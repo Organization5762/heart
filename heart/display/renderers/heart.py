@@ -20,22 +20,22 @@ class Heart(BaseRenderer):
     def _location(self):
         return (self.x, self.y)
 
-    def process(self, window) -> None:
+    def process(self, window, clock) -> None:
         # TODO: Cache?
         w, h = pygame.display.get_surface().get_size()
 
         # Randomly initialize
         if self.x is None:
-            self.x = random.randint(0, w)
+            self.x = random.randint(0, w - 1)
         if self.y is None:
-            self.y = random.randint(0, h)
+            self.y = random.randint(0, h - 1)
 
 
         # Simple wall collision mechanics
-        if self.x + 1 > (w - self.x_buffer) or self.x <= 0:
+        if self.x -1 > (w - self.x_buffer) or self.x <= 0:
             self.x_dir = -self.x_dir
 
-        if self.y + 1 > (h - self.y_buffer) or self.y <= 0:
+        if self.y - 1 > (h - self.y_buffer) or self.y <= 0:
             self.y_dir = -self.y_dir
 
         # Update coordinates

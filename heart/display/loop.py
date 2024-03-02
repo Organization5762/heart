@@ -1,5 +1,6 @@
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.heart import Heart
+from heart.display.renderers.kirby import KirbySwimming
 import pygame
 import logging
 
@@ -37,7 +38,7 @@ class GameLoop:
             self.screen.fill("black")
 
             for renderer in self.renderers:
-                renderer.process(self.screen)
+                renderer.process(self.screen, self.clock)
 
             # flip() the display to put your work on screen
             pygame.display.flip()
@@ -51,9 +52,6 @@ if __name__ == "__main__":
         512,
         512,
         renderers=[
-            Heart(),
-            Heart(),
-            Heart(),
-            Heart()
+            KirbySwimming()
         ]
     ).start()
