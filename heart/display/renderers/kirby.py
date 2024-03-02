@@ -13,7 +13,9 @@ class KeyFrame:
 
 class KirbyRunning(BaseRenderer):
     def __init__(self) -> None:
+        self.file = "kirby_flying.png"
         self.initialized = False
+
         self.current_frame = 0
 
         self.key_frames = [
@@ -55,7 +57,7 @@ class KirbyRunning(BaseRenderer):
         self.y = 30
 
     def _initialize(self) -> None:
-        self.spritesheet = Loader.load_spirtesheet("kirby_flying.png")
+        self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
     def process(self, window, clock) -> None:
@@ -78,8 +80,6 @@ class KirbyRunning(BaseRenderer):
             self.x += current_frame.right
 
         image = self.spritesheet.image_at(self.key_frames[self.current_frame].frame)
-        # Quick attempt to make it easier to view
-        image = pygame.transform.scale(image, (120, 120))
         window.blit(image, (self.x, self.y))
 
         self.time_since_last_update += clock.get_time()
