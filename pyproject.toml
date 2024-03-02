@@ -1,0 +1,7 @@
+[project]
+name = "heart"
+version = "0.1.0"
+keywords = []
+authors = []
+
+dependencies = ["pygame"]
