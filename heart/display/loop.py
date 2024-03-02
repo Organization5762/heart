@@ -1,6 +1,5 @@
 from heart.display.renderers import BaseRenderer
-from heart.display.renderers.heart import Heart
-from heart.display.renderers.kirby import KirbySwimming
+from heart.display.renderers.kirby import KirbyRunning
 import pygame
 import logging
 
@@ -52,6 +51,6 @@ if __name__ == "__main__":
         512,
         512,
         renderers=[
-            KirbySwimming()
+            KirbyRunning()
         ]
     ).start()

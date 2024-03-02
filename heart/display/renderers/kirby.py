@@ -1,21 +1,61 @@
+from dataclasses import dataclass
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
 import pygame
 
-class KirbySwimming(BaseRenderer):
+@dataclass
+class KeyFrame:
+    frame: tuple[int,int,int,int]
+    up: int = 0
+    down: int = 0
+    left: int = 0
+    right: int = 0
+
+class KirbyRunning(BaseRenderer):
     def __init__(self) -> None:
         self.initialized = False
         self.current_frame = 0
 
         self.key_frames = [
-            (((x*24)+5), 0, 24, 24) for x in range(0, 11)
+            KeyFrame(
+                (0,0,28,28),
+            ),
+            KeyFrame(
+                (28,0,28,28)
+            ),
+            KeyFrame(
+                (56,0,28,28),
+                up=10,
+                right=7
+            ),
+            KeyFrame(
+                (84,0,28,28),
+                up=20,
+                right=4
+            ),
+            KeyFrame(
+                (112,0,28,28),
+                down=10,
+                right=4
+            ),
+            KeyFrame(
+                (112,0,28,28),
+                down=10
+            ),
+            KeyFrame(
+                (140,0,28,28),
+                down=10
+            )
         ]
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 500
+        self.time_between_frames_ms = 50
+
+        self.x = 30
+        self.y = 30
 
     def _initialize(self) -> None:
-        self.spritesheet = Loader.load_spirtesheet("swimming.png")
+        self.spritesheet = Loader.load_spirtesheet("kirby_flying.png")
         self.initialized = True
 
     def process(self, window, clock) -> None:
@@ -30,8 +70,16 @@ class KirbySwimming(BaseRenderer):
 
             self.time_since_last_update = 0
 
-        image = self.spritesheet.image_at(self.key_frames[self.current_frame])
+            # Movement happens here
+            current_frame = self.key_frames[self.current_frame]
+            self.y += current_frame.down
+            self.y -= current_frame.up
+            self.x -= current_frame.left
+            self.x += current_frame.right
+
+        image = self.spritesheet.image_at(self.key_frames[self.current_frame].frame)
+        # Quick attempt to make it easier to view
         image = pygame.transform.scale(image, (120, 120))
-        window.blit(image, (30, 30))
+        window.blit(image, (self.x, self.y))
 
         self.time_since_last_update += clock.get_time()
