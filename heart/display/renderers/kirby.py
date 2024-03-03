@@ -13,9 +13,7 @@ class KeyFrame:
 
 class KirbyRunning(BaseRenderer):
     def __init__(self) -> None:
-        self.file = "kirby_flying.png"
         self.initialized = False
-
         self.current_frame = 0
 
         self.key_frames = [

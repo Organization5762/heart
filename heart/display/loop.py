@@ -1,4 +1,5 @@
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.heart_rate import HeartRate
 from heart.display.renderers.kirby import KirbyRunning
 import pygame
 import logging
@@ -39,9 +40,7 @@ class GameLoop:
             for renderer in self.renderers:
                 renderer.process(self.screen, self.clock)
 
-            # flip() the display to put your work on screen
             pygame.display.flip()
-
             self.clock.tick(self.max_fps)
 
         pygame.quit()
@@ -51,6 +50,6 @@ if __name__ == "__main__":
         512,
         512,
         renderers=[
-            KirbyRunning()
+            HeartRate()
         ]
     ).start()
