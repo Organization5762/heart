@@ -1,6 +1,7 @@
 import pygame
 import os
 
+
 class Loader:
     @classmethod
     def _resolve_path(cls, path):
@@ -27,8 +28,15 @@ class Loader:
 # https://www.pygame.org/wiki/Spritesheet
 # I copied this from here it is kinda meh lol
 class spritesheet(object):
-    def __init__(self, filename):
-        self.sheet = pygame.image.load(filename).convert()
+    def __init__(self, filename: str):
+        if not os.path.exists(filename):
+            raise ValueError(f"'{filename}' does not exist.")
+        
+        if not os.path.isfile(filename):
+            raise ValueError(f"'{filename}' is not a file.")
+        
+        with open(filename, "rb") as f:
+            self.sheet = pygame.image.load(f).convert()
 
     def image_at(self, rectangle):
         rect = pygame.Rect(rectangle)

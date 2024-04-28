@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-import pygame
 
 @dataclass
 class KeyFrame:
@@ -15,6 +14,7 @@ class KirbyRunning(BaseRenderer):
     def __init__(self) -> None:
         self.initialized = False
         self.current_frame = 0
+        self.file = Loader._resolve_path("kirby_flying.png")
 
         self.key_frames = [
             KeyFrame(
@@ -63,21 +63,9 @@ class KirbyRunning(BaseRenderer):
             if not self.initialized:
                 self._initialize()
 
-            if self.current_frame >= len(self.key_frames) - 1:
-                self.current_frame = 0
-            else:
-                self.current_frame += 1
-
-            self.time_since_last_update = 0
-
-            # Movement happens here
-            current_frame = self.key_frames[self.current_frame]
-            self.y += current_frame.down
-            self.y -= current_frame.up
-            self.x -= current_frame.left
-            self.x += current_frame.right
-
         image = self.spritesheet.image_at(self.key_frames[self.current_frame].frame)
-        window.blit(image, (self.x, self.y))
+        window.blit(image, (0,0))
 
+        if self.time_since_last_update is None:
+            self.time_since_last_update = 0
         self.time_since_last_update += clock.get_time()
