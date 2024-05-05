@@ -13,7 +13,7 @@ class KeyFrame:
     left: int = 0
     right: int = 0
 
-class KirbyRunning(BaseRenderer):
+class KirbyFlying(BaseRenderer):
     def __init__(self) -> None:
         self.initialized = False
         self.current_frame = 0
