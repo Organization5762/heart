@@ -4,8 +4,8 @@ import argparse
 import time
 import sys
 
-# from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
-from rgbmatrix import RGBMatrix, RGBMatrixOptions
+from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
+# from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 
 class SampleBase(object):
@@ -75,6 +75,7 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
+
 class LEDMatrix(SampleBase):
     def __init__(self, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)

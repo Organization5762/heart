@@ -6,7 +6,7 @@ import logging
 from PIL import Image
 
 # TODO (lampe): Generic Image Scroller
-from src.heart.projects.rgb_display import ImageScroller
+from src.heart.projects.rgb_display import LEDMatrix
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ ACTIVE_GAME_LOOP = None
 RGB_IMAGE_FORMAT = "RGB"
 
 class GameLoop:
-    def __init__(self, width: int, height: int, devices: List[ImageScroller], max_fps: int = 60) -> None:
+    def __init__(self, width: int, height: int, devices: List[LEDMatrix], max_fps: int = 60) -> None:
         self.initalized = False
 
         self.max_fps = max_fps
