@@ -1,6 +1,4 @@
-import time
 from PIL import Image
-
 
 import argparse
 import time
@@ -74,6 +72,7 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
+
 class LEDMatrix(SampleBase):
     def __init__(self, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
