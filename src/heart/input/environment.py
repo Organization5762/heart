@@ -1,12 +1,11 @@
-from typing import List
-
-from src.heart.display.renderers import BaseRenderer
+import os
+from heart.display.renderers import BaseRenderer
 import pygame
 import logging
 from PIL import Image
 
 # TODO (lampe): Generic Image Scroller
-from src.heart.projects.rgb_display import LEDMatrix
+from heart.projects.rgb_display import LEDMatrix
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +14,12 @@ ACTIVE_GAME_LOOP = None
 RGB_IMAGE_FORMAT = "RGB"
 
 class GameLoop:
-    def __init__(self, width: int, height: int, devices: List[LEDMatrix], max_fps: int = 60) -> None:
+    def __init__(self, width: int, height: int, devices: list[LEDMatrix], max_fps: int = 60) -> None:
+        
         self.initalized = False
 
         self.max_fps = max_fps
-        self.renderers: List[BaseRenderer] = []
+        self.renderers: list[BaseRenderer] = []
         self.dimensions = (width, height)
         self.display_mode = pygame.SHOWN
         self.clock = None

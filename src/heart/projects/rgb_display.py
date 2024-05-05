@@ -4,10 +4,6 @@ import argparse
 import time
 import sys
 
-from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
-# from rgbmatrix import RGBMatrix, RGBMatrixOptions
-
-
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
@@ -38,6 +34,7 @@ class SampleBase(object):
     def process(self):
         self.args = self.parser.parse_args()
 
+        from rgbmatrix import RGBMatrix, RGBMatrixOptions
         options = RGBMatrixOptions()
 
         if self.args.led_gpio_mapping != None:
@@ -79,7 +76,7 @@ class SampleBase(object):
 class LEDMatrix(SampleBase):
     def __init__(self, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
-
+        
         options = RGBMatrixOptions()
         # TODO: Might need to change these if we want N screens
         options.rows = 64
@@ -87,7 +84,7 @@ class LEDMatrix(SampleBase):
         options.chain_length = 1
         options.parallel = 1
         options.pwm_bits = 11
-
+        
         options.row_address_type = 0
         options.multiplexing = 0
         options.brightness = 100
@@ -98,10 +95,10 @@ class LEDMatrix(SampleBase):
         options.gpio_slowdown = 4
         # I hate this option.
         options.drop_privileges=False
-
+        
         self.matrix = RGBMatrix(options = options)
         self.offscreen_canvas = self.matrix.CreateFrameCanvas()
-
+        
     def display_size(self):
         return (self.matrix.width, self.matrix.height)
 
@@ -111,7 +108,7 @@ class LEDMatrix(SampleBase):
             Image.Resampling.LANCZOS
         )
         image = image.convert("RGB")
-
+        
         self.offscreen_canvas.Clear()
         self.offscreen_canvas.SetImage(image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)

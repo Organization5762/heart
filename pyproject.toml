@@ -4,7 +4,7 @@ version = "0.1.0"
 keywords = []
 authors = []
 
-dependencies = ["pygame", "openant", "pillow"]
+dependencies = ["pygame", "openant", "Pillow"]
 
 [build-system]
 requires = [
@@ -15,3 +15,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
 heart = ["*.png"]
+
+[project.scripts]
+totem = "heart.projects.loop:run"
