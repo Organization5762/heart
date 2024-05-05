@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+import pygame
 
 from typing import Tuple
 
@@ -18,8 +19,8 @@ class KirbyRunning(BaseRenderer):
     def __init__(self) -> None:
         self.initialized = False
         self.current_frame = 0
-        self.file = Loader._resolve_path("Kirby_flying.png")
-        json_path = Loader._resolve_path("Kirby_flying.json")
+        self.file = Loader._resolve_path("kirby_flying_32.png")
+        json_path = Loader._resolve_path("kirby_flying_32.json")
         with open(json_path, 'r') as f:
             frame_data = json.load(f)
 
@@ -31,7 +32,7 @@ class KirbyRunning(BaseRenderer):
             ))
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 100
+        self.time_between_frames_ms = 75
 
         self.x = 30
         self.y = 30
@@ -49,11 +50,10 @@ class KirbyRunning(BaseRenderer):
                 if self.current_frame >= len(self.key_frames):
                     self.current_frame = 0
                 self.time_since_last_update = 0
-            
-            
 
         image = self.spritesheet.image_at(self.key_frames[self.current_frame].frame)
-        window.blit(image, (0, 0))
+        scaled = pygame.transform.scale(image, (64, 64))
+        window.blit(scaled, (0, 0))
 
         if self.time_since_last_update is None:
             self.time_since_last_update = 0
