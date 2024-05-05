@@ -49,7 +49,7 @@ class KirbyRunning(BaseRenderer):
         ]
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 50
+        self.time_between_frames_ms = 400
 
         self.x = 30
         self.y = 30
@@ -62,6 +62,13 @@ class KirbyRunning(BaseRenderer):
         if self.time_since_last_update is None or self.time_since_last_update > self.time_between_frames_ms:
             if not self.initialized:
                 self._initialize()
+            else:
+                self.current_frame += 1
+                if self.current_frame >= len(self.key_frames):
+                    self.current_frame = 0
+                self.time_since_last_update = 0
+            
+            
 
         image = self.spritesheet.image_at(self.key_frames[self.current_frame].frame)
         window.blit(image, (0,0))

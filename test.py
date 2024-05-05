@@ -33,6 +33,9 @@ class SampleBase(object):
         self.parser.add_argument("--led-no-drop-privs", dest="drop_privileges", help="Don't drop privileges from 'root' after initializing the hardware.", action='store_false')
         self.parser.set_defaults(drop_privileges=True)
 
+    def usleep(self, value):
+        time.sleep(value / 1000000.0)
+
     def run(self):
         print("Running")
 
@@ -76,42 +79,40 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
-class LEDMatrix(SampleBase):
-    def __init__(self, *args, **kwargs):
-        super(LEDMatrix, self).__init__(*args, **kwargs)
-        
-        options = RGBMatrixOptions()
-        # TODO: Might need to change these if we want N screens
-        options.rows = 64
-        options.cols = 64
-        options.chain_length = 1
-        options.parallel = 1
-        options.pwm_bits = 11
-        
-        options.row_address_type = 0
-        options.multiplexing = 0
-        options.brightness = 100
-        options.pwm_lsb_nanoseconds = 130
-        options.led_rgb_sequence = "RGB"
-        options.pixel_mapper_config = ""
-        options.panel_type = ""
-        options.gpio_slowdown = 4
-        # I hate this option.
-        options.drop_privileges=False
-        
-        self.matrix = RGBMatrix(options = options)
-        self.offscreen_canvas = self.matrix.CreateFrameCanvas()
-        
-    def display_size(self):
-        return (self.matrix.width, self.matrix.height)
 
-    def set_image(self, image):
-        image = image.resize(
-            self.display_size(),
-            Image.Resampling.LANCZOS
-        )
-        image = image.convert("RGB")
-        
-        self.offscreen_canvas.Clear()
-        self.offscreen_canvas.SetImage(image, 0, 0)
-        self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)
+def create_gradient(width, height):
+    # Create a new blank image
+    img = Image.new("RGB", (width, height), "#FFFFFF")
+    
+    # Load the pixel map
+    pixels = img.load()
+
+    # Generate gradient
+    for i in range(width):
+        # Calculate the intensity of the color
+        intensity = int(255 * (i / width))
+        for j in range(height):
+            # Set the color for each pixel
+            pixels[i, j] = (intensity, intensity, intensity)
+
+    return img
+
+class ImageScroller(SampleBase):
+    def __init__(self, *args, **kwargs):
+        super(ImageScroller, self).__init__(*args, **kwargs)
+        # self.parser.add_argument("-i", "--image", help="The image to display", default="../../../examples-api-use/runtext.ppm")
+
+    def run(self):
+        self.image = Image.open("heart/assets/kirby_flying.png")
+        self.image.resize((self.matrix.width, self.matrix.height), Image.Resampling.LANCZOS)
+        self.image = self.image.convert("RGB")
+
+        double_buffer = self.matrix.CreateFrameCanvas()
+        double_buffer.SetImage(self.image, 0)
+        self.matrix.SwapOnVSync(double_buffer)
+        time.sleep(0.1)
+
+if __name__ == "__main__":
+    image_scroller = ImageScroller()
+    if (not image_scroller.process()):
+        image_scroller.print_help()
