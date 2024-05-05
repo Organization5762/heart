@@ -2,14 +2,12 @@ import json
 from dataclasses import dataclass
 import pygame
 
-from typing import Tuple
-
-from src.heart.assets.loader import Loader
-from src.heart.display.renderers import BaseRenderer
+from heart.assets.loader import Loader
+from heart.display.renderers import BaseRenderer
 
 @dataclass
 class KeyFrame:
-    frame: Tuple[int, int, int, int]
+    frame: tuple[int, int, int, int]
     up: int = 0
     down: int = 0
     left: int = 0

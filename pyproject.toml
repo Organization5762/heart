@@ -3,6 +3,7 @@ name = "heart"
 version = "0.1.0"
 keywords = []
 authors = []
+requires-python = ">= 3.10"
 
 dependencies = ["pygame", "openant", "Pillow"]
 
