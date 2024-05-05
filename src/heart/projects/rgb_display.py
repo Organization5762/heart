@@ -6,9 +6,6 @@ import argparse
 import time
 import sys
 
-from rgbmatrix import RGBMatrix, RGBMatrixOptions
-
-
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
@@ -39,6 +36,7 @@ class SampleBase(object):
     def process(self):
         self.args = self.parser.parse_args()
 
+        from rgbmatrix import RGBMatrix, RGBMatrixOptions
         options = RGBMatrixOptions()
 
         if self.args.led_gpio_mapping != None:
