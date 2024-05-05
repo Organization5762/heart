@@ -6,7 +6,7 @@ import argparse
 import time
 import sys
 
-from rgbmatrix import RGBMatrix, RGBMatrixOptions
+from RGBMatrixEmulator import RGBMatrix, RGBMatrixOptions
 
 
 class SampleBase(object):
@@ -80,7 +80,7 @@ class SampleBase(object):
 def create_gradient(width, height):
     # Create a new blank image
     img = Image.new("RGB", (width, height), "#FFFFFF")
-    
+
     # Load the pixel map
     pixels = img.load()
 
@@ -97,7 +97,7 @@ def create_gradient(width, height):
 class ImageScroller(SampleBase):
     def __init__(self, *args, **kwargs):
         super(ImageScroller, self).__init__(*args, **kwargs)
-        
+
         # self.parser.add_argument("--led-scan-mode", action="store", help="Progressive or interlaced scan. 0 Progressive, 1 Interlaced (default)", default=1, choices=range(2), type=int)
         # self.parser.add_argument("--led-pwm-lsb-nanoseconds", action="store", help="Base time-unit for the on-time in the lowest significant bit in nanoseconds. Default: 130", default=130, type=int)
         # self.parser.add_argument("--led-show-refresh", action="store_true", help="Shows the current refresh rate of the LED panel")
@@ -115,7 +115,7 @@ class ImageScroller(SampleBase):
         options.chain_length = 1
         options.parallel = 1
         options.pwm_bits = 11
-        
+
         options.row_address_type = 0
         options.multiplexing = 0
         options.brightness = 100
@@ -128,7 +128,7 @@ class ImageScroller(SampleBase):
 
         # if self.args.led_gpio_mapping != None:
         #   options.hardware_mapping = self.args.led_gpio_mapping
-          
+
         # print(self.args.led_rows)
         # options.rows = self.args.led_rows
         # options.cols = self.args.led_cols
@@ -152,13 +152,13 @@ class ImageScroller(SampleBase):
         #   options.disable_hardware_pulsing = True
         # if not self.args.drop_privileges:
         #   options.drop_privileges=False
-        
+
         # I hate this option.
         options.drop_privileges=False
-        
+
         self.matrix = RGBMatrix(options = options)
         self.offscreen_canvas = self.matrix.CreateFrameCanvas()
-        
+
     def display_size(self):
         return (self.matrix.width, self.matrix.height)
 
@@ -168,7 +168,7 @@ class ImageScroller(SampleBase):
             Image.Resampling.LANCZOS
         )
         image = image.convert("RGB")
-        
+
         self.offscreen_canvas.Clear()
         self.offscreen_canvas.SetImage(image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)

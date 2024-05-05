@@ -1,2 +1,2 @@
 start:
-	@python3 heart/display/loop.py
+	@python3 src/heart/display/loop.py
