@@ -40,7 +40,7 @@ class KirbySearch(BaseRenderer):
         for key in frame_data["frames"]:
             frame_obj = frame_data["frames"][key]
             frame = frame_obj["frame"]
-            tag, idx = key.split(' ', 1)
+            tag, _ = key.split(' ', 1)
             self.frames[tag].append(KeyFrame(
                 (frame["x"], frame["y"], frame["w"], frame["h"]),
                 frame_obj["duration"]
@@ -62,7 +62,6 @@ class KirbySearch(BaseRenderer):
             idx += 1
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 200
 
         self.x = 30
         self.y = 30
