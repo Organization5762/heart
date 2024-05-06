@@ -48,11 +48,15 @@ class MetadataScreen(BaseRenderer):
         self.y = y
 
     def add_data(self, new_data):
+        if not self.heart_rate_data:
+            self.heart_rate_data = deque()
         self.heart_rate_data.append(
             (new_data.beat_time, new_data.beat_count, time.time())
         )
 
     def update_heart_rate(self):
+        if not self.heart_rate_data:
+            return
         # Remove old data outside the window size
         while (
             self.heart_rate_data
