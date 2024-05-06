@@ -4,18 +4,18 @@ import pygame
 import logging
 from PIL import Image
 
-# TODO (lampe): Generic Image Scroller
-from heart.projects.rgb_display import LEDMatrix
-
 logger = logging.getLogger(__name__)
 
 ACTIVE_GAME_LOOP = None
 
 RGB_IMAGE_FORMAT = "RGB"
 
+
 class GameLoop:
-    def __init__(self, width: int, height: int, devices: list[LEDMatrix], max_fps: int = 60) -> None:
-        
+    def __init__(
+        self, width: int, height: int, devices: list, max_fps: int = 60
+    ) -> None:
+
         self.initalized = False
 
         self.max_fps = max_fps
@@ -25,11 +25,15 @@ class GameLoop:
         self.clock = None
         self.screen = None
         self.devices = devices
+        if len(devices) == 0:
+            self.scale_factor = 10
+        else:
+            self.scale_factor = 1
 
     @classmethod
     def get_game_loop(cls):
         return ACTIVE_GAME_LOOP
-    
+
     @classmethod
     def set_game_loop(cls, loop: "GameLoop"):
         global ACTIVE_GAME_LOOP
@@ -37,18 +41,22 @@ class GameLoop:
 
     def add_renderer(self, renderer: BaseRenderer):
         self.renderers.append(renderer)
-        
+
     def _initialize(self) -> None:
         if self.get_game_loop() is not None:
             raise Exception("An active GameLoop exists already, please re-use that one")
-        
+
         GameLoop.set_game_loop(self)
-        
+
         logger.info("Initializing Display")
         pygame.init()
-        self.screen = pygame.display.set_mode(
-            self.dimensions,
-            self.display_mode
+        self.screen = pygame.Surface(self.dimensions)
+        self.scaled_screen = pygame.display.set_mode(
+            (
+                self.dimensions[0] * self.scale_factor,
+                self.dimensions[1] * self.scale_factor,
+            ),
+            self.display_mode,
         )
         self.clock = pygame.time.Clock()
         logger.info("Display Initialized")
@@ -64,11 +72,16 @@ class GameLoop:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                    
+
             self.__dim_display()
-            
+
             for renderer in self.renderers:
                 renderer.process(self.screen, self.clock)
+
+            scaled_surface = pygame.transform.scale(
+                self.screen, self.scaled_screen.get_size()
+            )
+            self.scaled_screen.blit(scaled_surface, (0, 0))
 
             # TODO: Not sure if this call is necessary
             pygame.display.flip()
@@ -77,11 +90,11 @@ class GameLoop:
             image = Image.frombytes(RGB_IMAGE_FORMAT, self.dimensions, buffer)
             for device in self.devices:
                 device.set_image(image)
-            
+
             self.clock.tick(self.max_fps)
 
         pygame.quit()
-    
+
     def __dim_display(self):
         # Default to fully black, so the LEDs will be at lower power
         self.screen.fill("black")
