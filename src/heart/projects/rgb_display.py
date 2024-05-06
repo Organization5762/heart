@@ -4,6 +4,8 @@ import argparse
 import time
 import sys
 
+from rgbmatrix import RGBMatrix, RGBMatrixOptions
+
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
