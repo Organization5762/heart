@@ -1,10 +1,7 @@
 from PIL import Image
 
 import argparse
-import time
 import sys
-
-from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
@@ -79,6 +76,7 @@ class LEDMatrix(SampleBase):
     def __init__(self, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
         
+        from rgbmatrix import RGBMatrix, RGBMatrixOptions
         options = RGBMatrixOptions()
         # TODO: Might need to change these if we want N screens
         options.rows = 64
