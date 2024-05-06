@@ -60,7 +60,6 @@ class MetadataScreen(BaseRenderer):
         ):
             self.heart_rate_data.popleft()
 
-        print(self.heart_rate_data)
         # Compute heart rate if there are at least two points to calculate the difference
         if len(self.heart_rate_data) > 1:
             first_time = self.heart_rate_data[0][0]
