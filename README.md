@@ -1,10 +1,13 @@
 # heart
 Heart Rate Sensor --> Visual Display Project
 
-## Installation
+## Setup
+### Installation
 
 `pip install -e .`
 
-## Running
+### First Run
 
-After installing type `totem` into your Terminal.
+After installing type `totem` into your Terminal.  On a non-linux box this should pop-up a PyGame window that displays the application.
+
+## 

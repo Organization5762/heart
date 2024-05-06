@@ -5,7 +5,7 @@ keywords = []
 authors = []
 requires-python = ">= 3.10"
 
-dependencies = ["pygame", "openant", "Pillow"]
+dependencies = ["pygame", "openant", "Pillow", "pyserial", "tqdm"]
 
 [build-system]
 requires = [
@@ -19,4 +19,3 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.projects.loop:run"
-metadata = "heart.projects.metadata_loop:run"
