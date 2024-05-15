@@ -9,7 +9,6 @@ from heart.input.environment import GameLoop
 
 logger = logging.getLogger(__name__)
 
-
 def run():
     devices = []
     if platform.system() == "Linux":
