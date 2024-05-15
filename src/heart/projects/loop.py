@@ -1,4 +1,6 @@
 import os
+
+from heart.input.heart_rate import HeartRateSubscriber
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import threading
@@ -10,7 +12,6 @@ from heart.input.switch import SwitchSubscriber
 import logging
 from heart.display.renderers.metadata_screen import MetadataScreen
 from heart.input.environment import GameLoop
-
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ def run():
         # Start heart detection in another thread
         def my_function():
             # Your code to run in the separate thread goes here
-            detect_heart_rate(screens)
+            HeartRateSubscriber.get().run()
 
         # Create a new thread
         my_thread = threading.Thread(target=my_function)
