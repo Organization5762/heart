@@ -19,4 +19,3 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.projects.loop:run"
-metadata = "heart.projects.metadata_loop:run"
