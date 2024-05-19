@@ -5,7 +5,7 @@ keywords = []
 authors = []
 requires-python = ">= 3.10"
 
-dependencies = ["pygame", "openant", "Pillow", "pyserial", "tqdm"]
+dependencies = ["pygame", "openant", "Pillow", "pyserial", "openant", "tqdm"]
 
 [build-system]
 requires = [
