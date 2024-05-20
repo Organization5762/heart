@@ -1,4 +1,5 @@
 import math
+import os
 import random
 import time
 from heart.display.renderers import BaseRenderer
@@ -105,7 +106,10 @@ class GameLoop:
         # TODO (lampe): Not sure if this call is necessary
         pygame.display.flip()
         
-        buffer = pygame.image.tostring(self.screen, RGB_IMAGE_FORMAT)
+        # Try to render any Alpha channel (Hopefully there is none, but any) to black
+        surface = self.screen.copy()
+        
+        buffer = pygame.image.tostring(surface, RGB_IMAGE_FORMAT)
         # Create a PIL image from the string buffer
         image = Image.frombytes(RGB_IMAGE_FORMAT, self.dimensions, buffer)
         for device in self.devices:

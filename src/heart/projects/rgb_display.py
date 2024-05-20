@@ -1,3 +1,4 @@
+import os
 from PIL import Image
 
 import argparse
@@ -76,12 +77,16 @@ class LEDMatrix(SampleBase):
     def __init__(self, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
         
+        self.chain_length = 4
+        self.row_size = 64
+        self.col_size = 64
+        
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
         options = RGBMatrixOptions()
         # TODO: Might need to change these if we want N screens
-        options.rows = 64
-        options.cols = 64
-        options.chain_length = 1
+        options.rows = self.row_size
+        options.cols = self.col_size
+        options.chain_length = self.chain_length
         options.parallel = 1
         options.pwm_bits = 11
         
@@ -100,15 +105,23 @@ class LEDMatrix(SampleBase):
         self.offscreen_canvas = self.matrix.CreateFrameCanvas()
         
     def display_size(self):
-        return (self.matrix.width, self.matrix.height)
+        return (self.col_size, self.row_size)
 
     def set_image(self, image):
+        image = image.convert("RGB")
         image = image.resize(
             self.display_size(),
             Image.Resampling.LANCZOS
         )
-        image = image.convert("RGB")
+        
+        # Clone the image self.chain_length times (by width)
+        width, height = image.size
+        new_image = Image.new('RGB', (self.col_size * self.chain_length, height))
+        
+        # paste the image n times side by side
+        for i in range(self.chain_length):
+            new_image.paste(image, (i * width, 0))
         
         self.offscreen_canvas.Clear()
-        self.offscreen_canvas.SetImage(image, 0, 0)
+        self.offscreen_canvas.SetImage(new_image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)

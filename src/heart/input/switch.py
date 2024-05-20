@@ -56,11 +56,11 @@ class SwitchSubscriber:
         global ACTIVE_SWITCH
         if ACTIVE_SWITCH is None:
             if Environment.is_pi():
-                switch = Switch()
+                s = Switch()
             else:
-                switch = FakeSwitch()
+                s = FakeSwitch()
                 
-            switch = SwitchSubscriber(switch=switch)
+            switch = SwitchSubscriber(switch=s)
             ACTIVE_SWITCH = switch
         return ACTIVE_SWITCH
 

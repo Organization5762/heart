@@ -1,4 +1,5 @@
 import os
+from heart.display.renderers.kirby import KirbyFlying
 
 from heart.input.heart_rate import HeartRateSubscriber
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
@@ -31,7 +32,9 @@ def run():
     ]
 
     mode = loop.add_mode()
-    mode.add_renderer(KirbyLoop(64, 64))
+    # mode.add_renderer(KirbyFlying())
+    mode.add_renderer(KirbyFlying())
+    # mode.add_renderer(KirbyLoop(64, 64))
 
     mode = loop.add_mode()
     mode.add_renderer(screens[0])
@@ -52,7 +55,7 @@ def run():
         my_thread.start()
         
         def switch_fn():
-            SwitchSubscriber().get().run()
+            SwitchSubscriber.get().run()
             
         switch_thread = threading.Thread(target=switch_fn)
         switch_thread.start()

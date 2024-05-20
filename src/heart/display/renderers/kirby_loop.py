@@ -4,6 +4,8 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
+from PIL import Image
+import os
 
 
 @dataclass
@@ -21,8 +23,8 @@ class KirbyLoop(BaseRenderer):
         self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
         self.current_frame = 0
-        self.file = Loader._resolve_path("kirby_cell_64.png")
-        json_path = Loader._resolve_path("kirby_cell_64.json")
+        self.file = Loader._resolve_path("kirby_sleep_64.png")
+        json_path = Loader._resolve_path("kirby_sleep_64.json")
         with open(json_path, 'r') as f:
             frame_data = json.load(f)
 

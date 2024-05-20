@@ -14,26 +14,11 @@ class KeyFrame:
     right: int = 0
 
 class KirbyFlying(BaseRenderer):
-    def __init__(self) -> None:
+    def __init__(self, text: str) -> None:
         self.initialized = False
-        self.current_frame = 0
-        self.file = Loader._resolve_path("kirby_sleep_64.png")
-        json_path = Loader._resolve_path("kirby_sleep_64.json")
-        with open(json_path, 'r') as f:
-            frame_data = json.load(f)
-
-        self.key_frames = []
-        for key in frame_data["frames"]:
-            frame = frame_data["frames"][key]["frame"]
-            self.key_frames.append(KeyFrame(
-                (frame["x"], frame["y"], frame["w"], frame["h"])
-            ))
+        self.text = text
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 75
-
-        self.x = 30
-        self.y = 30
 
     def _initialize(self) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
