@@ -63,7 +63,7 @@ class GameLoop:
         return new_game_mode
     
     def active_mode(self) -> GameMode:
-        mode_index = SwitchSubscriber.get().get_rotational_value() % len(self.modes)
+        mode_index = SwitchSubscriber.get().get_button_value() % len(self.modes)
         return self.modes[mode_index]
         
     def start(self) -> None:
@@ -80,7 +80,10 @@ class GameLoop:
             
             self._preprocess_setup()
             for renderer in tqdm(self.active_mode().renderers, disable=not Environment.is_profiling_mode()):
-                renderer.process(self.screen, self.clock)
+                try:
+                    renderer.process(self.screen, self.clock)
+                except:
+                    pass
             self._render_out()
             
             self.clock.tick(self.max_fps)
@@ -103,12 +106,9 @@ class GameLoop:
         )
         self.scaled_screen.blit(scaled_surface, (0, 0))
 
-        # TODO (lampe): Not sure if this call is necessary
         pygame.display.flip()
         
-        # Try to render any Alpha channel (Hopefully there is none, but any) to black
         surface = self.screen.copy()
-        
         buffer = pygame.image.tostring(surface, RGB_IMAGE_FORMAT)
         # Create a PIL image from the string buffer
         image = Image.frombytes(RGB_IMAGE_FORMAT, self.dimensions, buffer)

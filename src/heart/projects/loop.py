@@ -24,23 +24,48 @@ def run():
 
     loop = GameLoop(64, 64, devices=devices)
 
-    screens = [
-        MetadataScreen(0, 0, "pink"),
-        MetadataScreen(32, 0, "yellow"),
-        MetadataScreen(0, 32, "blue"),
-        MetadataScreen(32, 32, "green"),
-    ]
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "kirby_flying_32.png",
+            "kirby_flying_32.json"
+        )
+    )
 
     mode = loop.add_mode()
-    # mode.add_renderer(KirbyFlying())
-    mode.add_renderer(KirbyFlying())
-    # mode.add_renderer(KirbyLoop(64, 64))
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "kirby_cell_64.png",
+            "kirby_cell_64.json"
+        )
+    )
 
     mode = loop.add_mode()
-    mode.add_renderer(screens[0])
-    mode.add_renderer(screens[1])
-    mode.add_renderer(screens[2])
-    mode.add_renderer(screens[3])
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "kirby_sleep_64.png",
+            "kirby_sleep_64.json"
+        )
+    )
+
+    # TODO (next year)
+    # mode = loop.add_mode()
+    # screens = [
+    #     MetadataScreen(0, 0, "pink"),
+    #     MetadataScreen(32, 0, "yellow"),
+    #     MetadataScreen(0, 32, "blue"),
+    #     MetadataScreen(32, 32, "green"),
+    # ]
+    # mode.add_renderer(screens[0])
+    # mode.add_renderer(screens[1])
+    # mode.add_renderer(screens[2])
+    # mode.add_renderer(screens[3])
     
     if Environment.is_pi():
         # Start heart detection in another thread

@@ -1,3 +1,4 @@
+import json
 from heart.input.env import Environment
 import serial
 
@@ -36,12 +37,21 @@ class Switch(BaseSwitch):
                 if self.ser.in_waiting > 0:
                     # TODO (lampe): Handle button state too
                     # Will likely switch this over to a JSON format + update the driver on the encoder
-                    data = self.ser.readline().decode('utf-8').rstrip()
-                    self.rotational_value = data
+                    bus_data = self.ser.readline().decode('utf-8').rstrip()
+                    data = json.loads(bus_data)
+                    
+                    event_type = data["event_type"]
+                    data_value = data["data"]
+                    
+                    if event_type == "rotation":
+                        self.rotational_value = int(data_value)
+                    
+                    if event_type == "button":
+                        self.button_value += int(data_value)
         except KeyboardInterrupt:
             print("Program terminated")
         finally:
-            self.get().ser.close()
+            self.ser.close()
 
 class SwitchSubscriber:
     def __init__(self, switch: BaseSwitch) -> None:

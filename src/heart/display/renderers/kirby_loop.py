@@ -19,12 +19,13 @@ class KeyFrame:
 
 # Searching mode loop.
 class KirbyLoop(BaseRenderer):
-    def __init__(self, screen_width, screen_height) -> None:
+    def __init__(self, screen_width, screen_height, image_file_path: str, metadata_file_path: str) -> None:
         self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
         self.current_frame = 0
-        self.file = Loader._resolve_path("kirby_sleep_64.png")
-        json_path = Loader._resolve_path("kirby_sleep_64.json")
+        self.file = Loader._resolve_path(image_file_path)
+        json_path = Loader._resolve_path(metadata_file_path)
+        
         with open(json_path, 'r') as f:
             frame_data = json.load(f)
 
