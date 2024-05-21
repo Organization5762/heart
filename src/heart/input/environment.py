@@ -82,7 +82,8 @@ class GameLoop:
             for renderer in tqdm(self.active_mode().renderers, disable=not Environment.is_profiling_mode()):
                 try:
                     renderer.process(self.screen, self.clock)
-                except:
+                except Exception as e:
+                    print(e)
                     pass
             self._render_out()
             

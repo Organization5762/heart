@@ -1,5 +1,6 @@
 import os
 from heart.display.renderers.kirby import KirbyFlying
+from heart.display.renderers.text_render import TextRendering
 
 from heart.input.heart_rate import HeartRateSubscriber
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
@@ -43,7 +44,48 @@ def run():
                 metadata_file_path=f"{kirby}.json"
             )
         )
-
+    
+    mode = loop.add_mode()
+    
+    text = [
+        "Lost my\nfriends\nagain"
+    ]
+    text.extend([
+        f"Where's\n{name}" for name in [
+            "Seb",
+            "Cal",
+            "Clem",
+            "Michael",
+            "Eric",
+            "Faye",
+            "Will",
+            "Spriha",
+            "Andrew",
+            "Mel",
+            "Stu",
+            "Elena",
+            "Jill",
+            "Graham",
+            "Russell",
+            "Sam",
+            "Sri"
+        ]
+    ])
+    text.append("Where is\neveryone")
+    mode.add_renderer(
+        TextRendering(
+            font='Comic Sans MS',
+            font_size=12,
+            color=(255, 105, 180),
+            text=text
+        )
+    )
+    
+    ## ============================= ##
+    ## ADD ALL MODES ABOVE THIS LINE ##
+    ## ============================= ##
+    # Retain an empty loop for "lower power" mode
+    loop.add_mode()
 
     ##
     # If on PI, start the sensors.  These should be stubbed out locally
