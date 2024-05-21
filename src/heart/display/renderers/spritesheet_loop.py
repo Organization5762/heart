@@ -4,9 +4,7 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-from PIL import Image
-import os
-
+from heart.input.switch import SwitchSubscriber
 
 @dataclass
 class KeyFrame:
@@ -15,13 +13,13 @@ class KeyFrame:
 
 
 # Searching mode loop.
-class KirbyLoop(BaseRenderer):
-    def __init__(self, screen_width, screen_height, image_file_path: str, metadata_file_path: str) -> None:
+class SpritesheetLoop(BaseRenderer):
+    def __init__(self, screen_width: int, screen_height: int, sheet_file_path: str, metadata_file_path: str) -> None:
         self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
         self.current_frame = 0
         self.loop_count = 0
-        self.file = Loader._resolve_path(image_file_path)
+        self.file = Loader._resolve_path(sheet_file_path)
         json_path = Loader._resolve_path(metadata_file_path)
         
         with open(json_path, 'r') as f:
@@ -57,10 +55,15 @@ class KirbyLoop(BaseRenderer):
     def _initialize(self) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
-
+        
+    def __duration_scale_factor(self):
+        current_value = SwitchSubscriber.get().get_rotational_value()
+        return current_value / 20.00
+        
     def process(self, window, clock) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
-        if self.time_since_last_update is None or self.time_since_last_update > current_kf.duration:
+        kf_duration = current_kf.duration + (current_kf.duration * self.__duration_scale_factor())
+        if self.time_since_last_update is None or self.time_since_last_update > kf_duration:
             if not self.initialized:
                 self._initialize()
             else:

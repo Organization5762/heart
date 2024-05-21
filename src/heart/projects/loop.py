@@ -5,13 +5,12 @@ from heart.input.heart_rate import HeartRateSubscriber
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import threading
-from heart.display.renderers.kirby_loop import KirbyLoop
+from heart.display.renderers.spritesheet_loop import SpritesheetLoop
 from heart.input.env import Environment
 
 from heart.input.switch import SwitchSubscriber
 
 import logging
-from heart.display.renderers.metadata_screen import MetadataScreen
 from heart.input.environment import GameLoop
 
 logger = logging.getLogger(__name__)
@@ -24,99 +23,31 @@ def run():
 
     loop = GameLoop(64, 64, devices=devices)
 
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "kirby_flying_32.png",
-            "kirby_flying_32.json"
+    # 
+    for kirby in [
+        "kirby_flying_32",
+        "kirby_cell_64",
+        "kirby_sleep_64",
+        "tornado_kirby",
+        "swimming_kirby",
+        "running_kirby",
+        "rolling_kirby",
+        "fighting_kirby",
+    ]:
+        mode = loop.add_mode()
+        mode.add_renderer(
+            SpritesheetLoop(
+                screen_width=64,
+                screen_height=64,
+                sheet_file_path=f"{kirby}.png",
+                metadata_file_path=f"{kirby}.json"
+            )
         )
-    )
 
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "kirby_cell_64.png",
-            "kirby_cell_64.json"
-        )
-    )
 
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "kirby_sleep_64.png",
-            "kirby_sleep_64.json"
-        )
-    )
-
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "tornado_kirby.png",
-            "tornado_kirby.json"
-        )
-    )
-
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "swimming_kirby.png",
-            "swimming_kirby.json"
-        )
-    )
-
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "running_kirby.png",
-            "running_kirby.json"
-        )
-    )
-
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "rolling_kirby.png",
-            "rolling_kirby.json"
-        )
-    )
-
-    mode = loop.add_mode()
-    mode.add_renderer(
-        KirbyLoop(
-            64,
-            64,
-            "fighting_kirby.png",
-            "fighting_kirby.json"
-        )
-    )
-
-    # TODO (next year)
-    # mode = loop.add_mode()
-    # screens = [
-    #     MetadataScreen(0, 0, "pink"),
-    #     MetadataScreen(32, 0, "yellow"),
-    #     MetadataScreen(0, 32, "blue"),
-    #     MetadataScreen(32, 32, "green"),
-    # ]
-    # mode.add_renderer(screens[0])
-    # mode.add_renderer(screens[1])
-    # mode.add_renderer(screens[2])
-    # mode.add_renderer(screens[3])
-    
+    ##
+    # If on PI, start the sensors.  These should be stubbed out locally
+    ##
     if Environment.is_pi():
         # Start heart detection in another thread
         def my_function():
