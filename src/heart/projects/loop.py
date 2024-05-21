@@ -54,6 +54,56 @@ def run():
         )
     )
 
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "tornado_kirby.png",
+            "tornado_kirby.json"
+        )
+    )
+
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "swimming_kirby.png",
+            "swimming_kirby.json"
+        )
+    )
+
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "running_kirby.png",
+            "running_kirby.json"
+        )
+    )
+
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "rolling_kirby.png",
+            "rolling_kirby.json"
+        )
+    )
+
+    mode = loop.add_mode()
+    mode.add_renderer(
+        KirbyLoop(
+            64,
+            64,
+            "fighting_kirby.png",
+            "fighting_kirby.json"
+        )
+    )
+
     # TODO (next year)
     # mode = loop.add_mode()
     # screens = [
