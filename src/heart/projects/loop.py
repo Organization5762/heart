@@ -80,20 +80,10 @@ def run():
             text=text
         )
     )
-    # mode.add_renderer(
-    #     TextRendering(
-    #         font='Comic Sans MS',
-    #         font_size=10,
-    #         y_location=2,
-    #         color=(255, 105, 180),
-    #         text=[
-    #             "Friend Finder"
-    #         ]
-    #     )
-    # )
-
-
-
+    
+    ## ============================= ##
+    ## ADD ALL MODES ABOVE THIS LINE ##
+    ## ============================= ##
     # Retain an empty loop for "lower power" mode
     loop.add_mode()
 
