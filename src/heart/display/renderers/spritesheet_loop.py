@@ -57,7 +57,7 @@ class SpritesheetLoop(BaseRenderer):
         self.initialized = True
         
     def __duration_scale_factor(self):
-        current_value = SwitchSubscriber.get().get_rotational_value()
+        current_value = SwitchSubscriber.get().get_normalized_rotational_value()
         return current_value / 20.00
         
     def process(self, window, clock) -> None:
