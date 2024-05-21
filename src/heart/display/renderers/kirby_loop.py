@@ -11,10 +11,7 @@ import os
 @dataclass
 class KeyFrame:
     frame: tuple[int, int, int, int]
-    up: int = 0
-    down: int = 0
-    left: int = 0
-    right: int = 0
+    duration: int
 
 
 # Searching mode loop.
@@ -23,6 +20,7 @@ class KirbyLoop(BaseRenderer):
         self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
         self.current_frame = 0
+        self.loop_count = 0
         self.file = Loader._resolve_path(image_file_path)
         json_path = Loader._resolve_path(metadata_file_path)
         
@@ -32,29 +30,26 @@ class KirbyLoop(BaseRenderer):
         self.start_frames = []
         self.loop_frames = []
         self.end_frames = []
+        self.frames = {
+            "start": [],
+            "loop": [],
+            "end": []
+        }
         for key in frame_data["frames"]:
-            frame = frame_data["frames"][key]["frame"]
-            tag, idx = key.split(' ', 1)
-            match tag:
-                case "start":
-                    self.start_frames.append(KeyFrame(
-                        (frame["x"], frame["y"], frame["w"], frame["h"])
-                    ))
-                case "loop":
-                    self.loop_frames.append(KeyFrame(
-                        (frame["x"], frame["y"], frame["w"], frame["h"])
-                    ))
-                case "end":
-                    self.end_frames.append(KeyFrame(
-                        (frame["x"], frame["y"], frame["w"], frame["h"])
-                    ))
-                case _:
-                    self.loop_frames.append(KeyFrame(
-                        (frame["x"], frame["y"], frame["w"], frame["h"])
-                    ))
+            frame_obj = frame_data["frames"][key]
+            frame = frame_obj["frame"]
+            tag, _ = key.split(' ', 1)
+            if tag not in self.frames:
+                tag = "loop"
+            self.frames[tag].append(KeyFrame(
+                (frame["x"], frame["y"], frame["w"], frame["h"]),
+                frame_obj["duration"]
+            ))
+        self.phase = "loop"
+        if len(self.frames["start"]) > 0:
+            self.phase = "start"
 
         self.time_since_last_update = None
-        self.time_between_frames_ms = 20
 
         self.x = 30
         self.y = 30
@@ -64,16 +59,31 @@ class KirbyLoop(BaseRenderer):
         self.initialized = True
 
     def process(self, window, clock) -> None:
-        if self.time_since_last_update is None or self.time_since_last_update > self.time_between_frames_ms:
+        current_kf = self.frames[self.phase][self.current_frame]
+        if self.time_since_last_update is None or self.time_since_last_update > current_kf.duration:
             if not self.initialized:
                 self._initialize()
             else:
                 self.current_frame += 1
-                if self.current_frame >= len(self.loop_frames):
-                    self.current_frame = 0
                 self.time_since_last_update = 0
+                if self.current_frame >= len(self.frames[self.phase]):
+                    self.current_frame = 0
+                    match self.phase:
+                        case "start":
+                            self.phase = "loop"
+                        case "loop":
+                            if self.loop_count < 4:
+                                self.loop_count += 1
+                            else:
+                                self.loop_count = 0
+                                if len(self.frames["end"]) > 0:
+                                    self.phase = "end"
+                                elif len(self.frames["start"]) > 0:
+                                    self.phase = "start"
+                        case "end":
+                            self.phase = "start"
 
-        image = self.spritesheet.image_at(self.loop_frames[self.current_frame].frame)
+        image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
         window.blit(scaled, (0, 0))
 
