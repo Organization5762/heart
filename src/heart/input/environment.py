@@ -148,19 +148,29 @@ class GameLoop:
             return
         
         switch = SwitchSubscriber.get().get_switch()
+        payload = None
         if keys[pygame.K_LEFT]:
-            switch.rotational_value -= 1
+            payload = {
+                "event_type": "rotation",
+                "data": switch.rotational_value - 1
+            }
 
         if keys[pygame.K_RIGHT]:
-            switch.rotational_value += 1
+            payload = {
+                "event_type": "rotation",
+                "data": switch.rotational_value + 1
+            }
 
         if keys[pygame.K_UP]:
-            switch.button_value += 1
-
-        if keys[pygame.K_DOWN]:
-            switch.button_value -= 1
+            payload = {
+                "event_type": "button",
+                "data": 1
+            }
+        
+        if payload is not None:
+            switch._update_due_to_data(payload)
             
         self.time_last_debugging_press = current_time
             
-        pygame.display.set_caption(f"Rotation: {switch.get_rotational_value()}, Button: {switch.get_button_value()}")
+        pygame.display.set_caption(f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}")
 

@@ -17,12 +17,6 @@ class Loader:
     @classmethod
     def load_spirtesheet(cls, path):
         resolved_path = cls._resolve_path(path)
-        from PIL import Image
-        
-        img = Image.open(resolved_path)
-        ff = "sheet.png"
-        if not os.path.exists(ff):
-            img.save(ff)
         return spritesheet(resolved_path)
 
     @classmethod
