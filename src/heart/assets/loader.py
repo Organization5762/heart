@@ -16,7 +16,14 @@ class Loader:
 
     @classmethod
     def load_spirtesheet(cls, path):
-        return spritesheet(cls._resolve_path(path))
+        resolved_path = cls._resolve_path(path)
+        from PIL import Image
+        
+        img = Image.open(resolved_path)
+        ff = "sheet.png"
+        if not os.path.exists(ff):
+            img.save(ff)
+        return spritesheet(resolved_path)
 
     @classmethod
     def load_animation(cls, path):
@@ -37,6 +44,7 @@ class spritesheet(object):
         
         with open(filename, "rb") as f:
             self.sheet = pygame.image.load(f).convert()
+            
 
     def image_at(self, rectangle):
         rect = pygame.Rect(rectangle)
