@@ -22,7 +22,7 @@ class BaseSwitch:
     def get_button_value(self) -> int:
         return self.button_value
     
-    def _update_due_to_data(self, data):
+    def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]
         data_value = data["data"]
         
@@ -43,22 +43,30 @@ class FakeSwitch(BaseSwitch):
         
 class Switch(BaseSwitch):
     def __init__(self, *args, **kwargs) -> None:
-        self.ser = serial.Serial('/dev/ttyACM0', 115200)
+        self.port = '/dev/ttyACM0'
+        self.baudrate = 115200
         super().__init__(*args, **kwargs)
+    
+    def _connect_to_ser(self):
+        return serial.Serial(
+            self.port,
+            self.baudrate
+        )
         
     def run(self):
-        try:
-            while True:
-                if self.ser.in_waiting > 0:
-                    # TODO (lampe): Handle button state too
-                    # Will likely switch this over to a JSON format + update the driver on the encoder
-                    bus_data = self.ser.readline().decode('utf-8').rstrip()
-                    data = json.loads(bus_data)
-                    self._update_due_to_data(data)
-        except KeyboardInterrupt:
-            print("Program terminated")
-        finally:
-            self.ser.close()
+        # If it crashes, try to re-connect
+        while True:
+            ser = self._connect_to_ser()
+            try:
+                while True:
+                    if ser.in_waiting > 0:
+                        bus_data = ser.readline().decode('utf-8').rstrip()
+                        data = json.loads(bus_data)
+                        self._update_due_to_data(data)
+            except KeyboardInterrupt:
+                print("Program terminated")
+            finally:
+                ser.close()
 
 class SwitchSubscriber:
     def __init__(self, switch: BaseSwitch) -> None:
