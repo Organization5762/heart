@@ -8,13 +8,13 @@ class BaseSwitch:
     def __init__(self) -> None:
         self.rotational_value = 0
         self.button_value = 0
-        self.last_rotational_value = self.rotational_value
+        self.rotation_value_at_last_button_press = self.rotational_value
         
     def run(self) -> None:
         return
     
-    def get_normalized_rotational_value(self) -> int:
-        return self.rotational_value - self.last_rotational_value
+    def get_rotation_since_last_button_press(self) -> int:
+        return self.rotational_value - self.rotation_value_at_last_button_press
     
     def get_rotational_value(self) -> int:
         return self.rotational_value
@@ -32,7 +32,7 @@ class BaseSwitch:
         if event_type == "button":
             self.button_value += int(data_value)
             # Button was pressed, update last_rotational_value
-            self.last_rotational_value = self.rotational_value
+            self.rotation_value_at_last_button_press = self.rotational_value
 
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args, **kwargs) -> None:
@@ -95,8 +95,8 @@ class SwitchSubscriber:
     def get_switch(self):
         return self.switch
     
-    def get_normalized_rotational_value(self) -> int:
-        return self.get_switch().get_normalized_rotational_value()
+    def get_rotation_since_last_button_press(self) -> int:
+        return self.get_switch().get_rotation_since_last_button_press()
     
     def get_rotational_value(self) -> int:
         return self.get_switch().get_rotational_value()

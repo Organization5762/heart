@@ -172,5 +172,5 @@ class GameLoop:
             
         self.time_last_debugging_press = current_time
             
-        pygame.display.set_caption(f"R: {switch.get_rotational_value()}, NR: {switch.get_normalized_rotational_value()}, B: {switch.get_button_value()}")
+        pygame.display.set_caption(f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}")
 
