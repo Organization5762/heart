@@ -62,7 +62,7 @@ class SpritesheetLoop(BaseRenderer):
         
     def process(self, window, clock) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
-        kf_duration = current_kf.duration + (current_kf.duration * self.__duration_scale_factor())
+        kf_duration = current_kf.duration - (current_kf.duration * self.__duration_scale_factor())
         if self.time_since_last_update is None or self.time_since_last_update > kf_duration:
             if not self.initialized:
                 self._initialize()
