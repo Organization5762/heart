@@ -56,17 +56,22 @@ class Switch(BaseSwitch):
     def run(self):
         # If it crashes, try to re-connect
         while True:
-            ser = self._connect_to_ser()
             try:
-                while True:
-                    if ser.in_waiting > 0:
-                        bus_data = ser.readline().decode('utf-8').rstrip()
-                        data = json.loads(bus_data)
-                        self._update_due_to_data(data)
-            except KeyboardInterrupt:
-                print("Program terminated")
-            finally:
-                ser.close()
+                ser = self._connect_to_ser()
+                try:
+                    while True:
+                        if ser.in_waiting > 0:
+                            bus_data = ser.readline().decode('utf-8').rstrip()
+                            data = json.loads(bus_data)
+                            self._update_due_to_data(data)
+                except KeyboardInterrupt:
+                    print("Program terminated")
+                except Exception:
+                    pass
+                finally:
+                    ser.close()
+            except Exception:
+                pass
 
 class SwitchSubscriber:
     def __init__(self, switch: BaseSwitch) -> None:

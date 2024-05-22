@@ -21,6 +21,8 @@ class MandelbrotMode(BaseRenderer):
         self.rotation_angle = 0
 
         self.last_switch_value = None
+        self.time_since_last_update = None
+        self.last_frame = None
 
     def _switch_feed(self):
         current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
@@ -34,19 +36,32 @@ class MandelbrotMode(BaseRenderer):
         if self.last_switch_value is None:
             self.last_switch_value = value
         delta = value - self.last_switch_value
-        self.zoom_factor = self.clamp(self.zoom_factor + 0.001 * delta, 1.01, 1.1)
+        self.zoom_factor = self.clamp(self.zoom_factor + 0.01 * delta, 0.85, 1.3)
         # print(self.zoom_factor)
         self.last_switch_value = value
 
     def process(self, window, clock):
-        self.handle_switch()
-        self.render_mandelbrot(window, clock)
-        self.update_zoom()
+        pygame.display.set_caption(f"Z: {self.zoom:.2f} ZF: {self.zoom_factor:.2f}")
+        duration = 1000 / 60
+        if self.time_since_last_update is None or self.time_since_last_update > duration:
+            self.handle_switch()
+            self.render_mandelbrot(window, clock)
+            self.update_zoom()
+            self.time_since_last_update = 0
+
+        window.blit(*self.last_frame)
+        if self.time_since_last_update is None:
+            self.time_since_last_update = 0
+        self.time_since_last_update += clock.get_time()
 
     def update_zoom(self):
         self.zoom *= self.zoom_factor
         if self.zoom > 100000000:
             self.zoom = 2 ** -4
+            self.invert_colors = not self.invert_colors
+            self.update_rotation()
+        elif self.zoom < 2 ** -4:
+            self.zoom = 100000000
             self.invert_colors = not self.invert_colors
             self.update_rotation()
 
@@ -62,6 +77,17 @@ class MandelbrotMode(BaseRenderer):
 
         return div_time
 
+    def get_mandelbrot_absolute(self, re, im, max_iter):
+        c = re + 1j * im
+        z = np.zeros(c.shape, dtype=np.complex128)
+        mask = np.full(c.shape, True, dtype=bool)
+
+        for i in range(max_iter):
+            z[mask] = z[mask] ** 2 + c[mask]
+            mask[mask] = np.abs(z[mask]) <= 2
+
+        return mask
+
     def update_rotation(self):
         self.rotation_angle += 90
         if self.rotation_angle >= 360:
@@ -71,17 +97,29 @@ class MandelbrotMode(BaseRenderer):
         re = np.linspace(-3.5 / self.zoom + self.offset_x, 3.5 / self.zoom + self.offset_x, self.width)
         im = np.linspace(-2.0 / self.zoom + self.offset_y, 2.0 / self.zoom + self.offset_y, self.height)
         re, im = np.meshgrid(re, im)
+        # color_values = self.get_mandelbrot_converge_time(re, im, self.max_iter)
         converge_time = self.get_mandelbrot_converge_time(re, im, self.max_iter)
+
+        # mask = self.get_mandelbrot_converge_time(re, im, self.max_iter)
 
         if self.invert_colors:
             color_values = (converge_time * 255 / self.max_iter).astype(np.uint8)
         else:
             color_values = 255 - (converge_time * 255 / self.max_iter).astype(np.uint8)
+        # if self.invert_colors:
+        #     mandelbrot_color = (255, 255, 255)  # Blue color
+        #     negative_space_color = (0, 0, 0)  # Dark gray color
+        # else:
+        #     negative_space_color = (255, 255, 255)  # Blue color
+        #     mandelbrot_color = (0, 0, 0)  # Dark gray color
+        # color_surface = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        # color_surface[mask] = mandelbrot_color  # Set the Mandelbrot set points
+        # color_surface[~mask] = negative_space_color  # Set the points outside the Mandelbrot set
 
         color_surface = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        color_surface[..., 0] = color_values  # Set red channel
-        color_surface[..., 1] = color_values  # Set red channel
-        color_surface[..., 2] = color_values  # Set red channel
+        color_surface[..., 0] = (color_values * 0.5)  # Set red channel
+        color_surface[..., 1] = (color_values * 0.5)  # Set green channel
+        color_surface[..., 2] = (color_values * 0.5)  # Set blue channel
 
         # negative_space_color = (0, 0, 100)  # Example dark gray color
         # mask = converge_time == self.max_iter
@@ -97,3 +135,6 @@ class MandelbrotMode(BaseRenderer):
         window.blit(
             pygame.transform.rotate(window, self.rotation_angle), (0, 0)
         )
+
+        last_frame = pygame.transform.rotate(window, self.rotation_angle), (0, 0)
+        self.last_frame = last_frame
