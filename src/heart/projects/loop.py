@@ -3,6 +3,8 @@ from heart.display.renderers.kirby import KirbyFlying
 from heart.display.renderers.text_render import TextRendering
 
 from heart.input.heart_rate import HeartRateSubscriber
+from heart.projects.mandelbrot import MandelbrotMode
+
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import threading
@@ -22,7 +24,8 @@ def run():
         from heart.projects.rgb_display import LEDMatrix
         devices.append(LEDMatrix())
 
-    loop = GameLoop(64, 64, devices=devices)
+    height = width = 64
+    loop = GameLoop(width, height, devices=devices)
 
     # 
     for kirby in [
@@ -44,7 +47,12 @@ def run():
                 metadata_file_path=f"{kirby}.json"
             )
         )
-    
+
+    modelbrot = loop.add_mode()
+    modelbrot.add_renderer(
+        MandelbrotMode(width, height)
+    )
+
     mode = loop.add_mode()
     
     text = [
