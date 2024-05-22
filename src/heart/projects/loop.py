@@ -60,30 +60,30 @@ def run():
     ]
     text.extend([
         f"Where's\n{name}" for name in [
-            "Seb",
-            "Cal",
-            "Clem",
-            "Michael",
-            "Eric",
-            "Faye",
-            "Will",
-            "Spriha",
-            "Andrew",
-            "Mel",
-            "Stu",
-            "Elena",
-            "Jill",
-            "Graham",
-            "Russell",
-            "Sam",
-            "Sri"
+            "seb",
+            "cal",
+            "clem",
+            "michaēl",
+            "eric",
+            "faye",
+            "big W",
+            "spriha",
+            "andrew",
+            "mel",
+            "stu",
+            "elena",
+            "jill",
+            "graham",
+            "russell",
+            "sam",
+            "sri"
         ]
     ])
     text.append("Where is\neveryone")
     mode.add_renderer(
         TextRendering(
             font='Comic Sans MS',
-            font_size=12,
+            font_size=20,
             color=(255, 105, 180),
             text=text
         )

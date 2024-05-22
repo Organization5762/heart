@@ -36,23 +36,16 @@ class MandelbrotMode(BaseRenderer):
         if self.last_switch_value is None:
             self.last_switch_value = value
         delta = value - self.last_switch_value
-        self.zoom_factor = self.clamp(self.zoom_factor + 0.01 * delta, 0.85, 1.3)
-        # print(self.zoom_factor)
+        self.zoom_factor = self.clamp(
+            self.zoom_factor + 0.01 * delta, 0.82, 1.3
+        )
         self.last_switch_value = value
 
     def process(self, window, clock):
         pygame.display.set_caption(f"Z: {self.zoom:.2f} ZF: {self.zoom_factor:.2f}")
-        duration = 1000 / 60
-        if self.time_since_last_update is None or self.time_since_last_update > duration:
-            self.handle_switch()
-            self.render_mandelbrot(window, clock)
-            self.update_zoom()
-            self.time_since_last_update = 0
-
-        window.blit(*self.last_frame)
-        if self.time_since_last_update is None:
-            self.time_since_last_update = 0
-        self.time_since_last_update += clock.get_time()
+        self.handle_switch()
+        self.render_mandelbrot(window, clock)
+        self.update_zoom()
 
     def update_zoom(self):
         self.zoom *= self.zoom_factor
@@ -135,6 +128,3 @@ class MandelbrotMode(BaseRenderer):
         window.blit(
             pygame.transform.rotate(window, self.rotation_angle), (0, 0)
         )
-
-        last_frame = pygame.transform.rotate(window, self.rotation_angle), (0, 0)
-        self.last_frame = last_frame
