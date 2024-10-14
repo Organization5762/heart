@@ -1,12 +1,15 @@
 # heart
+
 Heart Rate Sensor --> Visual Display Project
 
 ## Setup
+
 ### Installation
 
 `pip install -e .`
 
 #### On Pi
+
 Might need to run with sudo on Pi.
 
 ### First Run

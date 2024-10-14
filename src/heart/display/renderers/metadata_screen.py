@@ -1,11 +1,11 @@
 import time
-
+from collections import deque
 from dataclasses import dataclass
+
+from pygame import font
+
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-from pygame import font
-from collections import deque
-
 from heart.input.heart_rate import HeartRateSubscriber
 
 
@@ -70,10 +70,10 @@ class MetadataScreen(BaseRenderer):
             ms_to_wait_between = (60 / self.heart_rate) * 1000
             if self.time_since_last_beat > ms_to_wait_between:
                 self.time_since_last_beat = 0
-                
+
                 self.up = not self.up
                 self.image = self.small_heart_image if self.up else self.med_heart_image
-            
+
         if self.time_since_last_update > self.time_between_frames_ms:
             self.time_since_last_update = 0
             self.update_heart_rate()

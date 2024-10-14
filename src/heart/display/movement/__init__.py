@@ -9,7 +9,10 @@ class ObjectLocation:
         self.is_initialized = False
 
     def _initialize(self, window) -> None:
-        self.current_location = (random.randint(0, window.get_width()), random.randint(0, window.get_height()))
+        self.current_location = (
+            random.randint(0, window.get_width()),
+            random.randint(0, window.get_height()),
+        )
 
         self.is_initialized = True
 
@@ -43,6 +46,7 @@ class ObjectLocation:
 
         window.blit(surface, self.current_location)
 
+
 class UpAndDown:
     def __init__(self) -> None:
         self.moving_direction = 1
@@ -56,6 +60,7 @@ class UpAndDown:
 
         self.location.move_y(1 * self.moving_direction)
         self.location.process(surface, window, clock)
+
 
 class SideToSide:
     def __init__(self) -> None:
@@ -71,6 +76,7 @@ class SideToSide:
         self.location.move_x(1 * self.moving_direction)
         self.location.process(surface, window, clock)
 
+
 class Orbit:
     def __init__(self) -> None:
         self.angle = 0
@@ -79,7 +85,9 @@ class Orbit:
         self.center = (random.randint(100, 300), random.randint(100, 300))
         self.location = ObjectLocation()
 
-    def process(self, surface, window, clock, reference_objects: list[ObjectLocation]) -> None:
+    def process(
+        self, surface, window, clock, reference_objects: list[ObjectLocation]
+    ) -> None:
         self.angle += 0.01  # Adjust this value to change the speed of the orbit
         if self.angle >= 2 * math.pi:
             self.angle = 0
@@ -97,8 +105,10 @@ class Orbit:
 
         self.location.process(surface, window, clock)
 
+
 import math
 import random
+
 
 class ChaoticOrbit:
     def __init__(self) -> None:
@@ -113,7 +123,9 @@ class ChaoticOrbit:
         self.repulsion_strength = 0.5  # Strength of the repulsion force
         self.inertia = 0.1  # Inertia factor to smooth out changes in acceleration
 
-    def process(self, surface, window, clock, reference_objects: list[ObjectLocation]) -> None:
+    def process(
+        self, surface, window, clock, reference_objects: list[ObjectLocation]
+    ) -> None:
         # Update position based on current angle and speed
         self.angle += self.speed * 0.05
         x = self.center[0] + self.radius * math.cos(self.angle)
@@ -130,11 +142,15 @@ class ChaoticOrbit:
 
                 if distance < self.repulsion_range:  # Repulsion condition
                     angle_to_other = math.atan2(dy, dx)
-                    new_angle -= self.repulsion_strength * math.sin(self.angle - angle_to_other)
+                    new_angle -= self.repulsion_strength * math.sin(
+                        self.angle - angle_to_other
+                    )
 
                 elif distance < self.interaction_range:  # Attraction condition
                     angle_to_other = math.atan2(dy, dx)
-                    new_angle += self.interaction_strength * math.sin(angle_to_other - self.angle)
+                    new_angle += self.interaction_strength * math.sin(
+                        angle_to_other - self.angle
+                    )
 
         # Smooth out the angle change using inertia
         self.angle += (new_angle - self.angle) * self.inertia

@@ -1,14 +1,17 @@
 from dataclasses import dataclass
+
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
 
+
 @dataclass
 class KeyFrame:
-    frame: tuple[int,int,int,int]
+    frame: tuple[int, int, int, int]
     up: int = 0
     down: int = 0
     left: int = 0
     right: int = 0
+
 
 class RenderImage(BaseRenderer):
     def __init__(self, image_file: str) -> None:
@@ -25,8 +28,9 @@ class RenderImage(BaseRenderer):
         if not self.initialized:
             self._initialize()
 
-        image = self.spritesheet.image_at(KeyFrame(
-                (0,0,28,28),
+        image = self.spritesheet.image_at(
+            KeyFrame(
+                (0, 0, 28, 28),
             ).frame
         )
         window.blit(image, (0, 0))

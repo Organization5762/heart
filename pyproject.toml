@@ -1,11 +1,37 @@
 [project]
 name = "heart"
-version = "0.1.0"
+version = "0.2.0"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Music Lovers",
+  "Intended Audience :: Artists",
+  "Intended Audience :: Dancers",
+  "Intended Audience :: Other Audience",
+  "Environment :: MacOS X",
+  "Environment :: Linux",
+  "Environment :: Raspberry Pi",
+  "Topic :: Software Development :: Libraries :: pygame",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+]
 keywords = []
 authors = []
 requires-python = ">= 3.10"
 
-dependencies = ["pygame", "openant", "Pillow", "pyserial", "openant", "tqdm", "numpy"]
+dependencies = [
+    "numpy",
+    "openant",
+    "Pillow",
+    "pygame",
+    "pyserial",
+    "tqdm",
+]
 
 [build-system]
 requires = [
@@ -19,3 +45,7 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.projects.loop:run"
+
+[tool.docformatter]
+recursive = true
+blank = true

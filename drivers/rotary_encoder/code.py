@@ -23,9 +23,9 @@ switch = DigitalInOut(board.SWITCH)
 switch.direction = Direction.INPUT
 switch.pull = Pull.DOWN
 
+
 def form_json(name: str, data: int):
     return '{"event_type": "' + name + '", "data": ' + str(data) + '}'
-    
 
 
 while True:
