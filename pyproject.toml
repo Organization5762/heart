@@ -7,19 +7,16 @@ classifiers = [
   # Indicate who your project is intended for
   "Intended Audience :: Developers",
   "Intended Audience :: Education",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Music Lovers",
-    "Intended Audience :: Artists",
-    "Intended Audience :: Dancers",
-     "Intended Audience :: Other Audience",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Music Lovers",
+  "Intended Audience :: Artists",
+  "Intended Audience :: Dancers",
+  "Intended Audience :: Other Audience",
   "Environment :: MacOS X",
   "Environment :: Linux",
   "Environment :: Raspberry Pi",
-
-"Topic :: Software Development :: Libraries :: pygame",
-
-  # Pick your license as you wish (see also "license" above)
-  "License :: OSI Approved :: MIT License",
+  "Topic :: Software Development :: Libraries :: pygame",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
 ]
