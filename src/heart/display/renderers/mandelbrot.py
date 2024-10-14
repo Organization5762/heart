@@ -8,6 +8,7 @@ from heart.input.switch import SwitchSubscriber
 
 class MandelbrotMode(BaseRenderer):
     def __init__(self, width, height):
+        super().__init__()
         self.width = width
         self.height = height
         self.max_iter = 256

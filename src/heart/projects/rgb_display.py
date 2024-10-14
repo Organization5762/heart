@@ -1,8 +1,8 @@
-import os
-from PIL import Image
+from PIL.Image import Image, Resampling, new
 
 import argparse
 import sys
+from typing import Literal
 
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
@@ -73,7 +73,25 @@ class SampleBase(object):
 
         return True
 
-class LEDMatrix(SampleBase):
+class Device:
+    def individual_display_size(self) -> tuple[int, int]:
+        raise NotImplementedError("")
+    
+    def full_display_size(self) -> tuple[int, int]:
+        raise NotImplementedError("")
+    
+    def display_count(self) -> tuple[int, int]:
+        return 1, 1
+    
+    def get_scale_factor(self) -> int:
+        return 1
+    
+    def set_image(self, image: Image):
+        pass
+    
+
+
+class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
         
@@ -104,24 +122,19 @@ class LEDMatrix(SampleBase):
         self.matrix = RGBMatrix(options = options)
         self.offscreen_canvas = self.matrix.CreateFrameCanvas()
         
-    def display_size(self):
+    def display_count(self) -> int:
+        return (self.chain_length, 1)
+        
+    def individual_display_size(self):
         return (self.col_size, self.row_size)
+    
+    def full_display_size(self):
+        return (self.col_size * self.chain_length, self.row_size)
+        
+    def set_display_mode(self, mode: str):
+        self.display_mode = mode
 
-    def set_image(self, image):
-        image = image.convert("RGB")
-        image = image.resize(
-            self.display_size(),
-            Image.Resampling.LANCZOS
-        )
-        
-        # Clone the image self.chain_length times (by width)
-        width, height = image.size
-        new_image = Image.new('RGB', (self.col_size * self.chain_length, height))
-        
-        # paste the image n times side by side
-        for i in range(self.chain_length):
-            new_image.paste(image, (i * width, 0))
-        
+    def set_image(self, image: Image):
         self.offscreen_canvas.Clear()
-        self.offscreen_canvas.SetImage(new_image, 0, 0)
+        self.offscreen_canvas.SetImage(image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)

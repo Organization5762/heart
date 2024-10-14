@@ -1,7 +1,5 @@
 import os
-from heart.display.renderers.kirby import KirbyFlying
 from heart.display.renderers.text_render import TextRendering
-from heart.display.renderers.color import RenderColor
 
 from heart.input.heart_rate import HeartRateSubscriber
 from heart.display.renderers.mandelbrot import MandelbrotMode
@@ -10,6 +8,7 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import threading
 from heart.display.renderers.spritesheet_loop import SpritesheetLoop
+from heart.display.renderers.pixel import RandomPixel, Border
 from heart.input.env import Environment
 
 from heart.input.switch import SwitchSubscriber
@@ -20,13 +19,24 @@ from heart.input.environment import GameLoop
 logger = logging.getLogger(__name__)
 
 def run():
-    devices = []
+    # TODO: Re-write this so that there is a local device, as this is broken on local atm
+    device = None
     if Environment.is_pi():
         from heart.projects.rgb_display import LEDMatrix
-        devices.append(LEDMatrix(chain_length=8))
+        device = LEDMatrix(chain_length=8)
 
     height = width = 64
-    loop = GameLoop(width, height, devices=devices)
+    loop = GameLoop(device=device)
+    
+    mode = loop.add_mode()
+    mode.add_renderer(
+        RandomPixel(num_pixels=500)
+    )
+    mode.add_renderer(
+        Border(
+            border_width=2
+        ),
+    )
     
     for kirby in [
         "kirby_flying_32",

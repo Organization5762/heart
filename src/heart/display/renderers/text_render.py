@@ -24,6 +24,7 @@ class TextRendering(BaseRenderer):
         x_location: int | None = None,
         y_location: int | None = None,
     ) -> None:
+        super().__init__()
         self.color = color
         self.font_name = font
         self.font_size = font_size

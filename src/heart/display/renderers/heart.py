@@ -5,6 +5,7 @@ import pygame
 
 class Heart(BaseRenderer):
     def __init__(self) -> None:
+        super().__init__()
         self.image = Loader.load("heart.png")
         self.x = None
         self.y = None

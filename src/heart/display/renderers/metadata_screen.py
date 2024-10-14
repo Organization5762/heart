@@ -23,6 +23,7 @@ WINDOW_SIZE = 5  # seconds
 
 class MetadataScreen(BaseRenderer):
     def __init__(self, x, y, color) -> None:
+        super().__init__()
         self.initialized = False
         self.current_frame = 0
         self.color = color

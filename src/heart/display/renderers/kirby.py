@@ -15,6 +15,7 @@ class KeyFrame:
 
 class KirbyFlying(BaseRenderer):
     def __init__(self) -> None:
+        super().__init__()
         self.initialized = False
         self.current_frame = 0
         self.file = Loader._resolve_path("kirby_sleep_64.png")
@@ -56,3 +57,4 @@ class KirbyFlying(BaseRenderer):
         if self.time_since_last_update is None:
             self.time_since_last_update = 0
         self.time_since_last_update += clock.get_time()
+

@@ -12,6 +12,7 @@ class KeyFrame:
 
 class RenderImage(BaseRenderer):
     def __init__(self, image_file: str) -> None:
+        super().__init__()
         self.initialized = False
         self.current_frame = 0
         self.file = Loader._resolve_path(image_file)

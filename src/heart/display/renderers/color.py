@@ -13,6 +13,7 @@ class KeyFrame:
 
 class RenderColor(BaseRenderer):
     def __init__(self, color: tuple[int, int, int]) -> None:
+        super().__init__()
         for variant in color:
             assert variant >= 0 and variant <= 255, f"Expected all color values to be between 0 and 255. Found {color}"
         self.color = color
