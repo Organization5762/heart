@@ -1,19 +1,23 @@
-from ast import Load
-from dataclasses import dataclass
 import math
 import random
+from ast import Load
+from dataclasses import dataclass
 from shutil import move
+
+import pygame
+
 from heart.assets.loader import Loader
 from heart.display import movement
 from heart.display.movement import ChaoticOrbit, Orbit, UpAndDown
 from heart.display.renderers import BaseRenderer, heart
-import pygame
+
 
 @dataclass
 class HeartRateState:
     bpm: int
     color: tuple[int, int, int]
     moving_direction: int = 1
+
 
 class HeartRateUnit(BaseRenderer):
     def __init__(self, state: HeartRateState, movement) -> None:
@@ -28,6 +32,7 @@ class HeartRateUnit(BaseRenderer):
         image.fill(self.state.color, special_flags=pygame.BLEND_MULT)
         self.movement.process(image, window, clock, reference_objects)
         return image
+
 
 class HeartRate(BaseRenderer):
     def __init__(self) -> None:
@@ -65,9 +70,7 @@ class HeartRate(BaseRenderer):
         if not self.initialized:
             self._initialize(window)
 
-        locations = [
-            x.movement.location for x in self.heart_rates
-        ]
+        locations = [x.movement.location for x in self.heart_rates]
         for _, heart_rate in enumerate(self.heart_rates):
             # Exclude self from locations
             l = locations.copy()

@@ -1,7 +1,10 @@
 import random
+
+import pygame
+
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-import pygame
+
 
 class Heart(BaseRenderer):
     def __init__(self) -> None:
@@ -31,16 +34,15 @@ class Heart(BaseRenderer):
         if self.y is None:
             self.y = random.randint(0, h - 1)
 
-
         # Simple wall collision mechanics
-        if self.x -1 > (w - self.x_buffer) or self.x <= 0:
+        if self.x - 1 > (w - self.x_buffer) or self.x <= 0:
             self.x_dir = -self.x_dir
 
         if self.y - 1 > (h - self.y_buffer) or self.y <= 0:
             self.y_dir = -self.y_dir
 
         # Update coordinates
-        self.x += (self.speed * self.x_dir)
-        self.y += (self.speed * self.y_dir)
+        self.x += self.speed * self.x_dir
+        self.y += self.speed * self.y_dir
 
         window.blit(self.image, self._location())
