@@ -1,30 +1,15 @@
-from dataclasses import dataclass
-
 import pygame
 
-from heart.assets.loader import Loader
+from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 
 
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    up: int = 0
-    down: int = 0
-    left: int = 0
-    right: int = 0
-
-
 class RenderColor(BaseRenderer):
-    def __init__(self, color: tuple[int, int, int]) -> None:
+    def __init__(self, color: Color) -> None:
         super().__init__()
-        for variant in color:
-            assert (
-                variant >= 0 and variant <= 255
-            ), f"Expected all color values to be between 0 and 255. Found {color}"
         self.color = color
 
-    def process(self, window, clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         image = pygame.Surface(window.get_size())
         image.fill(self.color)
         window.blit(image, (0, 0))

@@ -31,6 +31,7 @@ dependencies = [
     "pygame",
     "pyserial",
     "tqdm",
+    "typer-slim",
 ]
 
 [build-system]
@@ -44,8 +45,11 @@ build-backend = "setuptools.build_meta"
 heart = ["*.png"]
 
 [project.scripts]
-totem = "heart.projects.loop:run"
+totem = "heart.loop:main"
 
 [tool.docformatter]
 recursive = true
 blank = true
+
+[tool.isort]
+profile = "black"

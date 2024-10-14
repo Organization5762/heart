@@ -39,7 +39,7 @@ class MandelbrotMode(BaseRenderer):
         self.zoom_factor = self.clamp(self.zoom_factor + 0.01 * delta, 0.82, 1.3)
         self.last_switch_value = value
 
-    def process(self, window, clock):
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         pygame.display.set_caption(f"Z: {self.zoom:.2f} ZF: {self.zoom_factor:.2f}")
         self.handle_switch()
         self.render_mandelbrot(window, clock)
@@ -84,7 +84,9 @@ class MandelbrotMode(BaseRenderer):
         if self.rotation_angle >= 360:
             self.rotation_angle = 0
 
-    def render_mandelbrot(self, window, clock):
+    def render_mandelbrot(
+        self, window: pygame.Surface, clock: pygame.time.Clock
+    ) -> None:
         re = np.linspace(
             -3.5 / self.zoom + self.offset_x,
             3.5 / self.zoom + self.offset_x,

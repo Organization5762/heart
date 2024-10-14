@@ -1,19 +1,18 @@
 import logging
-import math
-import os
-import random
 import time
 from enum import StrEnum
-from typing import Literal
+from typing import TYPE_CHECKING
 
 import pygame
 from PIL import Image
 from tqdm import tqdm
 
-from heart.display.renderers import BaseRenderer
-from heart.input.env import Environment
+from heart.device import Device
 from heart.input.switch import SwitchSubscriber
-from heart.projects.rgb_display import Device
+from heart.utilities.env import Configuration
+
+if TYPE_CHECKING:
+    from heart.display.renderers import BaseRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class GameMode:
     def __init__(self) -> None:
         self.renderers: list[BaseRenderer] = []
 
-    def add_renderer(self, *renderers: BaseRenderer):
+    def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
 
 
@@ -50,7 +49,7 @@ class GameLoop:
 
         self.max_fps = max_fps
         self.modes: list[GameMode] = []
-        self.display_mode = pygame.SHOWN
+        self.display_mode = pygame.SHOWN if not Configuration.is_pi() else pygame.HIDDEN
         self.clock = None
         self.screen = None
 
@@ -89,15 +88,16 @@ class GameLoop:
             self._preprocess_setup()
             renderers = self.active_mode().renderers
             for renderer in tqdm(
-                renderers, disable=not Environment.is_profiling_mode()
+                renderers, disable=not Configuration.is_profiling_mode()
             ):
                 try:
                     renderer.process(self.screen, self.clock)
                 except Exception as e:
                     print(e)
                     pass
-            # Last renderer dictates the mode
-            self._render_out(renderers[-1].device_display_mode)
+            if len(renderers) > 0:
+                # Last renderer dictates the mode
+                self._render_out(renderers[-1].device_display_mode)
 
             self.clock.tick(self.max_fps)
 
@@ -109,7 +109,7 @@ class GameLoop:
                 self.running = False
 
     def _preprocess_setup(self):
-        if not Environment.is_pi():
+        if not Configuration.is_pi():
             self.__process_debugging_key_presses()
         self.__dim_display()
 
@@ -180,6 +180,7 @@ class GameLoop:
         # Default to fully black, so the LEDs will be at lower power
         self.screen.fill("black")
 
+    # TODO: move this to the device
     def __process_debugging_key_presses(self):
         keys = (
             pygame.key.get_pressed()

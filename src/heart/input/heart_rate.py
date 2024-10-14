@@ -3,13 +3,14 @@ import threading
 import time
 
 from openant.devices import ANTPLUS_NETWORK_KEY
-from openant.devices.common import AntPlusDevice, DeviceType
-from openant.devices.heart_rate import HeartRate, HeartRateData
+from openant.devices.common import DeviceType
+from openant.devices.heart_rate import HeartRateData
 from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
 from openant.easy.node import Node
 
-from heart.input.env import Environment
+from heart.input import Subscriber
+from heart.utilities.env import Configuration
 
 
 class BaseHeartRate:
@@ -159,7 +160,7 @@ class HeartRateSensor(BaseHeartRate):
 ACTIVE_SWITCH: BaseHeartRate = None
 
 
-class HeartRateSubscriber:
+class HeartRateSubscriber(Subscriber[BaseHeartRate]):
     def __init__(self, switch: BaseHeartRate) -> None:
         global ACTIVE_SWITCH
         if ACTIVE_SWITCH is not None:
@@ -171,7 +172,7 @@ class HeartRateSubscriber:
     def get(cls):
         global ACTIVE_SWITCH
         if ACTIVE_SWITCH is None:
-            if Environment.is_pi():
+            if Configuration.is_pi():
                 switch = HeartRateSensor()
             else:
                 switch = FakeHeartRateSensor()

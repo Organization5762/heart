@@ -1,8 +1,10 @@
 import os
 import platform
 
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
-class Environment:
+
+class Configuration:
     @classmethod
     def is_pi(cls):
         return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))

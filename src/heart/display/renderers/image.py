@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import pygame
+
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
 
@@ -24,7 +26,7 @@ class RenderImage(BaseRenderer):
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
-    def process(self, window, clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         if not self.initialized:
             self._initialize()
 

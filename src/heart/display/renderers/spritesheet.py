@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from enum import StrEnum
 
 import pygame
 
@@ -12,6 +13,12 @@ from heart.input.switch import SwitchSubscriber
 class KeyFrame:
     frame: tuple[int, int, int, int]
     duration: int
+
+
+class LoopPhase(StrEnum):
+    START = "start"
+    LOOP = "loop"
+    END = "end"
 
 
 # Searching mode loop.
@@ -32,30 +39,34 @@ class SpritesheetLoop(BaseRenderer):
         json_path = Loader._resolve_path(metadata_file_path)
 
         with open(json_path, "r") as f:
+            # TODO: Parse this into a dataclass
             frame_data = json.load(f)
 
         self.start_frames = []
         self.loop_frames = []
         self.end_frames = []
-        self.frames = {"start": [], "loop": [], "end": []}
+        self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
         for key in frame_data["frames"]:
             frame_obj = frame_data["frames"][key]
             frame = frame_obj["frame"]
-            tag, _ = key.split(" ", 1)
-            if tag not in self.frames:
-                tag = "loop"
+            parsed_tag, _ = key.split(" ", 1)
+            if parsed_tag not in self.frames:
+                tag = LoopPhase.LOOP
+            else:
+                tag = LoopPhase(parsed_tag)
             self.frames[tag].append(
                 KeyFrame(
                     (frame["x"], frame["y"], frame["w"], frame["h"]),
                     frame_obj["duration"],
                 )
             )
-        self.phase = "loop"
-        if len(self.frames["start"]) > 0:
-            self.phase = "start"
+        self.phase = LoopPhase.LOOP
+        if len(self.frames[LoopPhase.START]) > 0:
+            self.phase = LoopPhase.START
 
         self.time_since_last_update = None
 
+        # TODO: Why is this 30 30 / should we be pulling this from somewhere
         self.x = 30
         self.y = 30
 
@@ -67,7 +78,7 @@ class SpritesheetLoop(BaseRenderer):
         current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
         return current_value / 20.00
 
-    def process(self, window, clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (
             current_kf.duration * self.__duration_scale_factor()
@@ -84,19 +95,19 @@ class SpritesheetLoop(BaseRenderer):
                 if self.current_frame >= len(self.frames[self.phase]):
                     self.current_frame = 0
                     match self.phase:
-                        case "start":
-                            self.phase = "loop"
-                        case "loop":
+                        case LoopPhase.START:
+                            self.phase = LoopPhase.LOOP
+                        case LoopPhase.LOOP:
                             if self.loop_count < 4:
                                 self.loop_count += 1
                             else:
                                 self.loop_count = 0
-                                if len(self.frames["end"]) > 0:
-                                    self.phase = "end"
-                                elif len(self.frames["start"]) > 0:
-                                    self.phase = "start"
-                        case "end":
-                            self.phase = "start"
+                                if len(self.frames[LoopPhase.END]) > 0:
+                                    self.phase = LoopPhase.END
+                                elif len(self.frames[LoopPhase.START]) > 0:
+                                    self.phase = LoopPhase.START
+                        case LoopPhase.END:
+                            self.phase = LoopPhase.START
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
