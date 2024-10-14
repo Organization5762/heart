@@ -1,6 +1,8 @@
+import pygame
+
 from heart.environment import DeviceDisplayMode
 
-import pygame
+
 class BaseRenderer:
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED

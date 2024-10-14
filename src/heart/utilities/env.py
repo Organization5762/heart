@@ -3,6 +3,7 @@ import platform
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
+
 class Configuration:
     @classmethod
     def is_pi(cls):

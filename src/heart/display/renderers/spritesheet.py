@@ -1,6 +1,6 @@
-from enum import StrEnum
 import json
 from dataclasses import dataclass
+from enum import StrEnum
 
 import pygame
 
@@ -19,6 +19,7 @@ class LoopPhase(StrEnum):
     START = "start"
     LOOP = "loop"
     END = "end"
+
 
 # Searching mode loop.
 class SpritesheetLoop(BaseRenderer):

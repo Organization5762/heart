@@ -5,6 +5,7 @@ from PIL import Image
 
 from heart.device import Device
 
+
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
@@ -184,6 +185,7 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
+
 
 class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):

@@ -7,9 +7,9 @@ import pygame
 from PIL import Image
 from tqdm import tqdm
 
-from heart.utilities.env import Configuration
-from heart.input.switch import SwitchSubscriber
 from heart.device import Device
+from heart.input.switch import SwitchSubscriber
+from heart.utilities.env import Configuration
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -38,7 +38,7 @@ class GameMode:
     def __init__(self) -> None:
         self.renderers: list[BaseRenderer] = []
 
-    def add_renderer(self, *renderers: 'BaseRenderer'):
+    def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
 
 

@@ -2,7 +2,6 @@ import random
 
 import pygame
 
-
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
@@ -116,11 +115,8 @@ class Slinky(BaseRenderer):
         # Now draw a rain drop
         # It should decrease the saturation, but also dim
 
-        window.set_at(
-            (self.starting_point, self.current_y),
-            self.starting_color
-        )
-        f =  self.starting_color.dim(fraction=1 / self.l)
+        window.set_at((self.starting_point, self.current_y), self.starting_color)
+        f = self.starting_color.dim(fraction=1 / self.l)
         window.set_at((self.starting_point + 1, self.current_y), f)
         window.set_at((self.starting_point - 1, self.current_y), f)
         for i in range(self.l):

@@ -1,23 +1,24 @@
-from typing import Annotated
-import typer
-from heart.programs.registry import registry
-from heart.input.heart_rate import HeartRateSubscriber
-
 import logging
 import threading
+from typing import Annotated
 
-from heart.utilities.env import Configuration
-from heart.environment import GameLoop
-from heart.input.switch import SwitchSubscriber
+import typer
+
 from heart.device.local import LocalScreen
+from heart.environment import GameLoop
+from heart.input.heart_rate import HeartRateSubscriber
+from heart.input.switch import SwitchSubscriber
+from heart.programs.registry import registry
+from heart.utilities.env import Configuration
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
 
+
 @app.command()
 def run(
-        configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024"
+    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024"
 ) -> None:
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
@@ -27,13 +28,14 @@ def run(
     device = None
     if Configuration.is_pi():
         from heart.device.rgb_display import LEDMatrix
+
         device = LEDMatrix(chain_length=8)
     else:
-        device = LocalScreen(width=8*64, height=64)
+        device = LocalScreen(width=8 * 64, height=64)
 
     loop = GameLoop(device=device)
     configuration_fn(loop)
-    
+
     ## ============================= ##
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
@@ -64,8 +66,10 @@ def run(
         switch_thread.start()
     loop.start()
 
+
 def main():
     return app()
+
 
 if __name__ == "__main__":
     main()

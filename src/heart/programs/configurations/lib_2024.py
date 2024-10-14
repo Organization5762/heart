@@ -1,4 +1,3 @@
-
 from heart.display.color import Color
 from heart.display.renderers.mandelbrot import MandelbrotMode
 from heart.display.renderers.spritesheet import SpritesheetLoop

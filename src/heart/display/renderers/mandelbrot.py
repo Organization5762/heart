@@ -84,7 +84,9 @@ class MandelbrotMode(BaseRenderer):
         if self.rotation_angle >= 360:
             self.rotation_angle = 0
 
-    def render_mandelbrot(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def render_mandelbrot(
+        self, window: pygame.Surface, clock: pygame.time.Clock
+    ) -> None:
         re = np.linspace(
             -3.5 / self.zoom + self.offset_x,
             3.5 / self.zoom + self.offset_x,

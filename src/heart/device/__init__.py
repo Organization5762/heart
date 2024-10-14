@@ -1,5 +1,6 @@
 from PIL import Image
 
+
 class Device:
     def individual_display_size(self) -> tuple[int, int]:
         raise NotImplementedError("")

@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import random
+from dataclasses import dataclass
 from typing import Iterator
 
 
@@ -31,7 +31,7 @@ class Color:
             g=random.randint(0, 255),
             b=random.randint(0, 255),
         )
-    
+
     def dim(self, fraction: float) -> "Color":
         return Color(
             r=self.__clamp_rgb(self.r - (self.r * fraction)),
@@ -41,6 +41,6 @@ class Color:
 
     def __clamp(self, min_value: int, max_value: int, value: int) -> int:
         return min(max(value, min_value), max_value)
-    
+
     def __clamp_rgb(self, value: int) -> int:
         return self.__clamp(0, 255, value)
