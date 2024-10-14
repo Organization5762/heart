@@ -5,10 +5,12 @@ import time
 from heart.display.renderers import BaseRenderer
 from heart.input.env import Environment
 from heart.input.switch import SwitchSubscriber
+from heart.projects.rgb_display import Device
 import pygame
 import logging
 from PIL import Image
 from tqdm import tqdm
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -23,28 +25,23 @@ class GameMode:
         
     def add_renderer(self, renderer: BaseRenderer):
         self.renderers.append(renderer)
-    
+
+DeviceDisplayMode = Literal["mirrored", "full"]
+
 class GameLoop:
     def __init__(
         self,
-        width: int,
-        height: int,
-        devices: list,
+        device: Device,
         max_fps: int = 60
     ) -> None:
         self.initalized = False
+        self.device = device
 
         self.max_fps = max_fps
         self.modes: list[GameMode] = []
-        self.dimensions = (width, height)
         self.display_mode = pygame.SHOWN
         self.clock = None
         self.screen = None
-        self.devices = devices
-        if len(devices) == 0:
-            self.scale_factor = 3
-        else:
-            self.scale_factor = 1
             
         self.time_last_debugging_press = None
             
@@ -79,13 +76,15 @@ class GameLoop:
             self._handle_events()
             
             self._preprocess_setup()
-            for renderer in tqdm(self.active_mode().renderers, disable=not Environment.is_profiling_mode()):
+            renderers = self.active_mode().renderers
+            for renderer in tqdm(renderers, disable=not Environment.is_profiling_mode()):
                 try:
                     renderer.process(self.screen, self.clock)
                 except Exception as e:
                     print(e)
                     pass
-            self._render_out()
+            # Last renderer dictates the mode
+            self._render_out(renderers[-1].device_display_mode)
             
             self.clock.tick(self.max_fps)
 
@@ -101,7 +100,7 @@ class GameLoop:
             self.__process_debugging_key_presses()
         self.__dim_display()
         
-    def _render_out(self):
+    def _render_out(self, device_display_mode: DeviceDisplayMode):
         scaled_surface = pygame.transform.scale(
             self.screen, self.scaled_screen.get_size()
         )
@@ -109,12 +108,41 @@ class GameLoop:
 
         pygame.display.flip()
         
-        surface = self.screen.copy()
-        buffer = pygame.image.tostring(surface, RGB_IMAGE_FORMAT)
-        # Create a PIL image from the string buffer
-        image = Image.frombytes(RGB_IMAGE_FORMAT, self.dimensions, buffer)
-        for device in self.devices:
-            device.set_image(image)
+        # surface = self.screen.copy()
+        # image = pygame.image.tostring(surface, RGB_IMAGE_FORMAT)
+        
+        surface_array = pygame.surfarray.array3d(self.screen)
+        image = Image.fromarray(surface_array.transpose((1, 0, 2)), mode='RGB')
+        image = image.convert("RGB")
+        
+        match device_display_mode:
+            case "mirrored":
+                # Clone the image self.chain_length times (by width)
+                columns_count, rows_count = self.device.display_count()
+                col_size, row_size = self.device.individual_display_size()
+                
+                # TODO: This seems conceptually cleaner, but doesn't actually work, because renders place a 64x64 object within the full one
+                # and that results in it just squishing this.  It would be nicer if the renderers just had a "pure" screen, and then mirorring resizing etc. could happen outside of their scope
+                # (If they are in mirrored mode, full mode should ofc. expose the full canvas)
+                # Resize the PyGame image to the size of a single unit
+                # image = image.resize(self.device.individual_display_size())
+                
+                final_image = Image.new('RGB', self.device.full_display_size())
+            
+                # TODO: Unclear if we want mirrored to mean "Mirrored for all displays" or something else
+                # Imagine we have a 16 LED cube, where each side has 4, and we want to mirror it.
+                # We can handle those more complex device unit configurations later
+                for i in range(columns_count):
+                    for j in range(rows_count):
+                        paste_box = (
+                            i * col_size,
+                            j * row_size,
+                        )
+                        final_image.paste(image, box=paste_box)
+            case "full":
+                final_image = image
+        
+        self.device.set_image(final_image)
     
     def _initialize(self) -> None:
         if self.get_game_loop() is not None:
@@ -124,11 +152,12 @@ class GameLoop:
 
         logger.info("Initializing Display")
         pygame.init()
-        self.screen = pygame.Surface(self.dimensions)
+        dimensions = self.device.full_display_size()
+        self.screen = pygame.Surface(dimensions)
         self.scaled_screen = pygame.display.set_mode(
             (
-                self.dimensions[0] * self.scale_factor,
-                self.dimensions[1] * self.scale_factor,
+                dimensions[0] * self.device.get_scale_factor(),
+                dimensions[1] * self.device.get_scale_factor(),
             ),
             self.display_mode,
         )

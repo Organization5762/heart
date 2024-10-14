@@ -15,6 +15,7 @@ class KeyFrame:
 # Searching mode loop.
 class SpritesheetLoop(BaseRenderer):
     def __init__(self, screen_width: int, screen_height: int, sheet_file_path: str, metadata_file_path: str) -> None:
+        super().__init__()
         self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
         self.current_frame = 0

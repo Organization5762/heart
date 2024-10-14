@@ -17,6 +17,7 @@ class HeartRateState:
 
 class HeartRateUnit(BaseRenderer):
     def __init__(self, state: HeartRateState, movement) -> None:
+        super().__init__()
         self.state = state
 
         self.animation = Loader.load_animation("web_heart_animation.png")
@@ -30,6 +31,7 @@ class HeartRateUnit(BaseRenderer):
 
 class HeartRate(BaseRenderer):
     def __init__(self) -> None:
+        super().__init__()
         self.initialized = False
         self.heart_rate = None
 
