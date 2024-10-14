@@ -1,17 +1,14 @@
-# heart
+# Heart
 
 Heart Rate Sensor --> Visual Display Project
 
-## Setup
+## Development
 
 ### Installation
-
 `pip install -e .`
 
-#### On Pi
+### Formatting
+`make format` should install and run the correct formatting and linting tools
 
-Might need to run with sudo on Pi.
-
-### First Run
-
-After installing type `totem` into your Terminal.  On a non-linux box this should pop-up a PyGame window that displays the application.
+## Testing Locally
+The command: `totem --configuration full_screen_test` should display a scene locally.  If you see a scene, then the setup is correct.

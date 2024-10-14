@@ -3,7 +3,7 @@ import json
 import serial
 
 from heart.input import RunnableIO, Subscriber
-from heart.input.env import Environment
+from heart.utilities.env import Configuration
 
 ACTIVE_SWITCH = None
 
@@ -89,7 +89,7 @@ class SwitchSubscriber(Subscriber[BaseSwitch]):
     def get(cls):
         global ACTIVE_SWITCH
         if ACTIVE_SWITCH is None:
-            if Environment.is_pi():
+            if Configuration.is_pi():
                 s = Switch()
             else:
                 s = FakeSwitch()

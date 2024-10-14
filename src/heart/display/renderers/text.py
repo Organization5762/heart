@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import pygame
 
 from heart.assets.loader import Loader
+from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.input.switch import SwitchSubscriber
 
@@ -23,7 +24,7 @@ class TextRendering(BaseRenderer):
         text: list[str],
         font: str,
         font_size: int,
-        color: tuple[int, int, int],
+        color: Color,
         x_location: int | None = None,
         y_location: int | None = None,
     ) -> None:
@@ -40,16 +41,15 @@ class TextRendering(BaseRenderer):
 
     def _initialize(self) -> None:
         self.font = pygame.font.SysFont(self.font_name, self.font_size)
-        self.color = self.color
 
         self.initialized = True
 
-    def _current_text(self):
+    def _current_text(self) -> str:
         current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
         current_text_idx = current_value % len(self.text)
         return self.text[current_text_idx]
 
-    def process(self, window, clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         if not self.initialized:
             self._initialize()
 
@@ -66,7 +66,7 @@ class TextRendering(BaseRenderer):
             y_offset = (window_height - total_text_height) // 2
 
         for line in lines:
-            text_surface = self.font.render(line, True, self.color)
+            text_surface = self.font.render(line, True, self.color._as_tuple())
             text_width, _ = text_surface.get_size()
             if self.x_location is None:
                 x_offset = (window_width - text_width) // 2

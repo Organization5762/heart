@@ -1,9 +1,9 @@
 import argparse
 import sys
-from typing import Literal
 
-from PIL.Image import Image, Resampling, new
+from PIL import Image
 
+from heart.device import Device
 
 class SampleBase(object):
     def __init__(self, *args, **kwargs):
@@ -185,24 +185,6 @@ class SampleBase(object):
 
         return True
 
-
-class Device:
-    def individual_display_size(self) -> tuple[int, int]:
-        raise NotImplementedError("")
-
-    def full_display_size(self) -> tuple[int, int]:
-        raise NotImplementedError("")
-
-    def display_count(self) -> tuple[int, int]:
-        return 1, 1
-
-    def get_scale_factor(self) -> int:
-        return 1
-
-    def set_image(self, image: Image):
-        pass
-
-
 class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
@@ -247,7 +229,7 @@ class LEDMatrix(Device, SampleBase):
     def set_display_mode(self, mode: str):
         self.display_mode = mode
 
-    def set_image(self, image: Image):
+    def set_image(self, image: Image.Image):
         self.offscreen_canvas.Clear()
         self.offscreen_canvas.SetImage(image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)
