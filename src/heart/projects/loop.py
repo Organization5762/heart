@@ -1,9 +1,10 @@
 import os
 from heart.display.renderers.kirby import KirbyFlying
 from heart.display.renderers.text_render import TextRendering
+from heart.display.renderers.color import RenderColor
 
 from heart.input.heart_rate import HeartRateSubscriber
-from heart.projects.mandelbrot import MandelbrotMode
+from heart.display.renderers.mandelbrot import MandelbrotMode
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
@@ -22,12 +23,11 @@ def run():
     devices = []
     if Environment.is_pi():
         from heart.projects.rgb_display import LEDMatrix
-        devices.append(LEDMatrix())
+        devices.append(LEDMatrix(chain_length=8))
 
     height = width = 64
     loop = GameLoop(width, height, devices=devices)
-
-    # 
+    
     for kirby in [
         "kirby_flying_32",
         "kirby_cell_64",

@@ -74,10 +74,10 @@ class SampleBase(object):
         return True
 
 class LEDMatrix(SampleBase):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, chain_length: int, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs)
         
-        self.chain_length = 4
+        self.chain_length = chain_length
         self.row_size = 64
         self.col_size = 64
         
