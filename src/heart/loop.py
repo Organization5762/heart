@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 
+from heart.device import Layout
 from heart.device.local import LocalScreen
 from heart.environment import GameLoop
 from heart.input.heart_rate import HeartRateSubscriber
@@ -31,7 +32,7 @@ def run(
 
         device = LEDMatrix(chain_length=8)
     else:
-        device = LocalScreen(width=8 * 64, height=64)
+        device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
 
     loop = GameLoop(device=device)
     configuration_fn(loop)

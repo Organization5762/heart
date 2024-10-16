@@ -1,13 +1,15 @@
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pygame
 from PIL import Image
 from tqdm import tqdm
 
-from heart.device import Device
+from heart.device import Device, Layout
 from heart.input.switch import SwitchSubscriber
 from heart.utilities.env import Configuration
 
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 ACTIVE_GAME_LOOP = None
-RGB_IMAGE_FORMAT = "RGB"
+RGBA_IMAGE_FORMAT = "RGBA"
 
 
 class DeviceDisplayMode(StrEnum):
@@ -49,7 +51,6 @@ class GameLoop:
 
         self.max_fps = max_fps
         self.modes: list[GameMode] = []
-        self.display_mode = pygame.SHOWN if not Configuration.is_pi() else pygame.HIDDEN
         self.clock = None
         self.screen = None
 
@@ -73,6 +74,87 @@ class GameLoop:
         mode_index = SwitchSubscriber.get().get_button_value() % len(self.modes)
         return self.modes[mode_index]
 
+    def process_renderer(self, renderer: "BaseRenderer") -> Image.Image | None:
+        try:
+            match renderer.device_display_mode:
+                case DeviceDisplayMode.FULL:
+                    # The screen is the full size of the device
+                    screen = pygame.Surface(
+                        self.device.full_display_size(), pygame.SRCALPHA
+                    )
+                case DeviceDisplayMode.MIRRORED:
+                    # The screen is the full size of the device
+                    screen = pygame.Surface(
+                        self.device.individual_display_size(), pygame.SRCALPHA
+                    )
+
+            # Process the screen
+            renderer.process(screen, self.clock)
+            image = pygame.surfarray.pixels3d(screen)
+            alpha = pygame.surfarray.pixels_alpha(screen)
+            image = np.dstack((image, alpha))
+            image = np.transpose(image, (1, 0, 2))
+            image = Image.fromarray(image, RGBA_IMAGE_FORMAT)
+
+            match renderer.device_display_mode:
+                case DeviceDisplayMode.MIRRORED:
+                    layout: Layout = self.device.layout
+                    image = image.resize(size=self.device.individual_display_size())
+                    final_image_array = np.tile(
+                        np.array(image), (layout.rows, layout.columns, 1)
+                    )
+                    final_image = Image.fromarray(
+                        final_image_array, mode=RGBA_IMAGE_FORMAT
+                    )
+
+                case DeviceDisplayMode.FULL:
+                    final_image = image
+
+            return final_image
+        except Exception as e:
+            return None
+
+    def _render_surfaces(self, renderers: list["BaseRenderer"]):
+        def merge_surfaces(
+            surface1: Image.Image, surface2: Image.Image
+        ) -> pygame.Surface:
+            # Ensure both surfaces are the same size
+            assert (
+                surface1.size == surface2.size
+            ), "Surfaces must be the same size to merge."
+            surface1.paste(surface2, (0, 0), surface2)
+            return surface1
+
+        renderers = self.active_mode().renderers
+        with ThreadPoolExecutor() as executor:
+            surfaces: list[Image.Image] = [
+                i
+                for i in list(executor.map(self.process_renderer, renderers))
+                if i is not None
+            ]
+
+            # Iteratively merge surfaces until only one remains
+            while len(surfaces) > 1:
+                pairs = []
+                # Create pairs of adjacent surfaces
+                for i in range(0, len(surfaces) - 1, 2):
+                    pairs.append((surfaces[i], surfaces[i + 1]))
+
+                # Merge pairs in parallel
+                merged_surfaces = list(
+                    executor.map(lambda p: merge_surfaces(*p), pairs)
+                )
+
+                # If there's an odd surface out, append it to the merged list
+                if len(surfaces) % 2 == 1:
+                    merged_surfaces.append(surfaces[-1])
+
+                # Update the surfaces list for the next iteration
+                surfaces = merged_surfaces
+
+        # Return the final merged surface
+        return surfaces[0] if surfaces else None
+
     def start(self) -> None:
         if not self.initalized:
             self._initialize()
@@ -86,19 +168,38 @@ class GameLoop:
             self._handle_events()
 
             self._preprocess_setup()
-            renderers = self.active_mode().renderers
-            for renderer in tqdm(
-                renderers, disable=not Configuration.is_profiling_mode()
-            ):
-                try:
-                    renderer.process(self.screen, self.clock)
-                except Exception as e:
-                    print(e)
-                    pass
-            if len(renderers) > 0:
-                # Last renderer dictates the mode
-                self._render_out(renderers[-1].device_display_mode)
+            mode = self.active_mode()
+            renderers = mode.renderers
+            image = self._render_surfaces(renderers)
+            if image is not None:
+                for renderer in renderers:
+                    image = self.process_renderer(renderer)
+                    surface = pygame.image.frombytes(
+                        image.tobytes(), image.size, image.mode
+                    )
+                    self.screen.blit(surface, (0, 0))
+                # TODO: the parallel version is much faster for when there are many renderers, but sometimes causes a fault
+                # Need to figure out why it sometimes causes a fault :\
+                #     else:
+                #         surface = pygame.image.frombytes(
+                #                 image.tobytes(), image.size, image.mode
+                #         )
+                #         self.screen.blit(surface, (0, 0))
+                # except:
+                #     for renderer in renderers:
+                #         image = self.process_renderer(renderer)
+                #         surface = pygame.image.frombytes(
+                #                 image.tobytes(), image.size, image.mode
+                #         )
+                #         self.screen.blit(surface, (0, 0))
 
+            if len(renderers) > 0:
+                pygame.display.flip()
+                # Convert screen to PIL Image
+                image = pygame.surfarray.array3d(self.screen)
+                image = np.transpose(image, (1, 0, 2))
+                image = Image.fromarray(image)
+                self.device.set_image(image)
             self.clock.tick(self.max_fps)
 
         pygame.quit()
@@ -113,48 +214,6 @@ class GameLoop:
             self.__process_debugging_key_presses()
         self.__dim_display()
 
-    def _render_out(self, device_display_mode: DeviceDisplayMode):
-        scaled_surface = pygame.transform.scale(
-            self.screen, self.scaled_screen.get_size()
-        )
-        self.scaled_screen.blit(scaled_surface, (0, 0))
-
-        pygame.display.flip()
-
-        surface_array = pygame.surfarray.array3d(self.screen)
-        image = Image.fromarray(
-            surface_array.transpose((1, 0, 2)), mode=RGB_IMAGE_FORMAT
-        )
-
-        match device_display_mode:
-            case DeviceDisplayMode.MIRRORED:
-                columns_count, rows_count = self.device.display_count()
-                col_size, row_size = self.device.individual_display_size()
-
-                # TODO: This seems conceptually cleaner, but doesn't actually work, because renders place a 64x64 object within the full one
-                # and that results in it just squishing this.  It would be nicer if the renderers just had a "pure" screen, and then mirorring resizing etc. could happen outside of their scope
-                # (If they are in mirrored mode, full mode should ofc. expose the full canvas)
-                # Resize the PyGame image to the size of a single unit
-                # image = image.resize(self.device.individual_display_size())
-
-                final_image = Image.new("RGB", self.device.full_display_size())
-
-                # TODO: Unclear if we want mirrored to mean "Mirrored for all displays" or something else
-                # Imagine we have a 16 LED cube, where each side has 4, and we want to mirror it.
-                # We can handle those more complex device unit configurations later
-                for i in range(columns_count):
-                    for j in range(rows_count):
-                        paste_box = (
-                            i * col_size,
-                            j * row_size,
-                        )
-                        final_image.paste(image, box=paste_box)
-            case DeviceDisplayMode.FULL:
-                # The image just is the full image
-                final_image = image
-
-        self.device.set_image(final_image)
-
     def _initialize(self) -> None:
         if self.get_game_loop() is not None:
             raise Exception("An active GameLoop exists already, please re-use that one")
@@ -163,20 +222,13 @@ class GameLoop:
         logger.info("Initializing Display")
 
         pygame.init()
-        full_screen_dimensions = self.device.full_display_size()
-        self.screen = pygame.Surface(full_screen_dimensions)
-        self.scaled_screen = pygame.display.set_mode(
-            (
-                full_screen_dimensions[0] * self.device.get_scale_factor(),
-                full_screen_dimensions[1] * self.device.get_scale_factor(),
-            ),
-            self.display_mode,
-        )
+        self.screen = pygame.Surface(self.device.full_display_size(), pygame.HIDDEN)
+
         self.clock = pygame.time.Clock()
         logger.info("Display Initialized")
         self.initalized = True
 
-    def __dim_display(self):
+    def __dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
         self.screen.fill("black")
 
