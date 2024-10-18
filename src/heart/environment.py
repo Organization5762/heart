@@ -1,13 +1,12 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from enum import StrEnum
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
 from PIL import Image
-from tqdm import tqdm
 
 from heart.device import Device, Layout
 from heart.input.switch import SwitchSubscriber
@@ -22,7 +21,7 @@ ACTIVE_GAME_LOOP = None
 RGBA_IMAGE_FORMAT = "RGBA"
 
 
-class DeviceDisplayMode(StrEnum):
+class DeviceDisplayMode(Enum):
     MIRRORED = "mirrored"
     FULL = "full"
 
@@ -55,6 +54,14 @@ class GameLoop:
         self.screen = None
 
         self.time_last_debugging_press = None
+
+        pygame.display.set_mode(
+            (
+                device.full_display_size()[0] * device.scale_factor,
+                device.full_display_size()[1] * device.scale_factor,
+            ),
+            pygame.SHOWN,
+        )
 
     @classmethod
     def get_game_loop(cls):
@@ -172,26 +179,11 @@ class GameLoop:
             renderers = mode.renderers
             image = self._render_surfaces(renderers)
             if image is not None:
-                for renderer in renderers:
-                    image = self.process_renderer(renderer)
-                    surface = pygame.image.frombytes(
-                        image.tobytes(), image.size, image.mode
-                    )
-                    self.screen.blit(surface, (0, 0))
-                # TODO: the parallel version is much faster for when there are many renderers, but sometimes causes a fault
-                # Need to figure out why it sometimes causes a fault :\
-                #     else:
-                #         surface = pygame.image.frombytes(
-                #                 image.tobytes(), image.size, image.mode
-                #         )
-                #         self.screen.blit(surface, (0, 0))
-                # except:
-                #     for renderer in renderers:
-                #         image = self.process_renderer(renderer)
-                #         surface = pygame.image.frombytes(
-                #                 image.tobytes(), image.size, image.mode
-                #         )
-                #         self.screen.blit(surface, (0, 0))
+                bytes = image.tobytes()
+                surface = pygame.image.frombytes(
+                    bytes, image.size, image.mode
+                )
+                self.screen.blit(surface, (0, 0))
 
             if len(renderers) > 0:
                 pygame.display.flip()

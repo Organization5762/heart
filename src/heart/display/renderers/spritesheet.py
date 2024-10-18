@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 
 import pygame
 
@@ -15,7 +15,7 @@ class KeyFrame:
     duration: int
 
 
-class LoopPhase(StrEnum):
+class LoopPhase(Enum):
     START = "start"
     LOOP = "loop"
     END = "end"

@@ -189,7 +189,7 @@ class SampleBase(object):
 
 class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):
-        super(LEDMatrix, self).__init__(*args, **kwargs)
+        super(LEDMatrix, self).__init__(*args, **kwargs, layout=Layout(columns=chain_length, rows=1))
 
         self.chain_length = chain_length
         self.row_size = 64
