@@ -6,6 +6,8 @@ import typer
 
 from heart.device import Layout
 from heart.device.local import LocalScreen
+from heart.display.color import Color
+from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.input.heart_rate import HeartRateSubscriber
 from heart.input.switch import SwitchSubscriber
@@ -41,8 +43,8 @@ def run(
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
     # Retain an empty loop for "lower power" mode
-    loop.add_mode()
-
+    mode = loop.add_mode()
+    mode.add_renderer(RenderColor(Color(0, 0, 0)))
     ##
     # If on PI, start the sensors.  These should be stubbed out locally
     ##
