@@ -2,14 +2,16 @@ import numpy as np
 import pygame
 
 from heart.display.renderers import BaseRenderer
+from heart.environment import DeviceDisplayMode
 from heart.input.switch import SwitchSubscriber
 
 
 class MandelbrotMode(BaseRenderer):
     def __init__(self, width, height):
         super().__init__()
-        self.width = width
-        self.height = height
+        self.device_display_mode = DeviceDisplayMode.FULL
+        self.width = 512
+        self.height = 128 // 2
         self.max_iter = 256
         self.zoom = 1
         self.zoom_factor = 1.05
@@ -23,6 +25,7 @@ class MandelbrotMode(BaseRenderer):
         self.last_switch_value = None
         self.time_since_last_update = None
         self.last_frame = None
+        self.count = 0
 
     def _switch_feed(self):
         current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
@@ -40,9 +43,11 @@ class MandelbrotMode(BaseRenderer):
         self.last_switch_value = value
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
-        self.handle_switch()
-        self.render_mandelbrot(window, clock)
-        self.update_zoom()
+        self.count += 1
+        if self.count % 2 == 0:
+            self.handle_switch()
+            self.render_mandelbrot(window, clock)
+            self.update_zoom()
 
     def update_zoom(self):
         self.zoom *= self.zoom_factor
@@ -66,17 +71,6 @@ class MandelbrotMode(BaseRenderer):
             div_time[mask & (np.abs(z) > 2)] = i
 
         return div_time
-
-    def get_mandelbrot_absolute(self, re, im, max_iter):
-        c = re + 1j * im
-        z = np.zeros(c.shape, dtype=np.complex128)
-        mask = np.full(c.shape, True, dtype=bool)
-
-        for i in range(max_iter):
-            z[mask] = z[mask] ** 2 + c[mask]
-            mask[mask] = np.abs(z[mask]) <= 2
-
-        return mask
 
     def update_rotation(self):
         self.rotation_angle += 90
