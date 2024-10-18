@@ -1,7 +1,7 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from enum import StrEnum
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -22,7 +22,7 @@ ACTIVE_GAME_LOOP = None
 RGBA_IMAGE_FORMAT = "RGBA"
 
 
-class DeviceDisplayMode(StrEnum):
+class DeviceDisplayMode(Enum):
     MIRRORED = "mirrored"
     FULL = "full"
 
@@ -112,6 +112,7 @@ class GameLoop:
 
             return final_image
         except Exception as e:
+            logger.error(f"Error processing renderer: {e}")
             return None
 
     def _render_surfaces(self, renderers: list["BaseRenderer"]):
