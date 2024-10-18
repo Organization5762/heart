@@ -12,4 +12,4 @@ def configure(loop: GameLoop) -> None:
     for _ in range(0, 50):
         mode.add_renderer(RandomPixel())
     mode.add_renderer(PacmanGhostRenderer())
-    mode.add_renderer(Border(width=2))
+    mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))

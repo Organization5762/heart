@@ -27,12 +27,12 @@ class RandomPixel(BaseRenderer):
 
 
 class Border(BaseRenderer):
-    def __init__(self, width: int) -> None:
+    def __init__(self, width: int, color: Color | None = None) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
-        self.color = Color.random()
+        self.color = color or Color.random()
 
     def _initialize(self) -> None:
         self.initialized = True
