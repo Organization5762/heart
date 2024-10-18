@@ -3,7 +3,7 @@ import sys
 
 from PIL import Image
 
-from heart.device import Device
+from heart.device import Device, Layout
 
 
 class SampleBase(object):
@@ -219,8 +219,8 @@ class LEDMatrix(Device, SampleBase):
         self.matrix = RGBMatrix(options=options)
         self.offscreen_canvas = self.matrix.CreateFrameCanvas()
 
-    def display_count(self) -> int:
-        return (self.chain_length, 1)
+    def layout(self) -> Layout:
+        return Layout(columns=self.chain_length, rows=1)
 
     def individual_display_size(self):
         return (self.col_size, self.row_size)

@@ -4,7 +4,10 @@ from typing import Annotated
 
 import typer
 
+from heart.device import Layout
 from heart.device.local import LocalScreen
+from heart.display.color import Color
+from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.input.heart_rate import HeartRateSubscriber
 from heart.input.switch import SwitchSubscriber
@@ -31,7 +34,7 @@ def run(
 
         device = LEDMatrix(chain_length=8)
     else:
-        device = LocalScreen(width=8 * 64, height=64)
+        device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
 
     loop = GameLoop(device=device)
     configuration_fn(loop)
@@ -40,8 +43,8 @@ def run(
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
     # Retain an empty loop for "lower power" mode
-    loop.add_mode()
-
+    mode = loop.add_mode()
+    mode.add_renderer(RenderColor(Color(0, 0, 0)))
     ##
     # If on PI, start the sensors.  These should be stubbed out locally
     ##

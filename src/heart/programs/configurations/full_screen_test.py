@@ -8,6 +8,6 @@ from heart.environment import GameLoop
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode()
-    mode.add_renderer(Border(width=2))
     for _ in range(0, 50):
         mode.add_renderer(RandomPixel())
+    mode.add_renderer(Border(width=2))

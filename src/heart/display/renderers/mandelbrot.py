@@ -40,7 +40,6 @@ class MandelbrotMode(BaseRenderer):
         self.last_switch_value = value
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
-        pygame.display.set_caption(f"Z: {self.zoom:.2f} ZF: {self.zoom_factor:.2f}")
         self.handle_switch()
         self.render_mandelbrot(window, clock)
         self.update_zoom()
