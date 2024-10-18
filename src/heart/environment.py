@@ -119,6 +119,7 @@ class GameLoop:
 
             return final_image
         except Exception as e:
+            logger.error(f"Error processing renderer: {e}")
             return None
 
     def _render_surfaces(self, renderers: list["BaseRenderer"]):
