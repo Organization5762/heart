@@ -179,13 +179,10 @@ class GameLoop:
             renderers = mode.renderers
             image = self._render_surfaces(renderers)
             if image is not None:
-                if isinstance(image, Image.Image):
-                    bytes = image.tobytes()
-                    surface = pygame.image.frombytes(
-                        bytes, image.size, image.mode
-                    )
-                else:
-                    surface = image
+                bytes = image.tobytes()
+                surface = pygame.image.frombytes(
+                    bytes, image.size, image.mode
+                )
                 self.screen.blit(surface, (0, 0))
 
             if len(renderers) > 0:
