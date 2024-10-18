@@ -26,10 +26,11 @@ class Color:
 
     @classmethod
     def random(cls) -> "Color":
+        randbytes = random.getrandbits(24).to_bytes(3, 'little')
         return Color(
-            r=random.randint(0, 255),
-            g=random.randint(0, 255),
-            b=random.randint(0, 255),
+            r=randbytes[0] * 0.5,
+            g=randbytes[1] * 0.5,
+            b=randbytes[2] * 0.5,
         )
 
     def dim(self, fraction: float) -> "Color":

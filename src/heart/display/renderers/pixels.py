@@ -19,12 +19,17 @@ class RandomPixel(BaseRenderer):
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         width, height = window.get_size()
-        for _ in range(self.num_pixels):
-            x = random.randint(0, width - 1)
-            y = random.randint(0, height - 1)
-
-            random_color = self.color or Color.random()
-            window.set_at((x, y), random_color._as_tuple())
+        
+        # TODO: We need a mask here because the most expensive thing is the random function.
+        # A mask of noise would allow for cheaper sampling of randomness
+        pixels = [
+            (random.randint(0, width - 1), random.randint(0, height - 1))
+            for _ in range(self.num_pixels)
+        ]
+        random_color = self.color or Color.random()
+        for x, y in pixels:
+            color_value = random_color._as_tuple()
+            window.set_at((x, y), color_value)
 
 
 class Border(BaseRenderer):
