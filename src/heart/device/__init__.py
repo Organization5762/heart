@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import cached_property
 
 from PIL import Image
 
@@ -22,7 +23,8 @@ class Device:
             self.individual_display_size()[1] * self.layout.rows,
         )
 
-    def get_scale_factor(self) -> int:
+    @cached_property
+    def scale_factor(self) -> int:
         return 1
 
     def set_image(self, image: Image.Image) -> None:
