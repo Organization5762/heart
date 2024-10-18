@@ -48,6 +48,8 @@ class MandelbrotMode(BaseRenderer):
             self.handle_switch()
             self.render_mandelbrot(window, clock)
             self.update_zoom()
+        else:
+            window.blit(self.last_frame, (0, 0))
 
     def update_zoom(self):
         self.zoom *= self.zoom_factor
@@ -60,16 +62,31 @@ class MandelbrotMode(BaseRenderer):
             self.invert_colors = not self.invert_colors
             self.update_rotation()
 
+    # def get_mandelbrot_converge_time(self, re, im, max_iter):
+    #     c = re + 1j * im
+    #     z = np.zeros(c.shape, dtype=np.complex128)
+    #     div_time = np.full(c.shape, max_iter, dtype=int)
+    #
+    #     for i in range(max_iter):
+    #         mask = np.abs(z) <= 2
+    #         z[mask] = z[mask] ** 2 + c[mask]
+    #         div_time[mask & (np.abs(z) > 2)] = i
+    #
+    #     return div_time
+
     def get_mandelbrot_converge_time(self, re, im, max_iter):
+        height, width = re.shape
         c = re + 1j * im
         z = np.zeros(c.shape, dtype=np.complex128)
-        div_time = np.full(c.shape, max_iter, dtype=int)
+        div_time = np.zeros(c.shape, dtype=int)
 
         for i in range(max_iter):
             mask = np.abs(z) <= 2
             z[mask] = z[mask] ** 2 + c[mask]
-            div_time[mask & (np.abs(z) > 2)] = i
+            div_now = np.logical_and(np.abs(z) > 2, div_time == 0)
+            div_time[div_now] = i
 
+        div_time[div_time == 0] = max_iter
         return div_time
 
     def update_rotation(self):
@@ -119,6 +136,11 @@ class MandelbrotMode(BaseRenderer):
         # mask = converge_time == self.max_iter
         # color_surface[mask] = negative_space_color
 
-        surface = pygame.surfarray.make_surface(np.transpose(color_surface, (1, 0, 2)))
+        # surface = pygame.surfarray.make_surface(np.transpose(color_surface, (1, 0, 2)))
+        surface = pygame.transform.scale(
+            pygame.surfarray.make_surface(np.transpose(color_surface, (1, 0, 2))),
+            (self.width, self.height)
+        )
+        # window.blit(surface, (0, 0))
         window.blit(surface, (0, 0))
-        window.blit(pygame.transform.rotate(window, self.rotation_angle), (0, 0))
+        self.last_frame = surface
