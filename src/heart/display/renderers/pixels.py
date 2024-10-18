@@ -8,10 +8,11 @@ from heart.environment import DeviceDisplayMode
 
 
 class RandomPixel(BaseRenderer):
-    def __init__(self, num_pixels=1) -> None:
+    def __init__(self, num_pixels=1, color: Color | None = None) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.num_pixels = num_pixels
+        self.color = color
 
     def _initialize(self) -> None:
         self.initialized = True
@@ -22,7 +23,7 @@ class RandomPixel(BaseRenderer):
             x = random.randint(0, width - 1)
             y = random.randint(0, height - 1)
 
-            random_color = Color.random()
+            random_color = self.color or Color.random()
             window.set_at((x, y), random_color._as_tuple())
 
 

@@ -9,5 +9,5 @@ from heart.environment import GameLoop
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode()
-    mode.add_renderer(RandomPixel(num_pixels=200))
+    mode.add_renderer(RandomPixel(num_pixels=40000))
     mode.add_renderer(Border(width=2))
