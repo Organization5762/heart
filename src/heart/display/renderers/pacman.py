@@ -151,26 +151,18 @@ class PacmanGhostRenderer(BaseRenderer):
     def _initialize(self, window: pygame.Surface) -> None:
         self.initialized = True
         self.screen_width, self.screen_height = window.get_size()
-        self.blood = False
+        self.blood = True
         self._initialize_corner()
+        self.pacmanIdx = 0
 
     def _initialize_corner(self) -> None:
         import random
 
         corners = ["top_left", "top_right"]
-        if self.last_corner:
-            corners.remove(self.last_corner)
         corner = random.choice(corners)
         self.last_corner = corner
 
-        if self.blood:
-            self.ghost1 = Loader.load(Loader._resolve_path("bloodghost.png"))
-            self.ghost2 = Loader.load(Loader._resolve_path("bloodghost.png"))
-            self.ghost3 = Loader.load(Loader._resolve_path("bloodghost.png"))
-        else:
-            self.ghost1 = Loader.load(Loader._resolve_path("pinkghost.png"))
-            self.ghost2 = Loader.load(Loader._resolve_path("pinkghost.png"))
-            self.ghost3 = Loader.load(Loader._resolve_path("pinkghost.png"))
+        self.blood = not self.blood
 
         if corner == "top_left":
             self.x = -50
@@ -189,20 +181,55 @@ class PacmanGhostRenderer(BaseRenderer):
             self.y = self.screen_height - 48
             self.reverse = True
 
+        if self.reverse:
+            self.ghost1 = pygame.transform.flip(
+                Loader.load(Loader._resolve_path("pinkghost.png")), True, False
+            )
+            self.ghost2 = pygame.transform.flip(
+                Loader.load(Loader._resolve_path("blueghost.png")), True, False
+            )
+            self.ghost3 = pygame.transform.flip(
+                Loader.load(Loader._resolve_path("redghost.png")), True, False
+            )
+        else:
+            self.ghost1 = Loader.load(Loader._resolve_path("pinkghost.png"))
+            self.ghost2 = Loader.load(Loader._resolve_path("blueghost.png"))
+            self.ghost3 = Loader.load(Loader._resolve_path("redghost.png"))
+
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         if not self.initialized:
             self._initialize(window=window)
 
         # Update position
         if self.reverse:
-            self.x -= 5
+            self.x -= 10
         else:
-            self.x += 5
+            self.x += 10
 
         if self.x > self.screen_width + 50 or self.x < -150:
             self._initialize_corner()
 
+        self.pacmanIdx = (self.pacmanIdx + 1) % 3
+        if self.blood:
+            self.pacman = Loader.load(
+                Loader._resolve_path(f"bloodpac{self.pacmanIdx + 1}.png")
+            )
+        else:
+            self.pacman = Loader.load(
+                Loader._resolve_path(f"pac{self.pacmanIdx + 1}.png")
+            )
+
+        if (self.reverse and not self.blood) or (self.blood and not self.reverse):
+            self.pacman = pygame.transform.flip(self.pacman, True, False)
+
         # Draw the sprite
-        window.blit(self.ghost1, (self.x, self.y))
-        window.blit(self.ghost2, (self.x + 32, self.y))
-        window.blit(self.ghost3, (self.x + 64, self.y))
+        if (not self.blood and self.reverse) or (self.blood and not self.reverse):
+            window.blit(self.pacman, (self.x, self.y))
+            window.blit(self.ghost1, (self.x + 32, self.y))
+            window.blit(self.ghost2, (self.x + 64, self.y))
+            window.blit(self.ghost3, (self.x + 96, self.y))
+        if self.blood and self.reverse or (not self.blood and not self.reverse):
+            window.blit(self.ghost3, (self.x, self.y))
+            window.blit(self.ghost2, (self.x + 32, self.y))
+            window.blit(self.ghost1, (self.x + 64, self.y))
+            window.blit(self.pacman, (self.x + 96, self.y))
