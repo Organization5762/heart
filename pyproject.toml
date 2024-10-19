@@ -29,7 +29,7 @@ dependencies = [
     "numpy",
     "openant",
     "Pillow",
-    "pygame",
+    "pygame==2.6.1",
     "pyserial",
     "tqdm",
     "typer-slim",

@@ -1,12 +1,14 @@
 import json
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
+import random
 
 import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
 from heart.input.switch import SwitchSubscriber
+from heart.environment import DeviceDisplayMode
 
 
 @dataclass
@@ -15,23 +17,26 @@ class KeyFrame:
     duration: int
 
 
-class LoopPhase(Enum):
+class LoopPhase(StrEnum):
     START = "start"
     LOOP = "loop"
     END = "end"
 
 
-# Searching mode loop.
-class SpritesheetLoop(BaseRenderer):
+# Renders a looping spritesheet on a random screen.
+class SpritesheetLoopRandom(BaseRenderer):
     def __init__(
         self,
         screen_width: int,
         screen_height: int,
         sheet_file_path: str,
         metadata_file_path: str,
+        screen_count: int,
     ) -> None:
         super().__init__()
+        self.device_display_mode = DeviceDisplayMode.FULL
         self.screen_width, self.screen_height = screen_width, screen_height
+        self.screen_count = screen_count
         self.initialized = False
         self.current_frame = 0
         self.loop_count = 0
@@ -65,6 +70,7 @@ class SpritesheetLoop(BaseRenderer):
             self.phase = LoopPhase.START
 
         self.time_since_last_update = None
+        self.current_screen = 0
 
         # TODO: Why is this 30 30 / should we be pulling this from somewhere
         self.x = 30
@@ -94,24 +100,11 @@ class SpritesheetLoop(BaseRenderer):
                 self.time_since_last_update = 0
                 if self.current_frame >= len(self.frames[self.phase]):
                     self.current_frame = 0
-                    match self.phase:
-                        case LoopPhase.START:
-                            self.phase = LoopPhase.LOOP
-                        case LoopPhase.LOOP:
-                            if self.loop_count < 4:
-                                self.loop_count += 1
-                            else:
-                                self.loop_count = 0
-                                if len(self.frames[LoopPhase.END]) > 0:
-                                    self.phase = LoopPhase.END
-                                elif len(self.frames[LoopPhase.START]) > 0:
-                                    self.phase = LoopPhase.START
-                        case LoopPhase.END:
-                            self.phase = LoopPhase.START
+                    self.current_screen = random.randint(0, self.screen_count-1)
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
-        window.blit(scaled, (0, 0))
+        window.blit(scaled, (self.current_screen*self.screen_width, 0))
 
         if self.time_since_last_update is None:
             self.time_since_last_update = 0
