@@ -96,9 +96,9 @@ class MandelbrotMode(BaseRenderer):
             color_values = 255 - (converge_time * 255 / self.max_iter).astype(np.uint8)
 
         color_surface = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        color_surface[..., 0] = color_values * 1  # Set red channel
-        color_surface[..., 1] = color_values * 1  # Set green channel
-        color_surface[..., 2] = color_values * 1  # Set blue channel
+        color_surface[..., 0] = color_values * 0.5
+        color_surface[..., 1] = color_values * 0.5
+        color_surface[..., 2] = color_values * 0.5
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
         if self.flip:
