@@ -8,31 +8,38 @@ from heart.environment import DeviceDisplayMode
 
 
 class RandomPixel(BaseRenderer):
-    def __init__(self, num_pixels=1) -> None:
+    def __init__(self, num_pixels=1, color: Color | None = None, brightness: float = 1.0) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.num_pixels = num_pixels
+        self.color = color
+        self.brightness = brightness
 
     def _initialize(self) -> None:
         self.initialized = True
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         width, height = window.get_size()
-        for _ in range(self.num_pixels):
-            x = random.randint(0, width - 1)
-            y = random.randint(0, height - 1)
-
-            random_color = Color.random()
-            window.set_at((x, y), random_color._as_tuple())
+        
+        # TODO: We need a mask here because the most expensive thing is the random function.
+        # A mask of noise would allow for cheaper sampling of randomness
+        pixels = [
+            (random.randint(0, width - 1), random.randint(0, height - 1))
+            for _ in range(self.num_pixels)
+        ]
+        random_color = self.color or Color.random()
+        color_value = [int(x * self.brightness) for x in random_color._as_tuple()]
+        for x, y in pixels:
+            window.set_at((x, y), color_value)
 
 
 class Border(BaseRenderer):
-    def __init__(self, width: int) -> None:
+    def __init__(self, width: int, color: Color | None = None) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
-        self.color = Color.random()
+        self.color = color or Color.random()
 
     def _initialize(self) -> None:
         self.initialized = True
