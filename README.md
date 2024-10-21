@@ -1,17 +1,23 @@
 # Heart
 
-Heart Rate Sensor --> Visual Display Project
+Visual display project for LED screens.  
 
 ## Development
 
-### Installation
+**Installation**
 
 `pip install -e .`
 
-### Formatting
+**Formatting**
 
 `make format` should install and run the correct formatting and linting tools
 
-## Testing Locally
+**Testing Locally**
 
 The command: `totem --configuration full_screen_test` should display a scene locally.  If you see a scene, then the setup is correct.
+
+**Supported Platforms**
+- MacOSX for local development
+- An appropriately setup Raspberry Pi 4 for portable use
+
+
