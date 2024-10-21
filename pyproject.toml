@@ -30,6 +30,7 @@ dependencies = [
     "Pillow",
     "pygame==2.6.1",
     "pyserial",
+    "scipy",
     "tqdm",
     "typer-slim",
 ]
