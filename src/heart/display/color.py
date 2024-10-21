@@ -26,7 +26,7 @@ class Color:
 
     @classmethod
     def random(cls) -> "Color":
-        randbytes = random.getrandbits(24).to_bytes(3, 'little')
+        randbytes = random.getrandbits(24).to_bytes(3, "little")
         return Color(
             r=randbytes[0] * 0.5,
             g=randbytes[1] * 0.5,

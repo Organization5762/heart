@@ -1,3 +1,4 @@
+import subprocess
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 
@@ -6,15 +7,12 @@ from PIL import Image
 
 from heart.device import Device
 
-import subprocess
 
 def _get_display_resolution():
     result = subprocess.run(
-        ["system_profiler", "SPDisplaysDataType"],
-        capture_output=True,
-        text=True
+        ["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True
     )
-    
+
     # find the line with the resolution
     for line in result.stdout.splitlines():
         if "Resolution" in line:
@@ -23,6 +21,7 @@ def _get_display_resolution():
             width, height = map(int, parsable.split("x"))
             aspect_ratio = width / height
             return width, height, aspect_ratio
+
 
 @dataclass
 class LocalScreen(Device):
@@ -45,7 +44,7 @@ class LocalScreen(Device):
     @cached_property
     def scale_factor(self) -> int:
         width, height, _ = _get_display_resolution()
-        current_width , current_height= self.full_display_size()
+        current_width, current_height = self.full_display_size()
 
         result = max(min(width // current_width, height // current_height), 1)
         return int(result / 3)

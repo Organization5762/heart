@@ -1,14 +1,14 @@
 import json
+import random
 from dataclasses import dataclass
 from enum import StrEnum
-import random
 
 import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-from heart.input.switch import SwitchSubscriber
 from heart.environment import DeviceDisplayMode
+from heart.input.switch import SwitchSubscriber
 
 
 @dataclass
@@ -100,11 +100,11 @@ class SpritesheetLoopRandom(BaseRenderer):
                 self.time_since_last_update = 0
                 if self.current_frame >= len(self.frames[self.phase]):
                     self.current_frame = 0
-                    self.current_screen = random.randint(0, self.screen_count-1)
+                    self.current_screen = random.randint(0, self.screen_count - 1)
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
-        window.blit(scaled, (self.current_screen*self.screen_width, 0))
+        window.blit(scaled, (self.current_screen * self.screen_width, 0))
 
         if self.time_since_last_update is None:
             self.time_since_last_update = 0
