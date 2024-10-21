@@ -8,7 +8,9 @@ from heart.environment import DeviceDisplayMode
 
 
 class RandomPixel(BaseRenderer):
-    def __init__(self, num_pixels=1, color: Color | None = None, brightness: float = 1.0) -> None:
+    def __init__(
+        self, num_pixels=1, color: Color | None = None, brightness: float = 1.0
+    ) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.num_pixels = num_pixels
@@ -20,7 +22,7 @@ class RandomPixel(BaseRenderer):
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         width, height = window.get_size()
-        
+
         # TODO: We need a mask here because the most expensive thing is the random function.
         # A mask of noise would allow for cheaper sampling of randomness
         pixels = [

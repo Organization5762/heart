@@ -2,10 +2,10 @@ import random
 
 import pygame
 
+from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.assets.loader import Loader
 
 
 class RandomPixel(BaseRenderer):
