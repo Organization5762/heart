@@ -7,7 +7,7 @@ from numba import jit, prange
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.input.direction import DirectionInput, Direction
+# from heart.input.direction import DirectionInput, Direction
 from heart.input.switch import SwitchSubscriber
 
 
