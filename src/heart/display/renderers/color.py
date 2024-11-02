@@ -11,5 +11,5 @@ class RenderColor(BaseRenderer):
 
     def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
         image = pygame.Surface(window.get_size())
-        image.fill(self.color)
+        image.fill(self.color._as_tuple())
         window.blit(image, (0, 0))
