@@ -18,14 +18,17 @@ class MandelbrotMode(BaseRenderer):
         self.dimensions_set = False
         self.width = None
         self.height = None
-        self.max_iter = 500
+        self.max_iter = 250
+        self.max_zoom = 20093773861.78
         self.max_zoom = 143317203096477.16
         self.zoom = 1
         self.zoom_factor = 1.05
         self.flip = False
 
         interesting_ofsets = [
-            (-0.7450010130148861, 0.11899999957892138),
+            (-0.7446419526647119, 0.11883810830309872),  # for max_iter = 250
+            (-0.7405913776174069, 0.11870395103898324),  # for max_iter = 250
+            (-0.7450010130148861, 0.11899999957892138),  # for max_iter = 500
             (-0.7450010040106548, 0.11900000673128418),
         ]
         self.init_offset_x, self.init_offset_y = interesting_ofsets[0]
@@ -191,7 +194,7 @@ class MandelbrotMode(BaseRenderer):
         color = np.zeros((iterations.shape[0], iterations.shape[1], 3), dtype=np.uint8)
 
         # Set the color for non-escaped points (Mandelbrot set)
-        color[~escaped] = np.dstack([intensity[~escaped]])
+        color[~escaped] = np.dstack([0, 0, 0])
         # color[~escaped] = np.dstack([255 - intensity[~escaped]])
 
         # Set the grayscale color for escaped points
@@ -221,7 +224,7 @@ class MandelbrotMode(BaseRenderer):
         )
         re, im = np.meshgrid(re, im)
         converge_time = get_mandelbrot_converge_time(re, im, self.max_iter)
-        color_surface = self.standard_coloring(converge_time, self.max_iter)
+        color_surface = self.gray_coloring(converge_time, self.max_iter)
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
         if self.flip:
