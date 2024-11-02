@@ -20,7 +20,7 @@ class MandelbrotMode(BaseRenderer):
         self.height = None
         self.max_iter = 250
         self.max_zoom = 20093773861.78
-        self.max_zoom = 143317203096477.16
+        # self.max_zoom = 143317203096477.16
         self.zoom = 1
         self.zoom_factor = 1.05
         self.flip = False
@@ -149,7 +149,7 @@ class MandelbrotMode(BaseRenderer):
         self.handle_switch()
         # self.handle_dpad()
         self.render_mandelbrot(window, clock)
-        # self.render_zoom_level(window)
+        self.render_zoom_level(window)
         if self.mode == "auto":
             self.update_zoom()
 
@@ -205,10 +205,30 @@ class MandelbrotMode(BaseRenderer):
 
     def standard_coloring(self, iterations, max_iter):
         color_surface = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        color_value = iterations * 0.5 if self.invert_colors else 255 - iterations * 0.5
-        color_surface[..., 0] = color_value
-        color_surface[..., 1] = color_value
-        color_surface[..., 2] = color_value
+
+        # Create mask for points in and out of set
+        in_set = iterations == max_iter
+        escaped = ~in_set
+
+        # Normalize the iteration counts for escaped points
+        normalized = np.zeros_like(iterations, dtype=np.float64)
+        normalized[escaped] = iterations[escaped] / max_iter
+
+        # Apply smooth coloring formula
+        smooth_normalized = np.sqrt(normalized)  # You can also try: np.log(normalized + 1) / np.log(2)
+
+        # Scale to 0-255 range
+        color_value = (smooth_normalized * 255).astype(np.uint8)
+
+        if self.invert_colors:
+            # Points in the set are white, escaped points get darker
+            color_surface[in_set] = 255
+            color_surface[escaped] = np.dstack([color_value[escaped]] * 3)
+        else:
+            # Points in the set are black, escaped points get lighter
+            color_surface[in_set] = 0
+            color_surface[escaped] = np.dstack([255 - color_value[escaped]] * 3)
+
         return color_surface
 
     def render_mandelbrot(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
@@ -224,7 +244,7 @@ class MandelbrotMode(BaseRenderer):
         )
         re, im = np.meshgrid(re, im)
         converge_time = get_mandelbrot_converge_time(re, im, self.max_iter)
-        color_surface = self.gray_coloring(converge_time, self.max_iter)
+        color_surface = self.standard_coloring(converge_time, self.max_iter)
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
         if self.flip:
