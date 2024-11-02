@@ -31,7 +31,7 @@ def configure(loop: GameLoop) -> None:
         )
 
     modelbrot = loop.add_mode()
-    modelbrot.add_renderer(MandelbrotMode(width, height))
+    modelbrot.add_renderer(MandelbrotMode())
 
     mode = loop.add_mode()
 
