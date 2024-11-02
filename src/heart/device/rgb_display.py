@@ -1,5 +1,6 @@
 import argparse
 import sys
+import threading
 
 from PIL import Image
 
@@ -57,6 +58,22 @@ class SampleBase(object):
             default=100,
             type=int,
         )
+        #         options.rows = self.row_size
+        # options.cols = self.col_size
+        # options.chain_length = self.chain_length
+        # options.parallel = 1
+        # options.pwm_bits = 11
+
+        # options.row_address_type = 0
+        # options.multiplexing = 0
+        # options.brightness = 100
+        # options.pwm_lsb_nanoseconds = 130
+        # options.led_rgb_sequence = "RGB"
+        # options.pixel_mapper_config = ""
+        # options.panel_type = ""
+        # options.gpio_slowdown = 4
+        # # I hate this option.
+        # options.drop_privileges = False
         self.parser.add_argument(
             "-m",
             "--led-gpio-mapping",
@@ -186,7 +203,6 @@ class SampleBase(object):
 
         return True
 
-
 class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):
         super(LEDMatrix, self).__init__(
@@ -207,10 +223,17 @@ class LEDMatrix(Device, SampleBase):
         options.parallel = 1
         options.pwm_bits = 11
 
+        # Testing
+        # options.led_limit_refresh = 100
+        options.show_refresh_rate = 1
+        # options.hardware_mapping = "adafruit-hat"
+        options.disable_hardware_pulsing = True
+        options.multiplexing = 0
+        options.pwm_bits = 7
+
         options.row_address_type = 0
         options.multiplexing = 0
         options.brightness = 100
-        options.pwm_lsb_nanoseconds = 130
         options.led_rgb_sequence = "RGB"
         options.pixel_mapper_config = ""
         options.panel_type = ""
@@ -233,7 +256,7 @@ class LEDMatrix(Device, SampleBase):
     def set_display_mode(self, mode: str):
         self.display_mode = mode
 
-    def set_image(self, image: Image.Image):
+    def set_image(self, image: Image.Image) -> None:
         self.offscreen_canvas.Clear()
         self.offscreen_canvas.SetImage(image, 0, 0)
         self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)
