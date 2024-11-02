@@ -149,7 +149,7 @@ class MandelbrotMode(BaseRenderer):
         self.handle_switch()
         # self.handle_dpad()
         self.render_mandelbrot(window, clock)
-        self.render_zoom_level(window)
+        # self.render_zoom_level(window)
         if self.mode == "auto":
             self.update_zoom()
 
