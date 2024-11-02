@@ -11,12 +11,13 @@ def configure(loop: GameLoop) -> None:
     width = 64
     height = 64
     screen_count = 8
-    mode.add_renderer(
-        SpritesheetLoopRandom(
-            screen_width=width,
-            screen_height=height,
-            screen_count=screen_count,
-            sheet_file_path="spookyeye.png",
-            metadata_file_path="spookyeye.json",
+    for _ in range(3):
+        mode.add_renderer(
+            SpritesheetLoopRandom(
+                screen_width=width,
+                screen_height=height,
+                screen_count=screen_count,
+                sheet_file_path="spookyeye.png",
+                metadata_file_path="spookyeye.json",
+            )
         )
-    )
