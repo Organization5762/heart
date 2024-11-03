@@ -51,17 +51,6 @@ def run(
     # TODO: I want to split this out of the core loop so that
     # there is a more centralized configuration / management of all these IO devices
     if Configuration.is_pi():
-        # Start heart detection in another thread
-        def my_function():
-            # Your code to run in the separate thread goes here
-            HeartRateSubscriber.get().run()
-
-        # Create a new thread
-        my_thread = threading.Thread(target=my_function)
-
-        # Start the thread
-        my_thread.start()
-
         def switch_fn():
             SwitchSubscriber.get().run()
 

@@ -6,6 +6,7 @@ from scipy.ndimage import convolve
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
+from heart.input.switch import SwitchSubscriber
 
 
 class Life(BaseRenderer):
@@ -14,6 +15,7 @@ class Life(BaseRenderer):
 
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
         self.state = None
+        self.seed = 0
 
     def _update_grid(self, grid):
         # convolve the grid with the kernel to count neighbors
@@ -25,10 +27,14 @@ class Life(BaseRenderer):
 
         return new_grid.astype(int)
 
-    def process(self, window: Surface, clock: Clock) -> None:
-        if self.state is None:
-            # TODO: set a non-random seed
+    def _maybe_update_seed(self, window: Surface) -> None:
+        current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
+        if current_value != self.seed:
+            self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())
+
+    def process(self, window: Surface, clock: Clock) -> None:
+        self._maybe_update_seed(window=window)
         self.state = self._update_grid(self.state)
 
         # if 1, make white, else make black
