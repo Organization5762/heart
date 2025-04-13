@@ -5,7 +5,6 @@ import sys
 import toml
 
 MEDIA_DIRECTORY = "/media/michael"
-# TODO: Verify checksum
 CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME="adafruit-circuitpython-bundle-9.x-mpy-20250412"
 CIRCUIT_PY_COMMON_LIBS=f"https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
 CIRCUIT_PY_COMMON_LIBS_CHECKSUM="6d49c73c352da31d5292508ff9b3eca2803372c1d2acca7175b64be2ff2bc450"
@@ -76,8 +75,12 @@ def main(device_driver_name: str) -> None:
         print(f"Error: The path {code_path} does not exist. This is where we expect the driver code to exist.")
         sys.exit(1)
 
-    # Extract out a couple variables from the driver's settings
+
+    ###
+    # Load a bunch of env vars the driver declares
+    ###
     d = toml.load(os.path.join(code_path, "settings.toml"))
+
     URL: str = d["CIRCUIT_PY_UF2_URL"]
     CHECKSUM: str = d["CIRCUIT_PY_UF2_CHECKSUM"]
     DRIVER_LIBS: list[str] = [lib for lib in d["CIRCUIT_PY_DRIVER_LIBS"].split(",") if lib]
@@ -86,6 +89,10 @@ def main(device_driver_name: str) -> None:
     DEVICE_BOOT_NAME: str= d["CIRCUIT_PY_BOOT_NAME"]
     VALID_BOARD_IDS: list[str] = [board_id for board_id in d["VALID_BOARD_IDS"].split(",") if board_id]
 
+
+    ###
+    # If the device is not a CIRCUIT_PY device yet, load the UF2 so that it is converted
+    ###
     UF2_DESTINATION = os.path.join(
         MEDIA_DIRECTORY,
         DEVICE_BOOT_NAME
@@ -97,6 +104,9 @@ def main(device_driver_name: str) -> None:
     else:
         print("Skipping CircuitPython UF2 installation as no device is in boot mode currently")
 
+    ###
+    # For all the CIRCUITPY devices, try to find whether this specific driver should be loaded onto them
+    ###
     for mount_point in os.listdir(MEDIA_DIRECTORY):
         if "CIRCUITPY" in mount_point:
             media_location = os.path.join(MEDIA_DIRECTORY, mount_point)
@@ -122,8 +132,6 @@ def main(device_driver_name: str) -> None:
                         os.path.join(media_location, file_name)
                     )
 
-                # We mostly expect the device to reboot already at this point
-                # time.sleep(5)
                 load_driver_libs(
                     libs=DRIVER_LIBS,
                     destination=os.path.join(os.path.join(media_location, "lib"))

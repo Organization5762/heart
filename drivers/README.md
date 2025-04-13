@@ -64,3 +64,12 @@ We have also explored Bluetooth-based bridges, which do not plug directly into t
 ## Future Bridges
 - [Garmin ANT+](https://www.amazon.com/Garmin-USB-Stick-Fitness-Devices/dp/B00CM381SQ/ref=sr_1_1?ie=UTF8&qid=1475691048&sr=8-1&keywords=ant%2B+stick)
 - [Flowtoy USB Bridge](https://flowtoys.com/usb-bridge) (Note, this is just a special-case of Bluetooth and may not be required)
+
+# Development Notes
+## Accessing Driver IO
+I've found the most reliable script to be this:
+`python3 -m serial.tools.miniterm /dev/ttyACM0 115200`
+
+It'll drop you in with a Python interpret and read STDOUT from the serial port.  You can directly run commands via the REPL to help with debugging and see errors.  It isn't the best, but it isn't bad.
+
+If you're on an OSx device, `screen /dev/ttyACM0 115200` might be more ergonomic.
