@@ -1,0 +1,8 @@
+HEART_DEVICE_TYPE="accelerometer-and-gyroscope-bridge"
+
+CIRCUIT_PY_BOOT_NAME="RPI-RP2"
+CIRCUIT_PY_UF2_URL="https://downloads.circuitpython.org/bin/adafruit_kb2040/en_US/adafruit-circuitpython-adafruit_kb2040-en_US-9.2.7.uf2"
+CIRCUIT_PY_UF2_CHECKSUM="d5f8f9f96513d9e97bab3ece60bcbe7213d64c9dd60a1cc9a7cdea546a42fdbd"
+
+VALID_BOARD_IDS="adafruit_kb2040"
+CIRCUIT_PY_DRIVER_LIBS="adafruit_lsm6ds,adafruit_register,adafruit_bus_device"
