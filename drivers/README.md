@@ -43,7 +43,7 @@ Possible future input types (Based on parts I've ordered):
 ## 📡 Location & Navigation
 
 | Part Name | Description | Supported | Driver Link |
-|----------|-------------|----|
+|----------|-------------|-----|----|
 | [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No | N/A |
 
 
