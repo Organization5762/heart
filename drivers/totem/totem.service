@@ -1,0 +1,10 @@
+[Unit]
+Description=Totem Service
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=sudo /usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py --configuration halloween_2024
+
+[Install]
+WantedBy=multi-user.target

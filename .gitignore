@@ -2,3 +2,4 @@ heart.egg-info
 __pycache__
 build/
 .venv
+**/.DS_Store
