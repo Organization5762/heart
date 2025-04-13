@@ -1,46 +1,66 @@
+# Input Devices
 Possible future input types (Based on parts I've ordered):
 
 ## 🎛️ Direct Input Devices
 
-| Part Name | Description | Supported |
-|----------|-------------|-----|
-| [Rotary Encoder + Extras](https://www.adafruit.com/product/4964) | Adafruit Rotary Trinkey - USB NeoPixel Rotary Encoder | Yes |
-| [I2C Quad Rotary Encoder](https://www.adafruit.com/product/5752) | Adafruit I2C Quad Rotary Encoder Breakout with NeoPixel - STEMMA QT / Qwiic | No |
-| [Analog Thumb Joystick](https://www.adafruit.com/product/512) | 2-axis joystick with select button + breakout board | No |
+| Part Name | Description | Supported | Driver Link |
+|----------|-------------|-----|----|
+| [Rotary Encoder + Extras](https://www.adafruit.com/product/4964) | Adafruit Rotary Trinkey - USB NeoPixel Rotary Encoder | Yes | [Driver](../drivers/rotary_encoder) |
+| [I2C Quad Rotary Encoder](https://www.adafruit.com/product/5752) | Adafruit I2C Quad Rotary Encoder Breakout with NeoPixel - STEMMA QT / Qwiic | No | N/A |
+| [Analog Thumb Joystick](https://www.adafruit.com/product/512) | 2-axis joystick with select button + breakout board | No | N/A |
 
 ---
 
 ## 🌡️ Sensors
 
-| Part Name | Description | Supported |
-|----------|-------------|-----|
-| [SCD-41 CO₂ Sensor](https://www.adafruit.com/product/5190) | True CO₂, temperature, and humidity sensor – STEMMA QT / Qwiic | No |
-| [Piezoelectric Ribbon](https://www.adafruit.com/product/4931) | 2 ft (600mm) piezoelectric ribbon sensor | No |
-| [ISM330DHCX IMU](https://www.adafruit.com/product/4502) | 6 DoF accelerometer + gyroscope – STEMMA QT / Qwiic | No |
-| [MPL3115A2 Sensor](https://www.adafruit.com/product/1893) | I2C barometric pressure / altitude / temperature | No |
+| Part Name | Description | Supported | Driver Link |
+|----------|-------------|-----|----|
+| [ISM330DHCX IMU](https://www.adafruit.com/product/4502) | 6 DoF accelerometer + gyroscope – STEMMA QT / Qwiic | Yes | [Driver](../drivers/accelerometer) |
+| [SCD-41 CO₂ Sensor](https://www.adafruit.com/product/5190) | True CO₂, temperature, and humidity sensor – STEMMA QT / Qwiic | No | N/A |
+| [Piezoelectric Ribbon](https://www.adafruit.com/product/4931) | 2 ft (600mm) piezoelectric ribbon sensor | No | N/A |
+| [MPL3115A2 Sensor](https://www.adafruit.com/product/1893) | I2C barometric pressure / altitude / temperature | No | N/A |
 
 ---
 
 ## 👁️ Visual Input
 
-| Part Name | Description | Supported |
-|----------|-------------|-----|
-| [PiCowbell Camera Breakout](https://www.adafruit.com/product/5946) | Autofocus 120° lens | No |
-| [MLX90640 Thermal Camera](https://www.adafruit.com/product/4469) | 24x32 IR thermal camera – 110° FoV | No |
+| Part Name | Description | Supported | Driver Link |
+|----------|-------------|-----|----|
+| [PiCowbell Camera Breakout](https://www.adafruit.com/product/5946) | Autofocus 120° lens | No | N/A |
+| [MLX90640 Thermal Camera](https://www.adafruit.com/product/4469) | 24x32 IR thermal camera – 110° FoV | No | N/A |
 
 ---
 
 ## 🎤 Audio Input
 
-| Part Name | Description | Supported |
-|----------|-------------|-----|
-| [Mini USB Microphone](https://www.adafruit.com/product/3367) | Plug-and-play USB mic | No |
-| [I2S MEMS Microphone](https://www.adafruit.com/product/3421) | SPH0645LM4H MEMS mic breakout – I2S | No |
+| Part Name | Description | Supported | Driver Link |
+|----------|-------------|-----|----|
+| [Mini USB Microphone](https://www.adafruit.com/product/3367) | Plug-and-play USB mic | No | N/A |
+| [I2S MEMS Microphone](https://www.adafruit.com/product/3421) | SPH0645LM4H MEMS mic breakout – I2S | No | N/A |
 
 ---
 
 ## 📡 Location & Navigation
 
-| Part Name | Description | Supported |
-|----------|-------------|-----|
-| [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No |
+| Part Name | Description | Supported | Driver Link |
+|----------|-------------|----|
+| [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No | N/A |
+
+
+# Bridges
+A bridge connects two hardware devices, allowing them to share data and communicate across different protocols. It translates and relays signals or data, ensuring compatibility and enhancing the overall system’s functionality.
+
+## USB Bridges
+Most drivers expect a direct USB connection to the Pi, sometimes mediated by a small controller on the board. We currently offer easy-setup for:
+- [KB2040](https://www.adafruit.com/product/5302)
+
+## Bluetooth LE Bridges
+**Note**: This driver is a work in progress. At the moment, it mainly forwards placeholder data. However, it’s still useful as a starting point for bridging to existing setups.
+
+We have also explored Bluetooth-based bridges, which do not plug directly into the PI:
+- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062) - Driver is at [this link](../drivers/bluetooth-bridge/)
+
+
+## Future Bridges
+- [Garmin ANT+](https://www.amazon.com/Garmin-USB-Stick-Fitness-Devices/dp/B00CM381SQ/ref=sr_1_1?ie=UTF8&qid=1475691048&sr=8-1&keywords=ant%2B+stick)
+- [Flowtoy USB Bridge](https://flowtoys.com/usb-bridge) (Note, this is just a special-case of Bluetooth and may not be required)
