@@ -73,3 +73,10 @@ I've found the most reliable script to be this:
 It'll drop you in with a Python interpret and read STDOUT from the serial port.  You can directly run commands via the REPL to help with debugging and see errors.  It isn't the best, but it isn't bad.
 
 If you're on an OSx device, `screen /dev/ttyACM0 115200` might be more ergonomic.
+
+## Understanding Interface
+Each board is really different, the following code can get you really far in understanding what is going on with a given board:
+```python
+import board
+dir(board)
+```

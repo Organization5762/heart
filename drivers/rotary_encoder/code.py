@@ -1,10 +1,4 @@
 # https://docs.circuitpython.org/en/latest/shared-bindings/rotaryio/index.html
-# This is code loaded onto the the little Rotary encoder
-# TODO (lampe): Send button press
-# TODO (lampe): Need to send the button press + disambiguate button presses from rotary turns.
-# Probably use JSON + events?
-# import json
-import time
 import rotaryio
 import board
 from digitalio import DigitalInOut, Direction, Pull

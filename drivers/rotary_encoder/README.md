@@ -1,9 +1,4 @@
-Folder for random driver-related code. Should be pretty small/limited.
+# Updating Driver
+There's some context in (this)[../devlog/03.SetupRotaryEncoder.md] devlog, but generally it has been abstrated away.
 
-# To Update:
-
-Read (this)[../devlog/03.SetupRotaryEncoder.md\]
-
-You can edit the files directly on the Py by going to /media/michael/CIRCUITPY.  Just copy the file over, replacing the existing `code.py`.
-
-You can screen into it via `screen /dev/ttyACM0 115200`
+Similarly to our other drivers, simply run `python update.py rotary_encoder`
