@@ -226,7 +226,6 @@ class LEDMatrix(Device, SampleBase):
         # Testing
         # options.led_limit_refresh = 100
         options.show_refresh_rate = 1
-        # options.hardware_mapping = "adafruit-hat"
         options.disable_hardware_pulsing = True
         options.multiplexing = 0
         options.pwm_bits = 7

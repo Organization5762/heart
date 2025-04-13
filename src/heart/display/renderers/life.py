@@ -15,7 +15,7 @@ class Life(BaseRenderer):
 
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
         self.state = None
-        self.seed = 0
+        self.seed = None
 
     def _update_grid(self, grid):
         # convolve the grid with the kernel to count neighbors
@@ -28,7 +28,7 @@ class Life(BaseRenderer):
         return new_grid.astype(int)
 
     def _maybe_update_seed(self, window: Surface) -> None:
-        current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
+        current_value = SwitchSubscriber.get().get_rotational_value()
         if current_value != self.seed:
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())

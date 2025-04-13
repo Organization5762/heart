@@ -1,3 +1,4 @@
+# This is expected to work on the PI, as the button is connected via USB to it
 
 wget https://downloads.circuitpython.org/bin/adafruit_rotary_trinkey_m0/en_US/adafruit-circuitpython-adafruit_rotary_trinkey_m0-en_US-9.2.0.uf2
 cp adafruit-circuitpython-adafruit_rotary_trinkey_m0-en_US-9.2.0.uf2 /media/michael/TRINKEYBOOT || echo "Error: Please make sure to hit reset on your button."

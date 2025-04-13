@@ -1,9 +1,11 @@
 import json
+from typing import NoReturn
 
 import serial
 
 from heart.input import RunnableIO, Subscriber
 from heart.utilities.env import Configuration
+from heart.input.bluetooth import UartListener
 
 ACTIVE_SWITCH = None
 
@@ -56,7 +58,7 @@ class Switch(BaseSwitch):
     def _connect_to_ser(self):
         return serial.Serial(self.port, self.baudrate)
 
-    def run(self):
+    def run(self) -> NoReturn:
         # If it crashes, try to re-connect
         while True:
             try:
@@ -73,6 +75,32 @@ class Switch(BaseSwitch):
                     pass
                 finally:
                     ser.close()
+            except Exception:
+                pass
+
+class BluetoothSwitch(BaseSwitch):
+    def __init__(self, *args, **kwargs) -> None:
+        self.listener = UartListener()
+        super().__init__(*args, **kwargs)
+
+    def _connect_to_ser(self) -> None:
+        return self.listener.start()
+
+    def run(self) -> NoReturn:
+        # If it crashes, try to re-connect
+        while True:
+            try:
+                self._connect_to_ser()
+                try:
+                    while True:
+                        for event in self.listener.consume_events():
+                            self._update_due_to_data(event)
+                except KeyboardInterrupt:
+                    print("Program terminated")
+                except Exception:
+                    pass
+                finally:
+                    self.listener.close()
             except Exception:
                 pass
 
@@ -98,10 +126,10 @@ class SwitchSubscriber(Subscriber[BaseSwitch]):
             ACTIVE_SWITCH = switch
         return ACTIVE_SWITCH
 
-    def run(self):
+    def run(self) -> None:
         self.switch.run()
 
-    def get_switch(self):
+    def get_switch(self) -> BaseSwitch:
         return self.switch
 
     def get_rotation_since_last_button_press(self) -> int:
