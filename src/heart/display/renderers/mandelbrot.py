@@ -218,7 +218,7 @@ class MandelbrotMode(BaseRenderer):
         smooth_normalized = np.sqrt(normalized)  # You can also try: np.log(normalized + 1) / np.log(2)
 
         # Scale to 0-255 range
-        color_value = (smooth_normalized * 255).astype(np.uint8)
+        color_value = (smooth_normalized * 255 * 0.5).astype(np.uint8)
 
         if self.invert_colors:
             # Points in the set are white, escaped points get darker

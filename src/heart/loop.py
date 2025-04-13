@@ -32,7 +32,7 @@ def run(
     if Configuration.is_pi():
         from heart.device.rgb_display import LEDMatrix
 
-        device = LEDMatrix(chain_length=8)
+        device = LEDMatrix(chain_length=12)
     else:
         device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
 
@@ -51,7 +51,7 @@ def run(
     # TODO: I want to split this out of the core loop so that
     # there is a more centralized configuration / management of all these IO devices
     if Configuration.is_pi():
-        def switch_fn():
+        def switch_fn() -> None:
             SwitchSubscriber.get().run()
 
         switch_thread = threading.Thread(target=switch_fn)
