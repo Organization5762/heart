@@ -12,20 +12,30 @@ from heart.utilities.env import get_device_ports
 class BaseSwitch(Peripheral):
     def __init__(self) -> None:
         self.rotational_value = 0
+
         self.button_value = 0
         self.rotation_value_at_last_button_press = self.rotational_value
 
+        self.button_long_press_value = 0
+        self.rotation_value_at_last_long_button_press = self.rotational_value
+    
     def run(self) -> None:
         return
 
     def get_rotation_since_last_button_press(self) -> int:
         return self.rotational_value - self.rotation_value_at_last_button_press
 
+    def get_rotation_since_last_long_button_press(self) -> int:
+        return self.rotational_value - self.rotation_value_at_last_long_button_press
+
     def get_rotational_value(self) -> int:
         return self.rotational_value
 
     def get_button_value(self) -> int:
         return self.button_value
+    
+    def get_long_button_value(self) -> int:
+        return self.button_long_press_value
 
     def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]
@@ -34,10 +44,15 @@ class BaseSwitch(Peripheral):
         if event_type == "rotation":
             self.rotational_value = int(data_value)
 
-        if event_type == "button":
+        if event_type == "button.press":
             self.button_value += int(data_value)
             # Button was pressed, update last_rotational_value
             self.rotation_value_at_last_button_press = self.rotational_value
+        
+        if event_type == "button.long_press":
+            self.button_long_press_value += int(data_value)
+            # Button was pressed, update last_rotational_value
+            self.rotation_value_at_last_long_button_press = self.rotational_value
 
 
 class FakeSwitch(BaseSwitch):

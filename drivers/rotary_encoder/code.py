@@ -1,39 +1,54 @@
-# https://docs.circuitpython.org/en/latest/shared-bindings/rotaryio/index.html
 import rotaryio
 import board
 from digitalio import DigitalInOut, Direction, Pull
+import time  # Import time module for tracking button press duration
 
-# I got ROTA and ROTB just by doing dir(board)
+# Initialize the rotary encoder
 enc = rotaryio.IncrementalEncoder(
     pin_a=board.ROTA,
     pin_b=board.ROTB,
 )
 last_position = None
 
-has_sent_this_input = False
+# Variables to track button press timing and state
+press_start = None         # Holds the time when the button was first pressed
+long_pressed_sent = False  # Flags whether a long-press event has been sent
 
-
+# Initialize the button switch
 switch = DigitalInOut(board.SWITCH)
 switch.direction = Direction.INPUT
 switch.pull = Pull.DOWN
 
-
+# Helper function to produce JSON-formatted messages
 def form_json(name: str, data: int):
     return '{"event_type": "' + name + '", "data": ' + str(data) + '}'
 
-
 while True:
+    # Handle rotary encoder rotations:
     position = enc.position
-    switch_value = switch.value
     if last_position is None or position != last_position:
         print(form_json("rotation", position))
-            
-    if switch_value and not has_sent_this_input:
-        # Send 1 instead of true so: (1) It can be added (2) we don't need to convert to JSON bool
-        print(form_json("button", 1))
-        has_sent_this_input = True
-    elif not switch_value and has_sent_this_input:
-        # Switch it back, as the button has become undepressed
-        has_sent_this_input = False
-        
     last_position = position
+
+    # Read the current state of the button
+    switch_value = switch.value
+
+    if switch_value:
+        # Button is pressed
+        if press_start is None:
+            # Button has just been pressed: record the current time
+            press_start = time.monotonic()
+        else:
+            # Button is still held down; check if it qualifies as a long press
+            if not long_pressed_sent and (time.monotonic() - press_start) >= 0.75:
+                # 0.75 seconds have passed – define this as a long press.
+                print(form_json("button.long_press", 1))
+                long_pressed_sent = True
+    else:
+        # Button is released
+        if press_start is not None:
+            if not long_pressed_sent:
+                print(form_json("button.press", 1))
+                
+            press_start = None
+            long_pressed_sent = False

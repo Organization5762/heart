@@ -256,7 +256,7 @@ class GameLoop:
             payload = {"event_type": "rotation", "data": switch.rotational_value + 1}
 
         if keys[pygame.K_UP]:
-            payload = {"event_type": "button", "data": 1}
+            payload = {"event_type": "button.press", "data": 1}
 
         if payload is not None:
             switch._update_due_to_data(payload)
