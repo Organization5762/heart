@@ -3,6 +3,8 @@ import time
 import subprocess
 import sys
 import toml
+from pathlib import Path
+import heart
 
 MEDIA_DIRECTORY = "/media/michael"
 CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME="adafruit-circuitpython-bundle-9.x-mpy-20250412"
@@ -64,9 +66,6 @@ def download_file(url: str, checksum: str) -> str:
         print(f"Error: Failed to download {url}")
         sys.exit(1)
 def copy_file(source: str, destination: str) -> None:
-    if not os.path.exists(source):
-        return
-    
     try:
         print(f"Before copying: {source} to {destination}")
         if os.path.isdir(source):
@@ -79,12 +78,11 @@ def copy_file(source: str, destination: str) -> None:
         sys.exit(1)
 
 def main(device_driver_name: str) -> None:
-    base_path = os.path.dirname(os.path.abspath(__file__))
+    base_path = str(Path(heart.__file__).resolve().parents[2] / "drivers")
     code_path = os.path.join(base_path, device_driver_name)
     if not os.path.isdir(code_path):
         print(f"Error: The path {code_path} does not exist. This is where we expect the driver code to exist.")
         sys.exit(1)
-
 
     ###
     # Load a bunch of env vars the driver declares

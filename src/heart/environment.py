@@ -9,7 +9,7 @@ import pygame
 from PIL import Image
 
 from heart.device import Device, Layout
-from heart.input.switch import SwitchSubscriber
+from heart.peripheral.manager import PeripheralManager
 from heart.utilities.env import Configuration
 
 if TYPE_CHECKING:
@@ -44,9 +44,10 @@ class GameMode:
 
 
 class GameLoop:
-    def __init__(self, device: Device, max_fps: int = 60) -> None:
+    def __init__(self, device: Device, peripheral_manager: PeripheralManager, max_fps: int = 60) -> None:
         self.initalized = False
         self.device = device
+        self.peripheral_manager = peripheral_manager
 
         self.max_fps = max_fps
         self.modes: list[GameMode] = []
@@ -78,7 +79,7 @@ class GameLoop:
         return new_game_mode
 
     def active_mode(self) -> GameMode:
-        mode_index = SwitchSubscriber.get().get_button_value() % len(self.modes)
+        mode_index = self.peripheral_manager._deprecated_get_main_switch().get_button_value() % len(self.modes)
         return self.modes[mode_index]
 
     def process_renderer(self, renderer: "BaseRenderer") -> Image.Image | None:
@@ -96,7 +97,11 @@ class GameLoop:
                     )
 
             # Process the screen
-            renderer.process(screen, self.clock)
+            renderer.process(
+                window=screen,
+                clock=self.clock,
+                peripheral_manager=self.peripheral_manager
+            )
             image = pygame.surfarray.pixels3d(screen)
             alpha = pygame.surfarray.pixels_alpha(screen)
             image = np.dstack((image, alpha))
@@ -216,6 +221,11 @@ class GameLoop:
         self.screen = pygame.Surface(self.device.full_display_size(), pygame.HIDDEN)
 
         self.clock = pygame.time.Clock()
+
+        logger.info("Attempting to detect attached peripherals")
+        self.peripheral_manager.detect()
+        logger.info(f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}")
+
         logger.info("Display Initialized")
         self.initalized = True
 
@@ -237,7 +247,7 @@ class GameLoop:
         ):
             return
 
-        switch = SwitchSubscriber.get().get_switch()
+        switch = self.peripheral_manager._deprecated_get_main_switch()
         payload = None
         if keys[pygame.K_LEFT]:
             payload = {"event_type": "rotation", "data": switch.rotational_value - 1}

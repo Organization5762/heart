@@ -33,7 +33,7 @@ def _form_payload(name: str, data) -> str:
         "event_type": name,
         "data": data
     }
-    return json.dumps(payload)
+    return "\n" + json.dumps(payload) + "\n"
 
 
 def form_tuple_payload(name: str, data: tuple) -> str:
@@ -93,6 +93,7 @@ def main() -> None:
     # 1. We care about the more precise data possibly (e.g. power by damned)
     # 2. That actually checking the sensor takes roughly 0 time
     wait_between_payloads_seconds = (1000 / get_sample_rate(sensor)) / 1000
+    last_acceleration = None
 
     while True:
         try:
@@ -100,9 +101,27 @@ def main() -> None:
                 sensor = connect_to_sensor(i2c=i2c)
 
             # M/s^2
-            print(form_tuple_payload("acceleration", sensor.acceleration))
+            # TODO: Maybe only send if the change is meaningful compared to the previous value
+            # (e.g. 0.1 M/s^2)
+            current_acceleration = sensor.acceleration
+
+            if last_acceleration is None:
+                # First iteration: print the reading and set as last reading.
+                print(form_tuple_payload("acceleration", current_acceleration))
+                last_acceleration = current_acceleration
+            else:
+                MINIMUM_CHANGE = 0.1
+                # Check if any axis changed by more than 0.1
+                if (abs(current_acceleration[0] - last_acceleration[0]) > MINIMUM_CHANGE or
+                    abs(current_acceleration[1] - last_acceleration[1]) > MINIMUM_CHANGE or
+                    abs(current_acceleration[2] - last_acceleration[2]) > MINIMUM_CHANGE):
+                    
+                    print(form_tuple_payload("acceleration", current_acceleration))
+                    last_acceleration = current_acceleration
+
+
             # radian/s
-            print(form_tuple_payload("angular_velocity", sensor.gyro))
+            # print(form_tuple_payload("angular_velocity", sensor.gyro))
 
             # This also has a `temperature` field but I'm not sure if that's chip temperature or ambient
             time.sleep(wait_between_payloads_seconds)
@@ -110,12 +129,6 @@ def main() -> None:
             sensor = None
             time.sleep(WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS)
         except BaseException as e:
-            _form_payload(
-                "exception",
-                data={
-                    "message": str(e)
-                }
-            )
             raise e
 
 main()

@@ -37,7 +37,6 @@ Possible future input types (Based on parts I've ordered):
 |----------|-------------|-----|----|
 | [Mini USB Microphone](https://www.adafruit.com/product/3367) | Plug-and-play USB mic | No | N/A |
 | [I2S MEMS Microphone](https://www.adafruit.com/product/3421) | SPH0645LM4H MEMS mic breakout – I2S | No | N/A |
-
 ---
 
 ## 📡 Location & Navigation
