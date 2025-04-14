@@ -6,7 +6,7 @@ import pygame
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.input.switch import SwitchSubscriber
+from heart.peripherial.manager import PeripherialManager
 
 
 @dataclass
@@ -44,16 +44,16 @@ class TextRendering(BaseRenderer):
 
         self.initialized = True
 
-    def _current_text(self) -> str:
-        current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
+    def _current_text(self, peripherial_manager: PeripherialManager) -> str:
+        current_value = peripherial_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         current_text_idx = current_value % len(self.text)
         return self.text[current_text_idx]
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
         if not self.initialized:
             self._initialize()
 
-        current_text = self._current_text()
+        current_text = self._current_text(peripherial_manager=peripherial_manager)
 
         lines = current_text.split("\n")
         total_text_height = len(lines) * self.font.get_linesize()

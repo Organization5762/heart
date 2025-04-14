@@ -7,6 +7,7 @@ from pygame.time import Clock
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
+from heart.peripherial.manager import PeripherialManager
 
 
 class LSystem(BaseRenderer):
@@ -83,7 +84,7 @@ class LSystem(BaseRenderer):
             elif char == "]":
                 position, current_angle = stack.pop()
 
-    def process(self, window: Surface, clock: Clock) -> None:
+    def process(self, window: Surface, clock: Clock, peripherial_manager: PeripherialManager) -> None:
         self.time_since_last_update += clock.get_time()
         if self.time_since_last_update > 1000:
             self._update_grammar()

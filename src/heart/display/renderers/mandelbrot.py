@@ -1,14 +1,12 @@
-import time
 from collections import deque
 
 import numpy as np
 import pygame
+from heart.peripherial.manager import PeripherialManager
 from numba import jit, prange
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-# from heart.input.direction import DirectionInput, Direction
-from heart.input.switch import SwitchSubscriber
 
 
 class MandelbrotMode(BaseRenderer):
@@ -51,8 +49,8 @@ class MandelbrotMode(BaseRenderer):
 
         self.coloring_mode = "gray"
 
-    def _switch_feed(self):
-        current_value = SwitchSubscriber.get().get_rotation_since_last_button_press()
+    def _switch_feed(self, peripherial_manager: PeripherialManager):
+        current_value = peripherial_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         return current_value
 
     # def _dpad_feed(self):
@@ -61,66 +59,66 @@ class MandelbrotMode(BaseRenderer):
     def clamp(self, n, low, high):
         return max(low, min(n, high))
 
-    def handle_dpad(self):
-        dpad = DirectionInput.get_active()
-        direction = dpad.get_direction()
-        pan_amount = 0.05 / self.zoom
-        dpad_trigerred = False
-        if direction == Direction.ENTER and self.mode == "free":
-            self.reset()
-            self.mode = "auto"
-            # if self.mode == "auto":
-            #     self.mode = "free"
-            # else:
-            #     self.reset()
-            #     self.mode = "auto"
-        elif direction == Direction.UP:
-            dpad_trigerred = True
-            # self.zoom_factor = self.clamp(self.zoom_factor + 0.01, 0.82, 1.3)
-            self.offset_y -= pan_amount
-        elif direction == Direction.UP_LEFT:
-            dpad_trigerred = True
-            self.offset_x -= pan_amount
-            self.offset_y -= pan_amount
-        elif direction == Direction.UP_RIGHT:
-            dpad_trigerred = True
-            self.offset_x += pan_amount
-            self.offset_y -= pan_amount
-        elif direction == Direction.DOWN_LEFT:
-            dpad_trigerred = True
-            self.offset_x -= pan_amount
-            self.offset_y += pan_amount
-        elif direction == Direction.DOWN_RIGHT:
-            dpad_trigerred = True
-            self.offset_x += pan_amount
-            self.offset_y += pan_amount
-        elif direction == Direction.DOWN:
-            dpad_trigerred = True
-            self.offset_y += pan_amount
-        elif direction == Direction.LEFT:
-            dpad_trigerred = True
-            self.offset_x -= pan_amount
-        elif direction == Direction.RIGHT:
-            dpad_trigerred = True
-            self.offset_x += pan_amount
-        elif direction == Direction.SPACE:
-            dpad_trigerred = True
-            if self.zoom < self.max_zoom:
-                self.zoom *= 1.1
-        elif direction == Direction.CTRL:
-            dpad_trigerred = True
-            if self.zoom > 1:
-                self.zoom /= 1.1
-        elif direction == "y":
-            self.coloring_mode = "standard"
-        elif direction == "u":
-            self.coloring_mode = "gray"
+    # def handle_dpad(self):
+    #     dpad = DirectionInput.get_active()
+    #     direction = dpad.get_direction()
+    #     pan_amount = 0.05 / self.zoom
+    #     dpad_trigerred = False
+    #     if direction == Direction.ENTER and self.mode == "free":
+    #         self.reset()
+    #         self.mode = "auto"
+    #         # if self.mode == "auto":
+    #         #     self.mode = "free"
+    #         # else:
+    #         #     self.reset()
+    #         #     self.mode = "auto"
+    #     elif direction == Direction.UP:
+    #         dpad_trigerred = True
+    #         # self.zoom_factor = self.clamp(self.zoom_factor + 0.01, 0.82, 1.3)
+    #         self.offset_y -= pan_amount
+    #     elif direction == Direction.UP_LEFT:
+    #         dpad_trigerred = True
+    #         self.offset_x -= pan_amount
+    #         self.offset_y -= pan_amount
+    #     elif direction == Direction.UP_RIGHT:
+    #         dpad_trigerred = True
+    #         self.offset_x += pan_amount
+    #         self.offset_y -= pan_amount
+    #     elif direction == Direction.DOWN_LEFT:
+    #         dpad_trigerred = True
+    #         self.offset_x -= pan_amount
+    #         self.offset_y += pan_amount
+    #     elif direction == Direction.DOWN_RIGHT:
+    #         dpad_trigerred = True
+    #         self.offset_x += pan_amount
+    #         self.offset_y += pan_amount
+    #     elif direction == Direction.DOWN:
+    #         dpad_trigerred = True
+    #         self.offset_y += pan_amount
+    #     elif direction == Direction.LEFT:
+    #         dpad_trigerred = True
+    #         self.offset_x -= pan_amount
+    #     elif direction == Direction.RIGHT:
+    #         dpad_trigerred = True
+    #         self.offset_x += pan_amount
+    #     elif direction == Direction.SPACE:
+    #         dpad_trigerred = True
+    #         if self.zoom < self.max_zoom:
+    #             self.zoom *= 1.1
+    #     elif direction == Direction.CTRL:
+    #         dpad_trigerred = True
+    #         if self.zoom > 1:
+    #             self.zoom /= 1.1
+    #     elif direction == "y":
+    #         self.coloring_mode = "standard"
+    #     elif direction == "u":
+    #         self.coloring_mode = "gray"
 
-        if dpad_trigerred:
-            self.mode = "free"
+    #     if dpad_trigerred:
+    #         self.mode = "free"
 
-    def handle_switch(self):
-        value = self._switch_feed()
+    def handle_switch(self, peripherial_manager: PeripherialManager):
+        value = self._switch_feed(peripherial_manager=peripherial_manager)
         if self.last_switch_value is None:
             self.last_switch_value = value
         delta = value - self.last_switch_value
@@ -142,11 +140,11 @@ class MandelbrotMode(BaseRenderer):
         self.invert_colors = False
         self.rotation_angle = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
         if not self.dimensions_set:
             self.height = window.get_height()
             self.width = window.get_width()
-        self.handle_switch()
+        self.handle_switch(peripherial_manager=peripherial_manager)
         # self.handle_dpad()
         self.render_mandelbrot(window, clock)
         # self.render_zoom_level(window)

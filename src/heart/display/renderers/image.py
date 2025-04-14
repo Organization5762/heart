@@ -4,6 +4,7 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
+from heart.peripherial.manager import PeripherialManager
 
 
 @dataclass
@@ -26,7 +27,7 @@ class RenderImage(BaseRenderer):
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
         if not self.initialized:
             self._initialize()
 

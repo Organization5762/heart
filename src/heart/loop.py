@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import threading
 from typing import Annotated
 
@@ -9,10 +10,10 @@ from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
-from heart.input.heart_rate import HeartRateSubscriber
-from heart.input.switch import SwitchSubscriber
+from heart.peripherial.manager import PeripherialManager
 from heart.programs.registry import registry
 from heart.utilities.env import Configuration
+from heart.manage.update import main as update_driver_main
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,8 @@ def run(
     else:
         device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
 
-    loop = GameLoop(device=device)
+    manager = PeripherialManager()
+    loop = GameLoop(device=device, peripherial_manager=manager)
     configuration_fn(loop)
 
     ## ============================= ##
@@ -50,13 +52,13 @@ def run(
     ##
     # TODO: I want to split this out of the core loop so that
     # there is a more centralized configuration / management of all these IO devices
-    if Configuration.is_pi():
-        def switch_fn() -> None:
-            SwitchSubscriber.get().run()
-
-        switch_thread = threading.Thread(target=switch_fn)
-        switch_thread.start()
     loop.start()
+
+@app.command()
+def update_driver(
+    name: Annotated[str, typer.Option("--name")]
+) -> None:
+    update_driver_main(device_driver_name=name)
 
 
 def main():

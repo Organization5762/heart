@@ -6,7 +6,7 @@ from scipy.ndimage import convolve
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.input.switch import SwitchSubscriber
+from heart.peripherial.manager import PeripherialManager
 
 
 class Life(BaseRenderer):
@@ -27,14 +27,14 @@ class Life(BaseRenderer):
 
         return new_grid.astype(int)
 
-    def _maybe_update_seed(self, window: Surface) -> None:
-        current_value = SwitchSubscriber.get().get_rotational_value()
+    def _maybe_update_seed(self, window: Surface, peripherial_manager: PeripherialManager) -> None:
+        current_value = peripherial_manager._deprecated_get_main_switch().get_rotational_value()
         if current_value != self.seed:
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())
 
-    def process(self, window: Surface, clock: Clock) -> None:
-        self._maybe_update_seed(window=window)
+    def process(self, window: Surface, clock: Clock, peripherial_manager: PeripherialManager) -> None:
+        self._maybe_update_seed(window=window, peripherial_manager=peripherial_manager)
         self.state = self._update_grid(self.state)
 
         # if 1, make white, else make black

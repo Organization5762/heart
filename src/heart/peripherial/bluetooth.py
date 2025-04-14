@@ -3,7 +3,7 @@ from collections import deque
 import functools
 import json
 import threading
-from typing import Any, Iterator, NoReturn
+from typing import Any, AsyncGenerator, AsyncIterator, Iterator, NoReturn
 from bleak import BleakScanner, BleakClient
 from bleak.backends.device import BLEDevice
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -19,11 +19,20 @@ class UartListener:
     """
     Listeners for data come in as raw bytes from a UART Service.  
     """
-    __slots__ = ("buffer", "events")
+    __slots__ = ("device", "buffer", "events")
 
-    def __init__(self) -> None:
+    def __init__(self, device: BLEDevice) -> None:
+        self.device = device
         self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
+
+    @classmethod
+    def _discover_devices(cls) -> Iterator[BLEDevice]:
+        devices: list[BLEDevice] = asyncio.run(BleakScanner.discover())
+        for device in devices:
+            # TODO: This should come from somewhere more principled
+            if device.name == "totem-controller":
+                yield device
 
     def start(self) -> None:
         t = threading.Thread(target=lambda: asyncio.run(self.connect_and_listen()))
@@ -37,20 +46,8 @@ class UartListener:
             yield self.events.popleft()
 
     async def connect_and_listen(self) -> NoReturn:
-        device = await self._discover_device()
-        if device is None:
-            raise ValueError("No device found.")
         print("Found a device, starting listener loop")
-        await self.__start_listener_loop(device)
-
-    async def _discover_device(self) -> BLEDevice | None:
-        # TODO: This definitely could be made mroe efficient
-        print("Attempting to discover the appropriate device")
-        devices: list[BLEDevice] = await BleakScanner.discover()
-        for device in devices:
-            if device.name == "totem-controller":
-                return device
-        return None
+        await self.__start_listener_loop(self.device)
 
     async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
         while True:

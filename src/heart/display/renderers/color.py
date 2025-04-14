@@ -2,6 +2,7 @@ import pygame
 
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
+from heart.peripherial.manager import PeripherialManager
 
 
 class RenderColor(BaseRenderer):
@@ -9,7 +10,7 @@ class RenderColor(BaseRenderer):
         super().__init__()
         self.color = color
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
         image = pygame.Surface(window.get_size())
         image.fill(self.color._as_tuple())
         window.blit(image, (0, 0))

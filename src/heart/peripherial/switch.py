@@ -1,16 +1,15 @@
 import json
-from typing import NoReturn
+from typing import Iterator, NoReturn, Self
 
 import serial
 
-from heart.input import RunnableIO, Subscriber
-from heart.utilities.env import Configuration
-from heart.input.bluetooth import UartListener
+from heart.peripherial import Peripherial
+from heart.peripherial.bluetooth import UartListener
+from bleak.backends.device import BLEDevice
 
-ACTIVE_SWITCH = None
+from heart.utilities.env import get_device_ports
 
-
-class BaseSwitch(RunnableIO):
+class BaseSwitch(Peripherial):
     def __init__(self) -> None:
         self.rotational_value = 0
         self.button_value = 0
@@ -45,15 +44,29 @@ class FakeSwitch(BaseSwitch):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+    @staticmethod
+    def detect() -> Iterator[Self]:
+        return [FakeSwitch()]
+
+
     def run(self) -> None:
         return
 
 
 class Switch(BaseSwitch):
-    def __init__(self, *args, **kwargs) -> None:
-        self.port = "/dev/ttyACM0"
-        self.baudrate = 115200
+    def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
+        self.port = port
+        self.baudrate = baudrate
         super().__init__(*args, **kwargs)
+    
+    @staticmethod
+    def detect() -> Iterator[Self]:
+        return [
+            Switch(
+                port=port,
+                baudrate=115200
+            ) for port in get_device_ports("usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0")
+        ]
 
     def _connect_to_ser(self):
         return serial.Serial(self.port, self.baudrate)
@@ -79,9 +92,16 @@ class Switch(BaseSwitch):
                 pass
 
 class BluetoothSwitch(BaseSwitch):
-    def __init__(self, *args, **kwargs) -> None:
-        self.listener = UartListener()
+    def __init__(self, device: BLEDevice, *args, **kwargs) -> None:
+        self.listener = UartListener(device=device)
         super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def detect() -> Iterator[Self]:
+        for device in UartListener._discover_devices():
+            yield BluetoothSwitch(
+                device=device
+            )
 
     def _connect_to_ser(self) -> None:
         return self.listener.start()
@@ -103,40 +123,3 @@ class BluetoothSwitch(BaseSwitch):
                     self.listener.close()
             except Exception:
                 pass
-
-
-class SwitchSubscriber(Subscriber[BaseSwitch]):
-    def __init__(self, switch: BaseSwitch) -> None:
-        global ACTIVE_SWITCH
-        if ACTIVE_SWITCH is not None:
-            raise Exception("Switch already initialized")
-
-        self.switch = switch
-
-    @classmethod
-    def get(cls):
-        global ACTIVE_SWITCH
-        if ACTIVE_SWITCH is None:
-            if Configuration.is_pi():
-                s = Switch()
-            else:
-                s = FakeSwitch()
-
-            switch = SwitchSubscriber(switch=s)
-            ACTIVE_SWITCH = switch
-        return ACTIVE_SWITCH
-
-    def run(self) -> None:
-        self.switch.run()
-
-    def get_switch(self) -> BaseSwitch:
-        return self.switch
-
-    def get_rotation_since_last_button_press(self) -> int:
-        return self.get_switch().get_rotation_since_last_button_press()
-
-    def get_rotational_value(self) -> int:
-        return self.get_switch().get_rotational_value()
-
-    def get_button_value(self) -> int:
-        return self.get_switch().get_button_value()
