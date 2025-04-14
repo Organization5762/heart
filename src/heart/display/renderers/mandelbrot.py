@@ -2,7 +2,7 @@ from collections import deque
 
 import numpy as np
 import pygame
-from heart.peripherial.manager import PeripherialManager
+from heart.peripheral.manager import PeripheralManager
 from numba import jit, prange
 
 from heart.display.renderers import BaseRenderer
@@ -49,8 +49,8 @@ class MandelbrotMode(BaseRenderer):
 
         self.coloring_mode = "gray"
 
-    def _switch_feed(self, peripherial_manager: PeripherialManager):
-        current_value = peripherial_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+    def _switch_feed(self, peripheral_manager: PeripheralManager):
+        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         return current_value
 
     # def _dpad_feed(self):
@@ -117,8 +117,8 @@ class MandelbrotMode(BaseRenderer):
     #     if dpad_trigerred:
     #         self.mode = "free"
 
-    def handle_switch(self, peripherial_manager: PeripherialManager):
-        value = self._switch_feed(peripherial_manager=peripherial_manager)
+    def handle_switch(self, peripheral_manager: PeripheralManager):
+        value = self._switch_feed(peripheral_manager=peripheral_manager)
         if self.last_switch_value is None:
             self.last_switch_value = value
         delta = value - self.last_switch_value
@@ -140,11 +140,11 @@ class MandelbrotMode(BaseRenderer):
         self.invert_colors = False
         self.rotation_angle = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         if not self.dimensions_set:
             self.height = window.get_height()
             self.width = window.get_width()
-        self.handle_switch(peripherial_manager=peripherial_manager)
+        self.handle_switch(peripheral_manager=peripheral_manager)
         # self.handle_dpad()
         self.render_mandelbrot(window, clock)
         # self.render_zoom_level(window)

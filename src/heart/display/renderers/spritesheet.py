@@ -6,7 +6,7 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-from heart.peripherial.manager import PeripherialManager
+from heart.peripheral.manager import PeripheralManager
 
 
 @dataclass
@@ -74,14 +74,14 @@ class SpritesheetLoop(BaseRenderer):
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
-    def __duration_scale_factor(self, peripherial_manager: PeripherialManager):
-        current_value = peripherial_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+    def __duration_scale_factor(self, peripheral_manager: PeripheralManager) -> float:
+        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         return current_value / 20.00
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (
-            current_kf.duration * self.__duration_scale_factor(peripherial_manager=peripherial_manager)
+            current_kf.duration * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
         )
         if (
             self.time_since_last_update is None

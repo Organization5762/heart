@@ -1,7 +1,7 @@
-from heart.peripherial.manager import PeripherialManager
-m = PeripherialManager()
+from heart.peripheral.manager import PeripheralManager
+m = PeripheralManager()
 d = m.detect()
 
-peripherials = m.peripherials
-print(len(peripherials))
-print(peripherials)
+peripheral = m.peripheral
+print(len(peripheral))
+print(peripheral)

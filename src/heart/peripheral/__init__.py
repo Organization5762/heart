@@ -1,7 +1,7 @@
 import abc
 from typing import Iterator, Self
 
-class Peripherial(abc.ABC):
+class Peripheral(abc.ABC):
     def run(self) -> None:
         pass
 

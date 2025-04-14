@@ -3,13 +3,13 @@ from typing import Iterator, NoReturn, Self
 
 import serial
 
-from heart.peripherial import Peripherial
-from heart.peripherial.bluetooth import UartListener
+from heart.peripheral import Peripheral
+from heart.peripheral.bluetooth import UartListener
 from bleak.backends.device import BLEDevice
 
 from heart.utilities.env import get_device_ports
 
-class BaseSwitch(Peripherial):
+class BaseSwitch(Peripheral):
     def __init__(self) -> None:
         self.rotational_value = 0
         self.button_value = 0

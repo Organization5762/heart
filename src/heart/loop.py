@@ -10,7 +10,7 @@ from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
-from heart.peripherial.manager import PeripherialManager
+from heart.peripheral.manager import PeripheralManager
 from heart.programs.registry import registry
 from heart.utilities.env import Configuration
 from heart.manage.update import main as update_driver_main
@@ -37,8 +37,8 @@ def run(
     else:
         device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
 
-    manager = PeripherialManager()
-    loop = GameLoop(device=device, peripherial_manager=manager)
+    manager = PeripheralManager()
+    loop = GameLoop(device=device, peripheral_manager=manager)
     configuration_fn(loop)
 
     ## ============================= ##

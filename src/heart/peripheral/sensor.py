@@ -5,7 +5,7 @@ import time
 from typing import Generic, Iterator, NoReturn, Self
 
 import serial
-from heart.peripherial import Peripherial
+from heart.peripheral import Peripheral
 from heart.utilities.env import get_device_ports
 
 @dataclass
@@ -55,7 +55,7 @@ class Distribution:
         return jerk_value
 
 
-class Accelerometer(Peripherial):
+class Accelerometer(Peripheral):
     def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
         self.acceleration_value = None
         self.port = port

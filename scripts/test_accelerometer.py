@@ -1,14 +1,14 @@
 import time
 
 from serial.serialutil import SerialException
-from heart.peripherial.manager import PeripherialManager
-from heart.peripherial.sensor import Accelerometer
+from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.sensor import Accelerometer
 import serial
 
-m = PeripherialManager()
+m = PeripheralManager()
 d = m.detect()
 
-accelerometers: list[Accelerometer] = [x for x in m.peripherials if isinstance(x, Accelerometer)]
+accelerometers: list[Accelerometer] = [x for x in m.peripheral if isinstance(x, Accelerometer)]
 assert len(accelerometers) == 1, f"Found {len(accelerometers)}"
 accelerometer = accelerometers[0]
 # s = accelerometer._connect_to_ser()

@@ -5,7 +5,7 @@ import pygame
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.peripherial.manager import PeripherialManager
+from heart.peripheral.manager import PeripheralManager
 
 
 class RandomPixel(BaseRenderer):
@@ -21,7 +21,7 @@ class RandomPixel(BaseRenderer):
     def _initialize(self) -> None:
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         width, height = window.get_size()
 
         # TODO: We need a mask here because the most expensive thing is the random function.
@@ -47,7 +47,7 @@ class Border(BaseRenderer):
     def _initialize(self) -> None:
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         width, height = window.get_size()
 
         # Draw the border
@@ -78,7 +78,7 @@ class Rain(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         width, height = window.get_size()
         if not self.initialized:
             self._change_starting_point(width=width)
@@ -112,7 +112,7 @@ class Slinky(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripherial_manager: PeripherialManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
         width, height = window.get_size()
         if not self.initialized:
             self._change_starting_point(width=width)

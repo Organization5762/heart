@@ -5,9 +5,9 @@ import itertools
 import threading
 from typing import Iterator
 
-from heart.peripherial import Peripherial
-from heart.peripherial.sensor import Accelerometer
-from heart.peripherial.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
+from heart.peripheral import Peripheral
+from heart.peripheral.sensor import Accelerometer
+from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
 from heart.utilities.env import Configuration
 
 
@@ -26,9 +26,9 @@ class Device:
         ROTARY_ENCODER = "ROTARY_ENCODER"
         BLUETOOTH_BRIDGE = "BLUETOOTH_BRIDGE"
 
-class PeripherialManager:
+class PeripheralManager:
     def __init__(self) -> None:
-        self.peripherials: list[Peripherial] = []
+        self.peripheral: list[Peripheral] = []
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread]  = []
 
@@ -52,7 +52,7 @@ class PeripherialManager:
             raise ValueError("Manager has already been started")
 
         self.started = True
-        for peripherial in self.peripherials:
+        for peripherial in self.peripheral:
             # TODO (lampe): Should likely keep a handle on all these threads
             def peripherial_run_fn() -> None:
                 peripherial.run()
@@ -63,7 +63,7 @@ class PeripherialManager:
 
             self._threads.append(peripherial_thread)
 
-    def _detect_switches(self) -> Iterator[Peripherial]:
+    def _detect_switches(self) -> Iterator[Peripheral]:
         if Configuration.is_pi():
             switches = itertools.chain(
                 Switch.detect(),
@@ -77,13 +77,13 @@ class PeripherialManager:
                 self._deprecated_main_switch = switch
             yield switch
 
-    def _detect_sensors(self) -> Iterator[Peripherial]:
+    def _detect_sensors(self) -> Iterator[Peripheral]:
         yield from itertools.chain(
             Accelerometer.detect()
         )
         
-    def _register_peripherial(self, peripherial: Peripherial) -> None:
-        self.peripherials.append(peripherial)
+    def _register_peripherial(self, peripherial: Peripheral) -> None:
+        self.peripheral.append(peripherial)
 
     def _deprecated_get_main_switch(self):
         """
