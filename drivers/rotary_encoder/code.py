@@ -1,9 +1,13 @@
+# https://docs.circuitpython.org/en/latest/shared-bindings/rotaryio/index.html
+
 import rotaryio
 import board
 from digitalio import DigitalInOut, Direction, Pull
-import time  # Import time module for tracking button press duration
+import time
 
-# Initialize the rotary encoder
+LONG_PRESS_DURATION_SECONDS = 0.75
+
+# I got ROTA and ROTB just by doing dir(board)
 enc = rotaryio.IncrementalEncoder(
     pin_a=board.ROTA,
     pin_b=board.ROTB,
@@ -11,15 +15,13 @@ enc = rotaryio.IncrementalEncoder(
 last_position = None
 
 # Variables to track button press timing and state
-press_start = None         # Holds the time when the button was first pressed
-long_pressed_sent = False  # Flags whether a long-press event has been sent
+press_start = None
+long_pressed_sent = False
 
-# Initialize the button switch
 switch = DigitalInOut(board.SWITCH)
 switch.direction = Direction.INPUT
 switch.pull = Pull.DOWN
 
-# Helper function to produce JSON-formatted messages
 def form_json(name: str, data: int):
     return '{"event_type": "' + name + '", "data": ' + str(data) + '}'
 
@@ -34,14 +36,12 @@ while True:
     switch_value = switch.value
 
     if switch_value:
-        # Button is pressed
+        # Button just pressed
         if press_start is None:
-            # Button has just been pressed: record the current time
             press_start = time.monotonic()
         else:
             # Button is still held down; check if it qualifies as a long press
-            if not long_pressed_sent and (time.monotonic() - press_start) >= 0.75:
-                # 0.75 seconds have passed – define this as a long press.
+            if not long_pressed_sent and (time.monotonic() - press_start) >= LONG_PRESS_DURATION_SECONDS:
                 print(form_json("button.long_press", 1))
                 long_pressed_sent = True
     else:
@@ -49,6 +49,6 @@ while True:
         if press_start is not None:
             if not long_pressed_sent:
                 print(form_json("button.press", 1))
-                
+
             press_start = None
             long_pressed_sent = False
