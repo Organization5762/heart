@@ -203,6 +203,7 @@ class SampleBase(object):
 
         return True
 
+
 class LEDMatrix(Device, SampleBase):
     def __init__(self, chain_length: int, *args, **kwargs):
         super(LEDMatrix, self).__init__(

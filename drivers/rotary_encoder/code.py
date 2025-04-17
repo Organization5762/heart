@@ -4,6 +4,7 @@ import rotaryio
 import board
 from digitalio import DigitalInOut, Direction, Pull
 import time
+from heart.firmware_io import constants
 
 LONG_PRESS_DURATION_SECONDS = 0.5
 
@@ -29,7 +30,7 @@ while True:
     # Handle rotary encoder rotations:
     position = enc.position
     if last_position is None or position != last_position:
-        print(form_json("rotation", position))
+        print(form_json(constants.SWITCH_ROTATION, position))
     last_position = position
 
     # Read the current state of the button
@@ -42,13 +43,13 @@ while True:
         else:
             # Button is still held down; check if it qualifies as a long press
             if not long_pressed_sent and (time.monotonic() - press_start) >= LONG_PRESS_DURATION_SECONDS:
-                print(form_json("button.long_press", 1))
+                print(form_json(constants.BUTTON_LONG_PRESS, 1))
                 long_pressed_sent = True
     else:
         # Button is released
         if press_start is not None:
             if not long_pressed_sent:
-                print(form_json("button.press", 1))
+                print(form_json(constants.BUTTON_PRESS, 1))
 
             press_start = None
             long_pressed_sent = False

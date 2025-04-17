@@ -2,11 +2,11 @@ from collections import deque
 
 import numpy as np
 import pygame
-from heart.peripheral.manager import PeripheralManager
 from numba import jit, prange
 
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
+from heart.peripheral.manager import PeripheralManager
 
 
 class MandelbrotMode(BaseRenderer):
@@ -50,7 +50,9 @@ class MandelbrotMode(BaseRenderer):
         self.coloring_mode = "gray"
 
     def _switch_feed(self, peripheral_manager: PeripheralManager):
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        current_value = (
+            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
         return current_value
 
     # def _dpad_feed(self):
@@ -140,7 +142,12 @@ class MandelbrotMode(BaseRenderer):
         self.invert_colors = False
         self.rotation_angle = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
         if not self.dimensions_set:
             self.height = window.get_height()
             self.width = window.get_width()
@@ -154,11 +161,11 @@ class MandelbrotMode(BaseRenderer):
     def update_zoom(self):
         self.zoom *= self.zoom_factor
         if self.zoom >= self.max_zoom:
-            self.zoom = 2 ** -5
+            self.zoom = 2**-5
             self.invert_colors = not self.invert_colors
             # self.update_rotation()
             # self.flip = not self.flip
-        elif self.zoom < 2 ** -5:
+        elif self.zoom < 2**-5:
             self.zoom = 100000000
             self.invert_colors = not self.invert_colors
             # self.flip = not self.flip
@@ -213,7 +220,9 @@ class MandelbrotMode(BaseRenderer):
         normalized[escaped] = iterations[escaped] / max_iter
 
         # Apply smooth coloring formula
-        smooth_normalized = np.sqrt(normalized)  # You can also try: np.log(normalized + 1) / np.log(2)
+        smooth_normalized = np.sqrt(
+            normalized
+        )  # You can also try: np.log(normalized + 1) / np.log(2)
 
         # Scale to 0-255 range
         color_value = (smooth_normalized * 255 * 0.5).astype(np.uint8)
@@ -229,7 +238,9 @@ class MandelbrotMode(BaseRenderer):
 
         return color_surface
 
-    def render_mandelbrot(self, window: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def render_mandelbrot(
+        self, window: pygame.Surface, clock: pygame.time.Clock
+    ) -> None:
         re = np.linspace(
             -3.5 / self.zoom + self.offset_x,
             3.5 / self.zoom + self.offset_x,

@@ -9,6 +9,7 @@ import pygame
 from PIL import Image
 
 from heart.device import Device, Layout
+from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
 from heart.utilities.env import Configuration
 
@@ -44,7 +45,9 @@ class GameMode:
 
 
 class GameLoop:
-    def __init__(self, device: Device, peripheral_manager: PeripheralManager, max_fps: int = 60) -> None:
+    def __init__(
+        self, device: Device, peripheral_manager: PeripheralManager, max_fps: int = 60
+    ) -> None:
         self.initalized = False
         self.device = device
         self.peripheral_manager = peripheral_manager
@@ -79,7 +82,10 @@ class GameLoop:
         return new_game_mode
 
     def active_mode(self) -> GameMode:
-        mode_index = self.peripheral_manager._deprecated_get_main_switch().get_button_value() % len(self.modes)
+        mode_index = (
+            self.peripheral_manager._deprecated_get_main_switch().get_button_value()
+            % len(self.modes)
+        )
         return self.modes[mode_index]
 
     def process_renderer(self, renderer: "BaseRenderer") -> Image.Image | None:
@@ -100,7 +106,7 @@ class GameLoop:
             renderer.process(
                 window=screen,
                 clock=self.clock,
-                peripheral_manager=self.peripheral_manager
+                peripheral_manager=self.peripheral_manager,
             )
             image = pygame.surfarray.pixels3d(screen)
             alpha = pygame.surfarray.pixels_alpha(screen)
@@ -224,7 +230,9 @@ class GameLoop:
 
         logger.info("Attempting to detect attached peripherals")
         self.peripheral_manager.detect()
-        logger.info(f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}")
+        logger.info(
+            f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
+        )
 
         logger.info("Display Initialized")
         self.initalized = True
@@ -249,14 +257,25 @@ class GameLoop:
 
         switch = self.peripheral_manager._deprecated_get_main_switch()
         payload = None
+
+        # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
         if keys[pygame.K_LEFT]:
-            payload = {"event_type": "rotation", "data": switch.rotational_value - 1}
+            payload = {
+                "event_type": SWITCH_ROTATION,
+                "data": switch.rotational_value - 1,
+            }
 
         if keys[pygame.K_RIGHT]:
-            payload = {"event_type": "rotation", "data": switch.rotational_value + 1}
+            payload = {
+                "event_type": SWITCH_ROTATION,
+                "data": switch.rotational_value + 1,
+            }
 
         if keys[pygame.K_UP]:
-            payload = {"event_type": "button.press", "data": 1}
+            payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+
+        if keys[pygame.K_DOWN]:
+            payload = {"event_type": BUTTON_PRESS, "data": 1}
 
         if payload is not None:
             switch._update_due_to_data(payload)

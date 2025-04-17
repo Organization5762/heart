@@ -81,13 +81,21 @@ class SpritesheetLoopRandom(BaseRenderer):
         self.initialized = True
 
     def __duration_scale_factor(self, peripheral_manager: PeripheralManager):
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        current_value = (
+            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
         return current_value / 20.00
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (
-            current_kf.duration * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
+            current_kf.duration
+            * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
         )
         if (
             self.time_since_last_update is None

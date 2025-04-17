@@ -1,9 +1,10 @@
-
-from dataclasses import dataclass
-from enum import StrEnum
 import itertools
 import threading
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Iterator
+
+from typing_extensions import deprecated
 
 from heart.peripheral import Peripheral
 from heart.peripheral.sensor import Accelerometer
@@ -14,6 +15,7 @@ from heart.utilities.env import Configuration
 class NotificationService:
     def start_notify(on_value_change) -> None:
         pass
+
 
 @dataclass
 class Device:
@@ -26,26 +28,23 @@ class Device:
         ROTARY_ENCODER = "ROTARY_ENCODER"
         BLUETOOTH_BRIDGE = "BLUETOOTH_BRIDGE"
 
+
 class PeripheralManager:
     def __init__(self) -> None:
         self.peripheral: list[Peripheral] = []
         self._deprecated_main_switch: BaseSwitch | None = None
-        self._threads: list[threading.Thread]  = []
+        self._threads: list[threading.Thread] = []
 
         # TODO: I think this is something I want to support as it simplifies
         # pushing state around in some ways
         self.notification_service = NotificationService()
         self.started = False
-    
+
     def detect(self) -> None:
-        peripherials = itertools.chain(
-            self._detect_switches(),
-            self._detect_sensors()
-        )
+        peripherials = itertools.chain(self._detect_switches(), self._detect_sensors())
 
         for peripherial in peripherials:
             self._register_peripherial(peripherial=peripherial)
-            
 
     def start(self) -> None:
         if self.started:
@@ -58,7 +57,9 @@ class PeripheralManager:
                 peripherial.run()
 
             # TODO: Doing the threading automatically might cause issues with the local switch?
-            peripherial_thread = threading.Thread(target=peripherial_run_fn, daemon=True)
+            peripherial_thread = threading.Thread(
+                target=peripherial_run_fn, daemon=True
+            )
             peripherial_thread.start()
 
             self._threads.append(peripherial_thread)
@@ -78,27 +79,28 @@ class PeripheralManager:
             yield switch
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
-        yield from itertools.chain(
-            Accelerometer.detect()
-        )
-        
+        yield from itertools.chain(Accelerometer.detect())
+
     def _register_peripherial(self, peripherial: Peripheral) -> None:
         self.peripheral.append(peripherial)
 
-    def _deprecated_get_main_switch(self):
-        """
-        Added this to make the legacy conversion easier, SwitchSubscriber is now subsumed by this.
-        """
+    @deprecated(
+        "This function has been deprecareted as I want to handle peripherals in a looser way instead of binding things so clearly to the switch."
+    )
+    def _deprecated_get_main_switch(self) -> BaseSwitch:
+        """Added this to make the legacy conversion easier, SwitchSubscriber is now
+        subsumed by this."""
         if self._deprecated_main_switch is None:
             raise Exception("Unable to get switch as it has not been registered")
-        
+
         return self._deprecated_main_switch
-    
+
     def __del__(self) -> None:
-        """
-        Attempt to clean up threads and peripherals at object deletion time.
-        This is not guaranteed to run in all scenarios; consider an explicit
-        'close()' or context-manager approach for reliability.
+        """Attempt to clean up threads and peripherals at object deletion time.
+
+        This is not guaranteed to run in all scenarios; consider an explicit 'close()'
+        or context-manager approach for reliability.
+
         """
         for t in self._threads:
             if t.is_alive():
