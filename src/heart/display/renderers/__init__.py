@@ -1,6 +1,6 @@
 import pygame
 
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 

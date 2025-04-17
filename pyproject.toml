@@ -33,6 +33,7 @@ dependencies = [
     "pygame==2.6.1",
     "pyserial",
     "scipy",
+    "toml",
     "tqdm",
     "typer-slim",
 ]

@@ -17,6 +17,7 @@ class Configuration:
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
-    for port in os.listdir(base_port):
-        if port.startswith(prefix):
-            yield os.path.join(base_port, port)
+    if os.path.exists(base_port):
+        for port in os.listdir(base_port):
+            if port.startswith(prefix):
+                yield os.path.join(base_port, port)

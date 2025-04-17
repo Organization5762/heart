@@ -5,7 +5,7 @@ import pygame
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -34,12 +34,12 @@ class RandomPixel(BaseRenderer):
 
 
 class Border(BaseRenderer):
-    def __init__(self, width: int) -> None:
+    def __init__(self, width: int, color: Color | None = None) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
-        self.color = Color.random()
+        self.color = color or Color.random()
 
     def _initialize(self) -> None:
         self.initialized = True

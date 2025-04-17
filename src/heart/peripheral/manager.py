@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Iterator
 
-from typing_extensions import deprecated
-
 from heart.peripheral import Peripheral
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
@@ -84,9 +82,6 @@ class PeripheralManager:
     def _register_peripherial(self, peripherial: Peripheral) -> None:
         self.peripheral.append(peripherial)
 
-    @deprecated(
-        "This function has been deprecareted as I want to handle peripherals in a looser way instead of binding things so clearly to the switch."
-    )
     def _deprecated_get_main_switch(self) -> BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now
         subsumed by this."""

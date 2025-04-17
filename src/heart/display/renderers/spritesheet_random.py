@@ -7,7 +7,7 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.display.renderers import BaseRenderer
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 

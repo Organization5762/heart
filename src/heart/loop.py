@@ -1,6 +1,4 @@
 import logging
-import subprocess
-import threading
 from typing import Annotated
 
 import typer
