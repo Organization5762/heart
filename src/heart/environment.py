@@ -254,10 +254,9 @@ class GameLoop:
 
         logger.info("Attempting to detect attached peripherals")
         self.peripheral_manager.detect()
-        logger.info(
-            f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
-        )
-
+        logger.info(f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}")
+        self.peripheral_manager.start()
+        logger.info("Starting all peripherals")
         logger.info("Display Initialized")
         self.initalized = True
 
