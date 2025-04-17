@@ -5,7 +5,7 @@ import board
 from digitalio import DigitalInOut, Direction, Pull
 import time
 
-LONG_PRESS_DURATION_SECONDS = 0.75
+LONG_PRESS_DURATION_SECONDS = 0.5
 
 # I got ROTA and ROTB just by doing dir(board)
 enc = rotaryio.IncrementalEncoder(
