@@ -82,8 +82,6 @@ class GameLoop:
         return new_game_mode
 
     def active_mode(self, mode_offset: int) -> GameMode:
-        # TODO (Lampe): The desired UX here is slightly different - which is that `get_long_button_value` enters the select mode
-        # Then after the select mode is entered, the user can scroll through
         mode_index = (self._active_mode_index + mode_offset) % len(self.modes)
         return self.modes[mode_index]
 
