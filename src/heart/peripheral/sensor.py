@@ -1,18 +1,21 @@
 import collections
-from dataclasses import dataclass
 import json
 import time
+from dataclasses import dataclass
 from typing import Generic, Iterator, NoReturn, Self
 
 import serial
+
 from heart.peripheral import Peripheral
 from heart.utilities.env import get_device_ports
+
 
 @dataclass
 class Acceleration:
     x: float
     y: float
     z: float
+
 
 # TODO (lampe): This is fundamentally useless right now
 class Distribution:
@@ -23,21 +26,19 @@ class Distribution:
         return time.monotonic()
 
     def add_value(self, value: float):
-        self.historic_values.append(
-            (self._get_time(), value)
-        )
+        self.historic_values.append((self._get_time(), value))
 
     def jerk(self) -> float | None:
-        """
-        Compute the instantaneous jerk using the two most recent data points.
-        
+        """Compute the instantaneous jerk using the two most recent data points.
+
         Jerk is calculated as:
-        
+
             jerk = (value_latest - value_previous) / (time_latest - time_previous)
-        
+
         Returns:
             The computed jerk (rate of change per second) if at least two values are available.
             If the time difference is zero or insufficient values exist, returns None.
+
         """
         if len(self.historic_values) < 2:
             return None  # Not enough data to compute jerk
@@ -48,7 +49,7 @@ class Distribution:
 
         dt = t_latest - t_prev
         if dt == 0:
-            return 0.0 
+            return 0.0
 
         # Compute jerk as the change in value divided by the change in time.
         jerk_value = (value_latest - value_prev) / dt
@@ -66,16 +67,14 @@ class Accelerometer(Peripheral):
         self.z_distribution = Distribution()
 
         super().__init__(*args, **kwargs)
-    
+
     @staticmethod
     def detect() -> Iterator[Self]:
         return [
-            Accelerometer(
-                port=port,
-                baudrate=115200
-            ) for port in get_device_ports("usb-Adafruit_KB2040_DF62585783393B33")
+            Accelerometer(port=port, baudrate=115200)
+            for port in get_device_ports("usb-Adafruit_KB2040_DF62585783393B33")
         ]
-    
+
     def _connect_to_ser(self) -> serial.Serial:
         return serial.Serial(self.port, self.baudrate)
 
@@ -111,9 +110,9 @@ class Accelerometer(Peripheral):
         return Acceleration(
             self.acceleration_value["x"],
             self.acceleration_value["y"],
-            self.acceleration_value["z"]
+            self.acceleration_value["z"],
         )
-    
+
     def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]
         data_value = data["data"]

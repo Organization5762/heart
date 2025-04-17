@@ -8,7 +8,11 @@ import numpy as np
 import pygame
 from PIL import Image
 
+from heart import DeviceDisplayMode
 from heart.device import Device, Layout
+from heart.display.color import Color
+from heart.display.renderers.pacman import Border
+from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
 from heart.utilities.env import Configuration
 
@@ -19,11 +23,6 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_GAME_LOOP = None
 RGBA_IMAGE_FORMAT = "RGBA"
-
-
-class DeviceDisplayMode(Enum):
-    MIRRORED = "mirrored"
-    FULL = "full"
 
 
 class GameMode:
@@ -44,7 +43,9 @@ class GameMode:
 
 
 class GameLoop:
-    def __init__(self, device: Device, peripheral_manager: PeripheralManager, max_fps: int = 60) -> None:
+    def __init__(
+        self, device: Device, peripheral_manager: PeripheralManager, max_fps: int = 60
+    ) -> None:
         self.initalized = False
         self.device = device
         self.peripheral_manager = peripheral_manager
@@ -55,6 +56,8 @@ class GameLoop:
         self.screen = None
 
         self.time_last_debugging_press = None
+
+        self._active_mode_index = 0
 
         pygame.display.set_mode(
             (
@@ -78,8 +81,8 @@ class GameLoop:
         self.modes.append(new_game_mode)
         return new_game_mode
 
-    def active_mode(self) -> GameMode:
-        mode_index = self.peripheral_manager._deprecated_get_main_switch().get_button_value() % len(self.modes)
+    def active_mode(self, mode_offset: int) -> GameMode:
+        mode_index = (self._active_mode_index + mode_offset) % len(self.modes)
         return self.modes[mode_index]
 
     def process_renderer(self, renderer: "BaseRenderer") -> Image.Image | None:
@@ -100,7 +103,7 @@ class GameLoop:
             renderer.process(
                 window=screen,
                 clock=self.clock,
-                peripheral_manager=self.peripheral_manager
+                peripheral_manager=self.peripheral_manager,
             )
             image = pygame.surfarray.pixels3d(screen)
             alpha = pygame.surfarray.pixels_alpha(screen)
@@ -138,7 +141,6 @@ class GameLoop:
             surface1.paste(surface2, (0, 0), surface2)
             return surface1
 
-        renderers = self.active_mode().renderers
         with ThreadPoolExecutor() as executor:
             surfaces: list[Image.Image] = [
                 i
@@ -177,12 +179,40 @@ class GameLoop:
 
         self.running = True
 
+        last_long_button_value = 0
+        in_select_mode = False
+        
+        mode_offset = 0
         while self.running:
             self._handle_events()
 
             self._preprocess_setup()
-            mode = self.active_mode()
-            renderers = mode.renderers
+            # TODO: Check if long press button value has changed
+            new_long_button_value = self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
+            if new_long_button_value != last_long_button_value:
+                # Swap select modes
+                if in_select_mode:
+                    # Combine the offset we're switching out of select mode
+                    self._active_mode_index += mode_offset
+                    mode_offset = 0
+                    print(self._active_mode_index)
+
+                in_select_mode = not in_select_mode
+                last_long_button_value = new_long_button_value
+            
+            if in_select_mode:
+                mode_offset = self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
+                print(mode_offset)
+
+            mode = self.active_mode(mode_offset=mode_offset)
+
+            renderers = mode.renderers.copy()
+            
+            # Add border in select mode
+            if in_select_mode:
+                renderers.append(
+                    Border(width=5, color=Color(r=255, g=105, b=180))
+                )
             image = self._render_surfaces(renderers)
             if image is not None:
                 bytes = image.tobytes()
@@ -250,14 +280,25 @@ class GameLoop:
 
         switch = self.peripheral_manager._deprecated_get_main_switch()
         payload = None
+
+        # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
         if keys[pygame.K_LEFT]:
-            payload = {"event_type": "rotation", "data": switch.rotational_value - 1}
+            payload = {
+                "event_type": SWITCH_ROTATION,
+                "data": switch.rotational_value - 1,
+            }
 
         if keys[pygame.K_RIGHT]:
-            payload = {"event_type": "rotation", "data": switch.rotational_value + 1}
+            payload = {
+                "event_type": SWITCH_ROTATION,
+                "data": switch.rotational_value + 1,
+            }
 
         if keys[pygame.K_UP]:
-            payload = {"event_type": "button", "data": 1}
+            payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+
+        if keys[pygame.K_DOWN]:
+            payload = {"event_type": BUTTON_PRESS, "data": 1}
 
         if payload is not None:
             switch._update_due_to_data(payload)
@@ -265,5 +306,5 @@ class GameLoop:
         self.time_last_debugging_press = current_time
 
         pygame.display.set_caption(
-            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}"
+            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
         )

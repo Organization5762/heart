@@ -1,6 +1,7 @@
 import abc
 from typing import Iterator, Self
 
+
 class Peripheral(abc.ABC):
     def run(self) -> None:
         pass

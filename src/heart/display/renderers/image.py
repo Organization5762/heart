@@ -27,7 +27,12 @@ class RenderImage(BaseRenderer):
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
         if not self.initialized:
             self._initialize()
 

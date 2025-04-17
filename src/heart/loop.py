@@ -1,6 +1,4 @@
 import logging
-import subprocess
-import threading
 from typing import Annotated
 
 import typer
@@ -10,10 +8,10 @@ from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
+from heart.manage.update import main as update_driver_main
 from heart.peripheral.manager import PeripheralManager
 from heart.programs.registry import registry
 from heart.utilities.env import Configuration
-from heart.manage.update import main as update_driver_main
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ app = typer.Typer()
 
 @app.command()
 def run(
-    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024"
+    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024",
 ) -> None:
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
@@ -54,10 +52,9 @@ def run(
     # there is a more centralized configuration / management of all these IO devices
     loop.start()
 
+
 @app.command()
-def update_driver(
-    name: Annotated[str, typer.Option("--name")]
-) -> None:
+def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     update_driver_main(device_driver_name=name)
 
 

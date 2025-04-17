@@ -45,11 +45,18 @@ class TextRendering(BaseRenderer):
         self.initialized = True
 
     def _current_text(self, peripheral_manager: PeripheralManager) -> str:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        current_value = (
+            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
         current_text_idx = current_value % len(self.text)
         return self.text[current_text_idx]
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
         if not self.initialized:
             self._initialize()
 
