@@ -8,6 +8,7 @@ import pygame.joystick
 from pygame.event import Event
 
 from heart.peripheral import Peripheral
+from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET
 
 logger = logging.getLogger(__name__)
 

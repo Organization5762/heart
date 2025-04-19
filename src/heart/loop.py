@@ -10,7 +10,7 @@ from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.manager import PeripheralManager
-from heart.programs.registry import ConfigurationRegistry, registry
+from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
 
 logger = logging.getLogger(__name__)
