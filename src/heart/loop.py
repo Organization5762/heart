@@ -55,7 +55,7 @@ def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
 
 
 def main():
-    return run()
+    return app()
 
 
 if __name__ == "__main__":

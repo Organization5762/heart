@@ -15,6 +15,7 @@ class ConfigurationRegistry:
             if filename.endswith(".py") and filename != "__init__.py":
                 module_name = f"heart.programs.configurations.{filename[:-3]}"
                 module = importlib.import_module(module_name)
+                print(f"importing {module_name}")
                 if hasattr(module, "configure"):
                     registry[filename[:-3]] = module.configure
 
