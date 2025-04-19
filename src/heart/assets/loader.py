@@ -1,4 +1,6 @@
+import json
 import os
+from typing import Any
 
 import pygame
 
@@ -20,6 +22,11 @@ class Loader:
     @classmethod
     def load_animation(cls, path):
         return Animation(cls._resolve_path(path), 100)
+
+    @classmethod
+    def load_json(cls, path) -> dict[str, Any]:
+        resolved_path = cls._resolve_path(path)
+        return json.load(resolved_path)
 
 
 # https://www.pygame.org/wiki/Spritesheet

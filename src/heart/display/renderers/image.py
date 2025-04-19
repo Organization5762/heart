@@ -12,7 +12,7 @@ class RenderImage(BaseRenderer):
         super().__init__()
         self.initialized = False
         self.current_frame = 0
-        self.file = Loader._resolve_path(image_file)
+        self.file = image_file
 
     def _initialize(self) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
