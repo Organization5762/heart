@@ -5,7 +5,6 @@ from typing import Iterator
 import pygame
 import serial.tools.list_ports
 
-
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 REQUEST_JOYSTICK_MODULE_RESET = pygame.event.custom_type()
 
@@ -33,9 +32,12 @@ def get_device_ports(prefix: str) -> Iterator[str]:
         pass  # Continue to fallback methods
 
     # Fallback for macOS and other platforms
-    if platform.system() == 'Darwin':  # macOS
+    if platform.system() == "Darwin":  # macOS
         # On macOS, use pyserial but filter results that match the prefix
         for port in serial.tools.list_ports.comports():
             port_name = os.path.basename(port.device)
-            if prefix.lower() in port.description.lower() or prefix.lower() in port_name.lower():
+            if (
+                prefix.lower() in port.description.lower()
+                or prefix.lower() in port_name.lower()
+            ):
                 yield port.device

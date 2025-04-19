@@ -1,5 +1,4 @@
 import json
-from dataclasses import dataclass
 from enum import Enum
 
 import pygame
@@ -7,13 +6,8 @@ import pygame
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.models import KeyFrame
 from heart.peripheral.manager import PeripheralManager
-
-
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    duration: int
 
 
 class LoopPhase(Enum):
@@ -86,7 +80,7 @@ class SpritesheetLoop(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (

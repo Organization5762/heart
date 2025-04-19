@@ -10,6 +10,8 @@ def configure(loop: GameLoop) -> None:
     width = 64
     height = 64
 
+    # TODO: There's some desire to refactor this into one "column" and then use the
+    # button to iterate through
     mode = loop.add_mode()
     for kirby in [
         "kirby_flying_32",
@@ -34,8 +36,12 @@ def configure(loop: GameLoop) -> None:
     modelbrot = loop.add_mode()
     modelbrot.add_renderer(MandelbrotMode())
 
+    hilbert_mode = loop.add_mode()
+    hilbert_mode.add_renderer(HilbertScene())
+
     mode = loop.add_mode()
 
+    # TODO: Refactor
     text = ["Lost my\nfriends\nagain"]
     text.extend(
         [

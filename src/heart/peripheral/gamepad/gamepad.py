@@ -20,7 +20,9 @@ class GamepadIdentifier(Enum):
 
 
 class Gamepad(Peripheral):
-    def __init__(self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None):
+    def __init__(
+        self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
+    ):
         self.joystick_id = joystick_id
         self.joystick = joystick
         self.TAP_THRESHOLD_MS = 500
@@ -43,7 +45,10 @@ class Gamepad(Peripheral):
         return tapped
 
     def was_released(self, button_id: int) -> bool:
-        return not self._pressed_curr_frame[button_id] and self._pressed_prev_frame[button_id]
+        return (
+            not self._pressed_curr_frame[button_id]
+            and self._pressed_prev_frame[button_id]
+        )
 
     def axis_value(self, axis_id: int, dead_zone: float = 0) -> float:
         axis_value = self._axis_curr_frame[self.axis_key(axis_id)]
@@ -99,7 +104,6 @@ class Gamepad(Peripheral):
                 # someone plugged in a rando controller, might as well try to use the bitdo mapping
                 return GamepadIdentifier.BIT_DO_LITE_2
 
-
     @staticmethod
     def axis_key(axis_id: int) -> str:
         return f"axis{axis_id}"
@@ -140,7 +144,7 @@ class Gamepad(Peripheral):
                     self._tap_flag[axis_key] = True
 
     @staticmethod
-    def detect() -> Iterator['Gamepad']:
+    def detect() -> Iterator["Gamepad"]:
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
