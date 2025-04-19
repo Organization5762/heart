@@ -10,20 +10,19 @@ import numpy as np
 import pygame
 from numba import jit, prange
 
-from heart.device import Orientation, Cube, Rectangle, Layout
+from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.mandelbrot.control_mappings import (
-    SwitchProControls,
-    KeyboardControls,
     BitDoLite2Controls,
-    SceneControlsMapping
+    KeyboardControls,
+    SceneControlsMapping,
+    SwitchProControls,
 )
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.display.renderers.mandelbrot.state import AppState, ViewMode
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.gamepad import GamepadIdentifier
 from heart.peripheral.manager import PeripheralManager
-
 
 ColorPalette = list[tuple[int, int, int]]
 
@@ -55,16 +54,21 @@ class MandelbrotMode(BaseRenderer):
         # auto-zoom loop properties
         self.max_auto_zoom = 20093773861.78
         self.init_zoom = 1
-        self.init_offset_x, self.init_offset_y = (-0.7446419526560056, 0.11883810795259032)
+        self.init_offset_x, self.init_offset_y = (
+            -0.7446419526560056,
+            0.11883810795259032,
+        )
         self.last_switch_value = None
 
         pygame.font.init()
-        self.font = pygame.font.SysFont('monospace', 8)
+        self.font = pygame.font.SysFont("monospace", 8)
 
         # input properties
         self.gamepad = None
         self.scene_controls: SceneControls | None = None
-        self.control_mappings: dict[GamepadIdentifier, SceneControlsMapping] | None = None
+        self.control_mappings: dict[GamepadIdentifier, SceneControlsMapping] | None = (
+            None
+        )
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
 
@@ -73,7 +77,7 @@ class MandelbrotMode(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ):
         self.clock = clock
         self.height = window.get_height()
@@ -107,8 +111,12 @@ class MandelbrotMode(BaseRenderer):
         self.scene_controls = SceneControls(self.state)
         self.keyboard_controls = KeyboardControls(self.scene_controls)
         self.control_mappings = {
-            GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(self.scene_controls, self.gamepad),
-            GamepadIdentifier.SWITCH_PRO: SwitchProControls(self.scene_controls, self.gamepad)
+            GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(
+                self.scene_controls, self.gamepad
+            ),
+            GamepadIdentifier.SWITCH_PRO: SwitchProControls(
+                self.scene_controls, self.gamepad
+            ),
         }
         self.initialized = True
 
@@ -161,12 +169,12 @@ class MandelbrotMode(BaseRenderer):
                         self._draw_mandelbrot_to_surface(screen, clock)
                         window.blit(
                             screen,
-                            (
-                                y * individual_screen_width,
-                                x * individual_screen_height
-                            )
+                            (y * individual_screen_width, x * individual_screen_height),
                         )
-        elif self.state.view_mode in (ViewMode.MANDELBROT_SELECTED, ViewMode.JULIA_SELECTED):
+        elif self.state.view_mode in (
+            ViewMode.MANDELBROT_SELECTED,
+            ViewMode.JULIA_SELECTED,
+        ):
             match self.state.orientation:
                 case Rectangle():
                     mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
@@ -195,10 +203,7 @@ class MandelbrotMode(BaseRenderer):
                         self._draw_julia_to_surface(screen, clock)
                         window.blit(
                             screen,
-                            (
-                                y * individual_screen_width,
-                                x * individual_screen_height
-                            )
+                            (y * individual_screen_width, x * individual_screen_height),
                         )
 
         if self.state.show_fps:
@@ -222,30 +227,20 @@ class MandelbrotMode(BaseRenderer):
     def auto_zoom(self):
         self.state.zoom *= 1.05
         if self.state.zoom >= self.max_auto_zoom:
-            self.state.zoom = 2 ** -5
+            self.state.zoom = 2**-5
             self.state.max_iterations = self.state._init_max_iterations
-        elif self.state.zoom < 2 ** -5:
+        elif self.state.zoom < 2**-5:
             self.state.zoom = 100000000
 
-    def _draw_cursor_to_surface(self, surface: pygame.Surface, posx: int, posy: int, cursor_size: float):
-        pygame.draw.circle(
-            surface,
-            (0, 0, 0),
-            (posx, posy),
-            2
-        )
-        pygame.draw.circle(
-            surface,
-            (255, 255, 255),
-            (posx, posy),
-            1
-        )
+    def _draw_cursor_to_surface(
+        self, surface: pygame.Surface, posx: int, posy: int, cursor_size: float
+    ):
+        pygame.draw.circle(surface, (0, 0, 0), (posx, posy), 2)
+        pygame.draw.circle(surface, (255, 255, 255), (posx, posy), 1)
 
     def clipped_line_end(self, start, end, screen_rect):
-        """
-        Given start=(x0,y0) inside screen_rect, and end=(x1,y1) anywhere,
-        return the point where the ray start→end intersects screen_rect.
-        """
+        """Given start=(x0,y0) inside screen_rect, and end=(x1,y1) anywhere, return the
+        point where the ray start→end intersects screen_rect."""
         x0, y0 = start
         x1, y1 = end
         dx = x1 - x0
@@ -300,11 +295,11 @@ class MandelbrotMode(BaseRenderer):
         #     screen_coords = self._complex_to_screen_julia(point, width, height)
         #     if screen_coords:
         #         x, y = screen_coords
-                # Draw bigger dot for the initial point (Julia constant)
-                # if i == 0:
-                #     pygame.draw.circle(surface, (255, 0, 0), (x, y), 3)
-                # else:
-                #     pygame.draw.circle(surface, (255, 255, 255), (x, y), 1)
+        # Draw bigger dot for the initial point (Julia constant)
+        # if i == 0:
+        #     pygame.draw.circle(surface, (255, 0, 0), (x, y), 3)
+        # else:
+        #     pygame.draw.circle(surface, (255, 255, 255), (x, y), 1)
 
         @dataclasses.dataclass
         class Rect:
@@ -321,8 +316,6 @@ class MandelbrotMode(BaseRenderer):
             # start_coords = self._clip_line_to_surface_boundary(start_coords, end_coords, width, height)
             # end_coords = self._clip_line_to_surface_boundary(start_coords, end_coords, width, height)
 
-
-
             # print("before", end_coords)
             # end_coords = (
             #     int(max(0, min(end_coords[0], width / 2))),
@@ -330,16 +323,19 @@ class MandelbrotMode(BaseRenderer):
             # )
             # print("after", end_coords)
 
-
             if start_coords and end_coords:
                 try:
-                    pygame.draw.line(surface, (255, 255, 255), start_coords, end_coords, 1)
+                    pygame.draw.line(
+                        surface, (255, 255, 255), start_coords, end_coords, 1
+                    )
                 except Exception as e:
                     print(start_coords)
                     print(end_coords)
                     raise e
 
-    def _complex_to_screen_julia(self, z: complex, surface_width: int, surface_height: int):
+    def _complex_to_screen_julia(
+        self, z: complex, surface_width: int, surface_height: int
+    ):
         width, height = surface_width, surface_height
         aspect_ratio = width / height
 
@@ -370,7 +366,12 @@ class MandelbrotMode(BaseRenderer):
 
         return screen_x, screen_y
 
-    def _draw_split_view(self, mandelbrot_surface: pygame.Surface, julia_surface: pygame.Surface, clock: pygame.time.Clock):
+    def _draw_split_view(
+        self,
+        mandelbrot_surface: pygame.Surface,
+        julia_surface: pygame.Surface,
+        clock: pygame.time.Clock,
+    ):
         self.state.msurface_width = mandelbrot_surface.get_width()
         msurface_width = mandelbrot_surface.get_width()
         msurface_height = mandelbrot_surface.get_height()
@@ -387,7 +388,7 @@ class MandelbrotMode(BaseRenderer):
             surface=mandelbrot_surface,
             posx=(msurface_width // 2 + self.state.cursor_pos.x),
             posy=((msurface_height // 2) + self.state.cursor_pos.y),
-            cursor_size=min(1, 0.05 * msurface_width)
+            cursor_size=min(1, 0.05 * msurface_width),
         )
 
         return mandelbrot_surface, julia_surface
@@ -402,7 +403,9 @@ class MandelbrotMode(BaseRenderer):
             thickness,
         )
 
-    def _draw_julia_to_surface(self, surface: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def _draw_julia_to_surface(
+        self, surface: pygame.Surface, clock: pygame.time.Clock
+    ) -> None:
         width, height = surface.get_size()
         aspect_ratio = width / height
 
@@ -425,7 +428,9 @@ class MandelbrotMode(BaseRenderer):
         c_real = self.state.julia_constant.real
         c_imag = self.state.julia_constant.imag
 
-        converge_time = get_julia_converge_time(re, im, c_real, c_imag, self.state.max_iterations)
+        converge_time = get_julia_converge_time(
+            re, im, c_real, c_imag, self.state.max_iterations
+        )
         clipped_times = np.clip(converge_time, 0, len(self.active_palette) - 1)
         palette_array = np.array(self.active_palette, dtype=np.uint8)
         color_surface = palette_array[clipped_times]
@@ -433,17 +438,31 @@ class MandelbrotMode(BaseRenderer):
         surface_array = np.transpose(color_surface, (1, 0, 2))
         pygame.surfarray.blit_array(surface, surface_array)
 
-    def _draw_mandelbrot_to_surface(self, surface: pygame.Surface, clock: pygame.time.Clock) -> None:
+    def _draw_mandelbrot_to_surface(
+        self, surface: pygame.Surface, clock: pygame.time.Clock
+    ) -> None:
         width, height = surface.get_size()
-        current_params = (self.state.zoom, self.state.movement.x, self.state.movement.y,
-                          self.state.max_iterations, width, height, self.state.jcursor_pos.x, self.state.jcursor_pos.y)
+        current_params = (
+            self.state.zoom,
+            self.state.movement.x,
+            self.state.movement.y,
+            self.state.max_iterations,
+            width,
+            height,
+            self.state.jcursor_pos.x,
+            self.state.jcursor_pos.y,
+        )
 
         if self.cached_result is None or self.last_params != current_params:
             self.last_params = current_params
             aspect_ratio = width / height
 
-            height_range = 4.0 / self.state.zoom  # Total height range (2.0 * 2 for padding)
-            width_range = height_range * aspect_ratio  # Width range adjusted for aspect ratio
+            height_range = (
+                4.0 / self.state.zoom
+            )  # Total height range (2.0 * 2 for padding)
+            width_range = (
+                height_range * aspect_ratio
+            )  # Width range adjusted for aspect ratio
 
             re = np.linspace(
                 -width_range / 2 + self.state.movement.x,
@@ -470,12 +489,10 @@ class MandelbrotMode(BaseRenderer):
         surface_array = np.transpose(color_surface, (1, 0, 2))
         pygame.surfarray.blit_array(surface, surface_array)
 
-
     def _draw_fps_to_surface(self, window: pygame.Surface):
         text_color = (255, 255, 255)
         window.blit(
-            self.font.render(f"{int(self.clock.get_fps())}", True, text_color),
-            (5, 5)
+            self.font.render(f"{int(self.clock.get_fps())}", True, text_color), (5, 5)
         )
 
     def _draw_debug_to_surface(self, window: pygame.Surface):
@@ -484,23 +501,27 @@ class MandelbrotMode(BaseRenderer):
             [
                 (
                     self.font.render(f"X: {self.state.movement.x}", True, text_color),
-                    (5, 10)
+                    (5, 10),
                 ),
                 (
                     self.font.render(f"Y: {self.state.movement.y}", True, text_color),
-                    (5, 25)
+                    (5, 25),
                 ),
                 (
-                    self.font.render(f"Iter: {self.state.max_iterations}", True, text_color),
-                    (5, 40)
+                    self.font.render(
+                        f"Iter: {self.state.max_iterations}", True, text_color
+                    ),
+                    (5, 40),
                 ),
                 (
                     self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
-                    (5, 55)
+                    (5, 55),
                 ),
                 (
-                    self.font.render(f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color),
-                    (5, 70)
+                    self.font.render(
+                        f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
+                    ),
+                    (5, 70),
                 ),
             ]
         )
@@ -526,9 +547,9 @@ class MandelbrotMode(BaseRenderer):
                 # Scale the cycle index to [0,1] range for the color calculation
                 t = cycle_i / cycle_length
 
-                r = int(255 * (t ** r_exp))
-                g = int(255 * (t ** g_exp))
-                b = int(255 * (t ** b_exp))
+                r = int(255 * (t**r_exp))
+                g = int(255 * (t**g_exp))
+                b = int(255 * (t**b_exp))
 
                 pulse = 0.5 + 0.5 * np.sin(2 * np.pi * i / cycle_length)
                 r = min(255, int(r * (1.1 + 0.2 * pulse)))
@@ -567,6 +588,7 @@ def get_mandelbrot_converge_time(re, im, critical_real, critical_imag, max_iter)
 
     return result
 
+
 @jit(nopython=True, parallel=True, fastmath=True, cache=True)
 def get_julia_converge_time(re, im, c_real, c_imag, max_iter):
     height, width = re.shape
@@ -587,6 +609,7 @@ def get_julia_converge_time(re, im, c_real, c_imag, max_iter):
 
 def main():
     import pygame
+
     profiling = os.environ.get("PROFILING", "False").lower() == "true"
     check_frames = int(os.environ.get("CHECK_FRAMES", "100"))
 
@@ -606,7 +629,7 @@ def main():
     clock = pygame.time.Clock()
     if profiling:
         profiler = cProfile.Profile()
-        profile_filename = 'mandelbrot_profile.prof'
+        profile_filename = "mandelbrot_profile.prof"
         profiler.enable()
 
     frame_count = 0
@@ -646,14 +669,14 @@ def main():
             # --- Option 1: Print stats to console ---
             s = io.StringIO()
             # Sort by cumulative time spent in function and its callees
-            ps = pstats.Stats(profiler, stream=s).sort_stats('cumulative')
+            ps = pstats.Stats(profiler, stream=s).sort_stats("cumulative")
             ps.print_stats(30)  # Print top 30 lines
             print("\n--- Profiling Stats (Sorted by Cumulative Time) ---")
             print(s.getvalue())
 
             # You might also want to sort by 'tottime' (total time spent ONLY in the function itself)
             s = io.StringIO()
-            ps = pstats.Stats(profiler, stream=s).sort_stats('tottime')
+            ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
             ps.print_stats(30)  # Print top 30 lines
             print("\n--- Profiling Stats (Sorted by Total Time) ---")
             print(s.getvalue())
@@ -661,11 +684,14 @@ def main():
             # --- Option 2: Save stats to a file for later analysis ---
             profiler.dump_stats(profile_filename)
             print(f"\nProfiling data saved to {profile_filename}")
-            print("You can analyze this file later, e.g., using 'snakeviz {profile_filename}'")
+            print(
+                "You can analyze this file later, e.g., using 'snakeviz {profile_filename}'"
+            )
 
     # Clean up
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()

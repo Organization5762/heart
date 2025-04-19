@@ -3,10 +3,15 @@ from collections import defaultdict
 
 import pygame
 
-from heart.device import Rectangle, Cube
+from heart.device import Cube, Rectangle
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.peripheral.gamepad import Gamepad
-from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, SwitchProMapping, SwitchLikeMapping, DpadType
+from heart.peripheral.gamepad.peripheral_mappings import (
+    BitDoLite2,
+    DpadType,
+    SwitchLikeMapping,
+    SwitchProMapping,
+)
 
 
 class SceneControlsMapping(ABC):
@@ -19,32 +24,33 @@ class SceneControlsMapping(ABC):
 
     @abstractmethod
     def update_movement(self):
-        """Update pan/cursor movement"""
+        """Update pan/cursor movement."""
         pass
 
     @abstractmethod
     def update_zoom(self):
-        """Update zoom"""
+        """Update zoom."""
         pass
 
     @abstractmethod
     def update_iterations(self):
-        """Update max_iterations used for evaluating if element in set"""
+        """Update max_iterations used for evaluating if element in set."""
         pass
 
     @abstractmethod
     def update_mode(self):
-        """
-        Cycle through the view modes
+        """Cycle through the view modes.
+
         0 - full mandelbrot
         1 - split view (with mandelbrot selected)
         2 - split view (with julia selected)
         3 - full julia
+
         """
         pass
 
     def update_additional(self):
-        """Catch all mostly for debug controls"""
+        """Catch all mostly for debug controls."""
         pass
 
 
@@ -80,13 +86,23 @@ class KeyboardControls(SceneControlsMapping):
 
     def update_mode(self):
         pressed = pygame.key.get_pressed()
-        if pressed[pygame.K_LEFTBRACKET] and not self.key_pressed_last_frame[pygame.K_LEFTBRACKET]:
+        if (
+            pressed[pygame.K_LEFTBRACKET]
+            and not self.key_pressed_last_frame[pygame.K_LEFTBRACKET]
+        ):
             self.scene_controls._decrement_view_mode()
-        self.key_pressed_last_frame[pygame.K_LEFTBRACKET] = pressed[pygame.K_LEFTBRACKET]
+        self.key_pressed_last_frame[pygame.K_LEFTBRACKET] = pressed[
+            pygame.K_LEFTBRACKET
+        ]
 
-        if pressed[pygame.K_RIGHTBRACKET] and not self.key_pressed_last_frame[pygame.K_RIGHTBRACKET]:
+        if (
+            pressed[pygame.K_RIGHTBRACKET]
+            and not self.key_pressed_last_frame[pygame.K_RIGHTBRACKET]
+        ):
             self.scene_controls._increment_view_mode()
-        self.key_pressed_last_frame[pygame.K_RIGHTBRACKET] = pressed[pygame.K_RIGHTBRACKET]
+        self.key_pressed_last_frame[pygame.K_RIGHTBRACKET] = pressed[
+            pygame.K_RIGHTBRACKET
+        ]
 
     def update_additional(self):
         pressed = pygame.key.get_pressed()
@@ -99,11 +115,15 @@ class KeyboardControls(SceneControlsMapping):
         self.key_pressed_last_frame[pygame.K_p] = pressed[pygame.K_p]
 
         if pressed[pygame.K_0] and not self.key_pressed_last_frame[pygame.K_0]:
-            self.scene_controls.state.orientation = Rectangle(self.scene_controls.state.orientation.layout)
+            self.scene_controls.state.orientation = Rectangle(
+                self.scene_controls.state.orientation.layout
+            )
         self.key_pressed_last_frame[pygame.K_0] = pressed[pygame.K_0]
 
         if pressed[pygame.K_9] and not self.key_pressed_last_frame[pygame.K_9]:
-            self.scene_controls.state.orientation = Cube(self.scene_controls.state.orientation.layout)
+            self.scene_controls.state.orientation = Cube(
+                self.scene_controls.state.orientation.layout
+            )
         self.key_pressed_last_frame[pygame.K_9] = pressed[pygame.K_9]
 
 
@@ -164,11 +184,15 @@ class SwitchLikeControls(SceneControlsMapping, ABC):
             if self.gamepad.was_tapped(self.mapping.BUTTON_MINUS):
                 self.scene_controls._toggle_fps()
 
-            if self.gamepad.is_held(self.mapping.BUTTON_HOME) and self.gamepad.was_tapped(self.mapping.BUTTON_PLUS):
+            if self.gamepad.is_held(
+                self.mapping.BUTTON_HOME
+            ) and self.gamepad.was_tapped(self.mapping.BUTTON_PLUS):
                 orientation = self.scene_controls.state.orientation
                 match orientation:
                     case Cube():
-                        self.scene_controls.state.orientation = Rectangle(orientation.layout)
+                        self.scene_controls.state.orientation = Rectangle(
+                            orientation.layout
+                        )
                     case Rectangle():
                         self.scene_controls.state.orientation = Cube(orientation.layout)
             return
@@ -197,13 +221,17 @@ class SwitchLikeControls(SceneControlsMapping, ABC):
             self.scene_controls._move(x_mov, y_mov, multiplier=multiplier)
 
         if rx_mov != 0 or ry_mov != 0:
-            self.scene_controls._move(rx_mov, ry_mov, explicit_mode="panning", multiplier=multiplier)
+            self.scene_controls._move(
+                rx_mov, ry_mov, explicit_mode="panning", multiplier=multiplier
+            )
 
     def _handle_dpad(self):
         if self.mapping.get_dpad_type() == DpadType.HAT:
             x_dir, y_dir = self.gamepad.joystick.get_hat(self.mapping.DPAD_HAT)
             if x_dir != 0 or y_dir != 0:
-                self.scene_controls._move(x_dir, -y_dir)  # opposite polarity for y-dir wrt _move(...)
+                self.scene_controls._move(
+                    x_dir, -y_dir
+                )  # opposite polarity for y-dir wrt _move(...)
 
         elif self.mapping.get_dpad_type() == DpadType.BUTTONS:
             if self.gamepad.is_held(self.mapping.DPAD_UP):

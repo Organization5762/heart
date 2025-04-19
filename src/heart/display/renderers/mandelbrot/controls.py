@@ -37,7 +37,7 @@ class SceneControls:
 
     def update_cursor_pos(self, delta_x: int = 0, delta_y: int = 0, cursor="julia"):
         padding = 3
-        y_lo_bound = -(self.state.msurface_height // 2) + padding   # - 2
+        y_lo_bound = -(self.state.msurface_height // 2) + padding  # - 2
         y_hi_bound = (self.state.msurface_height // 2) - padding  # - padding + 1
         x_lo_bound = -(self.state.msurface_width // 2) + padding  # + padding + 0.5
         x_hi_bound = (self.state.msurface_width // 2) - padding  # - padding - 1
@@ -69,7 +69,9 @@ class SceneControls:
 
     def cycle_palette(self, forward: bool = True):
         step = 1 if forward else -1
-        self.state.palette_index = (self.state.palette_index + step) % self.state.num_palettes
+        self.state.palette_index = (
+            self.state.palette_index + step
+        ) % self.state.num_palettes
 
     def _reset_julia(self):
         self.state.jmovement.x = 0
@@ -82,7 +84,9 @@ class SceneControls:
         self.state.zoom = 1.0
 
     def _toggle_selected_surface(self):
-        self.state.selected_surface = "mandelbrot" if self.state.selected_surface == "julia" else "julia"
+        self.state.selected_surface = (
+            "mandelbrot" if self.state.selected_surface == "julia" else "julia"
+        )
         self._reset_julia()
 
     def _increment_view_mode(self):
@@ -101,7 +105,11 @@ class SceneControls:
 
     @property
     def movement_mode(self):
-        return "cursor" if self.state.view_mode == ViewMode.MANDELBROT_SELECTED else "panning"
+        return (
+            "cursor"
+            if self.state.view_mode == ViewMode.MANDELBROT_SELECTED
+            else "panning"
+        )
 
     # Common action methods
     def _toggle_julia_mode(self):
@@ -122,10 +130,14 @@ class SceneControls:
             self.state.show_debug = show
 
     def _update_critical_point(self):
-        self.state.critical_point = complex(*self.screen_to_complex(self.state.jcursor_pos.x, self.state.jcursor_pos.y))
+        self.state.critical_point = complex(
+            *self.screen_to_complex(self.state.jcursor_pos.x, self.state.jcursor_pos.y)
+        )
 
     def _update_julia_constant(self):
-        self.state.julia_constant = complex(*self.screen_to_complex(self.state.cursor_pos.x, self.state.cursor_pos.y))
+        self.state.julia_constant = complex(
+            *self.screen_to_complex(self.state.cursor_pos.x, self.state.cursor_pos.y)
+        )
         if self.state.julia_constant:
             self._calculate_julia_orbit()
 
@@ -182,22 +194,26 @@ class SceneControls:
                         note_index = int(normalized_mag * (len(scale) - 1))
 
                     # Map angle to duration or velocity
-                    angle = (cmath.phase(point) + math.pi) / (2 * math.pi)  # Normalize to 0-1
+                    angle = (cmath.phase(point) + math.pi) / (
+                        2 * math.pi
+                    )  # Normalize to 0-1
                     duration = 0.1 + angle * 0.4  # Duration between 0.1 and 0.5 seconds
 
-                    notes.append({
-                        "frequency": scale[note_index],
-                        "duration": duration,
-                        "magnitude": mag,
-                        "angle": angle
-                    })
+                    notes.append(
+                        {
+                            "frequency": scale[note_index],
+                            "duration": duration,
+                            "magnitude": mag,
+                            "angle": angle,
+                        }
+                    )
 
                 return {
                     "is_bounded": True,
                     "cycle_length": cycle_length,
                     "orbit_length": len(orbit),
                     "notes": notes,
-                    "cycle_start": cycle_start
+                    "cycle_start": cycle_start,
                 }
 
             orbit.append(z)
@@ -211,14 +227,14 @@ class SceneControls:
                     "is_bounded": False,
                     "escape_iteration": i,
                     "orbit_length": len(orbit),
-                    "escape_speed": escape_speed
+                    "escape_speed": escape_speed,
                 }
 
         # Reached max iterations without finding cycle or escaping
         return {
             "is_bounded": True,  # Assumed bounded
             "orbit_length": len(orbit),
-            "notes": None  # No clear cycle detected
+            "notes": None,  # No clear cycle detected
         }
 
     def _move(self, x: int, y: int, explicit_mode: str = None, multiplier: float = 1.0):
@@ -232,13 +248,13 @@ class SceneControls:
                 self.state.movement.x = self.clamp(
                     self.state.movement.x + x * self.get_pan_amount(self.state.zoom),
                     -2.0,
-                    2.0
+                    2.0,
                 )
                 # self.state.movement.y += y * self.get_pan_amount(self.state.zoom)
                 self.state.movement.y = self.clamp(
                     self.state.movement.y + y * self.get_pan_amount(self.state.zoom),
                     -2.0,
-                    2.0
+                    2.0,
                 )
             case ViewMode.MANDELBROT_SELECTED:
                 self._reset_julia()
@@ -247,14 +263,16 @@ class SceneControls:
                         self.update_cursor_pos(delta_x=x, delta_y=y)
                     case _:
                         self.state.movement.x = self.clamp(
-                            self.state.movement.x + x * self.get_pan_amount(self.state.zoom),
+                            self.state.movement.x
+                            + x * self.get_pan_amount(self.state.zoom),
                             -2.0,
-                            2.0
+                            2.0,
                         )
                         self.state.movement.y = self.clamp(
-                            self.state.movement.y + y * self.get_pan_amount(self.state.zoom),
+                            self.state.movement.y
+                            + y * self.get_pan_amount(self.state.zoom),
                             -2.0,
-                            2.0
+                            2.0,
                         )
                 self._update_julia_constant()
             case ViewMode.JULIA_SELECTED | ViewMode.JULIA:
@@ -262,13 +280,13 @@ class SceneControls:
                 self.state.jmovement.x = self.clamp(
                     self.state.jmovement.x + x * self.get_pan_amount(self.state.jzoom),
                     -2.0,
-                    2.0
+                    2.0,
                 )
                 # self.state.jmovement.y += y * self.get_pan_amount(self.state.jzoom)
                 self.state.jmovement.y = self.clamp(
                     self.state.jmovement.y + y * self.get_pan_amount(self.state.jzoom),
                     -2.0,
-                    2.0
+                    2.0,
                 )
 
         # if self.state.view_mode == ViewMode.MANDELBROT_SELECTED:
@@ -332,8 +350,7 @@ class SceneControls:
                 self.state.jzoom = min(1e14, self.state.jzoom * 1.05)
             case ViewMode.MANDELBROT_SELECTED:
                 cursor_re, cursor_im = self.screen_to_complex(
-                    self.state.cursor_pos.x,
-                    self.state.cursor_pos.y
+                    self.state.cursor_pos.x, self.state.cursor_pos.y
                 )
 
                 # Apply zoom
@@ -344,8 +361,12 @@ class SceneControls:
                 zoom_factor_change = self.state.zoom / old_zoom
 
                 # Adjust movement to keep the cursor point fixed during zoom
-                self.state.movement.x = cursor_re - (cursor_re - self.state.movement.x) / zoom_factor_change
-                self.state.movement.y = cursor_im - (cursor_im - self.state.movement.y) / zoom_factor_change
+                self.state.movement.x = (
+                    cursor_re - (cursor_re - self.state.movement.x) / zoom_factor_change
+                )
+                self.state.movement.y = (
+                    cursor_im - (cursor_im - self.state.movement.y) / zoom_factor_change
+                )
 
         # if self.state.julia_mode:
         #     if self.state.selected_surface == "mandelbrot":
@@ -382,8 +403,7 @@ class SceneControls:
             case ViewMode.MANDELBROT_SELECTED:
                 # Same principle as zoom in, but with opposite zoom direction
                 cursor_re, cursor_im = self.screen_to_complex(
-                    self.state.cursor_pos.x,
-                    self.state.cursor_pos.y
+                    self.state.cursor_pos.x, self.state.cursor_pos.y
                 )
 
                 old_zoom = self.state.zoom
@@ -392,8 +412,12 @@ class SceneControls:
                 zoom_factor_change = self.state.zoom / old_zoom
 
                 # Adjust movement to keep the cursor point fixed during zoom
-                self.state.movement.x = cursor_re - (cursor_re - self.state.movement.x) / zoom_factor_change
-                self.state.movement.y = cursor_im - (cursor_im - self.state.movement.y) / zoom_factor_change
+                self.state.movement.x = (
+                    cursor_re - (cursor_re - self.state.movement.x) / zoom_factor_change
+                )
+                self.state.movement.y = (
+                    cursor_im - (cursor_im - self.state.movement.y) / zoom_factor_change
+                )
 
     def _increase_max_iterations(self):
         self.state.max_iterations += 1
@@ -415,7 +439,9 @@ class SceneControls:
 
     def _toggle_left_cursor(self):
         if self.state.julia_mode:
-            self.state.movement_mode = "cursor" if self.state.movement_mode != "cursor" else "panning"
+            self.state.movement_mode = (
+                "cursor" if self.state.movement_mode != "cursor" else "panning"
+            )
             # reset cursor if entering cursor mode
             if self.state.movement_mode == "cursor":
                 self.state.cursor_pos.x = 0
@@ -432,18 +458,20 @@ class SceneControls:
         aspect_ratio = width / height
 
         height_range = 4.0 / self.state.zoom  # Total height range
-        width_range = height_range * aspect_ratio  # Width range adjusted for aspect ratio
+        width_range = (
+            height_range * aspect_ratio
+        )  # Width range adjusted for aspect ratio
 
         re = np.linspace(
             -width_range / 2 + self.state.movement.x,
             width_range / 2 + self.state.movement.x,
             width,
-            )
+        )
         im = np.linspace(
             -height_range / 2 + self.state.movement.y,
             height_range / 2 + self.state.movement.y,
             height,
-            )
+        )
 
         # Normalize screen coordinates
         normalized_x = screen_x / width
