@@ -13,101 +13,125 @@ class SwitchLikeMapping(ABC):
 
     @property
     @abstractmethod
-    def DPAD_TYPE(self) -> DpadType: pass
+    def DPAD_TYPE(self) -> DpadType:
+        pass
 
     @property
-    def DPAD_HAT(self): pass
+    def DPAD_HAT(self):
+        pass
 
     # d-pad buttons
     @property
-    def DPAD_UP(self): pass
+    def DPAD_UP(self):
+        pass
 
     @property
-    def DPAD_DOWN(self): pass
+    def DPAD_DOWN(self):
+        pass
 
     @property
-    def DPAD_LEFT(self): pass
+    def DPAD_LEFT(self):
+        pass
 
     @property
-    def DPAD_RIGHT(self): pass
+    def DPAD_RIGHT(self):
+        pass
 
     # face buttons
     @property
     @abstractmethod
-    def BUTTON_A(self): pass
+    def BUTTON_A(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_B(self): pass
+    def BUTTON_B(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_X(self): pass
+    def BUTTON_X(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_Y(self): pass
+    def BUTTON_Y(self):
+        pass
 
     # option buttons
     @property
     @abstractmethod
-    def BUTTON_PLUS(self): pass
+    def BUTTON_PLUS(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_MINUS(self): pass
+    def BUTTON_MINUS(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_HOME(self): pass
+    def BUTTON_HOME(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_CAPTURE(self): pass
+    def BUTTON_CAPTURE(self):
+        pass
 
     # trigger buttons
     @property
     @abstractmethod
-    def BUTTON_ZL(self): pass
+    def BUTTON_ZL(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_ZR(self): pass
+    def BUTTON_ZR(self):
+        pass
 
     # "analogue" triggers
     @property
     @abstractmethod
-    def AXIS_L(self): pass
+    def AXIS_L(self):
+        pass
 
     @property
     @abstractmethod
-    def AXIS_R(self): pass
+    def AXIS_R(self):
+        pass
 
     # analogue joystick axes
     @property
     @abstractmethod
-    def AXIS_LEFT_X(self): pass
+    def AXIS_LEFT_X(self):
+        pass
 
     @property
     @abstractmethod
-    def AXIS_LEFT_Y(self): pass
+    def AXIS_LEFT_Y(self):
+        pass
 
     @property
     @abstractmethod
-    def AXIS_RIGHT_X(self): pass
+    def AXIS_RIGHT_X(self):
+        pass
 
     @property
     @abstractmethod
-    def AXIS_RIGHT_Y(self): pass
+    def AXIS_RIGHT_Y(self):
+        pass
 
     # joystick buttons
     @property
     @abstractmethod
-    def BUTTON_L3(self): pass
+    def BUTTON_L3(self):
+        pass
 
     @property
     @abstractmethod
-    def BUTTON_R3(self): pass
+    def BUTTON_R3(self):
+        pass
 
 
 class BitDoLite2(SwitchLikeMapping):

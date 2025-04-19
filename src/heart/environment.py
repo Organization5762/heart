@@ -16,7 +16,7 @@ from heart.display.renderers.pacman import Border
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
-from heart.utilities.env import Configuration, REQUEST_JOYSTICK_MODULE_RESET
+from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -212,21 +212,23 @@ class GameLoop:
 
             self._preprocess_setup()
             # TODO: Check if long press button value has changed
-            new_long_button_value = self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
+            new_long_button_value = (
+                self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
+            )
             if new_long_button_value != last_long_button_value:
                 # Swap select modes
                 if in_select_mode:
                     # Combine the offset we're switching out of select mode
                     self._active_mode_index += mode_offset
                     mode_offset = 0
-                    print(self._active_mode_index)
 
                 in_select_mode = not in_select_mode
                 last_long_button_value = new_long_button_value
 
             if in_select_mode:
-                mode_offset = self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
-                # print(mode_offset)
+                mode_offset = (
+                    self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
+                )
 
             mode = self.active_mode(mode_offset=mode_offset)
 
@@ -234,6 +236,7 @@ class GameLoop:
 
             # Use title renderer in select mode
             if in_select_mode:
+                renderers.append(Border(width=5, color=Color(r=255, g=105, b=180)))
                 if mode.title_renderer is not None:
                     renderers = [
                         mode.title_renderer
@@ -282,7 +285,6 @@ class GameLoop:
             #   try pygame-ce instead
             print("SystemError: Encountered segfaulted event")
 
-
     def _preprocess_setup(self):
         if not Configuration.is_pi():
             self.__process_debugging_key_presses()
@@ -302,7 +304,9 @@ class GameLoop:
 
         logger.info("Attempting to detect attached peripherals")
         self.peripheral_manager.detect()
-        logger.info(f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}")
+        logger.info(
+            f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
+        )
         self.peripheral_manager.start()
         logger.info("Starting all peripherals")
         logger.info("Display Initialized")

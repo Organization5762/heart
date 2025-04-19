@@ -4,7 +4,7 @@ Current plan to to wire the Accelerometer into the KB2040, then connect the KB20
 
 ## Setup
 
-Start with this guide (https://learn.adafruit.com/adafruit-kb2040/circuitpython) to get the KB2040 in the right state 
+Start with this guide (https://learn.adafruit.com/adafruit-kb2040/circuitpython) to get the KB2040 in the right state
 Datasheet: https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf
 Pinout Reference w/ Compatibility: https://learn.adafruit.com/adafruit-kb2040/pinouts
 
@@ -19,8 +19,10 @@ Drive named RPI-RP2
 New Media named CIRCUITPY showed up (yey!)
 
 ### First Programming
+
 LED wasn't flashing, so I ran this to connect to it with a Python REPL and inspect the board object:
 `python3 -m serial.tools.miniterm /dev/ttyACM0 115200`
+
 ```python
 import digitalio
 import board
@@ -39,11 +41,13 @@ led.direction = digitalio.Direction.OUTPUT
 This didn't work, screw it who cares it an LED
 
 ## Accelerometer
-I have a STEMMA QT connector that I plugged into the accelerometer, it only have one Female end though.  So I pinned this out now
+
+I have a STEMMA QT connector that I plugged into the accelerometer, it only have one Female end though. So I pinned this out now
 
 ### Powering up
+
 1. I connected the red wire to the RAW and the black to the GND to give it power
-2. Now I need to decide whre the blue and yellow go; I think TX and RX initially?
+1. Now I need to decide whre the blue and yellow go; I think TX and RX initially?
 
 From here: https://www.adafruit.com/product/5385
 Red - 3.3VDC Power
@@ -54,6 +58,7 @@ Yellow - I2C SCL Clock (RX/D1 - The main UART0 RX pin. It is also I2C0 SCL)
 Device is now connected
 
 ### Getting Data
+
 ```python
 data = digitalio.DigitalInOut(board.RX)
 data.value
@@ -74,9 +79,9 @@ rsync -a /Users/michael/Downloads/adafruit-circuitpython-bundle-9.x-mpy-20250412
 rsync -a /Users/michael/Downloads/adafruit-circuitpython-bundle-9.x-mpy-20250412/lib/adafruit_register michael@totem2.local:Desktop
 ```
 
-
 Downloaded it and synced the relevant lib
 Then moved it in
+
 ```
 mv ~/Desktop/adafruit_lsm6ds lib/
 ```

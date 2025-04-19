@@ -8,6 +8,7 @@ from heart.peripheral import Peripheral
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
+from heart.peripheral.heart_rates import HeartRateManager
 from heart.utilities.env import Configuration
 
 
@@ -43,7 +44,8 @@ class PeripheralManager:
         # todo: we're just assuming there's at most one gamepad plugged in and hence
         #  always exactly one Gamepad entry point. could generalize to more
         gamepads = [
-            peripheral for peripheral in self.peripheral
+            peripheral
+            for peripheral in self.peripheral
             if isinstance(peripheral, Gamepad)
         ]
         return gamepads[0]
@@ -52,7 +54,8 @@ class PeripheralManager:
         peripherials = itertools.chain(
             self._detect_switches(),
             self._detect_sensors(),
-            self._detect_gamepads()
+            self._detect_gamepads(),
+            self._detect_heart_rate_sensor(),
         )
 
         for peripherial in peripherials:
@@ -96,6 +99,9 @@ class PeripheralManager:
     def _detect_gamepads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Gamepad.detect())
 
+    def _detect_heart_rate_sensor(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(HeartRateManager.detect())
+
     def _register_peripherial(self, peripherial: Peripheral) -> None:
         self.peripheral.append(peripherial)
 
@@ -106,6 +112,13 @@ class PeripheralManager:
             raise Exception("Unable to get switch as it has not been registered")
 
         return self._deprecated_main_switch
+
+    def get_heart_rate_peripheral(self) -> HeartRateManager:
+        """There should be only one instance managing all the heart rate sensors."""
+        for p in self.peripheral:
+            if isinstance(p, HeartRateManager):
+                return p
+        raise ValueError("No HeartRateManager peripheral registered")
 
     def __del__(self) -> None:
         """Attempt to clean up threads and peripherals at object deletion time.

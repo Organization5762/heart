@@ -20,7 +20,7 @@ Items:
 
 [Example](https://www.digikey.com/en/products/detail/assmann-wsw-components/H3CCS-1636G/999349)
 
-I couldn't find a Cable Ribbon that works with these, which is too bad.  In general, seems like there isn't an easy way to extend the cable length.
+I couldn't find a Cable Ribbon that works with these, which is too bad. In general, seems like there isn't an easy way to extend the cable length.
 
 | Specification       | Value            |
 | ------------------- | ---------------- |

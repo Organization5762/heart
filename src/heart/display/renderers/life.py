@@ -4,9 +4,9 @@ from pygame import Surface
 from pygame.time import Clock
 from scipy.ndimage import convolve
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -43,7 +43,7 @@ class Life(BaseRenderer):
         window: Surface,
         clock: Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
         self.state = self._update_grid(self.state)

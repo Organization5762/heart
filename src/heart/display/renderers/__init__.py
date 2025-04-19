@@ -1,7 +1,8 @@
+from dataclasses import dataclass
 import pygame
 
-from heart.device import Orientation
 from heart import DeviceDisplayMode
+from heart.device import Orientation
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -18,6 +19,15 @@ class BaseRenderer:
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         None
+
+
+@dataclass
+class KeyFrame:
+    frame: tuple[int, int, int, int]
+    up: int = 0
+    down: int = 0
+    left: int = 0
+    right: int = 0

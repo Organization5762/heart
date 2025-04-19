@@ -2,10 +2,10 @@ import random
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -27,7 +27,7 @@ class RandomPixel(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
 
@@ -59,7 +59,7 @@ class Border(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
 
@@ -96,7 +96,7 @@ class Rain(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:
@@ -136,7 +136,7 @@ class Slinky(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:

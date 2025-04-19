@@ -27,7 +27,11 @@ class Rectangle(Orientation):
 class Cube(Orientation):
     @classmethod
     def sides(cls):
-        """I.e. the 4 "walls" of a cube"""
+        """I.e.
+
+        the 4 "walls" of a cube
+
+        """
         return cls(layout=Layout(4, 1))
 
 

@@ -2,11 +2,11 @@ import random
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -24,7 +24,7 @@ class RandomPixel(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         for _ in range(self.num_pixels):
@@ -51,7 +51,7 @@ class Border(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
 
@@ -88,7 +88,7 @@ class Rain(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:
@@ -128,7 +128,7 @@ class Slinky(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:
@@ -183,8 +183,6 @@ class PacmanGhostRenderer(BaseRenderer):
         self.switch_pacman = True
 
     def _initialize_corner(self) -> None:
-        import random
-
         corners = ["top_left", "top_right"]
         corner = random.choice(corners)
         self.last_corner = corner
@@ -210,47 +208,29 @@ class PacmanGhostRenderer(BaseRenderer):
 
         if self.reverse:
             self.ghost1 = pygame.transform.flip(
-                Loader.load(
-                    Loader._resolve_path(
-                        "scaredghost1.png" if self.blood else "pinkghost.png"
-                    )
-                ),
+                Loader.load("scaredghost1.png" if self.blood else "pinkghost.png"),
                 True,
                 False,
             )
             self.ghost2 = pygame.transform.flip(
-                Loader.load(
-                    Loader._resolve_path(
-                        "scaredghost2.png" if self.blood else "blueghost.png"
-                    )
-                ),
+                Loader.load("scaredghost2.png" if self.blood else "blueghost.png"),
                 True,
                 False,
             )
             self.ghost3 = pygame.transform.flip(
-                Loader.load(
-                    Loader._resolve_path(
-                        "scaredghost1.png" if self.blood else "redghost.png"
-                    )
-                ),
+                Loader.load("scaredghost1.png" if self.blood else "redghost.png"),
                 True,
                 False,
             )
         else:
             self.ghost1 = Loader.load(
-                Loader._resolve_path(
-                    "scaredghost1.png" if self.blood else "pinkghost.png"
-                )
+                "scaredghost1.png" if self.blood else "pinkghost.png"
             )
             self.ghost2 = Loader.load(
-                Loader._resolve_path(
-                    "scaredghost2.png" if self.blood else "blueghost.png"
-                )
+                "scaredghost2.png" if self.blood else "blueghost.png"
             )
             self.ghost3 = Loader.load(
-                Loader._resolve_path(
-                    "scaredghost1.png" if self.blood else "redghost.png"
-                )
+                "scaredghost1.png" if self.blood else "redghost.png"
             )
 
     def process(
@@ -258,7 +238,7 @@ class PacmanGhostRenderer(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         if not self.initialized:
             self._initialize(window=window)
@@ -279,13 +259,9 @@ class PacmanGhostRenderer(BaseRenderer):
             self.switch_pacman = True
 
         if self.blood:
-            self.pacman = Loader.load(
-                Loader._resolve_path(f"bloodpac{self.pacmanIdx + 1}.png")
-            )
+            self.pacman = Loader.load(f"bloodpac{self.pacmanIdx + 1}.png")
         else:
-            self.pacman = Loader.load(
-                Loader._resolve_path(f"pac{self.pacmanIdx + 1}.png")
-            )
+            self.pacman = Loader.load(f"pac{self.pacmanIdx + 1}.png")
 
         if (self.reverse and not self.blood) or (self.blood and not self.reverse):
             self.pacman = pygame.transform.flip(self.pacman, True, False)
