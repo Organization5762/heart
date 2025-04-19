@@ -1,4 +1,4 @@
-from heart.display.renderers.mandelbrot import MandelbrotMode
+from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.environment import GameLoop
 
 

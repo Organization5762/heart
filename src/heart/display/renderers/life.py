@@ -4,6 +4,7 @@ from pygame import Surface
 from pygame.time import Clock
 from scipy.ndimage import convolve
 
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
@@ -33,7 +34,7 @@ class Life(BaseRenderer):
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())
 
-    def process(self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
         self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
         self.state = self._update_grid(self.state)
 

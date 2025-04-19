@@ -1,3 +1,4 @@
+import inspect
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +11,7 @@ from PIL import Image
 
 from heart.device import Device, Layout
 from heart.peripheral.manager import PeripheralManager
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, REQUEST_JOYSTICK_MODULE_RESET
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -97,11 +98,17 @@ class GameLoop:
                     )
 
             # Process the screen
-            renderer.process(
-                window=screen,
-                clock=self.clock,
-                peripheral_manager=self.peripheral_manager
-            )
+
+            kwargs = {
+                "window": screen,
+                "clock": self.clock,
+                "peripheral_manager": self.peripheral_manager,
+            }
+            # check if process function takes a `orientation` argument
+            if inspect.signature(renderer.process).parameters.get("orientation"):
+                kwargs["orientation"] = self.device.orientation
+            renderer.process(**kwargs)
+
             image = pygame.surfarray.pixels3d(screen)
             alpha = pygame.surfarray.pixels_alpha(screen)
             image = np.dstack((image, alpha))
@@ -110,7 +117,7 @@ class GameLoop:
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:
-                    layout: Layout = self.device.layout
+                    layout: Layout = self.device.orientation.layout
                     image = image.resize(size=self.device.individual_display_size())
                     final_image_array = np.tile(
                         np.array(image), (layout.rows, layout.columns, 1)
@@ -201,9 +208,20 @@ class GameLoop:
         pygame.quit()
 
     def _handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
+        try:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                if event.type == REQUEST_JOYSTICK_MODULE_RESET:
+                    print("resetting joystick module")
+                    pygame.joystick.quit()
+                    pygame.joystick.init()
+        except SystemError:
+            # (clem): gamepad shit is weird and can randomly put caught segfault
+            #   events on queue, I see allusions to this online, people say
+            #   try pygame-ce instead
+            print("SystemError: Encountered segfaulted event")
+
 
     def _preprocess_setup(self):
         if not Configuration.is_pi():

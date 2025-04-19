@@ -5,6 +5,7 @@ from enum import Enum
 import pygame
 
 from heart.assets.loader import Loader
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
 
@@ -78,7 +79,7 @@ class SpritesheetLoop(BaseRenderer):
         current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         return current_value / 20.00
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (
             current_kf.duration * self.__duration_scale_factor(peripheral_manager=peripheral_manager)

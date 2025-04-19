@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pygame
 
 from heart.assets.loader import Loader
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
 
@@ -27,7 +28,7 @@ class RenderImage(BaseRenderer):
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager) -> None:
+    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
         if not self.initialized:
             self._initialize()
 
