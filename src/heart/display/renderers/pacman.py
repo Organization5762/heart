@@ -211,46 +211,34 @@ class PacmanGhostRenderer(BaseRenderer):
         if self.reverse:
             self.ghost1 = pygame.transform.flip(
                 Loader.load(
-                    Loader._resolve_path(
                         "scaredghost1.png" if self.blood else "pinkghost.png"
-                    )
                 ),
                 True,
                 False,
             )
             self.ghost2 = pygame.transform.flip(
                 Loader.load(
-                    Loader._resolve_path(
                         "scaredghost2.png" if self.blood else "blueghost.png"
-                    )
                 ),
                 True,
                 False,
             )
             self.ghost3 = pygame.transform.flip(
                 Loader.load(
-                    Loader._resolve_path(
                         "scaredghost1.png" if self.blood else "redghost.png"
-                    )
                 ),
                 True,
                 False,
             )
         else:
             self.ghost1 = Loader.load(
-                Loader._resolve_path(
                     "scaredghost1.png" if self.blood else "pinkghost.png"
-                )
             )
             self.ghost2 = Loader.load(
-                Loader._resolve_path(
                     "scaredghost2.png" if self.blood else "blueghost.png"
-                )
             )
             self.ghost3 = Loader.load(
-                Loader._resolve_path(
                     "scaredghost1.png" if self.blood else "redghost.png"
-                )
             )
 
     def process(
@@ -280,11 +268,11 @@ class PacmanGhostRenderer(BaseRenderer):
 
         if self.blood:
             self.pacman = Loader.load(
-                Loader._resolve_path(f"bloodpac{self.pacmanIdx + 1}.png")
+                f"bloodpac{self.pacmanIdx + 1}.png"
             )
         else:
             self.pacman = Loader.load(
-                Loader._resolve_path(f"pac{self.pacmanIdx + 1}.png")
+                f"pac{self.pacmanIdx + 1}.png"
             )
 
         if (self.reverse and not self.blood) or (self.blood and not self.reverse):

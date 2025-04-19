@@ -30,12 +30,8 @@ class SpritesheetLoop(BaseRenderer):
         self.initialized = False
         self.current_frame = 0
         self.loop_count = 0
-        self.file = Loader._resolve_path(sheet_file_path)
-        json_path = Loader._resolve_path(metadata_file_path)
-
-        with open(json_path, "r") as f:
-            # TODO: Parse this into a dataclass
-            frame_data = json.load(f)
+        self.file = sheet_file_path
+        frame_data = Loader.load_json(metadata_file_path)
 
         self.start_frames = []
         self.loop_frames = []
