@@ -31,6 +31,7 @@ def run(
     orientation = Cube.sides()
     if Configuration.is_pi():
         from heart.device.rgb_display import LEDMatrix
+
         device = LEDMatrix(orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)

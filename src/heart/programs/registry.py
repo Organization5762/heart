@@ -1,6 +1,6 @@
-from functools import cached_property
 import importlib
 import os
+from functools import cached_property
 from typing import Callable
 
 from heart.environment import GameLoop

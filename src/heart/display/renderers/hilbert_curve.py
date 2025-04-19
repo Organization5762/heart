@@ -10,6 +10,7 @@ from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
+
 class HilbertScene(BaseRenderer):
     def __init__(self):
         super().__init__()

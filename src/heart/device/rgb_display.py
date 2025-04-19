@@ -206,11 +206,7 @@ class SampleBase(object):
 
 class LEDMatrix(Device, SampleBase):
     def __init__(self, layout: Layout, *args, **kwargs):
-        super(LEDMatrix, self).__init__(
-            *args,
-            **kwargs,
-            layout=layout
-        )
+        super(LEDMatrix, self).__init__(*args, **kwargs, layout=layout)
         assert layout.rows == 1, "Maximum 1 row supported at the moment"
 
         self.chain_length = layout.columns
