@@ -210,35 +210,29 @@ class PacmanGhostRenderer(BaseRenderer):
 
         if self.reverse:
             self.ghost1 = pygame.transform.flip(
-                Loader.load(
-                        "scaredghost1.png" if self.blood else "pinkghost.png"
-                ),
+                Loader.load("scaredghost1.png" if self.blood else "pinkghost.png"),
                 True,
                 False,
             )
             self.ghost2 = pygame.transform.flip(
-                Loader.load(
-                        "scaredghost2.png" if self.blood else "blueghost.png"
-                ),
+                Loader.load("scaredghost2.png" if self.blood else "blueghost.png"),
                 True,
                 False,
             )
             self.ghost3 = pygame.transform.flip(
-                Loader.load(
-                        "scaredghost1.png" if self.blood else "redghost.png"
-                ),
+                Loader.load("scaredghost1.png" if self.blood else "redghost.png"),
                 True,
                 False,
             )
         else:
             self.ghost1 = Loader.load(
-                    "scaredghost1.png" if self.blood else "pinkghost.png"
+                "scaredghost1.png" if self.blood else "pinkghost.png"
             )
             self.ghost2 = Loader.load(
-                    "scaredghost2.png" if self.blood else "blueghost.png"
+                "scaredghost2.png" if self.blood else "blueghost.png"
             )
             self.ghost3 = Loader.load(
-                    "scaredghost1.png" if self.blood else "redghost.png"
+                "scaredghost1.png" if self.blood else "redghost.png"
             )
 
     def process(
@@ -267,13 +261,9 @@ class PacmanGhostRenderer(BaseRenderer):
             self.switch_pacman = True
 
         if self.blood:
-            self.pacman = Loader.load(
-                f"bloodpac{self.pacmanIdx + 1}.png"
-            )
+            self.pacman = Loader.load(f"bloodpac{self.pacmanIdx + 1}.png")
         else:
-            self.pacman = Loader.load(
-                f"pac{self.pacmanIdx + 1}.png"
-            )
+            self.pacman = Loader.load(f"pac{self.pacmanIdx + 1}.png")
 
         if (self.reverse and not self.blood) or (self.blood and not self.reverse):
             self.pacman = pygame.transform.flip(self.pacman, True, False)
