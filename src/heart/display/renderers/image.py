@@ -1,20 +1,10 @@
-from dataclasses import dataclass
-
 import pygame
 
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
-
-
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    up: int = 0
-    down: int = 0
-    left: int = 0
-    right: int = 0
+from heart.display.renderers.models import KeyFrame
 
 
 class RenderImage(BaseRenderer):
@@ -41,6 +31,7 @@ class RenderImage(BaseRenderer):
         image = self.spritesheet.image_at(
             KeyFrame(
                 (0, 0, 28, 28),
+                duration=None
             ).frame
         )
         window.blit(image, (0, 0))

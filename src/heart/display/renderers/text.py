@@ -1,22 +1,9 @@
-import json
-from dataclasses import dataclass
-
 import pygame
 
-from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
-
-
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    up: int = 0
-    down: int = 0
-    left: int = 0
-    right: int = 0
 
 
 class TextRendering(BaseRenderer):

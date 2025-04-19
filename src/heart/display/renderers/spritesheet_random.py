@@ -1,6 +1,5 @@
 import json
 import random
-from dataclasses import dataclass
 from enum import StrEnum
 
 import pygame
@@ -9,13 +8,8 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart import DeviceDisplayMode
+from heart.display.renderers.models import KeyFrame
 from heart.peripheral.manager import PeripheralManager
-
-
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    duration: int
 
 
 class LoopPhase(StrEnum):
