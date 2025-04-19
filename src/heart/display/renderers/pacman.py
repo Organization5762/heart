@@ -8,7 +8,7 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
-
+import random
 
 class RandomPixel(BaseRenderer):
     def __init__(self, num_pixels=1) -> None:
@@ -183,8 +183,6 @@ class PacmanGhostRenderer(BaseRenderer):
         self.switch_pacman = True
 
     def _initialize_corner(self) -> None:
-        import random
-
         corners = ["top_left", "top_right"]
         corner = random.choice(corners)
         self.last_corner = corner

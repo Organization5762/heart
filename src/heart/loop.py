@@ -10,7 +10,7 @@ from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.manager import PeripheralManager
-from heart.programs.registry import registry
+from heart.programs.registry import ConfigurationRegistry, registry
 from heart.utilities.env import Configuration
 
 logger = logging.getLogger(__name__)
@@ -22,18 +22,18 @@ app = typer.Typer()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024",
 ) -> None:
+    registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         raise Exception(f"Configuration '{configuration}' not found in registry")
 
-    # TODO: Re-write this so that there is a local device, as this is broken on local atm
-    device = None
+    # TODO: Add a way of adding orientation either from Config or `run`
+    orientation = Cube.sides()
     if Configuration.is_pi():
         from heart.device.rgb_display import LEDMatrix
-
-        device = LEDMatrix(chain_length=12)
+        device = LEDMatrix(orientation=orientation)
     else:
-        device = LocalScreen(width=64, height=64, orientation=Cube.sides())
+        device = LocalScreen(width=64, height=64, orientation=orientation)
 
     manager = PeripheralManager()
     loop = GameLoop(device=device, peripheral_manager=manager)
@@ -45,11 +45,6 @@ def run(
     # Retain an empty loop for "lower power" mode
     mode = loop.add_mode()
     mode.add_renderer(RenderColor(Color(0, 0, 0)))
-    ##
-    # If on PI, start the sensors.  These should be stubbed out locally
-    ##
-    # TODO: I want to split this out of the core loop so that
-    # there is a more centralized configuration / management of all these IO devices
     loop.start()
 
 

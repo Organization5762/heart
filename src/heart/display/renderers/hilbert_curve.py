@@ -10,7 +10,6 @@ from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
-
 class HilbertScene(BaseRenderer):
     def __init__(self):
         super().__init__()
@@ -142,8 +141,6 @@ class HilbertScene(BaseRenderer):
             # Use an easing function to adjust the zoom interpolation.
             # zoom_alpha = raw_alpha * raw_alpha * (3 - 2 * raw_alpha)  # Cubic ease in/out
             # Alternatively, uncomment the following two lines to use cosine ease:
-            import math
-
             zoom_alpha = -0.5 * (math.cos(math.pi * raw_alpha) - 1)
 
             zoomed_curve = transform_points(
