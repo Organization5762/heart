@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import Iterator
 
 from heart.peripheral import Peripheral
+from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
 from heart.utilities.env import Configuration
@@ -38,8 +39,21 @@ class PeripheralManager:
         self.notification_service = NotificationService()
         self.started = False
 
+    def get_gamepad(self) -> Gamepad:
+        # todo: we're just assuming there's at most one gamepad plugged in and hence
+        #  always exactly one Gamepad entry point. could generalize to more
+        gamepads = [
+            peripheral for peripheral in self.peripheral
+            if isinstance(peripheral, Gamepad)
+        ]
+        return gamepads[0]
+
     def detect(self) -> None:
-        peripherials = itertools.chain(self._detect_switches(), self._detect_sensors())
+        peripherials = itertools.chain(
+            self._detect_switches(),
+            self._detect_sensors(),
+            self._detect_gamepads()
+        )
 
         for peripherial in peripherials:
             self._register_peripherial(peripherial=peripherial)
@@ -78,6 +92,9 @@ class PeripheralManager:
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Accelerometer.detect())
+
+    def _detect_gamepads(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(Gamepad.detect())
 
     def _register_peripherial(self, peripherial: Peripheral) -> None:
         self.peripheral.append(peripherial)

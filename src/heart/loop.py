@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from heart.device import Layout
+from heart.device import Cube
 from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
@@ -33,7 +33,7 @@ def run(
 
         device = LEDMatrix(chain_length=12)
     else:
-        device = LocalScreen(width=64, height=64, layout=Layout(8, 2))
+        device = LocalScreen(width=64, height=64, orientation=Cube.sides())
 
     manager = PeripheralManager()
     loop = GameLoop(device=device, peripheral_manager=manager)
@@ -59,7 +59,7 @@ def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
 
 
 def main():
-    return app()
+    return run()
 
 
 if __name__ == "__main__":

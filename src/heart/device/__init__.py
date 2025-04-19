@@ -10,17 +10,38 @@ class Layout:
     rows: int
 
 
+class Orientation:
+    def get_type(self):
+        return type(self)
+
+    def __init__(self, layout: Layout):
+        self.layout = layout
+
+
+class Rectangle(Orientation):
+    @classmethod
+    def with_layout(cls, columns: int, rows: int):
+        return cls(layout=Layout(columns, rows))
+
+
+class Cube(Orientation):
+    @classmethod
+    def sides(cls):
+        """I.e. the 4 "walls" of a cube"""
+        return cls(layout=Layout(4, 1))
+
+
 @dataclass
 class Device:
-    layout: Layout
+    orientation: Orientation
 
     def individual_display_size(self) -> tuple[int, int]:
         raise NotImplementedError("")
 
     def full_display_size(self) -> tuple[int, int]:
         return (
-            self.individual_display_size()[0] * self.layout.columns,
-            self.individual_display_size()[1] * self.layout.rows,
+            self.individual_display_size()[0] * self.orientation.layout.columns,
+            self.individual_display_size()[1] * self.orientation.layout.rows,
         )
 
     @cached_property

@@ -3,6 +3,7 @@ import random
 import pygame
 
 from heart.assets.loader import Loader
+from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart import DeviceDisplayMode
@@ -23,6 +24,7 @@ class RandomPixel(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         width, height = window.get_size()
         for _ in range(self.num_pixels):
@@ -49,6 +51,7 @@ class Border(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         width, height = window.get_size()
 
@@ -85,6 +88,7 @@ class Rain(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:
@@ -124,6 +128,7 @@ class Slinky(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         width, height = window.get_size()
         if not self.initialized:
@@ -253,6 +258,7 @@ class PacmanGhostRenderer(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         if not self.initialized:
             self._initialize(window=window)

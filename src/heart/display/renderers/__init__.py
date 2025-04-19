@@ -1,5 +1,6 @@
 import pygame
 
+from heart.device import Orientation
 from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
@@ -13,5 +14,6 @@ class BaseRenderer:
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         None

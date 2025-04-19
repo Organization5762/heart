@@ -1,3 +1,4 @@
+import inspect
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +15,7 @@ from heart.display.color import Color
 from heart.display.renderers.pacman import Border
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, REQUEST_JOYSTICK_MODULE_RESET
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -100,11 +101,17 @@ class GameLoop:
                     )
 
             # Process the screen
-            renderer.process(
-                window=screen,
-                clock=self.clock,
-                peripheral_manager=self.peripheral_manager,
-            )
+
+            kwargs = {
+                "window": screen,
+                "clock": self.clock,
+                "peripheral_manager": self.peripheral_manager,
+            }
+            # check if process function takes a `orientation` argument
+            if inspect.signature(renderer.process).parameters.get("orientation"):
+                kwargs["orientation"] = self.device.orientation
+            renderer.process(**kwargs)
+
             image = pygame.surfarray.pixels3d(screen)
             alpha = pygame.surfarray.pixels_alpha(screen)
             image = np.dstack((image, alpha))
@@ -113,7 +120,7 @@ class GameLoop:
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:
-                    layout: Layout = self.device.layout
+                    layout: Layout = self.device.orientation.layout
                     image = image.resize(size=self.device.individual_display_size())
                     final_image_array = np.tile(
                         np.array(image), (layout.rows, layout.columns, 1)
@@ -181,7 +188,7 @@ class GameLoop:
 
         last_long_button_value = 0
         in_select_mode = False
-        
+
         mode_offset = 0
         while self.running:
             self._handle_events()
@@ -199,7 +206,7 @@ class GameLoop:
 
                 in_select_mode = not in_select_mode
                 last_long_button_value = new_long_button_value
-            
+
             if in_select_mode:
                 mode_offset = self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
                 print(mode_offset)
@@ -207,7 +214,7 @@ class GameLoop:
             mode = self.active_mode(mode_offset=mode_offset)
 
             renderers = mode.renderers.copy()
-            
+
             # Add border in select mode
             if in_select_mode:
                 renderers.append(
@@ -231,9 +238,20 @@ class GameLoop:
         pygame.quit()
 
     def _handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
+        try:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                if event.type == REQUEST_JOYSTICK_MODULE_RESET:
+                    print("resetting joystick module")
+                    pygame.joystick.quit()
+                    pygame.joystick.init()
+        except SystemError:
+            # (clem): gamepad shit is weird and can randomly put caught segfault
+            #   events on queue, I see allusions to this online, people say
+            #   try pygame-ce instead
+            print("SystemError: Encountered segfaulted event")
+
 
     def _preprocess_setup(self):
         if not Configuration.is_pi():

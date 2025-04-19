@@ -1,6 +1,7 @@
 from pygame import Surface
 from pygame.time import Clock
 
+from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart import DeviceDisplayMode
@@ -43,7 +44,11 @@ class PythagoreanTiling(BaseRenderer):
             y += square_b  # move to next position
 
     def process(
-        self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager
+        self,
+        window: Surface,
+        clock: Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
     ) -> None:
         self.time_since_last_update += clock.get_time()
         if self.time_since_last_update > 1000:
