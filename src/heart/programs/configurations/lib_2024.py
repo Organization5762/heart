@@ -1,5 +1,5 @@
 from heart.display.color import Color
-from heart.display.renderers.mandelbrot import MandelbrotMode
+from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.environment import GameLoop
