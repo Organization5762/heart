@@ -44,7 +44,7 @@ class TextRendering(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         if not self.initialized:
             self._initialize()

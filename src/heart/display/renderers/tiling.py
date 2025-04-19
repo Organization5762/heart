@@ -1,10 +1,10 @@
 from pygame import Surface
 from pygame.time import Clock
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -48,7 +48,7 @@ class PythagoreanTiling(BaseRenderer):
         window: Surface,
         clock: Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         self.time_since_last_update += clock.get_time()
         if self.time_since_last_update > 1000:

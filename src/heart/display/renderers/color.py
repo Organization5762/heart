@@ -16,7 +16,7 @@ class RenderColor(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         image = pygame.Surface(window.get_size())
         image.fill(self.color._as_tuple())

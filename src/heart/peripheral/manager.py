@@ -43,16 +43,15 @@ class PeripheralManager:
         # todo: we're just assuming there's at most one gamepad plugged in and hence
         #  always exactly one Gamepad entry point. could generalize to more
         gamepads = [
-            peripheral for peripheral in self.peripheral
+            peripheral
+            for peripheral in self.peripheral
             if isinstance(peripheral, Gamepad)
         ]
         return gamepads[0]
 
     def detect(self) -> None:
         peripherials = itertools.chain(
-            self._detect_switches(),
-            self._detect_sensors(),
-            self._detect_gamepads()
+            self._detect_switches(), self._detect_sensors(), self._detect_gamepads()
         )
 
         for peripherial in peripherials:
