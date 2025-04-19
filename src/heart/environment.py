@@ -204,7 +204,6 @@ class GameLoop:
                     # Combine the offset we're switching out of select mode
                     self._active_mode_index += mode_offset
                     mode_offset = 0
-                    print(self._active_mode_index)
 
                 in_select_mode = not in_select_mode
                 last_long_button_value = new_long_button_value
@@ -213,7 +212,6 @@ class GameLoop:
                 mode_offset = (
                     self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
                 )
-                print(mode_offset)
 
             mode = self.active_mode(mode_offset=mode_offset)
 

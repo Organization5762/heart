@@ -60,6 +60,7 @@ class MandelbrotMode(BaseRenderer):
         )
         self.last_switch_value = None
 
+        # TODO: load_font this
         pygame.font.init()
         self.font = pygame.font.SysFont("monospace", 8)
 
@@ -329,8 +330,6 @@ class MandelbrotMode(BaseRenderer):
                         surface, (255, 255, 255), start_coords, end_coords, 1
                     )
                 except Exception as e:
-                    print(start_coords)
-                    print(end_coords)
                     raise e
 
     def _complex_to_screen_julia(

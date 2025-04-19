@@ -183,8 +183,6 @@ class PacmanGhostRenderer(BaseRenderer):
         self.switch_pacman = True
 
     def _initialize_corner(self) -> None:
-        import random
-
         corners = ["top_left", "top_right"]
         corner = random.choice(corners)
         self.last_corner = corner
