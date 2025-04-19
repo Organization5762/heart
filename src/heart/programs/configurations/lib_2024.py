@@ -1,4 +1,5 @@
 from heart.display.color import Color
+from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
@@ -32,6 +33,9 @@ def configure(loop: GameLoop) -> None:
 
     modelbrot = loop.add_mode()
     modelbrot.add_renderer(MandelbrotMode())
+
+    hilbert_mode = loop.add_mode()
+    hilbert_mode.add_renderer(HilbertScene())
 
     mode = loop.add_mode()
 
