@@ -6,7 +6,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -19,7 +19,13 @@ class RandomPixel(BaseRenderer):
     def _initialize(self) -> None:
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         width, height = window.get_size()
         for _ in range(self.num_pixels):
             x = random.randint(0, width - 1)
@@ -30,17 +36,23 @@ class RandomPixel(BaseRenderer):
 
 
 class Border(BaseRenderer):
-    def __init__(self, width: int) -> None:
+    def __init__(self, width: int, color: Color | None = None) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
-        self.color = Color.random()
+        self.color = color or Color.random()
 
     def _initialize(self) -> None:
         self.initialized = True
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         width, height = window.get_size()
 
         # Draw the border
@@ -71,7 +83,13 @@ class Rain(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         width, height = window.get_size()
         if not self.initialized:
             self._change_starting_point(width=width)
@@ -105,7 +123,13 @@ class Slinky(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         width, height = window.get_size()
         if not self.initialized:
             self._change_starting_point(width=width)
@@ -229,7 +253,13 @@ class PacmanGhostRenderer(BaseRenderer):
                 )
             )
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         if not self.initialized:
             self._initialize(window=window)
 

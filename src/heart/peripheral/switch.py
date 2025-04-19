@@ -2,18 +2,23 @@ import json
 from typing import Iterator, NoReturn, Self
 
 import serial
-
-from heart.peripheral import Peripheral
-from heart.peripheral.bluetooth import UartListener
 from bleak.backends.device import BLEDevice
 
+from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
+from heart.peripheral import Peripheral
+from heart.peripheral.bluetooth import UartListener
 from heart.utilities.env import get_device_ports
+
 
 class BaseSwitch(Peripheral):
     def __init__(self) -> None:
         self.rotational_value = 0
+
         self.button_value = 0
         self.rotation_value_at_last_button_press = self.rotational_value
+
+        self.button_long_press_value = 0
+        self.rotation_value_at_last_long_button_press = self.rotational_value
 
     def run(self) -> None:
         return
@@ -21,23 +26,34 @@ class BaseSwitch(Peripheral):
     def get_rotation_since_last_button_press(self) -> int:
         return self.rotational_value - self.rotation_value_at_last_button_press
 
+    def get_rotation_since_last_long_button_press(self) -> int:
+        return self.rotational_value - self.rotation_value_at_last_long_button_press
+
     def get_rotational_value(self) -> int:
         return self.rotational_value
 
     def get_button_value(self) -> int:
         return self.button_value
 
+    def get_long_button_value(self) -> int:
+        return self.button_long_press_value
+
     def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]
         data_value = data["data"]
 
-        if event_type == "rotation":
+        if event_type == SWITCH_ROTATION:
             self.rotational_value = int(data_value)
 
-        if event_type == "button":
+        if event_type == BUTTON_PRESS:
             self.button_value += int(data_value)
             # Button was pressed, update last_rotational_value
             self.rotation_value_at_last_button_press = self.rotational_value
+
+        if event_type == BUTTON_LONG_PRESS:
+            self.button_long_press_value += int(data_value)
+            # Button was pressed, update last_rotational_value
+            self.rotation_value_at_last_long_button_press = self.rotational_value
 
 
 class FakeSwitch(BaseSwitch):
@@ -48,7 +64,6 @@ class FakeSwitch(BaseSwitch):
     def detect() -> Iterator[Self]:
         return [FakeSwitch()]
 
-
     def run(self) -> None:
         return
 
@@ -58,14 +73,14 @@ class Switch(BaseSwitch):
         self.port = port
         self.baudrate = baudrate
         super().__init__(*args, **kwargs)
-    
+
     @staticmethod
     def detect() -> Iterator[Self]:
         return [
-            Switch(
-                port=port,
-                baudrate=115200
-            ) for port in get_device_ports("usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0")
+            Switch(port=port, baudrate=115200)
+            for port in get_device_ports(
+                "usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"
+            )
         ]
 
     def _connect_to_ser(self):
@@ -91,6 +106,7 @@ class Switch(BaseSwitch):
             except Exception:
                 pass
 
+
 class BluetoothSwitch(BaseSwitch):
     def __init__(self, device: BLEDevice, *args, **kwargs) -> None:
         self.listener = UartListener(device=device)
@@ -99,9 +115,7 @@ class BluetoothSwitch(BaseSwitch):
     @staticmethod
     def detect() -> Iterator[Self]:
         for device in UartListener._discover_devices():
-            yield BluetoothSwitch(
-                device=device
-            )
+            yield BluetoothSwitch(device=device)
 
     def _connect_to_ser(self) -> None:
         return self.listener.start()

@@ -1,24 +1,24 @@
 import asyncio
-from collections import deque
 import functools
 import json
 import threading
+from collections import deque
 from typing import Any, AsyncGenerator, AsyncIterator, Iterator, NoReturn
-from bleak import BleakScanner, BleakClient
-from bleak.backends.device import BLEDevice
+
+from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak import BleakScanner
+from bleak.backends.device import BLEDevice
 
 # https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#service_uuid
 NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
-SINGLE_CLIENT_TIMEOUT_SECONDS = 60 * 60 * 12 # 12 hours
+SINGLE_CLIENT_TIMEOUT_SECONDS = 60 * 60 * 12  # 12 hours
 OBJECT_SEPARATOR = "\n"
 
+
 class UartListener:
-    """
-    Listeners for data come in as raw bytes from a UART Service.  
-    """
+    """Listeners for data come in as raw bytes from a UART Service."""
+
     __slots__ = ("device", "buffer", "events")
 
     def __init__(self, device: BLEDevice) -> None:
@@ -70,10 +70,9 @@ class UartListener:
 
                 # Otherwise use the notify channel
                 await client.start_notify(
-                    NOTIFICATION_CHANNEL,
-                    callback=self.__callback
+                    NOTIFICATION_CHANNEL, callback=self.__callback
                 )
-                
+
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
 
     @functools.cache
@@ -87,12 +86,12 @@ class UartListener:
         return client
 
     def __callback(self, sender: BleakGATTCharacteristic, data: bytearray):
-        """
-        Callback function to handle incoming data from the UART service.
+        """Callback function to handle incoming data from the UART service.
 
         Args:
             sender (BleakGATTCharacteristic): The characteristic that sent the data.
             data (bytearray): The data received from the characteristic.
+
         """
         # Append the decoded data to the buffer
         self.buffer += self.__decode_read_data(data)
@@ -107,6 +106,6 @@ class UartListener:
 
     def __decode_read_data(self, data: bytearray) -> str:
         return data.decode("utf-8", errors="ignore")
-    
+
     def __clear_buffer(self) -> None:
         self.buffer = ""

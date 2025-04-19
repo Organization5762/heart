@@ -1,5 +1,6 @@
-from collections import deque
 import math
+from collections import deque
+
 import numpy as np
 import pygame
 from pygame import Surface
@@ -7,7 +8,7 @@ from pygame.time import Clock
 
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -46,7 +47,6 @@ class LSystem(BaseRenderer):
         # rules  : (X → F+[[X]-X]-F[-FX]+X), (F → FF)
         # angle  : 25°
 
-
         angle = 25
 
         def calc_movement(L, angle):
@@ -63,7 +63,6 @@ class LSystem(BaseRenderer):
             if x_move >= 1 and y_move >= 1:
                 min_length = L
                 break
-
 
         current_angle = 0
         position = np.array(window.get_size()) // 2
@@ -85,7 +84,9 @@ class LSystem(BaseRenderer):
             elif char == "]":
                 position, current_angle = stack.pop()
 
-    def process(self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager, orientation: Orientation
+    ) -> None:
         self.time_since_last_update += clock.get_time()
         if self.time_since_last_update > 1000:
             self._update_grammar()

@@ -4,6 +4,7 @@ import time
 import board
 import busio
 import json
+from heart.firmware_io import constants
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 
@@ -19,8 +20,7 @@ def get_sample_rate(sensor) -> float:
 
 
 def _form_payload(name: str, data) -> str:
-    """
-    Forms a JSON payload string from a dictionary of data.
+    """Forms a JSON payload string from a dictionary of data.
 
     Args:
         name (str): The event type name.
@@ -28,6 +28,7 @@ def _form_payload(name: str, data) -> str:
 
     Returns:
         str: A JSON string representing the payload.
+
     """
     payload = {
         "event_type": name,
@@ -37,8 +38,7 @@ def _form_payload(name: str, data) -> str:
 
 
 def form_tuple_payload(name: str, data: tuple) -> str:
-    """
-    Forms a JSON payload string from a tuple of data.
+    """Forms a JSON payload string from a tuple of data.
 
     Args:
         name (str): The event type name.
@@ -46,6 +46,7 @@ def form_tuple_payload(name: str, data: tuple) -> str:
 
     Returns:
         str: A JSON string representing the payload.
+
     """
     return _form_payload(
         name,
@@ -57,10 +58,9 @@ def form_tuple_payload(name: str, data: tuple) -> str:
     )
 
 def connect_to_sensor(i2c):
-    """
-    Establishes a connection to the ISM330DHCX sensor using I2C communication.
+    """Establishes a connection to the ISM330DHCX sensor using I2C communication.
 
-    This function initializes the I2C bus on the specified board pins and 
+    This function initializes the I2C bus on the specified board pins and
     returns an instance of the ISM330DHCX sensor.
 
     Technical References:
@@ -71,20 +71,21 @@ def connect_to_sensor(i2c):
 
     Returns:
         ISM330DHCX: An instance of the ISM330DHCX sensor.
+
     """
     return ISM330DHCX(i2c)
 
 def main() -> None:
-    """
-    Main function to read sensor data and print it in JSON format.
+    """Main function to read sensor data and print it in JSON format.
 
-    This function connects to the ISM330DHCX sensor and continuously reads 
-    acceleration and angular velocity data. The data is then formatted into 
-    JSON strings and printed. If a connection error occurs, it attempts to 
+    This function connects to the ISM330DHCX sensor and continuously reads
+    acceleration and angular velocity data. The data is then formatted into
+    JSON strings and printed. If a connection error occurs, it attempts to
     reconnect to the sensor after a specified wait time.
 
     Raises:
         OSError: If an error occurs during sensor data reading or connection.
+
     """
     i2c = busio.I2C(board.RX, board.TX)
     sensor = connect_to_sensor(i2c=i2c)
@@ -107,7 +108,7 @@ def main() -> None:
 
             if last_acceleration is None:
                 # First iteration: print the reading and set as last reading.
-                print(form_tuple_payload("acceleration", current_acceleration))
+                print(form_tuple_payload(constants.ACCELERATION, current_acceleration))
                 last_acceleration = current_acceleration
             else:
                 MINIMUM_CHANGE = 0.1
@@ -116,7 +117,7 @@ def main() -> None:
                     abs(current_acceleration[1] - last_acceleration[1]) > MINIMUM_CHANGE or
                     abs(current_acceleration[2] - last_acceleration[2]) > MINIMUM_CHANGE):
                     
-                    print(form_tuple_payload("acceleration", current_acceleration))
+                    print(form_tuple_payload(ACCELERATION, current_acceleration))
                     last_acceleration = current_acceleration
 
 

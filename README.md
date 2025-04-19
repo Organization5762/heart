@@ -14,7 +14,7 @@ Visual display project for LED screens.
 
 **Testing Locally**
 
-The command: `totem --configuration full_screen_test` should display a scene locally.  If you see a scene, then the setup is correct.
+The command: `totem run --configuration full_screen_test` should display a scene locally.  If you see a scene, then the setup is correct.
 
 **Supported Platforms**
 

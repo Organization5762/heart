@@ -6,7 +6,7 @@ from scipy.ndimage import convolve
 
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.environment import DeviceDisplayMode
+from heart import DeviceDisplayMode
 from heart.peripheral.manager import PeripheralManager
 
 
@@ -28,13 +28,23 @@ class Life(BaseRenderer):
 
         return new_grid.astype(int)
 
-    def _maybe_update_seed(self, window: Surface, peripheral_manager: PeripheralManager) -> None:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotational_value()
+    def _maybe_update_seed(
+        self, window: Surface, peripheral_manager: PeripheralManager
+    ) -> None:
+        current_value = (
+            peripheral_manager._deprecated_get_main_switch().get_rotational_value()
+        )
         if current_value != self.seed:
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())
 
-    def process(self, window: Surface, clock: Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: Surface,
+        clock: Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> None:
         self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
         self.state = self._update_grid(self.state)
 
