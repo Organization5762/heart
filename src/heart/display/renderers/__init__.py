@@ -6,6 +6,10 @@ from heart.peripheral.manager import PeripheralManager
 
 
 class BaseRenderer:
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 

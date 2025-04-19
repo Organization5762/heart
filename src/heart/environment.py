@@ -13,6 +13,7 @@ from heart import DeviceDisplayMode
 from heart.device import Device, Layout
 from heart.display.color import Color
 from heart.display.renderers.pacman import Border
+from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
 from heart.utilities.env import Configuration, REQUEST_JOYSTICK_MODULE_RESET
@@ -36,11 +37,22 @@ class GameMode:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.renderers: list[BaseRenderer] = []
+        self.title_renderer: BaseRenderer = TextRendering(
+            font="Comic Sans MS",
+            font_size=8,
+            color=Color(255, 105, 180),
+            text=[name],
+        )
 
     def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
+
+    def set_title_renderer(self, renderer: "BaseRenderer"):
+        self.title_renderer = renderer
+
 
 
 class GameLoop:
@@ -77,8 +89,13 @@ class GameLoop:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
 
-    def add_mode(self):
-        new_game_mode = GameMode()
+    def add_empty_mode(self):
+        new_mode = GameMode("")
+        self.modes.append(new_mode)
+        return new_mode
+
+    def add_mode(self, name: str):
+        new_game_mode = GameMode(name=name)
         self.modes.append(new_game_mode)
         return new_game_mode
 
@@ -187,7 +204,7 @@ class GameLoop:
         self.running = True
 
         last_long_button_value = 0
-        in_select_mode = False
+        in_select_mode = True
 
         mode_offset = 0
         while self.running:
@@ -209,16 +226,29 @@ class GameLoop:
 
             if in_select_mode:
                 mode_offset = self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
-                print(mode_offset)
+                # print(mode_offset)
 
             mode = self.active_mode(mode_offset=mode_offset)
 
             renderers = mode.renderers.copy()
 
-            # Add border in select mode
+            # Use title renderer in select mode
             if in_select_mode:
+                if mode.title_renderer is not None:
+                    renderers = [
+                        mode.title_renderer
+                    ]
+                else:
+                    renderers = [
+                        TextRendering(
+                            font="Comic Sans MS",
+                            font_size=8,
+                            color=Color(255, 105, 180),
+                            text=[mode.__class__.__name__],
+                        )
+                    ]
                 renderers.append(
-                    Border(width=5, color=Color(r=255, g=105, b=180))
+                    Border(width=3, color=Color(r=255, g=105, b=180))
                 )
             image = self._render_surfaces(renderers)
             if image is not None:

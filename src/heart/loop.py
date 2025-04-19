@@ -43,7 +43,7 @@ def run(
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
     # Retain an empty loop for "lower power" mode
-    mode = loop.add_mode()
+    mode = loop.add_empty_mode()
     mode.add_renderer(RenderColor(Color(0, 0, 0)))
     ##
     # If on PI, start the sensors.  These should be stubbed out locally
@@ -59,7 +59,7 @@ def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
 
 
 def main():
-    return run()
+    return app()
 
 
 if __name__ == "__main__":
