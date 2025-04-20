@@ -48,7 +48,9 @@ dev = [
     "black",
     "docformatter[tomli]",
     "isort",
-    "mdformat"
+    "mdformat",
+    # Git
+    "pre-commit",
 ]
 
 [build-system]
