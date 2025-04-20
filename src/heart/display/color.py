@@ -9,6 +9,10 @@ class Color:
     g: int
     b: int
 
+    @staticmethod
+    def kirby() -> "Color":
+        return Color(r=255, g=105, b=180)
+
     def __post_init__(self):
         for variant in self._as_tuple():
             assert (

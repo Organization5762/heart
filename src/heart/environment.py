@@ -15,7 +15,6 @@ from PIL import Image
 from heart import DeviceDisplayMode
 from heart.device import Device, Layout
 from heart.display.color import Color
-from heart.display.renderers.pacman import Border
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
@@ -43,19 +42,25 @@ class GameMode:
     def __init__(self, name: str) -> None:
         self.name = name
         self.renderers: list[BaseRenderer] = []
-        self.title_renderer: BaseRenderer = TextRendering(
-            font="Comic Sans MS",
-            font_size=8,
-            color=Color(255, 105, 180),
-            text=[name],
-        )
+        self.title_renderer: list[BaseRenderer] | None = None
 
     def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
 
-    def set_title_renderer(self, renderer: "BaseRenderer"):
-        self.title_renderer = renderer
+    def add_title_renderer(self, *renderer: "BaseRenderer"):
+        self.title_renderer = (self.title_renderer or []) + list(renderer)
 
+    def default_title_renderer(self) -> list["BaseRenderer"]:
+        return [
+            TextRendering(
+                font="Comic Sans MS",
+                font_size=8,
+                color=Color(255, 105, 180),
+                text=[
+                    self.name,
+                ],
+            )
+        ]
 
 
 class RendererVariant(enum.Enum):
@@ -103,13 +108,13 @@ class GameLoop:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
 
-    def add_mode(self) -> GameMode:
-        new_game_mode = GameMode()
+    def add_mode(self, name: str) -> GameMode:
+        new_game_mode = GameMode(name)
         self.modes.append(new_game_mode)
         return new_game_mode
 
-    def add_empty_mode(self):
-        new_mode = GameMode("")
+    def add_sleep_mode(self):
+        new_mode = GameMode("zzz")
         self.modes.append(new_mode)
         return new_mode
 
@@ -279,10 +284,8 @@ class GameLoop:
             # Use title renderer in select mode
             if in_select_mode:
                 renderers = [
-                    mode.title_renderer,
-                    Border(width=5, color=Color(r=255, g=105, b=180))
+                    *(mode.title_renderer or mode.default_title_renderer())
                 ]
-                # renderers.append(Border(width=5, color=Color(r=255, g=105, b=180)))
 
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
