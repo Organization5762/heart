@@ -15,7 +15,7 @@ from PIL import Image
 from heart import DeviceDisplayMode
 from heart.device import Device, Layout
 from heart.display.color import Color
-from heart.display.renderers.pacman import Border
+from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
 from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
@@ -39,11 +39,28 @@ class GameMode:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.renderers: list[BaseRenderer] = []
+        self.title_renderer: list[BaseRenderer] | None = None
 
     def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
+
+    def add_title_renderer(self, *renderer: "BaseRenderer"):
+        self.title_renderer = (self.title_renderer or []) + list(renderer)
+
+    def default_title_renderer(self) -> list["BaseRenderer"]:
+        return [
+            TextRendering(
+                font="Comic Sans MS",
+                font_size=8,
+                color=Color(255, 105, 180),
+                text=[
+                    self.name,
+                ],
+            )
+        ]
 
 
 class RendererVariant(enum.Enum):
@@ -91,10 +108,15 @@ class GameLoop:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
 
-    def add_mode(self) -> GameMode:
-        new_game_mode = GameMode()
+    def add_mode(self, name: str) -> GameMode:
+        new_game_mode = GameMode(name)
         self.modes.append(new_game_mode)
         return new_game_mode
+
+    def add_sleep_mode(self):
+        new_mode = GameMode("zzz")
+        self.modes.append(new_mode)
+        return new_mode
 
     def active_mode(self, mode_offset: int) -> GameMode:
         mode_index = (self._active_mode_index + mode_offset) % len(self.modes)
@@ -230,7 +252,7 @@ class GameLoop:
         self.running = True
 
         last_long_button_value = 0
-        in_select_mode = False
+        in_select_mode = True
 
         mode_offset = 0
         while self.running:
@@ -259,8 +281,11 @@ class GameLoop:
             mode = self.active_mode(mode_offset=mode_offset)
             renderers = mode.renderers.copy()
 
+            # Use title renderer in select mode
             if in_select_mode:
-                renderers.append(Border(width=5, color=Color(r=255, g=105, b=180)))
+                renderers = [
+                    *(mode.title_renderer or mode.default_title_renderer())
+                ]
 
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
