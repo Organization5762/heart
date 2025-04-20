@@ -28,33 +28,6 @@ class Distribution:
     def add_value(self, value: float):
         self.historic_values.append((self._get_time(), value))
 
-    def jerk(self) -> float | None:
-        """Compute the instantaneous jerk using the two most recent data points.
-
-        Jerk is calculated as:
-
-            jerk = (value_latest - value_previous) / (time_latest - time_previous)
-
-        Returns:
-            The computed jerk (rate of change per second) if at least two values are available.
-            If the time difference is zero or insufficient values exist, returns None.
-
-        """
-        if len(self.historic_values) < 2:
-            return None  # Not enough data to compute jerk
-
-        # Retrieve the last two entries (each is a tuple of (time, value))
-        t_prev, value_prev = self.historic_values[-2]
-        t_latest, value_latest = self.historic_values[-1]
-
-        dt = t_latest - t_prev
-        if dt == 0:
-            return 0.0
-
-        # Compute jerk as the change in value divided by the change in time.
-        jerk_value = (value_latest - value_prev) / dt
-        return jerk_value
-
 
 class Accelerometer(Peripheral):
     def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
@@ -68,11 +41,11 @@ class Accelerometer(Peripheral):
 
         super().__init__(*args, **kwargs)
 
-    @staticmethod
-    def detect() -> Iterator[Self]:
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
         return [
             Accelerometer(port=port, baudrate=115200)
-            for port in get_device_ports("usb-Adafruit_KB2040_DF62585783393B33")
+            for port in get_device_ports("usb-Adafruit_KB2040")
         ]
 
     def _connect_to_ser(self) -> serial.Serial:
@@ -106,7 +79,9 @@ class Accelerometer(Peripheral):
         data = json.loads(bus_data)
         self._update_due_to_data(data)
 
-    def get_acceleration(self) -> Acceleration:
+    def get_acceleration(self) -> Acceleration | None:
+        if self.acceleration_value is None:
+            return None
         return Acceleration(
             self.acceleration_value["x"],
             self.acceleration_value["y"],
