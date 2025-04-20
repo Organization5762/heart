@@ -236,23 +236,10 @@ class GameLoop:
 
             # Use title renderer in select mode
             if in_select_mode:
-                renderers.append(Border(width=5, color=Color(r=255, g=105, b=180)))
-                if mode.title_renderer is not None:
-                    renderers = [
-                        mode.title_renderer
-                    ]
-                else:
-                    renderers = [
-                        TextRendering(
-                            font="Comic Sans MS",
-                            font_size=8,
-                            color=Color(255, 105, 180),
-                            text=[mode.__class__.__name__],
-                        )
-                    ]
-                renderers.append(
-                    Border(width=3, color=Color(r=255, g=105, b=180))
-                )
+                renderers = [
+                    mode.title_renderer,
+                    Border(width=5, color=Color(r=255, g=105, b=180))
+                ]
             image = self._render_surfaces(renderers)
             if image is not None:
                 bytes = image.tobytes()
