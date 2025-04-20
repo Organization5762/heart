@@ -1,6 +1,6 @@
 dev_install:
 	@pip install -e ".[dev]"
-	@pre-commit install
+	@pre-commit install --hook-type pre-push
 
 format: dev_install
 	@black src

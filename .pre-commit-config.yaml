@@ -6,3 +6,4 @@ repos:
         entry: make check
         language: system
         pass_filenames: false
+        stages: [push]  
