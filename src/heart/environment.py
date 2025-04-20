@@ -1,9 +1,9 @@
-from collections import deque
 import enum
 import inspect
 import logging
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, wait
 from enum import Enum
 from typing import TYPE_CHECKING, Callable, Optional
@@ -45,10 +45,12 @@ class GameMode:
     def add_renderer(self, *renderers: "BaseRenderer"):
         self.renderers.extend(renderers)
 
+
 class RendererVariant(enum.Enum):
     GREEDY = "GREEDY"
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
+
 
 class GameLoop:
     def __init__(
@@ -56,7 +58,7 @@ class GameLoop:
         device: Device,
         peripheral_manager: PeripheralManager,
         max_fps: int = 60,
-        render_variant: RendererVariant = RendererVariant.ITERATIVE
+        render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
         self.initalized = False
         self.device = device
@@ -128,9 +130,7 @@ class GameLoop:
                 case DeviceDisplayMode.MIRRORED:
                     layout: Layout = self.device.orientation.layout
                     screen = self._tile_surface(
-                        screen=screen,
-                        rows=layout.rows,
-                        cols=layout.columns
+                        screen=screen, rows=layout.rows, cols=layout.columns
                     )
 
                 case DeviceDisplayMode.FULL:
@@ -139,7 +139,7 @@ class GameLoop:
         except Exception as e:
             logger.error(f"Error processing renderer: {e}", exc_info=True)
             return None
-        
+
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
         # TODO: This operation will be slow.
         image = pygame.surfarray.pixels3d(screen)
@@ -148,29 +148,24 @@ class GameLoop:
         image = np.transpose(image, (1, 0, 2))
         image = Image.fromarray(image, RGBA_IMAGE_FORMAT)
         return image
-    
+
     def _tile_surface(
-        self,
-        screen: pygame.Surface,
-        rows: int,
-        cols: int
+        self, screen: pygame.Surface, rows: int, cols: int
     ) -> pygame.Surface:
         tile_width, tile_height = screen.get_size()
         tiled_surface = pygame.Surface(
             (tile_width * cols, tile_height * rows), pygame.SRCALPHA
         )
-        
+
         for row in range(rows):
             for col in range(cols):
                 dest_pos = (col * tile_width, row * tile_height)
                 tiled_surface.blit(screen, dest_pos)
-        
+
         return tiled_surface
 
     def merge_surfaces(
-        self,
-        surface1: pygame.Surface,
-        surface2: pygame.Surface
+        self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
         # Ensure both surfaces are the same size
         assert (
@@ -179,7 +174,9 @@ class GameLoop:
         surface1.blit(surface2, (0, 0))
         return surface1
 
-    def _render_surface_iterative(self, renderers: list["BaseRenderer"]) -> pygame.Surface | None:
+    def _render_surface_iterative(
+        self, renderers: list["BaseRenderer"]
+    ) -> pygame.Surface | None:
         base = None
         for renderer in renderers:
             surface = self.process_renderer(renderer)
@@ -189,8 +186,9 @@ class GameLoop:
                 base = self.merge_surfaces(base, surface)
         return base
 
-
-    def _render_surfaces_binary(self, renderers: list["BaseRenderer"]) -> pygame.Surface | None:
+    def _render_surfaces_binary(
+        self, renderers: list["BaseRenderer"]
+    ) -> pygame.Surface | None:
         with ThreadPoolExecutor() as executor:
             surfaces: list[pygame.Surface] = [
                 i
@@ -221,8 +219,10 @@ class GameLoop:
             return surfaces[0]
         else:
             return None
-        
-    def _render_surfaces_greedy(self, renderers: list["BaseRenderer"]) -> pygame.Surface | None:
+
+    def _render_surfaces_greedy(
+        self, renderers: list["BaseRenderer"]
+    ) -> pygame.Surface | None:
         merge_queue = deque()
         merge_queue_lock = threading.Lock()
         merge_event = threading.Event()
@@ -258,22 +258,26 @@ class GameLoop:
 
                     # termination condition: renderer‑side finished, queue holds
                     # 0 or 1 surfaces, and executor has no live futures
-                    if not any(t.running() for t in executor._threads) and len(merge_queue) <= 1:
+                    if (
+                        not any(t.running() for t in executor._threads)
+                        and len(merge_queue) <= 1
+                    ):
                         break
 
         with ThreadPoolExecutor() as executor:
-            merger = threading.Thread(target=merger_thread, args=(executor,), daemon=True)
+            merger = threading.Thread(
+                target=merger_thread, args=(executor,), daemon=True
+            )
             merger.start()
 
             # launch all renderers
             futures = [executor.submit(renderer_worker, r) for r in renderers]
-            wait(futures)           # wait until every renderer is done
-            merger.join()           # wait for the last merges to finish
+            wait(futures)  # wait until every renderer is done
+            merger.join()  # wait for the last merges to finish
 
             result = merge_queue.pop() if merge_queue else None
 
         return result
-
 
     def start(self) -> None:
         if not self.initalized:
@@ -332,9 +336,15 @@ class GameLoop:
             case RendererVariant.ITERATIVE:
                 return self._render_surface_iterative
 
-    def _one_loop(self, renderers: list["BaseRenderer"], override_renderer_variant: RendererVariant | None = None) -> None:
+    def _one_loop(
+        self,
+        renderers: list["BaseRenderer"],
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> None:
         # Add border in select mode
-        result: pygame.Surface | None = self._render_fn(override_renderer_variant)(renderers)
+        result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
+            renderers
+        )
         image = self.__finalize_rendering(result) if result else None
         if image is not None:
             bytes = image.tobytes()
@@ -374,7 +384,6 @@ class GameLoop:
             raise Exception("An active GameLoop exists already, please re-use that one")
 
         GameLoop.set_game_loop(self)
-
 
     def _initialize_screen(self) -> None:
         pygame.init()

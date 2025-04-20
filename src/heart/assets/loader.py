@@ -22,7 +22,7 @@ class Loader:
     @classmethod
     def load_animation(cls, path):
         return Animation(cls._resolve_path(path), 100)
-    
+
     @classmethod
     def load_font(cls, path):
         return pygame.font.Font(cls._resolve_path(path), 10)
