@@ -1,10 +1,7 @@
-from dataclasses import dataclass
-from typing import Iterable, Tuple
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm6ds import Rate
 import time
 import board
-import busio
 import json
 from heart.firmware_io import constants
 
@@ -77,20 +74,17 @@ def connect_to_sensor(i2c):
     """
     return ISM330DHCX(i2c)
 
-AxisData = Tuple[float, float, float]
-
-
-@dataclass
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
 
-    sensor: object
-    min_change: float = 0.1
+    def __init__(self, sensor, min_change: float = 0.1) -> None:
+        self.sensor = sensor
+        self.min_change = min_change
 
-    _last_accel: AxisData | None = None
-    _last_gyro: AxisData | None = None
+        self._last_accel: tuple | None = None
+        self._last_gyro: tuple | None = None
 
-    def read(self) -> Iterable[str]:
+    def read(self):
         """Yield JSON strings for each channel that crossed ``min_change``."""
         accel = self.sensor.acceleration  # m/s²
         gyro = self.sensor.gyro  # rad/s
@@ -103,7 +97,7 @@ class SensorReader:
             self._last_gyro = gyro
             yield form_tuple_payload(constants.GYROSCOPE, gyro)
 
-    def _changed_enough(self, new: AxisData, old: AxisData | None, min_change: float) -> bool:
+    def _changed_enough(self, new: tuple, old: tuple | None, min_change: float) -> bool:
         """Return *True* if any axis differs by more than *min_change*."""
         if old is None:
             return True
