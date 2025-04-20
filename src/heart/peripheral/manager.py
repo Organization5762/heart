@@ -6,9 +6,9 @@ from typing import Iterator
 
 from heart.peripheral import Peripheral
 from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
-from heart.peripheral.heart_rates import HeartRateManager
 from heart.utilities.env import Configuration
 
 

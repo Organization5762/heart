@@ -38,6 +38,21 @@ dependencies = [
     "typer-slim",
 ]
 
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest",
+    "pytest-benchmark",
+    "scipy",
+    # Formatting
+    "black",
+    "docformatter[tomli]",
+    "isort",
+    "mdformat",
+    # Git
+    "pre-commit",
+]
+
 [build-system]
 requires = [
     "setuptools",

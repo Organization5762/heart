@@ -4,6 +4,7 @@ from typing import Dict, Iterator, List, Set
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+
 from heart.peripheral import Peripheral
 
 # Heart Rate Service and Characteristic UUIDs
@@ -27,10 +28,8 @@ current_bpms: dict[str, int] = {}
 # It is responsible for scanning for and connecting to Bluetooth Heart Rate sensors,
 # collecting BPM data, and managing the connection to each sensor.
 class HeartRateManager(Peripheral):
-    """
-    A peripheral that scans for and connects to Bluetooth Heart Rate sensors,
-    collecting BPM data.
-    """
+    """A peripheral that scans for and connects to Bluetooth Heart Rate sensors,
+    collecting BPM data."""
 
     def __init__(self) -> None:
         self._connected_clients: Dict[str, BleakClient] = {}
@@ -224,7 +223,7 @@ class HeartRateManager(Peripheral):
             logger.info("HeartRateManager run loop finished.")
 
     async def _shutdown_clients(self):
-        """Ensure all clients are disconnected during shutdown"""
+        """Ensure all clients are disconnected during shutdown."""
         disconnect_tasks = []
         for address, client in self._connected_clients.items():
             if client.is_connected:

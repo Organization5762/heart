@@ -1,5 +1,5 @@
-from heart.environment import GameLoop
 from heart.display.renderers.metadata_screen import MetadataScreen
+from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:

@@ -1,13 +1,14 @@
 import logging
 import time
 
+from pygame import Surface, time
+
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
-from heart.display.renderers import BaseRenderer
-from pygame import Surface, time
 from heart.device import Orientation
-from heart.peripheral.manager import PeripheralManager
+from heart.display.renderers import BaseRenderer
 from heart.peripheral.heart_rates import current_bpms
+from heart.peripheral.manager import PeripheralManager
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
