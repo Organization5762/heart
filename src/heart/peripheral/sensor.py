@@ -28,6 +28,7 @@ class Distribution:
     def add_value(self, value: float):
         self.historic_values.append((self._get_time(), value))
 
+
 class Accelerometer(Peripheral):
     def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
         self.acceleration_value = None
