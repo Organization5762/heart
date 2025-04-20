@@ -47,9 +47,9 @@ class GameMode:
 
 
 class RendererVariant(enum.Enum):
-    GREEDY = "GREEDY"
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
+    # TODO: Add more
 
 
 class GameLoop:
@@ -220,65 +220,6 @@ class GameLoop:
         else:
             return None
 
-    def _render_surfaces_greedy(
-        self, renderers: list["BaseRenderer"]
-    ) -> pygame.Surface | None:
-        merge_queue = deque()
-        merge_queue_lock = threading.Lock()
-        merge_event = threading.Event()
-
-        def renderer_worker(renderer):
-            surface = self.process_renderer(renderer)
-            if surface:
-                with merge_queue_lock:
-                    merge_queue.append(surface)
-                    if len(merge_queue) >= 2:
-                        merge_event.set()
-
-        def _on_merge_done(fut):
-            res = fut.result()
-            with merge_queue_lock:
-                merge_queue.append(res)
-                if len(merge_queue) >= 2:
-                    merge_event.set()
-
-        def merger_thread(executor) -> None:
-            while True:
-                merge_event.wait()
-                with merge_queue_lock:
-                    while len(merge_queue) >= 2:
-                        s1 = merge_queue.popleft()
-                        s2 = merge_queue.popleft()
-                        fut = executor.submit(self.merge_surfaces, s1, s2)
-                        fut.add_done_callback(_on_merge_done)
-
-                    # nothing left to merge right now
-                    if len(merge_queue) <= 1:
-                        merge_event.clear()
-
-                    # termination condition: renderer‑side finished, queue holds
-                    # 0 or 1 surfaces, and executor has no live futures
-                    if (
-                        not any(t.running() for t in executor._threads)
-                        and len(merge_queue) <= 1
-                    ):
-                        break
-
-        with ThreadPoolExecutor() as executor:
-            merger = threading.Thread(
-                target=merger_thread, args=(executor,), daemon=True
-            )
-            merger.start()
-
-            # launch all renderers
-            futures = [executor.submit(renderer_worker, r) for r in renderers]
-            wait(futures)  # wait until every renderer is done
-            merger.join()  # wait for the last merges to finish
-
-            result = merge_queue.pop() if merge_queue else None
-
-        return result
-
     def start(self) -> None:
         if not self.initalized:
             self._initialize()
@@ -329,8 +270,6 @@ class GameLoop:
     def _render_fn(self, override_renderer_variant: RendererVariant | None):
         variant = override_renderer_variant or self.renderer_variant
         match variant:
-            case RendererVariant.GREEDY:
-                return self._render_surfaces_greedy
             case RendererVariant.BINARY:
                 return self._render_surfaces_binary
             case RendererVariant.ITERATIVE:

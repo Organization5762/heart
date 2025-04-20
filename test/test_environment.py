@@ -10,8 +10,6 @@ from pytest_benchmark.fixture import BenchmarkFixture
 def test_rendering_many_objects(benchmark: BenchmarkFixture, loop: GameLoop, num_renderers: int, renderer_variant: RendererVariant) -> None:
     mode = loop.add_mode()
 
-    # RendererVariant.GREEDY, 
-
     for _ in range(num_renderers):
         mode.add_renderer(RandomPixel(num_pixels=1, brightness=1))
 
