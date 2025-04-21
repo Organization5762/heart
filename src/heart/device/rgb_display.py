@@ -4,7 +4,7 @@ import threading
 
 from PIL import Image
 
-from heart.device import Device, Layout
+from heart.device import Device, Layout, Orientation
 
 
 class SampleBase(object):
@@ -205,11 +205,11 @@ class SampleBase(object):
 
 
 class LEDMatrix(Device, SampleBase):
-    def __init__(self, layout: Layout, *args, **kwargs):
-        super(LEDMatrix, self).__init__(*args, **kwargs, layout=layout)
-        assert layout.rows == 1, "Maximum 1 row supported at the moment"
+    def __init__(self, orientation: Orientation, *args, **kwargs):
+        super(LEDMatrix, self).__init__(*args, **kwargs, orientation=orientation)
+        assert orientation.layout.rows == 1, "Maximum 1 row supported at the moment"
 
-        self.chain_length = layout.columns
+        self.chain_length = orientation.layout.columns
         self.row_size = 64
         self.col_size = 64
 

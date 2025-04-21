@@ -30,9 +30,15 @@ def run(
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
-        from heart.device.rgb_display import LEDMatrix
+        try:
+            from heart.device.rgb_display import LEDMatrix
 
-        device = LEDMatrix(orientation=orientation)
+            device = LEDMatrix(orientation=orientation)
+        except ImportError:
+            # This makes it work on Pi when no screens are connected.
+            # You need to setup X11 forwarding with XQuartz to do that.
+            logger.warning("RGB display not found, using local screen")
+            device = LocalScreen(width=64, height=64, orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
 

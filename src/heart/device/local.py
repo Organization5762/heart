@@ -1,26 +1,70 @@
 import subprocess
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
+import platform  # Import platform module
+import logging  # Import logging module
 
 import pygame
 from PIL import Image
 
 from heart.device import Device
 
+logger = logging.getLogger(__name__)  # Add logger
+
 
 def _get_display_resolution():
-    result = subprocess.run(
-        ["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True
-    )
+    if platform.system() == "Darwin":  # Check if running on macOS
+        try:
+            result = subprocess.run(
+                ["system_profiler", "SPDisplaysDataType"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
 
-    # find the line with the resolution
-    for line in result.stdout.splitlines():
-        if "Resolution" in line:
-            res = line.split(":")[1].strip()
-            parsable = res.replace(" x ", "x").split(" ")[0]
-            width, height = map(int, parsable.split("x"))
-            aspect_ratio = width / height
-            return width, height, aspect_ratio
+            # find the line with the resolution
+            for line in result.stdout.splitlines():
+                if "Resolution" in line:
+                    res = line.split(":")[1].strip()
+                    parsable = res.replace(" x ", "x").split(" ")[0]
+                    width, height = map(int, parsable.split("x"))
+                    aspect_ratio = width / height
+                    logger.info(f"Detected macOS display resolution: {width}x{height}")
+                    return width, height, aspect_ratio
+            logger.warning(
+                "Could not parse display resolution from system_profiler output."
+            )
+            return 1920, 1080, 16 / 9  # Default if parsing fails
+        except (FileNotFoundError, subprocess.CalledProcessError) as e:
+            logger.warning(
+                f"Could not run system_profiler: {e}. Using default resolution."
+            )
+            return 1920, 1080, 16 / 9  # Default resolution
+    else:
+        # Attempt to use xrandr on Linux/other systems
+        # This is used to do X11 forwarding on Pi
+        try:
+            result = subprocess.run(
+                ["xrandr", "--query"], capture_output=True, text=True, check=True
+            )
+            for line in result.stdout.splitlines():
+                if " current " in line:
+                    res = line.split(" current ")[1].split(",")[0].strip()
+                    width, height = map(int, res.split("x"))
+                    aspect_ratio = width / height
+                    logger.info(
+                        f"Detected Linux/X11 display resolution: {width}x{height}"
+                    )
+                    return width, height, aspect_ratio
+            logger.warning("Could not parse display resolution from xrandr output.")
+            return 1920, 1080, 16 / 9  # Default if parsing fails
+        except (FileNotFoundError, subprocess.CalledProcessError) as e:
+            logger.warning(f"Could not run xrandr: {e}. Using default resolution.")
+            return (
+                1920,
+                1080,
+                16 / 9,
+            )  # Default resolution for non-macOS if xrandr fails
 
 
 @dataclass
