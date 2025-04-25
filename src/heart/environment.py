@@ -280,7 +280,6 @@ class GameLoop:
             if switching:
                 # Swap select modes
                 if in_select_mode:
-                    print("\n\nthis ran")
                     # Combine the offset we're switching out of select mode
                     self._active_mode_index += mode_offset
                     mode_offset = 0
@@ -293,13 +292,12 @@ class GameLoop:
                     self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
                 )
                 self.mode_change = (
-                    self._last_mode_offset % len(self.modes),
-                    mode_offset % len(self.modes)
+                    self._last_mode_offset,
+                    (self._active_mode_index + mode_offset) % len(self.modes)
                 )
-                self._last_mode_offset = mode_offset
+                self._last_mode_offset = (self._active_mode_index + mode_offset) % len(self.modes)
                 prev, cur = self.mode_change
                 if cur != prev and not switching:
-                    print(f"Mode change: {self.mode_change}")
                     self.sliding = True
                     self._last_offset_on_change = prev
                     self._current_offset_on_change = cur
@@ -346,6 +344,7 @@ class GameLoop:
                     sliding = any(renderer.sliding for renderer in renderers)
                     if not sliding:
                         self.sliding = False
+                        self.renderers_cache = None
                         renderers = mode.title_renderer or mode.default_title_renderer()
                 else:
                     self.renderers_cache = None
@@ -471,11 +470,13 @@ class GameLoop:
             }
         self._key_pressed_last_frame[pygame.K_RIGHT] = keys[pygame.K_RIGHT]
 
-        if keys[pygame.K_UP]:
+        if keys[pygame.K_UP] and not self._key_pressed_last_frame[pygame.K_UP]:
             payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+        self._key_pressed_last_frame[pygame.K_UP] = keys[pygame.K_UP]
 
-        if keys[pygame.K_DOWN]:
+        if keys[pygame.K_DOWN] and not self._key_pressed_last_frame[pygame.K_DOWN]:
             payload = {"event_type": BUTTON_PRESS, "data": 1}
+        self._key_pressed_last_frame[pygame.K_DOWN] = keys[pygame.K_DOWN]
 
         if payload is not None:
             switch._update_due_to_data(payload)
