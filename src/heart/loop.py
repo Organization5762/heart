@@ -20,7 +20,7 @@ app = typer.Typer()
 
 @app.command()
 def run(
-    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024",
+    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)

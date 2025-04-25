@@ -14,6 +14,11 @@ class MultiScene(BaseRenderer):
         self.current_scene_index = 0
         self.key_pressed_last_frame = defaultdict(lambda: False)
 
+    def reset(self):
+        self.current_scene_index = 0
+        for scene in self.scenes:
+            scene.reset()
+
     def process(
         self,
         window: pygame.Surface,

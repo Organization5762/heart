@@ -1,12 +1,10 @@
 import enum
 import inspect
 import logging
-import threading
 import time
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor, wait
-from enum import Enum
-from typing import TYPE_CHECKING, Callable, Optional
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
@@ -88,9 +86,18 @@ class GameLoop:
         self.screen = None
         self.renderer_variant = render_variant
 
+        # jank slide animation state machine
+        self.mode_change = (0, 0)
+        self.sliding = False
+        self._last_mode_offset = 0
+        self._last_offset_on_change = 0
+        self._current_offset_on_change = 0
+        self.renderers_cache = None
+
         self.time_last_debugging_press = None
 
         self._active_mode_index = 0
+        self._key_pressed_last_frame = defaultdict(lambda: False)
 
         pygame.display.set_mode(
             (
@@ -147,7 +154,11 @@ class GameLoop:
             # check if process function takes a `orientation` argument
             if inspect.signature(renderer.process).parameters.get("orientation"):
                 kwargs["orientation"] = self.device.orientation
-            renderer.process(**kwargs)
+
+            if self.sliding:
+                renderer.process_with_slide(**kwargs)
+            else:
+                renderer.process(**kwargs)
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:
@@ -264,9 +275,12 @@ class GameLoop:
             new_long_button_value = (
                 self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
             )
-            if new_long_button_value != last_long_button_value:
+
+            switching = (new_long_button_value != last_long_button_value)
+            if switching:
                 # Swap select modes
                 if in_select_mode:
+                    print("\n\nthis ran")
                     # Combine the offset we're switching out of select mode
                     self._active_mode_index += mode_offset
                     mode_offset = 0
@@ -278,13 +292,63 @@ class GameLoop:
                 mode_offset = (
                     self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
                 )
+                self.mode_change = (
+                    self._last_mode_offset % len(self.modes),
+                    mode_offset % len(self.modes)
+                )
+                self._last_mode_offset = mode_offset
+                prev, cur = self.mode_change
+                if cur != prev and not switching:
+                    print(f"Mode change: {self.mode_change}")
+                    self.sliding = True
+                    self._last_offset_on_change = prev
+                    self._current_offset_on_change = cur
+
 
             mode = self.active_mode(mode_offset=mode_offset)
             renderers = mode.renderers.copy()
 
             # Use title renderer in select mode
             if in_select_mode:
+                # shouldn't be expensive even if every frame
+                for renderer in renderers:
+                    renderer.reset()
+
                 renderers = [*(mode.title_renderer or mode.default_title_renderer())]
+
+                if self.sliding:
+                    if not self.renderers_cache:
+                        last_mode = self.modes[self._last_offset_on_change]
+                        last_renderers = last_mode.title_renderer or last_mode.default_title_renderer()
+
+                        if self._current_offset_on_change == 0 and self._last_offset_on_change == len(self.modes) - 1:
+                            slide_dir = 1
+                        elif self._current_offset_on_change == len(self.modes) - 1 and self._last_offset_on_change == 0:
+                            slide_dir = -1
+                        else:
+                            slide_dir = (self._current_offset_on_change - self._last_offset_on_change)
+
+                        # for now safe to assume we're strictly in MIRRORED when in_select_mode
+                        screen_width = self.device.individual_display_size()[0]
+                        for renderer in last_renderers:
+                            if slide_dir > 0:
+                                renderer.set_slide(0, -screen_width)
+                            elif slide_dir < 0:
+                                renderer.set_slide(0, screen_width)
+                        for renderer in renderers:
+                            if slide_dir > 0:
+                                renderer.set_slide(screen_width, 0)
+                            elif slide_dir < 0:
+                                renderer.set_slide(-screen_width, 0)
+                        self.renderers_cache = last_renderers + renderers
+
+                    renderers = self.renderers_cache
+                    sliding = any(renderer.sliding for renderer in renderers)
+                    if not sliding:
+                        self.sliding = False
+                        renderers = mode.title_renderer or mode.default_title_renderer()
+                else:
+                    self.renderers_cache = None
 
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
@@ -393,17 +457,19 @@ class GameLoop:
         payload = None
 
         # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
-        if keys[pygame.K_LEFT]:
+        if keys[pygame.K_LEFT] and not self._key_pressed_last_frame[pygame.K_LEFT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "data": switch.rotational_value - 1,
             }
+        self._key_pressed_last_frame[pygame.K_LEFT] = keys[pygame.K_LEFT]
 
-        if keys[pygame.K_RIGHT]:
+        if keys[pygame.K_RIGHT] and not self._key_pressed_last_frame[pygame.K_RIGHT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "data": switch.rotational_value + 1,
             }
+        self._key_pressed_last_frame[pygame.K_RIGHT] = keys[pygame.K_RIGHT]
 
         if keys[pygame.K_UP]:
             payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
