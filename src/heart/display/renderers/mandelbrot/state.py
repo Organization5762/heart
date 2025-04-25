@@ -60,6 +60,8 @@ class AppState:
         self.max_iterations = self._init_max_iterations
         self.zoom = 1.0
         self.jzoom = 2.0
+        self.show_fps = False
+        self.show_debug = False
 
     def set_mode_auto(self):
         self.reset()
