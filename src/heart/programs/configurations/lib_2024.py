@@ -14,11 +14,6 @@ def configure(loop: GameLoop) -> None:
         *KirbyScene.title_scene()
     )
 
-    # todo: default title card is just TextRenderer of the mode name but we can
-    #  add custom title cards for each i.e.
-    # kirby_title: BaseRenderer = ...
-    # kirby_mode.set_title_renderer(kirby_title)
-
     modelbrot = loop.add_mode("mandelbrot")
     modelbrot.add_renderer(MandelbrotMode())
     modelbrot.add_title_renderer(
