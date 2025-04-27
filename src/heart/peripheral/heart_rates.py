@@ -1,11 +1,12 @@
 import asyncio
 import logging
-from typing import Dict, Iterator, List, Set
+from typing import Dict, Iterator
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 
-from heart.peripheral import Peripheral
+from heart.peripheral.core import Peripheral
+from heart.utilities.logging import get_logger
 
 # Heart Rate Service and Characteristic UUIDs
 HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
@@ -17,7 +18,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.FileHandler("bluetooth.log"), logging.StreamHandler()],
 )
-logger = logging.getLogger("HeartRateManager")
+logger = get_logger("HeartRateManager")
 
 
 # This dictionary is what external code will use to get the BPM data for each sensor.

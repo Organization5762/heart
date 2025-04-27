@@ -63,7 +63,17 @@ def configure(loop: GameLoop) -> None:
     )
     text.append("Where is\neveryone")
     mode.add_renderer(
-        TextRendering(
+        MultiSceneRender(
+            scenes=[
+                        TextRendering(
             font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+        ),
+                TextRendering(
+            font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+        ),
+                TextRendering(
+            font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+        )
+            ]
         )
     )

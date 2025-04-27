@@ -2,15 +2,15 @@ import logging
 import time
 from collections import defaultdict
 from enum import Enum
-from typing import Iterator
+from typing import Iterator, NoReturn
 
 import pygame.joystick
 from pygame.event import Event
 
-from heart.peripheral import Peripheral
-from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET
+from heart.peripheral.core import Peripheral, events
+from heart.utilities.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GamepadIdentifier(Enum):
@@ -23,7 +23,7 @@ class GamepadIdentifier(Enum):
 class Gamepad(Peripheral):
     def __init__(
         self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
-    ):
+    ) -> None:
         self.joystick_id = joystick_id
         self.joystick = joystick
         self.TAP_THRESHOLD_MS = 500
@@ -161,7 +161,7 @@ class Gamepad(Peripheral):
     def gamepad_detected() -> bool:
         return pygame.joystick.get_count() > 0
 
-    def run(self):
+    def run(self) -> NoReturn:
         # Give pygame and USB subsystems time to fully initialize
         time.sleep(1.5)
         while True:
@@ -174,7 +174,7 @@ class Gamepad(Peripheral):
                     except pygame.error as e:
                         print(f"Error connecting joystick: {e}")
                         # trying to touch joystick module from a thread becomes weird af
-                        pygame.event.post(Event(REQUEST_JOYSTICK_MODULE_RESET))
+                        pygame.event.post(Event(events.REQUEST_JOYSTICK_MODULE_RESET))
                     except KeyboardInterrupt:
                         print("Program terminated")
                     except Exception:

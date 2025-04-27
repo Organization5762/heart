@@ -2,11 +2,13 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Generic, Iterator, NoReturn, Self
+from typing import Iterator, NoReturn, Self
 
 import serial
 
-from heart.peripheral import Peripheral
+from heart.firmware_io.constants import ACCELERATION
+from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Input
 from heart.utilities.env import get_device_ports
 
 
@@ -60,7 +62,10 @@ class Accelerometer(Peripheral):
                     while True:
                         data = ser.readlines(ser.in_waiting or 1)
                         for datum in data:
-                            self._process_data(data=datum)
+                            bus_data = datum.decode("utf-8").rstrip()
+                            if not bus_data or not bus_data.startswith("{"):
+                                continue
+                            self.update_due_to_data(json.loads(bus_data))
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:
@@ -69,15 +74,6 @@ class Accelerometer(Peripheral):
                     ser.close()
             except Exception:
                 pass
-
-    def _process_data(self, data: bytes) -> None:
-        bus_data = data.decode("utf-8").rstrip()
-        if not bus_data or not bus_data.startswith("{"):
-            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
-            print(f"Invalid packets received, '{bus_data}', skipping.")
-            return
-        data = json.loads(bus_data)
-        self._update_due_to_data(data)
 
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:
@@ -88,12 +84,9 @@ class Accelerometer(Peripheral):
             self.acceleration_value["z"],
         )
 
-    def _update_due_to_data(self, data: dict) -> None:
-        event_type = data["event_type"]
-        data_value = data["data"]
-
-        if event_type == "acceleration":
-            self.acceleration_value = data_value
-            self.x_distribution.add_value(data_value["x"])
-            self.y_distribution.add_value(data_value["y"])
-            self.z_distribution.add_value(data_value["z"])
+    def handle_event(self, data: Input) -> None:
+        if data.event_type == ACCELERATION:
+            self.acceleration_value = data.data
+            self.x_distribution.add_value(data.data["x"])
+            self.y_distribution.add_value(data.data["y"])
+            self.z_distribution.add_value(data.data["z"])

@@ -1,12 +1,8 @@
 import enum
 import inspect
-import logging
-import threading
 import time
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor, wait
-from enum import Enum
-from typing import TYPE_CHECKING, Callable, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
@@ -17,13 +13,15 @@ from heart.device import Device, Layout
 from heart.display.color import Color
 from heart.display.renderers.pacman import Border
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
-from heart.peripheral.manager import PeripheralManager
-from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core import events
+from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP = None
 RGBA_IMAGE_FORMAT = "RGBA"
@@ -221,8 +219,12 @@ class GameLoop:
             return None
 
     def start(self) -> None:
+        logger.info("Starting GameLoop")
         if not self.initalized:
+            logger.info("GameLoop not yet initialized, initializing...")
             self._initialize()
+            logger.info("Finished initializing GameLoop.")
+
 
         if len(self.modes) == 0:
             raise Exception("Unable to start as no GameModes were added.")
@@ -232,12 +234,14 @@ class GameLoop:
         last_long_button_value = 0
         in_select_mode = False
 
+        logger.info("Entering main loop.")
         mode_offset = 0
-        while self.running:
-            self._handle_events()
 
-            self._preprocess_setup()
+        while self.running:
             # TODO: Check if long press button value has changed
+            ##
+            # Global Navigation
+            ##
             new_long_button_value = (
                 self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
             )
@@ -256,11 +260,20 @@ class GameLoop:
                     self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
                 )
 
+
+
+            ##
+            # Global Navigation
+            ##
+            self._handle_events()
+            self._preprocess_setup()
             mode = self.active_mode(mode_offset=mode_offset)
             renderers = mode.renderers.copy()
 
+            # TODO: Delete
             if in_select_mode:
-                renderers.append(Border(width=5, color=Color(r=255, g=105, b=180)))
+                renderers.append(Border(width=1, color=Color(r=255, g=105, b=180)))
+
 
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
@@ -303,10 +316,12 @@ class GameLoop:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == REQUEST_JOYSTICK_MODULE_RESET:
+                if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
                     print("resetting joystick module")
                     pygame.joystick.quit()
                     pygame.joystick.init()
+                if event.type == events.ENTER_GLOBAL_NAVIGATION_MODE:
+                    
         except SystemError:
             # (clem): gamepad shit is weird and can randomly put caught segfault
             #   events on queue, I see allusions to this online, people say
@@ -335,9 +350,8 @@ class GameLoop:
         logger.info(
             f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
         )
-        self.peripheral_manager.start()
         logger.info("Starting all peripherals")
-        logger.info("Display Initialized")
+        self.peripheral_manager.start()
 
     def _initialize(self) -> None:
         self.__set_singleton()
@@ -350,7 +364,7 @@ class GameLoop:
         self.screen.fill("black")
 
     # TODO: move this to the device
-    def __process_debugging_key_presses(self):
+    def __process_debugging_key_presses(self) -> None:
         keys = (
             pygame.key.get_pressed()
         )  # This will give us a dictonary where each key has a value of 1 or 0. Where 1 is pressed and 0 is not pressed.

@@ -1,7 +1,7 @@
 import time
 
 from serial.serialutil import SerialException
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.sensor import Accelerometer
 import serial
 

@@ -7,7 +7,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class RandomPixel(BaseRenderer):

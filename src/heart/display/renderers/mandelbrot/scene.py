@@ -22,7 +22,7 @@ from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.display.renderers.mandelbrot.state import AppState, ViewMode
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.gamepad import GamepadIdentifier
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 ColorPalette = list[tuple[int, int, int]]
 
