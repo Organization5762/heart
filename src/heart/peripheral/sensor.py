@@ -2,7 +2,7 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Generic, Iterator, NoReturn, Self
+from typing import Iterator, NoReturn, Self
 
 import serial
 
@@ -74,8 +74,8 @@ class Accelerometer(Peripheral):
         bus_data = data.decode("utf-8").rstrip()
         if not bus_data or not bus_data.startswith("{"):
             # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
-            print(f"Invalid packets received, '{bus_data}', skipping.")
             return
+
         data = json.loads(bus_data)
         self._update_due_to_data(data)
 
@@ -92,7 +92,7 @@ class Accelerometer(Peripheral):
         event_type = data["event_type"]
         data_value = data["data"]
 
-        if event_type == "acceleration":
+        if event_type == "acceleration" or event_type == "sensor.acceleration":
             self.acceleration_value = data_value
             self.x_distribution.add_value(data_value["x"])
             self.y_distribution.add_value(data_value["y"])
