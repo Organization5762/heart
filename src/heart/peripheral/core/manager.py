@@ -12,21 +12,9 @@ from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Swi
 from heart.utilities.env import Configuration
 
 
-class NotificationService:
-    def start_notify(on_value_change) -> None:
-        pass
-
-
 @dataclass
 class Device:
     device_id: str
-    device_type: "Device.Types"
-
-    class Types(StrEnum):
-        # TODO: Still need to work our this handling
-        ACCELEROMETER = "ACCELEROMETER"
-        ROTARY_ENCODER = "ROTARY_ENCODER"
-        BLUETOOTH_BRIDGE = "BLUETOOTH_BRIDGE"
 
 
 class PeripheralManager:
@@ -35,9 +23,6 @@ class PeripheralManager:
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
 
-        # TODO: I think this is something I want to support as it simplifies
-        # pushing state around in some ways
-        self.notification_service = NotificationService()
         self.started = False
 
     def get_gamepad(self) -> Gamepad:
@@ -85,12 +70,6 @@ class PeripheralManager:
                 Switch.detect(),
                 BluetoothSwitch.detect(),
             )
-            # If no switches are found this probably means they're not plugged in, just use a fake switch
-            switches_list = list(switches)
-            if len(switches_list) == 0:
-                switches = FakeSwitch.detect()
-            else:
-                switches = switches_list
         else:
             switches = FakeSwitch.detect()
 

@@ -1,4 +1,7 @@
-import logging
+import os
+
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+
 from typing import Annotated
 
 import typer
@@ -9,11 +12,12 @@ from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 app = typer.Typer()
 
@@ -21,6 +25,7 @@ app = typer.Typer()
 @app.command()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024",
+    add_low_power_mode: bool = True,
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
@@ -30,6 +35,11 @@ def run(
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
+        if (pi := Configuration.pi()).version > 4:
+            raise ValueError(
+                f"Everything is only supported on Pi 4 and below. Detected: {pi}"
+            )
+
         try:
             from heart.device.rgb_display import LEDMatrix
 
@@ -50,8 +60,8 @@ def run(
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
     # Retain an empty loop for "lower power" mode
-    mode = loop.add_sleep_mode()
-    mode.add_renderer(RenderColor(Color(0, 0, 0)))
+    if add_low_power_mode:
+        loop.app_controller.add_sleep_mode()
     loop.start()
 
 

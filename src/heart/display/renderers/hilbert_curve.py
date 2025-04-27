@@ -8,7 +8,7 @@ from numba import njit
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class HilbertScene(BaseRenderer):

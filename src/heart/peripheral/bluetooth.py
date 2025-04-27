@@ -3,7 +3,7 @@ import functools
 import json
 import threading
 from collections import deque
-from typing import Any, AsyncGenerator, AsyncIterator, Iterator, NoReturn
+from typing import Any, Iterator, NoReturn
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic

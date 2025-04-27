@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart=sudo /usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py --configuration halloween_2024
+ExecStart=sudo /usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py run --configuration halloween_2024
 
 [Install]
 WantedBy=multi-user.target

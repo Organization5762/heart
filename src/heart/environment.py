@@ -1,12 +1,8 @@
 import enum
 import inspect
-import logging
-import threading
 import time
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor, wait
-from enum import Enum
-from typing import TYPE_CHECKING, Callable, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
@@ -14,53 +10,20 @@ from PIL import Image
 
 from heart import DeviceDisplayMode
 from heart.device import Device, Layout
-from heart.display.color import Color
-from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
-from heart.peripheral.manager import PeripheralManager
-from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
+from heart.navigation import AppController, ComposedRenderer, GameModes, MultiScene
+from heart.peripheral.core import events
+from heart.peripheral.core.manager import PeripheralManager
+from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP = None
 RGBA_IMAGE_FORMAT = "RGBA"
-
-
-class GameMode:
-    """GameMode represents a mode in the game loop where different renderers can be
-    added. Each mode can have multiple renderers that define how the game is displayed.
-
-    Methods:
-    - __init__: Initializes a new GameMode instance with an empty list of renderers.
-    - add_renderer: Adds a renderer to this game mode
-
-    """
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.renderers: list[BaseRenderer] = []
-        self.title_renderer: list[BaseRenderer] | None = None
-
-    def add_renderer(self, *renderers: "BaseRenderer"):
-        self.renderers.extend(renderers)
-
-    def add_title_renderer(self, *renderer: "BaseRenderer"):
-        self.title_renderer = (self.title_renderer or []) + list(renderer)
-
-    def default_title_renderer(self) -> list["BaseRenderer"]:
-        return [
-            TextRendering(
-                font="Comic Sans MS",
-                font_size=8,
-                color=Color(255, 105, 180),
-                text=[
-                    self.name,
-                ],
-            )
-        ]
 
 
 class RendererVariant(enum.Enum):
@@ -82,14 +45,10 @@ class GameLoop:
         self.peripheral_manager = peripheral_manager
 
         self.max_fps = max_fps
-        self.modes: list[GameMode] = []
+        self.app_controller = AppController()
         self.clock = None
         self.screen = None
         self.renderer_variant = render_variant
-
-        self.time_last_debugging_press = None
-
-        self._active_mode_index = 0
 
         pygame.display.set_mode(
             (
@@ -98,6 +57,12 @@ class GameLoop:
             ),
             pygame.SHOWN,
         )
+
+    def add_mode(self) -> ComposedRenderer:
+        return self.app_controller.add_mode()
+
+    def add_scene(self) -> MultiScene:
+        return self.app_controller.add_scene()
 
     @classmethod
     def get_game_loop(cls):
@@ -108,19 +73,29 @@ class GameLoop:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
 
-    def add_mode(self, name: str) -> GameMode:
-        new_game_mode = GameMode(name)
-        self.modes.append(new_game_mode)
-        return new_game_mode
+    def start(self) -> None:
+        logger.info("Starting GameLoop")
+        if not self.initalized:
+            logger.info("GameLoop not yet initialized, initializing...")
+            self._initialize()
+            logger.info("Finished initializing GameLoop.")
 
-    def add_sleep_mode(self):
-        new_mode = GameMode("zzz")
-        self.modes.append(new_mode)
-        return new_mode
+        if self.app_controller.is_empty():
+            raise Exception("Unable to start as no GameModes were added.")
 
-    def active_mode(self, mode_offset: int) -> GameMode:
-        mode_index = (self._active_mode_index + mode_offset) % len(self.modes)
-        return self.modes[mode_index]
+        self.running = True
+        logger.info("Entering main loop.")
+
+        while self.running:
+            self._handle_events()
+            self._preprocess_setup()
+            renderers = self.app_controller.get_renderers(
+                peripheral_manager=self.peripheral_manager
+            )
+            self._one_loop(renderers)
+            self.clock.tick(self.max_fps)
+
+        pygame.quit()
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
@@ -242,56 +217,6 @@ class GameLoop:
         else:
             return None
 
-    def start(self) -> None:
-        if not self.initalized:
-            self._initialize()
-
-        if len(self.modes) == 0:
-            raise Exception("Unable to start as no GameModes were added.")
-
-        self.running = True
-
-        last_long_button_value = 0
-        in_select_mode = True
-
-        mode_offset = 0
-        while self.running:
-            self._handle_events()
-
-            self._preprocess_setup()
-            # TODO: Check if long press button value has changed
-            new_long_button_value = (
-                self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
-            )
-            if new_long_button_value != last_long_button_value:
-                # Swap select modes
-                if in_select_mode:
-                    # Combine the offset we're switching out of select mode
-                    self._active_mode_index += mode_offset
-                    mode_offset = 0
-
-                in_select_mode = not in_select_mode
-                last_long_button_value = new_long_button_value
-
-            if in_select_mode:
-                mode_offset = (
-                    self.peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
-                )
-
-            mode = self.active_mode(mode_offset=mode_offset)
-            renderers = mode.renderers.copy()
-
-            # Use title renderer in select mode
-            if in_select_mode:
-                renderers = [
-                    *(mode.title_renderer or mode.default_title_renderer())
-                ]
-
-            self._one_loop(renderers)
-            self.clock.tick(self.max_fps)
-
-        pygame.quit()
-
     def _render_fn(self, override_renderer_variant: RendererVariant | None):
         variant = override_renderer_variant or self.renderer_variant
         match variant:
@@ -328,7 +253,7 @@ class GameLoop:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                if event.type == REQUEST_JOYSTICK_MODULE_RESET:
+                if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
                     print("resetting joystick module")
                     pygame.joystick.quit()
                     pygame.joystick.init()
@@ -339,8 +264,6 @@ class GameLoop:
             print("SystemError: Encountered segfaulted event")
 
     def _preprocess_setup(self):
-        if not Configuration.is_pi():
-            self.__process_debugging_key_presses()
         self.__dim_display()
 
     def __set_singleton(self) -> None:
@@ -360,9 +283,8 @@ class GameLoop:
         logger.info(
             f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
         )
-        self.peripheral_manager.start()
         logger.info("Starting all peripherals")
-        logger.info("Display Initialized")
+        self.peripheral_manager.start()
 
     def _initialize(self) -> None:
         self.__set_singleton()
@@ -373,48 +295,3 @@ class GameLoop:
     def __dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
         self.screen.fill("black")
-
-    # TODO: move this to the device
-    def __process_debugging_key_presses(self):
-        keys = (
-            pygame.key.get_pressed()
-        )  # This will give us a dictonary where each key has a value of 1 or 0. Where 1 is pressed and 0 is not pressed.
-
-        current_time = time.time()
-        input_lag_seconds = 0.1
-        if (
-            self.time_last_debugging_press is not None
-            and current_time - self.time_last_debugging_press < input_lag_seconds
-        ):
-            return
-
-        switch = self.peripheral_manager._deprecated_get_main_switch()
-        payload = None
-
-        # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
-        if keys[pygame.K_LEFT]:
-            payload = {
-                "event_type": SWITCH_ROTATION,
-                "data": switch.rotational_value - 1,
-            }
-
-        if keys[pygame.K_RIGHT]:
-            payload = {
-                "event_type": SWITCH_ROTATION,
-                "data": switch.rotational_value + 1,
-            }
-
-        if keys[pygame.K_UP]:
-            payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
-
-        if keys[pygame.K_DOWN]:
-            payload = {"event_type": BUTTON_PRESS, "data": 1}
-
-        if payload is not None:
-            switch._update_due_to_data(payload)
-
-        self.time_last_debugging_press = current_time
-
-        pygame.display.set_caption(
-            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
-        )

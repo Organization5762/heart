@@ -5,14 +5,13 @@ from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.text import TextRendering
 from heart.environment import GameLoop
+from heart.navigation import MultiScene
 
 
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode("kirby mode")
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(
-        *KirbyScene.title_scene()
-    )
+    kirby_mode.add_title_renderer(*KirbyScene.title_scene())
 
     # todo: default title card is just TextRenderer of the mode name but we can
     #  add custom title cards for each i.e.
@@ -63,7 +62,26 @@ def configure(loop: GameLoop) -> None:
     )
     text.append("Where is\neveryone")
     mode.add_renderer(
-        TextRendering(
-            font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+        MultiScene(
+            scenes=[
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+            ]
         )
     )

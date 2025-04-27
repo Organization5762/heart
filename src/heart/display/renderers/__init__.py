@@ -4,7 +4,7 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class BaseRenderer:
@@ -14,6 +14,11 @@ class BaseRenderer:
 
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list["BaseRenderer"]:
+        return [self]
 
     def process(
         self,

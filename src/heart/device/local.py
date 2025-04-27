@@ -1,8 +1,8 @@
+import logging  # Import logging module
+import platform  # Import platform module
 import subprocess
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
-import platform  # Import platform module
-import logging  # Import logging module
 
 import pygame
 from PIL import Image

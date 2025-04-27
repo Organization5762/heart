@@ -7,7 +7,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class RandomPixel(BaseRenderer):
@@ -40,7 +40,7 @@ class Border(BaseRenderer):
         self,
         width: int,
         color: Color | None = None,
-        display_mode: DeviceDisplayMode = DeviceDisplayMode.FULL
+        display_mode: DeviceDisplayMode = DeviceDisplayMode.FULL,
     ) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()

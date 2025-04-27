@@ -7,7 +7,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class LoopPhase(Enum):
@@ -117,11 +117,7 @@ class SpritesheetLoop(BaseRenderer):
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(
-            image,
-            (
-                screen_width * self.image_scale,
-                screen_height * self.image_scale
-            )
+            image, (screen_width * self.image_scale, screen_height * self.image_scale)
         )
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2

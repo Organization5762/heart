@@ -5,9 +5,12 @@ import serial
 from bleak.backends.device import BLEDevice
 
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
-from heart.peripheral import Peripheral
 from heart.peripheral.bluetooth import UartListener
+from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BaseSwitch(Peripheral):
@@ -38,22 +41,19 @@ class BaseSwitch(Peripheral):
     def get_long_button_value(self) -> int:
         return self.button_long_press_value
 
-    def _update_due_to_data(self, data: dict) -> None:
-        event_type = data["event_type"]
-        data_value = data["data"]
-
-        if event_type == SWITCH_ROTATION:
-            self.rotational_value = int(data_value)
-
-        if event_type == BUTTON_PRESS:
-            self.button_value += int(data_value)
+    def handle_input(self, data: Input) -> None:
+        if data.event_type == BUTTON_PRESS:
+            self.button_value += int(data.data)
             # Button was pressed, update last_rotational_value
             self.rotation_value_at_last_button_press = self.rotational_value
 
-        if event_type == BUTTON_LONG_PRESS:
-            self.button_long_press_value += int(data_value)
+        if data.event_type == BUTTON_LONG_PRESS:
+            self.button_long_press_value += int(data.data)
             # Button was pressed, update last_rotational_value
             self.rotation_value_at_last_long_button_press = self.rotational_value
+
+        if data.event_type == SWITCH_ROTATION:
+            self.rotational_value = int(data.data)
 
 
 class FakeSwitch(BaseSwitch):
@@ -96,7 +96,7 @@ class Switch(BaseSwitch):
                         if ser.in_waiting > 0:
                             bus_data = ser.readline().decode("utf-8").rstrip()
                             data = json.loads(bus_data)
-                            self._update_due_to_data(data)
+                            self.update_due_to_data(data)
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:
@@ -128,7 +128,7 @@ class BluetoothSwitch(BaseSwitch):
                 try:
                     while True:
                         for event in self.listener.consume_events():
-                            self._update_due_to_data(event)
+                            self.update_due_to_data(event)
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:
