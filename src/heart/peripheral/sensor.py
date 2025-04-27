@@ -62,10 +62,7 @@ class Accelerometer(Peripheral):
                     while True:
                         data = ser.readlines(ser.in_waiting or 1)
                         for datum in data:
-                            bus_data = datum.decode("utf-8").rstrip()
-                            if not bus_data or not bus_data.startswith("{"):
-                                continue
-                            self.update_due_to_data(json.loads(bus_data))
+                            self._process_data(datum)
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:
@@ -74,6 +71,15 @@ class Accelerometer(Peripheral):
                     ser.close()
             except Exception:
                 pass
+
+    def _process_data(self, data: bytes) -> None:
+        bus_data = data.decode("utf-8").rstrip()
+        if not bus_data or not bus_data.startswith("{"):
+            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
+            print(f"Invalid packets received, '{bus_data}', skipping.")
+            return
+        data = json.loads(bus_data)
+        self._update_due_to_data(data)
 
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:

@@ -38,9 +38,15 @@ def run(
         if (pi := Configuration.pi()).version > 4:
             raise ValueError(f"Everything is only supported on Pi 4 and below. Detected: {pi}")
         
-        from heart.device.rgb_display import LEDMatrix
+        try:
+            from heart.device.rgb_display import LEDMatrix
 
-        device = LEDMatrix(orientation=orientation)
+            device = LEDMatrix(orientation=orientation)
+        except ImportError:
+            # This makes it work on Pi when no screens are connected.
+            # You need to setup X11 forwarding with XQuartz to do that.
+            logger.warning("RGB display not found, using local screen")
+            device = LocalScreen(width=64, height=64, orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
 
@@ -48,10 +54,12 @@ def run(
     loop = GameLoop(device=device, peripheral_manager=manager)
     configuration_fn(loop)
 
+    ## ============================= ##
+    ## ADD ALL MODES ABOVE THIS LINE ##
+    ## ============================= ##
+    # Retain an empty loop for "lower power" mode
     if add_low_power_mode:
-        # Retain an empty loop for "lower power" mode
-        mode = loop.add_mode()
-        mode.add_renderer(RenderColor(Color(0, 0, 0)))
+        loop.app_controller.add_sleep_mode()
     loop.start()
 
 

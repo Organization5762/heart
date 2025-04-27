@@ -85,6 +85,12 @@ class PeripheralManager:
                 Switch.detect(),
                 BluetoothSwitch.detect(),
             )
+            # If no switches are found this probably means they're not plugged in, just use a fake switch
+            switches_list = list(switches)
+            if len(switches_list) == 0:
+                switches = FakeSwitch.detect()
+            else:
+                switches = switches_list
         else:
             switches = FakeSwitch.detect()
 

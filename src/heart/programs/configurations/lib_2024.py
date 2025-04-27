@@ -1,41 +1,42 @@
 from heart.display.color import Color
 from heart.display.renderers.hilbert_curve import HilbertScene
+from heart.display.renderers.kirby import KirbyScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
-from heart.display.renderers.spritesheet import SpritesheetLoop
+from heart.display.renderers.mandelbrot.title import MandelbrotTitle
+from heart.navigation import MultiScene
 from heart.display.renderers.text import TextRendering
 from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
-    width = 64
-    height = 64
+    kirby_mode = loop.add_mode("kirby mode")
+    kirby_mode.add_renderer(KirbyScene())
+    kirby_mode.add_title_renderer(
+        *KirbyScene.title_scene()
+    )
 
-    mode = loop.add_mode()
-    for kirby in [
-        "kirby_flying_32",
-        "kirby_cell_64",
-        "kirby_sleep_64",
-        "tornado_kirby",
-        "swimming_kirby",
-        "running_kirby",
-        "rolling_kirby",
-        "fighting_kirby",
-    ]:
-        mode = loop.add_mode()
-        mode.add_renderer(
-            SpritesheetLoop(
-                screen_width=width,
-                screen_height=height,
-                sheet_file_path=f"{kirby}.png",
-                metadata_file_path=f"{kirby}.json",
-            )
-        )
+    # todo: default title card is just TextRenderer of the mode name but we can
+    #  add custom title cards for each i.e.
+    # kirby_title: BaseRenderer = ...
+    # kirby_mode.set_title_renderer(kirby_title)
 
-    modelbrot = loop.add_mode()
+    modelbrot = loop.add_mode("mandelbrot")
     modelbrot.add_renderer(MandelbrotMode())
+    modelbrot.add_title_renderer(
+        MandelbrotTitle(),
+        TextRendering(
+            text=["mandelbrot"],
+            font="Comic Sans MS",
+            font_size=8,
+            color=Color(255, 255, 255),
+            y_location=35,
+        ),
+    )
 
-    mode = loop.add_mode()
+    hilbert_mode = loop.add_mode("hilbert")
+    hilbert_mode.add_renderer(HilbertScene())
 
+    mode = loop.add_mode("friend beacon")
     text = ["Lost my\nfriends\nagain"]
     text.extend(
         [
@@ -63,7 +64,7 @@ def configure(loop: GameLoop) -> None:
     )
     text.append("Where is\neveryone")
     mode.add_renderer(
-        MultiSceneRender(
+        MultiScene(
             scenes=[
                         TextRendering(
             font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text

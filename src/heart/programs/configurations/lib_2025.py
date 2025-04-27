@@ -1,45 +1,32 @@
 from heart.display.color import Color
 from heart.display.renderers.hilbert_curve import HilbertScene
+from heart.display.renderers.kirby import KirbyScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
-from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
+from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
-    width = 64
-    height = 64
 
-    # TODO: There's some desire to refactor this into one "column" and then use the
-    # button to iterate through
-    mode = loop.add_mode()
-    for kirby in [
-        "kirby_flying_32",
-        "kirby_cell_64",
-        "kirby_sleep_64",
-        "tornado_kirby",
-        "swimming_kirby",
-        "running_kirby",
-        "rolling_kirby",
-        "fighting_kirby",
-    ]:
-        mode = loop.add_mode()
-        mode.add_renderer(
-            SpritesheetLoop(
-                screen_width=width,
-                screen_height=height,
-                sheet_file_path=f"{kirby}.png",
-                metadata_file_path=f"{kirby}.json",
-            )
-        )
+    kirby_mode = loop.add_mode("kirby mode")
+    kirby_mode.add_renderer(KirbyScene())
+    kirby_mode.add_title_renderer(
+        *KirbyScene.title_scene()
+    )
 
-    modelbrot = loop.add_mode()
+    modelbrot = loop.add_mode("mandelbrot")
     modelbrot.add_renderer(MandelbrotMode())
 
-    hilbert_mode = loop.add_mode()
+    hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
 
-    mode = loop.add_mode()
+    yolisten_mode = loop.add_mode("yo listen")
+    yolisten_mode.add_renderer(
+        YoListenRenderer()
+    )
+
+    mode = loop.add_mode("friend beacon")
 
     # TODO: Refactor
     text = ["Lost my\nfriends\nagain"]

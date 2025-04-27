@@ -20,14 +20,16 @@ class LoopPhase(Enum):
 class SpritesheetLoop(BaseRenderer):
     def __init__(
         self,
-        screen_width: int,
-        screen_height: int,
         sheet_file_path: str,
         metadata_file_path: str,
+        image_scale: float = 1.0,
+        offset_x: int = 0,
+        offset_y: int = 0,
+        disable_input: bool = False,
     ) -> None:
         super().__init__()
-        self.screen_width, self.screen_height = screen_width, screen_height
         self.initialized = False
+        self.disable_input = disable_input
         self.current_frame = 0
         self.loop_count = 0
         self.file = sheet_file_path
@@ -57,9 +59,9 @@ class SpritesheetLoop(BaseRenderer):
 
         self.time_since_last_update = None
 
-        # TODO: Why is this 30 30 / should we be pulling this from somewhere
-        self.x = 30
-        self.y = 30
+        self.image_scale = image_scale
+        self.offset_x = offset_x
+        self.offset_y = offset_y
 
     def _initialize(self) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
@@ -78,11 +80,15 @@ class SpritesheetLoop(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        screen_width, screen_height = window.get_size()
         current_kf = self.frames[self.phase][self.current_frame]
-        kf_duration = current_kf.duration - (
-            current_kf.duration
-            * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
-        )
+        if self.disable_input:
+            kf_duration = current_kf.duration
+        else:
+            kf_duration = current_kf.duration - (
+                current_kf.duration
+                * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
+            )
         if (
             self.time_since_last_update is None
             or self.time_since_last_update > kf_duration
@@ -110,8 +116,20 @@ class SpritesheetLoop(BaseRenderer):
                             self.phase = LoopPhase.START
 
         image = self.spritesheet.image_at(current_kf.frame)
-        scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
-        window.blit(scaled, (0, 0))
+        scaled = pygame.transform.scale(
+            image,
+            (
+                screen_width * self.image_scale,
+                screen_height * self.image_scale
+            )
+        )
+        center_x = (screen_width - scaled.get_width()) // 2
+        center_y = (screen_height - scaled.get_height()) // 2
+
+        final_x = center_x + self.offset_x
+        final_y = center_y + self.offset_y
+
+        window.blit(scaled, (final_x, final_y))
 
         if self.time_since_last_update is None:
             self.time_since_last_update = 0

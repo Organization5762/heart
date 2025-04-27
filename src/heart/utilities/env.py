@@ -4,7 +4,6 @@ import platform
 import re
 from typing import Iterator
 
-import pygame
 import serial.tools.list_ports
 
 @dataclass

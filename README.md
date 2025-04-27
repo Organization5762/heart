@@ -6,7 +6,7 @@ Visual display project for LED screens.
 
 **Installation**
 
-`pip install -e .`
+`make install`
 
 **Formatting**
 

@@ -26,8 +26,6 @@ def configure(loop: GameLoop) -> None:
         mode = loop.add_mode()
         mode.add_renderer(
             SpritesheetLoop(
-                screen_width=width,
-                screen_height=height,
                 sheet_file_path=f"{kirby}.png",
                 metadata_file_path=f"{kirby}.json",
             )
@@ -84,8 +82,6 @@ def configure(loop: GameLoop) -> None:
         mode = loop.add_mode()
         mode.add_renderer(
             SpritesheetLoop(
-                screen_width=width,
-                screen_height=height,
                 sheet_file_path=f"{kirby}.png",
                 metadata_file_path=f"{kirby}.json",
             )

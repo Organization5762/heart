@@ -36,10 +36,15 @@ class RandomPixel(BaseRenderer):
 
 
 class Border(BaseRenderer):
-    def __init__(self, width: int, color: Color | None = None) -> None:
+    def __init__(
+        self,
+        width: int,
+        color: Color | None = None,
+        display_mode: DeviceDisplayMode = DeviceDisplayMode.FULL
+    ) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()
-        self.device_display_mode = DeviceDisplayMode.FULL
+        self.device_display_mode = display_mode
         self.width = width
         self.color = color or Color.random()
 
@@ -54,20 +59,12 @@ class Border(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
-
-        # Draw the border
-        color_value = self.color._as_tuple()
-        for x in range(width):
-            # Top and Bottom
-            for y in range(self.width):
-                window.set_at((x, y), color_value)
-                window.set_at((x, height - 1 - y), color_value)
-
-        for y in range(height):
-            # Left and Right
-            for x in range(self.width):
-                window.set_at((x, y), color_value)
-                window.set_at((width - 1 - x, y), color_value)
+        pygame.draw.rect(
+            window,
+            self.color._as_tuple(),
+            (0, 0, width, height),
+            self.width,
+        )
 
 
 class Rain(BaseRenderer):

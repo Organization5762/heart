@@ -4,7 +4,7 @@ from typing import Iterator, NoReturn, Self
 import serial
 from bleak.backends.device import BLEDevice
 
-from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS
+from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core import Peripheral, Input
 from heart.peripheral.bluetooth import UartListener
 from heart.utilities.env import get_device_ports
@@ -41,7 +41,7 @@ class BaseSwitch(Peripheral):
     def get_long_button_value(self) -> int:
         return self.button_long_press_value
 
-    def handle_event(self, data: Input) -> None:
+    def handle_input(self, data: Input) -> None:
         if data.event_type == BUTTON_PRESS:
             self.button_value += int(data.data)
             # Button was pressed, update last_rotational_value
@@ -51,6 +51,9 @@ class BaseSwitch(Peripheral):
             self.button_long_press_value += int(data.data)
             # Button was pressed, update last_rotational_value
             self.rotation_value_at_last_long_button_press = self.rotational_value
+
+        if data.event_type == SWITCH_ROTATION:
+            self.rotational_value = int(data.data)
 
 
 class FakeSwitch(BaseSwitch):
