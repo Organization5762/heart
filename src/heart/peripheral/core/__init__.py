@@ -4,6 +4,7 @@ from typing import Any, Iterator, Self
 
 import pygame
 
+
 @dataclass
 class Input:
     event_type: str
@@ -20,7 +21,7 @@ class Peripheral(abc.ABC):
 
     def handle_input(self, input: Input) -> None:
         pass
-    
+
     def update_due_to_data(self, data: dict) -> None:
         i = Input(**data)
         self.handle_input(i)

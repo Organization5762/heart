@@ -11,9 +11,7 @@ def configure(loop: GameLoop) -> None:
 
     kirby_mode = loop.add_mode("kirby mode")
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(
-        *KirbyScene.title_scene()
-    )
+    kirby_mode.add_title_renderer(*KirbyScene.title_scene())
 
     modelbrot = loop.add_mode("mandelbrot")
     modelbrot.add_renderer(MandelbrotMode())
@@ -22,9 +20,7 @@ def configure(loop: GameLoop) -> None:
     hilbert_mode.add_renderer(HilbertScene())
 
     yolisten_mode = loop.add_mode("yo listen")
-    yolisten_mode.add_renderer(
-        YoListenRenderer()
-    )
+    yolisten_mode.add_renderer(YoListenRenderer())
 
     mode = loop.add_mode("friend beacon")
 

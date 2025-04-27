@@ -7,8 +7,7 @@ from typing import Iterator, NoReturn, Self
 import serial
 
 from heart.firmware_io.constants import ACCELERATION
-from heart.peripheral.core import Peripheral
-from heart.peripheral.core import Input
+from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
 
 

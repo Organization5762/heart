@@ -12,8 +12,8 @@ from heart import DeviceDisplayMode
 from heart.device import Device, Layout
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.navigation import AppController, ComposedRenderer, GameModes, MultiScene
-from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core import events
+from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -57,10 +57,10 @@ class GameLoop:
             ),
             pygame.SHOWN,
         )
-    
+
     def add_mode(self) -> ComposedRenderer:
         return self.app_controller.add_mode()
-    
+
     def add_scene(self) -> MultiScene:
         return self.app_controller.add_scene()
 
@@ -80,7 +80,6 @@ class GameLoop:
             self._initialize()
             logger.info("Finished initializing GameLoop.")
 
-
         if self.app_controller.is_empty():
             raise Exception("Unable to start as no GameModes were added.")
 
@@ -90,7 +89,9 @@ class GameLoop:
         while self.running:
             self._handle_events()
             self._preprocess_setup()
-            renderers = self.app_controller.get_renderers(peripheral_manager=self.peripheral_manager)
+            renderers = self.app_controller.get_renderers(
+                peripheral_manager=self.peripheral_manager
+            )
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
 

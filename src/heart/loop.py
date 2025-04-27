@@ -1,4 +1,5 @@
 import os
+
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 from typing import Annotated
@@ -16,7 +17,6 @@ from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
-
 logger = get_logger(__name__)
 
 app = typer.Typer()
@@ -25,7 +25,7 @@ app = typer.Typer()
 @app.command()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2024",
-    add_low_power_mode: bool = True
+    add_low_power_mode: bool = True,
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
@@ -36,8 +36,10 @@ def run(
     orientation = Cube.sides()
     if Configuration.is_pi():
         if (pi := Configuration.pi()).version > 4:
-            raise ValueError(f"Everything is only supported on Pi 4 and below. Detected: {pi}")
-        
+            raise ValueError(
+                f"Everything is only supported on Pi 4 and below. Detected: {pi}"
+            )
+
         try:
             from heart.device.rgb_display import LEDMatrix
 
@@ -66,6 +68,7 @@ def run(
 @app.command()
 def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     update_driver_main(device_driver_name=name)
+
 
 def main():
     return app()

@@ -1,39 +1,41 @@
-from dataclasses import dataclass
 import os
 import platform
 import re
+from dataclasses import dataclass
 from typing import Iterator
 
 import serial.tools.list_ports
+
 
 @dataclass
 class Pi:
     version: int
 
+
 class Configuration:
     @classmethod
     def is_pi(cls):
         return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))
-    
+
     @classmethod
     def pi(cls) -> Pi | None:
         if not cls.is_pi():
             return None
-        
+
         with open("/proc/device-tree/model", "rb") as fp:
             raw = fp.read()
-            model = raw.decode('ascii', errors='ignore').rstrip('\x00\n')
-            
+            model = raw.decode("ascii", errors="ignore").rstrip("\x00\n")
+
             # Match “Raspberry Pi X” and capture X
-            m = re.search(r'Raspberry Pi (\d+)', model)
+            m = re.search(r"Raspberry Pi (\d+)", model)
             if not m:
                 raise ValueError(f"Couldn't parse Pi model from {model!r}")
             return int(m.group(1))
-    
+
     @classmethod
     def is_profiling_mode(cls) -> bool:
         return bool(os.environ.get("PROFILING_MODE", False))
-    
+
     @classmethod
     def is_debug_mode(cls) -> bool:
         return bool(os.environ.get("DEBUG_MODE", False))

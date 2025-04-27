@@ -5,8 +5,8 @@ import serial
 from bleak.backends.device import BLEDevice
 
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
-from heart.peripheral.core import Peripheral, Input
 from heart.peripheral.bluetooth import UartListener
+from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 

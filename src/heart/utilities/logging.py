@@ -7,4 +7,3 @@ def get_logger(name: str) -> logging.Logger:
     logging.basicConfig(level=getattr(logging, log_level))
     logger = logging.getLogger(name)
     return logger
-    

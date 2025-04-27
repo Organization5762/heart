@@ -1,46 +1,43 @@
 import time
+from collections import defaultdict
+
 import pygame
 from pygame.time import Clock
+
+from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.color import RenderColor
 from heart.display.renderers.text import TextRendering
-from collections import defaultdict
-
-import pygame
-
-from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.manager import PeripheralManager
-from heart.display.color import Color
-from heart.display.renderers import BaseRenderer
-from heart.display.renderers.text import TextRendering
+
 
 class AppController(BaseRenderer):
     def __init__(self) -> None:
         self.modes = GameModes()
         pass
-    def get_renderers(self, peripheral_manager: PeripheralManager) -> list[BaseRenderer]:
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
         return self.modes.get_renderers(peripheral_manager=peripheral_manager)
-  
+
     def add_sleep_mode(self) -> None:
-        self.modes.add_new_pages(
-            RenderColor(Color(0, 0, 0))
-        )
-    
-    def add_scene(self) -> 'MultiScene':
+        self.modes.add_new_pages(RenderColor(Color(0, 0, 0)))
+
+    def add_scene(self) -> "MultiScene":
         new_scene = MultiScene(scenes=[])
         self.modes.add_new_pages(new_scene)
         return new_scene
-    
-    def add_mode(self) -> 'ComposedRenderer':
+
+    def add_mode(self) -> "ComposedRenderer":
         result = ComposedRenderer([])
         self.modes.add_new_pages(result)
         return result
-    
-    def is_empty(self) -> bool: 
+
+    def is_empty(self) -> bool:
         return len(self.modes.renderers) == 0
 
 
@@ -51,7 +48,9 @@ class GameModes(BaseRenderer):
     Methods:
     - __init__: Initializes a new GameMode instance with an empty list of renderers.
     - add_renderer: Adds a renderer to this game mode
+
     """
+
     def __init__(self) -> None:
         self.renderers: list[BaseRenderer] = []
         self.in_select_mode = False
@@ -63,17 +62,19 @@ class GameModes(BaseRenderer):
     def add_new_pages(self, *renderers: "BaseRenderer") -> None:
         self.renderers.extend(renderers)
 
-    def get_renderers(self, peripheral_manager: PeripheralManager) -> list[BaseRenderer]:
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
         self.handle_inputs(peripheral_manager)
         active_renderer = self.active_renderer(mode_offset=self.mode_offset)
         renderers = active_renderer.get_renderers(peripheral_manager)
 
         return renderers
-    
-    def _process_debugging_key_presses(self, peripheral_manager: PeripheralManager) -> None:
-        keys = (
-            pygame.key.get_pressed()
-        )
+
+    def _process_debugging_key_presses(
+        self, peripheral_manager: PeripheralManager
+    ) -> None:
+        keys = pygame.key.get_pressed()
 
         current_time = time.time()
         input_lag_seconds = 0.1
@@ -117,8 +118,8 @@ class GameModes(BaseRenderer):
     def handle_inputs(self, peripheral_manager: PeripheralManager) -> None:
         self._process_debugging_key_presses(peripheral_manager)
         new_long_button_value = (
-                peripheral_manager._deprecated_get_main_switch().get_long_button_value()
-            )
+            peripheral_manager._deprecated_get_main_switch().get_long_button_value()
+        )
         if new_long_button_value != self.last_long_button_value:
             # Swap select modes
             if self.in_select_mode:
@@ -138,17 +139,20 @@ class GameModes(BaseRenderer):
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
         return self.renderers[mode_index]
 
+
 class ComposedRenderer(BaseRenderer):
     def __init__(self, renderers: list[BaseRenderer]) -> None:
         super().__init__()
         self.renderers: list[BaseRenderer] = renderers
-    
-    def get_renderers(self, peripheral_manager: PeripheralManager) -> list[BaseRenderer]:
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
         result = []
         for renderer in self.renderers:
             result.extend(renderer.get_renderers(peripheral_manager))
         return result
-    
+
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
 
@@ -160,11 +164,17 @@ class MultiScene(BaseRenderer):
         self.current_scene_index = 0
         self.key_pressed_last_frame = defaultdict(lambda: False)
 
-    def get_renderers(self, peripheral_manager: PeripheralManager) -> list[BaseRenderer]:
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
         self._process_input(peripheral_manager)
         # This multi-scene could be composed of multiple renderers
-        return [*self.scenes[self.current_scene_index].get_renderers(peripheral_manager=peripheral_manager)]
-    
+        return [
+            *self.scenes[self.current_scene_index].get_renderers(
+                peripheral_manager=peripheral_manager
+            )
+        ]
+
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch(peripheral_manager)
         self._process_keyboard()
@@ -176,11 +186,17 @@ class MultiScene(BaseRenderer):
         self._set_scene_index(current_value)
 
     def _process_keyboard(self) -> None:
-        if pygame.key.get_pressed()[pygame.K_a] and not self.key_pressed_last_frame[pygame.K_a]:
+        if (
+            pygame.key.get_pressed()[pygame.K_a]
+            and not self.key_pressed_last_frame[pygame.K_a]
+        ):
             self._decrement_scene()
         self.key_pressed_last_frame[pygame.K_a] = pygame.key.get_pressed()[pygame.K_a]
 
-        if pygame.key.get_pressed()[pygame.K_d] and not self.key_pressed_last_frame[pygame.K_d]:
+        if (
+            pygame.key.get_pressed()[pygame.K_d]
+            and not self.key_pressed_last_frame[pygame.K_d]
+        ):
             self._increment_scene()
         self.key_pressed_last_frame[pygame.K_d] = pygame.key.get_pressed()[pygame.K_d]
 

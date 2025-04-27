@@ -16,7 +16,7 @@
 #     def submit(self, input: Input) -> None:
 #         if Configuration.is_debug_mode():
 #             print(input)
-        
+
 #         # Convert into primary event loop event
 #         for callback in self.subcribers.get(input.event_type, []):
 #             event = callback(input)

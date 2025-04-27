@@ -40,7 +40,7 @@ class Border(BaseRenderer):
         self,
         width: int,
         color: Color | None = None,
-        display_mode: DeviceDisplayMode = DeviceDisplayMode.FULL
+        display_mode: DeviceDisplayMode = DeviceDisplayMode.FULL,
     ) -> None:
         # TODO: This whole freaking this is broken
         super().__init__()

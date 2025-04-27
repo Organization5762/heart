@@ -15,7 +15,9 @@ class BaseRenderer:
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
-    def get_renderers(self, peripheral_manager: PeripheralManager) -> list['BaseRenderer']:
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list["BaseRenderer"]:
         return [self]
 
     def process(
