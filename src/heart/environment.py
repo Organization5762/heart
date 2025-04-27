@@ -16,6 +16,7 @@ from heart.display.color import Color
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.switch import FakeSwitch
 from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
 
 if TYPE_CHECKING:
@@ -265,7 +266,7 @@ class GameLoop:
         self.running = True
 
         last_long_button_value = 0
-        in_select_mode = True
+        in_select_mode = len(self.modes) > 2
 
         mode_offset = 0
         while self.running:
@@ -415,7 +416,9 @@ class GameLoop:
             print("SystemError: Encountered segfaulted event")
 
     def _preprocess_setup(self):
-        if not Configuration.is_pi():
+        if isinstance(
+            self.peripheral_manager._deprecated_get_main_switch(), FakeSwitch
+        ):
             self.__process_debugging_key_presses()
         self.__dim_display()
 
