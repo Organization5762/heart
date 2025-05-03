@@ -5,6 +5,9 @@ import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
@@ -158,6 +161,10 @@ class GameLoop:
             if self.sliding:
                 renderer.process_with_slide(**kwargs)
             else:
+    
+            if self.sliding:
+                renderer.process_with_slide(**kwargs)
+            else:
                 renderer.process(**kwargs)
 
             match renderer.device_display_mode:
@@ -302,6 +309,17 @@ class GameLoop:
                     self._last_offset_on_change = prev
                     self._current_offset_on_change = cur
 
+                self.mode_change = (
+                    self._last_mode_offset,
+                    (self._active_mode_index + mode_offset) % len(self.modes)
+                )
+                self._last_mode_offset = (self._active_mode_index + mode_offset) % len(self.modes)
+                prev, cur = self.mode_change
+                if cur != prev and not switching:
+                    self.sliding = True
+                    self._last_offset_on_change = prev
+                    self._current_offset_on_change = cur
+
 
             mode = self.active_mode(mode_offset=mode_offset)
             renderers = mode.renderers.copy()
@@ -312,7 +330,46 @@ class GameLoop:
                 for renderer in renderers:
                     renderer.reset()
 
+                # shouldn't be expensive even if every frame
+                for renderer in renderers:
+                    renderer.reset()
+
                 renderers = [*(mode.title_renderer or mode.default_title_renderer())]
+
+                if self.sliding:
+                    if not self.renderers_cache:
+                        last_mode = self.modes[self._last_offset_on_change]
+                        last_renderers = last_mode.title_renderer or last_mode.default_title_renderer()
+
+                        if self._current_offset_on_change == 0 and self._last_offset_on_change == len(self.modes) - 1:
+                            slide_dir = 1
+                        elif self._current_offset_on_change == len(self.modes) - 1 and self._last_offset_on_change == 0:
+                            slide_dir = -1
+                        else:
+                            slide_dir = (self._current_offset_on_change - self._last_offset_on_change)
+
+                        # for now safe to assume we're strictly in MIRRORED when in_select_mode
+                        screen_width = self.device.individual_display_size()[0]
+                        for renderer in last_renderers:
+                            if slide_dir > 0:
+                                renderer.set_slide(0, -screen_width)
+                            elif slide_dir < 0:
+                                renderer.set_slide(0, screen_width)
+                        for renderer in renderers:
+                            if slide_dir > 0:
+                                renderer.set_slide(screen_width, 0)
+                            elif slide_dir < 0:
+                                renderer.set_slide(-screen_width, 0)
+                        self.renderers_cache = last_renderers + renderers
+
+                    renderers = self.renderers_cache
+                    sliding = any(renderer.sliding for renderer in renderers)
+                    if not sliding:
+                        self.sliding = False
+                        self.renderers_cache = None
+                        renderers = mode.title_renderer or mode.default_title_renderer()
+                else:
+                    self.renderers_cache = None
 
                 if self.sliding:
                     if not self.renderers_cache:
