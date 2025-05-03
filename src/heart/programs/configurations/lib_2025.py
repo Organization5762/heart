@@ -5,6 +5,7 @@ from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
+from heart.display.renderers.yolisten_dB import YoListenDBRenderer
 from heart.environment import GameLoop
 
 
@@ -35,6 +36,11 @@ def configure(loop: GameLoop) -> None:
     yolisten_mode = loop.add_mode("yo listen")
     yolisten_mode.add_renderer(
         YoListenRenderer()
+    )
+
+    yolisten_db_mode = loop.add_mode("yo listen db")
+    yolisten_db_mode.add_renderer(
+        YoListenDBRenderer()
     )
 
     mode = loop.add_mode("friend beacon")
