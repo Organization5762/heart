@@ -8,48 +8,87 @@ from heart.peripheral.manager import PeripheralManager
 
 
 class YoListenRenderer(BaseRenderer):
-    def __init__(
-        self,
-        font: str = "Arial Black",  # Changed to Arial Black which is bolder
-        font_weight: int = 900,     # Increased font weight to maximum
-        font_size: int = 20,        # Increased font size slightly
-        color: Color = Color(255, 0, 0),  # Red color
-    ) -> None:
+    def __init__(self, color: Color = Color(255, 0, 0)) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.color = color
-        self.font_name = font
-        self.base_font_size = font_size
-        self.initialized = False
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
         self.screen_count = 4
-        
-        # Animation state
-        self.scaled_fonts = {}
+        self.ascii_art = {
+            "YO": [
+                "█  █ █▀▀█",
+                " ██  █  █",
+                " █▀  ███▀"
+            ],
+            "LISTEN": [
+                "█     ▀█▀▀ █▀▀▀ █▀█▀ █▀▀▀ █  ██",
+                "█      █   ▀▀██   █  █▀▀  █▀ ██",
+                "█▀▀▀  ███▀ ▀███   █  ███▀ █ ▀██"
+            ],
+            "Y'HEAR": [
+                [
+                    "█  █ █▀▀█ █  █",
+                    " ██  █  █ █  █",
+                    " █▀  ███▀ ███▀"
+                ],
+                [
+                    "█  █ █▀▀▀  █▀█ █▀▀█",
+                    "█▀▀█ █▀▀  █▀ █ ██▀▀",
+                    "█  █ ███▀ █▀▀█ █ ▀█"
+                ]
+            ],
+            "THAT": [
+                "█▀█▀ █  █  █▀█ █▀█▀",
+                "  █  █▀▀█ █▀ █   █ ",
+                "  █  █  █ █▀▀█   █ "
+            ]
+        }
         self.last_flash_time = 0
-        self.flash_delay = 100  # ms between flashes
+        self.flash_delay = 100
+        self.ascii_font_sizes = {}
+        self.initialized = False
 
     def _initialize(self) -> None:
-        # Pre-calculate scaled fonts for each word
         for word in self.words:
-            self.scaled_fonts[word] = self._get_scaled_font(word)
+            self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
         self.initialized = True
 
-    def _get_scaled_font(self, word: str) -> pygame.font.Font:
-        # Start with base font size
-        font_size = self.base_font_size
-        font = pygame.font.SysFont(self.font_name, font_size)
-        
-        # Get the text size
-        text_width, _ = font.size(word)
-        
-        # Scale down if too wide
-        while text_width > 64:  # Assuming 64 is the screen width
-            font_size -= 1
-            font = pygame.font.SysFont(self.font_name, font_size)
-            text_width, _ = font.size(word)
-        
-        return font
+    def _calculate_optimal_ascii_font_size(self, word: str) -> int:
+        art = self.ascii_art[word]
+        # For Y'HEAR, flatten the two blocks
+        if word == "Y'HEAR":
+            art = art[0] + art[1]
+        font_size = 4
+        font = pygame.font.SysFont("Courier New", font_size)
+        longest_line = max(len(line) for line in art)
+        text_width, _ = font.size("█" * longest_line)
+        while text_width <= 60:
+            font_size += 1
+            font = pygame.font.SysFont("Courier New", font_size)
+            text_width, _ = font.size("█" * longest_line)
+        return max(4, font_size - 1)
+
+    def _draw_ascii_art(self, word: str, y_offset: int, screen_surface: pygame.Surface) -> None:
+        ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
+        if word == "Y'HEAR":
+            blocks = self.ascii_art[word]
+            spacing = 1  # integer spacing for pygame
+            line_idx = 0
+            for block_i, block in enumerate(blocks):
+                for line in block:
+                    text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                    text_width, _ = text_surface.get_size()
+                    x_centered = (screen_surface.get_width() - text_width) // 2
+                    screen_surface.blit(text_surface, (x_centered, y_offset + line_idx * (self.ascii_font_sizes[word] + 1)))
+                    line_idx += 1
+                if block_i == 0:
+                    line_idx += spacing  # add spacing only between blocks
+        else:
+            for j, line in enumerate(self.ascii_art[word]):
+                text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                text_width, _ = text_surface.get_size()
+                x_centered = (screen_surface.get_width() - text_width) // 2
+                screen_surface.blit(text_surface, (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)))
 
     def process(
         self,
@@ -60,38 +99,27 @@ class YoListenRenderer(BaseRenderer):
     ) -> None:
         if not self.initialized:
             self._initialize()
-
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
-
-        # Clear the window
         window.fill((0, 0, 0))
-
-        # Get rotation value to determine how many words to show
         rotation = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
-        
-        # Calculate number of words to show and flash state
         base_words = min(max(0, rotation // 5), len(self.words))
         extra_rotation = max(0, rotation - (len(self.words) * 5))
-        
-        # Determine if we should show words based on flash timing
         current_time = pygame.time.get_ticks()
         should_show = True
         if base_words == len(self.words) and extra_rotation > 0:
-            # Flash when all words are shown and rotating further
             flash_cycle = (current_time - self.last_flash_time) // self.flash_delay
             should_show = flash_cycle % 2 == 0
             if (current_time - self.last_flash_time) >= self.flash_delay:
                 self.last_flash_time = current_time
-
-        # Draw words if we should show them
         if should_show:
             words_to_show = self.words[:base_words]
             for i, word in enumerate(words_to_show):
                 x_offset = i * screen_width
-                y_offset = (window_height - self.scaled_fonts[word].get_linesize()) // 2
-                text_surface = self.scaled_fonts[word].render(word, True, self.color._as_tuple())
-                text_width, _ = text_surface.get_size()
-                x_centered = x_offset + (screen_width - text_width) // 2
+                if word == "Y'HEAR":
+                    total_lines = len(self.ascii_art[word][0]) + len(self.ascii_art[word][1]) + 1  # 1 for spacing
+                else:
+                    total_lines = len(self.ascii_art[word])
+                y_offset = (window_height - (total_lines * (self.ascii_font_sizes[word] + 1))) // 2
                 screen_surface = window.subsurface(pygame.Rect(x_offset, 0, screen_width, window_height))
-                screen_surface.blit(text_surface, (x_centered - x_offset, y_offset)) 
+                self._draw_ascii_art(word, y_offset, screen_surface) 
