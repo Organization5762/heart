@@ -21,7 +21,9 @@ app = typer.Typer()
 @app.command()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
-    x11_forward: bool = typer.Option(False, "--x11-forward", help="Use X11 forwarding for RGB display")
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)

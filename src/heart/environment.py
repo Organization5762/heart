@@ -275,7 +275,7 @@ class GameLoop:
                 self.peripheral_manager._deprecated_get_main_switch().get_long_button_value()
             )
 
-            switching = (new_long_button_value != last_long_button_value)
+            switching = new_long_button_value != last_long_button_value
             if switching:
                 # Swap select modes
                 if in_select_mode:
@@ -292,15 +292,16 @@ class GameLoop:
                 )
                 self.mode_change = (
                     self._last_mode_offset,
-                    (self._active_mode_index + mode_offset) % len(self.modes)
+                    (self._active_mode_index + mode_offset) % len(self.modes),
                 )
-                self._last_mode_offset = (self._active_mode_index + mode_offset) % len(self.modes)
+                self._last_mode_offset = (self._active_mode_index + mode_offset) % len(
+                    self.modes
+                )
                 prev, cur = self.mode_change
                 if cur != prev and not switching:
                     self.sliding = True
                     self._last_offset_on_change = prev
                     self._current_offset_on_change = cur
-
 
             mode = self.active_mode(mode_offset=mode_offset)
             renderers = mode.renderers.copy()
@@ -311,21 +312,31 @@ class GameLoop:
                 for renderer in renderers:
                     renderer.reset()
 
-                renderers = [
-                    *(mode.title_renderer or mode.default_title_renderer())
-                ]
+                renderers = [*(mode.title_renderer or mode.default_title_renderer())]
 
                 if self.sliding:
                     if not self.renderers_cache:
                         last_mode = self.modes[self._last_offset_on_change]
-                        last_renderers = last_mode.title_renderer or last_mode.default_title_renderer()
+                        last_renderers = (
+                            last_mode.title_renderer
+                            or last_mode.default_title_renderer()
+                        )
 
-                        if self._current_offset_on_change == 0 and self._last_offset_on_change == len(self.modes) - 1:
+                        if (
+                            self._current_offset_on_change == 0
+                            and self._last_offset_on_change == len(self.modes) - 1
+                        ):
                             slide_dir = 1
-                        elif self._current_offset_on_change == len(self.modes) - 1 and self._last_offset_on_change == 0:
+                        elif (
+                            self._current_offset_on_change == len(self.modes) - 1
+                            and self._last_offset_on_change == 0
+                        ):
                             slide_dir = -1
                         else:
-                            slide_dir = (self._current_offset_on_change - self._last_offset_on_change)
+                            slide_dir = (
+                                self._current_offset_on_change
+                                - self._last_offset_on_change
+                            )
 
                         # for now safe to assume we're strictly in MIRRORED when in_select_mode
                         screen_width = self.device.individual_display_size()[0]

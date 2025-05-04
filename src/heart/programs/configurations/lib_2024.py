@@ -10,9 +10,7 @@ from heart.environment import GameLoop
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode("kirby mode")
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(
-        *KirbyScene.title_scene()
-    )
+    kirby_mode.add_title_renderer(*KirbyScene.title_scene())
 
     modelbrot = loop.add_mode("mandelbrot")
     modelbrot.add_renderer(MandelbrotMode())

@@ -24,10 +24,12 @@ class MultiScene(BaseRenderer):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> None:
         self._process_input(peripheral_manager)
-        self.scenes[self.current_scene_index].process(window, clock, peripheral_manager, orientation)
+        self.scenes[self.current_scene_index].process(
+            window, clock, peripheral_manager, orientation
+        )
 
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch(peripheral_manager)
@@ -40,11 +42,17 @@ class MultiScene(BaseRenderer):
         self._set_scene_index(current_value)
 
     def _process_keyboard(self):
-        if pygame.key.get_pressed()[pygame.K_a] and not self.key_pressed_last_frame[pygame.K_a]:
+        if (
+            pygame.key.get_pressed()[pygame.K_a]
+            and not self.key_pressed_last_frame[pygame.K_a]
+        ):
             self._decrement_scene()
         self.key_pressed_last_frame[pygame.K_a] = pygame.key.get_pressed()[pygame.K_a]
 
-        if pygame.key.get_pressed()[pygame.K_d] and not self.key_pressed_last_frame[pygame.K_d]:
+        if (
+            pygame.key.get_pressed()[pygame.K_d]
+            and not self.key_pressed_last_frame[pygame.K_d]
+        ):
             self._increment_scene()
         self.key_pressed_last_frame[pygame.K_d] = pygame.key.get_pressed()[pygame.K_d]
 
