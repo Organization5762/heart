@@ -6,6 +6,7 @@ from typing import Iterator
 
 import serial.tools.list_ports
 
+from pygame.event import custom_type
 
 @dataclass
 class Pi:
@@ -30,7 +31,9 @@ class Configuration:
             m = re.search(r"Raspberry Pi (\d+)", model)
             if not m:
                 raise ValueError(f"Couldn't parse Pi model from {model!r}")
-            return int(m.group(1))
+            return Pi(
+                version=int(m.group(1))
+            )
 
     @classmethod
     def is_profiling_mode(cls) -> bool:

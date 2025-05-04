@@ -91,7 +91,7 @@ class HilbertScene(BaseRenderer):
                 self.current_curve, self.target_curve, alpha
             )
             if len(morphed_curve) > 1:
-                pygame.draw.lines(window, self.line_color, False, morphed_curve, 2)
+                pygame.draw.lines(window, self.line_color, False, morphed_curve, 1)
 
             # if self.next_order == self.max_order:
             #     self.forwards = False

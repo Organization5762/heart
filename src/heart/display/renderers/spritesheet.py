@@ -63,15 +63,27 @@ class SpritesheetLoop(BaseRenderer):
         self.offset_x = offset_x
         self.offset_y = offset_y
 
+        self._should_calibrate = True
+        self._scale_factor_offset = 0
+
     def _initialize(self) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
         self.initialized = True
+
+    def _calibrate(self, preripheral_manager: PeripheralManager):
+        self._scale_factor_offset = (
+            preripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
+        self._should_calibrate = False
 
     def __duration_scale_factor(self, peripheral_manager: PeripheralManager) -> float:
         current_value = (
             peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         )
-        return current_value / 20.00
+        return (current_value - self._scale_factor_offset) / 20.00
+
+    def reset(self):
+        self._should_calibrate = True
 
     def process(
         self,
@@ -95,6 +107,8 @@ class SpritesheetLoop(BaseRenderer):
         ):
             if not self.initialized:
                 self._initialize()
+            if self._should_calibrate:
+                self._calibrate(peripheral_manager)
             else:
                 self.current_frame += 1
                 self.time_since_last_update = 0

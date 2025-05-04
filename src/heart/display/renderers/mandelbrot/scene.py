@@ -126,7 +126,9 @@ class MandelbrotMode(BaseRenderer):
         return self.palettes[self.state.palette_index]
 
     def reset(self):
-        self.state.reset()
+        if self.state is not None:
+            self.state.reset()
+            self.state.set_mode_auto()
 
     def process_input(self) -> bool:
         self.keyboard_controls.update()

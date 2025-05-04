@@ -50,6 +50,19 @@ class GameLoop:
         self.screen = None
         self.renderer_variant = render_variant
 
+        # jank slide animation state machine
+        self.mode_change = (0, 0)
+        self.sliding = False
+        self._last_mode_offset = 0
+        self._last_offset_on_change = 0
+        self._current_offset_on_change = 0
+        self.renderers_cache = None
+
+        self.time_last_debugging_press = None
+
+        self._active_mode_index = 0
+        self._key_pressed_last_frame = defaultdict(lambda: False)
+
         pygame.display.set_mode(
             (
                 device.full_display_size()[0] * device.scale_factor,
@@ -121,7 +134,11 @@ class GameLoop:
             # check if process function takes a `orientation` argument
             if inspect.signature(renderer.process).parameters.get("orientation"):
                 kwargs["orientation"] = self.device.orientation
-            renderer.process(**kwargs)
+
+            if self.sliding:
+                renderer.process_with_slide(**kwargs)
+            else:
+                renderer.process(**kwargs)
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:
