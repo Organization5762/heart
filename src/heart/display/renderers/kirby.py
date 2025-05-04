@@ -38,7 +38,7 @@ class KirbyScene(MultiScene):
             SpritesheetLoop(
                 sheet_file_path=f"kirby_flying_32.png",
                 metadata_file_path=f"kirby_flying_32.json",
-                image_scale=1/3,
+                image_scale=1 / 3,
                 offset_y=-5,
                 disable_input=True,
             ),

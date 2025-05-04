@@ -178,6 +178,7 @@ class YoListenRenderer(BaseRenderer):
         if self._should_calibrate:
             self._calibrate_scroll_speed(peripheral_manager)
         self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(peripheral_manager)
+
         # Update the flickering effect
         current_time = time.time()
         self._update_flicker(current_time)

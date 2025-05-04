@@ -21,6 +21,9 @@ app = typer.Typer()
 @app.command()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
@@ -30,15 +33,15 @@ def run(
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
-        try:
-            from heart.device.rgb_display import LEDMatrix
-
-            device = LEDMatrix(orientation=orientation)
-        except ImportError:
+        if x11_forward:
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
             logger.warning("RGB display not found, using local screen")
             device = LocalScreen(width=64, height=64, orientation=orientation)
+        else:
+            from heart.device.rgb_display import LEDMatrix
+
+            device = LEDMatrix(orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
 
@@ -49,9 +52,7 @@ def run(
     ## ============================= ##
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
-    # Retain an empty loop for "lower power" mode
-    mode = loop.add_sleep_mode()
-    mode.add_renderer(RenderColor(Color(0, 0, 0)))
+    # Retain an empty loop for "lower power" mode))
     loop.start()
 
 
