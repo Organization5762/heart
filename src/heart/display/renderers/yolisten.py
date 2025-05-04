@@ -23,6 +23,10 @@ class YoListenRenderer(BaseRenderer):
         self.flicker_intensity = 0.4
         self.flicker_speed = 0.04  # How often to update the flicker (in seconds)
         self.last_flicker_update = 0
+        self.scroll_speed = 0.5  # pixels per frame
+        self.word_positions = [0]  # Single position for all words
+        self.word_widths = {}  # Store width of each word
+        self.word_spacing = 0  # Space between words
         self.ascii_art = {
             "YO": [
                 "█  █ █▀▀█",
@@ -73,6 +77,17 @@ class YoListenRenderer(BaseRenderer):
     def _initialize(self) -> None:
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
+            # Calculate and store the width of each word
+            font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
+            if word == "Y'HEAR":
+                # For Y'HEAR, calculate the width of both blocks and add them together
+                block1_width, _ = font.size(self.ascii_art[word][0][0])
+                block2_width, _ = font.size(self.ascii_art[word][1][0])
+                # Add a small spacing between blocks
+                self.word_widths[word] = max(block1_width, block2_width) + 5
+            else:
+                text_width, _ = font.size(self.ascii_art[word][0])
+                self.word_widths[word] = text_width
         self.initialized = True
 
     def _calculate_optimal_ascii_font_size(self, word: str) -> int:
@@ -153,44 +168,41 @@ class YoListenRenderer(BaseRenderer):
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
         window.fill((0, 0, 0))
-        # --- ACCELEROMETER-BASED MOVEMENT ---
-        if self.use_phyphox:
-            accel_x = self.phyphox_accel_x
-            accel_y = self.phyphox_accel_y
-        else:
-            try:
-                accel = peripheral_manager.get_accelerometer().get_acceleration()
-                accel_x = accel.x
-                accel_y = accel.y
-            except Exception:
-                self.test_mode = True
-                accel_x = self.sim_accel_x
-                accel_y = self.sim_accel_y
 
-        x_offset_accel = int(accel_x * 10)
-        y_offset_accel = int(accel_y * 10)
-        max_x = screen_width // 2 - 10
-        min_x = -max_x
-        max_y = window_height // 2 - 10
-        min_y = -max_y
-        x_offset_accel = max(min_x, min(max_x, x_offset_accel))
-        y_offset_accel = max(min_y, min(max_y, y_offset_accel))
+        # Update the single position for all words
+        self.word_positions[0] -= self.scroll_speed
+        # Reset position when words move completely off screen
+        if self.word_positions[0] < -window_width:
+            self.word_positions[0] = 0
 
-        # No flash effect - always show
-        should_show = True
-
-        if should_show:
-            words_to_show = self.words
-            for i, word in enumerate(words_to_show):
-                x_offset = i * screen_width
-                if word == "Y'HEAR":
-                    total_lines = len(self.ascii_art[word][0]) + len(self.ascii_art[word][1]) + 1  # 1 for spacing
-                else:
-                    total_lines = len(self.ascii_art[word])
-                y_offset = (window_height - (total_lines * (self.ascii_font_sizes[word] + 1))) // 2
-                y_offset += y_offset_accel
-                screen_surface = window.subsurface(pygame.Rect(x_offset, 0, screen_width, window_height))
-                self._draw_ascii_art_with_x_offset(word, y_offset, screen_surface, x_offset_accel)
+        # Draw all words at their relative positions, including duplicates for looping
+        for i, word in enumerate(self.words):
+            # Calculate the word's x position relative to the entire display
+            word_x = self.word_positions[0] + (i * (screen_width + self.word_spacing))
+            
+            # Draw the word and its duplicate for looping
+            for offset in [0, window_width]:
+                current_x = word_x + offset
+                
+                # Only draw if the word is visible on any screen
+                if current_x < window_width and current_x > -self.word_widths[word]:
+                    # Calculate which screen(s) the word is on
+                    start_screen = max(0, int(current_x // screen_width))
+                    end_screen = min(self.screen_count, int((current_x + self.word_widths[word]) // screen_width + 1))
+                    
+                    for screen in range(start_screen, end_screen):
+                        screen_x = screen * screen_width
+                        screen_surface = window.subsurface(pygame.Rect(screen_x, 0, screen_width, window_height))
+                        
+                        # Calculate y offset for vertical centering
+                        if word == "Y'HEAR":
+                            total_lines = len(self.ascii_art[word][0]) + len(self.ascii_art[word][1]) + 1
+                        else:
+                            total_lines = len(self.ascii_art[word])
+                        y_offset = (window_height - (total_lines * (self.ascii_font_sizes[word] + 1))) // 2
+                        
+                        # Draw the word with its current x position relative to the screen
+                        self._draw_ascii_art_with_x_offset(word, y_offset, screen_surface, int(current_x - screen_x))
 
     def _draw_ascii_art_with_x_offset(self, word: str, y_offset: int, screen_surface: pygame.Surface, x_offset_accel: int) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
@@ -206,7 +218,7 @@ class YoListenRenderer(BaseRenderer):
                     screen_surface.blit(text_surface, (x_centered, y_offset + line_idx * (self.ascii_font_sizes[word] + 1)))
                     line_idx += 1
                 if block_i == 0:
-                    line_idx += spacing
+                    line_idx += spacing  # add spacing only between blocks
         else:
             for j, line in enumerate(self.ascii_art[word]):
                 text_surface = ascii_font.render(line, True, self.color._as_tuple())
