@@ -1,8 +1,9 @@
+import random
+import threading
+import time
+
 import pygame
 import requests
-import time
-import threading
-import random
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -11,6 +12,7 @@ from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
 
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
+
 
 class YoListenRenderer(BaseRenderer):
     def __init__(self, color: Color = Color(255, 0, 0)) -> None:
@@ -28,33 +30,21 @@ class YoListenRenderer(BaseRenderer):
         self.word_widths = {}  # Store width of each word
         self.word_spacing = 0  # Space between words
         self.ascii_art = {
-            "YO": [
-                "█  █ █▀▀█",
-                " ██  █  █",
-                " █▀  ███▀"
-            ],
+            "YO": ["█  █ █▀▀█", " ██  █  █", " █▀  ███▀"],
             "LISTEN": [
                 "█     ▀█▀▀ █▀▀▀ █▀█▀ █▀▀▀ █  ██",
                 "█      █   ▀▀██   █  █▀▀  █▀ ██",
-                "█▀▀▀  ███▀ ▀███   █  ███▀ █ ▀██"
+                "█▀▀▀  ███▀ ▀███   █  ███▀ █ ▀██",
             ],
             "Y'HEAR": [
-                [
-                    "█  █ █▀▀█ █  █",
-                    " ██  █  █ █  █",
-                    " █▀  ███▀ ███▀"
-                ],
-                [
-                    "█  █ █▀▀▀  █▀█ █▀▀█",
-                    "█▀▀█ █▀▀  █▀ █ ██▀▀",
-                    "█  █ ███▀ █▀▀█ █ ▀█"
-                ]
+                ["█  █ █▀▀█ █  █", " ██  █  █ █  █", " █▀  ███▀ ███▀"],
+                ["█  █ █▀▀▀  █▀█ █▀▀█", "█▀▀█ █▀▀  █▀ █ ██▀▀", "█  █ ███▀ █▀▀█ █ ▀█"],
             ],
             "THAT": [
                 "█▀█▀ █  █  █▀█ █▀█▀",
                 "  █  █▀▀█ █▀ █   █ ",
-                "  █  █  █ █▀▀█   █ "
-            ]
+                "  █  █  █ █▀▀█   █ ",
+            ],
         }
         self.last_flash_time = 0
         self.flash_delay = 100
@@ -105,7 +95,9 @@ class YoListenRenderer(BaseRenderer):
             text_width, _ = font.size("█" * longest_line)
         return max(4, font_size - 1)
 
-    def _draw_ascii_art(self, word: str, y_offset: int, screen_surface: pygame.Surface) -> None:
+    def _draw_ascii_art(
+        self, word: str, y_offset: int, screen_surface: pygame.Surface
+    ) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
         if word == "Y'HEAR":
             blocks = self.ascii_art[word]
@@ -116,7 +108,13 @@ class YoListenRenderer(BaseRenderer):
                     text_surface = ascii_font.render(line, True, self.color._as_tuple())
                     text_width, _ = text_surface.get_size()
                     x_centered = (screen_surface.get_width() - text_width) // 2
-                    screen_surface.blit(text_surface, (x_centered, y_offset + line_idx * (self.ascii_font_sizes[word] + 1)))
+                    screen_surface.blit(
+                        text_surface,
+                        (
+                            x_centered,
+                            y_offset + line_idx * (self.ascii_font_sizes[word] + 1),
+                        ),
+                    )
                     line_idx += 1
                 if block_i == 0:
                     line_idx += spacing  # add spacing only between blocks
@@ -125,17 +123,20 @@ class YoListenRenderer(BaseRenderer):
                 text_surface = ascii_font.render(line, True, self.color._as_tuple())
                 text_width, _ = text_surface.get_size()
                 x_centered = (screen_surface.get_width() - text_width) // 2
-                screen_surface.blit(text_surface, (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)))
+                screen_surface.blit(
+                    text_surface,
+                    (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
+                )
 
     def _poll_phyphox_background(self):
         while True:
             try:
                 resp = requests.get(PHYPOX_URL, timeout=1)
                 data = resp.json()
-                self.phyphox_accel_x = data['buffer']['accX']['buffer'][-1]
-                self.phyphox_accel_y = data['buffer']['accY']['buffer'][-1]
-                self.phyphox_accel_z = data['buffer']['accZ']['buffer'][-1]
-                self.phyphox_db = data['buffer']['dB']['buffer'][-1]
+                self.phyphox_accel_x = data["buffer"]["accX"]["buffer"][-1]
+                self.phyphox_accel_y = data["buffer"]["accY"]["buffer"][-1]
+                self.phyphox_accel_z = data["buffer"]["accZ"]["buffer"][-1]
+                self.phyphox_db = data["buffer"]["dB"]["buffer"][-1]
             except Exception:
                 pass
             time.sleep(0.05)
@@ -143,7 +144,9 @@ class YoListenRenderer(BaseRenderer):
     def _update_flicker(self, current_time: float) -> None:
         if current_time - self.last_flicker_update >= self.flicker_speed:
             # Generate a random brightness factor between (1 - intensity) and (1 + intensity)
-            brightness_factor = 1 + random.uniform(-self.flicker_intensity, self.flicker_intensity)
+            brightness_factor = 1 + random.uniform(
+                -self.flicker_intensity, self.flicker_intensity
+            )
             # Apply the brightness factor to each color channel
             r = min(255, max(0, int(self.base_color.r * brightness_factor)))
             g = min(255, max(0, int(self.base_color.g * brightness_factor)))
@@ -158,13 +161,14 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+
         if not self.initialized:
             self._initialize()
-        
+
         # Update the flickering effect
         current_time = time.time()
         self._update_flicker(current_time)
-        
+
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
         window.fill((0, 0, 0))
@@ -204,7 +208,13 @@ class YoListenRenderer(BaseRenderer):
                         # Draw the word with its current x position relative to the screen
                         self._draw_ascii_art_with_x_offset(word, y_offset, screen_surface, int(current_x - screen_x))
 
-    def _draw_ascii_art_with_x_offset(self, word: str, y_offset: int, screen_surface: pygame.Surface, x_offset_accel: int) -> None:
+    def _draw_ascii_art_with_x_offset(
+        self,
+        word: str,
+        y_offset: int,
+        screen_surface: pygame.Surface,
+        x_offset_accel: int,
+    ) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
         if word == "Y'HEAR":
             blocks = self.ascii_art[word]
@@ -214,8 +224,16 @@ class YoListenRenderer(BaseRenderer):
                 for line in block:
                     text_surface = ascii_font.render(line, True, self.color._as_tuple())
                     text_width, _ = text_surface.get_size()
-                    x_centered = (screen_surface.get_width() - text_width) // 2 + x_offset_accel
-                    screen_surface.blit(text_surface, (x_centered, y_offset + line_idx * (self.ascii_font_sizes[word] + 1)))
+                    x_centered = (
+                        screen_surface.get_width() - text_width
+                    ) // 2 + x_offset_accel
+                    screen_surface.blit(
+                        text_surface,
+                        (
+                            x_centered,
+                            y_offset + line_idx * (self.ascii_font_sizes[word] + 1),
+                        ),
+                    )
                     line_idx += 1
                 if block_i == 0:
                     line_idx += spacing  # add spacing only between blocks
@@ -223,8 +241,14 @@ class YoListenRenderer(BaseRenderer):
             for j, line in enumerate(self.ascii_art[word]):
                 text_surface = ascii_font.render(line, True, self.color._as_tuple())
                 text_width, _ = text_surface.get_size()
-                x_centered = (screen_surface.get_width() - text_width) // 2 + x_offset_accel
-                screen_surface.blit(text_surface, (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)))
+                x_centered = (
+                    screen_surface.get_width() - text_width
+                ) // 2 + x_offset_accel
+                screen_surface.blit(
+                    text_surface,
+                    (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
+                )
+
 
 def poll_phyphox():
     while True:
@@ -232,10 +256,10 @@ def poll_phyphox():
             resp = requests.get(PHYPOX_URL, timeout=1)
             data = resp.json()
             # The structure may vary, but typically:
-            x = data['buffer']['acceleration']['x'][-1]
-            y = data['buffer']['acceleration']['y'][-1]
-            z = data['buffer']['acceleration']['z'][-1]
+            x = data["buffer"]["acceleration"]["x"][-1]
+            y = data["buffer"]["acceleration"]["y"][-1]
+            z = data["buffer"]["acceleration"]["z"][-1]
             print(f"x={x}, y={y}, z={z}")
         except Exception as e:
             print("Error:", e)
-        time.sleep(0.1) 
+        time.sleep(0.1)
