@@ -1,13 +1,15 @@
+from heart.display.renderers.image import RenderImage
 from heart.display.renderers.pixels import Border, RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
+    # mode = loop.add_mode()
+    # mode.add_renderer(SpritesheetLoop(
+    #     sheet_file_path=f"artist/rainbow_tesseract.png",
+    #     metadata_file_path=f"artist/rainbow_tesseract.json",
+    #     image_scale=1.25,
+    # ))
     mode = loop.add_mode()
-    renderer = SpritesheetLoop(
-        sheet_file_path=f"rainbow_tesseract.png",
-        metadata_file_path=f"rainbow_tesseract.json",
-        image_scale=1.25,
-    )
-    mode.add_renderer(renderer)
+    mode.add_renderer(RenderImage(image_file="artist/imaginal_disk.png"))
