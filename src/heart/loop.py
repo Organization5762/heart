@@ -52,9 +52,7 @@ def run(
     ## ============================= ##
     ## ADD ALL MODES ABOVE THIS LINE ##
     ## ============================= ##
-    # Retain an empty loop for "lower power" mode
-    mode = loop.add_sleep_mode()
-    mode.add_renderer(RenderColor(Color(0, 0, 0)))
+    # Retain an empty loop for "lower power" mode))
     loop.start()
 
 

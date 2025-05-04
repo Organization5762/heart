@@ -115,7 +115,9 @@ class GameLoop:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
 
-    def add_mode(self, name: str) -> GameMode:
+    def add_mode(self, name: str | None = None) -> GameMode:
+        if name is None:
+            name = ""
         new_game_mode = GameMode(name)
         self.modes.append(new_game_mode)
         return new_game_mode
