@@ -7,5 +7,6 @@ def configure(loop: GameLoop) -> None:
     renderer = SpritesheetLoop(
         sheet_file_path=f"rainbow_tesseract.png",
         metadata_file_path=f"rainbow_tesseract.json",
+        image_scale=1.25
     )
     mode.add_renderer(renderer)
