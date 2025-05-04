@@ -15,7 +15,7 @@ class RenderImage(BaseRenderer):
         self.file = image_file
 
     def _initialize(self) -> None:
-        self.spritesheet = Loader.load_spirtesheet(self.file)
+        self.image = Loader.load(self.file)
         self.initialized = True
 
     def process(
@@ -27,6 +27,6 @@ class RenderImage(BaseRenderer):
     ) -> None:
         if not self.initialized:
             self._initialize()
+            self.image = pygame.transform.scale(self.image, window.get_size())
 
-        image = self.spritesheet.image_at(KeyFrame((0, 0, 28, 28), duration=None).frame)
-        window.blit(image, (0, 0))
+        window.blit(self.image, (0, 0))

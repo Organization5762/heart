@@ -1,10 +1,17 @@
+import random
+import threading
+import time
+
 import pygame
+import requests
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
+
+PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 
 class YoListenRenderer(BaseRenderer):
@@ -17,22 +24,45 @@ class YoListenRenderer(BaseRenderer):
     ) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.color = color
-        self.font_name = font
-        self.base_font_size = font_size
-        self.initialized = False
+        self.base_color = color  # Store the base color
+        self.color = color  # This will be the flickering color
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
         self.screen_count = 4
 
         # Animation state
         self.scaled_fonts = {}
         self.last_flash_time = 0
-        self.flash_delay = 100  # ms between flashes
+        self.flash_delay = 100
+        self.ascii_font_sizes = {}
+        self.initialized = False
+        # --- Phyphox phone accel ---
+        self.phyphox_accel_x = 0.0
+        self.phyphox_accel_y = 0.0
+        self.phyphox_accel_z = 0.0
+        self.use_phyphox = True  # Set to True to use phone input
+        if self.use_phyphox:
+            threading.Thread(target=self._poll_phyphox_background, daemon=True).start()
+        # --- Simulated accel for test mode ---
+        self.sim_accel_x = 0.0
+        self.sim_accel_y = 0.0
+        self.sim_accel_step = 0.1
+        self.test_mode = False
+        self.phyphox_db = 50.0
 
     def _initialize(self) -> None:
-        # Pre-calculate scaled fonts for each word
         for word in self.words:
-            self.scaled_fonts[word] = self._get_scaled_font(word)
+            self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
+            # Calculate and store the width of each word
+            font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
+            if word == "Y'HEAR":
+                # For Y'HEAR, calculate the width of both blocks and add them together
+                block1_width, _ = font.size(self.ascii_art[word][0][0])
+                block2_width, _ = font.size(self.ascii_art[word][1][0])
+                # Add a small spacing between blocks
+                self.word_widths[word] = max(block1_width, block2_width) + 5
+            else:
+                text_width, _ = font.size(self.ascii_art[word][0])
+                self.word_widths[word] = text_width
         self.initialized = True
 
     def _get_scaled_font(self, word: str) -> pygame.font.Font:
@@ -58,13 +88,16 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+
         if not self.initialized:
             self._initialize()
 
+        # Update the flickering effect
+        current_time = time.time()
+        self._update_flicker(current_time)
+
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
-
-        # Clear the window
         window.fill((0, 0, 0))
 
         # Get rotation value to determine how many words to show
