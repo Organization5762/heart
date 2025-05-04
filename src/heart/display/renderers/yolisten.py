@@ -143,6 +143,7 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+
         if not self.initialized:
             self._initialize()
         
