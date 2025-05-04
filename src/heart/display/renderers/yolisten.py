@@ -24,6 +24,9 @@ class YoListenRenderer(BaseRenderer):
         self.flicker_speed = 0.04  # How often to update the flicker (in seconds)
         self.last_flicker_update = 0
         self.scroll_speed = 0.5  # pixels per frame
+        self._base_scroll_speed = 0.5  # Store the base scroll speed
+        self._should_calibrate = True
+        self._scroll_speed_offset = 0
         self.word_positions = [0]  # Single position for all words
         self.word_widths = {}  # Store width of each word
         self.word_spacing = 0  # Space between words
@@ -151,6 +154,18 @@ class YoListenRenderer(BaseRenderer):
             self.color = Color(r, g, b)
             self.last_flicker_update = current_time
 
+    def _calibrate_scroll_speed(self, peripheral_manager: PeripheralManager):
+        self._scroll_speed_offset = (
+            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
+        self._should_calibrate = False
+
+    def _scroll_speed_scale_factor(self, peripheral_manager: PeripheralManager) -> float:
+        current_value = (
+            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        )
+        return 1.0 + (current_value - self._scroll_speed_offset) / 20.0
+
     def process(
         self,
         window: pygame.Surface,
@@ -160,7 +175,9 @@ class YoListenRenderer(BaseRenderer):
     ) -> None:
         if not self.initialized:
             self._initialize()
-        
+        if self._should_calibrate:
+            self._calibrate_scroll_speed(peripheral_manager)
+        self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(peripheral_manager)
         # Update the flickering effect
         current_time = time.time()
         self._update_flicker(current_time)
