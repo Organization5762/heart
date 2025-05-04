@@ -227,7 +227,6 @@ class LEDMatrix(Device, SampleBase):
         options.show_refresh_rate = 1
         options.disable_hardware_pulsing = True
         options.multiplexing = 0
-        # options.pwm_bits = 7
 
         options.row_address_type = 0
         options.multiplexing = 0
