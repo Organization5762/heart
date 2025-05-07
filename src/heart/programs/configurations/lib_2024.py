@@ -18,8 +18,8 @@ def configure(loop: GameLoop) -> None:
         MandelbrotTitle(),
         TextRendering(
             text=["mandelbrot"],
-            font="Comic Sans MS",
-            font_size=8,
+            font="Roboto",
+            font_size=14,
             color=Color(255, 255, 255),
             y_location=35,
         ),
@@ -28,7 +28,7 @@ def configure(loop: GameLoop) -> None:
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
 
-    mode = loop.add_mode("friend beacon")
+    mode = loop.add_mode("friend\nbeacon")
     text = ["Lost my\nfriends\nagain"]
     text.extend(
         [

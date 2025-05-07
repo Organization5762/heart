@@ -51,8 +51,8 @@ class GameMode:
     def default_title_renderer(self) -> list["BaseRenderer"]:
         return [
             TextRendering(
-                font="Comic Sans MS",
-                font_size=8,
+                font="Roboto",
+                font_size=14,
                 color=Color(255, 105, 180),
                 text=[
                     self.name,
