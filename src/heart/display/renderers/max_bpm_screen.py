@@ -13,7 +13,7 @@ from heart.display.renderers.flame import FlameGenerator
 
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
-    "clem": "0EA8E",  # Green
+    "clem": "0EA8E",  # GREEN
     "faye": "0ED2A",  # YELLOW
     "will": "09F90",  # BLACK
     "seb": "0EA01",  # RED
