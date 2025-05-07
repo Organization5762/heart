@@ -30,8 +30,8 @@ class KirbyScene(MultiScene):
         return [
             TextRendering(
                 text=["kirby mode"],
-                font="Comic Sans MS",
-                font_size=8,
+                font="Roboto",
+                font_size=14,
                 color=Color.kirby(),
                 y_location=35,
             ),
