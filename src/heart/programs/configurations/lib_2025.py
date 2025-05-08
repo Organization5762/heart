@@ -5,11 +5,12 @@ from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
+from heart.display.renderers.mario import MarioRenderer
+from heart.display.renderers.image import RenderImage
 from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
-
     kirby_mode = loop.add_mode("kirby mode")
     kirby_mode.add_renderer(KirbyScene())
     kirby_mode.add_title_renderer(*KirbyScene.title_scene())
@@ -20,8 +21,8 @@ def configure(loop: GameLoop) -> None:
         MandelbrotTitle(),
         TextRendering(
             text=["mandelbrot"],
-            font="Comic Sans MS",
-            font_size=8,
+            font="Roboto",
+            font_size=14,
             color=Color(255, 255, 255),
             y_location=35,
         ),
@@ -32,6 +33,22 @@ def configure(loop: GameLoop) -> None:
 
     yolisten_mode = loop.add_mode("yo listen")
     yolisten_mode.add_renderer(YoListenRenderer())
+
+    mario_mode = loop.add_mode("mario")
+    mario_mode.add_renderer(MarioRenderer(
+        sheet_file_path=f"mario_64.png",
+        metadata_file_path=f"mario_64.json",
+    ))
+    mario_mode.add_title_renderer(
+        RenderImage(image_file="mario_still.png"),
+        TextRendering(
+            text=["mario"],
+            font="Roboto",
+            font_size=14,
+            color=Color(255, 0, 0),
+            y_location=5,
+        ),
+    )
 
     mode = loop.add_mode("friend beacon")
 
