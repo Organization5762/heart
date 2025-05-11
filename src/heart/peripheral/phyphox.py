@@ -15,7 +15,7 @@ class Phyphox(Peripheral):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        return [Phyphox("http://192.168.1.42")]
+        return [Phyphox("http://192.168.5.31")]
 
     def run(self) -> NoReturn:
         while True:

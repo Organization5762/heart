@@ -23,6 +23,7 @@ from pygame.time import Clock
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.water_effect import WaterEffect
 from heart.peripheral.manager import PeripheralManager
 
 # ───────────────────────── constants & tunables ───────────────────────────────
@@ -68,6 +69,8 @@ class WaterCube(BaseRenderer):
 
     def __init__(self) -> None:
         self.device_display_mode = DeviceDisplayMode.FULL
+        self.water_effect = WaterEffect(CUBE_PX_W, CUBE_PX_H)
+        self.dt = 0
 
         # physics state (float32 for speed on Pi)
         self.h = np.full((GRID, GRID), INIT_FILL, dtype=np.float32)
@@ -138,7 +141,7 @@ class WaterCube(BaseRenderer):
         start_time = time.time()
 
         # --- get gravity ---------------------------------------------------
-        accel = peripheral_manager.get_accelerometer().get_acceleration()
+        accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
         gx = accel.x if accel else 0.0
         gy = accel.y if accel else 0.0
         gz = accel.z if accel else 1.0  # default "down"
@@ -150,11 +153,22 @@ class WaterCube(BaseRenderer):
         # --- compose frame -------------------------------------------------
         frame = self._frame
         frame.fill(0)
+        self.water_effect.update(self.dt)
+        water_frame = (self.water_effect.render() * 255).astype(np.uint8)
+        
         for face in range(4):
             heights = self._face_heights(face)
             mask = self._mask_from_heights(heights, gz)
             x0 = face * FACE_PX
-            frame[x0 : x0 + FACE_PX, :][mask] = BLUE
+            
+            # Get the face slice from water effect
+            face_slice = water_frame[x0:x0 + FACE_PX, :]
+            
+            # Apply mask to the face slice
+            masked_face = face_slice[mask]
+            
+            # Update the frame with the masked face data
+            frame[x0:x0 + FACE_PX, :][mask] = masked_face
 
         # --- blit to LED surfaces -----------------------------------------
         pygame.surfarray.blit_array(window, frame)
@@ -165,3 +179,4 @@ class WaterCube(BaseRenderer):
 
         # maintain original display rate
         clock.tick_busy_loop(60)
+        self.dt = self.dt + 0.001

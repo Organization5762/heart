@@ -77,7 +77,7 @@ class MarioRenderer(BaseRenderer):
                 self.time_since_last_update = 0
             self.time_since_last_update += clock.get_time()
         else:
-            self.accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
+            self.accel = peripheral_manager.get_accelerometer().get_acceleration()
             if self.accel is not None and self.accel.z > 2.0:
                 self.in_loop = True
         
