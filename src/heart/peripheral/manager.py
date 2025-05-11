@@ -134,6 +134,12 @@ class PeripheralManager:
                 return p
         raise ValueError("No Phyphox peripheral registered")
 
+    def get_accelerometer(self) -> Accelerometer:
+        for p in self.peripheral:
+            if isinstance(p, Accelerometer):
+                return p
+        raise ValueError("No Accelerometer peripheral registered")
+
     def __del__(self) -> None:
         """Attempt to clean up threads and peripherals at object deletion time.
 
