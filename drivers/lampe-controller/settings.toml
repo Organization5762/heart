@@ -1,0 +1,17 @@
+# https://docs.circuitpython.org/en/stable/docs/workflows.html
+# https://docs.circuitpython.org/en/stable/docs/environment.html#core-circuitpython-keys
+CIRCUITPY_BLE_NAME="totem-controller"
+
+HEART_DEVICE_TYPE="bluetooth-bridge"
+
+# I think this is correct but can't confirm
+# Also all of these variables kinda overlap, might be worth trying to map them more smartly.
+# e.g. from CIRCUIT_PY_UF2_URL we know the valid board ID - but this also locks us into only feather express
+# from CIRCUIT_PY_BOOT_NAME we pretty much know it is the Feather as well
+# We use ValidBoard IDs at a different point, though, to filter out which CIRCUITPY media mounts we should be updating
+CIRCUIT_PY_BOOT_NAME="FTHRSNSBOOT"
+CIRCUIT_PY_UF2_URL="https://downloads.circuitpython.org/bin/feather_bluefruit_sense/en_US/adafruit-circuitpython-feather_bluefruit_sense-en_US-9.2.7.uf2"
+CIRCUIT_PY_UF2_CHECKSUM="cacfa87f986493e04072df6bbfaf8d0f01c716d68fce6251c9ca86c663755446"
+VALID_BOARD_IDS="feather_nrf52840_express"
+
+CIRCUIT_PY_DRIVER_LIBS="adafruit_ble"
