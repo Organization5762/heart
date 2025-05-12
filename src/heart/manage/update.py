@@ -98,11 +98,48 @@ def copy_file(source: str, destination: str) -> None:
         print(f"Before copying: {source} to {destination}")
         if os.path.isdir(source):
             subprocess.run(["cp", "-rf", source, destination], check=True)
+            destination_file_name = None
         else:
             subprocess.run(["cp", "-f", source, destination], check=True)
+            destination_file_name = os.path.join(destination, os.path.basename(source))
+
         print(f"After copying: {source} to {destination}")
-    except subprocess.CalledProcessError:
-        print(f"Error: Failed to copy {source} to {destination}")
+        if destination_file_name is not None:
+            # Check the checksum
+            if sys.platform == "darwin":
+                source_checksum = subprocess.run(
+                    ["shasum", "-a", "256", source],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                destination_checksum = subprocess.run(
+                    ["shasum", "-a", "256", destination_file_name],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            else:
+                source_checksum = subprocess.run(
+                    ["sha256sum", source],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                destination_checksum = subprocess.run(
+                    ["sha256sum", destination_file_name],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            source_checksum = source_checksum.stdout.split()[0]
+            destination_checksum = destination_checksum.stdout.split()[0]
+            assert (
+                source_checksum == destination_checksum
+            ), f"Checksum mismatch between {source} and {destination}. Got {source_checksum} and {destination_checksum}"
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Failed to copy {source} to {destination} - {e}")
         sys.exit(1)
 
 

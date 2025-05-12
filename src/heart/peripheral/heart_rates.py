@@ -28,7 +28,7 @@ _mutex = threading.Lock()  # protects the three dicts above
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("ant_hr.log"), logging.StreamHandler()],
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger("HeartRateManager")
 
