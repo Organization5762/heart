@@ -1,11 +1,11 @@
 import pygame
 
 from heart import DeviceDisplayMode
+from heart.assets.loader import Loader
 from heart.device import Orientation
+from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
-from heart.display.models import KeyFrame
-from heart.assets.loader import Loader
 
 
 class MarioRenderer(BaseRenderer):
@@ -13,7 +13,7 @@ class MarioRenderer(BaseRenderer):
         self,
         sheet_file_path: str,
         metadata_file_path: str,
-      ) -> None:
+    ) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
@@ -48,23 +48,24 @@ class MarioRenderer(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         """Process and render the Mario scene.
-        
+
         Args:
             window: The pygame surface to render to
             clock: The pygame clock for timing
             peripheral_manager: Manager for accessing peripheral devices
             orientation: The current device orientation
+
         """
         if not self.initialized:
             self._initialize()
-        
+
         current_kf = self.frames[self.current_frame]
         kf_duration = current_kf.duration
 
         if self.in_loop:
             if (
-              self.time_since_last_update is None
-              or self.time_since_last_update > kf_duration
+                self.time_since_last_update is None
+                or self.time_since_last_update > kf_duration
             ):
                 self.current_frame += 1
                 self.time_since_last_update = 0
@@ -80,12 +81,10 @@ class MarioRenderer(BaseRenderer):
             self.accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
             if self.accel is not None and self.accel.z > 2.0:
                 self.in_loop = True
-        
+
         screen_width, screen_height = window.get_size()
         image = self.spritesheet.image_at(current_kf.frame)
-        scaled = pygame.transform.scale(
-            image, (screen_width, screen_height)
-        )
+        scaled = pygame.transform.scale(image, (screen_width, screen_height))
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2
 

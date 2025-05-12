@@ -7,9 +7,9 @@ from typing import Iterator
 from heart.peripheral import Peripheral
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
+from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
-from heart.peripheral.phyphox import Phyphox
 from heart.utilities.env import Configuration
 
 
@@ -126,7 +126,7 @@ class PeripheralManager:
             if isinstance(p, HeartRateManager):
                 return p
         raise ValueError("No HeartRateManager peripheral registered")
-    
+
     def get_phyphox_peripheral(self) -> Phyphox:
         """There should be only one instance of Phyphox."""
         for p in self.peripheral:
