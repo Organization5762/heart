@@ -3,7 +3,6 @@ import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
-
 import numpy as np
 import pygame
 from PIL import Image
@@ -61,7 +60,6 @@ class GameLoop:
         self.time_last_debugging_press = None
 
         self._active_mode_index = 0
-        self._key_pressed_last_frame = defaultdict(lambda: False)
 
         pygame.display.set_mode(
             (

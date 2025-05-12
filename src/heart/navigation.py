@@ -17,7 +17,6 @@ from heart.peripheral.manager import PeripheralManager
 class AppController(BaseRenderer):
     def __init__(self) -> None:
         self.modes = GameModes()
-        pass
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
