@@ -7,6 +7,8 @@ from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
 from heart.display.renderers.mario import MarioRenderer
 from heart.display.renderers.image import RenderImage
+from heart.display.renderers.multicolor import MulticolorRenderer
+from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.environment import GameLoop
 
 
@@ -49,6 +51,11 @@ def configure(loop: GameLoop) -> None:
             y_location=5,
         ),
     )
+
+    shroomed_mode = loop.add_mode("shroomed")
+    shroomed_mode.add_renderer(MulticolorRenderer())
+    shroomed_mode.add_renderer(SpritesheetLoop("ness.png", "ness.json"))
+
 
     mode = loop.add_mode("friend beacon")
 
