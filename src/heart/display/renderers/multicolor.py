@@ -8,6 +8,7 @@ from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.manager import PeripheralManager
 
+# I'm getting really lazy, I had Cursor convert this shader to Python: https://www.shadertoy.com/view/X323DD
 
 def clamp(value: float, min_val: float, max_val: float) -> float:
     """Clamp a value between min and max."""
