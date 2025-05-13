@@ -1,9 +1,10 @@
 import numpy as np
-import math
-from typing import Tuple
+
+from numba import jit
 
 # I took this shader https://www.shadertoy.com/view/M3VcRt and had Cursor convert it to Python.
 
+@jit(nopython=True, fastmath=True)
 def voronoi(uv: np.ndarray) -> float:
     """
     Calculate Voronoi noise for a given UV coordinate.
@@ -23,14 +24,14 @@ def voronoi(uv: np.ndarray) -> float:
         for x in range(-1, 2):
             neighbor = np.array([float(x), float(y)])
             point = np.array([
-                math.fmod(math.sin(np.dot(i + neighbor, np.array([127.1, 311.7]))) * 43758.5453, 1.0),
-                math.fmod(math.sin(np.dot(i + neighbor, np.array([311.7, 127.1]))) * 43758.5453, 1.0)
+                np.fmod(np.sin(np.dot(i + neighbor, np.array([127.1, 311.7]))) * 43758.5453, 1.0),
+                np.fmod(np.sin(np.dot(i + neighbor, np.array([311.7, 127.1]))) * 43758.5453, 1.0)
             ])
             diff = neighbor + point - f
-            dist = np.linalg.norm(diff)
+            dist = np.sqrt(np.sum(diff * diff))
             
-            step1 = 1.0 - (1.0 if dist >= min_dist1 else 0.0)
-            step2 = 1.0 - (1.0 if dist >= min_dist2 else 0.0)
+            step1 = 1.0 - np.where(dist >= min_dist1, 1.0, 0.0)
+            step2 = 1.0 - np.where(dist >= min_dist2, 1.0, 0.0)
             
             min_dist2 = (min_dist1 * step1 + 
                         (1.0 - step1) * (step2 * dist) + 
@@ -47,13 +48,13 @@ class WaterEffect:
         
         # Water effect parameters
         self.voronoi_scale = 10.0
-        self.distortion1_strength = 0.24
-        self.distortion1_frequency = 1.0
-        self.distortion1_speed = 1.6
-        self.edge1_threshold_min = 0.02
-        self.edge1_threshold_max = 0.18
-        self.edge2_threshold_min = 0.24
-        self.edge2_threshold_max = 0.48
+        self.distortion1_strength = 0.12
+        self.distortion1_frequency = 0.5
+        self.distortion1_speed = 0.8
+        self.edge1_threshold_min = 0.01
+        self.edge1_threshold_max = 0.26
+        self.edge2_threshold_min = 0.28
+        self.edge2_threshold_max = 0.36
         
         # Colors
         self.main_blue = np.array([0.0, 0.7, 1.0])
@@ -95,7 +96,7 @@ class WaterEffect:
                         (self.edge2_threshold_max - self.edge2_threshold_min), 0, 1)
         
         # Mix colors
-        e = np.where(edges2[:, :, np.newaxis] > 0.5, 
+        e = np.where(edges2[:, :, np.newaxis] > 0.5,
                     self.light_blue, 
                     self.foam_color)
         e = np.where(edges1[:, :, np.newaxis] > 0.5,

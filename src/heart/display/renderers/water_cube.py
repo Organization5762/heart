@@ -16,6 +16,7 @@ import time
 from typing import Tuple
 
 import numpy as np
+from numba import jit
 import pygame
 from pygame import Surface
 from pygame.time import Clock
@@ -70,7 +71,6 @@ class WaterCube(BaseRenderer):
     def __init__(self) -> None:
         self.device_display_mode = DeviceDisplayMode.FULL
         self.water_effect = WaterEffect(CUBE_PX_W, CUBE_PX_H)
-        self.dt = 0
 
         # physics state (float32 for speed on Pi)
         self.h = np.full((GRID, GRID), INIT_FILL, dtype=np.float32)
@@ -153,7 +153,6 @@ class WaterCube(BaseRenderer):
         # --- compose frame -------------------------------------------------
         frame = self._frame
         frame.fill(0)
-        self.water_effect.update(self.dt)
         water_frame = (self.water_effect.render() * 255).astype(np.uint8)
         
         for face in range(4):
@@ -175,8 +174,8 @@ class WaterCube(BaseRenderer):
 
         # Calculate and print frame processing time
         frame_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        self.water_effect.update(time.time() - start_time)
         print(f"Water cube frame time: {frame_time:.2f} ms")
 
         # maintain original display rate
         clock.tick_busy_loop(60)
-        self.dt = self.dt + 0.001

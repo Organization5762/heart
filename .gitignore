@@ -4,3 +4,4 @@ build/
 .venv
 **/.DS_Store
 bluetooth.log
+ant_hr.log
