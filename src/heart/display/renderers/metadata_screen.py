@@ -1,25 +1,25 @@
 import logging
 import time
 
-from pygame import Surface, time, draw, Rect
+from pygame import Rect, Surface, draw, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.heart_rates import current_bpms, battery_status
-from heart.peripheral.manager import PeripheralManager
 from heart.display.renderers.max_bpm_screen import AVATAR_MAPPINGS
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.heart_rates import battery_status, current_bpms
+from heart.utilities.logging import get_logger
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
-logger = logging.getLogger("HeartRateManager")
+logger = get_logger("HeartRateManager")
 
 
 class MetadataScreen(BaseRenderer):
     def __init__(self) -> None:
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.initialized = False
         self.current_frame = 0
 
         # Define colors for different heart rate monitors

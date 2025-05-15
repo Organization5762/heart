@@ -3,7 +3,7 @@ import pytest
 
 from heart.device import Cube, Device
 from heart.environment import GameLoop
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 import numpy as np
 from scipy.optimize import curve_fit
 from pytest_benchmark.fixture import BenchmarkFixture

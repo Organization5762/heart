@@ -8,7 +8,7 @@ from pytest_benchmark.fixture import BenchmarkFixture
         )
 @pytest.mark.parametrize("renderer_variant", [RendererVariant.BINARY, RendererVariant.ITERATIVE])
 def test_rendering_many_objects(benchmark: BenchmarkFixture, loop: GameLoop, num_renderers: int, renderer_variant: RendererVariant) -> None:
-    mode = loop.add_mode()
+    mode = loop.add_mode("Test")
 
     for _ in range(num_renderers):
         mode.add_renderer(RandomPixel(num_pixels=1, brightness=1))

@@ -1,8 +1,8 @@
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.display.renderers.multi_scene import MultiScene
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
+from heart.navigation import MultiScene
 
 
 class KirbyScene(MultiScene):

@@ -4,30 +4,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Iterator
 
-from heart.peripheral import Peripheral
+from heart.peripheral.core import Peripheral
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
+from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
-from heart.peripheral.phyphox import Phyphox
 from heart.utilities.env import Configuration
-
-
-class NotificationService:
-    def start_notify(on_value_change) -> None:
-        pass
 
 
 @dataclass
 class Device:
     device_id: str
-    device_type: "Device.Types"
-
-    class Types(StrEnum):
-        # TODO: Still need to work our this handling
-        ACCELEROMETER = "ACCELEROMETER"
-        ROTARY_ENCODER = "ROTARY_ENCODER"
-        BLUETOOTH_BRIDGE = "BLUETOOTH_BRIDGE"
 
 
 class PeripheralManager:
@@ -36,9 +24,6 @@ class PeripheralManager:
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
 
-        # TODO: I think this is something I want to support as it simplifies
-        # pushing state around in some ways
-        self.notification_service = NotificationService()
         self.started = False
 
     def get_gamepad(self) -> Gamepad:
@@ -86,12 +71,6 @@ class PeripheralManager:
                 Switch.detect(),
                 BluetoothSwitch.detect(),
             )
-            # If no switches are found this probably means they're not plugged in, just use a fake switch
-            switches_list = list(switches)
-            if len(switches_list) == 0:
-                switches = FakeSwitch.detect()
-            else:
-                switches = switches_list
         else:
             switches = FakeSwitch.detect()
 
@@ -101,7 +80,7 @@ class PeripheralManager:
             yield switch
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
-        yield from itertools.chain(Accelerometer.detect(), Phyphox.detect())
+        yield from itertools.chain(Accelerometer.detect())
 
     def _detect_gamepads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Gamepad.detect())
@@ -126,7 +105,7 @@ class PeripheralManager:
             if isinstance(p, HeartRateManager):
                 return p
         raise ValueError("No HeartRateManager peripheral registered")
-    
+
     def get_phyphox_peripheral(self) -> Phyphox:
         """There should be only one instance of Phyphox."""
         for p in self.peripheral:

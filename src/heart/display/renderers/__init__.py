@@ -4,7 +4,7 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class BaseRenderer:
@@ -19,9 +19,39 @@ class BaseRenderer:
         self.slide_speed = 10  # pixels per frame
         self.sliding = False
         self.slide_enabled = False
+        self.initialized = False
+
+    def is_initialized(self) -> bool:
+        return self.initialized
+
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        self.initialized = True
 
     def reset(self):
         pass
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list["BaseRenderer"]:
+        return [self]
+
+    def _internal_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        if not self.is_initialized():
+            self.initialize(window, clock, peripheral_manager, orientation)
+
+        self.process(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -30,7 +60,7 @@ class BaseRenderer:
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        None
+        pass
 
     def process_with_slide(
         self,
@@ -46,7 +76,7 @@ class BaseRenderer:
         # Create a temporary surface to draw content
         temp_surface = pygame.Surface(window.get_size(), pygame.SRCALPHA)
 
-        self.process(temp_surface, clock, peripheral_manager, orientation)
+        self._internal_process(temp_surface, clock, peripheral_manager, orientation)
 
         # Draw the temp surface to the window with the offset
         window.blit(temp_surface, (self.x_offset, 0))

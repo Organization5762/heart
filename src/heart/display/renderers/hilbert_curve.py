@@ -8,14 +8,13 @@ from numba import njit
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.environment import DeviceDisplayMode
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class HilbertScene(BaseRenderer):
     def __init__(self):
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.initialized = False
         self.width = None
         self.height = None
         self.FPS = 60
@@ -48,10 +47,13 @@ class HilbertScene(BaseRenderer):
         self.background_color = (0, 0, 0)
         self.line_color = (215, 72, 148)
 
-    def is_initialized(self) -> bool:
-        return self.initialized
-
-    def initialize(self, window, clock):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         self.width = window.get_width()
         self.height = window.get_height()
         self.base_points = hilbert_curve_points_numba(
@@ -64,7 +66,7 @@ class HilbertScene(BaseRenderer):
         )
         self.target_curve = resample_curve_numba(self.next_points, self.resample_count)
         self.morph_start_time = time.time()
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -73,9 +75,6 @@ class HilbertScene(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        if not self.is_initialized():
-            self.initialize(window, clock)
-
         # set bg
         window.fill((0, 0, 0))
 

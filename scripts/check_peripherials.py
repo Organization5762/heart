@@ -1,4 +1,4 @@
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 m = PeripheralManager()
 d = m.detect()
 

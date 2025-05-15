@@ -1,5 +1,5 @@
-import logging  # Import logging module
-import platform  # Import platform module
+import logging
+import platform
 import subprocess
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
