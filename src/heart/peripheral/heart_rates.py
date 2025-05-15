@@ -1,234 +1,173 @@
-import asyncio
+# ant_hr_manager.py
 import logging
 from typing import Dict, Iterator
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+import threading
+import time
+from typing import Dict, Iterator, List, Optional, Tuple
+
+from openant.easy.node import Node
+from openant.devices import ANTPLUS_NETWORK_KEY
+from openant.devices.heart_rate import HeartRate, HeartRateData
+from openant.devices.scanner import Scanner
+from openant.devices.utilities import auto_create_device
+from openant.devices.common import DeviceType
+from openant.easy.exception import AntException
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.logging import get_logger
 
-# Heart Rate Service and Characteristic UUIDs
-HEART_RATE_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"
-HEART_RATE_CHARACTERISTIC_UUID = "00002a37-0000-1000-8000-00805f9b34fb"
+RETRY_DELAY = 5
+DEVICE_TIMEOUT = 30  # seconds of silence ⇒ forget the strap
+CLEANUP_INTERVAL = 5  # how often the janitor thread wakes up
 
-# Configure logging
+# ──────────────────────────────────────────────────────────────────────────────
+current_bpms: Dict[str, int] = {}
+battery_status: Dict[str, int] = {}
+last_seen: Dict[str, float] = {}  # NEW: last packet time-stamp
+_mutex = threading.Lock()  # protects the three dicts above
+# ──────────────────────────────────────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("bluetooth.log"), logging.StreamHandler()],
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.FileHandler("ant_hr.log"), logging.StreamHandler()],
 )
 logger = get_logger("HeartRateManager")
 
+# ---------------------------------------------------------------------------
+# OpenANT sometimes has race conditions where it receives broadcast data
+# before being initialized.  We wrap the list so __getitem__ never explodes.
+# ---------------------------------------------------------------------------
 
-# This dictionary is what external code will use to get the BPM data for each sensor.
-current_bpms: dict[str, int] = {}
+
+class _DummyChannel:
+    def on_broadcast_data(self, *_): ...
+    def on_burst_data(self, *_): ...
+    def on_acknowledge(self, *_): ...
 
 
-# This is a single peripheral that manages all heart rate sensors.
-# It is responsible for scanning for and connecting to Bluetooth Heart Rate sensors,
-# collecting BPM data, and managing the connection to each sensor.
+_DUMMY = _DummyChannel()
+
+
+class _SafeList(list):
+    def __getitem__(self, i):
+        if i >= len(self) or i < -len(self):
+            return _DUMMY
+        return super().__getitem__(i)
+
+
 class HeartRateManager(Peripheral):
-    """A peripheral that scans for and connects to Bluetooth Heart Rate sensors,
-    collecting BPM data."""
+    """Continuously scans for ANT+ HR straps and maintains the global dicts."""
 
     def __init__(self) -> None:
-        self._connected_clients: Dict[str, BleakClient] = {}
-        self._managing_tasks: Dict[str, asyncio.Task] = {}
+        self._node: Optional[Node] = None
+        self._scanner: Optional[Scanner] = None
+        self._devices: List[HeartRate] = []
+
+        # Background janitor that forgets silent devices
+        self._stop_evt = threading.Event()
+        self._janitor = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self._janitor.start()
+
+    # ---------- Peripheral framework ----------
 
     @staticmethod
     def detect() -> Iterator["HeartRateManager"]:
-        """Detects the presence of the Heart Rate Sensor system."""
-        # This peripheral manages the capability, so we always yield one instance.
         yield HeartRateManager()
 
-    def _parse_hr_measurement(self, data: bytearray) -> int:
-        """Parses the heart rate measurement data (UINT8 or UINT16 format)."""
+    # ---------- Callbacks -----------------------------------------------------
+
+    def _on_found(self, d: Tuple[int, int, int]):
+        dev_id, dev_type, tx_type = d
+        logger.info("Found device #%05X (%s)", dev_id, DeviceType(dev_type).name)
         try:
-            flags = data[0]
-            hr_format_bit = flags & 0x01
-            if hr_format_bit:  # UINT16
-                if len(data) < 3:
-                    raise ValueError("UINT16 data too short")
-                bpm = int.from_bytes(data[1:3], byteorder="little")
-            else:  # UINT8
-                if len(data) < 2:
-                    raise ValueError("UINT8 data too short")
-                bpm = data[1]
-            return bpm
-        except (IndexError, ValueError) as e:
-            logger.warning(f"Could not parse HR data: {data.hex()} ({e})")
-            return -1  # Indicate invalid data
-
-    async def _handle_hr_notification(
-        self, client: BleakClient, sender_handle: int, data: bytearray
-    ) -> None:
-        """Callback for heart rate notifications."""
-        bpm = self._parse_hr_measurement(data)
-        if bpm != -1:
-            current_bpms[client.address] = bpm
-            logger.debug(
-                f"Received HR: {bpm} BPM from {client.address} ({current_bpms})"
-            )
-
-    async def _manage_connection(self, device: BLEDevice) -> None:
-        """Connects to a device, starts notifications, and handles disconnection."""
-        address = device.address
-        logger.info(f"Attempting to connect to {address}")
-        disconnected_event = asyncio.Event()
-        client = BleakClient(
-            device,
-            disconnected_callback=lambda c: (
-                disconnected_event.set(),
-                logger.warning(f"Disconnected callback triggered for {c.address}"),
-            ),
-        )
-
-        try:
-            await client.connect(timeout=20.0)
-            if client.is_connected:
-                logger.info(f"Connected to {address}")
-                self._connected_clients[address] = client
-
-                await client.start_notify(
-                    HEART_RATE_CHARACTERISTIC_UUID,
-                    lambda handle, data: asyncio.create_task(
-                        self._handle_hr_notification(client, handle, data)
-                    ),
-                )
-                logger.info(f"Started HR notifications for {address}")
-                await disconnected_event.wait()
-
+            hrm = auto_create_device(self._node, dev_id, dev_type, tx_type)
+            hrm.on_device_data = self._cb(hrm)
+            self._devices.append(hrm)
         except Exception as e:
-            logger.error(f"Error managing connection to {address}: {e}", exc_info=True)
-        finally:
-            logger.warning(f"Device {address} processing finished or disconnected.")
-            if client.is_connected:
-                try:
-                    # Check if notifications were started before stopping
-                    if (
-                        HEART_RATE_CHARACTERISTIC_UUID
-                        in client.services.characteristics
-                    ):  # Basic check
-                        char = client.services.get_characteristic(
-                            HEART_RATE_CHARACTERISTIC_UUID
-                        )
-                        # A more robust check might involve tracking notification state externally
-                        # if notifications_active_for_char(char):
-                        await client.stop_notify(HEART_RATE_CHARACTERISTIC_UUID)
-                except Exception as e:
-                    logger.error(f"Error stopping notify for {address}: {e}")
-                try:
-                    await client.disconnect()
-                except Exception as e:
-                    logger.error(f"Error disconnecting {address}: {e}")
+            logger.error("Could not create HR device: %s", e)
 
-            self._connected_clients.pop(address, None)
-            self._managing_tasks.pop(address, None)  # Remove task reference
-            current_bpms.pop(address, None)
-            logger.info(f"Removed {address} from current_bpms")
+    @staticmethod
+    def _cb(hrm: HeartRate):
+        def _inner(_pg, _name, data):
+            if isinstance(data, HeartRateData):
+                device_id = f"{hrm.device_id:05X}"
+                with _mutex:
+                    current_bpms[device_id] = data.heart_rate
+                    last_seen[device_id] = time.time()
+                    if hasattr(data, "battery_percentage"):
+                        battery_status[device_id] = data.battery_percentage * 100 / 256
 
-    async def _scan_and_manage(self) -> None:
-        """Scans for devices and launches connection management tasks."""
-        scanner = BleakScanner(
-            service_uuids=[HEART_RATE_SERVICE_UUID],
-            detection_callback=self._handle_detection,
-        )
+                logger.debug("HR %s BPM (device %s)", data.heart_rate, device_id)
 
-        logger.info("Starting scanner for HR devices...")
-        await scanner.start()
+        return _inner
+
+    # ---------- Janitor thread ------------------------------------------------
+
+    def _cleanup_loop(self) -> None:
+        """Drop straps that have been quiet for DEVICE_TIMEOUT seconds."""
+        while not self._stop_evt.wait(CLEANUP_INTERVAL):
+            now = time.time()
+            stale: List[str] = []
+            with _mutex:
+                for dev_id, ts in list(last_seen.items()):
+                    if now - ts > DEVICE_TIMEOUT:
+                        stale.append(dev_id)
+
+                for dev_id in stale:
+                    current_bpms.pop(dev_id, None)
+                    battery_status.pop(dev_id, None)
+                    last_seen.pop(dev_id, None)
+                    logger.info(
+                        "Pruned silent HR strap %s (>%ds idle)", dev_id, DEVICE_TIMEOUT
+                    )
+
+    # ---------- ANT+ life-cycle ---------------------------------------------
+
+    def _ant_cycle(self):
+        self._node = Node()
+        self._node.channels = _SafeList(self._node.channels)
 
         try:
-            while True:
-                await asyncio.sleep(
-                    30
-                )  # Keep scanner alive and periodically clean tasks
-                await self._cleanup_finished_tasks()
-        except asyncio.CancelledError:
-            logger.info("Scan task cancelled.")
+            # 1) program ANT+ network key
+            try:
+                self._node.set_network_key(0x00, ANTPLUS_NETWORK_KEY)
+            except AntException as e:
+                logger.warning("Network-key ACK timed out, proceeding anyway (%s)", e)
+
+            # 2) HRM scanner
+            self._scanner = Scanner(
+                self._node, device_id=0, device_type=DeviceType.HeartRate.value
+            )
+            self._scanner.on_found = self._on_found
+
+            # 3) start USB / RX thread
+            self._node.start()
+
         finally:
-            logger.info("Stopping scanner...")
-            await scanner.stop()
-            await self._cleanup_finished_tasks(cancel_remaining=True)
+            # always free resources
+            try:
+                if self._scanner:
+                    self._scanner.close_channel()
+                for d in self._devices:
+                    d.close_channel()
+            finally:
+                if self._node:
+                    self._node.stop()
+                self._devices.clear()
 
-    async def _handle_detection(self, device: BLEDevice, advertisement_data):
-        """Callback for BleakScanner device detection."""
-        logger.debug(
-            f"Discovered HR device: {device.address} - {advertisement_data.local_name}"
-        )
-        if (
-            device.address not in self._connected_clients
-            and device.address not in self._managing_tasks
-        ):
-            logger.info(f"Found new HR device {device.address}, attempting to manage.")
-            task = asyncio.create_task(self._manage_connection(device))
-            self._managing_tasks[device.address] = task
-
-    async def _cleanup_finished_tasks(self, cancel_remaining: bool = False):
-        """Cleans up tasks that have completed or cancels them if requested."""
-        addresses_to_remove = set()
-        for address, task in self._managing_tasks.items():
-            if task.done():
-                addresses_to_remove.add(address)
-                try:
-                    exc = task.exception()
-                    if exc:
-                        logger.warning(
-                            f"Task for {address} finished with exception: {exc}",
-                            exc_info=exc,
-                        )
-                except asyncio.CancelledError:
-                    logger.info(f"Task for {address} was cancelled.")
-                except Exception as e:
-                    logger.error(
-                        f"Unexpected error getting exception for task {address}: {e}"
-                    )
-            elif cancel_remaining:
-                task.cancel()
-                addresses_to_remove.add(
-                    address
-                )  # Assume cancellation will lead to removal
-
-        for address in addresses_to_remove:
-            logger.debug(f"Cleaning up task reference for {address}")
-            self._managing_tasks.pop(address, None)
+    # ---------- Run loop -----------------------------------------------------
 
     def run(self) -> None:
-        """Runs the heart rate monitoring logic using asyncio."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        main_task = loop.create_task(self._scan_and_manage())
         try:
-            loop.run_until_complete(main_task)
-        except KeyboardInterrupt:
-            logger.info("HeartRateManager run loop stopped by user.")
-        except Exception as e:
-            logger.exception(f"Error in HeartRateManager run loop: {e}")
+            while True:
+                try:
+                    self._ant_cycle()
+                except (AntException, OSError, RuntimeError) as e:
+                    logger.error("ANT error: %s – retrying in %d s", e, RETRY_DELAY)
+                    time.sleep(RETRY_DELAY)
         finally:
-            logger.info("Shutting down HeartRateManager run loop...")
-            main_task.cancel()
-            # Run loop until the main task is cancelled and cleanup happens
-            try:
-                # Allow cancellation to propagate and cleanup tasks to run
-                loop.run_until_complete(main_task)
-            except asyncio.CancelledError:
-                logger.info("Main task successfully cancelled.")
-            except Exception as e:
-                logger.error(f"Error during final loop run: {e}")
-
-            # Explicitly close clients that might still be connected
-            # (though _manage_connection should handle this)
-            # Run loop briefly to allow disconnects to complete
-            loop.run_until_complete(self._shutdown_clients())
-            loop.close()
-            logger.info("HeartRateManager run loop finished.")
-
-    async def _shutdown_clients(self):
-        """Ensure all clients are disconnected during shutdown."""
-        disconnect_tasks = []
-        for address, client in self._connected_clients.items():
-            if client.is_connected:
-                logger.info(f"Explicitly disconnecting {address} during shutdown")
-                disconnect_tasks.append(asyncio.create_task(client.disconnect()))
-        await asyncio.gather(*disconnect_tasks, return_exceptions=True)
-        self._connected_clients.clear()
+            self._stop_evt.set()  # stop janitor when manager exits

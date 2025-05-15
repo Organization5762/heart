@@ -9,6 +9,7 @@ from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
+from heart.peripheral.phyphox import Phyphox
 from heart.utilities.env import Configuration
 
 
@@ -100,7 +101,7 @@ class PeripheralManager:
             yield switch
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
-        yield from itertools.chain(Accelerometer.detect())
+        yield from itertools.chain(Accelerometer.detect(), Phyphox.detect())
 
     def _detect_gamepads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Gamepad.detect())
@@ -125,6 +126,19 @@ class PeripheralManager:
             if isinstance(p, HeartRateManager):
                 return p
         raise ValueError("No HeartRateManager peripheral registered")
+    
+    def get_phyphox_peripheral(self) -> Phyphox:
+        """There should be only one instance of Phyphox."""
+        for p in self.peripheral:
+            if isinstance(p, Phyphox):
+                return p
+        raise ValueError("No Phyphox peripheral registered")
+
+    def get_accelerometer(self) -> Accelerometer:
+        for p in self.peripheral:
+            if isinstance(p, Accelerometer):
+                return p
+        raise ValueError("No Accelerometer peripheral registered")
 
     def __del__(self) -> None:
         """Attempt to clean up threads and peripherals at object deletion time.

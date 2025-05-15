@@ -15,6 +15,9 @@ from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.switch import FakeSwitch
+from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
