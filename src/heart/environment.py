@@ -3,6 +3,7 @@ import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
+
 import numpy as np
 import pygame
 from PIL import Image
@@ -12,12 +13,11 @@ from heart.device import Device, Layout
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.navigation import AppController, ComposedRenderer, GameModes, MultiScene
 from heart.peripheral.core import events
-from heart.peripheral.core.manager import PeripheralManager
-from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
+from heart.peripheral.core.events import REQUEST_JOYSTICK_MODULE_RESET
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import FakeSwitch
-from heart.peripheral.core.events import REQUEST_JOYSTICK_MODULE_RESET
+from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer

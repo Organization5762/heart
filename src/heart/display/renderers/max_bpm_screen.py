@@ -1,16 +1,16 @@
 import time
+
+from pygame import Surface, font, time
+
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from pygame import font, Surface, time
+from heart.display.renderers.flame import FlameGenerator
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import (
     current_bpms,
-) 
-from heart.device import Orientation
-
-from heart.display.renderers.flame import FlameGenerator
-
+)
 
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK

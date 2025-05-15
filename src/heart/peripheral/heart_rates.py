@@ -1,21 +1,19 @@
 # ant_hr_manager.py
 import logging
-from typing import Dict, Iterator
-
-from bleak import BleakClient, BleakScanner
-from bleak.backends.device import BLEDevice
 import threading
 import time
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from openant.easy.node import Node
+from bleak import BleakClient, BleakScanner
+from bleak.backends.device import BLEDevice
+from openant.base.driver import DriverNotFound
 from openant.devices import ANTPLUS_NETWORK_KEY
+from openant.devices.common import DeviceType
 from openant.devices.heart_rate import HeartRate, HeartRateData
 from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
-from openant.devices.common import DeviceType
 from openant.easy.exception import AntException
-from openant.base.driver import DriverNotFound
+from openant.easy.node import Node
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.logging import get_logger

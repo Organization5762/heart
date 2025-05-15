@@ -65,10 +65,13 @@ class SpritesheetLoop(BaseRenderer):
         self._should_calibrate = True
         self._scale_factor_offset = 0
 
-    def initialize(self,         window: pygame.Surface,
+    def initialize(
+        self,
+        window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,) -> None:
+        orientation: Orientation,
+    ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
 
     def _calibrate(self, preripheral_manager: PeripheralManager):

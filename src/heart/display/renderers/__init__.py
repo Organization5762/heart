@@ -24,8 +24,13 @@ class BaseRenderer:
     def is_initialized(self) -> bool:
         return self.initialized
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock,        peripheral_manager: PeripheralManager,
-        orientation: Orientation,) -> None:
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         self.initialized = True
 
     def reset(self):

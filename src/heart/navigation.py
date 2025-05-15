@@ -11,14 +11,19 @@ from heart.display.renderers.color import RenderColor
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.manager import PeripheralManager
 
 
 class AppController(BaseRenderer):
     def __init__(self) -> None:
         self.modes = GameModes()
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self.modes.initialize(window, clock, peripheral_manager, orientation)
         super().initialize(window, clock, peripheral_manager, orientation)
 
@@ -35,7 +40,9 @@ class AppController(BaseRenderer):
         self.modes.add_new_pages(new_scene)
         return new_scene
 
-    def add_mode(self, title: str | list[BaseRenderer] | BaseRenderer | None = None) -> "ComposedRenderer":
+    def add_mode(
+        self, title: str | list[BaseRenderer] | BaseRenderer | None = None
+    ) -> "ComposedRenderer":
         # TODO: Add a navigation page back in
         result = ComposedRenderer([])
         if title is None:
@@ -43,11 +50,11 @@ class AppController(BaseRenderer):
 
         if isinstance(title, str):
             title_renderer = TextRendering(
-                    text=[title],
-                    font="Roboto",
-                    font_size=14,
-                    color=Color(255, 105, 180),
-                )
+                text=[title],
+                font="Roboto",
+                font_size=14,
+                color=Color(255, 105, 180),
+            )
         elif isinstance(title, BaseRenderer):
             title_renderer = title
         elif isinstance(title, list):
@@ -88,7 +95,13 @@ class GameModes(BaseRenderer):
         self._current_offset_on_change = 0
         self.renderers_cache = None
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         for renderer in self.renderers:
             renderer.initialize(window, clock, peripheral_manager, orientation)
 

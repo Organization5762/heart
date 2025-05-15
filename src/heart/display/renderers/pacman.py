@@ -73,12 +73,16 @@ class Rain(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self._change_starting_point(width=window.get_width())
         self.current_y = random.randint(0, 20)
         super().initialize(window, clock, peripheral_manager, orientation)
-        
 
     def process(
         self,
@@ -115,7 +119,13 @@ class Slinky(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self._change_starting_point(width=window.get_width())
         self.current_y = random.randint(0, 20)
         super().initialize(window, clock, peripheral_manager, orientation)
@@ -165,7 +175,13 @@ class PacmanGhostRenderer(BaseRenderer):
         self.device_display_mode = DeviceDisplayMode.FULL
         self.last_corner = None  # Initialize the corner at the beginning
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self.screen_width, self.screen_height = window.get_size()
         self.blood = True
         self._initialize_corner()

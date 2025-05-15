@@ -66,10 +66,13 @@ class SpritesheetLoopRandom(BaseRenderer):
         self.x = 30
         self.y = 30
 
-    def initialize(self,         window: pygame.Surface,
+    def initialize(
+        self,
+        window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,) -> None:
+        orientation: Orientation,
+    ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
         super().initialize(window, clock, peripheral_manager, orientation)
 

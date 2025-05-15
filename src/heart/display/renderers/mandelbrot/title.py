@@ -1,9 +1,10 @@
-from heart import DeviceDisplayMode
-from heart.device import Rectangle
-from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 import pygame
+
+from heart import DeviceDisplayMode
+from heart.device import Orientation, Rectangle
+from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.peripheral.core.manager import PeripheralManager
-from heart.device import Orientation
+
 
 class MandelbrotTitle(MandelbrotMode):
     def __init__(self):

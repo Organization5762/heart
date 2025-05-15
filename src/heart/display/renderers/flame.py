@@ -1,21 +1,22 @@
-import pygame.transform as pgt
 import numpy as np
 import pygame
 import pygame.surfarray as sarr
-
+import pygame.transform as pgt
 
 # I took this shader https://www.shadertoy.com/view/mtjyzG and asked chat to convert it to python
+
 
 def _step(a, threshold):
     return (a >= threshold).astype(np.float32)  # 0. or 1.
 
 
 def _mix(a, b, alpha):
-    """
-    GLSL‑style mix().  Works with
-      • scalar alpha   – single blend factor
-      • 2‑D   alpha    – greyscale mask, auto‑expanded to (H,W,1)
-      • 3‑D   alpha    – per‑channel alpha (already shape‑compatible)
+    """GLSL‑style mix().
+
+    Works with • scalar alpha   – single blend factor • 2‑D   alpha    – greyscale mask,
+    auto‑expanded to (H,W,1) • 3‑D   alpha    – per‑channel alpha (already
+    shape‑compatible)
+
     """
     if np.isscalar(alpha):  # plain float → broadcast OK
         return a * (1.0 - alpha) + b * alpha
@@ -34,9 +35,10 @@ def _smoothstep(edge0, edge1, x):
 
 
 def _noise21(ix, iy):
-    """
-    32‑bit LCG / hash implemented with 64‑bit intermediates so it can't overflow.
+    """32‑bit LCG / hash implemented with 64‑bit intermediates so it can't overflow.
+
     Returns deterministic [0,1] noise for every integer coord pair.
+
     """
     ix = ix.astype(np.int64, copy=False)  # promote once, keep view‑only
     iy = iy.astype(np.int64, copy=False)
@@ -118,10 +120,9 @@ def _flame_layer(u, v, t, col_rgb, thr):
     res = _step(res, thr)  # binary mask
     return res[..., None] * col_rgb  # shape (...,3)
 
+
 class FlameGenerator:
-    """
-    Produces a 64×H animated flame Surface.
-    """
+    """Produces a 64×H animated flame Surface."""
 
     _LAYERS = [
         ((0.769, 0.153, 0.153), 0.001),
@@ -146,9 +147,7 @@ class FlameGenerator:
         self.v0 -= np.mod(self.v0, snap)
 
     def surface(self, t: float, side: str = "bottom") -> pygame.Surface:
-        """
-        side = "bottom" | "top" | "left" | "right"
-        """
+        """Side = "bottom" | "top" | "left" | "right"."""
         # -------------- generate the canonical strip (bottom → up) -------------
         v = self.v0.copy()
         u = self.u

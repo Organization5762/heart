@@ -84,7 +84,13 @@ class Rain(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self._change_starting_point(width=window.get_width())
         self.current_y = random.randint(0, 20)
         super().initialize(window, clock, peripheral_manager, orientation)
@@ -124,7 +130,13 @@ class Slinky(BaseRenderer):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
 
-    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ):
         self._change_starting_point(width=window.get_width())
         self.current_y = random.randint(0, 20)
         super().initialize(window, clock, peripheral_manager, orientation)

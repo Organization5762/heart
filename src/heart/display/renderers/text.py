@@ -27,10 +27,13 @@ class TextRendering(BaseRenderer):
 
         self.time_since_last_update = None
 
-    def initialize(self,         window: pygame.Surface,
+    def initialize(
+        self,
+        window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,) -> None:
+        orientation: Orientation,
+    ) -> None:
         self.font = pygame.font.SysFont(self.font_name, self.font_size)
         super().initialize(window, clock, peripheral_manager, orientation)
 

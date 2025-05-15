@@ -71,7 +71,7 @@ class MandelbrotMode(BaseRenderer):
         )
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
-    
+
     def initialize(
         self,
         window: pygame.Surface,
@@ -645,7 +645,9 @@ def main():
             screen.fill((0, 0, 0))
 
             # Process and render
-            mandelbrot._internal_process(screen, clock, manager, Rectangle.with_layout(1, 1))
+            mandelbrot._internal_process(
+                screen, clock, manager, Rectangle.with_layout(1, 1)
+            )
 
             # Update the display
             pygame.display.flip()
