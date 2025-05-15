@@ -8,18 +8,13 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
+# TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 class YoListenRenderer(BaseRenderer):
-    def __init__(
-        self,
-        font: str = "Arial Black",  # Changed to Arial Black which is bolder
-        font_weight: int = 900,  # Increased font weight to maximum
-        font_size: int = 20,  # Increased font size slightly
-        color: Color = Color(255, 0, 0),  # Red color
-    ) -> None:
+    def __init__(self, color: Color = Color(255, 0, 0)) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.base_color = color  # Store the base color
@@ -68,7 +63,6 @@ class YoListenRenderer(BaseRenderer):
         self.last_flash_time = 0
         self.flash_delay = 100
         self.ascii_font_sizes = {}
-        self.initialized = False
         # --- Phyphox phone accel ---
         self.phyphox_accel_x = 0.0
         self.phyphox_accel_y = 0.0
@@ -83,7 +77,7 @@ class YoListenRenderer(BaseRenderer):
         self.test_mode = False
         self.phyphox_db = 50.0
 
-    def _initialize(self) -> None:
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,) -> None:
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             # Calculate and store the width of each word
@@ -97,12 +91,22 @@ class YoListenRenderer(BaseRenderer):
             else:
                 text_width, _ = font.size(self.ascii_art[word][0])
                 self.word_widths[word] = text_width
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
-    def _get_scaled_font(self, word: str) -> pygame.font.Font:
-        # Start with base font size
-        font_size = self.base_font_size
-        font = pygame.font.SysFont(self.font_name, font_size)
+    def _calculate_optimal_ascii_font_size(self, word: str) -> int:
+        art = self.ascii_art[word]
+        # For Y'HEAR, flatten the two blocks
+        if word == "Y'HEAR":
+            art = art[0] + art[1]
+        font_size = 4
+        font = pygame.font.SysFont("Courier New", font_size)
+        longest_line = max(len(line) for line in art)
+        text_width, _ = font.size("█" * longest_line)
+        while text_width <= 60:
+            font_size += 1
+            font = pygame.font.SysFont("Courier New", font_size)
+            text_width, _ = font.size("█" * longest_line)
+        return max(4, font_size - 1)
 
     def _draw_ascii_art(self, word: str, y_offset: int, screen_surface: pygame.Surface) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
@@ -169,8 +173,6 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if not self.initialized:
-            self._initialize()
         if self._should_calibrate:
             self._calibrate_scroll_speed(peripheral_manager)
         self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(peripheral_manager)

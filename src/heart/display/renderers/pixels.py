@@ -19,9 +19,6 @@ class RandomPixel(BaseRenderer):
         self.color = color
         self.brightness = brightness
 
-    def _initialize(self) -> None:
-        self.initialized = True
-
     def process(
         self,
         window: pygame.Surface,
@@ -50,9 +47,6 @@ class Border(BaseRenderer):
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
         self.color = color or Color.random()
-
-    def _initialize(self) -> None:
-        self.initialized = True
 
     def process(
         self,
@@ -83,13 +77,17 @@ class Rain(BaseRenderer):
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.initialized = False
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
 
     def _change_starting_point(self, width):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
+
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+        self._change_starting_point(width=window.get_width())
+        self.current_y = random.randint(0, 20)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -99,10 +97,6 @@ class Rain(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
-        if not self.initialized:
-            self._change_starting_point(width=width)
-            self.current_y = random.randint(0, 20)
-            self.initialized = True
 
         # Move one unit
         self.current_y += 1
@@ -123,13 +117,17 @@ class Slinky(BaseRenderer):
         # TODO: This whole freaking this is broken
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.initialized = False
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)
 
     def _change_starting_point(self, width):
         self.starting_point = random.randint(0, width)
         self.current_y = 0
+
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+        self._change_starting_point(width=window.get_width())
+        self.current_y = random.randint(0, 20)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -139,10 +137,6 @@ class Slinky(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
-        if not self.initialized:
-            self._change_starting_point(width=width)
-            self.current_y = random.randint(0, 20)
-            self.initialized = True
 
         # Move one unit
         self.current_y += 1

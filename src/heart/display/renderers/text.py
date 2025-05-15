@@ -23,15 +23,16 @@ class TextRendering(BaseRenderer):
         self.font_size = font_size
         self.x_location = x_location
         self.y_location = y_location
-        self.initialized = False
         self.text = text
 
         self.time_since_last_update = None
 
-    def _initialize(self) -> None:
-        pygame.font.SysFont(self.font_name, self.font_size)
-
-        self.initialized = True
+    def initialize(self,         window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,) -> None:
+        self.font = pygame.font.SysFont(self.font_name, self.font_size)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _current_text(self, peripheral_manager: PeripheralManager) -> str:
         current_value = (
@@ -47,9 +48,6 @@ class TextRendering(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if not self.initialized:
-            self._initialize()
-
         current_text = self._current_text(peripheral_manager=peripheral_manager)
 
         lines = current_text.split("\n")

@@ -6,7 +6,7 @@ import time
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 # I'm getting really lazy, I had Cursor convert this shader to Python: https://www.shadertoy.com/view/X323DD
 
@@ -58,12 +58,7 @@ class MulticolorRenderer(BaseRenderer):
     def __init__(self) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.initialized = False
         self.start_time = None
-
-    def _initialize(self) -> None:
-        """Initialize any resources needed for rendering."""
-        self.initialized = True
 
     def process(
         self,
@@ -80,9 +75,6 @@ class MulticolorRenderer(BaseRenderer):
             peripheral_manager: Manager for accessing peripheral devices
             orientation: The current device orientation
         """
-        if not self.initialized:
-            self._initialize()
-        
         # Get window dimensions
         width, height = window.get_size()
         

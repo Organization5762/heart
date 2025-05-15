@@ -11,12 +11,16 @@ from heart.display.renderers.color import RenderColor
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class AppController(BaseRenderer):
     def __init__(self) -> None:
         self.modes = GameModes()
+
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+        self.modes.initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
@@ -31,8 +35,26 @@ class AppController(BaseRenderer):
         self.modes.add_new_pages(new_scene)
         return new_scene
 
-    def add_mode(self) -> "ComposedRenderer":
+    def add_mode(self, title: str | list[BaseRenderer] | BaseRenderer | None = None) -> "ComposedRenderer":
+        # TODO: Add a navigation page back in
         result = ComposedRenderer([])
+        if title is None:
+            title = "Untitled"
+
+        if isinstance(title, str):
+            title_renderer = TextRendering(
+                    text=[title],
+                    font="Roboto",
+                    font_size=14,
+                    color=Color(255, 105, 180),
+                )
+        elif isinstance(title, BaseRenderer):
+            title_renderer = title
+        elif isinstance(title, list):
+            title_renderer = ComposedRenderer(title)
+        else:
+            raise ValueError("Title must be a string or BaseRenderer, got: ", title)
+        self.modes.title_renderer = title_renderer
         self.modes.add_new_pages(result)
         return result
 
@@ -51,12 +73,24 @@ class GameModes(BaseRenderer):
     """
 
     def __init__(self) -> None:
+        self.title_renderer: BaseRenderer | None = None
         self.renderers: list[BaseRenderer] = []
         self.in_select_mode = False
         self.last_long_button_value = 0
         self.mode_offset = 0
         self._active_mode_index = 0
         self.time_last_debugging_press = None
+
+        self.mode_change = (0, 0)
+        self.sliding = False
+        self._last_mode_offset = 0
+        self._last_offset_on_change = 0
+        self._current_offset_on_change = 0
+        self.renderers_cache = None
+
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
+        for renderer in self.renderers:
+            renderer.initialize(window, clock, peripheral_manager, orientation)
 
     def add_new_pages(self, *renderers: "BaseRenderer") -> None:
         self.renderers.extend(renderers)
@@ -67,7 +101,6 @@ class GameModes(BaseRenderer):
         self.handle_inputs(peripheral_manager)
         active_renderer = self.active_renderer(mode_offset=self.mode_offset)
         renderers = active_renderer.get_renderers(peripheral_manager)
-
         return renderers
 
     def _process_debugging_key_presses(

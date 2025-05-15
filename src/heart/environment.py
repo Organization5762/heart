@@ -15,9 +15,9 @@ from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import FakeSwitch
-from heart.utilities.env import REQUEST_JOYSTICK_MODULE_RESET, Configuration
+from heart.peripheral.core.events import REQUEST_JOYSTICK_MODULE_RESET
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -72,8 +72,8 @@ class GameLoop:
             pygame.SHOWN,
         )
 
-    def add_mode(self) -> ComposedRenderer:
-        return self.app_controller.add_mode()
+    def add_mode(self, title: str | None = None) -> ComposedRenderer:
+        return self.app_controller.add_mode(title=title)
 
     def add_scene(self) -> MultiScene:
         return self.app_controller.add_scene()
@@ -97,9 +97,17 @@ class GameLoop:
         if self.app_controller.is_empty():
             raise Exception("Unable to start as no GameModes were added.")
 
+        # Initialize all renderers
+
         self.running = True
         logger.info("Entering main loop.")
 
+        self.app_controller.initialize(
+            window=self.screen,
+            clock=self.clock,
+            peripheral_manager=self.peripheral_manager,
+            orientation=self.device.orientation,
+        )
         while self.running:
             self._handle_events()
             self._preprocess_setup()
@@ -131,15 +139,13 @@ class GameLoop:
                 "window": screen,
                 "clock": self.clock,
                 "peripheral_manager": self.peripheral_manager,
+                "orientation": self.device.orientation,
             }
-            # check if process function takes a `orientation` argument
-            if inspect.signature(renderer.process).parameters.get("orientation"):
-                kwargs["orientation"] = self.device.orientation
 
             if self.sliding:
                 renderer.process_with_slide(**kwargs)
             else:
-                renderer.process(**kwargs)
+                renderer._internal_process(**kwargs)
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:

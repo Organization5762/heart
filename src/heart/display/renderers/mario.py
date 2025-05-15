@@ -3,7 +3,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 from heart.display.models import KeyFrame
 from heart.assets.loader import Loader
 
@@ -16,12 +16,11 @@ class MarioRenderer(BaseRenderer):
       ) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.initialized = False
         self.accel = None
-        self.in_loop = False
         self.current_frame = 0
         self.time_since_last_update = None
         self.file = sheet_file_path
+        self.in_loop = False
 
         frame_data = Loader.load_json(metadata_file_path)
         self.frames = []
@@ -35,10 +34,10 @@ class MarioRenderer(BaseRenderer):
                 )
             )
 
-    def _initialize(self) -> None:
+    def initialize(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation,):
         """Initialize any resources needed for rendering."""
         self.spritesheet = Loader.load_spirtesheet(self.file)
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -55,9 +54,6 @@ class MarioRenderer(BaseRenderer):
             peripheral_manager: Manager for accessing peripheral devices
             orientation: The current device orientation
         """
-        if not self.initialized:
-            self._initialize()
-        
         current_kf = self.frames[self.current_frame]
         kf_duration = current_kf.duration
 
@@ -77,7 +73,13 @@ class MarioRenderer(BaseRenderer):
                 self.time_since_last_update = 0
             self.time_since_last_update += clock.get_time()
         else:
-            self.accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
+            # HACK - Just added a try catch because it was crashing the whole app
+            # TODO: Sync this to the on-device accelerometer
+            try:
+                self.accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
+            except Exception as e:
+                print(f"Error getting acceleration: {e}")
+                self.accel = None
             if self.accel is not None and self.accel.z > 2.0:
                 self.in_loop = True
         

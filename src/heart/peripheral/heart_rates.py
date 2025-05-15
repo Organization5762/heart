@@ -15,6 +15,7 @@ from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
 from openant.devices.common import DeviceType
 from openant.easy.exception import AntException
+from openant.base.driver import DriverNotFound
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.logging import get_logger
@@ -33,7 +34,7 @@ _mutex = threading.Lock()  # protects the three dicts above
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler("ant_hr.log"), logging.StreamHandler()],
+    handlers=[logging.StreamHandler()],
 )
 logger = get_logger("HeartRateManager")
 
@@ -166,6 +167,9 @@ class HeartRateManager(Peripheral):
             while True:
                 try:
                     self._ant_cycle()
+                except DriverNotFound as e:
+                    logger.error("ANT driver not found - skipping HeartRateManager")
+                    return
                 except (AntException, OSError, RuntimeError) as e:
                     logger.error("ANT error: %s – retrying in %d s", e, RETRY_DELAY)
                     time.sleep(RETRY_DELAY)

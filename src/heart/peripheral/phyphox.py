@@ -2,7 +2,7 @@ from typing import Generic, Iterator, NoReturn, Self
 import requests
 import time
 
-from heart.peripheral import Peripheral
+from heart.peripheral.core import Peripheral
 from heart.peripheral.sensor import Acceleration
 
 

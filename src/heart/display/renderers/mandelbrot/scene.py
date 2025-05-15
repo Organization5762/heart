@@ -31,7 +31,6 @@ class MandelbrotMode(BaseRenderer):
     def __init__(self):
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.initialized = False
         self.clock: pygame.time.Clock | None = None
 
         # screen properties
@@ -72,14 +71,14 @@ class MandelbrotMode(BaseRenderer):
         )
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
-
+    
     def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ):
+    ) -> None:
         self.clock = clock
         self.height = window.get_height()
         self.width = window.get_width()
@@ -119,7 +118,7 @@ class MandelbrotMode(BaseRenderer):
                 self.scene_controls, self.gamepad
             ),
         }
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     @property
     def active_palette(self):
@@ -144,9 +143,6 @@ class MandelbrotMode(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if not self.initialized:
-            self.initialize(window, clock, peripheral_manager, orientation)
-
         try:
             gamepad_connected = self.process_input()
             if not gamepad_connected:
@@ -649,7 +645,7 @@ def main():
             screen.fill((0, 0, 0))
 
             # Process and render
-            mandelbrot.process(screen, clock, manager, Rectangle.with_layout(1, 1))
+            mandelbrot._internal_process(screen, clock, manager, Rectangle.with_layout(1, 1))
 
             # Update the display
             pygame.display.flip()

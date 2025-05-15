@@ -10,13 +10,19 @@ from heart.peripheral.core.manager import PeripheralManager
 class RenderImage(BaseRenderer):
     def __init__(self, image_file: str) -> None:
         super().__init__()
-        self.initialized = False
         self.current_frame = 0
         self.file = image_file
-
-    def _initialize(self) -> None:
+    
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         self.image = Loader.load(self.file)
-        self.initialized = True
+        self.image = pygame.transform.scale(self.image, window.get_size())
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -25,8 +31,4 @@ class RenderImage(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if not self.initialized:
-            self._initialize()
-            self.image = pygame.transform.scale(self.image, window.get_size())
-
         window.blit(self.image, (0, 0))

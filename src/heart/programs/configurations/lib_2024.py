@@ -6,25 +6,25 @@ from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.text import TextRendering
 from heart.environment import GameLoop
 from heart.navigation import MultiScene
-
+from heart.navigation import ComposedRenderer
 
 def configure(loop: GameLoop) -> None:
-    kirby_mode = loop.add_mode("kirby mode")
+    kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(*KirbyScene.title_scene())
 
-    modelbrot = loop.add_mode("mandelbrot")
-    modelbrot.add_renderer(MandelbrotMode())
-    modelbrot.add_title_renderer(
-        MandelbrotTitle(),
+    modelbrot = loop.add_mode(ComposedRenderer(
+        [
+            MandelbrotTitle(),
         TextRendering(
             text=["mandelbrot"],
             font="Roboto",
             font_size=14,
             color=Color(255, 255, 255),
             y_location=35,
-        ),
-    )
+        )
+        ]
+    ))
+    modelbrot.add_renderer(MandelbrotMode())
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
