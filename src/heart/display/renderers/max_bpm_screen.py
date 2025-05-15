@@ -4,12 +4,13 @@ from pygame import Surface, font, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.flame import FlameGenerator
-from heart.peripheral.heart_rates import (  # Import the shared BPM dictionary
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.heart_rates import (
     current_bpms,
 )
-from heart.peripheral.manager import PeripheralManager
 
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
@@ -28,7 +29,6 @@ SENSOR_TIMEOUT_MS = 30000
 class MaxBpmScreen(BaseRenderer):
     def __init__(self) -> None:
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.initialized = False
         self.current_frame = 0
 
         self._flame_edges = {
@@ -67,6 +67,7 @@ class MaxBpmScreen(BaseRenderer):
         window: Surface,
         clock: time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation,
     ) -> None:
         # --- BPM Calculation ---
         top_bpms = []

@@ -1,12 +1,16 @@
 import os
 import platform
+import re
+from dataclasses import dataclass
 from typing import Iterator
 
-import pygame
 import serial.tools.list_ports
+from pygame.event import custom_type
 
-os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-REQUEST_JOYSTICK_MODULE_RESET = pygame.event.custom_type()
+
+@dataclass
+class Pi:
+    version: int
 
 
 class Configuration:
@@ -15,8 +19,27 @@ class Configuration:
         return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))
 
     @classmethod
+    def pi(cls) -> Pi | None:
+        if not cls.is_pi():
+            return None
+
+        with open("/proc/device-tree/model", "rb") as fp:
+            raw = fp.read()
+            model = raw.decode("ascii", errors="ignore").rstrip("\x00\n")
+
+            # Match “Raspberry Pi X” and capture X
+            m = re.search(r"Raspberry Pi (\d+)", model)
+            if not m:
+                raise ValueError(f"Couldn't parse Pi model from {model!r}")
+            return Pi(version=int(m.group(1)))
+
+    @classmethod
     def is_profiling_mode(cls) -> bool:
         return bool(os.environ.get("PROFILING_MODE", False))
+
+    @classmethod
+    def is_debug_mode(cls) -> bool:
+        return bool(os.environ.get("DEBUG_MODE", False))
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:

@@ -9,8 +9,9 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
+# TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 
@@ -52,7 +53,6 @@ class YoListenRenderer(BaseRenderer):
         self.last_flash_time = 0
         self.flash_delay = 100
         self.ascii_font_sizes = {}
-        self.initialized = False
         # --- Phyphox phone accel ---
         self.phyphox_accel_x = 0.0
         self.phyphox_accel_y = 0.0
@@ -67,7 +67,13 @@ class YoListenRenderer(BaseRenderer):
         self.test_mode = False
         self.phyphox_db = 50.0
 
-    def _initialize(self) -> None:
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             # Calculate and store the width of each word
@@ -81,7 +87,7 @@ class YoListenRenderer(BaseRenderer):
             else:
                 text_width, _ = font.size(self.ascii_art[word][0])
                 self.word_widths[word] = text_width
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _calculate_optimal_ascii_font_size(self, word: str) -> int:
         art = self.ascii_art[word]
@@ -178,8 +184,6 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if not self.initialized:
-            self._initialize()
         if self._should_calibrate:
             self._calibrate_scroll_speed(peripheral_manager)
         self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(

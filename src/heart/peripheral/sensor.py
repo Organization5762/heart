@@ -6,7 +6,8 @@ from typing import Iterator, NoReturn, Self
 
 import serial
 
-from heart.peripheral import Peripheral
+from heart.firmware_io.constants import ACCELERATION
+from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
 
 
@@ -60,7 +61,7 @@ class Accelerometer(Peripheral):
                     while True:
                         data = ser.readlines(ser.in_waiting or 1)
                         for datum in data:
-                            self._process_data(data=datum)
+                            self._process_data(datum)
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:

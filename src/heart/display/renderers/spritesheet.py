@@ -7,7 +7,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class LoopPhase(Enum):
@@ -28,7 +28,6 @@ class SpritesheetLoop(BaseRenderer):
         disable_input: bool = False,
     ) -> None:
         super().__init__()
-        self.initialized = False
         self.disable_input = disable_input
         self.current_frame = 0
         self.loop_count = 0
@@ -66,9 +65,14 @@ class SpritesheetLoop(BaseRenderer):
         self._should_calibrate = True
         self._scale_factor_offset = 0
 
-    def _initialize(self) -> None:
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
-        self.initialized = True
 
     def _calibrate(self, preripheral_manager: PeripheralManager):
         self._scale_factor_offset = (
@@ -105,8 +109,6 @@ class SpritesheetLoop(BaseRenderer):
             self.time_since_last_update is None
             or self.time_since_last_update > kf_duration
         ):
-            if not self.initialized:
-                self._initialize()
             if self._should_calibrate:
                 self._calibrate(peripheral_manager)
             else:

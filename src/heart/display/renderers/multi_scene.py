@@ -4,7 +4,7 @@ import pygame
 
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class MultiScene(BaseRenderer):

@@ -10,11 +10,7 @@ import heart
 import heart.firmware_io
 from heart import firmware_io
 
-if sys.platform == "darwin":
-    MEDIA_DIRECTORY = "/Volumes"
-else:
-    MEDIA_DIRECTORY = "/media/michael"
-
+MEDIA_DIRECTORY = "/media/michael"
 CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = "adafruit-circuitpython-bundle-9.x-mpy-20250412"
 CIRCUIT_PY_COMMON_LIBS = f"https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
 CIRCUIT_PY_COMMON_LIBS_CHECKSUM = (
@@ -59,24 +55,13 @@ def download_file(url: str, checksum: str) -> str:
         destination = os.path.join("/tmp", url.split("/")[-1])
         if not os.path.exists(destination):
             print(f"Starting download: {url}")
-            if sys.platform == "darwin":
-                subprocess.run(["curl", url, "-o", destination], check=True)
-            else:
-                subprocess.run(["wget", url, "-O", destination], check=True)
+            subprocess.run(["wget", url, "-O", destination], check=True)
             print(f"Finished download: {destination}")
 
         # Check the checksum
-        if sys.platform == "darwin":
-            checksum_result = subprocess.run(
-                ["shasum", "-a", "256", destination],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-        else:
-            checksum_result = subprocess.run(
-                ["sha256sum", destination], capture_output=True, text=True, check=True
-            )
+        checksum_result = subprocess.run(
+            ["sha256sum", destination], capture_output=True, text=True, check=True
+        )
         file_checksum = checksum_result.stdout.split()[0]
         print(f"Checksum for {destination}: {file_checksum}")
 
@@ -100,10 +85,9 @@ def copy_file(source: str, destination: str) -> None:
             subprocess.run(["cp", "-rf", source, destination], check=True)
         else:
             subprocess.run(["cp", "-f", source, destination], check=True)
-
         print(f"After copying: {source} to {destination}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Failed to copy {source} to {destination} - {e}")
+    except subprocess.CalledProcessError:
+        print(f"Error: Failed to copy {source} to {destination}")
         sys.exit(1)
 
 

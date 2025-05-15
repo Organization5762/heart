@@ -5,28 +5,33 @@ from heart.display.renderers.kirby import KirbyScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.mario import MarioRenderer
+from heart.display.renderers.multicolor import MulticolorRenderer
+from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
+from heart.navigation import ComposedRenderer
 
 
 def configure(loop: GameLoop) -> None:
-    kirby_mode = loop.add_mode("kirby mode")
+    kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(*KirbyScene.title_scene())
 
-    modelbrot = loop.add_mode("mandelbrot")
-    modelbrot.add_renderer(MandelbrotMode())
-    modelbrot.add_title_renderer(
-        MandelbrotTitle(),
-        TextRendering(
-            text=["mandelbrot"],
-            font="Roboto",
-            font_size=14,
-            color=Color(255, 255, 255),
-            y_location=35,
-        ),
+    modelbrot = loop.add_mode(
+        ComposedRenderer(
+            [
+                MandelbrotTitle(),
+                TextRendering(
+                    text=["mandelbrot"],
+                    font="Roboto",
+                    font_size=14,
+                    color=Color(255, 255, 255),
+                    y_location=35,
+                ),
+            ]
+        )
     )
+    modelbrot.add_renderer(MandelbrotMode())
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
@@ -34,24 +39,32 @@ def configure(loop: GameLoop) -> None:
     yolisten_mode = loop.add_mode("yo listen")
     yolisten_mode.add_renderer(YoListenRenderer())
 
-    mario_mode = loop.add_mode("mario")
+    mario_mode = loop.add_mode(
+        ComposedRenderer(
+            [
+                RenderImage(image_file="mario_still.png"),
+                TextRendering(
+                    text=["mario"],
+                    font="Roboto",
+                    font_size=14,
+                    color=Color(255, 0, 0),
+                    y_location=5,
+                ),
+            ]
+        )
+    )
     mario_mode.add_renderer(
         MarioRenderer(
             sheet_file_path=f"mario_64.png",
             metadata_file_path=f"mario_64.json",
         )
     )
-    mario_mode.add_title_renderer(
-        RenderImage(image_file="mario_still.png"),
-        TextRendering(
-            text=["mario"],
-            font="Roboto",
-            font_size=14,
-            color=Color(255, 0, 0),
-            y_location=5,
-        ),
-    )
 
+    shroomed_mode = loop.add_mode("shroomed")
+    shroomed_mode.add_renderer(MulticolorRenderer())
+    shroomed_mode.add_renderer(SpritesheetLoop("ness.png", "ness.json"))
+
+    # TODO: Lol this renders each char
     mode = loop.add_mode("friend beacon")
 
     # TODO: Refactor
