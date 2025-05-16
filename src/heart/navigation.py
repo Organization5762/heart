@@ -79,12 +79,10 @@ class AppController(BaseRenderer):
 
 
 class GameModes(BaseRenderer):
-    """GameMode represents a mode in the game loop where different renderers can be
-    added. Each mode can have multiple renderers that define how the game is displayed.
+    """GameModes represents a collection of modes in the game loop where different
+    renderers can be added.
 
-    Methods:
-    - __init__: Initializes a new GameMode instance with an empty list of renderers.
-    - add_renderer: Adds a renderer to this game mode
+    Navigation is built-in to this, assuming the user long-presses
 
     """
 
@@ -128,6 +126,10 @@ class GameModes(BaseRenderer):
     def _process_debugging_key_presses(
         self, peripheral_manager: PeripheralManager
     ) -> None:
+        # Only run this if not on the Pi
+        if Configuration.is_pi():
+            return
+
         keys = pygame.key.get_pressed()
 
         current_time = time.time()
@@ -265,15 +267,3 @@ class MultiScene(BaseRenderer):
 
     def _decrement_scene(self) -> None:
         self.current_scene_index = (self.current_scene_index - 1) % len(self.scenes)
-
-    def default_title_renderer(self) -> list["BaseRenderer"]:
-        return [
-            TextRendering(
-                font="Comic Sans MS",
-                font_size=8,
-                color=Color(255, 105, 180),
-                text=[
-                    self.name,
-                ],
-            )
-        ]

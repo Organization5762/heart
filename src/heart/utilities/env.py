@@ -2,6 +2,7 @@ import os
 import platform
 import re
 from dataclasses import dataclass
+from functools import cache
 from typing import Iterator
 
 import serial.tools.list_ports
@@ -15,7 +16,8 @@ class Pi:
 
 class Configuration:
     @classmethod
-    def is_pi(cls):
+    @cache
+    def is_pi(cls) -> bool:
         return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))
 
     @classmethod
