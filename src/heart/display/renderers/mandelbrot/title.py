@@ -10,7 +10,7 @@ from heart.peripheral.core.manager import PeripheralManager
 class MandelbrotTitle(BaseRenderer):
     def __init__(self):
         super().__init__()
-        self.mandle = MandelbrotMode()
+        self.mandelbrot = MandelbrotMode()
         # Avoid double mirroring by setting this display
         # to just take in the full screen
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -24,10 +24,12 @@ class MandelbrotTitle(BaseRenderer):
         orientation: Orientation,
     ):
         if self.first_image is None:
-            self.mandle._internal_process(
+            self.mandelbrot._internal_process(
                 window, clock, peripheral_manager, orientation
             )
             self.first_image = window.copy()
+            del self.mandelbrot
+            self.mandelbrot = None
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(self, window, clock, peripheral_manager, orientation):
