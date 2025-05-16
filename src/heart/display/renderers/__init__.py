@@ -36,6 +36,32 @@ class BaseRenderer:
     ) -> list["BaseRenderer"]:
         return [self]
 
+    def _get_input_screen(self, window: pygame.Surface, orientation: Orientation):
+        window_x, window_y = window.get_size()
+
+        match self.device_display_mode:
+            case DeviceDisplayMode.MIRRORED:
+                layout: Layout = orientation.layout
+                screen_size = (window_x // layout.columns, window_y // layout.rows)
+            case DeviceDisplayMode.FULL:
+                # The screen is the full size of the device
+                screen_size = (window_x, window_y)
+        screen = pygame.Surface(screen_size, pygame.SRCALPHA)
+        return screen
+
+    def _postprocess_input_screen(
+        self, screen: pygame.Surface, orientation: Orientation
+    ):
+        match self.device_display_mode:
+            case DeviceDisplayMode.MIRRORED:
+                layout: Layout = orientation.layout
+                screen = self._tile_surface(
+                    screen=screen, rows=layout.rows, cols=layout.columns
+                )
+            case DeviceDisplayMode.FULL:
+                pass
+        return screen
+
     def _internal_process(
         self,
         window: pygame.Surface,
@@ -46,7 +72,11 @@ class BaseRenderer:
         if not self.is_initialized():
             self.initialize(window, clock, peripheral_manager, orientation)
 
-        self.process(window, clock, peripheral_manager, orientation)
+        screen = self._get_input_screen(window, orientation)
+        self.process(screen, clock, peripheral_manager, orientation)
+        screen = self._postprocess_input_screen(screen, orientation)
+
+        window.blit(screen, (0, 0))
 
     def process(
         self,
@@ -56,6 +86,21 @@ class BaseRenderer:
         orientation: Orientation,
     ) -> None:
         pass
+
+    def _tile_surface(
+        self, screen: pygame.Surface, rows: int, cols: int
+    ) -> pygame.Surface:
+        tile_width, tile_height = screen.get_size()
+        tiled_surface = pygame.Surface(
+            (tile_width * cols, tile_height * rows), pygame.SRCALPHA
+        )
+
+        for row in range(rows):
+            for col in range(cols):
+                dest_pos = (col * tile_width, row * tile_height)
+                tiled_surface.blit(screen, dest_pos)
+
+        return tiled_surface
 
 
 @dataclass

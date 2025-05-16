@@ -120,19 +120,7 @@ class GameLoop:
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
-            match renderer.device_display_mode:
-                case DeviceDisplayMode.FULL:
-                    # The screen is the full size of the device
-                    screen = pygame.Surface(
-                        self.device.full_display_size(), pygame.SRCALPHA
-                    )
-                case DeviceDisplayMode.MIRRORED:
-                    # The screen is the full size of the device
-                    screen = pygame.Surface(
-                        self.device.individual_display_size(), pygame.SRCALPHA
-                    )
-
-            # Process the screen
+            screen = pygame.Surface(self.device.full_display_size(), pygame.SRCALPHA)
 
             kwargs = {
                 "window": screen,
@@ -140,18 +128,8 @@ class GameLoop:
                 "peripheral_manager": self.peripheral_manager,
                 "orientation": self.device.orientation,
             }
-
             renderer._internal_process(**kwargs)
 
-            match renderer.device_display_mode:
-                case DeviceDisplayMode.MIRRORED:
-                    layout: Layout = self.device.orientation.layout
-                    screen = self._tile_surface(
-                        screen=screen, rows=layout.rows, cols=layout.columns
-                    )
-
-                case DeviceDisplayMode.FULL:
-                    pass
             return screen
         except Exception as e:
             logger.error(f"Error processing renderer: {e}", exc_info=True)
@@ -165,21 +143,6 @@ class GameLoop:
         image = np.transpose(image, (1, 0, 2))
         image = Image.fromarray(image, RGBA_IMAGE_FORMAT)
         return image
-
-    def _tile_surface(
-        self, screen: pygame.Surface, rows: int, cols: int
-    ) -> pygame.Surface:
-        tile_width, tile_height = screen.get_size()
-        tiled_surface = pygame.Surface(
-            (tile_width * cols, tile_height * rows), pygame.SRCALPHA
-        )
-
-        for row in range(rows):
-            for col in range(cols):
-                dest_pos = (col * tile_width, row * tile_height)
-                tiled_surface.blit(screen, dest_pos)
-
-        return tiled_surface
 
     def merge_surfaces(
         self, surface1: pygame.Surface, surface2: pygame.Surface
