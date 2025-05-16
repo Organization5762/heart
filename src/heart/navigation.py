@@ -8,11 +8,12 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.color import RenderColor
+from heart.display.renderers.slide import SlideTransitionRenderer
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
-from heart.display.renderers.slide import SlideTransitionRenderer
+
 
 class AppController(BaseRenderer):
     def __init__(self) -> None:
@@ -204,7 +205,6 @@ class GameModes(BaseRenderer):
             else:
                 return self.sliding_transition
 
-
         if self.in_select_mode:
             return self.title_renderers[mode_index]
 
@@ -228,10 +228,17 @@ class ComposedRenderer(BaseRenderer):
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
 
-    def process(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> None:
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
             renderer._internal_process(window, clock, peripheral_manager, orientation)
+
 
 class MultiScene(BaseRenderer):
     def __init__(self, scenes: list[BaseRenderer]) -> None:

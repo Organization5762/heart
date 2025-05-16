@@ -1,14 +1,17 @@
-from heart.display.renderers import BaseRenderer
 import pygame
-from heart.peripheral.core.manager import PeripheralManager
-from heart.device import Orientation
+
 from heart import DeviceDisplayMode
+from heart.device import Orientation
+from heart.display.renderers import BaseRenderer
+from heart.peripheral.core.manager import PeripheralManager
+
 
 class SlideTransitionRenderer(BaseRenderer):
-    """
-    Slides renderer_B into view while renderer_A moves out.
-    direction  =  1  → B comes from the right  (A → left)
-    direction  = -1  → B comes from the left   (A → right)
+    """Slides renderer_B into view while renderer_A moves out.
+
+    direction  =  1  → B comes from the right  (A → left) direction  = -1  → B comes
+    from the left   (A → right)
+
     """
 
     def __init__(
@@ -62,12 +65,12 @@ class SlideTransitionRenderer(BaseRenderer):
             dist = self._target_offset - self._x_offset
             step_size = (
                 dist
-                if abs(dist) <= self.slide_speed          # snap on final frame
+                if abs(dist) <= self.slide_speed  # snap on final frame
                 else self.slide_speed * (1 if dist > 0 else -1)
             )
             self._x_offset += step_size
             if self._x_offset <= self._target_offset:
-                self._sliding = False    
+                self._sliding = False
 
         # ----------------------------------------------------------------- #
         # 2. render both children to off-screen surfaces

@@ -57,6 +57,7 @@ class BaseRenderer:
     ) -> None:
         pass
 
+
 @dataclass
 class KeyFrame:
     frame: tuple[int, int, int, int]
