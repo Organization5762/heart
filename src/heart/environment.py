@@ -54,7 +54,6 @@ class GameLoop:
 
         # jank slide animation state machine
         self.mode_change = (0, 0)
-        self.sliding = False
         self._last_mode_offset = 0
         self._last_offset_on_change = 0
         self._current_offset_on_change = 0
@@ -142,10 +141,7 @@ class GameLoop:
                 "orientation": self.device.orientation,
             }
 
-            if self.sliding:
-                renderer.process_with_slide(**kwargs)
-            else:
-                renderer._internal_process(**kwargs)
+            renderer._internal_process(**kwargs)
 
             match renderer.device_display_mode:
                 case DeviceDisplayMode.MIRRORED:
