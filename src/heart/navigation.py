@@ -79,7 +79,11 @@ class AppController(BaseRenderer):
 
 
 class GameModes(BaseRenderer):
-    """GameModes represents a collection of modes in the game loop where different renderers can be added. Navigation is built-in to this, assuming the user long-presses
+    """GameModes represents a collection of modes in the game loop where different
+    renderers can be added.
+
+    Navigation is built-in to this, assuming the user long-presses
+
     """
 
     def __init__(self) -> None:
