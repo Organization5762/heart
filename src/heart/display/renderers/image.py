@@ -12,6 +12,7 @@ class RenderImage(BaseRenderer):
         super().__init__()
         self.current_frame = 0
         self.file = image_file
+        self.image = None
 
     def initialize(
         self,
