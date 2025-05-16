@@ -59,10 +59,6 @@ class MandelbrotMode(BaseRenderer):
         )
         self.last_switch_value = None
 
-        # TODO: load_font this
-        pygame.font.init()
-        self.font = pygame.font.SysFont("monospace", 8)
-
         # input properties
         self.gamepad = None
         self.scene_controls: SceneControls | None = None
@@ -79,6 +75,8 @@ class MandelbrotMode(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        pygame.font.init()
+        self.font = pygame.font.SysFont("monospace", 8)
         self.clock = clock
         self.height = window.get_height()
         self.width = window.get_width()

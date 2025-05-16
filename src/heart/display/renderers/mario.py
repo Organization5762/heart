@@ -1,3 +1,5 @@
+import time
+
 import pygame
 
 from heart import DeviceDisplayMode
@@ -87,7 +89,7 @@ class MarioRenderer(BaseRenderer):
                     peripheral_manager.get_phyphox_peripheral().get_acceleration()
                 )
             except Exception as e:
-                print(f"Error getting acceleration: {e}")
+                time.sleep(0.1)
                 self.accel = None
             if self.accel is not None and self.accel.z > 2.0:
                 self.in_loop = True
