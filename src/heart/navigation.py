@@ -68,7 +68,7 @@ class AppController(BaseRenderer):
             title_renderer = ComposedRenderer(title)
         else:
             raise ValueError("Title must be a string or BaseRenderer, got: ", title)
-        
+
         # TODO: Clean-up
         self.modes.title_renderers.append(title_renderer)
         self.modes.add_new_pages(result)
@@ -76,6 +76,7 @@ class AppController(BaseRenderer):
 
     def is_empty(self) -> bool:
         return len(self.modes.renderers) == 0
+
 
 class GameModes(BaseRenderer):
     """GameMode represents a mode in the game loop where different renderers can be
