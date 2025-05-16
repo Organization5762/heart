@@ -33,6 +33,13 @@ class AppController(BaseRenderer):
         return self.modes.get_renderers(peripheral_manager=peripheral_manager)
 
     def add_sleep_mode(self) -> None:
+        title_renderer = TextRendering(
+            text=["zzz"],
+            font="Comic Sans MS",
+            font_size=8,
+            color=Color(255, 105, 180),
+        )
+        self.modes.title_renderers.append(title_renderer)
         self.modes.add_new_pages(RenderColor(Color(0, 0, 0)))
 
     def add_scene(self) -> "MultiScene":
@@ -61,13 +68,14 @@ class AppController(BaseRenderer):
             title_renderer = ComposedRenderer(title)
         else:
             raise ValueError("Title must be a string or BaseRenderer, got: ", title)
-        self.modes.title_renderer = title_renderer
+        
+        # TODO: Clean-up
+        self.modes.title_renderers.append(title_renderer)
         self.modes.add_new_pages(result)
         return result
 
     def is_empty(self) -> bool:
         return len(self.modes.renderers) == 0
-
 
 class GameModes(BaseRenderer):
     """GameMode represents a mode in the game loop where different renderers can be
@@ -80,9 +88,9 @@ class GameModes(BaseRenderer):
     """
 
     def __init__(self) -> None:
-        self.title_renderer: BaseRenderer | None = None
+        self.title_renderers: list[BaseRenderer] = []
         self.renderers: list[BaseRenderer] = []
-        self.in_select_mode = False
+        self.in_select_mode = True
         self.last_long_button_value = 0
         self.mode_offset = 0
         self._active_mode_index = 0
@@ -182,6 +190,9 @@ class GameModes(BaseRenderer):
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
+        if self.in_select_mode:
+            return self.title_renderers[mode_index]
+
         return self.renderers[mode_index]
 
 
