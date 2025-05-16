@@ -1,7 +1,7 @@
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Orientation
+from heart.device import Orientation, Rectangle
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
@@ -80,10 +80,10 @@ class SlideTransitionRenderer(BaseRenderer):
         surf_B = pygame.Surface(size, pygame.SRCALPHA)
 
         result_A = self.renderer_A._internal_process(
-            surf_A, clock, peripheral_manager, orientation
+            surf_A, clock, peripheral_manager, Rectangle.with_layout(1, 1)
         )
         result = self.renderer_B._internal_process(
-            surf_B, clock, peripheral_manager, orientation
+            surf_B, clock, peripheral_manager, Rectangle.with_layout(1, 1)
         )
 
         # ----------------------------------------------------------------- #
