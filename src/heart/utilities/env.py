@@ -3,6 +3,7 @@ import platform
 import re
 from dataclasses import dataclass
 from typing import Iterator
+from functools import cache
 
 import serial.tools.list_ports
 from pygame.event import custom_type
@@ -15,7 +16,8 @@ class Pi:
 
 class Configuration:
     @classmethod
-    def is_pi(cls):
+    @cache
+    def is_pi(cls) -> bool:
         return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))
 
     @classmethod
