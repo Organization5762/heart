@@ -5,32 +5,33 @@ from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.text import TextRendering
 from heart.environment import GameLoop
+from heart.navigation import ComposedRenderer, MultiScene
 
 
 def configure(loop: GameLoop) -> None:
-    kirby_mode = loop.add_mode("kirby mode")
+    kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene())
-    kirby_mode.add_title_renderer(
-        *KirbyScene.title_scene()
-    )
 
-    modelbrot = loop.add_mode("mandelbrot")
-    modelbrot.add_renderer(MandelbrotMode())
-    modelbrot.add_title_renderer(
-        MandelbrotTitle(),
-        TextRendering(
-            text=["mandelbrot"],
-            font="Comic Sans MS",
-            font_size=8,
-            color=Color(255, 255, 255),
-            y_location=35,
-        ),
+    modelbrot = loop.add_mode(
+        ComposedRenderer(
+            [
+                MandelbrotTitle(),
+                TextRendering(
+                    text=["mandelbrot"],
+                    font="Roboto",
+                    font_size=14,
+                    color=Color(255, 255, 255),
+                    y_location=35,
+                ),
+            ]
+        )
     )
+    modelbrot.add_renderer(MandelbrotMode())
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
 
-    mode = loop.add_mode("friend beacon")
+    mode = loop.add_mode("friend\nbeacon")
     text = ["Lost my\nfriends\nagain"]
     text.extend(
         [
@@ -58,7 +59,26 @@ def configure(loop: GameLoop) -> None:
     )
     text.append("Where is\neveryone")
     mode.add_renderer(
-        TextRendering(
-            font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+        MultiScene(
+            scenes=[
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+                TextRendering(
+                    font="Comic Sans MS",
+                    font_size=20,
+                    color=Color(255, 105, 180),
+                    text=text,
+                ),
+            ]
         )
     )

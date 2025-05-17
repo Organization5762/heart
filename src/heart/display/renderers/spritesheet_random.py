@@ -9,7 +9,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class LoopPhase(StrEnum):
@@ -32,7 +32,6 @@ class SpritesheetLoopRandom(BaseRenderer):
         self.device_display_mode = DeviceDisplayMode.FULL
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
-        self.initialized = False
         self.current_frame = 0
         self.loop_count = 0
         self.file = sheet_file_path
@@ -67,9 +66,15 @@ class SpritesheetLoopRandom(BaseRenderer):
         self.x = 30
         self.y = 30
 
-    def _initialize(self) -> None:
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
-        self.initialized = True
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def __duration_scale_factor(self, peripheral_manager: PeripheralManager):
         current_value = (
@@ -93,14 +98,11 @@ class SpritesheetLoopRandom(BaseRenderer):
             self.time_since_last_update is None
             or self.time_since_last_update > kf_duration
         ):
-            if not self.initialized:
-                self._initialize()
-            else:
-                self.current_frame += 1
-                self.time_since_last_update = 0
-                if self.current_frame >= len(self.frames[self.phase]):
-                    self.current_frame = 0
-                    self.current_screen = random.randint(0, self.screen_count - 1)
+            self.current_frame += 1
+            self.time_since_last_update = 0
+            if self.current_frame >= len(self.frames[self.phase]):
+                self.current_frame = 0
+                self.current_screen = random.randint(0, self.screen_count - 1)
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))

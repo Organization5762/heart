@@ -9,7 +9,7 @@ from pygame.time import Clock
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class LSystem(BaseRenderer):

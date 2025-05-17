@@ -20,3 +20,9 @@ The command: `totem run --configuration full_screen_test` should display a scene
 
 - MacOSX for local development
 - An appropriately setup Raspberry Pi 4 for portable use
+
+## Drivers setup
+
+### ANT
+
+For ant you will need to run drivers/ant_dongle/setup.sh on the raspberry pi. Then unplug and replug the dongle

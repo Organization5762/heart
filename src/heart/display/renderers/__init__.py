@@ -4,7 +4,7 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class BaseRenderer:
@@ -14,14 +14,69 @@ class BaseRenderer:
 
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.x_offset = 0
-        self.target_x_offset = 0
-        self.slide_speed = 10  # pixels per frame
-        self.sliding = False
-        self.slide_enabled = False
+        self.initialized = False
+
+    def is_initialized(self) -> bool:
+        return self.initialized
+
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        self.initialized = True
 
     def reset(self):
         pass
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list["BaseRenderer"]:
+        return [self]
+
+    def _get_input_screen(self, window: pygame.Surface, orientation: Orientation):
+        window_x, window_y = window.get_size()
+
+        match self.device_display_mode:
+            case DeviceDisplayMode.MIRRORED:
+                layout: Layout = orientation.layout
+                screen_size = (window_x // layout.columns, window_y // layout.rows)
+            case DeviceDisplayMode.FULL:
+                # The screen is the full size of the device
+                screen_size = (window_x, window_y)
+        screen = pygame.Surface(screen_size, pygame.SRCALPHA)
+        return screen
+
+    def _postprocess_input_screen(
+        self, screen: pygame.Surface, orientation: Orientation
+    ):
+        match self.device_display_mode:
+            case DeviceDisplayMode.MIRRORED:
+                layout: Layout = orientation.layout
+                screen = self._tile_surface(
+                    screen=screen, rows=layout.rows, cols=layout.columns
+                )
+            case DeviceDisplayMode.FULL:
+                pass
+        return screen
+
+    def _internal_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        if not self.is_initialized():
+            self.initialize(window, clock, peripheral_manager, orientation)
+
+        screen = self._get_input_screen(window, orientation)
+        self.process(screen, clock, peripheral_manager, orientation)
+        screen = self._postprocess_input_screen(screen, orientation)
+
+        window.blit(screen, (0, 0))
 
     def process(
         self,
@@ -30,48 +85,22 @@ class BaseRenderer:
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        None
+        pass
 
-    def process_with_slide(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        """Process with sliding effect applied."""
-        # Update sliding animation
-        self._update_slide()
+    def _tile_surface(
+        self, screen: pygame.Surface, rows: int, cols: int
+    ) -> pygame.Surface:
+        tile_width, tile_height = screen.get_size()
+        tiled_surface = pygame.Surface(
+            (tile_width * cols, tile_height * rows), pygame.SRCALPHA
+        )
 
-        # Create a temporary surface to draw content
-        temp_surface = pygame.Surface(window.get_size(), pygame.SRCALPHA)
+        for row in range(rows):
+            for col in range(cols):
+                dest_pos = (col * tile_width, row * tile_height)
+                tiled_surface.blit(screen, dest_pos)
 
-        self.process(temp_surface, clock, peripheral_manager, orientation)
-
-        # Draw the temp surface to the window with the offset
-        window.blit(temp_surface, (self.x_offset, 0))
-
-    def set_slide(self, from_x_offset: int, to_x_offset: int):
-        self.target_x_offset = to_x_offset
-        self.sliding = True
-        self.slide_enabled = True
-        self.x_offset = from_x_offset
-
-    def _update_slide(self):
-        if not self.sliding:
-            return
-
-        # Calculate distance to target
-        distance = self.target_x_offset - self.x_offset
-
-        # If we're very close to target, snap to it and stop sliding
-        if abs(distance) < self.slide_speed:
-            self.x_offset = self.target_x_offset
-            self.sliding = False
-            return
-
-        # Otherwise move toward target
-        self.x_offset += (distance / abs(distance)) * self.slide_speed
+        return tiled_surface
 
 
 @dataclass

@@ -2,6 +2,10 @@ dev_install:
 	@pip install -e ".[dev]"
 	@pre-commit install --hook-type pre-push
 
+pi_install:
+	@sudo bash src/heart/manage/install_rgb_matrix.sh
+	@sudo pip install -e . --break-system-packages
+
 format: dev_install
 	@black src
 	@isort src
