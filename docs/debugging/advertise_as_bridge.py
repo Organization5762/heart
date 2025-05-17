@@ -1,98 +1,75 @@
-import dbus
-import dbus.exceptions
-import dbus.mainloop.glib
-import dbus.service
-from gi.repository import GLib
+#!/usr/bin/env python3
+# Advertises a minimal Flowtoys bridge named “Bridge”
 
-BLUEZ_SERVICE_NAME = "org.bluez"
-ADAPTER_IFACE = "org.bluez.Adapter1"
-LE_ADV_MANAGER_IFACE = "org.bluez.LEAdvertisingManager1"
-LE_ADVERTISEMENT_IFACE = "org.bluez.LEAdvertisement1"
+import asyncio, sys
+from datetime import datetime
+from dbus_next.aio import MessageBus
+from dbus_next.constants import BusType
+from dbus_next import Variant
+from dbus_next.service import ServiceInterface, dbus_property, method, PropertyAccess
 
-ADAPTER_PATH = "/org/bluez/hci0"
+UART_SVC = "49550001-aad5-59bd-934c-023d807e01d5"
 
 
-class Advertisement(dbus.service.Object):
-    PATH_BASE = "/com/example/advertisement"
+def ts():
+    return datetime.now().strftime("[%H:%M:%S]")
 
-    def __init__(self, bus, index):
-        self.path = self.PATH_BASE + str(index)
-        self.bus = bus
-        self.ad_type = "broadcast"
-        self.service_uuids = ["180F"]  # Battery Service
-        self.local_name = "PiBeacon"
-        self.include_tx_power = True
 
-        dbus.service.Object.__init__(self, bus, self.path)
+async def proxy(bus, name, path):
+    xml = await bus.introspect(name, path)
+    return bus.get_proxy_object(name, path, xml)
 
-    def get_path(self):
-        return dbus.ObjectPath(self.path)
 
-    @dbus.service.method(LE_ADVERTISEMENT_IFACE,
-                         in_signature="", out_signature="")
+class BridgeAd(ServiceInterface):
+    """Legacy, discoverable, local-name-only advertisement."""
+
+    def __init__(self):
+        super().__init__("org.bluez.LEAdvertisement1")
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Type(self) -> "s":
+        return "peripheral"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def ServiceUUIDs(self) -> "as":
+        return [UART_SVC]
+
+    @dbus_property(access=PropertyAccess.READ)
+    def LocalName(self) -> "s":
+        return "Bridge"  # exact string
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Discoverable(self) -> "b":
+        return True  # ensures Flags 0x06
+
+    @method()  # required
     def Release(self):
-        print("Advertisement Released")
-
-    @dbus.service.method(dbus_interface="org.freedesktop.DBus.Properties",
-                         in_signature="ss", out_signature="v")
-    def Get(self, interface, prop):
-        if interface != LE_ADVERTISEMENT_IFACE:
-            raise dbus.exceptions.DBusException(
-                "org.freedesktop.DBus.Error.InvalidArgs",
-                "Invalid interface {}".format(interface)
-            )
-
-        props = self._get_properties()[LE_ADVERTISEMENT_IFACE]
-        if prop not in props:
-            raise dbus.exceptions.DBusException(
-                "org.freedesktop.DBus.Error.InvalidArgs",
-                "Invalid property {}".format(prop)
-            )
-
-        return props[prop]
-
-    @dbus.service.method(dbus_interface="org.freedesktop.DBus.Properties",
-                         in_signature="s", out_signature="a{sv}")
-    def GetAll(self, interface):
-        if interface != LE_ADVERTISEMENT_IFACE:
-            raise dbus.exceptions.DBusException(
-                "org.freedesktop.DBus.Error.InvalidArgs",
-                "Invalid interface {}".format(interface)
-            )
-
-        return self._get_properties()[interface]
-
-    def _get_properties(self):
-        return {
-            LE_ADVERTISEMENT_IFACE: {
-                "Type": dbus.String(self.ad_type),
-                "ServiceUUIDs": dbus.Array(self.service_uuids, signature="s"),
-                "LocalName": dbus.String(self.local_name),
-                "IncludeTxPower": dbus.Boolean(self.include_tx_power),
-            }
-        }
+        pass
 
 
-def main():
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-    system_bus = dbus.SystemBus()
+async def main():
+    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
 
-    adapter = system_bus.get_object(BLUEZ_SERVICE_NAME, ADAPTER_PATH)
-    ad_manager = dbus.Interface(adapter, LE_ADV_MANAGER_IFACE)
+    # choose the first adapter that supports advertising
+    om = (await proxy(bus, "org.bluez", "/")).get_interface(
+        "org.freedesktop.DBus.ObjectManager"
+    )
+    objs = await om.call_get_managed_objects()
+    adapter = next(p for p, i in objs.items() if "org.bluez.LEAdvertisingManager1" in i)
 
-    advertisement = Advertisement(system_bus, 0)
+    ad_path = "/org/flowbridge/adv0"
+    bus.export(ad_path, BridgeAd())
+    adv_mgr = (await proxy(bus, "org.bluez", adapter)).get_interface(
+        "org.bluez.LEAdvertisingManager1"
+    )
+    await adv_mgr.call_register_advertisement(ad_path, {})
+    print(ts(), "📣 Advertising legacy packet “Bridge” (UUID 4955…)")
 
-    ad_manager.RegisterAdvertisement(advertisement.get_path(), {},
-                                     reply_handler=lambda: print("Advertisement registered"),
-                                     error_handler=lambda e: print(f"Failed to register ad: {e}"))
-
-    try:
-        GLib.MainLoop().run()
-    except KeyboardInterrupt:
-        print("Terminating...")
-        ad_manager.UnregisterAdvertisement(advertisement.get_path())
-        GLib.MainLoop().quit()
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
-    main()
+    if sys.version_info < (3, 9):
+        print("Python 3.9+ required")
+        sys.exit(1)
+    asyncio.run(main())
