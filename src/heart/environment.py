@@ -12,6 +12,7 @@ from PIL import Image
 
 from heart import DeviceDisplayMode
 from heart.device import Device, Layout
+from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
@@ -105,6 +106,7 @@ class GameLoop:
             ),
             pygame.SHOWN,
         )
+        self._last_render_mode = pygame.SHOWN
 
     @classmethod
     def get_game_loop(cls):
@@ -133,14 +135,52 @@ class GameLoop:
         try:
             match renderer.device_display_mode:
                 case DeviceDisplayMode.FULL:
-                    # The screen is the full size of the device
+                    if not self._last_render_mode == pygame.SHOWN:
+                        print("setting mode")
+                        pygame.display.set_mode(
+                            (
+                                self.device.full_display_size()[0] * self.device.scale_factor,
+                                self.device.full_display_size()[1] * self.device.scale_factor,
+                            ),
+                            pygame.SHOWN,
+                        )
+                        self._last_render_mode = pygame.SHOWN
                     screen = pygame.Surface(
                         self.device.full_display_size(), pygame.SRCALPHA
                     )
                 case DeviceDisplayMode.MIRRORED:
-                    # The screen is the full size of the device
+                    if not self._last_render_mode == pygame.SHOWN:
+                        pygame.display.set_mode(
+                            (
+                                self.device.full_display_size()[0] * self.device.scale_factor,
+                                self.device.full_display_size()[1] * self.device.scale_factor,
+                            ),
+                            pygame.SHOWN,
+                        )
+                        self._last_render_mode = pygame.SHOWN
                     screen = pygame.Surface(
                         self.device.individual_display_size(), pygame.SRCALPHA
+                    )
+                case DeviceDisplayMode.OPENGL:
+                    if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
+                        pygame.display.set_mode(
+                            (
+                                self.device.full_display_size()[0] * self.device.scale_factor,
+                                self.device.full_display_size()[1] * self.device.scale_factor,
+                            ),
+                            pygame.OPENGL | pygame.DOUBLEBUF,
+                        )
+                        self._last_render_mode = pygame.OPENGL | pygame.DOUBLEBUF
+
+                    # todo: this `screen` is not and cannot actually be used by opengl
+                    #  renderer scenes, but is still useful for getting the correct
+                    #  size/orientation since we construct it consistent with the current device size
+                    screen = (
+                        self.device.scaled_screen
+                        if isinstance(self.device, LocalScreen)
+                        else pygame.Surface(
+                            self.device.full_display_size()
+                        )
                     )
 
             # Process the screen
@@ -372,11 +412,14 @@ class GameLoop:
         result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
             renderers
         )
-        image = self.__finalize_rendering(result) if result else None
-        if image is not None:
-            bytes = image.tobytes()
-            surface = pygame.image.frombytes(bytes, image.size, image.mode)
-            self.screen.blit(surface, (0, 0))
+
+        # skip blitting if renderer was opengl
+        if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
+            image = self.__finalize_rendering(result) if result else None
+            if image is not None:
+                bytes = image.tobytes()
+                surface = pygame.image.frombytes(bytes, image.size, image.mode)
+                self.screen.blit(surface, (0, 0))
 
         if len(renderers) > 0:
             pygame.display.flip()

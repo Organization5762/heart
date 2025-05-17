@@ -498,32 +498,23 @@ class MandelbrotMode(BaseRenderer):
 
     def _draw_debug_to_surface(self, window: pygame.Surface):
         text_color = (255, 255, 255)
+        init_y = 5
+        y_spacing = 10
+        text_surfaces = [
+            self.font.render(f"X: {self.state.movement.x}", True, text_color),
+            self.font.render(f"Y: {self.state.movement.y}", True, text_color),
+            self.font.render(
+                f"Iter: {self.state.max_iterations}", True, text_color
+            ),
+            self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
+            self.font.render(
+                f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
+            ),
+        ]
         window.blits(
             [
-                (
-                    self.font.render(f"X: {self.state.movement.x}", True, text_color),
-                    (5, 10),
-                ),
-                (
-                    self.font.render(f"Y: {self.state.movement.y}", True, text_color),
-                    (5, 25),
-                ),
-                (
-                    self.font.render(
-                        f"Iter: {self.state.max_iterations}", True, text_color
-                    ),
-                    (5, 40),
-                ),
-                (
-                    self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
-                    (5, 55),
-                ),
-                (
-                    self.font.render(
-                        f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
-                    ),
-                    (5, 70),
-                ),
+                (surface, (5, init_y + idx * y_spacing))
+                for idx, surface in enumerate(text_surfaces)
             ]
         )
 
