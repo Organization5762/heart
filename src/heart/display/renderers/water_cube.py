@@ -141,7 +141,7 @@ class WaterCube(BaseRenderer):
         start_time = time.time()
 
         # --- get gravity ---------------------------------------------------
-        accel = peripheral_manager.get_phyphox_peripheral().get_acceleration()
+        accel = peripheral_manager.get_accelerometer().get_acceleration()
         gx = accel.x if accel else 0.0
         gy = accel.y if accel else 0.0
         gz = accel.z if accel else 1.0  # default "down"
