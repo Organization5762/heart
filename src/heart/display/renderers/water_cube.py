@@ -67,6 +67,7 @@ class WaterCube(BaseRenderer):
     """Height-field water simulation projected to four LED faces."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         # physics state (float32 for speed on Pi)

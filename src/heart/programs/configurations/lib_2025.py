@@ -64,9 +64,28 @@ def configure(loop: GameLoop) -> None:
         )
     )
 
-    shroomed_mode = loop.add_mode("shroomed")
-    shroomed_mode.add_renderer(MulticolorRenderer())
-    shroomed_mode.add_renderer(SpritesheetLoop("ness.png", "ness.json"))
+    shroomed_mode = loop.add_mode(
+        ComposedRenderer(
+            [
+                MulticolorRenderer(),
+                TextRendering(
+                    text=["shroomed"],
+                    font="Roboto",
+                    font_size=14,
+                    color=Color(255, 105, 180),
+                    y_location=32,
+                ),
+            ]
+        )
+    )
+    shroomed_mode.add_renderer(
+        ComposedRenderer(
+            [
+                MulticolorRenderer(),
+                SpritesheetLoop("ness.png", "ness.json"),
+            ]
+        )
+    )
 
     heart_rate_mode = loop.add_mode(
         ComposedRenderer(
