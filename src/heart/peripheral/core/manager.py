@@ -66,15 +66,23 @@ class PeripheralManager:
             self._threads.append(peripherial_thread)
 
     def _detect_switches(self) -> Iterator[Peripheral]:
+        print("detecting switches")
         if Configuration.is_pi() and not Configuration.is_x11_forward():
+            print("Found switches !")
             switches = itertools.chain(
                 Switch.detect(),
                 BluetoothSwitch.detect(),
             )
+            # # Can't use len() on an iterator
+            # switches_list = list(switches)
+            # print("Found", len(switches_list), "switches")
+            # switches = iter(switches_list)
         else:
+            print("No switches detected, using fake switch")
             switches = FakeSwitch.detect()
 
         for switch in switches:
+            print("Adding switch", self._deprecated_main_switch, switch)
             if self._deprecated_main_switch is None:
                 self._deprecated_main_switch = switch
             yield switch
