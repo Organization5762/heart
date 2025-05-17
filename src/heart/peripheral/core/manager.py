@@ -66,7 +66,7 @@ class PeripheralManager:
             self._threads.append(peripherial_thread)
 
     def _detect_switches(self) -> Iterator[Peripheral]:
-        if Configuration.is_pi():
+        if Configuration.is_pi() and not Configuration.is_x11_forward():
             switches = itertools.chain(
                 Switch.detect(),
                 BluetoothSwitch.detect(),

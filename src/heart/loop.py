@@ -28,9 +28,6 @@ def run(
     add_low_power_mode: bool = typer.Option(
         True, "--add-low-power-mode", help="Add a low power mode"
     ),
-    x11_forward: bool = typer.Option(
-        False, "--x11-forward", help="Use X11 forwarding for RGB display"
-    ),
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
@@ -45,7 +42,7 @@ def run(
                 f"Everything is only supported on Pi 4 and below. Detected: {pi}"
             )
 
-        if x11_forward:
+        if Configuration.is_x11_forward():
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
             logger.warning("RGB display not found, using local screen")

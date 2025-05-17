@@ -9,6 +9,8 @@ from heart.display.renderers.multicolor import MulticolorRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
+from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
+from heart.display.renderers.water_cube import WaterCube
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer
 
@@ -64,7 +66,12 @@ def configure(loop: GameLoop) -> None:
     shroomed_mode.add_renderer(MulticolorRenderer())
     shroomed_mode.add_renderer(SpritesheetLoop("ness.png", "ness.json"))
 
-    # TODO: Lol this renders each char
+    heart_rate_mode = loop.add_mode("heart rate")
+    heart_rate_mode.add_renderer(CombinedBpmScreen())
+
+    water_mode = loop.add_mode("water")
+    water_mode.add_renderer(WaterCube())
+
     mode = loop.add_mode("friend beacon")
 
     # TODO: Refactor

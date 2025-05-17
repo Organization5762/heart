@@ -43,6 +43,10 @@ class Configuration:
     def is_debug_mode(cls) -> bool:
         return bool(os.environ.get("DEBUG_MODE", False))
 
+    @classmethod
+    def is_x11_forward(cls) -> bool:
+        return bool(os.environ.get("X11_FORWARD", False))
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
