@@ -11,16 +11,19 @@ from pygame import OPENGL, DOUBLEBUF
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
-from heart.device import Rectangle, Cube
+from heart.device import Rectangle, Cube, Orientation
+from heart.device.local import LocalScreen
 from heart.display.renderers import BaseRenderer
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
-from heart.peripheral.manager import PeripheralManager
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class FractalScene(BaseRenderer):
-    def __init__(self):
+    def __init__(self, device):
         super().__init__()
+        self.device = device
+
         # Set to OPENGL to have your framework detect it properly
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self._initialized = False
@@ -108,14 +111,28 @@ class FractalScene(BaseRenderer):
         glEnableVertexAttribArray(0)
 
     # Modify initialize to support both modes
-    def initialize(self, clock, window_size, tiled_mode=False):
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+   ):
         """Initialize the fractal renderer with the given window size"""
         print(f"OpenGL Version: {glGetString(GL_VERSION).decode('utf-8')}")
         print(f"OpenGL Vendor: {glGetString(GL_VENDOR).decode('utf-8')}")
         print(f"OpenGL Renderer: {glGetString(GL_RENDERER).decode('utf-8')}")
         print(f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}")
 
-        self._initialized = True
+        window_size = (
+            self.device.scaled_screen.get_size()
+            if isinstance(self.device, LocalScreen)
+            else self.device.full_display_size()
+        )
+        # window_size = window.get_size()
+        tiled_mode = isinstance(orientation, Cube)
+
+        self.initialized = True
         self.tiled_mode = tiled_mode
         self.clock = clock
         self.mode = "auto"
@@ -410,13 +427,6 @@ class FractalScene(BaseRenderer):
             pass
 
     def process(self, window, clock, peripheral_manager, orientation):
-        if not self._initialized:
-            self.initialize(
-                clock, window.get_size(), tiled_mode=(
-                    isinstance(orientation, Cube)
-                )
-            )
-
         now = time.time()
         self.delta_real_time = now - self.last_frame_time or 0.0
         self.last_frame_time = now

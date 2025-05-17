@@ -149,13 +149,12 @@ class GameLoop:
                 self._last_render_mode = pygame.SHOWN
                 screen = pygame.Surface(self.device.full_display_size(), pygame.SRCALPHA)
 
-            kwargs = {
-                "window": screen,
-                "clock": self.clock,
-                "peripheral_manager": self.peripheral_manager,
-                "orientation": self.device.orientation,
-            }
-            renderer._internal_process(**kwargs)
+            renderer._internal_process(
+                window=screen,
+                clock=self.clock,
+                peripheral_manager=self.peripheral_manager,
+                orientation=self.device.orientation,
+            )
 
             return screen
         except Exception as e:

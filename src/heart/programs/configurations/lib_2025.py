@@ -35,7 +35,7 @@ def configure(loop: GameLoop) -> None:
     modelbrot.add_renderer(MandelbrotMode())
 
     sphere_mode = loop.add_mode("3d fractal")
-    sphere_mode.add_renderer(FractalScene())
+    sphere_mode.add_renderer(FractalScene(loop.device))
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
