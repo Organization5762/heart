@@ -16,27 +16,14 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.device import Device
+import importlib
 
 logger = get_logger(__name__)
 
 app = typer.Typer()
 
-
-@app.command()
-def run(
-    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
-    add_low_power_mode: bool = typer.Option(
-        True, "--add-low-power-mode", help="Add a low power mode"
-    ),
-    x11_forward: bool = typer.Option(
-        False, "--x11-forward", help="Use X11 forwarding for RGB display"
-    ),
-) -> None:
-    registry = ConfigurationRegistry()
-    configuration_fn = registry.get(configuration)
-    if configuration_fn is None:
-        raise Exception(f"Configuration '{configuration}' not found in registry")
-
+def _get_device(x11_forward: bool) -> Device:
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
@@ -56,9 +43,25 @@ def run(
             device = LEDMatrix(orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
+    return device
+
+@app.command()
+def run(
+    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
+    add_low_power_mode: bool = typer.Option(
+        True, "--add-low-power-mode", help="Add a low power mode"
+    ),
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
+) -> None:
+    registry = ConfigurationRegistry()
+    configuration_fn = registry.get(configuration)
+    if configuration_fn is None:
+        raise Exception(f"Configuration '{configuration}' not found in registry")
 
     manager = PeripheralManager()
-    loop = GameLoop(device=device, peripheral_manager=manager)
+    loop = GameLoop(device=_get_device(x11_forward), peripheral_manager=manager)
     configuration_fn(loop)
 
     ## ============================= ##
@@ -67,6 +70,26 @@ def run(
     # Retain an empty loop for "lower power" mode
     if add_low_power_mode:
         loop.app_controller.add_sleep_mode()
+    loop.start()
+
+@app.command(
+    name="test-renderer",
+)
+def test_renderer(
+    renderer_name: Annotated[str, typer.Option("--renderer", help="Renderer class name")] = "heart.display.renderers.tixyland:Tixyland",
+    add_low_power_mode: bool = typer.Option(
+        True, "--add-low-power-mode", help="Add a low power mode"
+    ),
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
+) -> None:
+    module_name, class_name = renderer_name.split(":")
+    module = importlib.import_module(module_name)
+    renderer_class = getattr(module, class_name)
+    renderer = renderer_class()
+    loop = GameLoop(device=_get_device(x11_forward), peripheral_manager=PeripheralManager())
+    loop.app_controller.add_mode(renderer)
     loop.start()
 
 
