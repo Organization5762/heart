@@ -2,11 +2,12 @@ import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
+import importlib
 from typing import Annotated
 
 import typer
 
-from heart.device import Cube
+from heart.device import Cube, Device
 from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
@@ -16,12 +17,11 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.device import Device
-import importlib
 
 logger = get_logger(__name__)
 
 app = typer.Typer()
+
 
 def _get_device(x11_forward: bool) -> Device:
     # TODO: Add a way of adding orientation either from Config or `run`
@@ -44,6 +44,7 @@ def _get_device(x11_forward: bool) -> Device:
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
     return device
+
 
 @app.command()
 def run(
@@ -72,11 +73,14 @@ def run(
         loop.app_controller.add_sleep_mode()
     loop.start()
 
+
 @app.command(
     name="test-renderer",
 )
 def test_renderer(
-    renderer_name: Annotated[str, typer.Option("--renderer", help="Renderer class name")] = "heart.display.renderers.tixyland:Tixyland",
+    renderer_name: Annotated[
+        str, typer.Option("--renderer", help="Renderer class name")
+    ] = "heart.display.renderers.tixyland:Tixyland",
     add_low_power_mode: bool = typer.Option(
         True, "--add-low-power-mode", help="Add a low power mode"
     ),
@@ -88,7 +92,9 @@ def test_renderer(
     module = importlib.import_module(module_name)
     renderer_class = getattr(module, class_name)
     renderer = renderer_class()
-    loop = GameLoop(device=_get_device(x11_forward), peripheral_manager=PeripheralManager())
+    loop = GameLoop(
+        device=_get_device(x11_forward), peripheral_manager=PeripheralManager()
+    )
     loop.app_controller.add_mode(renderer)
     loop.start()
 
