@@ -2,7 +2,7 @@
 
 # Configuration
 SOURCE_DIR="/Users/sebastien/source/heart"
-REMOTE_HOST="michael@totem.local"
+REMOTE_HOST="michael@totem3.local"
 REMOTE_DIR="~/Desktop/"
 REMOTE_PASS="totemlib2024"
 IGNORE_LIST="__pycache__ *.pyc .DS_Store"

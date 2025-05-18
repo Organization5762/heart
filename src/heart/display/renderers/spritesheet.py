@@ -26,12 +26,15 @@ class SpritesheetLoop(BaseRenderer):
         offset_x: int = 0,
         offset_y: int = 0,
         disable_input: bool = False,
+        boomerang: bool = False,
     ) -> None:
         super().__init__()
         self.disable_input = disable_input
         self.current_frame = 0
         self.loop_count = 0
         self.file = sheet_file_path
+        self.boomerang = boomerang
+        self.reverse_direction = False
         frame_data = Loader.load_json(metadata_file_path)
 
         self.start_frames = []
@@ -112,9 +115,35 @@ class SpritesheetLoop(BaseRenderer):
             if self._should_calibrate:
                 self._calibrate(peripheral_manager)
             else:
-                self.current_frame += 1
+                if self.boomerang and self.phase == LoopPhase.LOOP:
+                    if self.reverse_direction:
+                        self.current_frame -= 1
+                    else:
+                        self.current_frame += 1
+                else:
+                    self.current_frame += 1
+                
                 self.time_since_last_update = 0
-                if self.current_frame >= len(self.frames[self.phase]):
+                
+                if self.boomerang and self.phase == LoopPhase.LOOP:
+                    if self.current_frame >= len(self.frames[self.phase]) - 1:
+                        self.reverse_direction = True
+                        self.current_frame = len(self.frames[self.phase]) - 1
+                    elif self.current_frame <= 0:
+                        self.reverse_direction = False
+                        self.current_frame = 0
+                        self.loop_count += 1
+                        if self.loop_count >= 4:
+                            self.loop_count = 0
+                            if len(self.frames[LoopPhase.END]) > 0:
+                                self.phase = LoopPhase.END
+                                self.current_frame = 0
+                                self.reverse_direction = False
+                            elif len(self.frames[LoopPhase.START]) > 0:
+                                self.phase = LoopPhase.START
+                                self.current_frame = 0
+                                self.reverse_direction = False
+                elif self.current_frame >= len(self.frames[self.phase]):
                     self.current_frame = 0
                     match self.phase:
                         case LoopPhase.START:

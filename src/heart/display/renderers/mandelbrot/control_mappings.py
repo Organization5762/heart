@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import pygame
 
-from heart.configuration import Configuration
+from heart.utilities.env import Configuration
 from heart.device import Cube, Rectangle
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.peripheral.gamepad import Gamepad
