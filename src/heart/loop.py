@@ -42,8 +42,6 @@ def run(
                 f"Everything is only supported on Pi 4 and below. Detected: {pi}"
             )
 
-        import os
-        os.environ["SDL_VIDEO_X11_FORCE_EGL"] = "1"
         if Configuration.is_x11_forward():
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
