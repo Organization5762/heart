@@ -8,10 +8,12 @@ from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.peripheral_mappings import (
     BitDoLite2,
+    BitDoLite2Bluetooth,
     DpadType,
     SwitchLikeMapping,
     SwitchProMapping,
 )
+from heart.utilities.env import Configuration
 
 
 class SceneControlsMapping(ABC):
@@ -245,7 +247,7 @@ class SwitchLikeControls(SceneControlsMapping, ABC):
 
 
 class BitDoLite2Controls(SwitchLikeControls):
-    mapping = BitDoLite2()
+    mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
     dead_zone = 0.1
 
 

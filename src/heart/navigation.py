@@ -125,7 +125,7 @@ class GameModes(BaseRenderer):
         self, peripheral_manager: PeripheralManager
     ) -> None:
         # Only run this if not on the Pi
-        if Configuration.is_pi():
+        if Configuration.is_pi() and not Configuration.is_x11_forward():
             return
 
         keys = pygame.key.get_pressed()
@@ -191,19 +191,19 @@ class GameModes(BaseRenderer):
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
-        if self.previous_mode_index != mode_index:
-            self.sliding_transition = SlideTransitionRenderer(
-                renderer_A=self.title_renderers[self.previous_mode_index],
-                renderer_B=self.title_renderers[mode_index],
-            )
-            self.previous_mode_index = mode_index
-            return self.sliding_transition
+        # if self.previous_mode_index != mode_index:
+        #     self.sliding_transition = SlideTransitionRenderer(
+        #         renderer_A=self.title_renderers[self.previous_mode_index],
+        #         renderer_B=self.title_renderers[mode_index],
+        #     )
+        #     self.previous_mode_index = mode_index
+        #     return self.sliding_transition
 
-        if self.sliding_transition is not None:
-            if self.sliding_transition.is_done():
-                self.sliding_transition = None
-            else:
-                return self.sliding_transition
+        # if self.sliding_transition is not None:
+        #     if self.sliding_transition.is_done():
+        #         self.sliding_transition = None
+        #     else:
+        #         return self.sliding_transition
 
         if self.in_select_mode:
             return self.title_renderers[mode_index]

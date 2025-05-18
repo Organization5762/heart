@@ -12,13 +12,16 @@ from heart.peripheral.heart_rates import (
     current_bpms,
 )
 
+# Number of top BPMs to display (1-4)
+MAX_DISPLAYED_BPMS = 1
+
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
     "clem": "0EA8E",  # Green
     "faye": "0ED2A",  # YELLOW
     "will": "09F90",  # BLACK
     "seb": "0EA01",  # RED
-    # "michael": "0EA19",  # BLUE
+    "lampe": "0EA19",  # BLUE
     "cal": "0EB14",  # PURPLE
 }
 
@@ -78,34 +81,30 @@ class MaxBpmScreen(BaseRenderer):
                     (addr, bpm) for addr, bpm in current_bpms.items() if bpm > 0
                 ]
 
+                top_bpms = [None, None, None, None]
                 if active_bpms:
                     # Sort by BPM in descending order
                     sorted_bpms = sorted(active_bpms, key=lambda x: x[1], reverse=True)
 
-                    # Get the top 4 BPMs (or fewer if less than 4 are available)
-                    top_bpms = sorted_bpms[:4]
-
                     # Map device IDs to avatar names
-                    for i, (addr, bpm) in enumerate(top_bpms):
-                        avatar_name = "seb"  # Default
+
+                    for i in range(4):
+                        bpm = sorted_bpms[i % MAX_DISPLAYED_BPMS]
+                        avatar_name = "faye"  # Default
                         for name, device_id in AVATAR_MAPPINGS.items():
-                            if addr == device_id:
+                            if bpm[0] == device_id:
                                 avatar_name = name
                                 break
-                        top_bpms[i] = (addr, bpm, avatar_name)
+                        top_bpms[i] = (bpm[0], bpm[1], avatar_name)
             except ValueError:
                 # Handle cases where current_bpms might be temporarily empty or contain non-numeric data
                 pass
 
-        # Fill with defaults if we have fewer than 4 active monitors
-        while len(top_bpms) < 4:
-            top_bpms.append(("", 0, "seb"))
-
         # --- Rendering ---
-        # Render each of the top 4 BPMs on a different screen section
+        # Render each of the top X BPMs on a different screen section
         screen_positions = [(0, 0), (64, 0), (128, 0), (192, 0)]
 
-        for i, (addr, bpm, avatar_name) in enumerate(top_bpms[:4]):
+        for i, (addr, bpm, avatar_name) in enumerate(top_bpms):
             x, y = screen_positions[i]
 
             # Get the avatar image

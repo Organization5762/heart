@@ -67,6 +67,7 @@ class WaterCube(BaseRenderer):
     """Height-field water simulation projected to four LED faces."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         # physics state (float32 for speed on Pi)
@@ -140,7 +141,7 @@ class WaterCube(BaseRenderer):
         # --- get gravity ---------------------------------------------------
         accel = peripheral_manager.get_accelerometer().get_acceleration()
         gx = accel.x if accel else 0.0
-        gy = accel.y if accel else 0.0
+        gy = -accel.y if accel else 0.0
         gz = accel.z if accel else 1.0  # default "down"
 
         gvec = _norm((gx, gy, gz))
@@ -161,7 +162,6 @@ class WaterCube(BaseRenderer):
 
         # Calculate and print frame processing time
         frame_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-        print(f"Water cube frame time: {frame_time:.2f} ms")
 
         # maintain original display rate
         clock.tick_busy_loop(60)

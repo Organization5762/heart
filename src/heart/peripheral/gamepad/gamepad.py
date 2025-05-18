@@ -114,6 +114,14 @@ class Gamepad(Peripheral):
             logger.warning("joystick not initialized")
             return
 
+        # Refresh Pygame's internal event queue so that joystick state is up-to-date
+        # Without this, axes may appear stuck at their previous values (often -1),
+        # and button states may not change, leading to the behaviour where the
+        # stick seems permanently pushed to the top-left and only some buttons
+        # register. Calling pygame.event.pump() ensures Pygame processes any
+        # pending input events before we query the current state.
+        pygame.event.pump()
+
         now = pygame.time.get_ticks()
         self._pressed_prev_frame = self._pressed_curr_frame.copy()
         self._axis_prev_frame = self._axis_curr_frame.copy()

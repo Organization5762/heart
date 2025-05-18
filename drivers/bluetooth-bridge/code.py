@@ -5,7 +5,6 @@ import random
 
 from adafruit_ble import BLERadio
 from adafruit_ble.services.nordic import UARTService
-from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 import json
 from collections import deque

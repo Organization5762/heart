@@ -28,11 +28,13 @@ def _get_device(x11_forward: bool) -> Device:
     orientation = Cube.sides()
     if Configuration.is_pi():
         if (pi := Configuration.pi()).version > 4:
-            raise ValueError(
-                f"Everything is only supported on Pi 4 and below. Detected: {pi}"
+            print(
+                f"""!!!!!!!!!!!!!!!!!!!!
+                Everything is only supported on Pi 4 and below. Detected: {pi}
+!!!!!!!!!!!!!!!!!!!!!"""
             )
 
-        if x11_forward:
+        if Configuration.is_x11_forward():
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
             logger.warning("RGB display not found, using local screen")
