@@ -122,9 +122,9 @@ class SpritesheetLoop(BaseRenderer):
                         self.current_frame += 1
                 else:
                     self.current_frame += 1
-                
+
                 self.time_since_last_update = 0
-                
+
                 if self.boomerang and self.phase == LoopPhase.LOOP:
                     if self.current_frame >= len(self.frames[self.phase]) - 1:
                         self.reverse_direction = True

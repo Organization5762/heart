@@ -3,17 +3,17 @@ from collections import defaultdict
 
 import pygame
 
-from heart.utilities.env import Configuration
 from heart.device import Cube, Rectangle
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.peripheral_mappings import (
-    BitDoLite2Bluetooth,
     BitDoLite2,
+    BitDoLite2Bluetooth,
     DpadType,
     SwitchLikeMapping,
     SwitchProMapping,
 )
+from heart.utilities.env import Configuration
 
 
 class SceneControlsMapping(ABC):

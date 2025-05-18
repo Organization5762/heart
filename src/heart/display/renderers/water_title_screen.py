@@ -1,5 +1,6 @@
-import time
 import math
+import time
+
 import numpy as np
 import pygame
 from pygame import Surface
