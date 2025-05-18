@@ -4,3 +4,4 @@ SWITCH_ROTATION = "switch.rotation"
 
 ACCELERATION = "sensor.acceleration"
 GYROSCOPE = "sensor.gyroscope"
+MAGNETIC = "sensor.magnetic"

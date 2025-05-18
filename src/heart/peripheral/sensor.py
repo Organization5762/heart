@@ -77,7 +77,11 @@ class Accelerometer(Peripheral):
             # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
             return
 
-        data = json.loads(bus_data)
+        try:
+            data = json.loads(bus_data)
+        except json.JSONDecodeError:
+            print(f"Failed to decode JSON: {bus_data}")
+            return
         self._update_due_to_data(data)
 
     def get_acceleration(self) -> Acceleration | None:

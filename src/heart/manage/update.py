@@ -48,6 +48,8 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
 
     for lib in libs:
         copy_file(os.path.join(lib_path, lib), os.path.join(destination, lib))
+        # There are also .mpy files..
+        copy_file(os.path.join(lib_path, f"{lib}.mpy"), os.path.join(destination, f"{lib}.mpy"))
 
 
 def download_file(url: str, checksum: str) -> str:
@@ -88,7 +90,6 @@ def copy_file(source: str, destination: str) -> None:
         print(f"After copying: {source} to {destination}")
     except subprocess.CalledProcessError:
         print(f"Error: Failed to copy {source} to {destination}")
-        sys.exit(1)
 
 
 def main(device_driver_name: str) -> None:
