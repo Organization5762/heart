@@ -45,7 +45,7 @@ class spritesheet(object):
             raise ValueError(f"'{filename}' is not a file.")
 
         with open(filename, "rb") as f:
-            self.sheet = pygame.image.load(f).convert()
+            self.sheet = pygame.image.load(f).convert_alpha()
 
     def image_at(self, rectangle):
         rect = pygame.Rect(rectangle)
