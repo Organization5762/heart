@@ -83,9 +83,7 @@ class MarioRenderer(BaseRenderer):
             self.time_since_last_update += clock.get_time()
         else:
             try:
-                self.accel = (
-                    peripheral_manager.get_accelerometer().get_acceleration()
-                )
+                self.accel = peripheral_manager.get_accelerometer().get_acceleration()
             except Exception as e:
                 time.sleep(0.1)
                 self.accel = None

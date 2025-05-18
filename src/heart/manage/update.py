@@ -49,7 +49,10 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
     for lib in libs:
         copy_file(os.path.join(lib_path, lib), os.path.join(destination, lib))
         # There are also .mpy files..
-        copy_file(os.path.join(lib_path, f"{lib}.mpy"), os.path.join(destination, f"{lib}.mpy"))
+        copy_file(
+            os.path.join(lib_path, f"{lib}.mpy"),
+            os.path.join(destination, f"{lib}.mpy"),
+        )
 
 
 def download_file(url: str, checksum: str) -> str:
