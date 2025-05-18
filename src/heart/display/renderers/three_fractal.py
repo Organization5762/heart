@@ -1,6 +1,4 @@
-import cProfile
 import math
-import os
 import time
 from collections import defaultdict
 
@@ -12,11 +10,12 @@ from pygame.math import lerp
 
 from heart import DeviceDisplayMode
 from heart.device import Rectangle, Cube, Orientation
-from heart.device.local import LocalScreen
 from heart.display.renderers import BaseRenderer
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
+from heart.utilities.env import Configuration
 
 
 class FractalScene(BaseRenderer):
@@ -78,6 +77,11 @@ class FractalScene(BaseRenderer):
         self.render_size = None
         self.real_window_size = None
 
+        # For rendering to the provided surface
+        self.target_surface = None
+        self.framebuffer_texture = None
+        self.surface_array = None
+
     def _init_uniforms(self):
         set_global_float(self.sphere_radius_var)
 
@@ -110,39 +114,37 @@ class FractalScene(BaseRenderer):
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, fullscreen_quad)
         glEnableVertexAttribArray(0)
 
-    # Modify initialize to support both modes
+        # Create a texture to copy OpenGL rendering to for Pygame
+        self.framebuffer_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.framebuffer_texture)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     self.window_size[0], self.window_size[1],
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+
+    # Modified initialize to use the provided window
     def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-   ):
+    ):
         """Initialize the fractal renderer with the given window size"""
         print(f"OpenGL Version: {glGetString(GL_VERSION).decode('utf-8')}")
         print(f"OpenGL Vendor: {glGetString(GL_VENDOR).decode('utf-8')}")
         print(f"OpenGL Renderer: {glGetString(GL_RENDERER).decode('utf-8')}")
         print(f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}")
 
-        if not self.device:
-            window_size = (
-                1280, 720
-            )
-        else:
-            window_size = (
-                self.device.scaled_screen.get_size()
-                if isinstance(self.device, LocalScreen)
-                else self.device.full_display_size()
-            )
-        # window_size = window.get_size()
+        self.target_surface = window
+        window_size = window.get_size()
         tiled_mode = isinstance(orientation, Cube)
 
         self.initialized = True
         self.tiled_mode = tiled_mode
         self.clock = clock
         self.mode = "auto"
-
-        # window_size = window.get_size()
 
         if self.tiled_mode:
             self.render_size = (window_size[1], window_size[1])
@@ -155,6 +157,8 @@ class FractalScene(BaseRenderer):
             # For normal mode, use the actual window size
             self.window_size = window_size
 
+        # Create buffer for capturing pixels
+        self.surface_array = np.zeros((window_size[1], window_size[0], 4), dtype=np.uint8)
         self.screen_center = (window_size[0] / 2, window_size[1] / 2)
         pygame.mouse.set_visible(False)
         self._center_mouse()
@@ -193,8 +197,6 @@ class FractalScene(BaseRenderer):
         for key, val in self.shader.pending_uniforms.items():
             if key in _UNIFORMS:
                 val = _UNIFORMS[key]
-                # if type(val) is float and type(cur_val) is not float:
-                #     val = to_vec3(val)
             _UNIFORMS[key] = val
             if key in self.shader.keys:
                 key_id = self.shader.keys[key]
@@ -222,6 +224,32 @@ class FractalScene(BaseRenderer):
 
         # Draw
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+
+    def render_to_surface(self):
+        """Copy the OpenGL rendering to the Pygame surface"""
+        # Read pixels from framebuffer
+
+        if self.tiled_mode:
+            # glReadPixels(0, 0, self.render_size[0], self.render_size[1],
+            glReadPixels(0, 0, self.real_window_size[0], self.real_window_size[1],
+                         GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
+        else:
+            glReadPixels(0, 0, self.window_size[0], self.window_size[1],
+                         GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
+
+        # Convert to format suitable for Pygame surface
+        # Note: OpenGL coordinates start from bottom-left, Pygame from top-left
+        # So we need to flip the image vertically
+        flipped_array = np.flipud(self.surface_array)
+        # flipped_array = self.surface_array
+
+        # Create a Pygame surface from the pixel data
+        surf = pygame.surfarray.make_surface(
+            np.transpose(flipped_array[:, :, :3], (1, 0, 2))
+        )
+
+        # Blit to the target surface
+        self.target_surface.blit(surf, (0, 0))
 
     def render_tiled(self):
         """Render the texture tiled across the screen"""
@@ -268,6 +296,10 @@ class FractalScene(BaseRenderer):
             glVertex2f(x, tile_height)
             self._apply_pending_uniforms()
             glEnd()
+
+        # Read pixels for rendering to Pygame surface
+        glReadPixels(0, 0, self.real_window_size[0], self.real_window_size[1],
+                     GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
 
         # Clean up
         glDisable(GL_TEXTURE_2D)
@@ -317,6 +349,7 @@ class FractalScene(BaseRenderer):
             self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
     def _process_auto(self):
+        print("processing auto")
         # move forward
         self.virtual_time += self.delta_real_time * self.PULSE_FREQUENCY
 
@@ -331,23 +364,129 @@ class FractalScene(BaseRenderer):
         rz = self.make_rot(0.01, 2)
         self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
-        # pulse spheres
-        # pulse = math.sin(2 * math.pi * self.virtual_time)
-        # self.active_radius = self.BASE_RADIUS + self.AMPLITUDE * pulse
-
     def _check_enter_auto(self):
-        keys  = pygame.key.get_pressed()
+        keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFTBRACKET]:
             self.reset()
             self.mode = "auto"
 
-    def _check_break_auto(self):
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_RIGHTBRACKET]:
-            self.mode = "free"
+    def _check_break_auto(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        if gamepad.is_connected():
+            if gamepad.was_tapped(mapping.BUTTON_Y):
+                self.mode = "free"
+        # keys = pygame.key.get_pressed()
+        # if keys[pygame.K_RIGHTBRACKET]:
+        #     self.mode = "free"
 
     def _process_input(self, peripheral_manager):
-        self._process_keyboard_input(peripheral_manager)
+        # self._process_keyboard_input(peripheral_manager)
+        self._process_gamepad_input(peripheral_manager)
+
+    def _process_gamepad_input(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        acc = np.zeros((3,), dtype=np.float32)
+
+        if gamepad.is_connected():
+            # === process input (L stick) ===
+            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X)
+            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y)
+
+            if abs(xl_mov) > 0.1:
+                acc[0] += xl_mov * self.speed_accel / self.max_fps
+
+            if abs(yl_mov) > 0.1:
+                acc[2] += yl_mov * self.speed_accel / self.max_fps
+
+            # === process input (dpad) ===
+            xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+
+            print(f"xd_mov: {xd_mov}, yd_mov: {yd_mov}")
+            if xd_mov != 0:
+                self.mode = "free"
+                acc[0] += (xd_mov * self.speed_accel / self.max_fps)
+            if yd_mov != 0:
+                self.mode = "free"
+                # dir flipped wrt dpad sign
+                acc[2] -= (yd_mov * self.speed_accel / self.max_fps)
+
+            # === apply movement based on input ===
+            if np.isclose(np.dot(acc, acc), 0.0):
+                self.vel *= self.speed_decel
+            else:
+                # Calculate desired direction
+                direction = np.dot(self.mat[:3, :3].T, acc)
+                direction_norm = np.linalg.norm(direction)
+
+                if direction_norm > 0:
+                    # Normalize direction and scale by max_velocity
+                    normalized_direction = direction / direction_norm
+                    target_velocity = normalized_direction * self.max_velocity
+
+                    # Smoothly interpolate current velocity toward target
+                    lerp_factor = 0.1  # Adjust for faster/slower response
+                    self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
+
+            # === process movement (R stick) ===
+            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X)
+            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y)
+
+            if abs(xr_mov) > 0.1 or abs(yr_mov) > 0.1:
+                self.mode = "free"
+
+            fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
+            stick_scale_factor = 8
+
+            dx = xr_mov * stick_scale_factor * fps_scale_factor
+            dy = yr_mov * stick_scale_factor * fps_scale_factor
+
+            rx = self.make_rot(dx * self.look_speed, 1)
+            ry = self.make_rot(dy * self.look_speed, 0)
+
+            self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
+            self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
+
+            # === process button inputs ===
+            # invert the radius
+            if gamepad.axis_tapped(mapping.AXIS_R):
+                self.BASE_RADIUS = (
+                    self._LO_BASE if self.BASE_RADIUS == self._HI_BASE
+                    else self._HI_BASE
+                )
+
+            # pulse the radius
+            if gamepad.axis_passed_threshold(mapping.AXIS_L):
+                target = self.BASE_RADIUS + 0.2
+                self.active_radius = lerp(
+                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                )
+            else:
+                target = self.BASE_RADIUS
+                self.active_radius = lerp(
+                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                )
+
+            if not self.tiled_mode:
+                # eagerly apply the uniforms
+                self.shader.set('s_radius', self.active_radius)
+
+            # rotations
+            if gamepad.is_held(mapping.BUTTON_ZL):
+                rz = self.make_rot(0.01, 2)
+                self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+            if gamepad.is_held(mapping.BUTTON_ZR):
+                rz = self.make_rot(-0.01, 2)
+                self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+
+            # speed
+            if gamepad.is_held(mapping.BUTTON_PLUS):
+                self.max_velocity += 0.03
+            if gamepad.is_held(mapping.BUTTON_MINUS):
+                self.max_velocity = max(self.max_velocity - 0.03, 0)
+
+        gamepad.update()
 
     def _process_keyboard_input(self, peripheral_manager):
         keys = pygame.key.get_pressed()
@@ -380,12 +519,6 @@ class FractalScene(BaseRenderer):
                 # Smoothly interpolate current velocity toward target
                 lerp_factor = 0.1  # Adjust for faster/slower response
                 self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
-
-        # else:
-        #     self.vel += np.dot(self.mat[:3, :3].T, acc)
-        #     vel_ratio = min(self.max_velocity, 1e20) / (np.linalg.norm(self.vel) + 1e-12)
-        #     if vel_ratio < 1.0:
-        #         self.vel *= vel_ratio
 
         # invert the radius
         if keys[pygame.K_r] and not self.key_pressed_last_frame[pygame.K_r]:
@@ -438,17 +571,20 @@ class FractalScene(BaseRenderer):
             pass
 
     def process(self, window, clock, peripheral_manager, orientation):
+        # Update the target surface if it changed
+        if window is not self.target_surface:
+            self.target_surface = window
+
         now = time.time()
         self.delta_real_time = now - (self.last_frame_time or 0.0)
         self.last_frame_time = now
 
         if self.mode == "auto":
             self._process_auto()
-            self._check_break_auto()
+            self._check_break_auto(peripheral_manager)
         else:
             self._process_input(peripheral_manager)
             self._check_enter_auto()
-
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
 
@@ -484,6 +620,9 @@ class FractalScene(BaseRenderer):
 
             # Render the tiled view
             self.render_tiled()
+
+            # Transfer to Pygame surface
+            self.render_to_surface()
         else:
             # === NORMAL MODE ===
             # Clear the screen
@@ -491,6 +630,9 @@ class FractalScene(BaseRenderer):
 
             # Render the fractal directly
             self.render_fractal()
+
+            # Transfer to Pygame surface
+            self.render_to_surface()
 
         # print fps every second
         if time.time() - self.last_fps_print > 1:
@@ -520,7 +662,6 @@ class FractalScene(BaseRenderer):
         dsphere = (np.linalg.norm(p[:3] - c) - r) / p[3]
         return min(d, dsphere) * 10.0 < 0
 
-
     def reset(self):
         self.initialized = False
         self.mode = "auto"
@@ -529,16 +670,12 @@ class FractalScene(BaseRenderer):
 def main():
     import pygame
 
-    profiling = os.environ.get("PROFILING", "False").lower() == "true"
-    check_frames = int(os.environ.get("CHECK_FRAMES", "100"))
-
     # Initialize pygame
     pygame.init()
 
     # Set up the display
     WIDTH, HEIGHT = 1280, 720
     screen = pygame.display.set_mode((WIDTH, HEIGHT), OPENGL | DOUBLEBUF)
-    # window = pygame.display.set_mode(win_size, OPENGL | DOUBLEBUF)
     pygame.display.set_caption("Mandelbrot Explorer")
 
     scene = FractalScene(None)
@@ -546,12 +683,6 @@ def main():
     # Main game loop
     running = True
     clock = pygame.time.Clock()
-    if profiling:
-        profiler = cProfile.Profile()
-        profile_filename = "mandelbrot_profile.prof"
-        profiler.enable()
-
-    frame_count = 0
 
     manager = PeripheralManager()
     manager.detect()
@@ -563,63 +694,20 @@ def main():
                 if event.type == pygame.QUIT:
                     running = False
 
-            # Fill the screen with black
-            # screen.fill((0, 0, 0))
-
             # Process and render
             scene._internal_process(
-                screen, clock, manager, Rectangle.with_layout(
-                1, 1,
-                )
+                screen, clock, manager, Rectangle.with_layout(1, 1)
             )
 
             # Update the display
             pygame.display.flip()
-            frame_count += 1
-
-            if profiling and (frame_count >= check_frames):
-                profiler.disable()
-                profiler.dump_stats(profile_filename)
-                break
 
             clock.tick(60)
     except Exception as e:
         print("exception", e)
-    # finally:
-    #     if profiling:
-    #         # === Profiling Teardown and Analysis ===
-    #         profiler.disable()  # Stop profiling
-    #         print(f"Profiling finished after {frame_count} frames.")
-    #
-    #         # --- Option 1: Print stats to console ---
-    #         s = io.StringIO()
-    #         # Sort by cumulative time spent in function and its callees
-    #         ps = pstats.Stats(profiler, stream=s).sort_stats("cumulative")
-    #         ps.print_stats(30)  # Print top 30 lines
-    #         print("\n--- Profiling Stats (Sorted by Cumulative Time) ---")
-    #         print(s.getvalue())
-    #
-    #         # You might also want to sort by 'tottime' (total time spent ONLY in the function itself)
-    #         s = io.StringIO()
-    #         ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
-    #         ps.print_stats(30)  # Print top 30 lines
-    #         print("\n--- Profiling Stats (Sorted by Total Time) ---")
-    #         print(s.getvalue())
-    #
-    #         # --- Option 2: Save stats to a file for later analysis ---
-    #         profiler.dump_stats(profile_filename)
-    #         print(f"\nProfiling data saved to {profile_filename}")
-    #         print(
-    #             "You can analyze this file later, e.g., using 'snakeviz {profile_filename}'"
-    #         )
 
+    raise Exception("stopping")
     print("quitting")
-    raise Exception("quitting")
-
-    # why tf does it exit so slow if trying to actually quit gracefully lol
-    # pygame.display.quit()
-    # pygame.quit()
-    # sys.exit()
 
 
 if __name__ == "__main__":

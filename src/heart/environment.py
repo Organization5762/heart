@@ -243,12 +243,11 @@ class GameLoop:
         result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
             renderers
         )
-        if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
-            image = self.__finalize_rendering(result) if result else None
-            if image is not None:
-                bytes = image.tobytes()
-                surface = pygame.image.frombytes(bytes, image.size, image.mode)
-                self.screen.blit(surface, (0, 0))
+        image = self.__finalize_rendering(result) if result else None
+        if image is not None:
+            bytes = image.tobytes()
+            surface = pygame.image.frombytes(bytes, image.size, image.mode)
+            self.screen.blit(surface, (0, 0))
 
         if len(renderers) > 0:
             pygame.display.flip()
