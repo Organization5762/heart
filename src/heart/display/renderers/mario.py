@@ -82,16 +82,14 @@ class MarioRenderer(BaseRenderer):
                 self.time_since_last_update = 0
             self.time_since_last_update += clock.get_time()
         else:
-            # HACK - Just added a try catch because it was crashing the whole app
-            # TODO: Sync this to the on-device accelerometer
             try:
                 self.accel = (
-                    peripheral_manager.get_phyphox_peripheral().get_acceleration()
+                    peripheral_manager.get_accelerometer().get_acceleration()
                 )
             except Exception as e:
                 time.sleep(0.1)
                 self.accel = None
-            if self.accel is not None and self.accel.z > 2.0:
+            if self.accel is not None and (self.accel.z - 9.8) > 2.0:
                 self.in_loop = True
 
         screen_width, screen_height = window.get_size()
