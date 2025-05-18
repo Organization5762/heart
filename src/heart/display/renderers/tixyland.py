@@ -26,12 +26,11 @@ class Tixyland(BaseRenderer):
 
         numpy_output = self.fn(time_value, I, Y, X)
         numpy_output = np.clip(numpy_output, -1, 1)
-        numpy_output = numpy_output * 255
         numpy_output = numpy_output.astype(np.float16)
         mag = np.abs(numpy_output)
 
-        red   = mag[..., None] * np.array([1, 0, 0])
-        white = mag[..., None] * np.array([1, 1, 1])
+        red   = mag[..., None] * np.array([1, 0, 0]) * 255
+        white = mag[..., None] * np.array([1, 1, 1]) * 200
 
         rgb = np.where(numpy_output[..., None] < 0, red, white)
         
