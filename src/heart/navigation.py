@@ -126,7 +126,7 @@ class GameModes(BaseRenderer):
         self, peripheral_manager: PeripheralManager
     ) -> None:
         # Only run this if not on the Pi
-        if Configuration.is_pi() and False:
+        if Configuration.is_pi() and not Configuration.is_x11_forward():
             return
 
         keys = pygame.key.get_pressed()

@@ -161,7 +161,6 @@ class WaterCube(BaseRenderer):
 
         # Calculate and print frame processing time
         frame_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-        print(f"Water cube frame time: {frame_time:.2f} ms")
 
         # maintain original display rate
         clock.tick_busy_loop(60)
