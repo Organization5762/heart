@@ -18,10 +18,10 @@ MAX_DISPLAYED_BPMS = 1
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
     "clem": "0EA8E",  # Green
-    "lampe": "0ED2A",  # YELLOW
+    "faye": "0ED2A",  # YELLOW
     "will": "09F90",  # BLACK
     "seb": "0EA01",  # RED
-    # "lampe": "0EA19",  # BLUE
+    "lampe": "0EA19",  # BLUE
     "cal": "0EB14",  # PURPLE
 }
 

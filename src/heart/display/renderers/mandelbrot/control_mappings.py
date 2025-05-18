@@ -3,10 +3,12 @@ from collections import defaultdict
 
 import pygame
 
+from heart.utilities.env import Configuration
 from heart.device import Cube, Rectangle
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.peripheral_mappings import (
+    BitDoLite2Bluetooth,
     BitDoLite2,
     DpadType,
     SwitchLikeMapping,
@@ -245,7 +247,7 @@ class SwitchLikeControls(SceneControlsMapping, ABC):
 
 
 class BitDoLite2Controls(SwitchLikeControls):
-    mapping = BitDoLite2()
+    mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
     dead_zone = 0.1
 
 

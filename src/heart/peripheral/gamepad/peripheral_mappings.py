@@ -173,6 +173,84 @@ class BitDoLite2(SwitchLikeMapping):
     BUTTON_ZR = 5
 
 
+class BitDoLite2BluetoothPi4(SwitchLikeMapping):
+    DPAD_TYPE = DpadType.HAT
+    DPAD_HAT = 0
+
+    # face buttons
+    BUTTON_A = 0
+    BUTTON_B = 1
+    BUTTON_X = 3
+    BUTTON_Y = 4
+
+    # options buttons
+    BUTTON_PLUS = 11
+    BUTTON_MINUS = 10
+    BUTTON_HOME = 12
+
+    # button seems to not register on bitdo lite 2
+    BUTTON_CAPTURE = -1
+
+    # stick buttons
+    BUTTON_L3 = 13
+    BUTTON_R3 = 14
+
+    # left stick axis
+    AXIS_LEFT_X = 0
+    AXIS_LEFT_Y = 1
+
+    # right stick axis
+    AXIS_RIGHT_X = 2
+    AXIS_RIGHT_Y = 3
+
+    # trigger axis
+    AXIS_L = 5
+    AXIS_R = 4
+
+    # trigger buttons
+    BUTTON_ZL = 6
+    BUTTON_ZR = 7
+
+
+class BitDoLite2Bluetooth(SwitchLikeMapping):
+    DPAD_TYPE = DpadType.HAT
+    DPAD_HAT = 0
+
+    # face buttons
+    BUTTON_A = 0
+    BUTTON_B = 1
+    BUTTON_X = 3
+    BUTTON_Y = 4
+
+    # options buttons
+    BUTTON_PLUS = 11
+    BUTTON_MINUS = 10
+    BUTTON_HOME = 12
+
+    # button seems to not register on bitdo lite 2
+    BUTTON_CAPTURE = -1
+
+    # stick buttons
+    BUTTON_L3 = 13
+    BUTTON_R3 = 14
+
+    # left stick axis
+    AXIS_LEFT_X = 0
+    AXIS_LEFT_Y = 1
+
+    # right stick axis
+    AXIS_RIGHT_X = 2
+    AXIS_RIGHT_Y = 3
+
+    # trigger axis
+    AXIS_L = 5
+    AXIS_R = 4
+
+    # trigger buttons
+    BUTTON_ZL = 6
+    BUTTON_ZR = 7
+
+
 class SwitchProMapping(SwitchLikeMapping):
     DPAD_TYPE = DpadType.BUTTONS
 
