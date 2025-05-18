@@ -38,8 +38,10 @@ def run(
     orientation = Cube.sides()
     if Configuration.is_pi():
         if (pi := Configuration.pi()).version > 4:
-            raise ValueError(
-                f"Everything is only supported on Pi 4 and below. Detected: {pi}"
+            print(
+                f"""!!!!!!!!!!!!!!!!!!!!
+                Everything is only supported on Pi 4 and below. Detected: {pi}
+!!!!!!!!!!!!!!!!!!!!!"""
             )
 
         if Configuration.is_x11_forward():

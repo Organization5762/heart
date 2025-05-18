@@ -67,6 +67,7 @@ class WaterCube(BaseRenderer):
     """Height-field water simulation projected to four LED faces."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         # physics state (float32 for speed on Pi)
@@ -140,7 +141,7 @@ class WaterCube(BaseRenderer):
         # --- get gravity ---------------------------------------------------
         accel = peripheral_manager.get_accelerometer().get_acceleration()
         gx = accel.x if accel else 0.0
-        gy = accel.y if accel else 0.0
+        gy = -accel.y if accel else 0.0
         gz = accel.z if accel else 1.0  # default "down"
 
         gvec = _norm((gx, gy, gz))
