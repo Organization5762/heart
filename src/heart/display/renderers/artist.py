@@ -1,11 +1,11 @@
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.image import RenderImage
+from heart.display.renderers.sliding_image import SlidingImage
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
 from heart.navigation import MultiScene
-from heart.display.renderers.sliding_image import SlidingImage
 
 
 class ArtistScene(MultiScene):

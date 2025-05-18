@@ -15,6 +15,7 @@ class SlidingImage(BaseRenderer):
     Each frame the image is shifted `speed` pixels to the **left**; once the
     offset reaches the image width it wraps to 0, creating an endless loop
     around the cube sides.
+
     """
 
     def __init__(self, image_file: str, *, speed: int = 1) -> None:
