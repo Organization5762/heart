@@ -177,7 +177,7 @@ class MandelbrotMode(BaseRenderer):
                     mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
                     julia_surface = pygame.Surface((self.width // 2, self.height))
                     self._draw_split_view(mandelbrot_surface, julia_surface, clock)
-                    self._draw_orbit_to_surface(mandelbrot_surface)
+                    # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))
                     window.blit(julia_surface, (self.width // 2, 0))
                 case Cube():
@@ -677,6 +677,7 @@ def main():
             )
 
     # Clean up
+    raise Exception("stopping")
     pygame.quit()
     sys.exit()
 

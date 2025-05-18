@@ -42,8 +42,6 @@ class Shader:
 
 		with open(Path(template_location).parent / 'frag_gen.glsl') as f:
 			frag_shader = f.read()
-			print(f"\n\n{frag_shader}\n\n")
-			# raise Exception("stop")
 
 		program = self.compile_program(vert_shader, frag_shader)
 		for k in _UNIFORMS:

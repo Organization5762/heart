@@ -49,7 +49,7 @@ class BaseRenderer:
             case DeviceDisplayMode.OPENGL:
                 # todo: this is actually completely unused for this dispaly mode
                 #  so there's some smell here but providing this dummy val for now
-                screen_size = (-1, -1)
+                screen_size = (window_x, window_y)
         screen = pygame.Surface(screen_size, pygame.SRCALPHA)
         return screen
 

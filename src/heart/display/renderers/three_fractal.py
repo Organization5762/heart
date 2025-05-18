@@ -20,7 +20,7 @@ from heart.peripheral.core.manager import PeripheralManager
 
 
 class FractalScene(BaseRenderer):
-    def __init__(self, device):
+    def __init__(self, device=None):
         super().__init__()
         self.device = device
 
@@ -124,11 +124,16 @@ class FractalScene(BaseRenderer):
         print(f"OpenGL Renderer: {glGetString(GL_RENDERER).decode('utf-8')}")
         print(f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}")
 
-        window_size = (
-            self.device.scaled_screen.get_size()
-            if isinstance(self.device, LocalScreen)
-            else self.device.full_display_size()
-        )
+        if not self.device:
+            window_size = (
+                1280, 720
+            )
+        else:
+            window_size = (
+                self.device.scaled_screen.get_size()
+                if isinstance(self.device, LocalScreen)
+                else self.device.full_display_size()
+            )
         # window_size = window.get_size()
         tiled_mode = isinstance(orientation, Cube)
 
@@ -330,9 +335,15 @@ class FractalScene(BaseRenderer):
         # pulse = math.sin(2 * math.pi * self.virtual_time)
         # self.active_radius = self.BASE_RADIUS + self.AMPLITUDE * pulse
 
+    def _check_enter_auto(self):
+        keys  = pygame.key.get_pressed()
+        if keys[pygame.K_LEFTBRACKET]:
+            self.reset()
+            self.mode = "auto"
+
     def _check_break_auto(self):
         keys = pygame.key.get_pressed()
-        if any(keys):
+        if keys[pygame.K_RIGHTBRACKET]:
             self.mode = "free"
 
     def _process_input(self, peripheral_manager):
@@ -428,7 +439,7 @@ class FractalScene(BaseRenderer):
 
     def process(self, window, clock, peripheral_manager, orientation):
         now = time.time()
-        self.delta_real_time = now - self.last_frame_time or 0.0
+        self.delta_real_time = now - (self.last_frame_time or 0.0)
         self.last_frame_time = now
 
         if self.mode == "auto":
@@ -436,6 +447,7 @@ class FractalScene(BaseRenderer):
             self._check_break_auto()
         else:
             self._process_input(peripheral_manager)
+            self._check_enter_auto()
 
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
@@ -510,7 +522,8 @@ class FractalScene(BaseRenderer):
 
 
     def reset(self):
-        self._initialized = False
+        self.initialized = False
+        self.mode = "auto"
 
 
 def main():
@@ -523,12 +536,12 @@ def main():
     pygame.init()
 
     # Set up the display
-    WIDTH, HEIGHT = 1024, 512
+    WIDTH, HEIGHT = 1280, 720
     screen = pygame.display.set_mode((WIDTH, HEIGHT), OPENGL | DOUBLEBUF)
     # window = pygame.display.set_mode(win_size, OPENGL | DOUBLEBUF)
     pygame.display.set_caption("Mandelbrot Explorer")
 
-    scene = FractalScene()
+    scene = FractalScene(None)
 
     # Main game loop
     running = True
@@ -554,9 +567,9 @@ def main():
             # screen.fill((0, 0, 0))
 
             # Process and render
-            scene.process(
+            scene._internal_process(
                 screen, clock, manager, Rectangle.with_layout(
-                1, 1, (WIDTH, HEIGHT)
+                1, 1,
                 )
             )
 

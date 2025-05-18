@@ -99,6 +99,7 @@ class GameModes(BaseRenderer):
 
         self.previous_mode_index = 0
         self.sliding_transition = None
+        self.key_pressed_last_frame = defaultdict(lambda: False)
 
     def initialize(
         self,
@@ -125,7 +126,7 @@ class GameModes(BaseRenderer):
         self, peripheral_manager: PeripheralManager
     ) -> None:
         # Only run this if not on the Pi
-        if Configuration.is_pi():
+        if Configuration.is_pi() and False:
             return
 
         keys = pygame.key.get_pressed()
@@ -142,23 +143,29 @@ class GameModes(BaseRenderer):
         payload = None
 
         # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
-        if keys[pygame.K_LEFT]:
+        if keys[pygame.K_LEFT] and not self.key_pressed_last_frame[pygame.K_LEFT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "data": switch.rotational_value - 1,
             }
+        self.key_pressed_last_frame[pygame.K_LEFT] = keys[pygame.K_LEFT]
 
-        if keys[pygame.K_RIGHT]:
+        if keys[pygame.K_RIGHT] and not self.key_pressed_last_frame[pygame.K_RIGHT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "data": switch.rotational_value + 1,
             }
+        self.key_pressed_last_frame[pygame.K_RIGHT] = keys[pygame.K_RIGHT]
 
-        if keys[pygame.K_UP]:
+        if keys[pygame.K_UP] and not self.key_pressed_last_frame[pygame.K_UP]:
             payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
 
-        if keys[pygame.K_DOWN]:
+        self.key_pressed_last_frame[pygame.K_UP] = keys[pygame.K_UP]
+
+        if keys[pygame.K_DOWN] and not self.key_pressed_last_frame[pygame.K_DOWN]:
             payload = {"event_type": BUTTON_PRESS, "data": 1}
+
+        self.key_pressed_last_frame[pygame.K_DOWN] = keys[pygame.K_DOWN]
 
         if payload is not None:
             switch.update_due_to_data(payload)
@@ -191,10 +198,20 @@ class GameModes(BaseRenderer):
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
+        last_render_index = len(self.renderers) - 1
+
         if self.previous_mode_index != mode_index:
+            if mode_index == 0 and self.previous_mode_index == last_render_index:
+                slide_dir = 1
+            elif mode_index == last_render_index and self.previous_mode_index == 0:
+                slide_dir = -1
+            else:
+                slide_dir = (mode_index - self.previous_mode_index)
+
             self.sliding_transition = SlideTransitionRenderer(
                 renderer_A=self.title_renderers[self.previous_mode_index],
                 renderer_B=self.title_renderers[mode_index],
+                direction=slide_dir,
             )
             self.previous_mode_index = mode_index
             return self.sliding_transition
@@ -206,6 +223,8 @@ class GameModes(BaseRenderer):
                 return self.sliding_transition
 
         if self.in_select_mode:
+            for renderer in self.renderers:
+                renderer.reset()
             return self.title_renderers[mode_index]
 
         self.previous_mode_index = mode_index
@@ -227,6 +246,10 @@ class ComposedRenderer(BaseRenderer):
 
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
+
+    def reset(self):
+        for renderer in self.renderers:
+            renderer.reset()
 
     def process(
         self,

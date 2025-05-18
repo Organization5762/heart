@@ -40,11 +40,14 @@ def run(
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
-        if (pi := Configuration.pi()).version > 4:
-            raise ValueError(
-                f"Everything is only supported on Pi 4 and below. Detected: {pi}"
-            )
-
+        # if (pi := Configuration.pi()).version > 4:
+        #     raise ValueError(
+        #         f"Everything is only supported on Pi 4 and below. Detected: {pi}"
+        #     )
+        import os
+        os.environ["SDL_VIDEO_X11_FORCE_EGL"] = "1"
+        # os.environ["SDL_VIDEO_GL_DRIVER"] = "libGLESv2.so"
+        # print('baz')
         if x11_forward:
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
