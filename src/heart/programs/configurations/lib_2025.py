@@ -1,4 +1,5 @@
 from heart.display.color import Color
+from heart.display.renderers.artist import ArtistScene
 from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.image import RenderImage
 from heart.display.renderers.kirby import KirbyScene
@@ -14,6 +15,9 @@ from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.heart_title_screen import HeartTitleScreen
 from heart.display.renderers.water_title_screen import WaterTitleScreen
+from heart.display.renderers.image import RenderImage
+from heart.display.renderers.pixels import Border, RandomPixel
+from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer
 
@@ -43,9 +47,6 @@ def configure(loop: GameLoop) -> None:
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())
-
-    yolisten_mode = loop.add_mode("yo listen")
-    yolisten_mode.add_renderer(YoListenRenderer())
 
     mario_mode = loop.add_mode(
         ComposedRenderer(
@@ -103,6 +104,9 @@ def configure(loop: GameLoop) -> None:
         )
     )
     water_mode.add_renderer(WaterCube())
+
+    artist_mode = loop.add_mode(ArtistScene.title_scene())
+    artist_mode.add_renderer(ArtistScene())
 
     mode = loop.add_mode("friend beacon")
 
