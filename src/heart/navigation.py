@@ -9,9 +9,11 @@ from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.color import RenderColor
 from heart.display.renderers.slide import SlideTransitionRenderer
+from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2Bluetooth, BitDoLite2
 from heart.utilities.env import Configuration
 
 
@@ -35,14 +37,24 @@ class AppController(BaseRenderer):
         return self.modes.get_renderers(peripheral_manager=peripheral_manager)
 
     def add_sleep_mode(self) -> None:
-        title_renderer = TextRendering(
-            text=["zzz"],
-            font="Comic Sans MS",
-            font_size=8,
-            color=Color(255, 105, 180),
-        )
-        self.modes.title_renderers.append(title_renderer)
-        self.modes.add_new_pages(RenderColor(Color(0, 0, 0)))
+        sleep_title = [
+            SpritesheetLoop(
+                sheet_file_path=f"kirby_sleep_64.png",
+                metadata_file_path=f"kirby_sleep_64.json",
+                image_scale=0.5,
+                offset_y=-5,
+                disable_input=True,
+            ),
+            TextRendering(
+                text=["sleep"],
+                font="Roboto",
+                font_size=14,
+                color=Color.kirby(),
+                y_location=35,
+            ),
+        ]
+        mode = self.add_mode(sleep_title)
+        mode.add_renderer(RenderColor(Color(0, 0, 0)))
 
     def add_scene(self) -> "MultiScene":
         new_scene = MultiScene(scenes=[])
@@ -100,6 +112,7 @@ class GameModes(BaseRenderer):
         self.previous_mode_index = 0
         self.sliding_transition = None
         self.key_pressed_last_frame = defaultdict(lambda: False)
+        self.gamepad_last_frame = defaultdict(lambda: False)
 
     def initialize(
         self,
@@ -122,6 +135,43 @@ class GameModes(BaseRenderer):
         renderers = active_renderer.get_renderers(peripheral_manager)
         return renderers
 
+    def _process_gamepad_key_input(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+
+        switch = peripheral_manager._deprecated_get_main_switch()
+        gamepad.update()
+
+        payload = None
+        if gamepad.is_connected() and self.in_select_mode:
+            # print("gamepad connectee")
+            x_dir, y_dir = gamepad.get_dpad_value()
+            if x_dir != 0 and x_dir != self.gamepad_last_frame[f"DPAD_X"]:
+                payload = {
+                    "event_type": SWITCH_ROTATION,
+                    "data": switch.rotational_value + x_dir,
+                }
+            self.gamepad_last_frame[f"DPAD_X"] = x_dir
+            if y_dir != 0 and y_dir != self.gamepad_last_frame[f"DPAD_Y"]:
+                payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+            self.gamepad_last_frame[f"DPAD_Y"] = y_dir
+
+        # i.e. this branch to listen for exit request when inside a scene
+        elif gamepad.is_connected():
+            # i.e. press plus + minus to exit from any mode
+            plus_tapped = gamepad.is_held(mapping.BUTTON_PLUS)
+            minus_tapped = gamepad.is_held(mapping.BUTTON_MINUS)
+            if plus_tapped and minus_tapped:
+                payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+
+        if payload is not None:
+            switch.update_due_to_data(payload)
+
+        pygame.display.set_caption(
+            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
+        )
+
+
     def _process_debugging_key_presses(
         self, peripheral_manager: PeripheralManager
     ) -> None:
@@ -130,14 +180,6 @@ class GameModes(BaseRenderer):
             return
 
         keys = pygame.key.get_pressed()
-
-        current_time = time.time()
-        input_lag_seconds = 0.1
-        if (
-            self.time_last_debugging_press is not None
-            and current_time - self.time_last_debugging_press < input_lag_seconds
-        ):
-            return
 
         switch = peripheral_manager._deprecated_get_main_switch()
         payload = None
@@ -170,14 +212,13 @@ class GameModes(BaseRenderer):
         if payload is not None:
             switch.update_due_to_data(payload)
 
-        self.time_last_debugging_press = current_time
-
         pygame.display.set_caption(
             f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
         )
 
     def handle_inputs(self, peripheral_manager: PeripheralManager) -> None:
         self._process_debugging_key_presses(peripheral_manager)
+        self._process_gamepad_key_input(peripheral_manager)
         new_long_button_value = (
             peripheral_manager._deprecated_get_main_switch().get_long_button_value()
         )
@@ -268,7 +309,9 @@ class MultiScene(BaseRenderer):
         super().__init__()
         self.scenes = scenes
         self.current_scene_index = 0
+        self.last_switch_value = None
         self.key_pressed_last_frame = defaultdict(lambda: False)
+        self.gamepad_last_frame = defaultdict(lambda: False)
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
@@ -281,15 +324,36 @@ class MultiScene(BaseRenderer):
             )
         ]
 
+    def reset(self):
+        self.current_scene_index = 0
+        for scene in self.scenes:
+            scene.reset()
+
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch(peripheral_manager)
         self._process_keyboard()
+        self._process_gamepad(peripheral_manager)
+
+    def _process_gamepad(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+
+        if gamepad.is_connected():
+            x_dir, y_dir = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+            if x_dir != 0 and x_dir != self.gamepad_last_frame[f"DPAD_X"]:
+                self._increment_scene() if x_dir > 0 else self._decrement_scene()
+            self.gamepad_last_frame[f"DPAD_X"] = x_dir
+
+        gamepad.update()
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
         current_value = (
             peripheral_manager._deprecated_get_main_switch().get_button_value()
         )
-        self._set_scene_index(current_value)
+        if self.last_switch_value and self.last_switch_value != current_value:
+            self._increment_scene()
+
+        self.last_switch_value = current_value
 
     def _process_keyboard(self) -> None:
         if (

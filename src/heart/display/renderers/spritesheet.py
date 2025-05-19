@@ -8,6 +8,8 @@ from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
+from heart.utilities.env import Configuration
 
 
 class LoopPhase(Enum):
@@ -65,8 +67,8 @@ class SpritesheetLoop(BaseRenderer):
         self.offset_x = offset_x
         self.offset_y = offset_y
 
-        self._should_calibrate = True
-        self._scale_factor_offset = 0
+        self._current_duration_scale_factor = 0.0
+        self._last_switch_rot_value = None
 
     def initialize(
         self,
@@ -77,20 +79,33 @@ class SpritesheetLoop(BaseRenderer):
     ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
 
-    def _calibrate(self, preripheral_manager: PeripheralManager):
-        self._scale_factor_offset = (
-            preripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
-        )
-        self._should_calibrate = False
+    def reset(self):
+        self._current_duration_scale_factor = 0.0
 
-    def __duration_scale_factor(self, peripheral_manager: PeripheralManager) -> float:
+    def _process_input(self, peripheral_manager: PeripheralManager) -> None:
+        self._process_switch(peripheral_manager)
+        self._process_gamepad(peripheral_manager)
+
+    def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
         current_value = (
             peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         )
-        return (current_value - self._scale_factor_offset) / 20.00
+        if self._last_switch_rot_value is not None:
+            if current_value > self._last_switch_rot_value:
+                self._current_duration_scale_factor += 0.05
+            elif current_value < self._last_switch_rot_value:
+                self._current_duration_scale_factor -= 0.05
 
-    def reset(self):
-        self._should_calibrate = True
+        self._last_switch_rot_value = current_value
+
+    def _process_gamepad(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        if gamepad.is_connected():
+            if gamepad.axis_passed_threshold(mapping.AXIS_R):
+                self._current_duration_scale_factor += 0.005
+            elif gamepad.axis_passed_threshold(mapping.AXIS_L):
+                self._current_duration_scale_factor -= 0.005
 
     def process(
         self,
@@ -104,61 +119,58 @@ class SpritesheetLoop(BaseRenderer):
         if self.disable_input:
             kf_duration = current_kf.duration
         else:
+            self._process_input(peripheral_manager)
             kf_duration = current_kf.duration - (
-                current_kf.duration
-                * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
+                current_kf.duration * self._current_duration_scale_factor
             )
         if (
             self.time_since_last_update is None
             or self.time_since_last_update > kf_duration
         ):
-            if self._should_calibrate:
-                self._calibrate(peripheral_manager)
-            else:
-                if self.boomerang and self.phase == LoopPhase.LOOP:
-                    if self.reverse_direction:
-                        self.current_frame -= 1
-                    else:
-                        self.current_frame += 1
+            if self.boomerang and self.phase == LoopPhase.LOOP:
+                if self.reverse_direction:
+                    self.current_frame -= 1
                 else:
                     self.current_frame += 1
-                
-                self.time_since_last_update = 0
-                
-                if self.boomerang and self.phase == LoopPhase.LOOP:
-                    if self.current_frame >= len(self.frames[self.phase]) - 1:
-                        self.reverse_direction = True
-                        self.current_frame = len(self.frames[self.phase]) - 1
-                    elif self.current_frame <= 0:
-                        self.reverse_direction = False
-                        self.current_frame = 0
-                        self.loop_count += 1
-                        if self.loop_count >= 4:
+            else:
+                self.current_frame += 1
+
+            self.time_since_last_update = 0
+
+            if self.boomerang and self.phase == LoopPhase.LOOP:
+                if self.current_frame >= len(self.frames[self.phase]) - 1:
+                    self.reverse_direction = True
+                    self.current_frame = len(self.frames[self.phase]) - 1
+                elif self.current_frame <= 0:
+                    self.reverse_direction = False
+                    self.current_frame = 0
+                    self.loop_count += 1
+                    if self.loop_count >= 4:
+                        self.loop_count = 0
+                        if len(self.frames[LoopPhase.END]) > 0:
+                            self.phase = LoopPhase.END
+                            self.current_frame = 0
+                            self.reverse_direction = False
+                        elif len(self.frames[LoopPhase.START]) > 0:
+                            self.phase = LoopPhase.START
+                            self.current_frame = 0
+                            self.reverse_direction = False
+            elif self.current_frame >= len(self.frames[self.phase]):
+                self.current_frame = 0
+                match self.phase:
+                    case LoopPhase.START:
+                        self.phase = LoopPhase.LOOP
+                    case LoopPhase.LOOP:
+                        if self.loop_count < 4:
+                            self.loop_count += 1
+                        else:
                             self.loop_count = 0
                             if len(self.frames[LoopPhase.END]) > 0:
                                 self.phase = LoopPhase.END
-                                self.current_frame = 0
-                                self.reverse_direction = False
                             elif len(self.frames[LoopPhase.START]) > 0:
                                 self.phase = LoopPhase.START
-                                self.current_frame = 0
-                                self.reverse_direction = False
-                elif self.current_frame >= len(self.frames[self.phase]):
-                    self.current_frame = 0
-                    match self.phase:
-                        case LoopPhase.START:
-                            self.phase = LoopPhase.LOOP
-                        case LoopPhase.LOOP:
-                            if self.loop_count < 4:
-                                self.loop_count += 1
-                            else:
-                                self.loop_count = 0
-                                if len(self.frames[LoopPhase.END]) > 0:
-                                    self.phase = LoopPhase.END
-                                elif len(self.frames[LoopPhase.START]) > 0:
-                                    self.phase = LoopPhase.START
-                        case LoopPhase.END:
-                            self.phase = LoopPhase.START
+                    case LoopPhase.END:
+                        self.phase = LoopPhase.START
 
         image = self.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(

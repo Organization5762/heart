@@ -349,7 +349,6 @@ class FractalScene(BaseRenderer):
             self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
     def _process_auto(self):
-        print("processing auto")
         # move forward
         self.virtual_time += self.delta_real_time * self.PULSE_FREQUENCY
 
@@ -364,21 +363,26 @@ class FractalScene(BaseRenderer):
         rz = self.make_rot(0.01, 2)
         self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
-    def _check_enter_auto(self):
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_LEFTBRACKET]:
-            self.reset()
-            self.mode = "auto"
-
-    def _check_break_auto(self, peripheral_manager: PeripheralManager):
+    def _check_switch_auto(self, peripheral_manager: PeripheralManager):
         gamepad = peripheral_manager.get_gamepad()
         mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
         if gamepad.is_connected():
             if gamepad.was_tapped(mapping.BUTTON_Y):
-                self.mode = "free"
+                self.mode = "free" if self.mode == "auto" else "auto"
+                if self.mode == "auto":
+                    self._reset_camera_pos()
+
         # keys = pygame.key.get_pressed()
-        # if keys[pygame.K_RIGHTBRACKET]:
-        #     self.mode = "free"
+        #
+        # if keys[pygame.K_LEFTBRACKET] and not self.key_pressed_last_frame[pygame.K_LEFTBRACKET]:
+        #     self.mode = "free" if self.mode == "auto" else "auto"
+        #     if self.mode == "auto":
+        #         self._reset_camera_pos()
+        #
+        # self.key_pressed_last_frame[pygame.K_LEFTBRACKET] = keys[pygame.K_LEFTBRACKET]
+
+    def set_mode_free(self):
+        self.mode = "free"
 
     def _process_input(self, peripheral_manager):
         # self._process_keyboard_input(peripheral_manager)
@@ -405,10 +409,8 @@ class FractalScene(BaseRenderer):
 
             print(f"xd_mov: {xd_mov}, yd_mov: {yd_mov}")
             if xd_mov != 0:
-                self.mode = "free"
                 acc[0] += (xd_mov * self.speed_accel / self.max_fps)
             if yd_mov != 0:
-                self.mode = "free"
                 # dir flipped wrt dpad sign
                 acc[2] -= (yd_mov * self.speed_accel / self.max_fps)
 
@@ -432,9 +434,6 @@ class FractalScene(BaseRenderer):
             # === process movement (R stick) ===
             xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X)
             yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y)
-
-            if abs(xr_mov) > 0.1 or abs(yr_mov) > 0.1:
-                self.mode = "free"
 
             fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
             stick_scale_factor = 8
@@ -570,6 +569,14 @@ class FractalScene(BaseRenderer):
             #  device detected (e.g. on pi) so just catching in case
             pass
 
+    def _reset_camera_pos(self):
+        # self.mat[3, :3] = np.array([0., 0., 0.])
+        # self.mat[:3, :3] = np.array([0., 0., 0.])
+        start_pos = [0, 0, 12.0]
+        self.mat = np.identity(4, np.float32)
+        self.mat[3, :3] = np.array(start_pos)
+        self.vel = np.array([0, 0, -self.max_velocity], dtype=np.float32)
+
     def process(self, window, clock, peripheral_manager, orientation):
         # Update the target surface if it changed
         if window is not self.target_surface:
@@ -581,17 +588,21 @@ class FractalScene(BaseRenderer):
 
         if self.mode == "auto":
             self._process_auto()
-            self._check_break_auto(peripheral_manager)
         else:
             self._process_input(peripheral_manager)
-            self._check_enter_auto()
+
+        print(self.mode)
+
+
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
+        self._check_switch_auto(peripheral_manager)
 
         if self.check_collision():
-            self.mat[3, :3] = np.array([0., 0., 0.])
-            self.mat[:3, :3] = np.array([0., 0., 0.])
-            self.vel = np.array([0, 0, -self.max_velocity], dtype=np.float32)
+            self._reset_camera_pos()
+            # self.mat[3, :3] = np.array([0., 0., 0.])
+            # self.mat[:3, :3] = np.array([0., 0., 0.])
+            # self.vel = np.array([0, 0, -self.max_velocity], dtype=np.float32)
 
         # Save previous matrix for motion effects
         self.prevMat = np.copy(self.mat)
@@ -638,6 +649,9 @@ class FractalScene(BaseRenderer):
         if time.time() - self.last_fps_print > 1:
             print(f"fps: {self.clock.get_fps()}")
             self.last_fps_print = time.time()
+
+        # self._check_switch_auto(peripheral_manager)
+
 
     def check_collision(self):
         # copy origin

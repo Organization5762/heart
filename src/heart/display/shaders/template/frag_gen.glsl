@@ -139,7 +139,7 @@ vec4 COL(vec4 p) {
     vec4 newCol;
     vec3 orbit = vec3(0.0);
     p.xyz = abs(mod(p.xyz - 2.0/2, 2.0) - 2.0/2);
-    orbit = max(orbit, (p.xyz - vec3(0.0, 0.0, 0.0)) * vec3(1.0, 0.078431375, 0.8627451));
+    orbit = max(orbit, (p.xyz - vec3(0.0, 0.0, 0.0)) * vec3(0.0, 0.0, 0.0));
     newCol = vec4(orbit, de_sphere(p - vec4(vec3(1.0, 1.0, 1.0), 0), _s_radius));
     if (newCol.w < col.w) { col = newCol; }
     return col;

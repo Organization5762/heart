@@ -38,16 +38,14 @@ def run(
     orientation = Cube.sides()
     if Configuration.is_pi():
         if (pi := Configuration.pi()).version > 4:
-            print(
-                f"""!!!!!!!!!!!!!!!!!!!!
-                Everything is only supported on Pi 4 and below. Detected: {pi}
-!!!!!!!!!!!!!!!!!!!!!"""
+            logger.warning(
+                f"Shit not guaranteed to work Pi5 and higher. Detected: {pi}"
             )
 
         if Configuration.is_x11_forward():
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
-            logger.warning("RGB display not found, using local screen")
+            logger.warning("X11_FORWARD set, running with `LocalScreen`")
             device = LocalScreen(width=64, height=64, orientation=orientation)
         else:
             from heart.device.rgb_display import LEDMatrix
