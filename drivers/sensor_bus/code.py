@@ -17,9 +17,9 @@ def get_sample_rate(sensor) -> float:
     # For now, assume gyro and acceleration will be the same
     if hasattr(sensor, "accelerometer_data_rate"):
         check_interval = sensor.accelerometer_data_rate
-        update_hz = Rate.string[check_interval]
-        return update_hz
-    return 0.1
+    else:
+        check_interval = Rate.RATE_104_HZ
+    return Rate.string[check_interval]
 
 
 def _form_payload(name: str, data) -> str:
