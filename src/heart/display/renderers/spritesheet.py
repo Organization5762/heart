@@ -78,6 +78,7 @@ class SpritesheetLoop(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def reset(self):
         self._current_duration_scale_factor = 0.0

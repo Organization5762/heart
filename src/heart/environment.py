@@ -188,6 +188,8 @@ class GameLoop:
             surface = self.process_renderer(renderer)
             if base is None:
                 base = surface
+            elif surface is None:
+                continue
             else:
                 base = self.merge_surfaces(base, surface)
         return base

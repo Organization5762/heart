@@ -25,6 +25,6 @@ while True:
         
         print("\n\n")
         print(accelerometer.acceleration_value)
-        print(f"\nX Jerk: {accelerometer.x_distribution.jerk()}")
+        print(f"\nX Jerk: {accelerometer.x_distribution}")
     except SerialException as e:
         pass

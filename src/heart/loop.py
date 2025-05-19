@@ -2,11 +2,13 @@ import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
+import importlib
 from typing import Annotated
 
 import typer
+from PIL import Image
 
-from heart.device import Cube
+from heart.device import Cube, Device
 from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
@@ -22,18 +24,7 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 
-@app.command()
-def run(
-    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
-    add_low_power_mode: bool = typer.Option(
-        True, "--add-low-power-mode", help="Add a low power mode"
-    ),
-) -> None:
-    registry = ConfigurationRegistry()
-    configuration_fn = registry.get(configuration)
-    if configuration_fn is None:
-        raise Exception(f"Configuration '{configuration}' not found in registry")
-
+def _get_device(x11_forward: bool) -> Device:
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
@@ -53,9 +44,26 @@ def run(
             device = LEDMatrix(orientation=orientation)
     else:
         device = LocalScreen(width=64, height=64, orientation=orientation)
+    return device
+
+
+@app.command()
+def run(
+    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
+    add_low_power_mode: bool = typer.Option(
+        True, "--add-low-power-mode", help="Add a low power mode"
+    ),
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
+) -> None:
+    registry = ConfigurationRegistry()
+    configuration_fn = registry.get(configuration)
+    if configuration_fn is None:
+        raise Exception(f"Configuration '{configuration}' not found in registry")
 
     manager = PeripheralManager()
-    loop = GameLoop(device=device, peripheral_manager=manager)
+    loop = GameLoop(device=_get_device(x11_forward), peripheral_manager=manager)
     configuration_fn(loop)
 
     ## ============================= ##
@@ -67,9 +75,52 @@ def run(
     loop.start()
 
 
+@app.command(
+    name="test-renderer",
+)
+def test_renderer(
+    renderer_name: Annotated[
+        str, typer.Option("--renderer", help="Renderer class name")
+    ] = "heart.display.renderers.tixyland:Tixyland",
+    add_low_power_mode: bool = typer.Option(
+        True, "--add-low-power-mode", help="Add a low power mode"
+    ),
+    x11_forward: bool = typer.Option(
+        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+    ),
+) -> None:
+    module_name, class_name = renderer_name.split(":")
+    module = importlib.import_module(module_name)
+    renderer_class = getattr(module, class_name)
+    renderer = renderer_class()
+    loop = GameLoop(
+        device=_get_device(x11_forward), peripheral_manager=PeripheralManager()
+    )
+    loop.app_controller.add_mode(renderer)
+    loop.start()
+
+
 @app.command()
 def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     update_driver_main(device_driver_name=name)
+
+
+@app.command(
+    name="bench-device",
+)
+def bench_device() -> None:
+    d = _get_device(x11_forward=False)
+
+    size = d.full_display_size()
+    print(size)
+
+    image = Image.new("RGB", size)
+    while True:
+        for i in range(256):
+            for j in range(256):
+                for k in range(256):
+                    image.putdata([(i, j, k)] * (size[0] * size[1]))
+                    d.set_image(image)
 
 
 def main():

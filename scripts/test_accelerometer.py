@@ -23,8 +23,6 @@ while True:
         for data in datas:
             accelerometer._process_data(data)
         
-        print("\n\n")
         print(accelerometer.acceleration_value)
-        print(f"\nX Jerk: {accelerometer.x_distribution.jerk()}")
     except SerialException as e:
         pass
