@@ -68,7 +68,7 @@ class HeartRateManager(Peripheral):
 
         # Background janitor that forgets silent devices
         self._stop_evt = threading.Event()
-        self._janitor = threading.Thread(target=self._cleanup_loop, daemon=True)
+        self._janitor = threading.Thread(target=self._cleanup_loop, daemon=True, name="HeartRateManager janitor")
         self._janitor.start()
 
     # ---------- Peripheral framework ----------

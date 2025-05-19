@@ -76,6 +76,7 @@ class SpritesheetLoop(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _calibrate(self, preripheral_manager: PeripheralManager):
         self._scale_factor_offset = (

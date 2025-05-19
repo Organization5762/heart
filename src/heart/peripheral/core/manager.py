@@ -59,7 +59,9 @@ class PeripheralManager:
 
             # TODO: Doing the threading automatically might cause issues with the local switch?
             peripherial_thread = threading.Thread(
-                target=peripherial_run_fn, daemon=True
+                target=peripherial_run_fn,
+                daemon=True,
+                name=f"Peripherial - {type(peripherial).__name__}",
             )
             peripherial_thread.start()
 
