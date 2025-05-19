@@ -4,8 +4,9 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import importlib
 from typing import Annotated
-from PIL import Image
+
 import typer
+from PIL import Image
 
 from heart.device import Cube, Device
 from heart.device.local import LocalScreen
@@ -105,6 +106,7 @@ def test_renderer(
 def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     update_driver_main(device_driver_name=name)
 
+
 @app.command(
     name="bench-device",
 )
@@ -121,6 +123,7 @@ def bench_device() -> None:
                 for k in range(256):
                     image.putdata([(i, j, k)] * (size[0] * size[1]))
                     d.set_image(image)
+
 
 def main():
     return app()

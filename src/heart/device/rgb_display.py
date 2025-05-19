@@ -202,20 +202,25 @@ class SampleBase(object):
 
         return True
 
-import threading
+
 import queue
+import threading
 from typing import Optional
-from PIL import Image   # just for the type hint
+
+from PIL import Image  # just for the type hint
+
 
 class MatrixDisplayWorker:
-    """
-    Worker thread that handles sending images to the RGB matrix (This was taking up ~20-30% of main thread)
-    """
+    """Worker thread that handles sending images to the RGB matrix (This was taking up
+    ~20-30% of main thread)"""
+
     def __init__(self, matrix):
         self.matrix = matrix
         self.offscreen = self.matrix.CreateFrameCanvas()
         self.q: queue.Queue[Optional[Image.Image]] = queue.Queue(maxsize=2)
-        self._worker = threading.Thread(target=self._run, daemon=True, name="matrix display worker")
+        self._worker = threading.Thread(
+            target=self._run, daemon=True, name="matrix display worker"
+        )
         self._worker.start()
 
     def set_image_async(self, img: Image.Image) -> None:
@@ -234,11 +239,12 @@ class MatrixDisplayWorker:
             img = self.q.get()
             if img is None:
                 break
-            
+
             self.offscreen.Clear()
             self.offscreen.SetImage(img, 0, 0)
             self.offscreen = self.matrix.SwapOnVSync(self.offscreen)
             self.q.task_done()
+
 
 class LEDMatrix(Device, SampleBase):
     def __init__(self, orientation: Orientation, *args, **kwargs):
