@@ -57,7 +57,9 @@ class YoListenRenderer(BaseRenderer):
         self.phyphox_accel_x = 0.0
         self.phyphox_accel_y = 0.0
         self.phyphox_accel_z = 0.0
-        self.use_phyphox = True  # Set to True to use phone input
+        # We won't have phone input for now as we don't have internet access
+        # TODO: Do we want to just hook this into the Accelerometer?
+        self.use_phyphox = False  # Set to True to use phone input
         if self.use_phyphox:
             threading.Thread(target=self._poll_phyphox_background, daemon=True).start()
         # --- Simulated accel for test mode ---

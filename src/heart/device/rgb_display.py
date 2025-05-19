@@ -203,6 +203,49 @@ class SampleBase(object):
         return True
 
 
+import queue
+import threading
+from typing import Optional
+
+from PIL import Image  # just for the type hint
+
+
+class MatrixDisplayWorker:
+    """Worker thread that handles sending images to the RGB matrix (This was taking up
+    ~20-30% of main thread)"""
+
+    def __init__(self, matrix):
+        self.matrix = matrix
+        self.offscreen = self.matrix.CreateFrameCanvas()
+        self.q: queue.Queue[Optional[Image.Image]] = queue.Queue(maxsize=2)
+        self._worker = threading.Thread(
+            target=self._run, daemon=True, name="matrix display worker"
+        )
+        self._worker.start()
+
+    def set_image_async(self, img: Image.Image) -> None:
+        try:
+            self.q.put_nowait(img)
+        except queue.Full:
+            _ = self.q.get_nowait()
+            self.q.put_nowait(img)
+
+    def shutdown(self):
+        self.q.put(None)
+        self._worker.join()
+
+    def _run(self):
+        while True:
+            img = self.q.get()
+            if img is None:
+                break
+
+            self.offscreen.Clear()
+            self.offscreen.SetImage(img, 0, 0)
+            self.offscreen = self.matrix.SwapOnVSync(self.offscreen)
+            self.q.task_done()
+
+
 class LEDMatrix(Device, SampleBase):
     def __init__(self, orientation: Orientation, *args, **kwargs):
         super(LEDMatrix, self).__init__(*args, **kwargs, orientation=orientation)
@@ -222,24 +265,25 @@ class LEDMatrix(Device, SampleBase):
         options.parallel = 1
         options.pwm_bits = 11
 
-        # Testing
-        # options.led_limit_refresh = 100
-        options.show_refresh_rate = 0
-        options.disable_hardware_pulsing = True
+        options.show_refresh_rate = 1
+        # Setting this to True can cause ghosting
+        options.disable_hardware_pulsing = False
         options.multiplexing = 0
-
         options.row_address_type = 0
-        options.multiplexing = 0
         options.brightness = 100
         options.led_rgb_sequence = "RGB"
+
+        # These two settings, pwm_lsb_nanoseconds and gpio_slowdown are sometimes associated with ghosting
+        # https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/README.md
+        options.pwm_lsb_nanoseconds = 100
+        options.gpio_slowdown = 4
         options.pixel_mapper_config = ""
         options.panel_type = ""
-        options.gpio_slowdown = 4
         # I hate this option.
         options.drop_privileges = False
 
         self.matrix = RGBMatrix(options=options)
-        self.offscreen_canvas = self.matrix.CreateFrameCanvas()
+        self.worker = MatrixDisplayWorker(self.matrix)
 
     def layout(self) -> Layout:
         return Layout(columns=self.chain_length, rows=1)
@@ -254,6 +298,4 @@ class LEDMatrix(Device, SampleBase):
         self.display_mode = mode
 
     def set_image(self, image: Image.Image) -> None:
-        self.offscreen_canvas.Clear()
-        self.offscreen_canvas.SetImage(image, 0, 0)
-        self.offscreen_canvas = self.matrix.SwapOnVSync(self.offscreen_canvas)
+        self.worker.set_image_async(image)
