@@ -17,7 +17,6 @@ class ArtistScene(MultiScene):
             "imaginal_disk_animated",
             "rainbow_tesseract",
             "dancing_robot",
-            "jamie_xx_in_color",
             "jamie_xx_life",
             "john_summit_neon",
         ]:
@@ -26,6 +25,19 @@ class ArtistScene(MultiScene):
                     sheet_file_path=f"artist/{artist}.png",
                     metadata_file_path=f"artist/{artist}.json",
                     boomerang=True,
+                )
+            )
+
+        for artist in [
+            "jamie_xx_in_color",
+        ]:
+            scenes.append(
+                SpritesheetLoop.from_frame_data(
+                    sheet_file_path=f"artist/{artist}.png",
+                    duration=75,
+                    boomerang=False,
+                    # Assumes the loop begins and ends on the same
+                    skip_last_frame=True,
                 )
             )
 

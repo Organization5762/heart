@@ -49,6 +49,9 @@ class spritesheet(object):
         with open(filename, "rb") as f:
             self.sheet = pygame.image.load(f).convert_alpha()
 
+    def get_size(self):
+        return self.sheet.get_size()
+
     def image_at(self, rectangle):
         rect = pygame.Rect(rectangle)
         image = pygame.Surface(rect.size, pygame.SRCALPHA)
