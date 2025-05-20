@@ -4,6 +4,10 @@ from heart.display.renderers.tixyland import Tixyland
 from heart.environment import GameLoop
 from heart.navigation import MultiScene
 
+def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+    t_i = int(t)
+    val = (Y - 2 * t_i) * (X - 2 - t_i)
+    return val
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode()
