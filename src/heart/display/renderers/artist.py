@@ -13,7 +13,14 @@ class ArtistScene(MultiScene):
         scenes: list[BaseRenderer] = []
 
         # Two animated sprite sheets
-        for artist in ["imaginal_disk_animated", "rainbow_tesseract", "dancing_robot", "jamie_xx_in_color", "jamie_xx_life", "john_summit_neon"]:
+        for artist in [
+            "imaginal_disk_animated",
+            "rainbow_tesseract",
+            "dancing_robot",
+            "jamie_xx_in_color",
+            "jamie_xx_life",
+            "john_summit_neon",
+        ]:
             scenes.append(
                 SpritesheetLoop(
                     sheet_file_path=f"artist/{artist}.png",
