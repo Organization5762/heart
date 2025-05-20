@@ -28,7 +28,6 @@ class ArtistScene(MultiScene):
                 )
             )
 
-
         for artist in [
             "jamie_xx_in_color",
         ]:
@@ -52,7 +51,7 @@ class ArtistScene(MultiScene):
                         metadata_file_path=f"artist/{artist}.json",
                         boomerang=False,
                     ),
-                    speed=1
+                    speed=1,
                 )
             )
 

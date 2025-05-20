@@ -4,8 +4,9 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.peripheral.core.manager import PeripheralManager
 from heart.display.renderers.spritesheet import SpritesheetLoop
+from heart.peripheral.core.manager import PeripheralManager
+
 
 class SlidingImage(BaseRenderer):
     """Render a 256×64 image that continuously slides horizontally.
