@@ -1,7 +1,7 @@
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.image import RenderImage
-from heart.display.renderers.sliding_image import SlidingImage
+from heart.display.renderers.sliding_image import SlidingImage, SlidingRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
@@ -28,6 +28,7 @@ class ArtistScene(MultiScene):
                 )
             )
 
+
         for artist in [
             "jamie_xx_in_color",
         ]:
@@ -45,10 +46,13 @@ class ArtistScene(MultiScene):
             "troyboi_glitch_cartwheel",
         ]:
             scenes.append(
-                SpritesheetLoop(
-                    sheet_file_path=f"artist/{artist}.png",
-                    metadata_file_path=f"artist/{artist}.json",
-                    boomerang=False,
+                SlidingRenderer(
+                    renderer=SpritesheetLoop(
+                        sheet_file_path=f"artist/{artist}.png",
+                        metadata_file_path=f"artist/{artist}.json",
+                        boomerang=False,
+                    ),
+                    speed=1
                 )
             )
 
