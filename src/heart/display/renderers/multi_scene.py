@@ -6,7 +6,6 @@ from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-
 class MultiScene(BaseRenderer):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
         super().__init__()

@@ -29,6 +29,7 @@ def _get_device(x11_forward: bool) -> Device:
     orientation = Cube.sides()
     if Configuration.is_pi():
         import os
+
         os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
         if (pi := Configuration.pi()).version > 4:

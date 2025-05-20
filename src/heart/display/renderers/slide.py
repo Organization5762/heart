@@ -9,8 +9,9 @@ from heart.peripheral.core.manager import PeripheralManager
 class SlideTransitionRenderer(BaseRenderer):
     """Slides renderer_B into view while renderer_A moves out.
 
-    direction  =  1  → B comes from the right  (A → left)
-    direction  = -1  → B comes from the left   (A → right)
+    direction  =  1  → B comes from the right  (A → left) direction  = -1  → B comes
+    from the left   (A → right)
+
     """
 
     def __init__(
@@ -70,9 +71,12 @@ class SlideTransitionRenderer(BaseRenderer):
             self._x_offset += step_size
 
             # Check if we've reached or passed the target in either direction
-            if (self.direction > 0 and self._x_offset <= self._target_offset) or \
-                    (self.direction < 0 and self._x_offset >= self._target_offset):
-                self._x_offset = self._target_offset  # Ensure it stops exactly at target
+            if (self.direction > 0 and self._x_offset <= self._target_offset) or (
+                self.direction < 0 and self._x_offset >= self._target_offset
+            ):
+                self._x_offset = (
+                    self._target_offset
+                )  # Ensure it stops exactly at target
                 self._sliding = False
 
         # ----------------------------------------------------------------- #
