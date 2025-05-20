@@ -19,6 +19,7 @@ class ArtistScene(MultiScene):
             "dancing_robot",
             "jamie_xx_life",
             "john_summit_neon",
+            "troyboi_glitch_cartwheel",
         ]:
             scenes.append(
                 SpritesheetLoop(
@@ -38,20 +39,6 @@ class ArtistScene(MultiScene):
                     boomerang=False,
                     # Assumes the loop begins and ends on the same
                     skip_last_frame=True,
-                )
-            )
-
-        for artist in [
-            "troyboi_glitch_cartwheel",
-        ]:
-            scenes.append(
-                SlidingRenderer(
-                    renderer=SpritesheetLoop(
-                        sheet_file_path=f"artist/{artist}.png",
-                        metadata_file_path=f"artist/{artist}.json",
-                        boomerang=False,
-                    ),
-                    speed=1,
                 )
             )
 
