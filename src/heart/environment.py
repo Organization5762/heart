@@ -75,7 +75,6 @@ class GameLoop:
         )
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             pygame.event.set_grab(True)
-        
 
         self._last_render_mode = pygame.SHOWN
 

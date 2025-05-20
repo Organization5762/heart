@@ -17,8 +17,6 @@ def configure(loop: GameLoop) -> None:
         MultiScene(
             [
                 Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
                 Tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
                 Tixyland(fn=lambda t, i, x, y: y - t * t),
                 Tixyland(
@@ -29,6 +27,8 @@ def configure(loop: GameLoop) -> None:
                 ),
                 Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
                 Tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
+                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
+                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
             ]
         )
     )

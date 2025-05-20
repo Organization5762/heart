@@ -1,3 +1,5 @@
+import numpy as np
+
 from heart.display.color import Color
 from heart.display.renderers.artist import ArtistScene
 from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
@@ -22,6 +24,12 @@ from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer, MultiScene
+
+
+def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+    t_i = int(t)
+    val = (Y - 2 * t_i) * (X - 2 - t_i)
+    return val
 
 
 def configure(loop: GameLoop) -> None:
@@ -181,7 +189,7 @@ def configure(loop: GameLoop) -> None:
             y_location=32,
         )
     )
-    mode.add_renderer(
+    tixyland.add_renderer(
         MultiScene(
             [
                 Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
