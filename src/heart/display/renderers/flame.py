@@ -1,24 +1,26 @@
 import numpy as np
+from heart import DeviceDisplayMode
+from heart.device import Orientation
+from heart.display.renderers import BaseRenderer
+from heart.peripheral.core.manager import PeripheralManager
 import pygame
+from pygame import Surface
 import pygame.surfarray as sarr
 import pygame.transform as pgt
 
-# I took this shader https://www.shadertoy.com/view/mtjyzG and asked chat to convert it to python
 
-
+# ------------------------------------------------------------------------------------
+#  Utility helpers
+# ------------------------------------------------------------------------------------
 def _step(a, threshold):
-    return (a >= threshold).astype(np.float32)  # 0. or 1.
+    """Return a binary mask where a >= threshold (float32)."""
+    # `astype(copy=False)` re-uses the original buffer when possible
+    return (a >= threshold).astype(np.float32, copy=False)
 
 
 def _mix(a, b, alpha):
-    """GLSL‑style mix().
-
-    Works with • scalar alpha   – single blend factor • 2‑D   alpha    – greyscale mask,
-    auto‑expanded to (H,W,1) • 3‑D   alpha    – per‑channel alpha (already
-    shape‑compatible)
-
-    """
-    if np.isscalar(alpha):  # plain float → broadcast OK
+    """GLSL-style mix().  Handles scalar / greyscale / per-channel alpha."""
+    if np.isscalar(alpha):
         return a * (1.0 - alpha) + b * alpha
 
     alpha = np.asarray(alpha, dtype=np.float32)
@@ -29,43 +31,42 @@ def _mix(a, b, alpha):
 
 
 def _smoothstep(edge0, edge1, x):
-    # identical to GLSL smoothstep
+    """Classic smoothstep."""
     t = np.clip((x - edge0) / (edge1 - edge0), 0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
 
 
+# ------------------------------------------------------------------------------------
+#  Noise helpers (unchanged – already nicely vectorised)
+# ------------------------------------------------------------------------------------
 def _noise21(ix, iy):
-    """32‑bit LCG / hash implemented with 64‑bit intermediates so it can't overflow.
-
-    Returns deterministic [0,1] noise for every integer coord pair.
-
-    """
-    ix = ix.astype(np.int64, copy=False)  # promote once, keep view‑only
+    """Hash → scalar noise in [0,1].  Guaranteed deterministic."""
+    ix = ix.astype(np.int64, copy=False)
     iy = iy.astype(np.int64, copy=False)
 
-    w, s = 32, 16  # bit‑width & rotation (same as shader)
-
-    # --- the exact hash chain from the original GLSL ---
+    w, s = 32, 16
     a = (ix * 3284157443) & 0xFFFFFFFF
     b = (iy ^ ((a << s) | (a >> (w - s)))) & 0xFFFFFFFF
     b = (b * 1911520717) & 0xFFFFFFFF
     a = (a ^ ((b << s) | (b >> (w - s)))) & 0xFFFFFFFF
     a = (a * 2048419325) & 0xFFFFFFFF
 
-    # convert to float in [0,1]
     rand = a.astype(np.float32) * (3.14159265 / 2147483647.0)
     return np.cos(rand) * 0.5 + 0.5
 
 
 def _noise22(ix, iy):
-    # simplified, good enough for cell jitter
-    n = np.sin(ix * 138.546 + iy * 78.233) * 43758.5453
+    """Cheap 2-vector noise – good enough for Voronoi jitter."""
+    n1 = np.sin(ix * 138.546 + iy * 78.233) * 43758.5453
     n2 = np.sin(ix * 12.9898 + iy * 4.1414) * 12543.2451
-    return np.modf(np.stack((n, n2), axis=-1))[0]  # fract()
+    return np.modf(np.stack((n1, n2), axis=-1))[0]  # fract()
 
 
+# ------------------------------------------------------------------------------------
+#  Layered noise / Voronoi helpers
+# ------------------------------------------------------------------------------------
 def _smooth_noise(u, v):
-    # u,v are fractional; iv, iu integer
+    """Smooth (Perlin-style) noise."""
     iu = np.floor(u).astype(np.int32)
     iv = np.floor(v).astype(np.int32)
     fu = u - iu
@@ -77,16 +78,13 @@ def _smooth_noise(u, v):
     bl = _noise21(iu, iv)
     tr = _noise21(iu + 1, iv + 1)
     br = _noise21(iu + 1, iv)
-    t = _mix(tl, tr, fu)
-    b = _mix(bl, br, fu)
-    return _mix(b, t, fv)
+    return _mix(_mix(bl, br, fu), _mix(tl, tr, fu), fv)
 
 
 def _layer_noise(u, v):
+    """4-octave FBM."""
     res = np.zeros_like(u, dtype=np.float32)
-    amp = 1.0
-    freq = 10.0
-    norm = 0.0
+    amp, freq, norm = 1.0, 10.0, 0.0
     for _ in range(4):
         res += _smooth_noise(u * freq, v * freq) * amp
         norm += amp
@@ -96,85 +94,172 @@ def _layer_noise(u, v):
 
 
 def _voronoi(u, v, t):
+    """Vectorised Voronoi – no Python loops over pixels."""
     iu = np.floor(u).astype(np.int32)
     iv = np.floor(v).astype(np.int32)
+
     fu = u - iu - 0.5
     fv = v - iv - 0.5
-    min_d = np.full_like(u, 100.0, dtype=np.float32)
 
-    for ox in (-1, 0, 1):
-        for oy in (-1, 0, 1):
-            jitter = _noise22(iu + ox, iv + oy)  # 2‑vector
-            px = ox + np.sin(jitter[..., 0] * t) * 0.5
-            py = oy + np.sin(jitter[..., 1] * t) * 0.5
-            d = np.sqrt((fu - px) ** 2 + (fv - py) ** 2)
-            min_d = np.minimum(min_d, d)
+    # Offsets -1,0,1  → shape (3,3,1,1) ready for broadcasting
+    offsets = np.array([-1, 0, 1], dtype=np.int32)
+    ox, oy = np.meshgrid(offsets, offsets, indexing="ij")
+    ox = ox[..., None, None]
+    oy = oy[..., None, None]
+
+    jitter = _noise22(iu + ox, iv + oy)  # (3,3,H,W,2)
+    px = ox + np.sin(jitter[..., 0] * t) * 0.5
+    py = oy + np.sin(jitter[..., 1] * t) * 0.5
+
+    d = np.sqrt((fu - px) ** 2 + (fv - py) ** 2)  # (3,3,H,W)
+    min_d = d.min(axis=(0, 1))  # (H,W)
     return _smoothstep(0.0, 1.0, min_d)
 
 
 def _flame_layer(u, v, t, col_rgb, thr):
-    ln = _layer_noise(u + 0.25 * t, v - 0.5 * t)
-    vn = _voronoi(u * 3.0, v * 3.0 - 0.25 * t, t)
+    """
+    Legacy helper kept for external callers.
+    Internally the generator now pre-computes expensive pieces once per frame.
+    """
+    ln = _layer_noise(u + 0.125 * t, v - 0.25 * t)  # Half speed (0.25→0.125, 0.5→0.25)
+    vn = _voronoi(u * 3.0, v * 3.0 - 0.125 * t, t)  # Half speed (0.25→0.125)
     res = ln * _mix(ln, vn, 0.7)
-    res = _smoothstep(res, 0.0, 1.0 - v)  # fade downward (inverted v)
+    res = _smoothstep(res, 0.0, 1.0 - v)  # fade downward
     res = _step(res, thr)  # binary mask
-    return res[..., None] * col_rgb  # shape (...,3)
+    return res[..., None] * col_rgb  # (H,W,3)
 
 
+# ------------------------------------------------------------------------------------
+#  Public generator class
+# ------------------------------------------------------------------------------------
 class FlameGenerator:
     """Produces a 64×H animated flame Surface."""
 
     _LAYERS = [
         ((0.769, 0.153, 0.153), 0.001),
-        ((0.886, 0.345, 0.133), 0.1),
-        ((0.914, 0.475, 0.102), 0.5),
-        ((0.945, 0.604, 0.067), 0.8),
-        ((0.973, 0.729, 0.035), 0.9),
-        ((1.000, 0.900, 0.600), 0.99),
+        ((0.886, 0.345, 0.133), 0.100),
+        ((0.914, 0.475, 0.102), 0.500),
+        ((0.945, 0.604, 0.067), 0.800),
+        ((0.973, 0.729, 0.035), 0.900),
+        ((1.000, 0.900, 0.600), 0.990),
     ]
 
-    def __init__(self, width=64, height=16):
-        self.w = width
-        self.h = height
-        # pre‑compute static coordinate grids
+    def __init__(self, width: int = 64, height: int = 16):
+        self.w, self.h = width, height
+
+        # Static UV grids (pixelated to 1/64 like the shader)
         y, x = np.indices((height, width), dtype=np.float32)
-        # shader‑style normalised UV
         self.u = (x - 0.5 * width) / height
         self.v0 = (y - 0.5 * height) / height + 0.5
-        # pixelate to 1/64 just like GLSL
         snap = 1.0 / 64.0
         self.u -= np.mod(self.u, snap)
         self.v0 -= np.mod(self.v0, snap)
 
+        # Pre-compute arrays & buffers to avoid per-frame allocations
+        self._layer_rgbs = np.array([rgb for rgb, _ in self._LAYERS], dtype=np.float32)
+        self._layer_thrs = np.array([thr for _, thr in self._LAYERS], dtype=np.float32)
+        self._col_buf = np.empty((height, width, 3), dtype=np.float32)
+        self._surf = pygame.Surface((self.w, self.h))
+        self._surf.set_colorkey((0, 0, 0))
+
+    # -------------------------------------------------------------------------
+    #  Public API
+    # -------------------------------------------------------------------------
     def surface(self, t: float, side: str = "bottom") -> pygame.Surface:
-        """Side = "bottom" | "top" | "left" | "right"."""
-        # -------------- generate the canonical strip (bottom → up) -------------
-        v = self.v0.copy()
-        u = self.u
-        col = np.zeros((self.h, self.w, 3), dtype=np.float32)
-        for rgb, thr in self._LAYERS:
-            layer = _flame_layer(u, v, t, np.array(rgb, np.float32), thr)
-            col = _mix(col, layer, layer[..., 0][..., None])
+        """
+        Generate the flame strip for the given time `t`.
+        side ∈ {"bottom","top","left","right"} – controls orientation.
+        """
+        u, v = self.u, self.v0  # aliases: no copies
+        col = self._col_buf
+        col.fill(0.0)  # reuse buffer instead of allocating
 
-        surf = pygame.Surface((self.w, self.h))
-        surf.set_colorkey((0, 0, 0))
-        sarr.blit_array(
-            surf, (np.clip(col * 255, 0, 255)).astype(np.uint8).swapaxes(0, 1)
-        )
+        # ------------------------------------------------------------------
+        # 1) EXPENSIVE PART: evaluate once per frame
+        # ------------------------------------------------------------------
+        ln = _layer_noise(
+            u + 0.125 * t, v - 0.25 * t
+        )  # Half speed (0.25→0.125, 0.5→0.25)
+        vn = _voronoi(u * 3.0, v * 3.0 - 0.125 * t, t)  # Half speed (0.25→0.125)
+        base = ln * _mix(ln, vn, 0.7)
+        base = _smoothstep(base, 0.0, 1.0 - v)  # fade downward
 
-        # -------------- orient the strip for the requested side ----------------
-        match side:
-            case "bottom":  # already correct
-                return surf
+        # ------------------------------------------------------------------
+        # 2) Threshold / colour merge (cheap; 6 iterations)
+        # ------------------------------------------------------------------
+        for rgb, thr in zip(self._layer_rgbs, self._layer_thrs):
+            alpha = _step(base, thr)[..., None]  # (H,W,1) float mask
+            col += (rgb - col) * alpha  # GLSL-style mix
 
-            case "top":  # upside‑down
-                return pgt.flip(surf, False, True)
+        # ------------------------------------------------------------------
+        # 3) Copy pixels → pygame.Surface (in-place; no extra Surface)
+        # ------------------------------------------------------------------
+        rgb8 = np.clip(col * 255.0, 0, 255).astype(np.uint8)
+        surfpx = sarr.pixels3d(self._surf)  # (W,H,3) view
+        surfpx[...] = rgb8.swapaxes(0, 1)  # transpose H/W
+        del surfpx  # unlock the Surface
 
-            case "left":  # 90° clockwise → base on the left edge
-                return pgt.rotate(surf, -90)
+        # ----------------------------- orientation ----------------------------
+        if side == "bottom":
+            return self._surf
+        if side == "top":
+            return pgt.flip(self._surf, False, True)
+        if side == "left":
+            return pgt.rotate(self._surf, -90)
+        if side == "right":
+            return pgt.rotate(self._surf, 90)
 
-            case "right":  # 90° counter‑clockwise → base on the right edge
-                return pgt.rotate(surf, 90)
+        raise ValueError("side must be 'bottom', 'top', 'left' or 'right'")
 
-            case _:
-                raise ValueError("side must be bottom|top|left|right")
+
+class FlameRenderer(BaseRenderer):
+    """
+    A renderer that displays flames on all four sides of the screen.
+    Similar to the flame borders used in MaxBpmScreen.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
+
+        # Create a single flame generator instead of four
+        self._flame_generator = FlameGenerator(64, 16)
+
+        self.time_since_last_update = 0
+
+    def process(
+        self,
+        window: Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        # Calculate time and render the flame once
+        t = pygame.time.get_ticks() * 2 / 1000.0  # floating-point seconds
+
+        # Generate the base flame surface once
+        base_flame = self._flame_generator.surface(t, "bottom")
+        
+        # Transform the base flame for other orientations
+        flame_surfaces = {
+            "bottom": base_flame,
+            "top": pgt.flip(base_flame.copy(), False, True),
+            "left": pgt.rotate(base_flame.copy(), -90),
+            "right": pgt.rotate(base_flame.copy(), 90)
+        }
+
+        # Get window dimensions
+        window_width, window_height = window.get_size()
+
+        # Draw flames on all four sides
+        # Bottom flame
+        window.blit(flame_surfaces["bottom"], (0, window_height - 16))
+
+        # Top flame
+        window.blit(flame_surfaces["top"], (0, 0))
+
+        # Left flame
+        window.blit(flame_surfaces["left"], (0, 0))
+
+        # Right flame
+        window.blit(flame_surfaces["right"], (window_width - 16, 0))

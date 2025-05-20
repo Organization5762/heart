@@ -6,7 +6,8 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.display.renderers.flame import FlameGenerator
+from heart.display.renderers.flame import FlameGenerator, FlameRenderer
+from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import (
     current_bpms,
@@ -23,23 +24,32 @@ AVATAR_MAPPINGS = {
     "seb": "0EA01",  # RED
     "lampe": "0EA19",  # BLUE
     "cal": "0EB14",  # PURPLE
+    "ditto": "08E5F",  # WHITE
 }
 
 # Timeout for inactive sensors (30 seconds)
 SENSOR_TIMEOUT_MS = 30000
 
 
-class MaxBpmScreen(BaseRenderer):
+class MaxBpmScreen(ComposedRenderer):
     def __init__(self) -> None:
-        self.device_display_mode = DeviceDisplayMode.FULL
-        self.current_frame = 0
+        # Create the flame renderer
+        flame_renderer = FlameRenderer()
 
-        self._flame_edges = {
-            "bottom": FlameGenerator(64, 16),
-            "top": FlameGenerator(64, 16),
-            "left": FlameGenerator(64, 16),
-            "right": FlameGenerator(64, 16),
-        }
+        # Create the avatar renderer
+        avatar_renderer = AvatarBpmRenderer()
+
+        # Initialize the composed renderer with both components
+        super().__init__([flame_renderer, avatar_renderer])
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self.is_flame_renderer = True
+
+
+class AvatarBpmRenderer(BaseRenderer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self.current_frame = 0
 
         # Load avatar images for all users
         self.avatar_images = {}
@@ -54,14 +64,13 @@ class MaxBpmScreen(BaseRenderer):
 
         self.time_since_last_update = 0
         self.time_between_frames_ms = 400
-        self._flame = FlameGenerator(width=64, height=16)  # bottom strip 16 px tall
 
     def display_number(self, window, number, x, y):
         my_font = font.Font(Loader._resolve_path("Grand9K Pixel.ttf"), 8)
         text = my_font.render(str(number).zfill(3), True, (255, 255, 255))
         # Center the text horizontally on the screen
         text_rect = text.get_rect(
-            center=(x + 32, y + 56)  # Center relative to the 64x64 screen section
+            center=(x, y + 40)  # Center relative to the avatar position
         )
         window.blit(text, text_rect)
 
@@ -73,7 +82,7 @@ class MaxBpmScreen(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         # --- BPM Calculation ---
-        top_bpms = []
+        top_bpm = None
         if current_bpms:  # Check if the dictionary is not empty
             try:
                 # Create a list of (address, bpm) tuples for non-zero BPM values
@@ -81,57 +90,38 @@ class MaxBpmScreen(BaseRenderer):
                     (addr, bpm) for addr, bpm in current_bpms.items() if bpm > 0
                 ]
 
-                top_bpms = [None, None, None, None]
                 if active_bpms:
-                    # Sort by BPM in descending order
+                    # Sort by BPM in descending order and get the highest
                     sorted_bpms = sorted(active_bpms, key=lambda x: x[1], reverse=True)
+                    highest_bpm = sorted_bpms[0]
 
-                    # Map device IDs to avatar names
+                    # Map device ID to avatar name
+                    avatar_name = "faye"  # Default
+                    for name, device_id in AVATAR_MAPPINGS.items():
+                        if highest_bpm[0] == device_id:
+                            avatar_name = name
+                            break
 
-                    for i in range(4):
-                        bpm = sorted_bpms[i % MAX_DISPLAYED_BPMS]
-                        avatar_name = "faye"  # Default
-                        for name, device_id in AVATAR_MAPPINGS.items():
-                            if bpm[0] == device_id:
-                                avatar_name = name
-                                break
-                        top_bpms[i] = (bpm[0], bpm[1], avatar_name)
+                    top_bpm = (highest_bpm[0], highest_bpm[1], avatar_name)
             except ValueError:
                 # Handle cases where current_bpms might be temporarily empty or contain non-numeric data
                 pass
 
-        # --- Rendering ---
-        # Render each of the top X BPMs on a different screen section
-        screen_positions = [(0, 0), (64, 0), (128, 0), (192, 0)]
+        # Draw the highest BPM in the center of the screen
+        if top_bpm:
+            addr, bpm, avatar_name = top_bpm
 
-        for i, (addr, bpm, avatar_name) in enumerate(top_bpms):
-            x, y = screen_positions[i]
+            # Get window dimensions
+            window_width = window.get_width()
+            window_height = window.get_height()
 
-            # Get the avatar image
+            # Avatar --------------------------------------------------------------------
             image = self.avatar_images.get(avatar_name, self.avatar_images["seb"])
-
-            # Center the avatar image in the middle of the 64x64 screen section
-            image_width = image.get_width()
-            image_height = image.get_height()
-            center_x = x + (64 - image_width) // 2
+            center_x = (window_width - image.get_width()) // 2
             center_y = (
-                y + (64 - image_height) // 2 - 8
-            )  # Keep the slight y-offset for visual balance
-
-            # Render the avatar at the center position
+                window_height - image.get_height()
+            ) // 2 - 8  # retain visual offset
             window.blit(image, (center_x, center_y))
 
-            # Display the BPM number
-            self.display_number(window, bpm, x, y)
-
-            # Render flames for each screen section
-            t = time.get_ticks() * 2 / 1000.0  # floating‑point seconds
-
-            window.blit(
-                self._flame_edges["bottom"].surface(t, "bottom"), (x, y + 64 - 16)
-            )
-            window.blit(self._flame_edges["top"].surface(t, "top"), (x, y))
-            window.blit(self._flame_edges["left"].surface(t, "left"), (x, y))
-            window.blit(self._flame_edges["right"].surface(t, "right"), (x + 48, y))
-
-        self.time_since_last_update += clock.get_time()
+            # BPM number ----------------------------------------------------------------
+            self.display_number(window, bpm, window_width // 2, center_y)

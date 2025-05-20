@@ -20,12 +20,13 @@ class CombinedBpmScreen(BaseRenderer):
         self.max_bpm_screen = MaxBpmScreen()
 
         # Screen swap timing
-        self.metadata_duration_ms = 15000  # 15 seconds
+        self.metadata_duration_ms = 12000  # 12 seconds
         self.max_bpm_duration_ms = 5000  # 5 seconds
 
         # Track timing state
         self.elapsed_time_ms = 0
         self.showing_metadata = True
+        self.is_flame_renderer = True
 
     def process(
         self,

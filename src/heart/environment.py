@@ -16,6 +16,10 @@ from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.display.renderers.flame import FlameRenderer
+from heart.peripheral.heart_rates import (
+    current_bpms,
+)
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -142,6 +146,15 @@ class GameLoop:
                     peripheral_manager=self.peripheral_manager
                 )
 
+            # Check if the average BPM is above 80 and show flames if so
+            if current_bpms and len(current_bpms) >= 5:
+                bpm_values = [bpm for bpm in current_bpms.values() if bpm > 0]
+                if bpm_values and sum(bpm_values) / len(bpm_values) > 150:
+                    for r in renderers:
+                        if hasattr(r, "is_flame_renderer") and r.is_flame_renderer:
+                            break
+                    else:
+                        renderers.append(FlameRenderer())
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
 
