@@ -9,6 +9,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class BaseRenderer:
     @property
     def name(self):

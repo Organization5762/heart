@@ -5,7 +5,6 @@ from heart.environment import GameLoop
 from heart.navigation import MultiScene
 
 
-
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode()
     mode.add_renderer(
