@@ -1,15 +1,27 @@
-from heart.firmware_io import constants
 import time
+
 from digitalio import Pull
+
+from heart.firmware_io import constants
 
 LONG_PRESS_DURATION_SECONDS = 0.5
 
+
 # We don't use `json` here because the Trinkey doesn't support it by default
 def form_json(name: str, data: int, producer_id: int):
-    return '{"event_type": "' + name + '", "data": ' + str(data) + ', "producer_id": ' + str(producer_id) + '}'
+    return (
+        '{"event_type": "'
+        + name
+        + '", "data": '
+        + str(data)
+        + ', "producer_id": '
+        + str(producer_id)
+        + "}"
+    )
+
 
 class RotaryEncoderHandler:
-    def __init__(self, encoder, switch, index = 0):
+    def __init__(self, encoder, switch, index=0):
         self.last_position = None
         self.press_started_timestamp = None
         self.long_pressed_sent = False
@@ -33,7 +45,11 @@ class RotaryEncoderHandler:
                 self.press_started_timestamp = self._current_time()
             else:
                 # Button is still held down; check if it qualifies as a long press
-                is_long_press = not self.long_pressed_sent and (self._current_time() - self.press_started_timestamp) >= LONG_PRESS_DURATION_SECONDS
+                is_long_press = (
+                    not self.long_pressed_sent
+                    and (self._current_time() - self.press_started_timestamp)
+                    >= LONG_PRESS_DURATION_SECONDS
+                )
                 if is_long_press:
                     yield form_json(constants.BUTTON_LONG_PRESS, 1, self.index)
                     self.long_pressed_sent = True
@@ -55,6 +71,7 @@ class RotaryEncoderHandler:
     def handle(self):
         yield from self._handle_rotation()
         yield from self._handle_switch()
+
 
 class Seesaw:
     def __init__(self, handlers):

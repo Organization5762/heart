@@ -158,10 +158,18 @@ class GameModes(BaseRenderer):
             }
 
         if keys[pygame.K_UP]:
-            payload = {"event_type": BUTTON_LONG_PRESS,                 "producer_id": DEFAULT_PRODUCER_ID,"data": 1}
+            payload = {
+                "event_type": BUTTON_LONG_PRESS,
+                "producer_id": DEFAULT_PRODUCER_ID,
+                "data": 1,
+            }
 
         if keys[pygame.K_DOWN]:
-            payload = {"event_type": BUTTON_PRESS,                "producer_id": DEFAULT_PRODUCER_ID, "data": 1}
+            payload = {
+                "event_type": BUTTON_PRESS,
+                "producer_id": DEFAULT_PRODUCER_ID,
+                "data": 1,
+            }
 
         if payload is not None:
             switch.update_due_to_data(payload)

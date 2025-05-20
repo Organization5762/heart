@@ -15,6 +15,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class PeripheralManager:
     def __init__(self) -> None:
         self.peripheral: list[Peripheral] = []
