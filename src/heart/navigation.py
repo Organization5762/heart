@@ -37,8 +37,8 @@ class AppController(BaseRenderer):
     def add_sleep_mode(self) -> None:
         title_renderer = TextRendering(
             text=["zzz"],
-            font="Comic Sans MS",
-            font_size=8,
+            font="Roboto",
+            font_size=14,
             color=Color(255, 105, 180),
         )
         self.modes.title_renderers.append(title_renderer)

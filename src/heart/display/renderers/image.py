@@ -21,7 +21,7 @@ class RenderImage(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.image = Loader.load(self.file)
+        self.image = Loader.load(self.file).convert_alpha()
         self.image = pygame.transform.scale(self.image, window.get_size())
         super().initialize(window, clock, peripheral_manager, orientation)
 
