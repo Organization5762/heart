@@ -84,7 +84,7 @@ class FractalScene(BaseRenderer):
         self.surface_array = None
 
         self.initialized = False
-        self.warmup = True
+        self.warmup = False
 
     def _init_uniforms(self):
         set_global_float(self.sphere_radius_var)

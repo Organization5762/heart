@@ -147,7 +147,8 @@ class GameModes(BaseRenderer):
         orientation: Orientation,
     ):
         for renderer in self.renderers:
-            renderer.initialize(window, clock, peripheral_manager, orientation)
+            if renderer.warmup:
+                renderer.initialize(window, clock, peripheral_manager, orientation)
 
     def add_new_pages(
         self, title_renderer: "BaseRenderer", renderers: "BaseRenderer"
@@ -286,7 +287,7 @@ class GameModes(BaseRenderer):
             elif mode_index == render_count and last_scene_index == 0:
                 slide_dir = -1
             else:
-                slide_dir = mode_index - last_scene_index
+                slide_dir = mode_index - self.previous_mode_index
 
             self.sliding_transition = SlideTransitionRenderer(
                 renderer_A=self.title_renderers[last_scene_index],
@@ -333,7 +334,8 @@ class ComposedRenderer(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         for renderer in self.renderers:
-            renderer.initialize(window, clock, peripheral_manager, orientation)
+            if renderer.warmup:
+                renderer.initialize(window, clock, peripheral_manager, orientation)
 
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)

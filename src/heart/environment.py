@@ -73,7 +73,10 @@ class GameLoop:
             ),
             pygame.SHOWN,
         )
-        pygame.event.set_grab(True)
+        if Configuration.is_pi() and not Configuration.is_x11_forward():
+            pygame.event.set_grab(True)
+        
+
         self._last_render_mode = pygame.SHOWN
 
     def add_mode(self, title: str | None = None) -> ComposedRenderer:
