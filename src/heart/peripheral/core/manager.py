@@ -73,6 +73,7 @@ class PeripheralManager:
             switches = itertools.chain(
                 Switch.detect(),
                 BluetoothSwitch.detect(),
+                FakeSwitch.detect(),
             )
             switches = list(switches)
             logger.info("Found %d switches", len(switches))
@@ -82,6 +83,7 @@ class PeripheralManager:
 
         for switch in switches:
             logger.info(f"Adding switch - {switch}")
+
             if self._deprecated_main_switch is None:
                 self._deprecated_main_switch = switch
             yield switch
