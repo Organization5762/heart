@@ -46,7 +46,6 @@ class Life(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        print(window.get_size())
         self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
         self.state = self._update_grid(self.state)
 
