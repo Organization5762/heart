@@ -19,7 +19,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 1": {
         "frame": {
@@ -40,7 +40,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 2": {
         "frame": {
@@ -61,7 +61,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 3": {
         "frame": {
@@ -82,7 +82,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 4": {
         "frame": {
@@ -103,7 +103,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 5": {
         "frame": {
@@ -124,7 +124,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 6": {
         "frame": {
@@ -145,7 +145,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 7": {
         "frame": {
@@ -166,7 +166,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 8": {
         "frame": {
@@ -187,7 +187,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 9": {
         "frame": {
@@ -208,7 +208,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 10": {
         "frame": {
@@ -229,7 +229,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 11": {
         "frame": {
@@ -250,7 +250,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 12": {
         "frame": {
@@ -271,7 +271,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 13": {
         "frame": {
@@ -292,7 +292,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 14": {
         "frame": {
@@ -313,7 +313,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 15": {
         "frame": {
@@ -334,7 +334,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 16": {
         "frame": {
@@ -355,7 +355,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 17": {
         "frame": {
@@ -376,7 +376,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 18": {
         "frame": {
@@ -397,7 +397,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 19": {
         "frame": {
@@ -418,7 +418,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 20": {
         "frame": {
@@ -439,7 +439,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 21": {
         "frame": {
@@ -460,7 +460,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 22": {
         "frame": {
@@ -481,7 +481,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 23": {
         "frame": {
@@ -502,7 +502,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       },
       "loop 24": {
         "frame": {
@@ -523,7 +523,7 @@
           "w": 64,
           "h": 64
         },
-        "duration": 800
+        "duration": 50
       }
     },
     "meta": {

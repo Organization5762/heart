@@ -29,6 +29,17 @@ class ArtistScene(MultiScene):
                 )
             )
 
+        for artist in [
+            "troyboi_glitch_cartwheel",
+        ]:
+            scenes.append(
+                SpritesheetLoop(
+                    sheet_file_path=f"artist/{artist}.png",
+                    metadata_file_path=f"artist/{artist}.json",
+                    boomerang=False,
+                )
+            )
+
         # And one sliding banner that wraps around all 4 faces
         scenes.append(
             SlidingImage(
@@ -37,12 +48,6 @@ class ArtistScene(MultiScene):
             )
         )
 
-        scenes.append(
-            SlidingImage(
-                image_file="artist/troyboi_glitch_cartwheel.png",
-                speed=1,
-            )
-        )
         scenes.append(YoListenRenderer())
 
         super().__init__(scenes)
