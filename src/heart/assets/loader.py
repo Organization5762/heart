@@ -1,7 +1,7 @@
 import json
 import os
-from typing import Any
 from functools import cache
+from typing import Any
 
 import pygame
 

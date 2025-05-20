@@ -130,25 +130,33 @@ class GameLoop:
                     logger.info("Switching to OPENGL mode")
                     pygame.display.set_mode(
                         (
-                            self.device.full_display_size()[0] * self.device.scale_factor,
-                            self.device.full_display_size()[1] * self.device.scale_factor,
+                            self.device.full_display_size()[0]
+                            * self.device.scale_factor,
+                            self.device.full_display_size()[1]
+                            * self.device.scale_factor,
                         ),
                         pygame.OPENGL | pygame.DOUBLEBUF,
                     )
                 self._last_render_mode = pygame.OPENGL | pygame.DOUBLEBUF
-                screen = pygame.Surface(self.device.full_display_size(), pygame.SRCALPHA)
+                screen = pygame.Surface(
+                    self.device.full_display_size(), pygame.SRCALPHA
+                )
             else:
                 if self._last_render_mode != pygame.SHOWN:
                     logger.info("Switching to SHOWN mode")
                     pygame.display.set_mode(
                         (
-                            self.device.full_display_size()[0] * self.device.scale_factor,
-                            self.device.full_display_size()[1] * self.device.scale_factor,
+                            self.device.full_display_size()[0]
+                            * self.device.scale_factor,
+                            self.device.full_display_size()[1]
+                            * self.device.scale_factor,
                         ),
                         pygame.SHOWN,
                     )
                 self._last_render_mode = pygame.SHOWN
-                screen = pygame.Surface(self.device.full_display_size(), pygame.SRCALPHA)
+                screen = pygame.Surface(
+                    self.device.full_display_size(), pygame.SRCALPHA
+                )
 
             renderer._internal_process(
                 window=screen,

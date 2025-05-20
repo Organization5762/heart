@@ -88,7 +88,9 @@ class MarioRenderer(BaseRenderer):
             except Exception as e:
                 time.sleep(0.1)
                 self.accel = None
-            if self.accel is not None and (self.accel.z > 11.0):  # vibes based constants found by shaking totem
+            if self.accel is not None and (
+                self.accel.z > 11.0
+            ):  # vibes based constants found by shaking totem
                 self.highest_z = max(self.highest_z, self.accel.z)
                 print(f"highest z: {self.highest_z}, accel z: {self.accel.z}")
                 self.in_loop = True

@@ -6,11 +6,11 @@ from collections import defaultdict
 import numpy as np
 import pygame
 from OpenGL.GL import *
-from pygame import OPENGL, DOUBLEBUF
+from pygame import DOUBLEBUF, OPENGL
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
-from heart.device import Rectangle, Cube, Orientation
+from heart.device import Cube, Orientation, Rectangle
 from heart.display.renderers import BaseRenderer
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
@@ -109,12 +109,10 @@ class FractalScene(BaseRenderer):
         glUniform1f(self.ipdID, 0.04)
 
         # Create and bind fullscreen quad
-        fullscreen_quad = np.array([
-            -1.0, -1.0, 0.0,
-            1.0, -1.0, 0.0,
-            -1.0, 1.0, 0.0,
-            1.0, 1.0, 0.0],
-            dtype=np.float32)
+        fullscreen_quad = np.array(
+            [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0],
+            dtype=np.float32,
+        )
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, fullscreen_quad)
         glEnableVertexAttribArray(0)
 
@@ -123,9 +121,17 @@ class FractalScene(BaseRenderer):
         glBindTexture(GL_TEXTURE_2D, self.framebuffer_texture)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     self.window_size[0], self.window_size[1],
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            self.window_size[0],
+            self.window_size[1],
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            None,
+        )
 
     # Modified initialize to use the provided window
     def initialize(
@@ -135,11 +141,13 @@ class FractalScene(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        """Initialize the fractal renderer with the given window size"""
+        """Initialize the fractal renderer with the given window size."""
         print(f"OpenGL Version: {glGetString(GL_VERSION).decode('utf-8')}")
         print(f"OpenGL Vendor: {glGetString(GL_VENDOR).decode('utf-8')}")
         print(f"OpenGL Renderer: {glGetString(GL_RENDERER).decode('utf-8')}")
-        print(f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}")
+        print(
+            f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}"
+        )
 
         self.target_surface = window
         window_size = window.get_size()
@@ -162,7 +170,9 @@ class FractalScene(BaseRenderer):
             self.window_size = window_size
 
         # Create buffer for capturing pixels
-        self.surface_array = np.zeros((window_size[1], window_size[0], 4), dtype=np.uint8)
+        self.surface_array = np.zeros(
+            (window_size[1], window_size[0], 4), dtype=np.uint8
+        )
         self.screen_center = (window_size[0] / 2, window_size[1] / 2)
         pygame.mouse.set_visible(False)
         self._center_mouse()
@@ -183,21 +193,31 @@ class FractalScene(BaseRenderer):
         self.mode = "auto"
 
     def setup_tiled_rendering(self):
-        """Set up resources for tiled rendering"""
+        """Set up resources for tiled rendering."""
         # Create a pixel buffer to store the rendered result
-        self.pixels = np.zeros((self.render_size[0], self.render_size[1], 4), dtype=np.uint8)
+        self.pixels = np.zeros(
+            (self.render_size[0], self.render_size[1], 4), dtype=np.uint8
+        )
 
         # Create a texture to hold the rendered result for display
         self.display_texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.display_texture)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                     self.render_size[0], self.render_size[1],
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            self.render_size[0],
+            self.render_size[1],
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            None,
+        )
 
     def _apply_pending_uniforms(self):
-        """Apply any pending uniform changes to the active shader program"""
+        """Apply any pending uniform changes to the active shader program."""
         for key, val in self.shader.pending_uniforms.items():
             if key in _UNIFORMS:
                 val = _UNIFORMS[key]
@@ -216,7 +236,7 @@ class FractalScene(BaseRenderer):
             self.shader.pending_uniforms = {}
 
     def render_fractal(self):
-        """Render the fractal scene"""
+        """Render the fractal scene."""
         glUseProgram(self.program)
 
         # Apply any pending uniforms
@@ -230,16 +250,30 @@ class FractalScene(BaseRenderer):
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
 
     def render_to_surface(self):
-        """Copy the OpenGL rendering to the Pygame surface"""
+        """Copy the OpenGL rendering to the Pygame surface."""
         # Read pixels from framebuffer
 
         if self.tiled_mode:
             # glReadPixels(0, 0, self.render_size[0], self.render_size[1],
-            glReadPixels(0, 0, self.real_window_size[0], self.real_window_size[1],
-                         GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
+            glReadPixels(
+                0,
+                0,
+                self.real_window_size[0],
+                self.real_window_size[1],
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                self.surface_array,
+            )
         else:
-            glReadPixels(0, 0, self.window_size[0], self.window_size[1],
-                         GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
+            glReadPixels(
+                0,
+                0,
+                self.window_size[0],
+                self.window_size[1],
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                self.surface_array,
+            )
 
         # Convert to format suitable for Pygame surface
         # Note: OpenGL coordinates start from bottom-left, Pygame from top-left
@@ -256,7 +290,7 @@ class FractalScene(BaseRenderer):
         self.target_surface.blit(surf, (0, 0))
 
     def render_tiled(self):
-        """Render the texture tiled across the screen"""
+        """Render the texture tiled across the screen."""
         # Set viewport back to the real window size
         glViewport(0, 0, self.real_window_size[0], self.real_window_size[1])
 
@@ -302,8 +336,15 @@ class FractalScene(BaseRenderer):
             glEnd()
 
         # Read pixels for rendering to Pygame surface
-        glReadPixels(0, 0, self.real_window_size[0], self.real_window_size[1],
-                     GL_RGBA, GL_UNSIGNED_BYTE, self.surface_array)
+        glReadPixels(
+            0,
+            0,
+            self.real_window_size[0],
+            self.real_window_size[1],
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            self.surface_array,
+        )
 
         # Clean up
         glDisable(GL_TEXTURE_2D)
@@ -322,17 +363,11 @@ class FractalScene(BaseRenderer):
         s = math.sin(angle)
         c = math.cos(angle)
         if axis_ix == 0:
-            return np.array([[1, 0, 0],
-                             [0, c, -s],
-                             [0, s, c]], dtype=np.float32)
+            return np.array([[1, 0, 0], [0, c, -s], [0, s, c]], dtype=np.float32)
         elif axis_ix == 1:
-            return np.array([[c, 0, s],
-                             [0, 1, 0],
-                             [-s, 0, c]], dtype=np.float32)
+            return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]], dtype=np.float32)
         elif axis_ix == 2:
-            return np.array([[c, -s, 0],
-                             [s, c, 0],
-                             [0, 0, 1]], dtype=np.float32)
+            return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
 
     def _process_mouse(self):
         self.prev_mouse_pos = self.mouse_pos
@@ -408,10 +443,10 @@ class FractalScene(BaseRenderer):
             # === process input (dpad) ===
             xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
             if xd_mov != 0:
-                acc[0] += (xd_mov * self.speed_accel / self.max_fps)
+                acc[0] += xd_mov * self.speed_accel / self.max_fps
             if yd_mov != 0:
                 # dir flipped wrt dpad sign
-                acc[2] -= (yd_mov * self.speed_accel / self.max_fps)
+                acc[2] -= yd_mov * self.speed_accel / self.max_fps
 
             # === apply movement based on input ===
             if np.isclose(np.dot(acc, acc), 0.0):
@@ -428,7 +463,9 @@ class FractalScene(BaseRenderer):
 
                     # Smoothly interpolate current velocity toward target
                     lerp_factor = 0.1  # Adjust for faster/slower response
-                    self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
+                    self.vel = (
+                        self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
+                    )
 
             # === process movement (R stick) ===
             xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
@@ -450,7 +487,8 @@ class FractalScene(BaseRenderer):
             # invert the radius
             if gamepad.axis_tapped(mapping.AXIS_R):
                 self.BASE_RADIUS = (
-                    self._LO_BASE if self.BASE_RADIUS == self._HI_BASE
+                    self._LO_BASE
+                    if self.BASE_RADIUS == self._HI_BASE
                     else self._HI_BASE
                 )
 
@@ -458,17 +496,21 @@ class FractalScene(BaseRenderer):
             if gamepad.axis_passed_threshold(mapping.AXIS_L):
                 target = self.BASE_RADIUS + 0.2
                 self.active_radius = lerp(
-                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                    self.active_radius,
+                    target,
+                    self.delta_real_time * self.INFLATE_SPEED,
                 )
             else:
                 target = self.BASE_RADIUS
                 self.active_radius = lerp(
-                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                    self.active_radius,
+                    target,
+                    self.delta_real_time * self.INFLATE_SPEED,
                 )
 
             if not self.tiled_mode:
                 # eagerly apply the uniforms
-                self.shader.set('s_radius', self.active_radius)
+                self.shader.set("s_radius", self.active_radius)
 
             # rotations
             if gamepad.is_held(mapping.BUTTON_ZL):
@@ -500,7 +542,6 @@ class FractalScene(BaseRenderer):
         if keys[pygame.K_s]:
             acc[2] += self.speed_accel / self.max_fps
 
-
         # Apply acceleration or deceleration
         if np.dot(acc, acc) == 0.0:
             self.vel *= self.speed_decel
@@ -521,8 +562,7 @@ class FractalScene(BaseRenderer):
         # invert the radius
         if keys[pygame.K_r] and not self.key_pressed_last_frame[pygame.K_r]:
             self.BASE_RADIUS = (
-                self._LO_BASE if self.BASE_RADIUS == self._HI_BASE
-                else self._HI_BASE
+                self._LO_BASE if self.BASE_RADIUS == self._HI_BASE else self._HI_BASE
             )
         self.key_pressed_last_frame[pygame.K_r] = keys[pygame.K_r]
 
@@ -531,12 +571,16 @@ class FractalScene(BaseRenderer):
             if keys[pygame.K_SPACE]:
                 target = self.BASE_RADIUS + 0.2
                 self.active_radius = lerp(
-                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                    self.active_radius,
+                    target,
+                    self.delta_real_time * self.INFLATE_SPEED,
                 )
             else:
                 target = self.BASE_RADIUS
                 self.active_radius = lerp(
-                    self.active_radius, target, self.delta_real_time * self.INFLATE_SPEED
+                    self.active_radius,
+                    target,
+                    self.delta_real_time * self.INFLATE_SPEED,
                 )
         except Exception as e:
             # TODO: Very occasionally this raises an exception for some reason, no idea why
@@ -545,7 +589,7 @@ class FractalScene(BaseRenderer):
 
         if not self.tiled_mode:
             # eagerly apply the uniforms
-            self.shader.set('s_radius', self.active_radius)
+            self.shader.set("s_radius", self.active_radius)
 
         # rotations
         if keys[pygame.K_q]:
@@ -608,7 +652,7 @@ class FractalScene(BaseRenderer):
         # Render either in normal or tiled mode
         if self.tiled_mode:
             # queue uniforms to send to shader
-            self.shader.set('s_radius', self.active_radius, lazy=True)
+            self.shader.set("s_radius", self.active_radius, lazy=True)
 
             # Set viewport to the small render size
             glViewport(0, 0, self.render_size[0], self.render_size[1])
@@ -620,12 +664,29 @@ class FractalScene(BaseRenderer):
             self.render_fractal()
 
             # Read the pixels from the framebuffer
-            glReadPixels(0, 0, self.render_size[0], self.render_size[1], GL_RGBA, GL_UNSIGNED_BYTE, self.pixels)
+            glReadPixels(
+                0,
+                0,
+                self.render_size[0],
+                self.render_size[1],
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                self.pixels,
+            )
 
             # Upload the pixels to our display texture
             glBindTexture(GL_TEXTURE_2D, self.display_texture)
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.render_size[0], self.render_size[1], GL_RGBA, GL_UNSIGNED_BYTE,
-                            self.pixels)
+            glTexSubImage2D(
+                GL_TEXTURE_2D,
+                0,
+                0,
+                0,
+                self.render_size[0],
+                self.render_size[1],
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                self.pixels,
+            )
 
             # Render the tiled view
             self.render_tiled()
@@ -644,7 +705,6 @@ class FractalScene(BaseRenderer):
             self.render_to_surface()
 
         # self._check_switch_auto(peripheral_manager)
-
 
     def check_collision(self):
         # copy origin
@@ -702,9 +762,7 @@ def main():
                     running = False
 
             # Process and render
-            scene._internal_process(
-                screen, clock, manager, Rectangle.with_layout(1, 1)
-            )
+            scene._internal_process(screen, clock, manager, Rectangle.with_layout(1, 1))
 
             # Update the display
             pygame.display.flip()

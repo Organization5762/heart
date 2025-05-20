@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""
-Test runner for the *PhoneText* BLE peripheral.
+"""Test runner for the *PhoneText* BLE peripheral.
 
 This small helper script simply instantiates :class:`heart.peripheral.phone_text.PhoneText`
 so that it can be launched from the command line.  The actual BLE handling logic
 now lives in the *heart* package.
+
 """
 
 from heart.peripheral.phone_text import PhoneText

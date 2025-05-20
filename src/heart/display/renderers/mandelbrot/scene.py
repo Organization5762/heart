@@ -506,9 +506,7 @@ class MandelbrotMode(BaseRenderer):
         text_surfaces = [
             self.font.render(f"X: {self.state.movement.x}", True, text_color),
             self.font.render(f"Y: {self.state.movement.y}", True, text_color),
-            self.font.render(
-                f"Iter: {self.state.max_iterations}", True, text_color
-            ),
+            self.font.render(f"Iter: {self.state.max_iterations}", True, text_color),
             self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
             self.font.render(
                 f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
