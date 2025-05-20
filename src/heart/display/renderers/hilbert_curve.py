@@ -21,7 +21,7 @@ class HilbertScene(BaseRenderer):
         self.max_order = 7
         self.xmargin = 0
         self.ymargin = 0
-        self.resample_count = 100000  # Number of points to use for interpolation.
+        self.resample_count = 10000  # Number of points to use for interpolation.
         self.morph_duration = 0.5  # Seconds for the morph transition.
         self.hold_duration = 0.5  # Hold time after morph completes.
 
@@ -190,7 +190,7 @@ class HilbertScene(BaseRenderer):
         # text = font.render(f"Hilbert Curve Order: {self.current_order}", True, (220, 220, 220))
         # window.blit(text, (10, self.height - 30))
 
-        pygame.display.flip()
+        # pygame.display.flip()
 
 
 def compute_bounding_box(points):
