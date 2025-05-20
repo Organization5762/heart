@@ -19,6 +19,10 @@ class Color:
                 variant >= 0 and variant <= 255
             ), f"Expected all color values to be between 0 and 255. Found {self.rgb}"
 
+    def tuple(self):
+        return self._as_tuple()
+
+    # todo (clem): why is this private anyway, re-exposed above
     def _as_tuple(self):
         return (self.r, self.g, self.b)
 

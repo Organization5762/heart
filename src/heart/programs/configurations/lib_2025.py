@@ -12,6 +12,9 @@ from heart.display.renderers.multicolor import MulticolorRenderer
 from heart.display.renderers.pixels import Border, RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
+from heart.display.renderers.three_fractal import FractalScene
+from heart.display.renderers.yolisten import YoListenRenderer
+from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.display.renderers.yolisten import YoListenRenderer
@@ -38,6 +41,9 @@ def configure(loop: GameLoop) -> None:
         )
     )
     modelbrot.add_renderer(MandelbrotMode())
+
+    sphere_mode = loop.add_mode("3d fractal")
+    sphere_mode.add_renderer(FractalScene(loop.device))
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene())

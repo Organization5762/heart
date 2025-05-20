@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import time
 from collections import defaultdict
 from enum import Enum
@@ -8,6 +9,7 @@ import pygame.joystick
 from pygame.event import Event
 
 from heart.peripheral.core import Peripheral, events
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +37,10 @@ class Gamepad(Peripheral):
         self._pressed_prev_frame = defaultdict(bool)
         self._pressed_curr_frame = defaultdict(bool)
         self._axis_prev_frame = defaultdict(float)
+        self._axis_tapped_prev_frame = defaultdict(lambda: False)
         self._axis_curr_frame = defaultdict(float)
+        self._dpad_last_frame = (0, 0)
+        self._dpad_curr_frame = (0, 0)
 
     def is_held(self, button_id: int) -> bool:
         return self._pressed_curr_frame[button_id]
@@ -60,16 +65,14 @@ class Gamepad(Peripheral):
     def axis_passed_threshold(self, axis_id: int, threshold: float = 0) -> bool:
         return self._axis_curr_frame[self.axis_key(axis_id)] > threshold
 
-    def axis_tapped(self, axis_id: int) -> bool:
-        tapped = self._tap_flag[self.axis_key(axis_id)]
-        self._tap_flag[self.axis_key(axis_id)] = False
-        return tapped
+    def axis_tapped(self, axis_id: int, threshold: float = 0) -> bool:
+        tapped = self._axis_curr_frame[self.axis_key(axis_id)] > threshold
+        tapped_last_frame = self._axis_tapped_prev_frame[self.axis_key(axis_id)]
+        self._axis_tapped_prev_frame[self.axis_key(axis_id)] = tapped
+        return tapped and not tapped_last_frame
 
-    def axis_toggle(self, axis_id: int, threshold: float = 0) -> bool:
-        return (
-            self._axis_curr_frame[self.axis_key(axis_id)] >= threshold
-            and not self._axis_prev_frame[axis_id] >= threshold
-        )
+    def get_dpad_value(self):
+        return self._dpad_curr_frame
 
     def reset(self):
         self.joystick.quit()
@@ -110,8 +113,13 @@ class Gamepad(Peripheral):
         return f"axis{axis_id}"
 
     def update(self):
+        try:
+            self._update()
+        except Exception as e:
+            print(f"Error updating gamepad state: {e}")
+
+    def _update(self):
         if not self.joystick:
-            logger.warning("joystick not initialized")
             return
 
         # Refresh Pygame's internal event queue so that joystick state is up-to-date
@@ -125,7 +133,9 @@ class Gamepad(Peripheral):
         now = pygame.time.get_ticks()
         self._pressed_prev_frame = self._pressed_curr_frame.copy()
         self._axis_prev_frame = self._axis_curr_frame.copy()
+        self._dpad_last_frame = self._dpad_curr_frame
 
+        self._dpad_curr_frame = self.joystick.get_hat(0)
         for button_id in range(self.num_buttons):
             pressed = bool(self.joystick.get_button(button_id))
             self._pressed_curr_frame[button_id] = pressed
@@ -178,7 +188,7 @@ class Gamepad(Peripheral):
                     try:
                         self.joystick = pygame.joystick.Joystick(0)
                         self.joystick.init()
-                        print(f"{self.joystick.get_name()} connected")
+                        print(f"{self.joystick.get_name()} ready")
                     except pygame.error as e:
                         print(f"Error connecting joystick: {e}")
                         # trying to touch joystick module from a thread becomes weird af
@@ -192,6 +202,24 @@ class Gamepad(Peripheral):
                     cached_name = self.joystick.get_name()
                     self.reset()
                     print(f"{cached_name} disconnected")
+
+                # Todo: We're reaching unfathomable levels of hard-coding.
+                #  This will only work specifically with our pi4, and our 8bitdo
+                #  controller. We only know the mac address bc we've explicitly
+                #  paired the 8bitdo controller with the raspberry pi.
+                #  God help us if it ever unpairs.
+                if Configuration.is_pi():
+                    if not Gamepad.gamepad_detected():
+                        result = subprocess.run(
+                            ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
+                            capture_output=True,
+                            text=True
+                        )
+                        if result.returncode == 0:
+                            print("Successfully connected to 8bitdo controller")
+                        else:
+                            print(f"Failed to connect to 8bitdo controller")
+
             except KeyboardInterrupt:
                 print("Program terminated")
             except Exception:

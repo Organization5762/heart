@@ -192,8 +192,6 @@ class HilbertScene(BaseRenderer):
 
         pygame.display.flip()
 
-        clock.tick(self.FPS)
-
 
 def compute_bounding_box(points):
     """Compute the bounding box (min_x, min_y, max_x, max_y) for a list of points."""

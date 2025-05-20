@@ -9,9 +9,8 @@ from heart.peripheral.core.manager import PeripheralManager
 class SlideTransitionRenderer(BaseRenderer):
     """Slides renderer_B into view while renderer_A moves out.
 
-    direction  =  1  → B comes from the right  (A → left) direction  = -1  → B comes
-    from the left   (A → right)
-
+    direction  =  1  → B comes from the right  (A → left)
+    direction  = -1  → B comes from the left   (A → right)
     """
 
     def __init__(
@@ -20,13 +19,13 @@ class SlideTransitionRenderer(BaseRenderer):
         renderer_B: BaseRenderer,
         *,
         direction: int = 1,
-        slide_speed: int = 2,
+        slide_speed: int = 10,
     ) -> None:
         super().__init__()
         self.renderer_A = renderer_A
         self.renderer_B = renderer_B
         self.direction = 1 if direction >= 0 else -1
-        self.slide_speed = slide_speed
+        self.slide_speed = slide_speed  # Use the parameter value instead of hardcoding
 
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
@@ -69,7 +68,11 @@ class SlideTransitionRenderer(BaseRenderer):
                 else self.slide_speed * (1 if dist > 0 else -1)
             )
             self._x_offset += step_size
-            if self._x_offset <= self._target_offset:
+
+            # Check if we've reached or passed the target in either direction
+            if (self.direction > 0 and self._x_offset <= self._target_offset) or \
+                    (self.direction < 0 and self._x_offset >= self._target_offset):
+                self._x_offset = self._target_offset  # Ensure it stops exactly at target
                 self._sliding = False
 
         # ----------------------------------------------------------------- #
@@ -94,7 +97,6 @@ class SlideTransitionRenderer(BaseRenderer):
         offset_A = (self._x_offset, 0)
         offset_B = (self._x_offset + self.direction * self._screen_w, 0)
 
-        # Just draw a pink screen
-        # surf_A.fill((255, 0, 255))
+        # Draw the renderers at their current positions
         window.blit(surf_A, offset_A)
         window.blit(surf_B, offset_B)
