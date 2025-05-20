@@ -2,6 +2,7 @@ from heart.display.color import Color
 from heart.display.renderers.artist import ArtistScene
 from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.display.renderers.heart_title_screen import HeartTitleScreen
+from heart.display.renderers.free_text import FreeTextRenderer
 from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.image import RenderImage
 from heart.display.renderers.kirby import KirbyScene
@@ -9,7 +10,6 @@ from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.mario import MarioRenderer
 from heart.display.renderers.multicolor import MulticolorRenderer
-from heart.display.renderers.pixels import Border, RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.three_fractal import FractalScene
@@ -17,12 +17,14 @@ from heart.display.renderers.yolisten import YoListenRenderer
 from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
-from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer
 
 
 def configure(loop: GameLoop) -> None:
+    free_text_mode = loop.add_mode("free text")
+    free_text_mode.add_renderer(FreeTextRenderer())
+
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene())
 
