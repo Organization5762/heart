@@ -61,7 +61,13 @@ class AppController(BaseRenderer):
 
     def add_scene(self) -> "MultiScene":
         new_scene = MultiScene(scenes=[])
-        self.modes.add_new_pages(new_scene)
+        title_renderer = TextRendering(
+            text=["Untitled"],
+            font="Roboto",
+            font_size=14,
+            color=Color(255, 105, 180),
+        )
+        self.modes.add_new_pages(title_renderer, new_scene)
         return new_scene
 
     def add_mode(
@@ -87,8 +93,7 @@ class AppController(BaseRenderer):
             raise ValueError("Title must be a string or BaseRenderer, got: ", title)
 
         # TODO: Clean-up
-        self.modes.title_renderers.append(title_renderer)
-        self.modes.add_new_pages(result)
+        self.modes.add_new_pages(title_renderer, result)
         return result
 
     def is_empty(self) -> bool:
@@ -117,6 +122,23 @@ class GameModes(BaseRenderer):
         self.key_pressed_last_frame = defaultdict(lambda: False)
         self.gamepad_last_frame = defaultdict(lambda: False)
 
+    def __repr__(self) -> str:
+        return (
+            f"GameModes("
+            f"in_select_mode={self.in_select_mode}, "
+            f"last_long_button_value={self.last_long_button_value}, "
+            f"mode_offset={self.mode_offset}, "
+            f"_active_mode_index={self._active_mode_index}, "
+            f"time_last_debugging_press={self.time_last_debugging_press}, "
+            f"previous_mode_index={self.previous_mode_index}, "
+            f"sliding_transition={self.sliding_transition}, "
+            f"title_renderers={self.title_renderers}, "
+            f"renderers={self.renderers}, "
+            f"key_pressed_last_frame={dict(self.key_pressed_last_frame)}, "
+            f"gamepad_last_frame={dict(self.gamepad_last_frame)}"
+            f")"
+        )
+
     def initialize(
         self,
         window: pygame.Surface,
@@ -127,8 +149,9 @@ class GameModes(BaseRenderer):
         for renderer in self.renderers:
             renderer.initialize(window, clock, peripheral_manager, orientation)
 
-    def add_new_pages(self, *renderers: "BaseRenderer") -> None:
-        self.renderers.extend(renderers)
+    def add_new_pages(self, title_renderer: "BaseRenderer", renderers: "BaseRenderer") -> None:
+        self.renderers.append(renderers)
+        self.title_renderers.append(title_renderer)
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
@@ -249,23 +272,27 @@ class GameModes(BaseRenderer):
                 peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
             )
 
+
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
-        last_render_index = len(self.renderers) - 1
+        render_count = len(self.renderers) - 1
+        last_scene_index = self.previous_mode_index
 
-        if self.previous_mode_index != mode_index:
-            if mode_index == 0 and self.previous_mode_index == last_render_index:
+        if last_scene_index != mode_index:
+            if mode_index == 0 and last_scene_index == render_count:
                 slide_dir = 1
-            elif mode_index == last_render_index and self.previous_mode_index == 0:
+            # This one isn't being hit because `previous_mode_index`
+            elif mode_index == render_count and last_scene_index == 0:
                 slide_dir = -1
             else:
-                slide_dir = mode_index - self.previous_mode_index
+                slide_dir = mode_index - last_scene_index
 
             self.sliding_transition = SlideTransitionRenderer(
-                renderer_A=self.title_renderers[self.previous_mode_index],
+                renderer_A=self.title_renderers[last_scene_index],
                 renderer_B=self.title_renderers[mode_index],
                 direction=slide_dir,
             )
+            
             self.previous_mode_index = mode_index
             return self.sliding_transition
 

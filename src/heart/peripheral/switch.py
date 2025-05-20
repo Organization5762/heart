@@ -113,7 +113,29 @@ class Switch(BaseSwitch):
 class BluetoothSwitch(BaseSwitch):
     def __init__(self, device: BLEDevice, *args, **kwargs) -> None:
         self.listener = UartListener(device=device)
+        self.switches = [
+            BaseSwitch(),
+            BaseSwitch(),
+            BaseSwitch(),
+            BaseSwitch(),
+        ]
         super().__init__(*args, **kwargs)
+
+    def update_due_to_data(self, data: dict[str, int]) -> None:
+        producer_id = int(data["producer_id"])
+        self.switches[producer_id].update_due_to_data(data)
+
+    def switch_zero(self) -> BaseSwitch:
+        return self.switches[0]
+
+    def switch_one(self) -> BaseSwitch:
+        return self.switches[1]
+
+    def switch_two(self) -> BaseSwitch:
+        return self.switches[2]
+
+    def switch_three(self) -> BaseSwitch:
+        return self.switches[3]
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
