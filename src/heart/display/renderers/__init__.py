@@ -5,7 +5,9 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.utilities.logging import get_logger
 
+logger = get_logger(__name__)
 
 class BaseRenderer:
     @property
@@ -34,7 +36,7 @@ class BaseRenderer:
                 screen = self._get_input_screen(window, orientation)
                 self.process(screen, clock, peripheral_manager, orientation)
         except Exception as e:
-            print(f"Error initializing renderer: {e}")
+            logger.warning(f"Error initializing renderer ({type(self)}): {e}")
         self.initialized = True
 
     def reset(self):
