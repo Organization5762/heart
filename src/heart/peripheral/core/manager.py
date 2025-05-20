@@ -79,7 +79,7 @@ class PeripheralManager:
             switches = list(FakeSwitch.detect())
 
         for switch in switches:
-            logger.info("Adding switch", self._deprecated_main_switch, switch)
+            logger.info(f"Adding switch - {switch}")
             if self._deprecated_main_switch is None:
                 self._deprecated_main_switch = switch
             yield switch
