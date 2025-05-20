@@ -73,10 +73,12 @@ class PeripheralManager:
             switches = itertools.chain(
                 Switch.detect(),
                 BluetoothSwitch.detect(),
-                FakeSwitch.detect(),
             )
             switches = list(switches)
             logger.info("Found %d switches", len(switches))
+            if len(switches) == 0:
+                logger.warning("No switches found")
+                switches = list(FakeSwitch.detect())
         else:
             logger.info("Not running on pi, using fake switch")
             switches = list(FakeSwitch.detect())
