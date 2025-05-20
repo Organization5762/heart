@@ -1,5 +1,7 @@
 import json
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import pygame
 
@@ -12,6 +14,52 @@ from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2B
 from heart.utilities.env import Configuration
 
 
+@dataclass
+class Size:
+    w: int
+    h: int
+
+
+@dataclass
+class BoundingBox(Size):
+    x: int
+    y: int
+
+
+@dataclass
+class FrameDescription:
+    frame: BoundingBox
+    spriteSourceSize: BoundingBox
+    sourceSize: Size
+    duration: int
+    rotated: bool
+    trimmed: bool
+
+    @classmethod
+    def from_dict(cls, json_data: dict[str, Any]):
+        return cls(
+            frame=BoundingBox(
+                x=json_data["frame"]["x"],
+                y=json_data["frame"]["y"],
+                w=json_data["frame"]["w"],
+                h=json_data["frame"]["h"],
+            ),
+            spriteSourceSize=BoundingBox(
+                x=json_data["spriteSourceSize"]["x"],
+                y=json_data["spriteSourceSize"]["y"],
+                w=json_data["spriteSourceSize"]["w"],
+                h=json_data["spriteSourceSize"]["h"],
+            ),
+            sourceSize=Size(
+                w=json_data["sourceSize"]["w"],
+                h=json_data["sourceSize"]["h"],
+            ),
+            duration=json_data["duration"],
+            rotated=json_data["rotated"],
+            trimmed=json_data["trimmed"],
+        )
+
+
 class LoopPhase(Enum):
     START = "start"
     LOOP = "loop"
@@ -20,15 +68,65 @@ class LoopPhase(Enum):
 
 # Searching mode loop.
 class SpritesheetLoop(BaseRenderer):
-    def __init__(
-        self,
+    @classmethod
+    def from_frame_data(
+        cls,
         sheet_file_path: str,
-        metadata_file_path: str,
+        duration: int,
         image_scale: float = 1.0,
         offset_x: int = 0,
         offset_y: int = 0,
         disable_input: bool = False,
         boomerang: bool = False,
+        skip_last_frame: bool = False,
+    ):
+        sheet = Loader.load_spirtesheet(sheet_file_path)
+        size = sheet.get_size()
+        # X / 64 = number of frames
+        number_of_frames = size[0] // 64
+        if skip_last_frame:
+            number_of_frames -= 1
+        frames = [(64 * i, 0, 64, size[1]) for i in range(number_of_frames)]
+
+        # Create FrameDescriptions
+        frame_descriptions = []
+        for frame_number in range(number_of_frames):
+            x = frame_number * 64
+            y = 0
+            w = 64
+            h = size[1]
+            frame_descriptions.append(
+                FrameDescription(
+                    frame=BoundingBox(x=x, y=y, w=w, h=h),
+                    spriteSourceSize=BoundingBox(x=0, y=0, w=w, h=h),
+                    sourceSize=Size(w=w, h=h),
+                    duration=duration,
+                    rotated=False,
+                    trimmed=False,
+                )
+            )
+
+        return cls(
+            sheet_file_path=sheet_file_path,
+            metadata_file_path=None,
+            image_scale=image_scale,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            disable_input=disable_input,
+            boomerang=boomerang,
+            frame_data=frame_descriptions,
+        )
+
+    def __init__(
+        self,
+        sheet_file_path: str,
+        metadata_file_path: str | None = None,
+        image_scale: float = 1.0,
+        offset_x: int = 0,
+        offset_y: int = 0,
+        disable_input: bool = False,
+        boomerang: bool = False,
+        frame_data: list[FrameDescription] | None = None,
     ) -> None:
         super().__init__()
         self.disable_input = disable_input
@@ -37,26 +135,51 @@ class SpritesheetLoop(BaseRenderer):
         self.file = sheet_file_path
         self.boomerang = boomerang
         self.reverse_direction = False
-        frame_data = Loader.load_json(metadata_file_path)
+
+        assert (
+            frame_data is not None or metadata_file_path is not None
+        ), "Must provide either frame_data or metadata_file_path"
 
         self.start_frames = []
         self.loop_frames = []
         self.end_frames = []
         self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
-        for key in frame_data["frames"]:
-            frame_obj = frame_data["frames"][key]
-            frame = frame_obj["frame"]
-            parsed_tag, _ = key.split(" ", 1)
-            if parsed_tag not in self.frames:
-                tag = LoopPhase.LOOP
-            else:
-                tag = LoopPhase(parsed_tag)
-            self.frames[tag].append(
-                KeyFrame(
-                    (frame["x"], frame["y"], frame["w"], frame["h"]),
-                    frame_obj["duration"],
+
+        if frame_data is None:
+            frame_data = Loader.load_json(metadata_file_path)
+            for key in frame_data["frames"]:
+                frame_obj = FrameDescription.from_dict(frame_data["frames"][key])
+                frame = frame_obj.frame
+                parsed_tag, _ = key.split(" ", 1)
+                if parsed_tag not in self.frames:
+                    tag = LoopPhase.LOOP
+                else:
+                    tag = LoopPhase(parsed_tag)
+                self.frames[tag].append(
+                    KeyFrame(
+                        (
+                            frame.x,
+                            frame.y,
+                            frame.w,
+                            frame.h,
+                        ),
+                        frame_obj.duration,
+                    )
                 )
-            )
+        else:
+            for frame_description in frame_data:
+                self.frames[LoopPhase.LOOP].append(
+                    KeyFrame(
+                        (
+                            frame_description.frame.x,
+                            frame_description.frame.y,
+                            frame_description.frame.w,
+                            frame_description.frame.h,
+                        ),
+                        frame_description.duration,
+                    )
+                )
+
         self.phase = LoopPhase.LOOP
         if len(self.frames[LoopPhase.START]) > 0:
             self.phase = LoopPhase.START

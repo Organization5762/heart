@@ -101,9 +101,7 @@ class FreeTextRenderer(BaseRenderer):
             for paragraph in text.split("\n"):
                 # Use textwrap with break_long_words=False to avoid cutting words
                 wrapped_lines = textwrap.wrap(
-                    paragraph, 
-                    width=max_chars_per_line, 
-                    break_long_words=False
+                    paragraph, width=max_chars_per_line, break_long_words=False
                 ) or [""]
                 wrapped.extend(wrapped_lines)
 
@@ -131,12 +129,10 @@ class FreeTextRenderer(BaseRenderer):
         for paragraph in text.split("\n"):
             # Use break_long_words=False here too for consistency
             wrapped_lines = textwrap.wrap(
-                paragraph, 
-                width=max_chars_per_line, 
-                break_long_words=False
+                paragraph, width=max_chars_per_line, break_long_words=False
             ) or [""]
             wrapped.extend(wrapped_lines)
-            
+
         return fallback_font, wrapped
 
     # ------------------------------------------------------------------
@@ -179,10 +175,10 @@ class FreeTextRenderer(BaseRenderer):
 
         # Calculate how many lines can fit in the window height
         max_lines_visible = max(1, window_height // self._line_height)
-        
+
         # Truncate lines to only show what fits in the window
         visible_lines = self._wrapped_lines[:max_lines_visible]
-        
+
         # Calculate total height of visible lines
         total_height = len(visible_lines) * self._line_height
 

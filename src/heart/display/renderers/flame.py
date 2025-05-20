@@ -1,12 +1,13 @@
 import numpy as np
+import pygame
+import pygame.surfarray as sarr
+import pygame.transform as pgt
+from pygame import Surface
+
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
-import pygame
-from pygame import Surface
-import pygame.surfarray as sarr
-import pygame.transform as pgt
 
 
 # ------------------------------------------------------------------------------------
@@ -19,7 +20,11 @@ def _step(a, threshold):
 
 
 def _mix(a, b, alpha):
-    """GLSL-style mix().  Handles scalar / greyscale / per-channel alpha."""
+    """GLSL-style mix().
+
+    Handles scalar / greyscale / per-channel alpha.
+
+    """
     if np.isscalar(alpha):
         return a * (1.0 - alpha) + b * alpha
 
@@ -40,7 +45,11 @@ def _smoothstep(edge0, edge1, x):
 #  Noise helpers (unchanged – already nicely vectorised)
 # ------------------------------------------------------------------------------------
 def _noise21(ix, iy):
-    """Hash → scalar noise in [0,1].  Guaranteed deterministic."""
+    """Hash → scalar noise in [0,1].
+
+    Guaranteed deterministic.
+
+    """
     ix = ix.astype(np.int64, copy=False)
     iy = iy.astype(np.int64, copy=False)
 
@@ -117,9 +126,10 @@ def _voronoi(u, v, t):
 
 
 def _flame_layer(u, v, t, col_rgb, thr):
-    """
-    Legacy helper kept for external callers.
+    """Legacy helper kept for external callers.
+
     Internally the generator now pre-computes expensive pieces once per frame.
+
     """
     ln = _layer_noise(u + 0.125 * t, v - 0.25 * t)  # Half speed (0.25→0.125, 0.5→0.25)
     vn = _voronoi(u * 3.0, v * 3.0 - 0.125 * t, t)  # Half speed (0.25→0.125)
@@ -166,9 +176,10 @@ class FlameGenerator:
     #  Public API
     # -------------------------------------------------------------------------
     def surface(self, t: float, side: str = "bottom") -> pygame.Surface:
-        """
-        Generate the flame strip for the given time `t`.
+        """Generate the flame strip for the given time `t`.
+
         side ∈ {"bottom","top","left","right"} – controls orientation.
+
         """
         u, v = self.u, self.v0  # aliases: no copies
         col = self._col_buf
@@ -213,9 +224,10 @@ class FlameGenerator:
 
 
 class FlameRenderer(BaseRenderer):
-    """
-    A renderer that displays flames on all four sides of the screen.
+    """A renderer that displays flames on all four sides of the screen.
+
     Similar to the flame borders used in MaxBpmScreen.
+
     """
 
     def __init__(self) -> None:
@@ -239,13 +251,13 @@ class FlameRenderer(BaseRenderer):
 
         # Generate the base flame surface once
         base_flame = self._flame_generator.surface(t, "bottom")
-        
+
         # Transform the base flame for other orientations
         flame_surfaces = {
             "bottom": base_flame,
             "top": pgt.flip(base_flame.copy(), False, True),
             "left": pgt.rotate(base_flame.copy(), -90),
-            "right": pgt.rotate(base_flame.copy(), 90)
+            "right": pgt.rotate(base_flame.copy(), 90),
         }
 
         # Get window dimensions

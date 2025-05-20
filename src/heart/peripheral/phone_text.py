@@ -8,8 +8,8 @@ null terminator (`\0`).  The most-recent message is available via
 `PhoneText.get_last_text()` for inspection by other code/tests.
 """
 
-from collections.abc import Iterator
 import time
+from collections.abc import Iterator
 
 from heart.peripheral.core import Peripheral
 
@@ -87,7 +87,8 @@ class PhoneText(Peripheral):
         return self._last_text
 
     def pop_text(self) -> str | None:
-        """Return the most recent text that was sent to the peripheral and clear the buffer."""
+        """Return the most recent text that was sent to the peripheral and clear the
+        buffer."""
         if not self.new_text:
             return None
         text = self._last_text

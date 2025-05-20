@@ -1,7 +1,7 @@
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.image import RenderImage
-from heart.display.renderers.sliding_image import SlidingImage
+from heart.display.renderers.sliding_image import SlidingImage, SlidingRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.yolisten import YoListenRenderer
@@ -17,9 +17,9 @@ class ArtistScene(MultiScene):
             "imaginal_disk_animated",
             "rainbow_tesseract",
             "dancing_robot",
-            "jamie_xx_in_color",
             "jamie_xx_life",
             "john_summit_neon",
+            "troyboi_glitch_cartwheel",
         ]:
             scenes.append(
                 SpritesheetLoop(
@@ -30,13 +30,15 @@ class ArtistScene(MultiScene):
             )
 
         for artist in [
-            "troyboi_glitch_cartwheel",
+            "jamie_xx_in_color",
         ]:
             scenes.append(
-                SpritesheetLoop(
+                SpritesheetLoop.from_frame_data(
                     sheet_file_path=f"artist/{artist}.png",
-                    metadata_file_path=f"artist/{artist}.json",
+                    duration=75,
                     boomerang=False,
+                    # Assumes the loop begins and ends on the same
+                    skip_last_frame=True,
                 )
             )
 
