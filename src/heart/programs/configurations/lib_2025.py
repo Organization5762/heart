@@ -82,7 +82,7 @@ def configure(loop: GameLoop) -> None:
                     text=["shroomed"],
                     font="Roboto",
                     font_size=14,
-                    color=Color(255, 105, 180),
+                    color=Color(0, 0, 0),
                     y_location=32,
                 ),
             ]
@@ -132,7 +132,7 @@ def configure(loop: GameLoop) -> None:
     artist_mode = loop.add_mode(ArtistScene.title_scene())
     artist_mode.add_renderer(ArtistScene())
 
-    mode = loop.add_mode("friend beacon")
+    mode = loop.add_mode("friend\nbeacon")
 
     # TODO: Refactor
     text = ["Lost my\nfriends\nagain"]
@@ -144,26 +144,30 @@ def configure(loop: GameLoop) -> None:
                 "cal",
                 "clem",
                 "michaēl",
+                "james",
                 "eric",
+                "macy",
                 "faye",
                 "big W",
-                "spriha",
-                "andrew",
                 "mel",
                 "stu",
                 "elena",
+                "steve",
                 "jill",
                 "graham",
-                "russell",
                 "sam",
+                "matt",
                 "sri",
+                "amir",
+                "sue anna",
+                "brody",
             ]
         ]
     )
     text.append("Where is\neveryone")
     mode.add_renderer(
         TextRendering(
-            font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
+            font="Comic Sans MS", font_size=14, color=Color(255, 105, 180), text=text
         )
     )
 
