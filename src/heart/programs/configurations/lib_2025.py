@@ -14,7 +14,12 @@ from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
+from heart.display.renderers.tixyland import Tixyland
 from heart.display.renderers.yolisten import YoListenRenderer
+from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.display.renderers.life import Life
+from heart.display.renderers.pixels import Border, RandomPixel
+from heart.navigation import MultiScene
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer
 
@@ -155,3 +160,61 @@ def configure(loop: GameLoop) -> None:
             font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
         )
     )
+    
+    # Some random ones
+    tixyland = loop.add_mode(
+        TextRendering(
+            text=["tixyland"],
+            font="Roboto",
+            font_size=14,
+            color=Color(255, 105, 180),
+            y_location=32,
+        )
+    )
+    mode.add_renderer(
+        MultiScene(
+            [
+                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
+                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
+                Tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
+                Tixyland(fn=lambda t, i, x, y: y - t * t),
+                Tixyland(
+                    fn=lambda t, i, x, y: np.sin(
+                        t
+                        - np.sqrt((x - x.shape[0] / 2) ** 2 + (y - y.shape[1] / 2) ** 2)
+                    )
+                ),
+                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                Tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
+            ]
+        )
+    )
+
+    life = loop.add_mode("life")
+    life.add_renderer(Life())
+
+    spooky = loop.add_mode("spook")
+    spooky.add_renderer(
+        SpritesheetLoopRandom(
+            screen_width=64,
+            screen_height=64,
+            screen_count=4,
+            sheet_file_path="spookyeye.png",
+            metadata_file_path="spookyeye.json",
+        )
+    )
+
+    confetti = loop.add_mode("confetti")
+    confetti.add_renderer(
+        ComposedRenderer(
+            [
+                RandomPixel(num_pixels=40000, brightness=0.05),
+                RandomPixel(num_pixels=4000, brightness=0.10),
+                RandomPixel(num_pixels=2000, brightness=0.25),
+                RandomPixel(num_pixels=500, brightness=0.50),
+                RandomPixel(num_pixels=50, brightness=1)
+            ]
+        )
+    )
+    
