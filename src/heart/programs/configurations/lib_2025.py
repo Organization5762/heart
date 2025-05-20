@@ -145,8 +145,8 @@ def configure(loop: GameLoop) -> None:
         MultiScene(
             [
                 *[
-                  TextRendering.default(text=f"Where's\n{name}")
-                  for name in [
+                    TextRendering.default(text=f"Where's\n{name}")
+                    for name in [
                         "seb",
                         "cal",
                         "clem",
@@ -165,8 +165,15 @@ def configure(loop: GameLoop) -> None:
                         "sam",
                         "matt",
                         "sri",
-                        "amir",
                         "sue anna",
+                        "pranay",
+                        "amir",
+                        "victor",
+                        "connor",
+                        "david",
+                        "penny",
+                        "nicole",
+                        "greg",
                         "brody",
                     ]
                 ],

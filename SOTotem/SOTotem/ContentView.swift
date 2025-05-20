@@ -1,51 +1,25 @@
 import SwiftUI
-import PhotosUI                       // iOS 15+
-import ImageIO
-import MobileCoreServices
-
-extension UIImage {
-    /// Returns a 64×64 copy using Lanczos resampling.
-    func resized(to side: CGFloat) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: .init(width: side, height: side))
-        return renderer.image { _ in
-            self.draw(in: CGRect(origin: .zero, size: renderer.format.bounds.size))
-        }
-    }
-}
 
 struct ContentView: View {
-    @StateObject private var bleManager = BLEManager()
+    @EnvironmentObject private var bleManager: BLEManager
     @State private var statusMessage = ""
     @State private var textToSend = ""
-
-    // Image-transfer state ---------------------------------------------
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var resized64: UIImage?
+    @State private var showDebugLog = false
     @State private var isSending = false
 
     // MARK: – Helpers ---------------------------------------------------
     private func send() {
         statusMessage = ""
-        if let uiImg = resized64, let png = uiImg.pngData() {
-            isSending = true
-            bleManager.sendImage(png) { success in
-                isSending = false
-                statusMessage = success ? "Image sent!" : "Failed to send image"
-            }
-        } else {
-            guard !textToSend.isEmpty else { return }
-            let txt = textToSend
-            isSending = true
-            bleManager.sendText(txt) { success in
-                isSending = false
-                statusMessage = success ? "Text sent!" : "Failed to send text"
+        guard !textToSend.isEmpty else { return }
+        let txt = textToSend
+        isSending = true
+        bleManager.sendText(txt) { success in
+            isSending = false
+            statusMessage = success ? "Text sent!" : "Failed to send text"
+            if success {
+                textToSend = ""   // clear after successful send
             }
         }
-    }
-
-    private func clearImage() {
-        resized64 = nil
-        pickerItem = nil
     }
 
     // MARK: – Body ------------------------------------------------------
@@ -55,6 +29,14 @@ struct ContentView: View {
                 Text("BLE iOS Client")
                     .font(.largeTitle)
                     .padding(.top)
+                
+                // Connection status
+                HStack {
+                    Text("Status:")
+                    Text(bleManager.connectionState)
+                        .foregroundColor(connectionStateColor(bleManager.connectionState))
+                        .bold()
+                }
 
                 // TEXT --------------------------------------------------
                 TextEditor(text: $textToSend)
@@ -64,29 +46,12 @@ struct ContentView: View {
                             .stroke(Color.secondary.opacity(0.4))
                     )
                     .padding(.horizontal)
-                    .disabled(resized64 != nil)
-                    .opacity(resized64 != nil ? 0.4 : 1)
-
-                // IMAGE -------------------------------------------------
-                if let uiImage = resized64 {
-                    Image(uiImage: uiImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .frame(width: 128, height: 128)
-                        .border(Color.gray)
-
-                    Button("Clear Image", role: .destructive, action: clearImage)
-                }
-
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Label("Choose Image", systemImage: "photo")
-                }
-                .disabled(!textToSend.isEmpty)       // mutual exclusion
+                    .disabled(isSending)
 
                 // SEND --------------------------------------------------
                 Button("Send", action: send)
                     .buttonStyle(.borderedProminent)
-                    .disabled((textToSend.isEmpty && resized64 == nil) || isSending)
+                    .disabled(textToSend.isEmpty || isSending)
 
                 // STATUS ------------------------------------------------
                 if isSending {
@@ -96,25 +61,60 @@ struct ContentView: View {
                         .foregroundColor(.primary)
                         .padding(.top, 2)
                 }
+                
+                // Add reset button for connection issues
+                Button(action: {
+                    bleManager.forgetAllConnections()
+                    statusMessage = "Connections reset"
+                }) {
+                    Label("Reset Connections", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .font(.footnote)
+                .padding(.top, 8)
+                .buttonStyle(.bordered)
+                .foregroundColor(.red)
+                .opacity(0.8)
+                
+                // Debug logs toggle
+                Button(action: {
+                    showDebugLog.toggle()
+                }) {
+                    Label(showDebugLog ? "Hide Debug Log" : "Show Debug Log", 
+                          systemImage: showDebugLog ? "chevron.up" : "chevron.down")
+                }
+                .font(.footnote)
+                .padding(.top, 4)
+                
+                // Debug log view
+                if showDebugLog {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(bleManager.debugLogs.suffix(10), id: \.self) { log in
+                            Text(log)
+                                .font(.system(size: 10, design: .monospaced))
+                                .lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(8)
+                    .background(Color.black.opacity(0.05))
+                    .cornerRadius(8)
+                }
             }
             .padding()
         }
-        // IMAGE LOAD TASK ----------------------------------------------
-        .task(id: pickerItem) {
-            if let data = try? await pickerItem?.loadTransferable(type: Data.self),
-               let img  = UIImage(data: data) {
-                resized64 = img.resized(to: 64)
-                textToSend = ""       // clear text so mutual exclusion holds
-            }
+    }
+    
+    // Helper to provide color based on connection state
+    private func connectionStateColor(_ state: String) -> Color {
+        switch state {
+        case "Connected", "Transmitting", "Paired":
+            return .green
+        case "Scanning", "Connecting", "Discovering", "Waiting for flush", "Pairing":
+            return .orange
+        case "Disconnected", "Bluetooth Off":
+            return .red
+        default:
+            return .gray
         }
     }
-}
-
-func canonicalPNG(from img: UIImage) -> Data? {
-    guard let cg = img.cgImage else { return nil }
-    let data = NSMutableData()
-    guard let dest = CGImageDestinationCreateWithData(data, kUTTypePNG, 1, nil) else { return nil }
-    CGImageDestinationAddImage(dest, cg, nil)
-    CGImageDestinationFinalize(dest)
-    return data as Data
 }
