@@ -73,6 +73,7 @@ class GameLoop:
             ),
             pygame.SHOWN,
         )
+        pygame.event.set_grab(True)
         self._last_render_mode = pygame.SHOWN
 
     def add_mode(self, title: str | None = None) -> ComposedRenderer:
@@ -285,7 +286,7 @@ class GameLoop:
 
     def _initialize_screen(self) -> None:
         pygame.init()
-        self.screen = pygame.Surface(self.device.full_display_size(), pygame.HIDDEN)
+        self.screen = pygame.Surface(self.device.full_display_size(), pygame.SHOWN)
         self.clock = pygame.time.Clock()
 
     def _initialize_peripherals(self) -> None:

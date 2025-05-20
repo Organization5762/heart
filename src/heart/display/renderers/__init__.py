@@ -15,6 +15,7 @@ class BaseRenderer:
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
+        self.warmup = True
 
     def is_initialized(self) -> bool:
         return self.initialized
@@ -26,6 +27,14 @@ class BaseRenderer:
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        # We call process once incase there is any implicit cachable work to do
+        # e.g. for numba jitted functions we'll cache their compiled code
+        try:
+            if self.warmup:
+                screen = self._get_input_screen(window, orientation)
+                self.process(screen, clock, peripheral_manager, orientation)
+        except Exception as e:
+            print(f"Error initializing renderer: {e}")
         self.initialized = True
 
     def reset(self):

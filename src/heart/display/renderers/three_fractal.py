@@ -1,5 +1,6 @@
 import math
 import time
+import traceback
 from collections import defaultdict
 
 import numpy as np
@@ -81,6 +82,9 @@ class FractalScene(BaseRenderer):
         self.target_surface = None
         self.framebuffer_texture = None
         self.surface_array = None
+
+        self.initialized = False
+        self.warmup = True
 
     def _init_uniforms(self):
         set_global_float(self.sphere_radius_var)
@@ -395,19 +399,17 @@ class FractalScene(BaseRenderer):
 
         if gamepad.is_connected():
             # === process input (L stick) ===
-            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X)
-            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y)
+            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
+            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
 
-            if abs(xl_mov) > 0.1:
-                acc[0] += xl_mov * self.speed_accel / self.max_fps
-
-            if abs(yl_mov) > 0.1:
-                acc[2] += yl_mov * self.speed_accel / self.max_fps
+            # if abs(xl_mov) > 0.1:
+            #     acc[0] += xl_mov * self.speed_accel / self.max_fps
+            #
+            # if abs(yl_mov) > 0.1:
+            #     acc[2] += yl_mov * self.speed_accel / self.max_fps
 
             # === process input (dpad) ===
             xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
-
-            print(f"xd_mov: {xd_mov}, yd_mov: {yd_mov}")
             if xd_mov != 0:
                 acc[0] += (xd_mov * self.speed_accel / self.max_fps)
             if yd_mov != 0:
@@ -432,8 +434,8 @@ class FractalScene(BaseRenderer):
                     self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
 
             # === process movement (R stick) ===
-            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X)
-            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y)
+            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
+            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
 
             fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
             stick_scale_factor = 8
@@ -591,9 +593,8 @@ class FractalScene(BaseRenderer):
         else:
             self._process_input(peripheral_manager)
 
-        print(self.mode)
-
-
+        # print(f"\n\n{self.vel=}\n\n")
+        # if not np.allclose(self.vel, 0.0):
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
         self._check_switch_auto(peripheral_manager)
@@ -644,11 +645,6 @@ class FractalScene(BaseRenderer):
 
             # Transfer to Pygame surface
             self.render_to_surface()
-
-        # print fps every second
-        if time.time() - self.last_fps_print > 1:
-            print(f"fps: {self.clock.get_fps()}")
-            self.last_fps_print = time.time()
 
         # self._check_switch_auto(peripheral_manager)
 

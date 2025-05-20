@@ -28,6 +28,9 @@ def _get_device(x11_forward: bool) -> Device:
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     if Configuration.is_pi():
+        import os
+        os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
+
         if (pi := Configuration.pi()).version > 4:
             logger.warning(
                 f"Shit not guaranteed to work Pi5 and higher. Detected: {pi}"

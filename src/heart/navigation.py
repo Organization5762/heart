@@ -51,7 +51,7 @@ class AppController(BaseRenderer):
             TextRendering(
                 text=["sleep"],
                 font="Roboto",
-                font_size=14,
+                font_size=16,
                 color=Color.kirby(),
                 y_location=35,
             ),
