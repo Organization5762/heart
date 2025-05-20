@@ -87,7 +87,7 @@ class MarioRenderer(BaseRenderer):
             except Exception as e:
                 time.sleep(0.1)
                 self.accel = None
-            if self.accel is not None and self.accel.z < -2.0:
+            if self.accel is not None and (self.accel.z - 9.8) < 2.0:
                 self.in_loop = True
 
         screen_width, screen_height = window.get_size()
