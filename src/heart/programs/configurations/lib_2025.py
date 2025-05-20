@@ -19,12 +19,6 @@ from heart.display.renderers.three_fractal import FractalScene
 from heart.display.renderers.tixyland import Tixyland
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
-from heart.display.renderers.tixyland import Tixyland
-from heart.display.renderers.yolisten import YoListenRenderer
-from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
-from heart.display.renderers.life import Life
-from heart.display.renderers.pixels import Border, RandomPixel
-from heart.navigation import MultiScene
 from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer, MultiScene
@@ -172,7 +166,6 @@ def configure(loop: GameLoop) -> None:
             font="Comic Sans MS", font_size=20, color=Color(255, 105, 180), text=text
         )
     )
-    
 
     # Some random ones
     tixyland = loop.add_mode(
@@ -226,8 +219,7 @@ def configure(loop: GameLoop) -> None:
                 RandomPixel(num_pixels=4000, brightness=0.10),
                 RandomPixel(num_pixels=2000, brightness=0.25),
                 RandomPixel(num_pixels=500, brightness=0.50),
-                RandomPixel(num_pixels=50, brightness=1)
+                RandomPixel(num_pixels=50, brightness=1),
             ]
         )
     )
-    
