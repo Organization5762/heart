@@ -9,6 +9,8 @@ from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 import json
 from collections import deque
 
+raise NotImplementedError("Not working")
+
 DELAY_BETWEEN_MESSAGES = 0.1
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 

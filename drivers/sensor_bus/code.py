@@ -35,7 +35,10 @@ def _form_payload(name: str, data) -> str:
     """
     payload = {
         "event_type": name,
-        "data": data
+        "data": {
+            "value": data,
+            "id": 0
+        }
     }
     return "\n" + json.dumps(payload) + "\n"
 
