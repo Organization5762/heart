@@ -50,12 +50,6 @@ class FreeTextRenderer(BaseRenderer):
         self._font_size_max: int = 12
         self._font_size_min: int = 6
 
-        # Paging helpers
-        self._pages: list[list[str]] = [[]]
-        self._page_index: int = 0
-        self._page_duration_ms: int = 4000  # 4 seconds per page
-        self._page_change_time_ms: int = 0
-
     # ------------------------------------------------------------------
     # Lifecycle helpers
     # ------------------------------------------------------------------
@@ -105,9 +99,13 @@ class FreeTextRenderer(BaseRenderer):
             # Perform soft wrapping for each paragraph using that limit.
             wrapped: list[str] = []
             for paragraph in text.split("\n"):
-                wrapped.extend(
-                    textwrap.wrap(paragraph, width=max_chars_per_line) or [""]
-                )
+                # Use textwrap with break_long_words=False to avoid cutting words
+                wrapped_lines = textwrap.wrap(
+                    paragraph, 
+                    width=max_chars_per_line, 
+                    break_long_words=False
+                ) or [""]
+                wrapped.extend(wrapped_lines)
 
             # Calculate dimensions.
             max_line_width_px = 0
@@ -131,7 +129,14 @@ class FreeTextRenderer(BaseRenderer):
         max_chars_per_line = max(1, window_width // char_width)
         wrapped: list[str] = []
         for paragraph in text.split("\n"):
-            wrapped.extend(textwrap.wrap(paragraph, width=max_chars_per_line) or [""])
+            # Use break_long_words=False here too for consistency
+            wrapped_lines = textwrap.wrap(
+                paragraph, 
+                width=max_chars_per_line, 
+                break_long_words=False
+            ) or [""]
+            wrapped.extend(wrapped_lines)
+            
         return fallback_font, wrapped
 
     # ------------------------------------------------------------------
@@ -157,7 +162,7 @@ class FreeTextRenderer(BaseRenderer):
 
         window_width, window_height = window.get_size()
 
-        # Recalculate font/wrapping/pages if the text or available space changed.
+        # Recalculate font/wrapping if the text or available space changed.
         if (
             last_text != self._cached_text
             or self._last_window_size != (window_width, window_height)
@@ -172,32 +177,20 @@ class FreeTextRenderer(BaseRenderer):
             # Update line height for the current font
             self._line_height = self._font.get_linesize()
 
-            # Build pages in case wrapped lines still exceed view height.
-            max_lines_per_page = max(1, window_height // self._line_height)
-            self._pages = [
-                self._wrapped_lines[i : i + max_lines_per_page]
-                for i in range(0, len(self._wrapped_lines), max_lines_per_page)
-            ]
-            # Reset paging state
-            self._page_index = 0
-            self._page_change_time_ms = pygame.time.get_ticks()
-
-        # Handle page rotation if multiple pages exist.
-        if len(self._pages) > 1:
-            current_time_ms = pygame.time.get_ticks()
-            if current_time_ms - self._page_change_time_ms >= self._page_duration_ms:
-                self._page_index = (self._page_index + 1) % len(self._pages)
-                self._page_change_time_ms = current_time_ms
-
-        # Use current page's lines for sizing and rendering.
-        current_page_lines = self._pages[self._page_index]
-        total_height = len(current_page_lines) * self._line_height
+        # Calculate how many lines can fit in the window height
+        max_lines_visible = max(1, window_height // self._line_height)
+        
+        # Truncate lines to only show what fits in the window
+        visible_lines = self._wrapped_lines[:max_lines_visible]
+        
+        # Calculate total height of visible lines
+        total_height = len(visible_lines) * self._line_height
 
         # Calculate vertical centring.
         y = (window_height - total_height) // 2
 
         # Draw each line centred horizontally.
-        for line in current_page_lines:
+        for line in visible_lines:
             rendered = self._font.render(line, True, (255, 105, 180))
             text_width, _ = rendered.get_size()
             x = (window_width - text_width) // 2

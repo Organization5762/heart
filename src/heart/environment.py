@@ -9,16 +9,11 @@ import pygame
 from PIL import Image
 
 from heart import DeviceDisplayMode
-from heart.device import Device, Layout
-from heart.device.local import LocalScreen
-from heart.display.color import Color
-from heart.display.renderers.text import TextRendering
-from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
-from heart.navigation import AppController, ComposedRenderer, GameModes, MultiScene
+from heart.device import Device
+from heart.display.renderers.free_text import FreeTextRenderer
+from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
-from heart.peripheral.core.events import REQUEST_JOYSTICK_MODULE_RESET
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import FakeSwitch
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -65,6 +60,11 @@ class GameLoop:
         self.time_last_debugging_press = None
 
         self._active_mode_index = 0
+
+        # Phone text display state
+        self._phone_text_display_time = None
+        self._phone_text_duration = 5.0  # Display phone text for 5 seconds
+        self._phone_text_renderer = None
 
         pygame.display.set_mode(
             (
@@ -117,9 +117,31 @@ class GameLoop:
         while self.running:
             self._handle_events()
             self._preprocess_setup()
-            renderers = self.app_controller.get_renderers(
-                peripheral_manager=self.peripheral_manager
-            )
+
+            # Check for phone text
+            phone_text = self.peripheral_manager.get_phone_text()
+            if phone_text.pop_text():
+                # Set the time when text was received
+                self._phone_text_display_time = time.time()
+                # Create a text renderer for the phone text
+                self._phone_text_renderer = FreeTextRenderer()
+
+            # If we're in the phone text display period, add the text renderer
+            if self._phone_text_display_time is not None:
+                current_time = time.time()
+                renderers = [self._phone_text_renderer]
+                if (
+                    current_time - self._phone_text_display_time
+                    > self._phone_text_duration
+                ):
+                    # Reset phone text display time after duration expires
+                    self._phone_text_display_time = None
+
+            else:
+                renderers = self.app_controller.get_renderers(
+                    peripheral_manager=self.peripheral_manager
+                )
+
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
 

@@ -36,6 +36,7 @@ class PhoneText(Peripheral):
     def __init__(self) -> None:
         """Create a new *PhoneText* peripheral."""
         self._last_text: str | None = None  # full text as received
+        self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
         super().__init__()
 
@@ -85,6 +86,14 @@ class PhoneText(Peripheral):
         """Return the most recent text that was sent to the peripheral."""
         return self._last_text
 
+    def pop_text(self) -> str | None:
+        """Return the most recent text that was sent to the peripheral and clear the buffer."""
+        if not self.new_text:
+            return None
+        text = self._last_text
+        self.new_text = False
+        return text
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -98,17 +107,18 @@ class PhoneText(Peripheral):
         # Check if the buffer contains a null terminator which indicates end of message
         if b"\0" in self._buffer:
             # Split at the null terminator and take everything before it
-            text_bytes = self._buffer[:self._buffer.index(b"\0")]
+            text_bytes = self._buffer[: self._buffer.index(b"\0")]
             try:
                 # Convert buffer to string
                 text = text_bytes.decode("utf-8")
                 # Save the received text
                 self._last_text = text
+                self.new_text = True
                 print(f"Processed text: '{text}'")
             except UnicodeDecodeError as e:
                 print(f"Error decoding text: {e}")
                 print(f"Raw bytes: {text_bytes}")
-            
+
             # Clear the buffer for the next message
             self._buffer.clear()
 

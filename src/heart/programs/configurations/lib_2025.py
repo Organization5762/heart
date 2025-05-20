@@ -33,9 +33,6 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 def configure(loop: GameLoop) -> None:
-    free_text_mode = loop.add_mode("free text")
-    free_text_mode.add_renderer(FreeTextRenderer())
-
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene())
 

@@ -1,8 +1,4 @@
 //
-//  BLEManager.swift
-//  SOTotem
-//
-//  Re-written 2025-05-20
 //
 //  Sends UTF-8 text messages to a Raspberry Pi peripheral advertising service 1235 /
 //  characteristic 5679.  Each message is automatically null-terminated so the
@@ -249,12 +245,20 @@ extension BLEManager: CBCentralManagerDelegate, CBPeripheralDelegate {
         peripheral.discoverServices([serviceUUID])
     }
 
-    func centralManager(_ central: CBCentralManager,
+        func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?)
     {
         log("⚠️  Failed to connect: \(error?.localizedDescription ?? "unknown")")
         connectionState = isPaired ? "Paired" : "Disconnected"
+
+        // ── Clean-up & notify caller so the UI can leave the “Sending…” state ──
+        targetPeripheral      = nil
+        writeCharacteristic   = nil
+        pendingPayload        = nil
+
+        onComplete?(false)      // tell ContentView that the send failed
+        onComplete = nil
     }
 
     func peripheral(_ peripheral: CBPeripheral,
