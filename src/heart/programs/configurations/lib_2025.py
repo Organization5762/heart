@@ -140,55 +140,43 @@ def configure(loop: GameLoop) -> None:
     artist_mode = loop.add_mode(ArtistScene.title_scene())
     artist_mode.add_renderer(ArtistScene())
 
-    mode = loop.add_mode("friend\nbeacon")
-
-    # TODO: Refactor
-    text = ["Lost my\nfriends\nagain"]
-    text.extend(
-        [
-            f"Where's\n{name}"
-            for name in [
-                "seb",
-                "cal",
-                "clem",
-                "michaēl",
-                "james",
-                "eric",
-                "macy",
-                "faye",
-                "big W",
-                "mel",
-                "stu",
-                "elena",
-                "steve",
-                "jill",
-                "graham",
-                "sam",
-                "matt",
-                "sri",
-                "amir",
-                "sue anna",
-                "brody",
+    friend_beacon_mode = loop.add_mode("friend\nbeacon")
+    friend_beacon_mode.add_renderer(
+        MultiScene(
+            [
+                *[
+                  TextRendering.default(text=f"Where's\n{name}")
+                  for name in [
+                        "seb",
+                        "cal",
+                        "clem",
+                        "michaēl",
+                        "james",
+                        "eric",
+                        "macy",
+                        "faye",
+                        "big W",
+                        "mel",
+                        "stu",
+                        "elena",
+                        "steve",
+                        "jill",
+                        "graham",
+                        "sam",
+                        "matt",
+                        "sri",
+                        "amir",
+                        "sue anna",
+                        "brody",
+                    ]
+                ],
+                TextRendering.default(text="Lost my\nfriends\nagain"),
             ]
-        ]
-    )
-    text.append("Where is\neveryone")
-    mode.add_renderer(
-        TextRendering(
-            font="Comic Sans MS", font_size=14, color=Color(255, 105, 180), text=text
         )
     )
 
     # Some random ones
-    tixyland = loop.add_mode(
-        TextRendering(
-            text=["tixyland"],
-            font="Roboto",
-            font_size=14,
-            color=Color(255, 105, 180),
-            y_location=32,
-        )
-    )
+    tixyland = loop.add_mode("tixyland")
     tixyland.add_renderer(
         MultiScene(
             [
