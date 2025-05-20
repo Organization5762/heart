@@ -347,6 +347,16 @@ class MultiScene(BaseRenderer):
             )
         ]
 
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        for scene in self.scenes:
+            scene.initialize(window, clock, peripheral_manager, orientation)
+
     def reset(self):
         self.current_scene_index = 0
         for scene in self.scenes:

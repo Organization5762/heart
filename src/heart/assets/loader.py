@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Any
+from functools import cache
 
 import pygame
 
@@ -11,6 +12,7 @@ class Loader:
         return os.path.join(os.path.dirname(__file__), path)
 
     @classmethod
+    @cache
     def load(cls, path: str):
         return pygame.image.load(cls._resolve_path(path))
 

@@ -402,11 +402,8 @@ class FractalScene(BaseRenderer):
             xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
             yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
 
-            # if abs(xl_mov) > 0.1:
-            #     acc[0] += xl_mov * self.speed_accel / self.max_fps
-            #
-            # if abs(yl_mov) > 0.1:
-            #     acc[2] += yl_mov * self.speed_accel / self.max_fps
+            acc[0] += xl_mov * self.speed_accel / self.max_fps
+            acc[2] += yl_mov * self.speed_accel / self.max_fps
 
             # === process input (dpad) ===
             xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
