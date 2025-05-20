@@ -38,7 +38,6 @@ dependencies = [
     "tqdm",
     "typer-slim",
     "PyOpenGL>=3.1.0",
-    "PyOpenGL-accelerate",
     "moderngl",
 ]
 
