@@ -11,11 +11,9 @@ from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
-
-@dataclass
-class Device:
-    device_id: str
+logger = get_logger(__name__)
 
 
 class PeripheralManager:
@@ -68,23 +66,20 @@ class PeripheralManager:
             self._threads.append(peripherial_thread)
 
     def _detect_switches(self) -> Iterator[Peripheral]:
-        print("detecting switches")
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            print("Found switches !")
+            logger.info("Detecting switches")
             switches = itertools.chain(
                 Switch.detect(),
                 BluetoothSwitch.detect(),
             )
-            # # Can't use len() on an iterator
-            # switches_list = list(switches)
-            # print("Found", len(switches_list), "switches")
-            # switches = iter(switches_list)
+            switches = list(switches)
+            logger.info("Found %d switches", len(switches))
         else:
-            print("No switches detected, using fake switch")
-            switches = FakeSwitch.detect()
+            logger.info("Not running on pi, using fake switch")
+            switches = list(FakeSwitch.detect())
 
         for switch in switches:
-            print("Adding switch", self._deprecated_main_switch, switch)
+            logger.info("Adding switch", self._deprecated_main_switch, switch)
             if self._deprecated_main_switch is None:
                 self._deprecated_main_switch = switch
             yield switch
