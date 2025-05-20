@@ -149,7 +149,9 @@ class GameModes(BaseRenderer):
         for renderer in self.renderers:
             renderer.initialize(window, clock, peripheral_manager, orientation)
 
-    def add_new_pages(self, title_renderer: "BaseRenderer", renderers: "BaseRenderer") -> None:
+    def add_new_pages(
+        self, title_renderer: "BaseRenderer", renderers: "BaseRenderer"
+    ) -> None:
         self.renderers.append(renderers)
         self.title_renderers.append(title_renderer)
 
@@ -272,7 +274,6 @@ class GameModes(BaseRenderer):
                 peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
             )
 
-
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
         render_count = len(self.renderers) - 1
@@ -292,7 +293,7 @@ class GameModes(BaseRenderer):
                 renderer_B=self.title_renderers[mode_index],
                 direction=slide_dir,
             )
-            
+
             self.previous_mode_index = mode_index
             return self.sliding_transition
 
