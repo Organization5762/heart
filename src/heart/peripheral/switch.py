@@ -124,17 +124,21 @@ class BluetoothSwitch(BaseSwitch):
     def update_due_to_data(self, data: dict[str, int]) -> None:
         producer_id = data.get("producer_id", 0)
         self.switches[producer_id].update_due_to_data(data)
-        
+
         # Update first producer as if it is the main switch
         if producer_id == 0:
             main_switch = self.switches[0]
             self.rotational_value = main_switch.rotational_value
 
             self.button_value = main_switch.button_value
-            self.rotation_value_at_last_button_press = main_switch.rotation_value_at_last_button_press
+            self.rotation_value_at_last_button_press = (
+                main_switch.rotation_value_at_last_button_press
+            )
 
             self.button_long_press_value = main_switch.button_long_press_value
-            self.rotation_value_at_last_long_button_press = main_switch.rotation_value_at_last_long_button_press
+            self.rotation_value_at_last_long_button_press = (
+                main_switch.rotation_value_at_last_long_button_press
+            )
 
     def switch_zero(self) -> BaseSwitch:
         return self.switches[0]
