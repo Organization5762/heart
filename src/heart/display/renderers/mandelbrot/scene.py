@@ -5,6 +5,7 @@ import itertools
 import os
 import pstats
 import sys
+import time
 
 import numpy as np
 import pygame
@@ -60,6 +61,7 @@ class MandelbrotMode(BaseRenderer):
         self.last_switch_value = None
 
         # input properties
+        self.time_initialized = None
         self.gamepad = None
         self.scene_controls: SceneControls | None = None
         self.control_mappings: dict[GamepadIdentifier, SceneControlsMapping] | None = (
@@ -76,6 +78,7 @@ class MandelbrotMode(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         pygame.font.init()
+        self.time_initialized = time.time()
         self.font = pygame.font.SysFont("monospace", 8)
         self.clock = clock
         self.height = window.get_height()
@@ -104,6 +107,7 @@ class MandelbrotMode(BaseRenderer):
             msurface_height=self.height,
             num_palettes=len(self.palettes),
             init_orientation=orientation,
+            mode="auto",
         )
         self.gamepad = peripheral_manager.get_gamepad()
         self.scene_controls = SceneControls(self.state)
@@ -123,11 +127,16 @@ class MandelbrotMode(BaseRenderer):
         return self.palettes[self.state.palette_index]
 
     def reset(self):
-        if self.state is not None:
-            self.state.reset()
-            self.state.set_mode_auto()
+        self.initialized = False
+        # if self.state is not None:
+        #     self.state.reset()
+        #     self.state.set_mode_auto()
 
     def process_input(self) -> bool:
+        # when we first enter the scene, ignore input for a bit
+        if time.time() - self.time_initialized < 0.5:
+            return False
+
         self.keyboard_controls.update()
         if connected := self.gamepad.is_connected():
             mapping = self.control_mappings.get(self.gamepad.gamepad_identifier)
@@ -177,7 +186,7 @@ class MandelbrotMode(BaseRenderer):
                     mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
                     julia_surface = pygame.Surface((self.width // 2, self.height))
                     self._draw_split_view(mandelbrot_surface, julia_surface, clock)
-                    self._draw_orbit_to_surface(mandelbrot_surface)
+                    # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))
                     window.blit(julia_surface, (self.width // 2, 0))
                 case Cube():
@@ -492,32 +501,21 @@ class MandelbrotMode(BaseRenderer):
 
     def _draw_debug_to_surface(self, window: pygame.Surface):
         text_color = (255, 255, 255)
+        init_y = 5
+        y_spacing = 10
+        text_surfaces = [
+            self.font.render(f"X: {self.state.movement.x}", True, text_color),
+            self.font.render(f"Y: {self.state.movement.y}", True, text_color),
+            self.font.render(f"Iter: {self.state.max_iterations}", True, text_color),
+            self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
+            self.font.render(
+                f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
+            ),
+        ]
         window.blits(
             [
-                (
-                    self.font.render(f"X: {self.state.movement.x}", True, text_color),
-                    (5, 10),
-                ),
-                (
-                    self.font.render(f"Y: {self.state.movement.y}", True, text_color),
-                    (5, 25),
-                ),
-                (
-                    self.font.render(
-                        f"Iter: {self.state.max_iterations}", True, text_color
-                    ),
-                    (5, 40),
-                ),
-                (
-                    self.font.render(f"Zoom: {self.state.zoom:e}", True, text_color),
-                    (5, 55),
-                ),
-                (
-                    self.font.render(
-                        f"Orbit: {len(self.state.julia_orbit or [])}", True, text_color
-                    ),
-                    (5, 70),
-                ),
+                (surface, (5, init_y + idx * y_spacing))
+                for idx, surface in enumerate(text_surfaces)
             ]
         )
 
@@ -686,6 +684,7 @@ def main():
             )
 
     # Clean up
+    raise Exception("stopping")
     pygame.quit()
     sys.exit()
 

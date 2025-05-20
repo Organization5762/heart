@@ -2,7 +2,6 @@ from collections import defaultdict
 
 import pygame
 
-from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
@@ -14,22 +13,16 @@ class MultiScene(BaseRenderer):
         self.current_scene_index = 0
         self.key_pressed_last_frame = defaultdict(lambda: False)
 
-    def reset(self):
-        self.current_scene_index = 0
-        for scene in self.scenes:
-            scene.reset()
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
         self._process_input(peripheral_manager)
-        self.scenes[self.current_scene_index].process(
-            window, clock, peripheral_manager, orientation
-        )
+        # This multi-scene could be composed of multiple renderers
+        return [
+            *self.scenes[self.current_scene_index].get_renderers(
+                peripheral_manager=peripheral_manager
+            )
+        ]
 
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch(peripheral_manager)
@@ -41,7 +34,7 @@ class MultiScene(BaseRenderer):
         )
         self._set_scene_index(current_value)
 
-    def _process_keyboard(self):
+    def _process_keyboard(self) -> None:
         if (
             pygame.key.get_pressed()[pygame.K_a]
             and not self.key_pressed_last_frame[pygame.K_a]
@@ -56,11 +49,11 @@ class MultiScene(BaseRenderer):
             self._increment_scene()
         self.key_pressed_last_frame[pygame.K_d] = pygame.key.get_pressed()[pygame.K_d]
 
-    def _set_scene_index(self, index: int):
+    def _set_scene_index(self, index: int) -> None:
         self.current_scene_index = index % len(self.scenes)
 
-    def _increment_scene(self):
+    def _increment_scene(self) -> None:
         self.current_scene_index = (self.current_scene_index + 1) % len(self.scenes)
 
-    def _decrement_scene(self):
+    def _decrement_scene(self) -> None:
         self.current_scene_index = (self.current_scene_index - 1) % len(self.scenes)

@@ -76,6 +76,3 @@ class WaterTitleScreen(BaseRenderer):
                     (x, self.cube_px_h - 1),
                     1,
                 )
-
-        # Maintain display rate
-        clock.tick_busy_loop(60)

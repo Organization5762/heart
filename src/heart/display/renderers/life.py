@@ -12,6 +12,7 @@ from heart.peripheral.core.manager import PeripheralManager
 
 class Life(BaseRenderer):
     def __init__(self) -> None:
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
@@ -45,6 +46,7 @@ class Life(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        print(window.get_size())
         self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
         self.state = self._update_grid(self.state)
 
