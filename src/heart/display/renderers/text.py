@@ -27,6 +27,17 @@ class TextRendering(BaseRenderer):
 
         self.time_since_last_update = None
 
+    @classmethod
+    def default(cls, text: str):
+        return cls(
+            text=[text],
+            font="Roboto",
+            font_size=14,
+            color=Color(255, 105, 180),
+            x_location=None,
+            y_location=None,
+        )
+
     def initialize(
         self,
         window: pygame.Surface,
