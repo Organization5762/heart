@@ -1,5 +1,7 @@
 import json
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 import pygame
 
@@ -10,18 +12,19 @@ from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
 from heart.utilities.env import Configuration
-from dataclasses import dataclass
-from typing import Any
+
 
 @dataclass
 class Size:
     w: int
     h: int
 
+
 @dataclass
 class BoundingBox(Size):
     x: int
     y: int
+
 
 @dataclass
 class FrameDescription:
@@ -56,10 +59,12 @@ class FrameDescription:
             trimmed=json_data["trimmed"],
         )
 
+
 class LoopPhase(Enum):
     START = "start"
     LOOP = "loop"
     END = "end"
+
 
 # Searching mode loop.
 class SpritesheetLoop(BaseRenderer):
@@ -81,10 +86,7 @@ class SpritesheetLoop(BaseRenderer):
         number_of_frames = size[0] // 64
         if skip_last_frame:
             number_of_frames -= 1
-        frames = [
-            (64 * i, 0, 64, size[1])
-            for i in range(number_of_frames)
-        ]
+        frames = [(64 * i, 0, 64, size[1]) for i in range(number_of_frames)]
 
         # Create FrameDescriptions
         frame_descriptions = []
@@ -134,7 +136,9 @@ class SpritesheetLoop(BaseRenderer):
         self.boomerang = boomerang
         self.reverse_direction = False
 
-        assert frame_data is not None or metadata_file_path is not None, "Must provide either frame_data or metadata_file_path"
+        assert (
+            frame_data is not None or metadata_file_path is not None
+        ), "Must provide either frame_data or metadata_file_path"
 
         self.start_frames = []
         self.loop_frames = []

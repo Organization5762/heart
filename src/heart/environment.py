@@ -10,16 +10,16 @@ from PIL import Image
 
 from heart import DeviceDisplayMode
 from heart.device import Device
+from heart.display.renderers.flame import FlameRenderer
 from heart.display.renderers.free_text import FreeTextRenderer
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
-from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
-from heart.display.renderers.flame import FlameRenderer
 from heart.peripheral.heart_rates import (
     current_bpms,
 )
+from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
