@@ -58,7 +58,7 @@ def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
     # avoid blow-up when gz ~ 0 (cube on its side)
     denom = 0.001 + abs(gz)
     slope_x = -gx / denom
-    slope_y = -gy / denom
+    slope_y = gy / denom
 
     return INIT_FILL + slope_x * DX + slope_y * DY
 

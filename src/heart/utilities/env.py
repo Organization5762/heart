@@ -45,7 +45,11 @@ class Configuration:
 
     @classmethod
     def is_x11_forward(cls) -> bool:
-        return bool(os.environ.get("X11_FORWARD", False))
+        return os.environ.get("X11_FORWARD", "False").lower() in {"true", "1"}
+
+    @classmethod
+    def use_mock_switch(cls) -> bool:
+        return os.environ.get("MOCK_SWITCH", "False").lower() in {"true", "1"}
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:

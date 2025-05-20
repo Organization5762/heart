@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Iterator, NoReturn, Self
 
 import serial
@@ -105,6 +106,8 @@ class Switch(BaseSwitch):
                     ser.close()
             except Exception:
                 pass
+
+            time.sleep(0.1)
 
 
 class BluetoothSwitch(BaseSwitch):

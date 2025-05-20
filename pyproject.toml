@@ -37,6 +37,9 @@ dependencies = [
     "toml",
     "tqdm",
     "typer-slim",
+    "PyOpenGL>=3.1.0",
+    "PyOpenGL-accelerate",
+    "moderngl",
 ]
 
 [project.optional-dependencies]

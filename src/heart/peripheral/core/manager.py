@@ -7,6 +7,7 @@ from typing import Iterator
 from heart.peripheral.core import Peripheral
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
+from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
@@ -40,6 +41,7 @@ class PeripheralManager:
             self._detect_sensors(),
             self._detect_gamepads(),
             self._detect_heart_rate_sensor(),
+            self._detect_phone_text(),
         )
 
         for peripherial in peripherials:
@@ -79,10 +81,13 @@ class PeripheralManager:
             switches = list(FakeSwitch.detect())
 
         for switch in switches:
-            logger.info("Adding switch", self._deprecated_main_switch, switch)
+            logger.info(f"Adding switch - {switch}")
             if self._deprecated_main_switch is None:
                 self._deprecated_main_switch = switch
             yield switch
+
+    def _detect_phone_text(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(PhoneText.detect())
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Accelerometer.detect())
@@ -123,6 +128,12 @@ class PeripheralManager:
             if isinstance(p, Accelerometer):
                 return p
         raise ValueError("No Accelerometer peripheral registered")
+
+    def get_phone_text(self) -> PhoneText:
+        for p in self.peripheral:
+            if isinstance(p, PhoneText):
+                return p
+        raise ValueError("No PhoneText peripheral registered")
 
     def __del__(self) -> None:
         """Attempt to clean up threads and peripherals at object deletion time.
