@@ -213,7 +213,7 @@ class Gamepad(Peripheral):
                         result = subprocess.run(
                             ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
                             capture_output=True,
-                            text=True
+                            text=True,
                         )
                         if result.returncode == 0:
                             print("Successfully connected to 8bitdo controller")

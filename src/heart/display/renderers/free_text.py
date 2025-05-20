@@ -30,6 +30,7 @@ class FreeTextRenderer(BaseRenderer):
         wrap_at_chars:
             Soft wrap column when incoming text does not contain new‐lines.  Set
             to *None* to disable wrapping.
+
         """
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
@@ -84,10 +85,11 @@ class FreeTextRenderer(BaseRenderer):
     ) -> tuple[pygame.font.Font, list[str]]:
         """Return a font (within bounds) and wrapped lines that fit *text* on screen.
 
-        The function iterates from the largest to the smallest allowed font size
-        and picks the first one where every wrapped line fits horizontally and
-        the accumulated height fits vertically.  If *no* font size satisfies
-        those constraints we fall back to the minimum size.
+        The function iterates from the largest to the smallest allowed font size and
+        picks the first one where every wrapped line fits horizontally and the
+        accumulated height fits vertically.  If *no* font size satisfies those
+        constraints we fall back to the minimum size.
+
         """
 
         # Iterate from largest to smallest size to find the best fit.

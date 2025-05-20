@@ -1,20 +1,22 @@
 from heart.display.color import Color
 from heart.display.renderers.artist import ArtistScene
 from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
-from heart.display.renderers.heart_title_screen import HeartTitleScreen
 from heart.display.renderers.free_text import FreeTextRenderer
+from heart.display.renderers.heart_title_screen import HeartTitleScreen
 from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.image import RenderImage
 from heart.display.renderers.kirby import KirbyScene
+from heart.display.renderers.life import Life
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.mario import MarioRenderer
 from heart.display.renderers.multicolor import MulticolorRenderer
+from heart.display.renderers.pixels import Border, RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
+from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.three_fractal import FractalScene
-from heart.display.renderers.yolisten import YoListenRenderer
-from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
+from heart.display.renderers.tixyland import Tixyland
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.display.renderers.tixyland import Tixyland
@@ -23,8 +25,9 @@ from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.life import Life
 from heart.display.renderers.pixels import Border, RandomPixel
 from heart.navigation import MultiScene
+from heart.display.renderers.yolisten import YoListenRenderer
 from heart.environment import GameLoop
-from heart.navigation import ComposedRenderer
+from heart.navigation import ComposedRenderer, MultiScene
 
 
 def configure(loop: GameLoop) -> None:
@@ -170,6 +173,7 @@ def configure(loop: GameLoop) -> None:
         )
     )
     
+
     # Some random ones
     tixyland = loop.add_mode(
         TextRendering(

@@ -10,15 +10,16 @@ The most recently received image can be retrieved with `PhoneText.get_last_image
 and the most recently received text with `PhoneText.get_last_text()`.
 """
 
+import time
 from pathlib import Path
 from typing import Iterator, Self
-import time
 
 from heart.peripheral.core import Peripheral
 
 try:
     # bluezero is only required when the peripheral is actually *run*.
-    from bluezero import adapter, peripheral as _bz_peripheral  # type: ignore
+    from bluezero import adapter
+    from bluezero import peripheral as _bz_peripheral  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover – only imported on the target device
     _bz_peripheral = None  # type: ignore  # noqa: N816
     adapter = None  # type: ignore
@@ -47,6 +48,7 @@ class PhoneText(Peripheral):
             Optional path where the most-recent image should also be
             stored on disk.  If *None* (default) the image is only kept in
             memory.
+
         """
         self._last_image: bytes | None = None  # full PNG as received
         self._last_text: str | None = None  # full text as received
@@ -147,9 +149,10 @@ class PhoneText(Peripheral):
     def _process_text_chunk(self, value: bytes):
         """Process a chunk of text data.
 
-        Text data may arrive in multiple chunks. We collect them until
-        we find a null terminator or until we have a complete valid
-        UTF-8 sequence (to support older apps that don't add terminators).
+        Text data may arrive in multiple chunks. We collect them until we find a null
+        terminator or until we have a complete valid UTF-8 sequence (to support older
+        apps that don't add terminators).
+
         """
         # Look for a null terminator (we added this in the iOS app)
         null_pos = self._buffer.find(b"\x00")
@@ -212,9 +215,9 @@ class PhoneText(Peripheral):
     def detect() -> Iterator[Self]:
         """Return an iterator with a single *PhoneText* instance.
 
-        Unlike some other peripherals we cannot *discover* a running Bluezero
-        GATT server from the same process.  Therefore detection simply returns
-        a single instance that, when *run()*, will start a local BLE GATT
-        server.
+        Unlike some other peripherals we cannot *discover* a running Bluezero GATT
+        server from the same process.  Therefore detection simply returns a single
+        instance that, when *run()*, will start a local BLE GATT server.
+
         """
         yield PhoneText()

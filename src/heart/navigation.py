@@ -14,7 +14,7 @@ from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2Bluetooth, BitDoLite2
+from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
 from heart.utilities.env import Configuration
 
 
@@ -174,7 +174,6 @@ class GameModes(BaseRenderer):
             f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
         )
 
-
     def _process_debugging_key_presses(
         self, peripheral_manager: PeripheralManager
     ) -> None:
@@ -260,7 +259,7 @@ class GameModes(BaseRenderer):
             elif mode_index == last_render_index and self.previous_mode_index == 0:
                 slide_dir = -1
             else:
-                slide_dir = (mode_index - self.previous_mode_index)
+                slide_dir = mode_index - self.previous_mode_index
 
             self.sliding_transition = SlideTransitionRenderer(
                 renderer_A=self.title_renderers[self.previous_mode_index],

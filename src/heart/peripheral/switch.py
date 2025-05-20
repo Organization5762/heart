@@ -140,3 +140,4 @@ class BluetoothSwitch(BaseSwitch):
                     self.listener.close()
             except Exception:
                 pass
+            time.sleep(3)
