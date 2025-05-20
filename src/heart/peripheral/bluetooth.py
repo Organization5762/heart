@@ -65,7 +65,7 @@ class UartListener:
             # 2. Is a weird failure case where the Totem / main controller would need to be restarted
             async with self.__get_client(device) as client:
                 # Try to connect if not connected
-                if not client.is_connected:
+                if not await client.is_connected():
                     await client.connect()
 
                 # Otherwise use the notify channel
@@ -74,6 +74,8 @@ class UartListener:
                 )
 
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
+            # On failure, wait a bit before retrying
+            time.sleep(1.0)
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:

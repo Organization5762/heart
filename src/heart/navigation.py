@@ -142,23 +142,26 @@ class GameModes(BaseRenderer):
         payload = None
 
         # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
+        DEFAULT_PRODUCER_ID = 0
         if keys[pygame.K_LEFT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
+                "producer_id": DEFAULT_PRODUCER_ID,
                 "data": switch.rotational_value - 1,
             }
 
         if keys[pygame.K_RIGHT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
+                "producer_id": DEFAULT_PRODUCER_ID,
                 "data": switch.rotational_value + 1,
             }
 
         if keys[pygame.K_UP]:
-            payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
+            payload = {"event_type": BUTTON_LONG_PRESS,                 "producer_id": DEFAULT_PRODUCER_ID,"data": 1}
 
         if keys[pygame.K_DOWN]:
-            payload = {"event_type": BUTTON_PRESS, "data": 1}
+            payload = {"event_type": BUTTON_PRESS,                "producer_id": DEFAULT_PRODUCER_ID, "data": 1}
 
         if payload is not None:
             switch.update_due_to_data(payload)

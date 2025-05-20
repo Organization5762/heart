@@ -9,6 +9,7 @@ import pygame
 class Input:
     event_type: str
     data: Any
+    producer_id: int = 0
 
 
 class Peripheral(abc.ABC):

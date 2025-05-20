@@ -112,10 +112,10 @@ class BluetoothSwitch(BaseSwitch):
         self.listener = UartListener(device=device)
         super().__init__(*args, **kwargs)
 
-    @staticmethod
-    def detect() -> Iterator[Self]:
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
         for device in UartListener._discover_devices():
-            yield BluetoothSwitch(device=device)
+            yield cls(device=device)
 
     def _connect_to_ser(self) -> None:
         return self.listener.start()

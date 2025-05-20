@@ -2,8 +2,6 @@
 # https://docs.circuitpython.org/en/stable/docs/environment.html#core-circuitpython-keys
 CIRCUITPY_BLE_NAME="totem-controller"
 
-HEART_DEVICE_TYPE="bluetooth-bridge"
-
 # I think this is correct but can't confirm
 # Also all of these variables kinda overlap, might be worth trying to map them more smartly.
 # e.g. from CIRCUIT_PY_UF2_URL we know the valid board ID - but this also locks us into only feather express
