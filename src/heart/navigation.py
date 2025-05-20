@@ -4,6 +4,7 @@ from collections import defaultdict
 import pygame
 from pygame.time import Clock
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
@@ -20,6 +21,8 @@ from heart.utilities.env import Configuration
 class AppController(BaseRenderer):
     def __init__(self) -> None:
         self.modes = GameModes()
+        self.device_display_mode = DeviceDisplayMode.FULL
+        self.warmup = True
 
     def initialize(
         self,
@@ -284,6 +287,16 @@ class ComposedRenderer(BaseRenderer):
         for renderer in self.renderers:
             result.extend(renderer.get_renderers(peripheral_manager))
         return result
+
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        for renderer in self.renderers:
+            renderer.initialize(window, clock, peripheral_manager, orientation)
 
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
