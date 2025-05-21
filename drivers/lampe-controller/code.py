@@ -45,3 +45,5 @@ while True:
     seesaw_events = list(seesaw.handle())
 
     bluetooth.send(seesaw_events)
+    if len(seesaw_events) > 0:
+        print(seesaw_events)
