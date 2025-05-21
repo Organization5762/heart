@@ -1,8 +1,9 @@
-from heart.peripheral.bluetooth import UartListener
+from heart.peripheral.switch import BluetoothSwitch
 
-
-listener = UartListener()
-listener.start()
-while True:
-    for event in listener.consume_events():
-        print(event)
+for l in BluetoothSwitch.detect():
+    print("Starting")
+    l.listener.start()
+    print("Started listener")
+    while True:
+        for event in l.listener.consume_events():
+            print(event)

@@ -15,6 +15,7 @@ END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
 
 
+# TODO: AAddDd a bulk write command
 def send(messages: list[str]):
     if not ble.advertising:
         ble.start_advertising(advertisement)

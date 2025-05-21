@@ -42,8 +42,6 @@ handlers = [
 seesaw = rotary_encoder.Seesaw(handlers)
 
 while True:
-    for event in seesaw.handle():
-        print("Sending ", event)
-        bluetooth.send([event])
-        print("Sent ", event)
-    
+    seesaw_events = list(seesaw.handle())
+
+    bluetooth.send(seesaw_events)

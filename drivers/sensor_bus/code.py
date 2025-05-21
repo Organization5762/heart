@@ -35,10 +35,7 @@ def _form_payload(name: str, data) -> str:
     """
     payload = {
         "event_type": name,
-        "data": {
-            "value": data,
-            "id": 0
-        }
+        "data": data
     }
     return "\n" + json.dumps(payload) + "\n"
 
@@ -120,13 +117,11 @@ class SensorReader:
                     self._last_gyro = gyro
                     yield form_tuple_payload(constants.GYROSCOPE, gyro)
 
-            if hasattr(sensor, "magnetic"):
-                mag = sensor.magnetic
-                if self._changed_enough(mag, self._last_mag, self.min_change):
-                    self._last_mag = mag
-                    yield form_tuple_payload(constants.MAGNETIC, mag)
-
-
+            # if hasattr(sensor, "magnetic"):
+            #     mag = sensor.magnetic
+            #     if self._changed_enough(mag, self._last_mag, self.min_change):
+            #         self._last_mag = mag
+            #         yield form_tuple_payload(constants.MAGNETIC, mag)
 
     def _changed_enough(self, new: tuple, old: tuple | None, min_change: float) -> bool:
         """Return *True* if any axis differs by more than *min_change*."""
