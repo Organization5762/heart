@@ -8,45 +8,45 @@ import json
 from heart.firmware_io import constants
 
 def _form_payload(name: str, data) -> str:
-        """Forms a JSON payload string from a dictionary of data.
+    """Forms a JSON payload string from a dictionary of data.
 
-        Args:
-            name (str): The event type name.
-            data (dict[str, float]): A dictionary containing data values.
+    Args:
+        name (str): The event type name.
+        data (dict[str, float]): A dictionary containing data values.
 
-        Returns:
-            str: A JSON string representing the payload.
+    Returns:
+        str: A JSON string representing the payload.
 
-        """
-        payload = {
-            "event_type": name,
-            "producer_id": 0,
-            "data": {
-                "value": data,
-            }
+    """
+    payload = {
+        "event_type": name,
+        "producer_id": 0,
+        "data": {
+            "value": data,
         }
-        return "\n" + json.dumps(payload) + "\n"
+    }
+    return "\n" + json.dumps(payload) + "\n"
 
 
 def form_tuple_payload(name: str, data: tuple) -> str:
     """Forms a JSON payload string from a tuple of data.
 
-        Args:
-            name (str): The event type name.
-            data (tuple): A tuple containing three float values representing x, y, and z coordinates.
+    Args:
+        name (str): The event type name.
+        data (tuple): A tuple containing three float values representing x, y, and z coordinates.
 
-        Returns:
-            str: A JSON string representing the payload.
+    Returns:
+        str: A JSON string representing the payload.
 
-        """
-        return _form_payload(
-            name,
-            data={
-                "x": data[0],
-                "y": data[1],
-                "z": data[2],
-            }
-        )
+    """
+    return _form_payload(
+        name,
+        data={
+            "x": data[0],
+            "y": data[1],
+            "z": data[2],
+        }
+    )
 
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
@@ -74,11 +74,12 @@ class SensorReader:
                     self._last_gyro = gyro
                     yield form_tuple_payload(constants.GYROSCOPE, gyro)
 
-            if hasattr(sensor, "magnetic"):
-                mag = sensor.magnetic
-                if self._changed_enough(mag, self._last_mag, self.min_change):
-                    self._last_mag = mag
-                    yield form_tuple_payload(constants.MAGNETIC, mag)
+            # TODO: Can be turned on when we have a use for it
+            # if hasattr(sensor, "magnetic"):
+            #     mag = sensor.magnetic
+            #     if self._changed_enough(mag, self._last_mag, self.min_change):
+            #         self._last_mag = mag
+            # yield form_tuple_payload(constants.MAGNETIC, mag)
 
     def _changed_enough(self, new: tuple, old: tuple | None, min_change: float) -> bool:
         """Return *True* if any axis differs by more than *min_change*."""
@@ -123,7 +124,7 @@ class SensorReader:
                 pass
         return sensors
 
-    def get_sample_rate(self) -> float:
+    def get_sample_rate(self, sensor) -> float:
         """
         Max interval defined by device rate
         Reference: https://github.com/adafruit/Adafruit_CircuitPython_LSM6DS/blob/main/adafruit_lsm6ds/__init__.py#L108-L123
@@ -131,9 +132,8 @@ class SensorReader:
         I put this up here because it is quite likely we'll just want to 
         For now, assume gyro and acceleration will be the same
         """
-        for sensor in self.sensors:
-            if hasattr(sensor, "accelerometer_data_rate"):
-                check_interval = sensor.accelerometer_data_rate
-            else:
-                check_interval = Rate.RATE_104_HZ
-            return Rate.string[check_interval]
+        if hasattr(sensor, "accelerometer_data_rate"):
+            check_interval = sensor.accelerometer_data_rate
+        else:
+            check_interval = Rate.RATE_104_HZ
+        return Rate.string[check_interval]

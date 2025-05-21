@@ -201,6 +201,7 @@ class GameLoop:
                 peripheral_manager=self.peripheral_manager,
                 orientation=self.device.orientation,
             )
+            
 
             return screen
         except Exception as e:
@@ -208,6 +209,10 @@ class GameLoop:
             return None
 
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
+        # HACKKK
+        if self.peripheral_manager.bluetooth_switch() is not None:
+            print("Bluetooth button available for finalization")
+        
         # TODO: This operation will be slow.
         image = pygame.surfarray.pixels3d(screen)
         alpha = pygame.surfarray.pixels_alpha(screen)

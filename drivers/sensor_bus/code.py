@@ -8,6 +8,7 @@ import json
 from heart.firmware_io import constants, accel
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
+MIN_CHANGE = 0.5
 
 def main() -> None:
     """Main function to read sensor data and print it in JSON format.
@@ -22,13 +23,13 @@ def main() -> None:
 
     """
     i2c = board.STEMMA_I2C()
-    sr = accel.SensorReader.connect(i2c=i2c)
+    sr = accel.SensorReader.connect(i2c=i2c, min_change=MIN_CHANGE)
 
     # This assumes two things:
     # 1. We care about the more precise data possibly (e.g. power by damned)
     # 2. That actually checking the sensor takes roughly 0 time
     sample_rates = [
-        (1000 / get_sample_rate(sensor)) / 1000 for sensor in sensors
+        (1000 / sr.get_sample_rate(sensor)) / 1000 for sensor in sr.sensors
     ]
     if len(sample_rates) == 0:
         wait_between_payloads_seconds = 0.1
@@ -38,7 +39,7 @@ def main() -> None:
     while True:
         try:
             if sr is None:
-                sr = accel.SensorReader.connect(i2c=i2c)
+                sr = accel.SensorReader.connect(i2c=i2c, min_change=MIN_CHANGE)
 
             for sensor_data_payload in sr.read():
                 print(sensor_data_payload)
