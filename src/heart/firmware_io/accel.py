@@ -1,11 +1,14 @@
-from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
-from adafruit_lsm303_accel import LSM303_Accel
+import json
+import time
+
+import board
 from adafruit_lis2mdl import LIS2MDL
 from adafruit_lsm6ds import Rate
-import time
-import board
-import json
+from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
+from adafruit_lsm303_accel import LSM303_Accel
+
 from heart.firmware_io import constants
+
 
 def _form_payload(name: str, data) -> str:
     """Forms a JSON payload string from a dictionary of data.
@@ -23,7 +26,7 @@ def _form_payload(name: str, data) -> str:
         "producer_id": 0,
         "data": {
             "value": data,
-        }
+        },
     }
     return "\n" + json.dumps(payload) + "\n"
 
@@ -45,8 +48,9 @@ def form_tuple_payload(name: str, data: tuple) -> str:
             "x": data[0],
             "y": data[1],
             "z": data[2],
-        }
+        },
     )
+
 
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
@@ -129,7 +133,7 @@ class SensorReader:
         Max interval defined by device rate
         Reference: https://github.com/adafruit/Adafruit_CircuitPython_LSM6DS/blob/main/adafruit_lsm6ds/__init__.py#L108-L123
 
-        I put this up here because it is quite likely we'll just want to 
+        I put this up here because it is quite likely we'll just want to
         For now, assume gyro and acceleration will be the same
         """
         if hasattr(sensor, "accelerometer_data_rate"):

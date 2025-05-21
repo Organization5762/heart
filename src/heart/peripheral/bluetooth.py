@@ -73,8 +73,7 @@ class UartListener:
 
                 # Otherwise use the notify channel
                 await client.start_notify(
-                    NOTIFICATION_CHANNEL,
-                    callback=self.__callback
+                    NOTIFICATION_CHANNEL, callback=self.__callback
                 )
 
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)

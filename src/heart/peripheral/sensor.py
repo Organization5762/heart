@@ -13,6 +13,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 @dataclass
 class Acceleration:
     x: float
@@ -96,9 +97,10 @@ class Accelerometer(Peripheral):
                 self.acceleration_value["z"],
             )
         except KeyError:
-            logger.warning("Failed to get acceleration, data: %s", self.acceleration_value)
+            logger.warning(
+                "Failed to get acceleration, data: %s", self.acceleration_value
+            )
             return None
-            
 
     def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]

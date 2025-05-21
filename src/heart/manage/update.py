@@ -68,10 +68,7 @@ def download_file(url: str, checksum: str) -> str:
             if Configuration.is_pi():
                 subprocess.run(["wget", url, "-O", destination], check=True)
             else:
-                subprocess.run(
-    ["curl", "-fL", url, "-o", destination],
-    check=True
-)
+                subprocess.run(["curl", "-fL", url, "-o", destination], check=True)
             print(f"Finished download: {destination}")
 
         # Check the checksum

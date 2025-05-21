@@ -118,7 +118,6 @@ class PeripheralManager:
             if isinstance(p, BluetoothSwitch):
                 return p
         return None
-        
 
     def get_heart_rate_peripheral(self) -> HeartRateManager:
         """There should be only one instance managing all the heart rate sensors."""
