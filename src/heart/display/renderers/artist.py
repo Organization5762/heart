@@ -25,7 +25,7 @@ class ArtistScene(MultiScene):
                 SpritesheetLoop(
                     sheet_file_path=f"artist/{artist}.png",
                     metadata_file_path=f"artist/{artist}.json",
-                    boomerang=True,
+                    boomerang=(artist != "troyboi_glitch_cartwheel"),
                 )
             )
 

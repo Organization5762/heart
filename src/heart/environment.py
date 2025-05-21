@@ -74,6 +74,7 @@ class GameLoop:
         # Lampe controller
         self.feedback_buffer = None
         self.tmp_float = None
+        self.edge_thresh = 1
 
         pygame.display.set_mode(
             (
@@ -264,40 +265,38 @@ class GameLoop:
             ###
             # Button Three
             ###
-            if edge_sw := self.peripheral_manager.bluetooth_switch().switch_three():
+            if (edge_sw := self.peripheral_manager.bluetooth_switch().switch_three()):
                 d = edge_sw.get_rotation_since_last_long_button_press()
-                if d:  # each detent ≈ ±10 %
+                if d:  # ±10 % per detent
                     self.edge_thresh = int(
                         np.clip(self.edge_thresh * (1.0 + 0.10 * d), 1, 255)
                     )
 
-                # ----- quick Sobel-style outline ------------------------------------------
-                # 1) luminance so we only process one channel
-                lum = (
-                    0.299 * image[..., 0]
-                    + 0.587 * image[..., 1]
-                    + 0.114 * image[..., 2]
-                ).astype(np.int16)
+                    # --- fast edge magnitude (same math as before) -----------------------------
+                    lum = (0.299 * image[..., 0]  # perceptual luminance
+                           + 0.587 * image[..., 1]
+                           + 0.114 * image[..., 2]).astype(np.int16)
 
-                # 2) horizontal & vertical gradients via neighbor differences
-                gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))  # left-right diff
-                gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum, 1, 0))  # up-down  diff
-                edge_mag = gx + gy  # cheap ≈sqrt(gx²+gy²)
+                    gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))
+                    gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum, 1, 0))
+                    edge_mag = gx + gy  # 0‥510
 
-                # 3) threshold → binary mask
-                mask = edge_mag > self.edge_thresh
+                    # --- convert to a *soft* alpha mask ----------------------------------------
+                    #   • everything below threshold fades to 0
+                    #   • values above threshold ramp smoothly toward 1
+                    alpha = np.clip(
+                        (edge_mag.astype(np.float32) - self.edge_thresh) / (255 - self.edge_thresh),
+                        0.0, 1.0
+                    )
+                    alpha **= 0.5  # gamma-soften: 0.5 ≈ thicker, lighter lines
+                    alpha = alpha[..., None]  # shape => (H,W,1) for RGB broadcasting
 
-                # 4) (optional) thicken lines by OR-ing with 4-neighbours
-                mask |= (
-                    np.roll(mask, 1, 0)
-                    | np.roll(mask, -1, 0)
-                    | np.roll(mask, 1, 1)
-                    | np.roll(mask, -1, 1)
-                )
+                    # --- composite: dim base layer, add white edges ----------------------------
+                    base = image.astype(np.float32) * 0.75  # 25 % darker background
+                    edges = alpha * 255.0  # white strokes
+                    out = np.clip(base + edges, 0, 255)
 
-                # 5) write back: white lines on black
-                image[:] = 0
-                image[mask] = 255
+                    image[:] = out.astype(np.uint8)
 
         # TODO: This operation will be slow.
         alpha = pygame.surfarray.pixels_alpha(screen)

@@ -85,6 +85,8 @@ class FractalScene(BaseRenderer):
 
         self.initialized = False
         self.warmup = False
+        self.time_initialized = None
+        self._auto_started = False
 
     def _init_uniforms(self):
         set_global_float(self.sphere_radius_var)
@@ -149,6 +151,7 @@ class FractalScene(BaseRenderer):
             f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}"
         )
 
+        self.time_initialized = time.time()
         self.target_surface = window
         window_size = window.get_size()
         tiled_mode = isinstance(orientation, Cube)
@@ -191,6 +194,8 @@ class FractalScene(BaseRenderer):
         self.last_frame_time = time.time()
 
         self.mode = "auto"
+
+        # self.active_color = (1, 1, 1)
 
     def setup_tiled_rendering(self):
         """Set up resources for tiled rendering."""
@@ -388,6 +393,11 @@ class FractalScene(BaseRenderer):
             self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
     def _process_auto(self):
+        if not self._auto_started:
+            self._reset_camera_pos()
+
+        self._auto_started = True
+
         # move forward
         self.virtual_time += self.delta_real_time * self.PULSE_FREQUENCY
 
@@ -402,30 +412,67 @@ class FractalScene(BaseRenderer):
         rz = self.make_rot(0.01, 2)
         self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
+        # xr_mov = 0.17124
+        xr_mov = -0.3524
+        yr_mov = 0.1524
+        fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
+        stick_scale_factor = 8
+        dx = xr_mov * stick_scale_factor * fps_scale_factor
+        dy = yr_mov * stick_scale_factor * fps_scale_factor
+
+        rx = self.make_rot(dx * self.look_speed, 1)
+        ry = self.make_rot(dy * self.look_speed, 0)
+
+        self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
+        self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
+
+    def _check_enter_auto(self, peripheral_manager: PeripheralManager):
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        if gamepad.is_connected():
+            if gamepad.was_tapped(mapping.BUTTON_Y):
+                self.mode = "auto"
+                self._reset_camera_pos()
+
+    def _check_break_auto(self, peripheral_manager: PeripheralManager):
+        # ignore break auto check at first to avoid inut overlap from scene
+        # select mode
+        if time.time() - self.time_initialized < 0.3:
+            return
+
+        gamepad = peripheral_manager.get_gamepad()
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        if gamepad.is_connected():
+            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
+            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
+            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
+            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
+            xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+
+            if (
+                xl_mov != 0 or yl_mov != 0
+                or xr_mov != 0 or yr_mov != 0
+                or xd_mov != 0 or yd_mov != 0
+            ):
+                self.mode = "free"
+
     def _check_switch_auto(self, peripheral_manager: PeripheralManager):
         gamepad = peripheral_manager.get_gamepad()
         mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
         if gamepad.is_connected():
             if gamepad.was_tapped(mapping.BUTTON_Y):
-                self.mode = "free" if self.mode == "auto" else "auto"
-                if self.mode == "auto":
-                    self._reset_camera_pos()
-
-        # keys = pygame.key.get_pressed()
-        #
-        # if keys[pygame.K_LEFTBRACKET] and not self.key_pressed_last_frame[pygame.K_LEFTBRACKET]:
-        #     self.mode = "free" if self.mode == "auto" else "auto"
-        #     if self.mode == "auto":
-        #         self._reset_camera_pos()
-        #
-        # self.key_pressed_last_frame[pygame.K_LEFTBRACKET] = keys[pygame.K_LEFTBRACKET]
+                self.mode = "auto"
+                self._reset_camera_pos()
 
     def set_mode_free(self):
         self.mode = "free"
 
     def _process_input(self, peripheral_manager):
-        # self._process_keyboard_input(peripheral_manager)
-        self._process_gamepad_input(peripheral_manager)
+        try:
+            self._process_gamepad_input(peripheral_manager)
+            # self._process_keyboard_input(peripheral_manager)
+        except:  # i haven't actually seen it fail but just in case
+            pass
 
     def _process_gamepad_input(self, peripheral_manager: PeripheralManager):
         gamepad = peripheral_manager.get_gamepad()
@@ -453,6 +500,7 @@ class FractalScene(BaseRenderer):
                 self.vel *= self.speed_decel
             else:
                 # Calculate desired direction
+                self.mode = "free"
                 direction = np.dot(self.mat[:3, :3].T, acc)
                 direction_norm = np.linalg.norm(direction)
 
@@ -470,6 +518,9 @@ class FractalScene(BaseRenderer):
             # === process movement (R stick) ===
             xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
             yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
+
+            if xr_mov != 0 or yr_mov != 0:
+                self.mode = "free"
 
             fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
             stick_scale_factor = 8
@@ -508,16 +559,20 @@ class FractalScene(BaseRenderer):
                     self.delta_real_time * self.INFLATE_SPEED,
                 )
 
+            # orbit color
+            # if gamepad.was_tapped(mapping.BUTTON_X):
+            #     self.shader.set("_orbit_color", np.array([1, 0, 0]))
+
             if not self.tiled_mode:
                 # eagerly apply the uniforms
                 self.shader.set("s_radius", self.active_radius)
 
             # rotations
             if gamepad.is_held(mapping.BUTTON_ZL):
-                rz = self.make_rot(0.01, 2)
+                rz = self.make_rot(0.02, 2)
                 self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
             if gamepad.is_held(mapping.BUTTON_ZR):
-                rz = self.make_rot(-0.01, 2)
+                rz = self.make_rot(-0.02, 2)
                 self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
             # speed
@@ -565,6 +620,15 @@ class FractalScene(BaseRenderer):
                 self._LO_BASE if self.BASE_RADIUS == self._HI_BASE else self._HI_BASE
             )
         self.key_pressed_last_frame[pygame.K_r] = keys[pygame.K_r]
+
+        # if keys[pygame.K_o] and not self.key_pressed_last_frame[pygame.K_o]:
+        #     print("changing color")
+        #     # self.shader.set("_orbit_color", to_vec3((1, 1, 1)))
+        #     # self.shader.set("s_radius", 3.0)
+        #     self.active_color = (1, 1, 1)
+        #     self.shader.set("_orbit_color", to_vec3(self.active_color))
+
+        # self.key_pressed_last_frame[pygame.K_o] = keys[pygame.K_o]
 
         # "inflate/deflate" sphere on hold/release
         try:
@@ -631,14 +695,16 @@ class FractalScene(BaseRenderer):
 
         if self.mode == "auto":
             self._process_auto()
+            self._check_break_auto(peripheral_manager)
         else:
             self._process_input(peripheral_manager)
+            self._check_enter_auto(peripheral_manager)
 
         # print(f"\n\n{self.vel=}\n\n")
         # if not np.allclose(self.vel, 0.0):
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
-        self._check_switch_auto(peripheral_manager)
+        # self._check_switch_auto(peripheral_manager)
 
         if self.check_collision():
             self._reset_camera_pos()
@@ -653,6 +719,7 @@ class FractalScene(BaseRenderer):
         if self.tiled_mode:
             # queue uniforms to send to shader
             self.shader.set("s_radius", self.active_radius, lazy=True)
+            # self.shader.set("_orbit_color", to_vec3(self.active_color), lazy=True)
 
             # Set viewport to the small render size
             glViewport(0, 0, self.render_size[0], self.render_size[1])
@@ -731,6 +798,7 @@ class FractalScene(BaseRenderer):
 
     def reset(self):
         self.initialized = False
+        self._auto_started = False
         self.mode = "auto"
 
 

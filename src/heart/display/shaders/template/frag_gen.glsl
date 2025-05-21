@@ -7,11 +7,12 @@ uniform vec2 iResolution;
 // Constants
 const float AMBIENT_OCCLUSION_STRENGTH = 0.01;
 const vec3 AMBIENT_OCCLUSION_COLOR_DELTA = vec3(0.8, 0.8, 0.8);
-const vec3 BACKGROUND_COLOR = vec3(0.25, 0.25, 0.25);
+const vec3 BACKGROUND_COLOR = vec3(0.15, 0.15, 0.15);
 const float EXPOSURE = 1.0;
 const float FIELD_OF_VIEW = 60.0;
 const vec3 LIGHT_COLOR = vec3(1.0, 0.9, 0.6);
 const vec3 LIGHT_DIRECTION = vec3(-0.36, 0.48, 0.8);
+// const vec3 ORBIT_COLOR = vec3(0.5, 0.5, 0.5);
 const float LOD_MULTIPLIER = 10.0;
 const int MAX_MARCHES = 1000;
 const float MAX_DIST = 50.0;
@@ -25,6 +26,10 @@ const float FOCAL_DIST = 1.0 / tan(M_PI * FIELD_OF_VIEW / 360.0);
 
 // Uniform variable
 uniform float _s_radius;
+// uniform vec3 _orbit_color;
+// const vec3 _orbit_color = vec3(1.0,0.078431375,0.8627451);
+const vec3 _orbit_color = vec3(1.0,0.078431375,0.8627451);
+
 
 // Forward declarations for distance estimator and coloring functions
 float DE(vec4 p);
@@ -139,7 +144,7 @@ vec4 COL(vec4 p) {
     vec4 newCol;
     vec3 orbit = vec3(0.0);
     p.xyz = abs(mod(p.xyz - 2.0/2, 2.0) - 2.0/2);
-    orbit = max(orbit, (p.xyz - vec3(0.0, 0.0, 0.0)) * vec3(0.0, 0.0, 0.0));
+    orbit = max(orbit, (p.xyz - vec3(0.0, 0.0, 0.0)) * _orbit_color);
     newCol = vec4(orbit, de_sphere(p - vec4(vec3(1.0, 1.0, 1.0), 0), _s_radius));
     if (newCol.w < col.w) { col = newCol; }
     return col;
