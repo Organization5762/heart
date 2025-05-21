@@ -29,6 +29,7 @@ dependencies = [
     "numba",
     "numpy",
     "openant",
+    "opencv-python",
     "Pillow",
     "pygame==2.6.1",
     "pyserial",

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pygame
 from PIL import Image
+import cv2
 
 from heart import DeviceDisplayMode
 from heart.device import Device
@@ -69,6 +70,10 @@ class GameLoop:
         self._phone_text_display_time = None
         self._phone_text_duration = 5.0  # Display phone text for 5 seconds
         self._phone_text_renderer = None
+
+        # Lampe controller
+        self.feedback_buffer = None
+        self.tmp_float = None
 
         pygame.display.set_mode(
             (
@@ -209,12 +214,78 @@ class GameLoop:
             return None
 
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
+        image = pygame.surfarray.pixels3d(screen)
+
         # HACKKK
         if self.peripheral_manager.bluetooth_switch() is not None:
-            print("Bluetooth button available for finalization")
-        
+            ###
+            # Button One
+            ###
+            if (switch_one := self.peripheral_manager.bluetooth_switch().switch_one()) is not None:
+                rotation_delta = switch_one.get_rotation_since_last_long_button_press()
+                if rotation_delta != 0:
+                    # 0.05 per detent, same feel as before
+                    factor = 1.0 + 0.05 * rotation_delta
+                    factor = max(0.0, min(5.0, factor))      # allow full desat → heavy oversat
+
+                    # ---------- saturation tweak (RGB → lerp with luminance) -------------
+                    img = image.astype(np.float32)
+                    
+                    # perceptual luma used by Rec. 601
+                    lum = (0.299 * img[..., 0]
+                        + 0.587 * img[..., 1]
+                    + 0.114 * img[..., 2])[..., None]    # shape (H, W, 1)
+
+                    # interpolate: lum + factor × (color – lum)
+                    img_sat = lum + factor * (img - lum)
+
+                    image[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
+
+            ###
+            # Button Two
+            ###
+            if self.tmp_float is None:
+                self.tmp_float = np.empty_like(image, dtype=np.float32)
+            if (hue_switch := self.peripheral_manager.bluetooth_switch().switch_two()):
+                delta = hue_switch.get_rotation_since_last_long_button_press()
+                if delta:                           
+                    # 0.03 ~= ~11° per detent; tune to taste
+                    hue_delta = (delta * 0.03) % 1.0
+                    # Convert to HSV, roll H channel, convert back
+                    hsv   = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+                    hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
+                    image[:] = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            
+            ###
+            # Button Three
+            ###
+            if (edge_sw := self.peripheral_manager.bluetooth_switch().switch_three()):
+                d = edge_sw.get_rotation_since_last_long_button_press()
+                if d:                     # each detent ≈ ±10 %
+                    self.edge_thresh = int(
+                        np.clip(self.edge_thresh * (1.0 + 0.10 * d), 1, 255)
+                    )
+
+                # ----- quick Sobel-style outline ------------------------------------------
+                # 1) luminance so we only process one channel
+                lum = (0.299 * image[...,0] + 0.587 * image[...,1] + 0.114 * image[...,2]).astype(np.int16)
+
+                # 2) horizontal & vertical gradients via neighbor differences
+                gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum,  1, 1))   # left-right diff
+                gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum,  1, 0))   # up-down  diff
+                edge_mag = gx + gy                                        # cheap ≈sqrt(gx²+gy²)
+
+                # 3) threshold → binary mask
+                mask = edge_mag > self.edge_thresh
+
+                # 4) (optional) thicken lines by OR-ing with 4-neighbours
+                mask |= np.roll(mask, 1, 0) | np.roll(mask,-1,0) | np.roll(mask,1,1) | np.roll(mask,-1,1)
+
+                # 5) write back: white lines on black
+                image[:] = 0
+                image[mask] = 255
+
         # TODO: This operation will be slow.
-        image = pygame.surfarray.pixels3d(screen)
         alpha = pygame.surfarray.pixels_alpha(screen)
         image = np.dstack((image, alpha))
         image = np.transpose(image, (1, 0, 2))
@@ -316,7 +387,7 @@ class GameLoop:
                 if event.type == pygame.QUIT:
                     self.running = False
                 if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
-                    print("resetting joystick module")
+                    logger.info("resetting joystick module")
                     pygame.joystick.quit()
                     pygame.joystick.init()
         except SystemError:

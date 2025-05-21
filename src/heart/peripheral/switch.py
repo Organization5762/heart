@@ -119,6 +119,7 @@ class BluetoothSwitch(BaseSwitch):
             BaseSwitch(),
             BaseSwitch(),
         ]
+        self.connected = False
         super().__init__(*args, **kwargs)
 
     def update_due_to_data(self, data: dict[str, int]) -> None:
@@ -140,16 +141,24 @@ class BluetoothSwitch(BaseSwitch):
                 main_switch.rotation_value_at_last_long_button_press
             )
 
-    def switch_zero(self) -> BaseSwitch:
+    def switch_zero(self) -> BaseSwitch | None:
+        if not self.connected:
+            return None
         return self.switches[0]
 
-    def switch_one(self) -> BaseSwitch:
+    def switch_one(self) -> BaseSwitch | None:
+        if not self.connected:
+            return None
         return self.switches[1]
 
-    def switch_two(self) -> BaseSwitch:
+    def switch_two(self) -> BaseSwitch | None:
+        if not self.connected:
+            return None
         return self.switches[2]
 
-    def switch_three(self) -> BaseSwitch:
+    def switch_three(self) -> BaseSwitch | None:
+        if not self.connected:
+            return None
         return self.switches[3]
 
     @classmethod
@@ -161,20 +170,32 @@ class BluetoothSwitch(BaseSwitch):
         return self.listener.start()
 
     def run(self) -> NoReturn:
+        slow_poll = False
+        number_of_retries_without_success = 0
         # If it crashes, try to re-connect
         while True:
             try:
                 self._connect_to_ser()
+                number_of_retries_without_success = 0
+                slow_poll = False
+                self.connected = True
                 try:
                     while True:
                         for event in self.listener.consume_events():
                             self.update_due_to_data(event)
+                        time.sleep(0.1)
                 except KeyboardInterrupt:
                     print("Program terminated")
                 except Exception:
+                    self.connected = False
                     pass
                 finally:
+                    self.connected = False
                     self.listener.close()
             except Exception:
-                pass
-            time.sleep(3)
+                self.connected = False
+                number_of_retries_without_success += 1
+                if number_of_retries_without_success > 5:
+                    slow_poll = True
+
+            time.sleep(30 if slow_poll else 5)

@@ -19,12 +19,13 @@ OBJECT_SEPARATOR = "\n"
 class UartListener:
     """Listeners for data come in as raw bytes from a UART Service."""
 
-    __slots__ = ("device", "buffer", "events")
+    __slots__ = ("device", "buffer", "events", "disconnected")
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
         self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
+        self.disconnected = False
 
     @classmethod
     def _discover_devices(cls) -> Iterator[BLEDevice]:
@@ -43,6 +44,8 @@ class UartListener:
 
     def consume_events(self) -> Iterator[dict[str, Any]]:
         while self.events:
+            if self.disconnected:
+                raise RuntimeError("Device disconnected")
             yield self.events.popleft()
 
     async def connect_and_listen(self) -> NoReturn:
@@ -70,7 +73,8 @@ class UartListener:
 
                 # Otherwise use the notify channel
                 await client.start_notify(
-                    NOTIFICATION_CHANNEL, callback=self.__callback
+                    NOTIFICATION_CHANNEL,
+                    callback=self.__callback
                 )
 
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
@@ -79,9 +83,12 @@ class UartListener:
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:
+        def on_disconnect(client: BleakClient):
+            self.disconnected = True
+
         client = BleakClient(
             device,
-            disconnected_callback=None,
+            disconnected_callback=on_disconnect,
         )
         # https://github.com/adafruit/Adafruit_CircuitPython_BLE/blob/main/adafruit_ble/services/nordic.py#L47
         client._backend._mtu_size = 512

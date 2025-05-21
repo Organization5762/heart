@@ -9,7 +9,9 @@ import serial
 from heart.firmware_io.constants import ACCELERATION
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
+from heart.utilities.logging import get_logger
 
+logger = get_logger(__name__)
 
 @dataclass
 class Acceleration:
@@ -87,11 +89,16 @@ class Accelerometer(Peripheral):
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:
             return None
-        return Acceleration(
-            self.acceleration_value["x"],
-            self.acceleration_value["y"],
-            self.acceleration_value["z"],
-        )
+        try:
+            return Acceleration(
+                self.acceleration_value["x"],
+                self.acceleration_value["y"],
+                self.acceleration_value["z"],
+            )
+        except KeyError:
+            logger.warning("Failed to get acceleration, data: %s", self.acceleration_value)
+            return None
+            
 
     def _update_due_to_data(self, data: dict) -> None:
         event_type = data["event_type"]
