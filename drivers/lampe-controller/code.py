@@ -11,7 +11,7 @@ from adafruit_ble.services.nordic import UARTService
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 import json
 from collections import deque
-from heart.firmware_io import constants, rotary_encoder, bluetooth
+from heart.firmware_io import constants, rotary_encoder, bluetooth, accel
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 
@@ -40,10 +40,13 @@ handlers = [
 ]
 
 seesaw = rotary_encoder.Seesaw(handlers)
+sensors = accel.SensorReader.connect(i2c=i2c)
 
 while True:
-    for event in seesaw.handle():
-        print("Sending ", event)
-        bluetooth.send([event])
-        print("Sent ", event)
-    
+    seesaw_events = list(seesaw.handle())
+    sensor_events = list(sensors.read())
+
+    bluetooth.send([
+        *seesaw_events,
+        *sensor_events,
+    ], bulk_write=True)

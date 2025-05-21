@@ -12,4 +12,4 @@ CIRCUIT_PY_UF2_URL="https://downloads.circuitpython.org/bin/feather_bluefruit_se
 CIRCUIT_PY_UF2_CHECKSUM="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 VALID_BOARD_IDS="feather_bluefruit_sense"
 
-CIRCUIT_PY_DRIVER_LIBS="adafruit_ble,adafruit_bus_device,adafruit_seesaw"
+CIRCUIT_PY_DRIVER_LIBS="adafruit_ble,adafruit_bus_device,adafruit_seesaw,adafruit_lsm6ds,adafruit_register,adafruit_lsm303_accel,adafruit_lis2mdl"
