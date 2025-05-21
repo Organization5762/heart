@@ -120,6 +120,13 @@ class MandelbrotMode(BaseRenderer):
                 self.scene_controls, self.gamepad
             ),
         }
+
+        if isinstance(orientation, Cube):
+            # warmup compilation of the jitted functions
+            mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
+            julia_surface = pygame.Surface((self.width // 2, self.height))
+            self._draw_split_view(mandelbrot_surface, julia_surface, clock)
+
         super().initialize(window, clock, peripheral_manager, orientation)
 
     @property

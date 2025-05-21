@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Configuration
-SOURCE_DIR="/Users/michael/Home/SideProject/heart"
+SOURCE_DIR="/Users/cemmanuel/stash/playground/totem/heart"
 REMOTE_HOST="michael@totem.local"
 REMOTE_DIR="~/Desktop/"
 REMOTE_PASS="totemlib2024"
-IGNORE_LIST=".venv __pycache__ *.pyc .DS_Store"
+IGNORE_LIST="__pycache__ *.pyc .DS_Store build external update.py .venv"
 
 # Generate exclusion parameters
 EXCLUSIONS=""
