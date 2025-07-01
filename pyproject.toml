@@ -76,3 +76,8 @@ blank = true
 
 [tool.isort]
 profile = "black"
+
+[tool.uv.workspace]
+members = [
+    "experimental/lapis",
+]
