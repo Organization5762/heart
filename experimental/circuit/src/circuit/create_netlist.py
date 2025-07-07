@@ -1,15 +1,21 @@
 from dataclasses import dataclass
+import glob
+from skidl.part import Part
+from skidl.part import Part
 import string
+from typing import Any, Optional
 from skidl import *
 from skidl.pin import pin_types
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
+
+from painter.board import Board
 
 logger = logging.getLogger(__name__)
 
+
 # ------------------- Nets & Power Rails ---------------------------------
 VCC5      = Net('5V');   VCC5.drive   = POWER
-VCC3V3    = Net('3V3');  VCC3V3.drive = POWER
 VCORE_1V2 = Net('VCORE_1V2'); VCORE_1V2.drive = POWER
 GND       = Net('GND');  GND.drive    = POWER
 
@@ -18,44 +24,65 @@ class BoardConfig:
     """Central location for board‑level constants."""
 
     # High‑level params
-    NUM_PORTS     = 10
+    NUM_PORTS     = 4
     BUF_PER_PORT  = 2  # 8‑bit buffers per HUB75 port
     BUF_SIZE = 8
     RES_PER_PORT  = 1  # SIP‑9 resistor array per port
     RESARRAY_NAME = "R_Pack09_Split"
 
     # Libraries & device names
-    SNAP_EDA  = 'SnapEDA-Library'
-    FGPA_NAME = 'LFE5U-45F-7BG256I'
+    SNAP_EDA  = 'LFE5U-45F-8BG381I'
+    # https://www.snapeda.com/parts/LFE5U-45F-8BG381I/Lattice%20Semiconductor/view-part/
+    # Footprint is for 381-FBGA
+    FGPA_NAME = 'LFE5U-45F-8BG381I'
 
     # Footprints
-    FPGA_FOOTPRINT  = 'BGA381C80P20X20_1700X1700X176N'
     CONNECTOR_FOOT  = 'Connector_IDC:IDC-Header_2x08_P2.54mm_Vertical'
     RESARRAY_FOOT   = 'Resistor_THT:R_Array_SIP9'
     CAP0402_FOOT    = 'Capacitor_SMD:C_0402_1005Metric'
     CAP0805_FOOT    = 'Capacitor_SMD:C_0805_2012Metric'
+    FPGA_FOOTPRINT  = 'FPGA:BGA381C80P20X20_1700X1700X176N'
 
     # HUB75 signal ordering
-    HUB_75_NAMES = ['R1','G1','B1', 'E', 'R2','G2','B2','CLK','LAT','OE','A','B','C','D']
     HUB75_WIRE_ORDER = ['CLK', 'LAT', 'OE',
                     'R1','G1','B1','R2','G2','B2',
                     'A','B','C','D','E']
 
-    HUB_75_WIRE_ROWS = {
-        0: ["CLK", "LAT", "OE"],
-        2: ['R1','G1','B1'],
-        3: ["B2", 'R2', 'G2', 'A'],
-        4: ["B", "C", "D", "E"],
-    }
+    BUFFER_A_ASSIGNMENTS = (
+        2,
+        [
+            "R1",
+            "G1",
+            "B1",
+            "E",
+            "R2",
+            "G2",
+            "B2",
+        ]
+    )
+
+    BUFFER_B_ASSIGNMENTS = (0,
+        [
+            "CLK",
+            "LAT",
+            "OE",
+            "A",
+            "B",
+            "C",
+        "D",
+        ]
+    )
 
     def buffer_part(self) -> Part:
         # https://www.nexperia.com/product/74HCT245BQ
-        return Part("74HCT245BQ_115", "74HCT245BQ,115", footprint="Package_SO:74HCT245BQ115")
+        part = Part("74HCT245BQ_115", "74HCT245BQ,115", footprint="Buffer:74HCT245BQ115")
+        part[Rgx(".*")] += NC
+        return part
 # ------------------- Board Builder --------------------------------------
 class Hub75DriverBoard:
     """Builds an ECP5‑based multi‑port HUB75 splitter board."""
 
-    def __init__(self, cfg: BoardConfig | None = None):
+    def __init__(self, cfg: Optional[BoardConfig] = None) -> None:
         self.cfg = cfg or BoardConfig()
         self._create_fpga()
         self.allocator = FPGAPinAllocator(
@@ -67,6 +94,7 @@ class Hub75DriverBoard:
     # ------------------------------------------------------------------
     def _create_fpga(self):
         self.fpga = Part(self.cfg.SNAP_EDA, self.cfg.FGPA_NAME, footprint=self.cfg.FPGA_FOOTPRINT)
+        self.fpga[Rgx('.*')] += NC
         self.fpga_io_pins = self._gather_io_pins()
 
     def _gather_io_pins(self):
@@ -82,10 +110,10 @@ class Hub75DriverBoard:
     def _hub75_nets(self, idx):
         """Return dict of 13 signal nets for port *idx*."""
         prefix = f'H{idx}_'
-        return {name: Net(prefix + name) for name in self.cfg.HUB_75_NAMES}
+        return {name: Net(prefix + name) for name in self.cfg.HUB75_WIRE_ORDER}
 
     def _add_decoupling(self, pin_regex, cap_val='0.1u', count_per_pin=1):
-        for p in self.fpga.get_pins(pin_regex):
+        for p in self.fpga.get_pins(pin_regex) or []:
             for _ in range(count_per_pin):
                 c = Part('Device', 'C', value=cap_val, footprint=self.cfg.CAP0402_FOOT)
                 c[1] += p.net
@@ -94,7 +122,7 @@ class Hub75DriverBoard:
     # ------------------------------------------------------------------
     #   Per‑port helpers (namespacing fixed)
     # ------------------------------------------------------------------
-    def _create_port_buffers(self, idx):
+    def _create_port_buffers(self, idx) -> list[Part]:
         """Instantiate fresh buffer parts so refs don't collide between ports."""
         bufs = []
         for b in range(self.cfg.BUF_PER_PORT):
@@ -103,18 +131,20 @@ class Hub75DriverBoard:
             bufs.append(buf)
         return bufs
 
-    def _create_res_array(self, idx):
+    def _create_res_array(self, idx) -> Part:
         rn = Part('Device', self.cfg.RESARRAY_NAME, value='33', footprint=self.cfg.RESARRAY_FOOT)
         rn.ref = f'RN{idx}'
         return rn
 
-    # ---- HUB75 connector ----------------------------------------------
-    def _create_hub75_connector(self, idx):
+    def _create_hub75_connector(self, idx) -> Part:
         hub = Part('Connector_Generic', 'Conn_02x08_Odd_Even', footprint=self.cfg.CONNECTOR_FOOT)
         hub.ref = f'J{idx}'
         return hub
 
-    def _map_hub75_pins(self, hub, sig):
+    # ------------------------------------------------------------------
+    #   WIRING
+    # ------------------------------------------------------------------
+    def _map_hub75_pins(self, hub, sig) -> None:
         """Wire logical HUB75 signals to physical header pins."""
         pin_map = {
             1:'R1', 2:'G1', 3:'B1', 4:'E', 5:'R2', 6:'G2', 7:'B2', 8:'GND',
@@ -122,7 +152,7 @@ class Hub75DriverBoard:
         }
         for pin_num, name in pin_map.items():
             hub[str(pin_num)] += sig.get(name, GND)
-        hub['8,16'] += GND  # dedicated grounds
+        hub['8,16'] += GND 
 
     # ---- Buffer handling ----------------------------------------------
     def _wire_fpga_to_buffers(self, port_idx, bufs, sig):
@@ -132,45 +162,26 @@ class Hub75DriverBoard:
         • FPGA-IO  →  244 “A” pins   (via a private *_IN net)
         • 244 “Y”  →  public net     (shared with resistor-pack + connector)
         """
-        # --- Fill to 16 lines so the two octal buffers are fully used ----
-        order = []
-        for x in self.cfg.HUB_75_WIRE_ROWS.values():
-            order.extend(x)
-        buf_bits = [sig[n] for n in order]
-
-        while len(buf_bits) < self.cfg.BUF_SIZE * self.cfg.BUF_PER_PORT:
-            pad_idx = len(buf_bits)
-            buf_bits.append(Net(f'BF{port_idx}_NC{pad_idx}'))
-
-        # Grab an allocated region for this buffer
-        # Max of all the values
+        buffers = [self.cfg.BUFFER_A_ASSIGNMENTS, self.cfg.BUFFER_B_ASSIGNMENTS]
         allocated_pins = self.allocator.allocate_region(
-            col_size=max([len(x) for x in self.cfg.HUB_75_WIRE_ROWS.values()]),
-            row_size=max(self.cfg.HUB_75_WIRE_ROWS.keys()) + 1
+            col_size=max([x[0] for x in buffers]) + 1,
+            row_size=max([len(x[1]) for x in buffers])
         )
 
-        # Now we have to do two things:
-        # 1. Allocate FPGA pins for each (This is easy, we have the index in HUB_75_WIRE_ROWS)
-        # 2. Allocate a buffer pin for each
-        io_cursor = 0
+        # Optimizations:
+        # 1. Equally split between multiple buffers
+        # 2. Spatially configure the pins so that they easily map to the next set
+        for buf, (row, assignments) in zip(bufs, buffers):
+            for current_buf_idx, assignment in enumerate(assignments):
 
-        for row, values in self.cfg.HUB_75_WIRE_ROWS.items():
-            for i, value in enumerate(values):
-                buf_idx = int(io_cursor / self.cfg.BUF_SIZE)
-                current_buf_idx = io_cursor % self.cfg.BUF_SIZE
-                buf = bufs[buf_idx]
-                net = buf_bits[io_cursor]
+                fpga_pin = allocated_pins[current_buf_idx][row]
 
+                net = sig[assignment]
                 net_in = Net(f'{net.name}_IN')
-
-                fpga_pin = allocated_pins[row][i]
                 self.fpga[fpga_pin] += net_in
 
-                buf[f"A{current_buf_idx}"]            += net_in
-                buf[f"B{current_buf_idx}"]            += net
-
-                io_cursor += 1
-
+                buf[f"A{7 - current_buf_idx}"] += net_in
+                buf[f"B{current_buf_idx}"] += net
 
     def _configure_buffers(self, bufs):
         for buf in bufs:
@@ -186,9 +197,9 @@ class Hub75DriverBoard:
                 buf['GND'] += GND
             buf['VCC'] += VCC5
 
-            cdec = Part('Device', 'C', value='0.1u', footprint=self.cfg.CAP0402_FOOT)
-            cdec[1] += VCC5
-            cdec[2] += GND
+            # cdec = Part('Device', 'C', value='0.1u', footprint=self.cfg.CAP0402_FOOT)
+            # cdec[1] += VCC5
+            # cdec[2] += GND
 
     # ---- Series resistors ---------------------------------------------
     def _add_series_resistors(self, rn, sig, hub) -> None:
@@ -236,7 +247,7 @@ class Hub75DriverBoard:
         self.fpga[Rgx(AUX_RAILS)] += VCC5
         self._add_decoupling(Rgx(AUX_RAILS), '1u')
         self._add_decoupling(Rgx(AUX_RAILS), '0.1u')
-        self.fpga[Rgx('GND.*')] += GND
+        # self.fpga[Rgx('GND.*')] += GND
 
     # ------------------------------------------------------------------
     #   Public API
@@ -244,8 +255,62 @@ class Hub75DriverBoard:
     def build(self):
         self.assemble()
         ERC()
-        generate_netlist(tool=KICAD8)
-        print('Netlist written as hub75_fpga_driver.net')
+        self.build_board()
+
+    def build_board(self):
+        # https://docs.kicad.org/8.0/en/pcbnew/pcbnew.pdf
+
+        board = Board(layers=6)
+        # pads = fpga.Pads()
+        # print(pads)
+
+        # x, y = 200, 100
+        # brd = Board((x, y))
+    
+        # brd.add_inner_copper_layer(4)
+        # # Place 2 mm mounting holes in the corners
+        # holes = ((5, 5), (5, y - 5), (x - 5, 5), (x - 5, y -5 ))
+        # for hole in holes:
+        #     brd.add_hole(hole, 2.0)
+
+        # # Place a VDD patch under MCU on layer GP3
+        # # brd.add_named_rect((27, 25), (45, 5), layer="GP3", name="VDD")
+
+        # ckt = default_circuit
+        # print("Circuit:  Parts: %d  Nets: %d" % (len(ckt.parts), len(ckt.nets)))
+        # ##
+        # # Place parts
+        # ##
+        # s = SkiPart(
+        #     brd.DC(
+        #         (
+        #             x * 2 / 3,
+        #             y / 2,
+        #         )
+        #     ),
+        #     self.fpga,
+        #     side='top'
+        # )
+
+        # brd.add_named_rect(
+        #     (s.bounds[0] + 5 , s.bounds[1] + 5), (s.bounds[2] + 5 , s.bounds[3] + 5),
+        #     "GTL",
+        #     self.cfg.FGPA_NAME
+        # )
+
+        # # sp.fanout(["VDD"])
+        # # sp.fanout(["GND"], relative_to="inside")
+ 
+        # ##
+        # # Final fill
+        # ##
+        # brd.add_outline()
+        # brd.fill_layer("GTL", "GND")
+        # brd.fill_layer("GBL", "GND")
+        # brd.fill_layer("GP3", "GND")
+        # brd.fill_layer("GBL", "GND")
+        # brd.fill_layer("GP3", "GND")
+        # brd.save("/tmp/circuit", in_subdir=False)
 
 
 class FPGAPinAllocator:
@@ -264,34 +329,36 @@ class FPGAPinAllocator:
         *,
         col_size = 4,
         row_size = 5,
-        start_at: tuple[str, int] | None = None
     ) -> list[list[str]]:
         all_valid = []
         
-        # Get all the unique numbers
-        rows = sorted(list(set([x[0] for x in self._grid])))
-        columns = sorted(list(set([x[1] for x in self._grid])))
-        for row_start in range(0, len(rows), row_size):
-            row_names = rows[row_start:row_start + row_size]
+        row_groups = defaultdict(list)
+        for row, column in sorted(list(self._grid.keys())):
+            row_groups[row].append(f"{row}{column}")
 
-            for col_start in range(0, len(columns), col_size):
-                col_names = columns[col_start:col_start + col_size]
-                
-                if len(row_names) < row_size or len(col_names) < col_size:
+        ordered_keys = sorted(list(row_groups.keys()))
+        for i in range(0, len(ordered_keys), row_size):
+            valid_rows = ordered_keys[i:i+row_size]
+
+            # For each row get candidate columns:
+            candidate_row_columns = []
+            for valid_row in valid_rows:
+                columns_in_this_row = row_groups[valid_row]
+                candidate_row_columns.append(columns_in_this_row)
+            
+            # now we take as many as the col_size will allow
+            for i in range(0, min([len(x) for x in candidate_row_columns]), col_size):
+                x = [x[i:i+col_size] for x in candidate_row_columns]
+
+                if any([len(y) < col_size for y in x]):
                     continue
-                all_valid.append((row_names, col_names))
+                all_valid.append(x)
+                
 
         if self.counter < len(all_valid):
-            combinations = []
-            rows, cols = all_valid[self.counter] 
-            for row in rows:
-                result = []
-                for col in cols:
-                    result.append(f"{row}{col}")
-                combinations.append(result)
-
+            result = all_valid[self.counter]
             self.counter += 1
-            return combinations
+            return result
 
         raise RuntimeError(f"No {row_size}×{col_size} IO region left on the FPGA. Ran out on board {self.counter}")
 
@@ -323,3 +390,7 @@ class FPGAPinAllocator:
 # ------------------- Script entrypoint -----------------------------------
 if __name__ == '__main__':
     Hub75DriverBoard().build()
+
+#####
+# Hack the board together
+#####

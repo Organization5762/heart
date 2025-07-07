@@ -38,3 +38,29 @@ Copy symbols + footprints
 # Reverse engineering of existing boards
 https://github.com/q3k/chubby75/tree/master
 https://blog.yosyshq.com/p/colorlight-part-1/?utm_source=chatgpt.com
+
+
+## Shopping for PCBs
+Price Comparison: https://pcbshopper.com
+
+
+Sierra Circuits
+PCB Way
+Bay Area Circuits
+
+
+# Installation
+ln -s "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3" /usr/local/bin/kipython
+kipython create_netlist.py
+kipython -m pip install --user pcbflow skidl
+
+
+## Code-based layout:
+https://github.com/michaelgale/pcbflow
+circuitpainter
+
+## Routing Recommendations
+https://sigma.octopart.com/138896719/technical_drawing/Lattice-Semiconductor-LCMXO3LF-2100C-5BG256I.pdf
+
+This example utilizes 4-mil traces and 7-mil via drills for BGA escape
+routing. Two internal layers are used as reference planes.
