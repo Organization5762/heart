@@ -46,6 +46,7 @@ ______________________________________________________________________
 | Part Name                                                      | Description                         | Supported | Driver Link |
 | -------------------------------------------------------------- | ----------------------------------- | --------- | ----------- |
 | [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No        | N/A         |
+| [Ultra-Wide-Band Positioning Development Kit (UWB, BU-03)](https://core-electronics.com.au/ultra-wide-band-module-development-kit-bu03.html) | Distance between two boards | No | N/A ~
 
 # Bridges
 
