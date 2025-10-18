@@ -91,7 +91,11 @@ class LocalScreen(Device):
         current_width, current_height = self.full_display_size()
 
         result = max(min(width // current_width, height // current_height), 1)
-        return int(result / 3)
+        scale = int(result / 3)
+        # Cap at 4 for X11 forwarding performance
+        scale = min(scale, 4)
+        logger.info(f"Scale factor: {scale}x (window: {current_width * scale}x{current_height * scale})")
+        return scale
 
     def set_image(self, image: Image.Image) -> None:
         assert (

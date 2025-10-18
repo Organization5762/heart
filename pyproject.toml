@@ -26,6 +26,7 @@ requires-python = ">= 3.11"
 
 dependencies = [
     "bleak",
+    "fastapi",
     "numba",
     "numpy",
     "openant",
@@ -33,11 +34,14 @@ dependencies = [
     "Pillow",
     "pygame==2.6.1",
     "pyserial",
+    "python-multipart",
     "requests",
     "scipy",
     "toml",
     "tqdm",
     "typer-slim",
+    "uvicorn[standard]",
+    "websockets",
     "PyOpenGL>=3.1.0",
     "moderngl",
 ]

@@ -6,7 +6,7 @@ Visual display project for LED screens.
 
 **Installation**
 
-`make install`
+`make dev_install` or `make pi_install`
 
 **Formatting**
 

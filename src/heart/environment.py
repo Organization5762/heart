@@ -124,6 +124,11 @@ class GameLoop:
             peripheral_manager=self.peripheral_manager,
             orientation=self.device.orientation,
         )
+        
+        # FPS tracking for debugging
+        frame_count = 0
+        last_fps_log = time.time()
+        
         while self.running:
             self._handle_events()
             self._preprocess_setup()
@@ -163,6 +168,16 @@ class GameLoop:
                         renderers.append(FlameRenderer())
             self._one_loop(renderers)
             self.clock.tick(self.max_fps)
+            
+            # FPS logging every 10 seconds
+            frame_count += 1
+            current_time = time.time()
+            if current_time - last_fps_log >= 10.0:
+                elapsed = current_time - last_fps_log
+                fps = frame_count / elapsed
+                logger.info(f"FPS: {fps:.2f} (target: {self.max_fps})")
+                frame_count = 0
+                last_fps_log = current_time
 
         pygame.quit()
 
