@@ -24,11 +24,11 @@ def list_peripherals() -> None:
 
 @app.command(name="accelerometer")
 def stream_accelerometer(
-    raw: bool = typer.Option(False, help="Echo raw serial data in addition to processed values."),
+    raw: bool = typer.Option(
+        False, help="Echo raw serial data in addition to processed values."
+    ),
     sleep_interval: float = typer.Option(
-        0.0,
-        min=0.0,
-        help="Sleep duration (seconds) between polling cycles."
+        0.0, min=0.0, help="Sleep duration (seconds) between polling cycles."
     ),
 ) -> None:
     """Stream accelerometer readings."""
@@ -58,10 +58,14 @@ def run_phone_text() -> None:
 
 
 @gamepad_app.command(name="scan")
-def scan_gamepads(scan_duration: int = typer.Option(10, min=1, help="Scan duration in seconds.")) -> None:
+def scan_gamepads(
+    scan_duration: int = typer.Option(10, min=1, help="Scan duration in seconds.")
+) -> None:
     """Scan for Bluetooth controllers."""
 
-    all_devices, matched_devices = debug.find_gamepad_devices(scan_duration=scan_duration)
+    all_devices, matched_devices = debug.find_gamepad_devices(
+        scan_duration=scan_duration
+    )
 
     typer.echo("All Bluetooth devices found:")
     for device in all_devices:
@@ -71,24 +75,37 @@ def scan_gamepads(scan_duration: int = typer.Option(10, min=1, help="Scan durati
     if matched_devices:
         typer.echo(f"\nFound {len(matched_devices)} potential 8BitDo devices.")
     else:
-        typer.echo("\nNo 8BitDo controllers discovered. Ensure pairing mode is enabled.")
+        typer.echo(
+            "\nNo 8BitDo controllers discovered. Ensure pairing mode is enabled."
+        )
 
 
 @gamepad_app.command(name="pair")
-def pair_gamepad(mac_address: str = typer.Argument(..., help="MAC address of the controller to pair.")) -> None:
+def pair_gamepad(
+    mac_address: str = typer.Argument(
+        ..., help="MAC address of the controller to pair."
+    )
+) -> None:
     """Attempt to pair and connect to a Bluetooth gamepad."""
 
     result = debug.pair_gamepad(mac_address)
     if result.after.connected:
         typer.secho("Controller connected.", fg=typer.colors.GREEN)
     else:
-        typer.secho("Connection attempt completed. Check controller status.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "Connection attempt completed. Check controller status.",
+            fg=typer.colors.YELLOW,
+        )
 
     typer.echo(
-        "Status before: paired={0.before.paired} connected={0.before.connected}".format(result)
+        "Status before: paired={0.before.paired} connected={0.before.connected}".format(
+            result
+        )
     )
     typer.echo(
-        "Status after:  paired={0.after.paired} connected={0.after.connected}".format(result)
+        "Status after:  paired={0.after.paired} connected={0.after.connected}".format(
+            result
+        )
     )
 
     stdout = (result.stdout or "").strip()
@@ -100,7 +117,9 @@ def pair_gamepad(mac_address: str = typer.Argument(..., help="MAC address of the
 
 
 @gamepad_app.command(name="status")
-def gamepad_status(mac_address: str = typer.Argument(..., help="MAC address of the controller.")) -> None:
+def gamepad_status(
+    mac_address: str = typer.Argument(..., help="MAC address of the controller.")
+) -> None:
     """Display whether a controller is paired and/or connected."""
 
     status = debug.get_gamepad_status(mac_address)

@@ -77,9 +77,7 @@ class Switch(BaseSwitch):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        for port in get_device_ports(
-            "usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"
-        ):
+        for port in get_device_ports("usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"):
             yield cls(port=port, baudrate=115200)
 
     def _connect_to_ser(self):

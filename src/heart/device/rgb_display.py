@@ -1,7 +1,6 @@
 import argparse
-import sys
-
 import queue
+import sys
 import threading
 from typing import Optional
 
@@ -210,9 +209,6 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
-
-
-from PIL import Image  # just for the type hint
 
 
 class MatrixDisplayWorker:

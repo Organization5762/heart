@@ -1,21 +1,26 @@
 import os
+
 import pytest
 
 from heart.device import Cube, Device
 from heart.environment import GameLoop
 from heart.peripheral.core.manager import PeripheralManager
 
+
 class FakeFixtureDevice(Device):
     def individual_display_size(self) -> tuple[int, int]:
         return (64, 64)
+
 
 @pytest.fixture()
 def orientation() -> Cube:
     return Cube.sides()
 
+
 @pytest.fixture()
 def device(orientation) -> Device:
     return FakeFixtureDevice(orientation=orientation)
+
 
 @pytest.fixture()
 def manager() -> PeripheralManager:

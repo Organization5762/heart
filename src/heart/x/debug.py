@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import subprocess
 import time
+from dataclasses import dataclass
 from typing import Sequence
 
 from serial.serialutil import SerialException
+
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.sensor import Accelerometer
@@ -57,7 +58,9 @@ def stream_accelerometer(raw: bool = False, sleep_interval: float = 0.0) -> None
     manager.detect()
 
     accelerometers = [
-        peripheral for peripheral in manager.peripheral if isinstance(peripheral, Accelerometer)
+        peripheral
+        for peripheral in manager.peripheral
+        if isinstance(peripheral, Accelerometer)
     ]
     if not accelerometers:
         raise RuntimeError("No accelerometer peripherals detected")
@@ -164,7 +167,10 @@ def get_gamepad_status(mac_address: str) -> GamepadStatus:
     """Return the pairing/connection status for ``mac_address``."""
 
     result = subprocess.run(
-        ["bluetoothctl", "info", mac_address], capture_output=True, text=True, check=False
+        ["bluetoothctl", "info", mac_address],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     output = result.stdout
     return GamepadStatus(
@@ -186,7 +192,9 @@ def find_gamepad_devices(scan_duration: int = 10) -> tuple[list[str], list[str]]
 
     try:
         time.sleep(max(scan_duration, 1))
-        result = subprocess.run(["bluetoothctl", "devices"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["bluetoothctl", "devices"], capture_output=True, text=True
+        )
     finally:
         scan_proc.terminate()
 
@@ -220,7 +228,10 @@ def pair_gamepad(mac_address: str) -> GamepadConnectionResult:
         )
     else:
         connect_result = subprocess.run(
-            ["bluetoothctl", "connect", mac_address], capture_output=True, text=True, check=False
+            ["bluetoothctl", "connect", mac_address],
+            capture_output=True,
+            text=True,
+            check=False,
         )
 
     after = get_gamepad_status(mac_address)

@@ -4,6 +4,7 @@ import numpy as np
 
 UniformValue = float | np.ndarray
 
+
 def normalize(x):
     return x / np.linalg.norm(x)
 

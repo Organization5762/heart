@@ -449,9 +449,12 @@ class FractalScene(BaseRenderer):
             xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
 
             if (
-                xl_mov != 0 or yl_mov != 0
-                or xr_mov != 0 or yr_mov != 0
-                or xd_mov != 0 or yd_mov != 0
+                xl_mov != 0
+                or yl_mov != 0
+                or xr_mov != 0
+                or yr_mov != 0
+                or xd_mov != 0
+                or yd_mov != 0
             ):
                 self.mode = "free"
 

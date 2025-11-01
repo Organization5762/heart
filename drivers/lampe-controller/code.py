@@ -1,17 +1,11 @@
-import board
-import digitalio
-import time
-import random
-import adafruit_seesaw.seesaw
-import adafruit_seesaw.rotaryio
 import adafruit_seesaw.digitalio
+import adafruit_seesaw.rotaryio
+import adafruit_seesaw.seesaw
+import board
 import busio
-from adafruit_ble import BLERadio
-from adafruit_ble.services.nordic import UARTService
-from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
-import json
-from collections import deque
-from heart.firmware_io import constants, rotary_encoder, bluetooth
+import digitalio
+
+from heart.firmware_io import bluetooth, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 

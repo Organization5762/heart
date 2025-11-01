@@ -23,8 +23,8 @@ class Acceleration:
 # TODO (lampe): This is fundamentally useless right now
 class Distribution:
     def __init__(self) -> None:
-        self.historic_values: collections.deque[tuple[float, float]] = collections.deque(
-            [], maxlen=100
+        self.historic_values: collections.deque[tuple[float, float]] = (
+            collections.deque([], maxlen=100)
         )
 
     def _get_time(self) -> float:
