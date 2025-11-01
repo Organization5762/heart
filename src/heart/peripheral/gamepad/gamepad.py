@@ -1,4 +1,3 @@
-import logging
 import subprocess
 import time
 from collections import defaultdict
@@ -162,12 +161,12 @@ class Gamepad(Peripheral):
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
 
-    @staticmethod
-    def detect() -> Iterator["Gamepad"]:
+    @classmethod
+    def detect(cls) -> Iterator["Gamepad"]:
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
-            return [Gamepad()]
+            return [cls()]
         except pygame.error as e:
             print(f"Error initializing joystick module: {e}")
             return []
@@ -218,7 +217,7 @@ class Gamepad(Peripheral):
                         if result.returncode == 0:
                             print("Successfully connected to 8bitdo controller")
                         else:
-                            print(f"Failed to connect to 8bitdo controller")
+                            print("Failed to connect to 8bitdo controller")
 
             except KeyboardInterrupt:
                 print("Program terminated")

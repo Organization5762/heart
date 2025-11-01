@@ -1,6 +1,4 @@
 from heart.display.renderers.image import RenderImage
-from heart.display.renderers.pixels import Border, RandomPixel
-from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.environment import GameLoop
 
 

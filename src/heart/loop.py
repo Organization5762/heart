@@ -10,8 +10,6 @@ from PIL import Image
 
 from heart.device import Cube, Device
 from heart.device.local import LocalScreen
-from heart.display.color import Color
-from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.manager import PeripheralManager

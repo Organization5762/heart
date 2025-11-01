@@ -1,7 +1,5 @@
 import json
-import time
 
-import board
 from adafruit_lis2mdl import LIS2MDL
 from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
@@ -124,7 +122,7 @@ class SensorReader:
         for sensor_fn in sensor_fn:
             try:
                 sensors.append(sensor_fn(i2c))
-            except:
+            except Exception:
                 pass
         return sensors
 

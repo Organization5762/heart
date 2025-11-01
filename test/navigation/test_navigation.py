@@ -1,11 +1,8 @@
 import pytest
 from heart.display.color import Color
 from heart.display.renderers.color import RenderColor
-from heart.display.renderers.pixels import RandomPixel
-from heart.environment import GameLoop, RendererVariant
-from pytest_benchmark.fixture import BenchmarkFixture
+from heart.environment import GameLoop
 
-from heart.navigation import AppController, GameMode
 
 def test_creating_(loop: GameLoop) -> None:
     # Now we get automatic movement between A and B, facilitated by AppController

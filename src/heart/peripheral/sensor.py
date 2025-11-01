@@ -6,8 +6,7 @@ from typing import Iterator, NoReturn, Self
 
 import serial
 
-from heart.firmware_io.constants import ACCELERATION
-from heart.peripheral.core import Input, Peripheral
+from heart.peripheral.core import Peripheral
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -48,7 +47,7 @@ class Accelerometer(Peripheral):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         return [
-            Accelerometer(port=port, baudrate=115200)
+            cls(port=port, baudrate=115200)
             for port in get_device_ports("usb-Adafruit_KB2040")
         ]
 

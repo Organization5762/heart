@@ -1,5 +1,8 @@
 import argparse
 import sys
+import queue
+import threading
+from typing import Optional
 
 from PIL import Image
 
@@ -166,7 +169,7 @@ class SampleBase(object):
 
         options = RGBMatrixOptions()
 
-        if self.args.led_gpio_mapping != None:
+        if self.args.led_gpio_mapping is not None:
             options.hardware_mapping = self.args.led_gpio_mapping
         options.rows = self.args.led_rows
         options.cols = self.args.led_cols
@@ -184,7 +187,7 @@ class SampleBase(object):
         # if self.args.led_show_refresh:
         #     options.show_refresh_rate = 0
 
-        if self.args.led_slowdown_gpio != None:
+        if self.args.led_slowdown_gpio is not None:
             options.gpio_slowdown = self.args.led_slowdown_gpio
         if self.args.led_no_hardware_pulse:
             options.disable_hardware_pulsing = True
@@ -201,15 +204,6 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
-
-
-import queue
-import threading
-from typing import Optional
-
-from PIL import Image  # just for the type hint
-
-
 class MatrixDisplayWorker:
     """Worker thread that handles sending images to the RGB matrix (This was taking up
     ~20-30% of main thread)"""

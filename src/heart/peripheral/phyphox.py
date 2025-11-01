@@ -1,5 +1,5 @@
 import time
-from typing import Generic, Iterator, NoReturn, Self
+from typing import Iterator, NoReturn, Self
 
 import requests
 
@@ -16,7 +16,7 @@ class Phyphox(Peripheral):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        return [Phyphox("http://192.168.1.42")]
+        return [cls("http://192.168.1.42")]
 
     def run(self) -> NoReturn:
         while True:
