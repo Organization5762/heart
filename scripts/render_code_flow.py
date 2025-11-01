@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Render the runtime service-level diagram as an SVG without external CLIs."""
+
 from __future__ import annotations
 
 import argparse
@@ -49,7 +50,9 @@ COLUMNS: tuple[ColumnDef, ...] = (
         (
             NodeDef("cli", "CLI (Typer `totem run`)", "service"),
             NodeDef("registry", "Configuration Registry", "service"),
-            NodeDef("configurer", "Program Configuration\n`configure(loop)`", "service"),
+            NodeDef(
+                "configurer", "Program Configuration\n`configure(loop)`", "service"
+            ),
         ),
     ),
     ColumnDef(
@@ -58,13 +61,17 @@ COLUMNS: tuple[ColumnDef, ...] = (
             NodeDef("loop", "GameLoop Service\n(start + main loop)", "orchestrator"),
             NodeDef("app_router", "AppController / Mode Router", "orchestrator"),
             NodeDef("mode_services", "Mode Services & Renderers", "service"),
-            NodeDef("frame_composer", "Frame Composer\n(surface merge + timing)", "service"),
+            NodeDef(
+                "frame_composer", "Frame Composer\n(surface merge + timing)", "service"
+            ),
         ),
     ),
     ColumnDef(
         "Peripheral & Signal Services",
         (
-            NodeDef("peripheral_manager", "PeripheralManager\n(background threads)", "input"),
+            NodeDef(
+                "peripheral_manager", "PeripheralManager\n(background threads)", "input"
+            ),
             NodeDef("switch", "Switch / BluetoothSwitch", "input"),
             NodeDef("gamepad", "Gamepad", "input"),
             NodeDef("sensors", "Accelerometer / Phyphox", "input"),
@@ -75,7 +82,9 @@ COLUMNS: tuple[ColumnDef, ...] = (
     ColumnDef(
         "Display & Device Services",
         (
-            NodeDef("display_service", "Display Service\npygame.display.flip", "output"),
+            NodeDef(
+                "display_service", "Display Service\npygame.display.flip", "output"
+            ),
             NodeDef("local_screen", "LocalScreen Window", "output"),
             NodeDef("capture", "Frame Capture\n(share surface)", "service"),
             NodeDef("device_bridge", "Device Bridge", "service"),
@@ -139,7 +148,12 @@ class ColumnLayout:
 class DiagramLayout:
     """Layout container with helper lookups for edges."""
 
-    def __init__(self, nodes: dict[str, NodeLayout], columns: tuple[ColumnLayout, ...], size: tuple[float, float]):
+    def __init__(
+        self,
+        nodes: dict[str, NodeLayout],
+        columns: tuple[ColumnLayout, ...],
+        size: tuple[float, float],
+    ):
         self.nodes = nodes
         self.columns = columns
         self.width, self.height = size
@@ -151,7 +165,9 @@ class DiagramLayout:
             raise KeyError(f"Unknown node '{identifier}' in edge definition") from exc
 
 
-def _measure_node(node: NodeDef, line_height: float) -> tuple[float, float, tuple[str, ...]]:
+def _measure_node(
+    node: NodeDef, line_height: float
+) -> tuple[float, float, tuple[str, ...]]:
     lines = tuple(node.label.split("\n"))
     height = max(line_height * len(lines) + 22.0, 64.0)
     width = 224.0
@@ -196,7 +212,9 @@ def compute_layout(columns: tuple[ColumnDef, ...]) -> DiagramLayout:
                 column_index=index,
             )
             if node.identifier in nodes:
-                raise SystemExit(f"Duplicate node identifier detected: {node.identifier}")
+                raise SystemExit(
+                    f"Duplicate node identifier detected: {node.identifier}"
+                )
             nodes[node.identifier] = layout
             y_cursor += height + node_gap
             column_bottom = max(column_bottom, center_y + height / 2.0)
@@ -219,7 +237,9 @@ def compute_layout(columns: tuple[ColumnDef, ...]) -> DiagramLayout:
     return DiagramLayout(nodes, tuple(column_layouts), (svg_width, svg_height))
 
 
-def _edge_path(source: NodeLayout, target: NodeLayout) -> tuple[str, tuple[float, float]]:
+def _edge_path(
+    source: NodeLayout, target: NodeLayout
+) -> tuple[str, tuple[float, float]]:
     """Compute a cubic bezier path for the given edge."""
 
     same_column = source.column_index == target.column_index
@@ -315,17 +335,26 @@ def build_svg(layout: DiagramLayout) -> ET.Element:
         title = ET.SubElement(
             column_group,
             "text",
-            {"x": f"{title_x:.2f}", "y": f"{title_y:.2f}", "text-anchor": "middle", "class": "column-title"},
+            {
+                "x": f"{title_x:.2f}",
+                "y": f"{title_y:.2f}",
+                "text-anchor": "middle",
+                "class": "column-title",
+            },
         )
         title.text = column_layout.definition.title
 
     # Edge paths
-    edges_group = ET.SubElement(svg, "g", {"fill": "none", "stroke": "#1f2937", "stroke-width": "1.6"})
+    edges_group = ET.SubElement(
+        svg, "g", {"fill": "none", "stroke": "#1f2937", "stroke-width": "1.6"}
+    )
     for edge in EDGES:
         source = layout.get_node(edge.source)
         target = layout.get_node(edge.target)
         path_d, label_pos = _edge_path(source, target)
-        ET.SubElement(edges_group, "path", {"d": path_d, "marker-end": "url(#arrowhead)"})
+        ET.SubElement(
+            edges_group, "path", {"d": path_d, "marker-end": "url(#arrowhead)"}
+        )
         if edge.label:
             label_width = max(86.0, len(edge.label) * 7.0 + 16.0)
             label_height = 20.0
