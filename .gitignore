@@ -11,3 +11,4 @@ ant_hr.log
 *.ini
 *.pkl
 .vscode
+.dev_install.stamp
