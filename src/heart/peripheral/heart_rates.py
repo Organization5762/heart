@@ -75,9 +75,9 @@ class HeartRateManager(Peripheral):
 
     # ---------- Peripheral framework ----------
 
-    @staticmethod
-    def detect() -> Iterator["HeartRateManager"]:
-        yield HeartRateManager()
+    @classmethod
+    def detect(cls) -> Iterator["HeartRateManager"]:
+        yield cls()
 
     # ---------- Callbacks -----------------------------------------------------
 

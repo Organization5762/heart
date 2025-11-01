@@ -48,7 +48,7 @@ class Accelerometer(Peripheral):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         return [
-            Accelerometer(port=port, baudrate=115200)
+            cls(port=port, baudrate=115200)
             for port in get_device_ports("usb-Adafruit_KB2040")
         ]
 

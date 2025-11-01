@@ -162,12 +162,12 @@ class Gamepad(Peripheral):
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
 
-    @staticmethod
-    def detect() -> Iterator["Gamepad"]:
+    @classmethod
+    def detect(cls) -> Iterator["Gamepad"]:
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
-            return [Gamepad()]
+            return [cls()]
         except pygame.error as e:
             print(f"Error initializing joystick module: {e}")
             return []
