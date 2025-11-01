@@ -6,8 +6,6 @@ null terminator (`\0`).  The most-recent message is available via
 `PhoneText.get_last_text()` for inspection by other code/tests.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from types import ModuleType
 from typing import Self

@@ -1,8 +1,7 @@
 """Integration test ensuring the MQTT sidecar cooperates with the core loop."""
 
-from __future__ import annotations
-
 import json
+import sys
 import threading
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -10,21 +9,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable, Iterable
 
-import sys
-
 import pytest
 
 # Ensure the experimental peripheral sidecar package is importable during tests.
 EXPERIMENTAL_SRC = (
-    Path(__file__).resolve().parents[1]
-    / "experimental"
-    / "peripheral_sidecar"
-    / "src"
+    Path(__file__).resolve().parents[1] / "experimental" / "peripheral_sidecar" / "src"
 )
 if str(EXPERIMENTAL_SRC) not in sys.path:
     sys.path.insert(0, str(EXPERIMENTAL_SRC))
 
-from heart.peripheral.core import Peripheral  # noqa: E402
+from peripheral_sidecar import aggregators as aggregators_module  # noqa: E402
+from peripheral_sidecar import mqtt_sidecar  # noqa: E402
 from peripheral_sidecar.aggregators import (  # noqa: E402
     ActionEvent,
     PeripheralActionMapper,
@@ -32,9 +27,9 @@ from peripheral_sidecar.aggregators import (  # noqa: E402
     RawPeripheralSnapshot,
 )
 from peripheral_sidecar.config import PeripheralServiceConfig  # noqa: E402
-from peripheral_sidecar import aggregators as aggregators_module  # noqa: E402
-from peripheral_sidecar import mqtt_sidecar  # noqa: E402
 from peripheral_sidecar.mqtt_sidecar import PeripheralMQTTService  # noqa: E402
+
+from heart.peripheral.core import Peripheral  # noqa: E402
 
 
 class FakeMQTTBroker:
@@ -42,7 +37,9 @@ class FakeMQTTBroker:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._subscriptions: defaultdict[str, list[Callable[[str, str], None]]] = defaultdict(list)
+        self._subscriptions: defaultdict[str, list[Callable[[str, str], None]]] = (
+            defaultdict(list)
+        )
         self.published: defaultdict[str, list[str]] = defaultdict(list)
 
     def publish(self, topic: str, payload: str) -> None:
@@ -199,12 +196,16 @@ def test_mqtt_integration_with_moving_average(monkeypatch: pytest.MonkeyPatch) -
 
     original_builder = aggregators_module.build_action_mappers
 
-    def patched_build_action_mappers(peripheral: Peripheral, source: str, config: PeripheralServiceConfig):
+    def patched_build_action_mappers(
+        peripheral: Peripheral, source: str, config: PeripheralServiceConfig
+    ):
         if isinstance(peripheral, FakeMovingAveragePeripheral):
             return [MovingAverageActionMapper(peripheral, source, config)]
         return list(original_builder(peripheral, source, config))
 
-    monkeypatch.setattr(aggregators_module, "build_action_mappers", patched_build_action_mappers)
+    monkeypatch.setattr(
+        aggregators_module, "build_action_mappers", patched_build_action_mappers
+    )
 
     raw_messages: list[dict] = []
     action_messages: list[dict] = []
@@ -238,12 +239,19 @@ def test_mqtt_integration_with_moving_average(monkeypatch: pytest.MonkeyPatch) -
     service_thread.start()
 
     try:
-        assert processing_complete.wait(timeout=5.0), "Timed out waiting for MQTT actions"
+        assert processing_complete.wait(
+            timeout=5.0
+        ), "Timed out waiting for MQTT actions"
     finally:
         service.shutdown()
         service_thread.join(timeout=5.0)
 
-    assert [entry["data"]["value"] for entry in raw_messages] == [10.0, 20.0, 30.0, 40.0]
+    assert [entry["data"]["value"] for entry in raw_messages] == [
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+    ]
     assert [entry["action"] for entry in action_messages] == [
         "sensor.moving_average"
     ] * len(samples)

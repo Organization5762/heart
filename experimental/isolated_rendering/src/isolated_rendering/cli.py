@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import signal
 import socketserver
 from typing import Optional

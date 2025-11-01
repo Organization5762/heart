@@ -275,17 +275,17 @@ class GameModes(BaseRenderer):
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
-        render_count = len(self.renderers) - 1
         last_scene_index = self.previous_mode_index
 
         if last_scene_index != mode_index:
-            if mode_index == 0 and last_scene_index == render_count:
+            if mode_offset > 0:
                 slide_dir = 1
-            # This one isn't being hit because `previous_mode_index`
-            elif mode_index == render_count and last_scene_index == 0:
+            elif mode_offset < 0:
                 slide_dir = -1
             else:
-                slide_dir = mode_index - self.previous_mode_index
+                forward_steps = (mode_index - last_scene_index) % len(self.renderers)
+                backward_steps = (last_scene_index - mode_index) % len(self.renderers)
+                slide_dir = 1 if forward_steps <= backward_steps else -1
 
             self.sliding_transition = SlideTransitionRenderer(
                 renderer_A=self.title_renderers[last_scene_index],

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from unittest.mock import Mock, patch
 
 import pytest
@@ -76,6 +74,46 @@ def test_active_renderer_returns_existing_transition_until_finished() -> None:
 
     assert result is transition
     transition.is_done.assert_called_once()
+
+
+def test_active_renderer_zero_offset_prefers_forward_steps_when_equal() -> None:
+    game_modes = _make_game_modes(count=4)
+    game_modes.previous_mode_index = 0
+    game_modes._active_mode_index = 2
+
+    with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        transition = Mock()
+        slide_cls.return_value = transition
+
+        result = game_modes.active_renderer(mode_offset=0)
+
+    assert result is transition
+    slide_cls.assert_called_once_with(
+        renderer_A=game_modes.title_renderers[0],
+        renderer_B=game_modes.title_renderers[2],
+        direction=1,
+    )
+    assert game_modes.previous_mode_index == 2
+
+
+def test_active_renderer_zero_offset_prefers_shortest_wrap_direction() -> None:
+    game_modes = _make_game_modes(count=4)
+    game_modes.previous_mode_index = 0
+    game_modes._active_mode_index = len(game_modes.renderers) - 1
+
+    with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        transition = Mock()
+        slide_cls.return_value = transition
+
+        result = game_modes.active_renderer(mode_offset=0)
+
+    assert result is transition
+    slide_cls.assert_called_once_with(
+        renderer_A=game_modes.title_renderers[0],
+        renderer_B=game_modes.title_renderers[-1],
+        direction=-1,
+    )
+    assert game_modes.previous_mode_index == len(game_modes.renderers) - 1
 
 
 def test_active_renderer_returns_title_renderer_in_select_mode() -> None:

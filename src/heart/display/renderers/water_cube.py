@@ -9,8 +9,6 @@ This computes a 64x64 height-field that is projected onto the cube's four 64x64 
     Plus neighbour coupling for ripples.
 """
 
-from __future__ import annotations
-
 import math
 from typing import Tuple
 
