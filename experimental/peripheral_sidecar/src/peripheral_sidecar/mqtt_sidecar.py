@@ -1,12 +1,13 @@
-from __future__ import annotations
-
+import contextlib
+import importlib
 import signal
 import sys
 import time
+from types import ModuleType
 from typing import Iterable
 
-import paho.mqtt.client as mqtt
-from peripheral_sidecar.aggregators import PeripheralActionMapper, build_action_mappers
+from peripheral_sidecar import aggregators
+from peripheral_sidecar.aggregators import PeripheralActionMapper
 from peripheral_sidecar.config import PeripheralServiceConfig
 from peripheral_sidecar.models import ActionEvent, RawPeripheralSnapshot
 
@@ -14,6 +15,61 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _create_placeholder_mqtt() -> ModuleType:
+    module = ModuleType("paho.mqtt.client")
+
+    class _PlaceholderClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise RuntimeError("paho-mqtt is required to run the peripheral sidecar.")
+
+        def connect(
+            self, *_args: object, **_kwargs: object
+        ) -> None:  # pragma: no cover
+            raise RuntimeError("paho-mqtt is required to run the peripheral sidecar.")
+
+        def loop_start(self) -> None:  # pragma: no cover
+            return None
+
+        def loop_stop(self) -> None:  # pragma: no cover
+            return None
+
+        def disconnect(self) -> None:  # pragma: no cover
+            return None
+
+        def is_connected(self) -> bool:  # pragma: no cover
+            return False
+
+        def publish(
+            self, *_args: object, **_kwargs: object
+        ) -> None:  # pragma: no cover
+            raise RuntimeError("paho-mqtt is required to run the peripheral sidecar.")
+
+    module.Client = _PlaceholderClient  # type: ignore[attr-defined]
+    return module
+
+
+def _load_mqtt_module() -> ModuleType:
+    spec = None
+    with contextlib.suppress(ModuleNotFoundError):
+        spec = importlib.util.find_spec("paho.mqtt.client")
+    if spec is None or spec.loader is None:
+        logger.warning("paho-mqtt not available; using placeholder client")
+        return _create_placeholder_mqtt()
+
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)  # type: ignore[call-arg]
+    except Exception:  # pragma: no cover - environment-specific dependency issues
+        logger.warning(
+            "Failed to import paho-mqtt; using placeholder client", exc_info=True
+        )
+        return _create_placeholder_mqtt()
+    return module  # type: ignore[return-value]
+
+
+mqtt = _load_mqtt_module()
 
 
 class PeripheralMQTTService:
@@ -62,7 +118,9 @@ class PeripheralMQTTService:
 
         for peripheral in self._manager.peripherals:
             source = self._allocate_source_name(peripheral)
-            mappers = list(build_action_mappers(peripheral, source, self.config))
+            mappers = list(
+                aggregators.build_action_mappers(peripheral, source, self.config)
+            )
             if not mappers:
                 logger.debug("No mappers registered for peripheral %s", source)
                 continue

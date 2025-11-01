@@ -1,7 +1,5 @@
 """Command line interface bundling miscellaneous debug helpers."""
 
-from __future__ import annotations
-
 import typer
 
 from . import debug

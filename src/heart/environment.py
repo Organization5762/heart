@@ -1,9 +1,10 @@
 import enum
+import importlib
 import time
 from concurrent.futures import ThreadPoolExecutor
+from types import ModuleType
 from typing import TYPE_CHECKING
 
-import cv2
 import numpy as np
 import pygame
 from PIL import Image
@@ -20,6 +21,110 @@ from heart.peripheral.heart_rates import (
 )
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+
+
+def _load_cv2_module() -> ModuleType | None:
+    module: ModuleType | None = None
+    loader = importlib.util.find_spec("cv2")
+    if loader is None or loader.loader is None:
+        return None
+    module = importlib.util.module_from_spec(loader)
+    try:
+        loader.loader.exec_module(module)
+    except Exception:  # pragma: no cover - runtime dependency issues
+        return None
+    return module
+
+
+CV2_MODULE = _load_cv2_module()
+
+
+def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
+    if CV2_MODULE is not None:
+        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV)
+
+    image_float = image.astype(np.float32) / 255.0
+    b, g, r = image_float[..., 0], image_float[..., 1], image_float[..., 2]
+
+    c_max = np.maximum.reduce([r, g, b])
+    c_min = np.minimum.reduce([r, g, b])
+    delta = c_max - c_min
+
+    hue = np.zeros_like(c_max)
+    non_zero_delta = delta != 0
+
+    r_mask = (c_max == r) & non_zero_delta
+    g_mask = (c_max == g) & non_zero_delta
+    b_mask = (c_max == b) & non_zero_delta
+
+    hue[r_mask] = ((g - b)[r_mask] / delta[r_mask]) % 6
+    hue[g_mask] = ((b - r)[g_mask] / delta[g_mask]) + 2
+    hue[b_mask] = ((r - g)[b_mask] / delta[b_mask]) + 4
+    hue = (hue / 6.0) % 1.0
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        saturation = np.zeros_like(c_max)
+        saturation[c_max != 0] = delta[c_max != 0] / c_max[c_max != 0]
+
+    value = c_max
+
+    hue_uint8 = np.round(hue * 179).astype(np.uint8)
+    saturation_uint8 = np.round(saturation * 255).astype(np.uint8)
+    value_uint8 = np.round(value * 255).astype(np.uint8)
+
+    return np.stack([hue_uint8, saturation_uint8, value_uint8], axis=-1)
+
+
+def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
+    if CV2_MODULE is not None:
+        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR)
+
+    h = image[..., 0].astype(np.float32) / 179.0 * 6.0
+    s = image[..., 1].astype(np.float32) / 255.0
+    v = image[..., 2].astype(np.float32) / 255.0
+
+    c = v * s
+    m = v - c
+    h_mod = np.mod(h, 6.0)
+    x = c * (1 - np.abs(np.mod(h_mod, 2) - 1))
+
+    zeros = np.zeros_like(c)
+    r = np.empty_like(c)
+    g = np.empty_like(c)
+    b = np.empty_like(c)
+
+    conditions = [
+        (0 <= h_mod) & (h_mod < 1),
+        (1 <= h_mod) & (h_mod < 2),
+        (2 <= h_mod) & (h_mod < 3),
+        (3 <= h_mod) & (h_mod < 4),
+        (4 <= h_mod) & (h_mod < 5),
+        (5 <= h_mod) & (h_mod < 6),
+    ]
+    rgb_values = [
+        (c, x, zeros),
+        (x, c, zeros),
+        (zeros, c, x),
+        (zeros, x, c),
+        (x, zeros, c),
+        (c, zeros, x),
+    ]
+
+    r.fill(0)
+    g.fill(0)
+    b.fill(0)
+
+    for condition, (r_val, g_val, b_val) in zip(conditions, rgb_values):
+        r[condition] = r_val[condition]
+        g[condition] = g_val[condition]
+        b[condition] = b_val[condition]
+
+    r = (r + m) * 255.0
+    g = (g + m) * 255.0
+    b = (b + m) * 255.0
+
+    return np.stack([b, g, r], axis=-1).astype(np.uint8)
+
 
 if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
@@ -266,9 +371,9 @@ class GameLoop:
                     # 0.03 ~= ~11° per detent; tune to taste
                     hue_delta = (delta * 0.03) % 1.0
                     # Convert to HSV, roll H channel, convert back
-                    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+                    hsv = _convert_bgr_to_hsv(image).astype(np.float32)
                     hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
-                    image[:] = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+                    image[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
 
             ###
             # Button Three
