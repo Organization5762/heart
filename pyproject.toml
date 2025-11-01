@@ -70,6 +70,7 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.loop:main"
+totem_debug = "heart.x.cli:main"
 
 [tool.docformatter]
 recursive = true
@@ -92,6 +93,7 @@ ignore = ["E501", "F403", "F405"]
 
 [tool.uv.workspace]
 members = [
+    "experimental/app",
     "experimental/lapis",
     "experimental/circuit",
 ]

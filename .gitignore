@@ -10,3 +10,4 @@ ant_hr.log
 *.erc
 *.ini
 *.pkl
+.vscode
