@@ -1,5 +1,5 @@
 import time
-from typing import Generic, Iterator, NoReturn, Self
+from typing import Iterator, NoReturn, Self
 
 import requests
 

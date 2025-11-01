@@ -1,4 +1,3 @@
-import logging
 import subprocess
 import time
 from collections import defaultdict
@@ -218,7 +217,7 @@ class Gamepad(Peripheral):
                         if result.returncode == 0:
                             print("Successfully connected to 8bitdo controller")
                         else:
-                            print(f"Failed to connect to 8bitdo controller")
+                            print("Failed to connect to 8bitdo controller")
 
             except KeyboardInterrupt:
                 print("Program terminated")

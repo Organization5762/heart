@@ -1,4 +1,3 @@
-from heart.display.renderers.metadata_screen import MetadataScreen
 from heart.display.renderers.water_cube import WaterCube
 from heart.environment import GameLoop
 

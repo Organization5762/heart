@@ -2,9 +2,6 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Iterator, Self
 
-import pygame
-
-
 @dataclass
 class Input:
     event_type: str

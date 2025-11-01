@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -86,8 +85,6 @@ class SpritesheetLoop(BaseRenderer):
         number_of_frames = size[0] // 64
         if skip_last_frame:
             number_of_frames -= 1
-        frames = [(64 * i, 0, 64, size[1]) for i in range(number_of_frames)]
-
         # Create FrameDescriptions
         frame_descriptions = []
         for frame_number in range(number_of_frames):

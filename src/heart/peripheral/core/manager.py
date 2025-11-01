@@ -1,7 +1,5 @@
 import itertools
 import threading
-from dataclasses import dataclass
-from enum import StrEnum
 from typing import Iterator
 
 from heart.peripheral.core import Peripheral

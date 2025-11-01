@@ -1,5 +1,4 @@
 from heart.display.renderers.max_bpm_screen import MaxBpmScreen
-from heart.display.renderers.metadata_screen import MetadataScreen
 from heart.environment import GameLoop
 
 

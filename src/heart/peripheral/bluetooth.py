@@ -2,6 +2,7 @@ import asyncio
 import functools
 import json
 import threading
+import time
 from collections import deque
 from typing import Any, Iterator, NoReturn
 
@@ -109,7 +110,7 @@ class UartListener:
 
             try:
                 self.events.append(json.loads(line))
-            except json.decoder.JSONDecodeError as e:
+            except json.decoder.JSONDecodeError:
                 pass
 
     def __decode_read_data(self, data: bytearray) -> str:
