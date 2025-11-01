@@ -93,5 +93,4 @@ class Shader:
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, byref(length))
 
         if length.value > 0:
-            log = create_string_buffer(length.value)
             print(glGetShaderInfoLog(shader))

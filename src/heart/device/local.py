@@ -2,17 +2,18 @@ import logging
 import platform
 import subprocess
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import pygame
 from PIL import Image
 
 from heart.device import Device
 
-logger = logging.getLogger(__name__)  # Add logger
+logger = logging.getLogger(__name__)
 
 
-def _get_display_resolution():
+@lru_cache(maxsize=1)
+def _get_display_resolution() -> tuple[int, int, float]:
     if platform.system() == "Darwin":  # Check if running on macOS
         try:
             result = subprocess.run(
@@ -73,7 +74,6 @@ class LocalScreen(Device):
     height: int
 
     def __post_init__(self) -> None:
-        pass
         self.scaled_screen = pygame.display.set_mode(
             (
                 self.full_display_size()[0] * self.scale_factor,
@@ -91,7 +91,7 @@ class LocalScreen(Device):
         current_width, current_height = self.full_display_size()
 
         result = max(min(width // current_width, height // current_height), 1)
-        return int(result / 3)
+        return max(result // 3, 1)
 
     def set_image(self, image: Image.Image) -> None:
         assert (

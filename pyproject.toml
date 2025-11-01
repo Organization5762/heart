@@ -48,11 +48,15 @@ dev = [
     "pytest",
     "pytest-benchmark",
     "scipy",
+    "mypy",
+    "types-requests",
+    "types-toml",
     # Formatting
     "black",
     "docformatter[tomli]",
     "isort",
     "mdformat",
+    "ruff",
     # Git
     "pre-commit",
 ]
@@ -69,6 +73,7 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.loop:main"
+totem_debug = "heart.x.cli:main"
 
 [tool.docformatter]
 recursive = true
@@ -77,9 +82,73 @@ blank = true
 [tool.isort]
 profile = "black"
 
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501", "F403", "F405"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/heart/display/shaders/shader.py" = ["F403", "F405"]
+"src/heart/display/renderers/three_fractal.py" = ["F403", "F405"]
+
 [tool.uv.workspace]
 members = [
+    "experimental/app",
     "experimental/lapis",
     "experimental/circuit",
     "experimental/isolated_rendering",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = [
+    "heart.device",
+    "heart.environment",
+    "heart.loop",
+    "heart.peripheral",
+    "heart.utilities",
+]
+warn_unused_configs = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "bleak",
+    "bleak.*",
+    "cv2",
+    "cv2.*",
+    "moderngl",
+    "numpy",
+    "numpy.*",
+    "openant",
+    "openant.*",
+    "PIL",
+    "PIL.*",
+    "pygame",
+    "pygame.*",
+    "requests",
+    "rgbmatrix",
+    "serial",
+    "serial.*",
+    "bluezero",
+    "bluezero.*",
+    "typer",
+    "toml",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "heart.assets",
+    "heart.assets.*",
+    "heart.display",
+    "heart.display.*",
+    "heart.navigation",
+    "heart.navigation.*",
+]
+follow_imports = "skip"

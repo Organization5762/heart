@@ -1,11 +1,8 @@
-import json
-from collections import deque
 
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 
-from heart.firmware_io import constants, rotary_encoder
 
 ble = BLERadio()
 uart = UARTService()

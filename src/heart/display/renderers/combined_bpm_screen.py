@@ -1,6 +1,5 @@
-import time
-
-from pygame import Surface, time
+from pygame import Surface
+from pygame import time as pygame_time
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -31,7 +30,7 @@ class CombinedBpmScreen(BaseRenderer):
     def process(
         self,
         window: Surface,
-        clock: time.Clock,
+        clock: pygame_time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:

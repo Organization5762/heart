@@ -61,9 +61,9 @@ class FakeSwitch(BaseSwitch):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    @staticmethod
-    def detect() -> Iterator[Self]:
-        return [FakeSwitch()]
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
+        yield cls()
 
     def run(self) -> None:
         return
@@ -75,14 +75,12 @@ class Switch(BaseSwitch):
         self.baudrate = baudrate
         super().__init__(*args, **kwargs)
 
-    @staticmethod
-    def detect() -> Iterator[Self]:
-        return [
-            Switch(port=port, baudrate=115200)
-            for port in get_device_ports(
-                "usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"
-            )
-        ]
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
+        for port in get_device_ports(
+            "usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"
+        ):
+            yield cls(port=port, baudrate=115200)
 
     def _connect_to_ser(self):
         return serial.Serial(self.port, self.baudrate)

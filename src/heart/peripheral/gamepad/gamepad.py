@@ -1,9 +1,8 @@
-import logging
 import subprocess
 import time
 from collections import defaultdict
 from enum import Enum
-from typing import Iterator, NoReturn
+from typing import Iterator, NoReturn, Self
 
 import pygame.joystick
 from pygame.event import Event
@@ -27,20 +26,20 @@ class Gamepad(Peripheral):
         self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
     ) -> None:
         self.joystick_id = joystick_id
-        self.joystick = joystick
+        self.joystick: pygame.joystick.JoystickType | None = joystick
         self.TAP_THRESHOLD_MS = 500
 
-        self._num_buttons: int = None
-        self._num_axes: int = None
-        self._press_time = {}
-        self._tap_flag = defaultdict(bool)
-        self._pressed_prev_frame = defaultdict(bool)
-        self._pressed_curr_frame = defaultdict(bool)
-        self._axis_prev_frame = defaultdict(float)
-        self._axis_tapped_prev_frame = defaultdict(lambda: False)
-        self._axis_curr_frame = defaultdict(float)
-        self._dpad_last_frame = (0, 0)
-        self._dpad_curr_frame = (0, 0)
+        self._num_buttons: int | None = None
+        self._num_axes: int | None = None
+        self._press_time: dict[int | str, int] = {}
+        self._tap_flag: defaultdict[int | str, bool] = defaultdict(bool)
+        self._pressed_prev_frame: defaultdict[int, bool] = defaultdict(bool)
+        self._pressed_curr_frame: defaultdict[int, bool] = defaultdict(bool)
+        self._axis_prev_frame: defaultdict[str, float] = defaultdict(float)
+        self._axis_tapped_prev_frame: defaultdict[str, bool] = defaultdict(lambda: False)
+        self._axis_curr_frame: defaultdict[str, float] = defaultdict(float)
+        self._dpad_last_frame: tuple[int, int] = (0, 0)
+        self._dpad_curr_frame: tuple[int, int] = (0, 0)
 
     def is_held(self, button_id: int) -> bool:
         return self._pressed_curr_frame[button_id]
@@ -71,11 +70,12 @@ class Gamepad(Peripheral):
         self._axis_tapped_prev_frame[self.axis_key(axis_id)] = tapped
         return tapped and not tapped_last_frame
 
-    def get_dpad_value(self):
+    def get_dpad_value(self) -> tuple[int, int]:
         return self._dpad_curr_frame
 
     def reset(self):
-        self.joystick.quit()
+        if self.joystick is not None:
+            self.joystick.quit()
         self.joystick = None
         self._num_buttons = None
         self._num_axes = None
@@ -90,36 +90,39 @@ class Gamepad(Peripheral):
     def num_buttons(self) -> int:
         if self._num_buttons is None and self.joystick is not None:
             self._num_buttons = self.joystick.get_numbuttons()
-        return self._num_buttons
+        return self._num_buttons or 0
 
     @property
     def num_axes(self) -> int:
         if self._num_axes is None and self.joystick is not None:
             self._num_axes = self.joystick.get_numaxes()
-        return self._num_axes
+        return self._num_axes or 0
 
     @property
     def gamepad_identifier(self) -> GamepadIdentifier:
-        if self.is_connected():
-            try:
-                return GamepadIdentifier(self.joystick.get_name())
-            except ValueError:
-                logger.warning(f"Unrecognized gamepad type: {self.joystick.get_name()}")
-                # someone plugged in a rando controller, might as well try to use the bitdo mapping
-                return GamepadIdentifier.BIT_DO_LITE_2
+        if not self.is_connected() or self.joystick is None:
+            raise RuntimeError("Attempted to read identifier of disconnected gamepad")
+        try:
+            return GamepadIdentifier(self.joystick.get_name())
+        except ValueError:
+            logger.warning(
+                "Unrecognized gamepad type: %s", self.joystick.get_name()
+            )
+            # someone plugged in a rando controller, might as well try to use the bitdo mapping
+            return GamepadIdentifier.BIT_DO_LITE_2
 
     @staticmethod
     def axis_key(axis_id: int) -> str:
         return f"axis{axis_id}"
 
-    def update(self):
+    def update(self) -> None:
         try:
             self._update()
         except Exception as e:
             print(f"Error updating gamepad state: {e}")
 
-    def _update(self):
-        if not self.joystick:
+    def _update(self) -> None:
+        if self.joystick is None:
             return
 
         # Refresh Pygame's internal event queue so that joystick state is up-to-date
@@ -162,17 +165,17 @@ class Gamepad(Peripheral):
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
 
-    @staticmethod
-    def detect() -> Iterator["Gamepad"]:
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
-            return [Gamepad()]
+            yield cls()
         except pygame.error as e:
             print(f"Error initializing joystick module: {e}")
-            return []
+            return
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         return self.joystick is not None
 
     @staticmethod
@@ -199,9 +202,10 @@ class Gamepad(Peripheral):
                         pass
 
                 if not Gamepad.gamepad_detected() and self.is_connected():
-                    cached_name = self.joystick.get_name()
+                    cached_name = self.joystick.get_name() if self.joystick else None
                     self.reset()
-                    print(f"{cached_name} disconnected")
+                    if cached_name is not None:
+                        print(f"{cached_name} disconnected")
 
                 # Todo: We're reaching unfathomable levels of hard-coding.
                 #  This will only work specifically with our pi4, and our 8bitdo
@@ -218,7 +222,7 @@ class Gamepad(Peripheral):
                         if result.returncode == 0:
                             print("Successfully connected to 8bitdo controller")
                         else:
-                            print(f"Failed to connect to 8bitdo controller")
+                            print("Failed to connect to 8bitdo controller")
 
             except KeyboardInterrupt:
                 print("Program terminated")

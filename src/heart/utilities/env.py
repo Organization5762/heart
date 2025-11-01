@@ -6,7 +6,6 @@ from functools import cache
 from typing import Iterator
 
 import serial.tools.list_ports
-from pygame.event import custom_type
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 

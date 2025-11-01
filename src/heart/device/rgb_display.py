@@ -1,5 +1,8 @@
 import argparse
 import sys
+
+import queue
+import threading
 from typing import Optional
 
 from PIL import Image
@@ -13,7 +16,7 @@ logger = get_logger(__name__)
 
 
 class SampleBase(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.parser = argparse.ArgumentParser()
 
         self.parser.add_argument(
@@ -172,7 +175,7 @@ class SampleBase(object):
 
         options = RGBMatrixOptions()
 
-        if self.args.led_gpio_mapping != None:
+        if self.args.led_gpio_mapping is not None:
             options.hardware_mapping = self.args.led_gpio_mapping
         options.rows = self.args.led_rows
         options.cols = self.args.led_cols
@@ -190,7 +193,7 @@ class SampleBase(object):
         # if self.args.led_show_refresh:
         #     options.show_refresh_rate = 0
 
-        if self.args.led_slowdown_gpio != None:
+        if self.args.led_slowdown_gpio is not None:
             options.gpio_slowdown = self.args.led_slowdown_gpio
         if self.args.led_no_hardware_pulse:
             options.disable_hardware_pulsing = True
@@ -208,10 +211,6 @@ class SampleBase(object):
 
         return True
 
-
-import queue
-import threading
-from typing import Optional
 
 from PIL import Image  # just for the type hint
 
@@ -253,8 +252,9 @@ class MatrixDisplayWorker:
 
 
 class LEDMatrix(Device, SampleBase):
-    def __init__(self, orientation: Orientation, *args, **kwargs):
-        super(LEDMatrix, self).__init__(*args, **kwargs, orientation=orientation)
+    def __init__(self, orientation: Orientation, *args, **kwargs) -> None:
+        Device.__init__(self, orientation=orientation)
+        SampleBase.__init__(self, *args, **kwargs)
         assert orientation.layout.rows == 1, "Maximum 1 row supported at the moment"
 
         self.chain_length = orientation.layout.columns
@@ -312,13 +312,13 @@ class LEDMatrix(Device, SampleBase):
     def layout(self) -> Layout:
         return Layout(columns=self.chain_length, rows=1)
 
-    def individual_display_size(self):
+    def individual_display_size(self) -> tuple[int, int]:
         return (self.col_size, self.row_size)
 
-    def full_display_size(self):
+    def full_display_size(self) -> tuple[int, int]:
         return (self.col_size * self.chain_length, self.row_size)
 
-    def set_display_mode(self, mode: str):
+    def set_display_mode(self, mode: str) -> None:
         self.display_mode = mode
 
     def set_image(self, image: Image.Image) -> None:

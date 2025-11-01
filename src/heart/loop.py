@@ -10,8 +10,6 @@ from PIL import Image
 
 from heart.device import Cube, Device
 from heart.device.local import LocalScreen
-from heart.display.color import Color
-from heart.display.renderers.color import RenderColor
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.manager import PeripheralManager
@@ -40,9 +38,10 @@ def _get_device(x11_forward: bool) -> Device:
 
         os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
-        if (pi := Configuration.pi()).version > 4:
+        pi_info = Configuration.pi()
+        if pi_info is not None and pi_info.version > 4:
             logger.warning(
-                f"Shit not guaranteed to work Pi5 and higher. Detected: {pi}"
+                f"Shit not guaranteed to work Pi5 and higher. Detected: {pi_info}"
             )
 
         if Configuration.is_x11_forward():
