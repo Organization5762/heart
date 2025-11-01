@@ -79,14 +79,33 @@ def pair_gamepad(mac_address: str = typer.Argument(..., help="MAC address of the
     """Attempt to pair and connect to a Bluetooth gamepad."""
 
     result = debug.pair_gamepad(mac_address)
-    if "Connection successful" in result.stdout:
-        typer.secho("Successfully connected to the controller!", fg=typer.colors.GREEN)
+    if result.after.connected:
+        typer.secho("Controller connected.", fg=typer.colors.GREEN)
     else:
         typer.secho("Connection attempt completed. Check controller status.", fg=typer.colors.YELLOW)
-        if result.stdout:
-            typer.echo("bluetoothctl output:\n" + result.stdout.strip())
-        if result.stderr:
-            typer.echo("bluetoothctl errors:\n" + result.stderr.strip())
+
+    typer.echo(
+        "Status before: paired={0.before.paired} connected={0.before.connected}".format(result)
+    )
+    typer.echo(
+        "Status after:  paired={0.after.paired} connected={0.after.connected}".format(result)
+    )
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if stdout:
+        typer.echo("bluetoothctl output:\n" + stdout)
+    if stderr:
+        typer.echo("bluetoothctl errors:\n" + stderr)
+
+
+@gamepad_app.command(name="status")
+def gamepad_status(mac_address: str = typer.Argument(..., help="MAC address of the controller.")) -> None:
+    """Display whether a controller is paired and/or connected."""
+
+    status = debug.get_gamepad_status(mac_address)
+    typer.echo(f"Paired: {'yes' if status.paired else 'no'}")
+    typer.echo(f"Connected: {'yes' if status.connected else 'no'}")
 
 
 def main() -> None:

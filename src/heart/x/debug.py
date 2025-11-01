@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import subprocess
 import time
@@ -12,6 +13,29 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BluetoothSwitch
+
+try:  # pragma: no cover - optional dependency on Linux hosts
+    from heart.peripheral.bluetooth import UartListener
+except ImportError:  # pragma: no cover - fallback for minimal environments
+    UartListener = None  # type: ignore[assignment]
+
+
+@dataclass(frozen=True)
+class GamepadStatus:
+    """Pairing and connection details for a Bluetooth controller."""
+
+    paired: bool
+    connected: bool
+
+
+@dataclass(frozen=True)
+class GamepadConnectionResult:
+    """Outcome of attempting to pair and connect to a controller."""
+
+    before: GamepadStatus
+    after: GamepadStatus
+    stdout: str
+    stderr: str
 
 
 def detect_peripherals() -> Sequence[object]:
@@ -77,10 +101,13 @@ def listen_to_uart() -> None:
     """Listen for raw UART events using :class:`UartListener`."""
 
     devices = list(BluetoothSwitch.detect())
-    if not devices:
+    if devices:
+        listener: object = devices[0].listener
+    elif UartListener is not None:
+        listener = UartListener()
+    else:
         raise RuntimeError("No Bluetooth switches discovered")
 
-    listener = devices[0].listener
     print("Starting UART listener...")
     listener.start()
     print("Listener started. Press Ctrl+C to stop.")
@@ -95,7 +122,10 @@ def listen_to_uart() -> None:
     except RuntimeError as exc:
         print(f"Listener error: {exc}")
     finally:
-        listener.close()
+        try:
+            listener.close()
+        except Exception:
+            pass
 
 
 def listen_to_bluetooth_switch() -> None:
@@ -130,6 +160,19 @@ def run_phone_text() -> None:
     PhoneText().run()
 
 
+def get_gamepad_status(mac_address: str) -> GamepadStatus:
+    """Return the pairing/connection status for ``mac_address``."""
+
+    result = subprocess.run(
+        ["bluetoothctl", "info", mac_address], capture_output=True, text=True, check=False
+    )
+    output = result.stdout
+    return GamepadStatus(
+        paired="Paired: yes" in output,
+        connected="Connected: yes" in output,
+    )
+
+
 def find_gamepad_devices(scan_duration: int = 10) -> tuple[list[str], list[str]]:
     """Scan for Bluetooth gamepads using ``bluetoothctl``.
 
@@ -159,9 +202,31 @@ def find_gamepad_devices(scan_duration: int = 10) -> tuple[list[str], list[str]]
     return all_devices, matched_devices
 
 
-def pair_gamepad(mac_address: str) -> subprocess.CompletedProcess[str]:
+def pair_gamepad(mac_address: str) -> GamepadConnectionResult:
     """Pair and connect to a Bluetooth gamepad."""
 
-    subprocess.run(["bluetoothctl", "pair", mac_address], check=False)
-    subprocess.run(["bluetoothctl", "trust", mac_address], check=False)
-    return subprocess.run(["bluetoothctl", "connect", mac_address], capture_output=True, text=True)
+    before = get_gamepad_status(mac_address)
+
+    if not before.paired:
+        subprocess.run(["bluetoothctl", "pair", mac_address], check=False)
+        subprocess.run(["bluetoothctl", "trust", mac_address], check=False)
+
+    if before.connected:
+        connect_result = subprocess.CompletedProcess(
+            args=["bluetoothctl", "connect", mac_address],
+            returncode=0,
+            stdout="Controller already connected.\n",
+            stderr="",
+        )
+    else:
+        connect_result = subprocess.run(
+            ["bluetoothctl", "connect", mac_address], capture_output=True, text=True, check=False
+        )
+
+    after = get_gamepad_status(mac_address)
+    return GamepadConnectionResult(
+        before=before,
+        after=after,
+        stdout=connect_result.stdout,
+        stderr=connect_result.stderr,
+    )
