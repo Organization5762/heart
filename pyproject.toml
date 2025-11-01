@@ -48,6 +48,9 @@ dev = [
     "pytest",
     "pytest-benchmark",
     "scipy",
+    "mypy",
+    "types-requests",
+    "types-toml",
     # Formatting
     "black",
     "docformatter[tomli]",
@@ -97,3 +100,54 @@ members = [
     "experimental/lapis",
     "experimental/circuit",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = [
+    "heart.device",
+    "heart.environment",
+    "heart.loop",
+    "heart.peripheral",
+    "heart.utilities",
+]
+warn_unused_configs = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "bleak",
+    "bleak.*",
+    "cv2",
+    "cv2.*",
+    "moderngl",
+    "numpy",
+    "numpy.*",
+    "openant",
+    "openant.*",
+    "PIL",
+    "PIL.*",
+    "pygame",
+    "pygame.*",
+    "requests",
+    "rgbmatrix",
+    "serial",
+    "serial.*",
+    "bluezero",
+    "bluezero.*",
+    "typer",
+    "toml",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "heart.assets",
+    "heart.assets.*",
+    "heart.display",
+    "heart.display.*",
+    "heart.navigation",
+    "heart.navigation.*",
+]
+follow_imports = "skip"

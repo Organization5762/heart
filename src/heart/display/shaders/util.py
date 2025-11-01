@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import numpy as np
 
+UniformValue = float | np.ndarray
 
 def normalize(x):
     return x / np.linalg.norm(x)
@@ -124,4 +127,4 @@ def make_color(geo):
         raise Exception("Invalid coloring type")
 
 
-_UNIFORMS = {}
+_UNIFORMS: dict[str, UniformValue] = {}

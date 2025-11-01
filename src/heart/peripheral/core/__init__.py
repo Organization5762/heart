@@ -25,9 +25,8 @@ class Peripheral(abc.ABC):
         """Start the peripheral's processing loop."""
 
     @classmethod
-    @abc.abstractmethod
-    def detect(cls) -> Iterable[Self]:
-        """Discover available peripherals of this type."""
+    def detect(cls) -> Iterator[Self]:
+        raise NotImplementedError("'detect' is not implemented")
 
     def handle_input(self, input: Input) -> None:
         """Process input data sent to the peripheral.

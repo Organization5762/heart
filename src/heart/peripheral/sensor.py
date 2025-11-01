@@ -2,7 +2,7 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Iterator, NoReturn, Self
+from typing import Any, Iterator, NoReturn, Self
 
 import serial
 
@@ -23,18 +23,20 @@ class Acceleration:
 # TODO (lampe): This is fundamentally useless right now
 class Distribution:
     def __init__(self) -> None:
-        self.historic_values = collections.deque([], maxlen=100)
+        self.historic_values: collections.deque[tuple[float, float]] = collections.deque(
+            [], maxlen=100
+        )
 
     def _get_time(self) -> float:
         return time.monotonic()
 
-    def add_value(self, value: float):
+    def add_value(self, value: float) -> None:
         self.historic_values.append((self._get_time(), value))
 
 
 class Accelerometer(Peripheral):
     def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
-        self.acceleration_value = None
+        self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
 
@@ -46,10 +48,8 @@ class Accelerometer(Peripheral):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        return [
-            cls(port=port, baudrate=115200)
-            for port in get_device_ports("usb-Adafruit_KB2040")
-        ]
+        for port in get_device_ports("usb-Adafruit_KB2040"):
+            yield cls(port=port, baudrate=115200)
 
     def _connect_to_ser(self) -> serial.Serial:
         return serial.Serial(self.port, self.baudrate)
@@ -80,11 +80,11 @@ class Accelerometer(Peripheral):
             return
 
         try:
-            data = json.loads(bus_data)
+            parsed: dict[str, Any] = json.loads(bus_data)
         except json.JSONDecodeError:
             print(f"Failed to decode JSON: {bus_data}")
             return
-        self._update_due_to_data(data)
+        self._update_due_to_data(parsed)
 
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:
@@ -101,7 +101,7 @@ class Accelerometer(Peripheral):
             )
             return None
 
-    def _update_due_to_data(self, data: dict) -> None:
+    def _update_due_to_data(self, data: dict[str, Any]) -> None:
         event_type = data["event_type"]
         data_value = data["data"]
 

@@ -13,17 +13,17 @@ class Color:
     def kirby() -> "Color":
         return Color(r=255, g=105, b=180)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for variant in self._as_tuple():
             assert (
                 variant >= 0 and variant <= 255
             ), f"Expected all color values to be between 0 and 255. Found {self.rgb}"
 
-    def tuple(self):
+    def tuple(self) -> tuple[int, int, int]:
         return self._as_tuple()
 
     # todo (clem): why is this private anyway, re-exposed above
-    def _as_tuple(self):
+    def _as_tuple(self) -> tuple[int, int, int]:
         return (self.r, self.g, self.b)
 
     def __iter__(self) -> Iterator[int]:
@@ -36,20 +36,21 @@ class Color:
     def random(cls) -> "Color":
         randbytes = random.getrandbits(24).to_bytes(3, "little")
         return Color(
-            r=randbytes[0] * 0.5,
-            g=randbytes[1] * 0.5,
-            b=randbytes[2] * 0.5,
+            r=int(randbytes[0] / 2),
+            g=int(randbytes[1] / 2),
+            b=int(randbytes[2] / 2),
         )
 
     def dim(self, fraction: float) -> "Color":
         return Color(
-            r=self.__clamp_rgb(self.r - (self.r * fraction)),
-            g=self.__clamp_rgb(self.g - (self.g * fraction)),
-            b=self.__clamp_rgb(self.b - (self.b * fraction)),
+            r=self.__clamp_rgb(self.r * (1 - fraction)),
+            g=self.__clamp_rgb(self.g * (1 - fraction)),
+            b=self.__clamp_rgb(self.b * (1 - fraction)),
         )
 
-    def __clamp(self, min_value: int, max_value: int, value: int) -> int:
-        return min(max(value, min_value), max_value)
+    def __clamp(self, min_value: int, max_value: int, value: float) -> int:
+        clamped = min(max_value, max(min_value, int(round(value))))
+        return clamped
 
-    def __clamp_rgb(self, value: int) -> int:
+    def __clamp_rgb(self, value: float) -> int:
         return self.__clamp(0, 255, value)

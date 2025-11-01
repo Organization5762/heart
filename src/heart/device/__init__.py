@@ -11,7 +11,7 @@ class Layout:
 
 
 class Orientation:
-    def get_type(self):
+    def get_type(self) -> type["Orientation"]:
         return type(self)
 
     def __init__(self, layout: Layout):
@@ -20,13 +20,13 @@ class Orientation:
 
 class Rectangle(Orientation):
     @classmethod
-    def with_layout(cls, columns: int, rows: int):
+    def with_layout(cls, columns: int, rows: int) -> "Rectangle":
         return cls(layout=Layout(columns, rows))
 
 
 class Cube(Orientation):
     @classmethod
-    def sides(cls):
+    def sides(cls) -> "Cube":
         """I.e.
 
         the 4 "walls" of a cube

@@ -4,13 +4,17 @@ import queue
 import threading
 from typing import Optional
 
+import queue
+import threading
+from typing import Optional
+
 from PIL import Image
 
 from heart.device import Device, Layout, Orientation
 
 
 class SampleBase(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.parser = argparse.ArgumentParser()
 
         self.parser.add_argument(
@@ -204,6 +208,11 @@ class SampleBase(object):
             sys.exit(0)
 
         return True
+
+
+from PIL import Image  # just for the type hint
+
+
 class MatrixDisplayWorker:
     """Worker thread that handles sending images to the RGB matrix (This was taking up
     ~20-30% of main thread)"""
@@ -241,8 +250,9 @@ class MatrixDisplayWorker:
 
 
 class LEDMatrix(Device, SampleBase):
-    def __init__(self, orientation: Orientation, *args, **kwargs):
-        super(LEDMatrix, self).__init__(*args, **kwargs, orientation=orientation)
+    def __init__(self, orientation: Orientation, *args, **kwargs) -> None:
+        Device.__init__(self, orientation=orientation)
+        SampleBase.__init__(self, *args, **kwargs)
         assert orientation.layout.rows == 1, "Maximum 1 row supported at the moment"
 
         self.chain_length = orientation.layout.columns
@@ -282,13 +292,13 @@ class LEDMatrix(Device, SampleBase):
     def layout(self) -> Layout:
         return Layout(columns=self.chain_length, rows=1)
 
-    def individual_display_size(self):
+    def individual_display_size(self) -> tuple[int, int]:
         return (self.col_size, self.row_size)
 
-    def full_display_size(self):
+    def full_display_size(self) -> tuple[int, int]:
         return (self.col_size * self.chain_length, self.row_size)
 
-    def set_display_mode(self, mode: str):
+    def set_display_mode(self, mode: str) -> None:
         self.display_mode = mode
 
     def set_image(self, image: Image.Image) -> None:

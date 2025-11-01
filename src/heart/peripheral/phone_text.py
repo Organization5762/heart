@@ -9,19 +9,27 @@ null terminator (`\0`).  The most-recent message is available via
 from __future__ import annotations
 
 from collections.abc import Iterator
+from types import ModuleType
+from typing import Self
 
 from heart.peripheral.core import Peripheral
 
 # Target iPhone information
 TARGET_DEVICE_NAME = "SEBASTIEN's iPhone"
 
+adapter: ModuleType | None
+bz_peripheral: ModuleType | None
+
 try:
     # bluezero is only required when the peripheral is actually *run*.
-    from bluezero import adapter
-    from bluezero import peripheral as _bz_peripheral  # type: ignore
+    from bluezero import adapter as adapter_module
+    from bluezero import peripheral as peripheral_module
 except ModuleNotFoundError:  # pragma: no cover – only imported on the target device
-    _bz_peripheral = None  # type: ignore  # noqa: N816
-    adapter = None  # type: ignore
+    adapter_module = None
+    peripheral_module = None
+
+adapter = adapter_module
+bz_peripheral = peripheral_module
 
 # UUIDs shared with the legacy test script so that existing iOS/Mac apps keep
 # working without any change.
@@ -43,17 +51,20 @@ class PhoneText(Peripheral):
     # Peripheral API
     # ---------------------------------------------------------------------
     def run(self) -> None:  # noqa: D401 – keeping signature of base class
-        if _bz_peripheral is None or adapter is None:
+        if bz_peripheral is None or adapter is None:
             print(
                 "!!! bluezero must be installed to run PhoneText as a BLE peripheral !!!"
             )
             return
 
+        assert adapter is not None
+        assert bz_peripheral is not None
+
         # Pick the first Bluetooth adapter available on the host.
-        hci_addr = list(adapter.Adapter.available())[0].address  # type: ignore[index]
+        hci_addr = list(adapter.Adapter.available())[0].address
 
         # Create and configure the Bluezero peripheral object.
-        pi_ble = _bz_peripheral.Peripheral(hci_addr, local_name="PhoneText")
+        pi_ble = bz_peripheral.Peripheral(hci_addr, local_name="PhoneText")
         pi_ble.add_service(1, _SERVICE_UUID, True)
 
         # Print clear information about what we're using
@@ -97,10 +108,10 @@ class PhoneText(Peripheral):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _on_write(self, value: bytes, _options: dict | None):  # noqa: D401
+    def _on_write(self, value: bytes, _options: dict | None) -> None:  # noqa: D401
         """Bluezero callback executed whenever a central writes new data."""
 
-        print(f"Received value: {value}")
+        print(f"Received value: {value!r}")
         # Accumulate the incoming chunk and process as text only
         self._buffer.extend(value)
 
@@ -123,5 +134,5 @@ class PhoneText(Peripheral):
             self._buffer.clear()
 
     @classmethod
-    def detect(cls) -> Iterator["PhoneText"]:
+    def detect(cls) -> Iterator[Self]:
         yield cls()
