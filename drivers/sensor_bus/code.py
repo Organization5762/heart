@@ -1,19 +1,25 @@
-from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
-from adafruit_lsm303_accel import LSM303_Accel
+import json
+import logging
+import time
+
+import board
 from adafruit_lis2mdl import LIS2MDL
 from adafruit_lsm6ds import Rate
-import time
-import board
-import json
+from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
+from adafruit_lsm303_accel import LSM303_Accel
+
 from heart.firmware_io import constants
 
+logger = logging.getLogger(__name__)
+
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
+
 
 def get_sample_rate(sensor) -> float:
     # Max interval defined by device rate
     # Reference: https://github.com/adafruit/Adafruit_CircuitPython_LSM6DS/blob/main/adafruit_lsm6ds/__init__.py#L108-L123
     #
-    # I put this up here because it is quite likely we'll just want to 
+    # I put this up here because it is quite likely we'll just want to
     # For now, assume gyro and acceleration will be the same
     if hasattr(sensor, "accelerometer_data_rate"):
         check_interval = sensor.accelerometer_data_rate
@@ -33,10 +39,7 @@ def _form_payload(name: str, data) -> str:
         str: A JSON string representing the payload.
 
     """
-    payload = {
-        "event_type": name,
-        "data": data
-    }
+    payload = {"event_type": name, "data": data}
     return "\n" + json.dumps(payload) + "\n"
 
 
@@ -57,8 +60,9 @@ def form_tuple_payload(name: str, data: tuple) -> str:
             "x": data[0],
             "y": data[1],
             "z": data[2],
-        }
+        },
     )
+
 
 def connect_to_sensors(i2c):
     """Establishes a connection to the ISM330DHCX sensor using I2C communication.
@@ -87,9 +91,10 @@ def connect_to_sensors(i2c):
     for sensor_fn in sensor_fn:
         try:
             sensors.append(sensor_fn(i2c))
-        except:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed to initialize sensor %s: %s", sensor_fn.__name__, exc)
     return sensors
+
 
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
@@ -129,6 +134,7 @@ class SensorReader:
             return True
         return any(abs(n - o) > min_change for n, o in zip(new, old))
 
+
 def main() -> None:
     """Main function to read sensor data and print it in JSON format.
 
@@ -147,14 +153,12 @@ def main() -> None:
     # This assumes two things:
     # 1. We care about the more precise data possibly (e.g. power by damned)
     # 2. That actually checking the sensor takes roughly 0 time
-    sample_rates = [
-        (1000 / get_sample_rate(sensor)) / 1000 for sensor in sensors
-    ]
+    sample_rates = [(1000 / get_sample_rate(sensor)) / 1000 for sensor in sensors]
     if len(sample_rates) == 0:
         wait_between_payloads_seconds = 0.1
     else:
         wait_between_payloads_seconds = min(sample_rates)
-    
+
     sr = SensorReader(sensors=sensors, min_change=0.1)
 
     while True:
@@ -167,10 +171,12 @@ def main() -> None:
 
             # This also has a `temperature` field but I'm not sure if that's chip temperature or ambient
             time.sleep(wait_between_payloads_seconds)
-        except (OSError) as e:
-            sensor = None
+        except OSError:
+            sensors = None
             time.sleep(WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS)
         except BaseException as e:
             raise e
 
-main()
+
+if __name__ == "__main__":
+    main()

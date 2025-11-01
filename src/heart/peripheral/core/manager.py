@@ -84,9 +84,7 @@ class PeripheralManager:
         for switch in switches:
             logger.info("Adding switch - %s", switch)
 
-            if self._deprecated_main_switch is None and isinstance(
-                switch, BaseSwitch
-            ):
+            if self._deprecated_main_switch is None and isinstance(switch, BaseSwitch):
                 self._deprecated_main_switch = switch
             yield switch
 
@@ -151,7 +149,9 @@ class PeripheralManager:
         for thread in self._threads:
             if thread.is_alive():
                 logger.debug(
-                    "Joining peripheral thread %s with timeout %.1f", thread.name, join_timeout
+                    "Joining peripheral thread %s with timeout %.1f",
+                    thread.name,
+                    join_timeout,
                 )
                 try:
                     thread.join(timeout=join_timeout)

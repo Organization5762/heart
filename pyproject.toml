@@ -96,7 +96,6 @@ ignore = ["E501", "F403", "F405"]
 
 [tool.uv.workspace]
 members = [
-    "experimental/app",
     "experimental/lapis",
     "experimental/circuit",
     "experimental/peripheral_sidecar",

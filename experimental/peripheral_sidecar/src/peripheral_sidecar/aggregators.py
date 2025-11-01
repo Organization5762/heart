@@ -6,9 +6,16 @@ from abc import ABC, abstractmethod
 from collections import deque
 from typing import Deque, Iterable
 
+from peripheral_sidecar.config import PeripheralServiceConfig
+from peripheral_sidecar.models import (
+    ActionEvent,
+    PeripheralPollResult,
+    RawPeripheralSnapshot,
+)
+
 from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.heart_rates import _mutex as heart_rate_mutex
 from heart.peripheral.heart_rates import (
-    _mutex as heart_rate_mutex,
     battery_status,
     current_bpms,
     last_seen,
@@ -16,8 +23,6 @@ from heart.peripheral.heart_rates import (
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch
-from peripheral_sidecar.config import PeripheralServiceConfig
-from peripheral_sidecar.models import ActionEvent, PeripheralPollResult, RawPeripheralSnapshot
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,7 +41,9 @@ class PeripheralActionMapper(ABC):
 
 
 class SwitchActionMapper(PeripheralActionMapper):
-    def __init__(self, switch: BaseSwitch, source: str, config: PeripheralServiceConfig) -> None:
+    def __init__(
+        self, switch: BaseSwitch, source: str, config: PeripheralServiceConfig
+    ) -> None:
         super().__init__(source, config)
         self._switch = switch
         self._last_rotation = switch.get_rotational_value()
@@ -87,7 +94,10 @@ class SwitchActionMapper(PeripheralActionMapper):
                 )
             )
         elif button_delta < 0:
-            logger.debug("Switch button count decreased unexpectedly", extra={"delta": button_delta})
+            logger.debug(
+                "Switch button count decreased unexpectedly",
+                extra={"delta": button_delta},
+            )
         self._last_button = button_value
 
         long_press_delta = long_press_value - self._last_long_press
@@ -105,7 +115,10 @@ class SwitchActionMapper(PeripheralActionMapper):
         window_seconds = self.config.switch_rotation_window
         threshold = self.config.switch_rotation_threshold
         if threshold > 0 and window_seconds > 0:
-            while self._rotation_history and now - self._rotation_history[0][0] > window_seconds:
+            while (
+                self._rotation_history
+                and now - self._rotation_history[0][0] > window_seconds
+            ):
                 self._rotation_history.popleft()
             aggregate_delta = sum(delta for _, delta in self._rotation_history)
             if aggregate_delta >= threshold:
@@ -151,7 +164,9 @@ class BluetoothSwitchActionMapper(SwitchActionMapper):
 
 
 class GamepadActionMapper(PeripheralActionMapper):
-    def __init__(self, gamepad: Gamepad, source: str, config: PeripheralServiceConfig) -> None:
+    def __init__(
+        self, gamepad: Gamepad, source: str, config: PeripheralServiceConfig
+    ) -> None:
         super().__init__(source, config)
         self._gamepad = gamepad
         self._last_connected = gamepad.is_connected()
@@ -208,7 +223,9 @@ class GamepadActionMapper(PeripheralActionMapper):
                 value = self._gamepad.axis_value(axis_id)
                 axes_state[str(axis_id)] = value
                 previous = self._axis_states.get(axis_id, 0.0)
-                if threshold > 0 and self._crossed_threshold(previous, value, threshold):
+                if threshold > 0 and self._crossed_threshold(
+                    previous, value, threshold
+                ):
                     actions.append(
                         ActionEvent(
                             action="gamepad.axis.threshold",
@@ -281,13 +298,14 @@ class AccelerometerActionMapper(PeripheralActionMapper):
         if acceleration is None:
             return PeripheralPollResult.empty()
 
-        magnitude = math.sqrt(
-            acceleration.x**2 + acceleration.y**2 + acceleration.z**2
-        )
+        magnitude = math.sqrt(acceleration.x**2 + acceleration.y**2 + acceleration.z**2)
         self._magnitude_history.append((now, magnitude))
 
         window_seconds = max(0.0, self.config.accelerometer_window)
-        while self._magnitude_history and now - self._magnitude_history[0][0] > window_seconds:
+        while (
+            self._magnitude_history
+            and now - self._magnitude_history[0][0] > window_seconds
+        ):
             self._magnitude_history.popleft()
 
         actions: list[ActionEvent] = []
@@ -337,9 +355,7 @@ class AccelerometerActionMapper(PeripheralActionMapper):
 
 
 class HeartRateActionMapper(PeripheralActionMapper):
-    def __init__(
-        self, source: str, config: PeripheralServiceConfig
-    ) -> None:
+    def __init__(self, source: str, config: PeripheralServiceConfig) -> None:
         super().__init__(source, config)
         self._history: dict[str, Deque[tuple[float, int]]] = {}
         self._alert_state: dict[str, bool] = {}
@@ -481,4 +497,7 @@ def build_action_mappers(
         if isinstance(peripheral, HeartRateManager):
             yield HeartRateActionMapper(source, config)
         else:
-            logger.debug("No action mapper registered for peripheral", extra={"type": type(peripheral).__name__})
+            logger.debug(
+                "No action mapper registered for peripheral",
+                extra={"type": type(peripheral).__name__},
+            )

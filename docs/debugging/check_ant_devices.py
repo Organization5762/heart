@@ -1,9 +1,9 @@
-from openant.easy.node import Node
-
+from openant.devices import ANTPLUS_NETWORK_KEY
 from openant.devices.common import DeviceType
 from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
-from openant.devices import ANTPLUS_NETWORK_KEY
+from openant.easy.node import Node
+
 
 # also see `auto_scanner` in ant/subparsers/scan.py
 def example_scan(file_path=None, device_id=0, device_type=0, auto_create=False):

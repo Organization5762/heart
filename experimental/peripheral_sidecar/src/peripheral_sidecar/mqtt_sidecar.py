@@ -6,11 +6,11 @@ import time
 from typing import Iterable
 
 import paho.mqtt.client as mqtt
-
-from heart.peripheral.core.manager import PeripheralManager
 from peripheral_sidecar.aggregators import PeripheralActionMapper, build_action_mappers
 from peripheral_sidecar.config import PeripheralServiceConfig
 from peripheral_sidecar.models import ActionEvent, RawPeripheralSnapshot
+
+from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -60,7 +60,7 @@ class PeripheralMQTTService:
         self._manager.detect()
         self._manager.start()
 
-        for peripheral in self._manager.peripheral:
+        for peripheral in self._manager.peripherals:
             source = self._allocate_source_name(peripheral)
             mappers = list(build_action_mappers(peripheral, source, self.config))
             if not mappers:

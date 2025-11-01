@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import contextlib
 import os
-import socket
 import socketserver
 import struct
 import threading
 from typing import Optional, Tuple
 
-from heart.utilities.logging import get_logger
-
 from heart.device.isolated_render import HEADER
+from heart.utilities.logging import get_logger
 
 from .buffer import FrameBuffer
 

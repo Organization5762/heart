@@ -44,7 +44,9 @@ def run(
     device = create_device(x11_forward=x11_forward)
     frame_buffer = FrameBuffer(size=device.full_display_size())
     server = _create_server(frame_buffer, unix_socket, tcp_host, tcp_port)
-    render_loop = RenderLoop(device=device, frame_buffer=frame_buffer, fps=fps, debug=debug)
+    render_loop = RenderLoop(
+        device=device, frame_buffer=frame_buffer, fps=fps, debug=debug
+    )
 
     def _signal_handler(signum, frame):
         render_loop.stop()

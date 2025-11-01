@@ -281,9 +281,11 @@ class GameLoop:
                     )
 
                     # --- fast edge magnitude (same math as before) -----------------------------
-                    lum = (0.299 * image[..., 0]  # perceptual luminance
-                           + 0.587 * image[..., 1]
-                           + 0.114 * image[..., 2]).astype(np.int16)
+                    lum = (
+                        0.299 * image[..., 0]  # perceptual luminance
+                        + 0.587 * image[..., 1]
+                        + 0.114 * image[..., 2]
+                    ).astype(np.int16)
 
                     gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))
                     gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum, 1, 0))
@@ -293,8 +295,10 @@ class GameLoop:
                     #   • everything below threshold fades to 0
                     #   • values above threshold ramp smoothly toward 1
                     alpha = np.clip(
-                        (edge_mag.astype(np.float32) - self.edge_thresh) / (255 - self.edge_thresh),
-                        0.0, 1.0
+                        (edge_mag.astype(np.float32) - self.edge_thresh)
+                        / (255 - self.edge_thresh),
+                        0.0,
+                        1.0,
                     )
                     alpha **= 0.5  # gamma-soften: 0.5 ≈ thicker, lighter lines
                     alpha = alpha[..., None]  # shape => (H,W,1) for RGB broadcasting
