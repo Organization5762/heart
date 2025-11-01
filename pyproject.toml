@@ -99,6 +99,7 @@ members = [
     "experimental/app",
     "experimental/lapis",
     "experimental/circuit",
+    "experimental/isolated_rendering",
 ]
 
 [tool.mypy]
