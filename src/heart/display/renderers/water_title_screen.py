@@ -1,13 +1,11 @@
 import math
 import time
 
-import numpy as np
 import pygame
 from pygame import Surface
 from pygame.time import Clock
 
 from heart import DeviceDisplayMode
-from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager

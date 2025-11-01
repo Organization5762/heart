@@ -1,8 +1,6 @@
-import time
 from collections import defaultdict
 
 import pygame
-from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -42,8 +40,8 @@ class AppController(BaseRenderer):
     def add_sleep_mode(self) -> None:
         sleep_title = [
             SpritesheetLoop(
-                sheet_file_path=f"kirby_sleep_64.png",
-                metadata_file_path=f"kirby_sleep_64.json",
+                sheet_file_path="kirby_sleep_64.png",
+                metadata_file_path="kirby_sleep_64.json",
                 image_scale=0.5,
                 offset_y=-5,
                 disable_input=True,
@@ -175,15 +173,15 @@ class GameModes(BaseRenderer):
         if gamepad.is_connected() and self.in_select_mode:
             # print("gamepad connectee")
             x_dir, y_dir = gamepad.get_dpad_value()
-            if x_dir != 0 and x_dir != self.gamepad_last_frame[f"DPAD_X"]:
+            if x_dir != 0 and x_dir != self.gamepad_last_frame["DPAD_X"]:
                 payload = {
                     "event_type": SWITCH_ROTATION,
                     "data": switch.rotational_value + x_dir,
                 }
-            self.gamepad_last_frame[f"DPAD_X"] = x_dir
-            if y_dir != 0 and y_dir != self.gamepad_last_frame[f"DPAD_Y"]:
+            self.gamepad_last_frame["DPAD_X"] = x_dir
+            if y_dir != 0 and y_dir != self.gamepad_last_frame["DPAD_Y"]:
                 payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
-            self.gamepad_last_frame[f"DPAD_Y"] = y_dir
+            self.gamepad_last_frame["DPAD_Y"] = y_dir
 
         # i.e. this branch to listen for exit request when inside a scene
         elif gamepad.is_connected():
@@ -402,9 +400,9 @@ class MultiScene(BaseRenderer):
 
         if gamepad.is_connected():
             x_dir, y_dir = gamepad.joystick.get_hat(mapping.DPAD_HAT)
-            if x_dir != 0 and x_dir != self.gamepad_last_frame[f"DPAD_X"]:
+            if x_dir != 0 and x_dir != self.gamepad_last_frame["DPAD_X"]:
                 self._increment_scene() if x_dir > 0 else self._decrement_scene()
-            self.gamepad_last_frame[f"DPAD_X"] = x_dir
+            self.gamepad_last_frame["DPAD_X"] = x_dir
 
         gamepad.update()
 

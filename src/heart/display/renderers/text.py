@@ -1,6 +1,5 @@
 import pygame
 
-from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer

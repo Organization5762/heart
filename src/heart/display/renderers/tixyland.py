@@ -1,5 +1,3 @@
-import math
-import time
 
 import numpy as np
 import pygame
@@ -26,12 +24,11 @@ class Tixyland(BaseRenderer):
         # Convert from ms to seconds
         time_value = self.time_since_last_update / 1000
 
-        arr = pygame.surfarray.pixels3d(window)
         h, w = window.get_height(), window.get_width()
         X, Y = np.meshgrid(np.arange(w), np.arange(h))
-        I = X + Y * w
+        flat_indices = X + Y * w
 
-        numpy_output = self.fn(time_value, I, Y, X)
+        numpy_output = self.fn(time_value, flat_indices, Y, X)
         numpy_output = np.clip(numpy_output, -1, 1)
         numpy_output = numpy_output.astype(np.float16)
         mag = np.abs(numpy_output)

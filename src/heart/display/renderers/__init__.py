@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Orientation
+from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 

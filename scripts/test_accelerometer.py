@@ -1,9 +1,7 @@
-import time
 
 from serial.serialutil import SerialException
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.sensor import Accelerometer
-import serial
 
 m = PeripheralManager()
 d = m.detect()
@@ -24,5 +22,5 @@ while True:
             accelerometer._process_data(data)
         
         print(accelerometer.acceleration_value)
-    except SerialException as e:
+    except SerialException:
         pass
