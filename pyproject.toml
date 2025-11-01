@@ -80,6 +80,6 @@ profile = "black"
 
 [tool.uv.workspace]
 members = [
-    "src/heart/x/experimental/lapis",
-    "src/heart/x/experimental/circuit",
+    "experimental/lapis",
+    "experimental/circuit",
 ]
