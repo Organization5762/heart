@@ -1,177 +1,137 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 960">
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1408" height="660" viewBox="0 0 1408 660">
   <defs>
-    <style>
-      text { font-family: "Inter", "Helvetica", "Arial", sans-serif; fill: #1a1a1a; }
-      .title { font-weight: 600; font-size: 22px; }
-      .node { fill: #ffffff; stroke: #2f4f6f; stroke-width: 2; rx: 12; ry: 12; }
-      .subgraph { fill: #eef3ff; stroke: #97a6c3; stroke-dasharray: 8 6; stroke-width: 2; }
-      .subgraph-fill { fill: #eef3ff; opacity: 0.7; }
-      .connector { stroke: #2f4f6f; stroke-width: 2.4; fill: none; }
-      .connector.arrow { marker-end: url(#arrow); }
-      .label { font-size: 15px; font-weight: 500; }
-      .node-text { font-size: 15px; font-weight: 500; }
-    </style>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f4f6f" />
+    <style>text { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
+.column-title { font-size: 16px; font-weight: 600; }
+.edge-label { font-size: 12px; fill: #1f2937; background: #ffffff; }
+</style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 3.5 L 0 7 z" fill="#1f2937" />
     </marker>
   </defs>
-
-  <!-- Launch & Configuration -->
-  <g transform="translate(40,60)">
-    <rect class="subgraph" width="260" height="360" rx="18" ry="18" fill="none" />
-    <text class="title" x="130" y="32">Launch &amp; Configuration</text>
-
-    <rect class="node" x="20" y="60" width="220" height="60" />
-    <text class="node-text" x="130" y="95" text-anchor="middle">totem run --configuration &lt;name&gt;</text>
-
-    <rect class="node" x="20" y="140" width="220" height="60" />
-    <text class="node-text" x="130" y="175" text-anchor="middle">heart.loop.run() Typer CLI</text>
-
-    <rect class="node" x="20" y="220" width="220" height="60" />
-    <text class="node-text" x="130" y="255" text-anchor="middle">ConfigurationRegistry.get(name)</text>
-
-    <rect class="node" x="20" y="300" width="220" height="60" />
-    <text class="node-text" x="130" y="327" text-anchor="middle">configure(loop)</text>
-    <text class="node-text" x="130" y="347" text-anchor="middle">heart.programs.configurations.*</text>
-  </g>
-
-  <!-- Core Runtime -->
-  <g transform="translate(360,40)">
-    <rect class="subgraph" width="320" height="600" rx="18" ry="18" fill="none" />
-    <text class="title" x="160" y="32">Core GameLoop Runtime</text>
-
-    <rect class="node" x="30" y="60" width="260" height="60" />
-    <text class="node-text" x="160" y="90" text-anchor="middle">GameLoop.start()</text>
-    <text class="node-text" x="160" y="110" text-anchor="middle">initializes once</text>
-
-    <rect class="node" x="30" y="140" width="260" height="60" />
-    <text class="node-text" x="160" y="170" text-anchor="middle">_initialize_screen()</text>
-    <text class="node-text" x="160" y="190" text-anchor="middle">pygame surfaces + clock</text>
-
-    <rect class="node" x="30" y="220" width="260" height="60" />
-    <text class="node-text" x="160" y="250" text-anchor="middle">_initialize_peripherals()</text>
-    <text class="node-text" x="160" y="270" text-anchor="middle">PeripheralManager.detect()/start()</text>
-
-    <rect class="node" x="30" y="300" width="260" height="60" />
-    <text class="node-text" x="160" y="330" text-anchor="middle">while running:</text>
-    <text class="node-text" x="160" y="350" text-anchor="middle">_handle_events()</text>
-    <text class="node-text" x="160" y="370" text-anchor="middle">_preprocess_setup()</text>
-
-    <rect class="node" x="30" y="380" width="260" height="60" />
-    <text class="node-text" x="160" y="410" text-anchor="middle">AppController / GameModes</text>
-    <text class="node-text" x="160" y="430" text-anchor="middle">select active mode</text>
-
-    <rect class="node" x="30" y="460" width="260" height="60" />
-    <text class="node-text" x="160" y="490" text-anchor="middle">Active renderers</text>
-    <text class="node-text" x="160" y="510" text-anchor="middle">return pygame surfaces</text>
-
-    <rect class="node" x="30" y="540" width="260" height="60" />
-    <text class="node-text" x="160" y="570" text-anchor="middle">_render_fn()</text>
-    <text class="node-text" x="160" y="590" text-anchor="middle">merge surfaces</text>
-  </g>
-
-  <!-- Inputs -->
-  <g transform="translate(40,440)">
-    <rect class="subgraph" width="260" height="400" rx="18" ry="18" fill="none" />
-    <text class="title" x="130" y="32">Peripheral Threads &amp; Signals</text>
-
-    <rect class="node" x="20" y="60" width="220" height="60" />
-    <text class="node-text" x="130" y="95" text-anchor="middle">PeripheralManager</text>
-    <text class="node-text" x="130" y="115" text-anchor="middle">background threads</text>
-
-    <rect class="node" x="20" y="140" width="220" height="56" />
-    <text class="node-text" x="130" y="170" text-anchor="middle">Switch / BluetoothSwitch</text>
-
-    <rect class="node" x="20" y="216" width="220" height="56" />
-    <text class="node-text" x="130" y="246" text-anchor="middle">Gamepad</text>
-
-    <rect class="node" x="20" y="292" width="220" height="56" />
-    <text class="node-text" x="130" y="322" text-anchor="middle">Accelerometer / Phyphox</text>
-
-    <rect class="node" x="20" y="368" width="220" height="56" />
-    <text class="node-text" x="130" y="398" text-anchor="middle">HeartRateManager</text>
-
-    <rect class="node" x="20" y="444" width="220" height="56" />
-    <text class="node-text" x="130" y="474" text-anchor="middle">PhoneText</text>
-  </g>
-
-  <!-- Display -->
-  <g transform="translate(720,160)">
-    <rect class="subgraph" width="320" height="420" rx="18" ry="18" fill="none" />
-    <text class="title" x="160" y="32">Display &amp; Device Output</text>
-
-    <rect class="node" x="40" y="60" width="240" height="60" />
-    <text class="node-text" x="160" y="95" text-anchor="middle">pygame.display.flip</text>
-    <text class="node-text" x="160" y="115" text-anchor="middle">capture surface</text>
-
-    <rect class="node" x="40" y="140" width="240" height="60" />
-    <text class="node-text" x="160" y="175" text-anchor="middle">Device.set_image(image)</text>
-
-    <!-- Local display subgroup -->
-    <g transform="translate(20,220)">
-      <rect class="subgraph" width="140" height="140" rx="14" ry="14" fill="none" />
-      <text class="label" x="70" y="28" text-anchor="middle">Local PC Display</text>
-      <rect class="node" x="10" y="56" width="120" height="60" />
-      <text class="node-text" x="70" y="86" text-anchor="middle">LocalScreen</text>
-      <text class="node-text" x="70" y="106" text-anchor="middle">scaled pygame window</text>
-    </g>
-
-    <!-- LED hardware subgroup -->
-    <g transform="translate(180,220)">
-      <rect class="subgraph" width="140" height="180" rx="14" ry="14" fill="none" />
-      <text class="label" x="70" y="28" text-anchor="middle">RGB LED Hardware</text>
-      <rect class="node" x="10" y="56" width="120" height="60" />
-      <text class="node-text" x="70" y="86" text-anchor="middle">MatrixDisplayWorker</text>
-      <text class="node-text" x="70" y="106" text-anchor="middle">thread</text>
-      <rect class="node" x="10" y="136" width="120" height="60" />
-      <text class="node-text" x="70" y="166" text-anchor="middle">LEDMatrix</text>
-      <text class="node-text" x="70" y="186" text-anchor="middle">rgbmatrix driver</text>
-    </g>
-  </g>
-
-  <!-- Connectors -->
   <g>
-    <!-- Launch chain -->
-    <path class="connector arrow" d="M 170 180 L 170 200" />
-    <path class="connector arrow" d="M 170 260 L 170 280" />
-    <path class="connector arrow" d="M 170 340 L 170 360" />
-
-    <!-- Typer to GameLoop.start -->
-    <path class="connector arrow" d="M 280 230 C 360 230 400 150 520 130" />
-
-    <!-- ConfigFn to AppController -->
-    <path class="connector arrow" d="M 280 390 C 360 390 420 450 520 450" />
-
-    <!-- LoopStart fan-out -->
-    <path class="connector arrow" d="M 520 160 L 520 180" />
-    <path class="connector arrow" d="M 520 160 C 620 200 620 260 520 260" />
-    <path class="connector arrow" d="M 520 160 C 640 240 640 340 520 340" />
-
-    <!-- Runtime progression -->
-    <path class="connector arrow" d="M 520 400 L 520 420" />
-    <path class="connector arrow" d="M 520 480 L 520 500" />
-    <path class="connector arrow" d="M 520 560 L 520 580" />
-
-    <!-- Render pipeline -->
-    <path class="connector arrow" d="M 650 610 C 720 610 760 250 880 250" />
-    <path class="connector arrow" d="M 880 280 L 880 300" />
-    <path class="connector arrow" d="M 880 360 C 820 360 820 436 810 436" />
-    <path class="connector arrow" d="M 880 360 C 940 360 960 436 970 436" />
-    <path class="connector arrow" d="M 970 496 L 970 516" />
-
-    <!-- Peripheral initialization -->
-    <path class="connector arrow" d="M 470 290 C 360 320 260 480 170 500" />
-    <path class="connector arrow" d="M 170 560 L 170 580" />
-    <path class="connector arrow" d="M 170 560 C 150 600 150 640 170 664" />
-    <path class="connector arrow" d="M 170 560 C 150 620 150 700 170 736" />
-    <path class="connector arrow" d="M 170 560 C 150 640 150 780 170 812" />
-    <path class="connector arrow" d="M 170 560 C 150 660 150 860 170 888" />
-
-    <!-- Peripheral signals into AppController -->
-    <path class="connector arrow" d="M 280 608 C 360 608 420 450 520 450" />
-    <path class="connector arrow" d="M 280 684 C 360 684 420 450 520 450" />
-    <path class="connector arrow" d="M 280 760 C 360 760 420 450 520 450" />
-    <path class="connector arrow" d="M 280 836 C 360 836 420 450 520 450" />
-    <path class="connector arrow" d="M 280 912 C 360 912 420 450 520 450" />
+    <rect x="64.00" y="48.00" width="260.00" height="318.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <text x="194.00" y="74.00" text-anchor="middle" class="column-title">Launch &amp; Configuration Services</text>
+  </g>
+  <g>
+    <rect x="404.00" y="48.00" width="260.00" height="400.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <text x="534.00" y="74.00" text-anchor="middle" class="column-title">GameLoop Orchestration</text>
+  </g>
+  <g>
+    <rect x="744.00" y="48.00" width="260.00" height="564.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <text x="874.00" y="74.00" text-anchor="middle" class="column-title">Peripheral &amp; Signal Services</text>
+  </g>
+  <g>
+    <rect x="1084.00" y="48.00" width="260.00" height="482.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <text x="1214.00" y="74.00" text-anchor="middle" class="column-title">Display &amp; Device Services</text>
+  </g>
+  <g fill="none" stroke="#1f2937" stroke-width="1.6">
+    <path d="M 194.00 174.00 C 194.00 183.00 194.00 183.00 194.00 192.00" marker-end="url(#arrowhead)" />
+    <path d="M 194.00 256.00 C 194.00 265.00 194.00 265.00 194.00 274.00" marker-end="url(#arrowhead)" />
+    <path d="M 306.00 306.00 C 346.00 306.00 382.00 142.00 422.00 142.00" marker-end="url(#arrowhead)" />
+    <path d="M 306.00 306.00 C 346.00 306.00 382.00 224.00 422.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 174.00 C 534.00 183.00 534.00 183.00 534.00 192.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 174.00 C 534.00 265.00 534.00 265.00 534.00 356.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 256.00 C 534.00 265.00 534.00 265.00 534.00 274.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 338.00 C 534.00 347.00 534.00 347.00 534.00 356.00" marker-end="url(#arrowhead)" />
+    <path d="M 646.00 388.00 C 686.00 388.00 1062.00 142.00 1102.00 142.00" marker-end="url(#arrowhead)" />
+    <path d="M 1214.00 174.00 C 1214.00 183.00 1214.00 183.00 1214.00 192.00" marker-end="url(#arrowhead)" />
+    <path d="M 1214.00 174.00 C 1214.00 224.00 1214.00 224.00 1214.00 274.00" marker-end="url(#arrowhead)" />
+    <path d="M 1214.00 338.00 C 1214.00 347.00 1214.00 347.00 1214.00 356.00" marker-end="url(#arrowhead)" />
+    <path d="M 1214.00 420.00 C 1214.00 429.00 1214.00 429.00 1214.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 646.00 142.00 C 686.00 142.00 722.00 142.00 762.00 142.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 183.00 874.00 183.00 874.00 192.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 224.00 874.00 224.00 874.00 274.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 265.00 874.00 265.00 874.00 356.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 306.00 874.00 306.00 874.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 347.00 874.00 347.00 874.00 520.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 224.00 C 722.00 224.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 306.00 C 722.00 306.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 388.00 C 722.00 388.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 470.00 C 722.00 470.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 552.00 C 722.00 552.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+  </g>
+  <rect x="289.50" y="241.00" width="149.00" height="20.00" rx="4" fill="#ffffff" stroke="#d1d5db" opacity="0.95" />
+  <text x="364.00" y="251.00" text-anchor="middle" dominant-baseline="middle" class="edge-label">adds modes &amp; scenes</text>
+  <g>
+    <rect x="82.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="194.00" y="142.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="194.00">CLI (Typer `totem run`)</tspan>
+    </text>
+    <rect x="82.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="194.00" y="224.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="194.00">Configuration Registry</tspan>
+    </text>
+    <rect x="82.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="194.00" y="297.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="194.00">Program Configuration</tspan>
+      <tspan x="194.00" dy="18">`configure(loop)`</tspan>
+    </text>
+    <rect x="422.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#1d4ed8" stroke="#1d4ed8" />
+    <text x="534.00" y="133.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">GameLoop Service</tspan>
+      <tspan x="534.00" dy="18">(start + main loop)</tspan>
+    </text>
+    <rect x="422.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#1d4ed8" stroke="#1d4ed8" />
+    <text x="534.00" y="224.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">AppController / Mode Router</tspan>
+    </text>
+    <rect x="422.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="534.00" y="306.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">Mode Services &amp; Renderers</tspan>
+    </text>
+    <rect x="422.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="534.00" y="379.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">Frame Composer</tspan>
+      <tspan x="534.00" dy="18">(surface merge + timing)</tspan>
+    </text>
+    <rect x="762.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="133.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">PeripheralManager</tspan>
+      <tspan x="874.00" dy="18">(background threads)</tspan>
+    </text>
+    <rect x="762.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="224.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Switch / BluetoothSwitch</tspan>
+    </text>
+    <rect x="762.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="306.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Gamepad</tspan>
+    </text>
+    <rect x="762.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="388.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Accelerometer / Phyphox</tspan>
+    </text>
+    <rect x="762.00" y="438.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="470.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">HeartRateManager</tspan>
+    </text>
+    <rect x="762.00" y="520.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="552.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">PhoneText</tspan>
+    </text>
+    <rect x="1102.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
+    <text x="1214.00" y="133.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">Display Service</tspan>
+      <tspan x="1214.00" dy="18">pygame.display.flip</tspan>
+    </text>
+    <rect x="1102.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
+    <text x="1214.00" y="224.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">LocalScreen Window</tspan>
+    </text>
+    <rect x="1102.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="1214.00" y="297.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">Frame Capture</tspan>
+      <tspan x="1214.00" dy="18">(share surface)</tspan>
+    </text>
+    <rect x="1102.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="1214.00" y="388.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">Device Bridge</tspan>
+    </text>
+    <rect x="1102.00" y="438.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
+    <text x="1214.00" y="461.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">LEDMatrix Driver</tspan>
+      <tspan x="1214.00" dy="18">(rgbmatrix)</tspan>
+    </text>
   </g>
 </svg>
