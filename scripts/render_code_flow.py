@@ -325,7 +325,7 @@ def build_svg(layout: DiagramLayout) -> ET.Element:
         source = layout.get_node(edge.source)
         target = layout.get_node(edge.target)
         path_d, label_pos = _edge_path(source, target)
-        path = ET.SubElement(edges_group, "path", {"d": path_d, "marker-end": "url(#arrowhead)"})
+        ET.SubElement(edges_group, "path", {"d": path_d, "marker-end": "url(#arrowhead)"})
         if edge.label:
             label_width = max(86.0, len(edge.label) * 7.0 + 16.0)
             label_height = 20.0
