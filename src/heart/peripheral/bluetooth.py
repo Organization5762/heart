@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import json
+import logging
 import threading
 import time
 from collections import deque
@@ -20,13 +21,14 @@ OBJECT_SEPARATOR = "\n"
 class UartListener:
     """Listeners for data come in as raw bytes from a UART Service."""
 
-    __slots__ = ("device", "buffer", "events", "disconnected")
+    __slots__ = ("device", "buffer", "events", "disconnected", "_logger")
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
         self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
         self.disconnected = False
+        self._logger = logging.getLogger(f"{__name__}.{type(self).__name__}")
 
     @classmethod
     def _discover_devices(cls) -> Iterator[BLEDevice]:
@@ -37,11 +39,17 @@ class UartListener:
                 yield device
 
     def start(self) -> None:
-        t = threading.Thread(target=lambda: asyncio.run(self.connect_and_listen()))
+        self._logger.debug("Starting UART listener thread for %s", self.device.address)
+        t = threading.Thread(
+            target=lambda: asyncio.run(self.connect_and_listen()),
+            daemon=True,
+            name=f"UartListener-{self.device.address}",
+        )
         t.start()
 
     def close(self) -> None:
-        pass
+        self._logger.debug("Closing UART listener for %s", self.device.address)
+        self.disconnected = True
 
     def consume_events(self) -> Iterator[dict[str, Any]]:
         while self.events:
@@ -50,14 +58,16 @@ class UartListener:
             yield self.events.popleft()
 
     async def connect_and_listen(self) -> NoReturn:
-        print("Found a device, starting listener loop")
+        self._logger.info("Found a device, starting listener loop")
         await self.__start_listener_loop(self.device)
 
     async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
         while True:
             # We still tend to loe a decent amount of data (~5 seconds worth)
             # as part of the reconnection process, but if the timeout is infrequent enough it would be hard to notice
-            print(f"Attempting to connect to {device.address} ({device.name}).")
+            self._logger.info(
+                "Attempting to connect to %s (%s).", device.address, device.name
+            )
 
             # For now we just restart the listener, as whatever we lost in the reconnection
             # is likely going to be discarded as misaligned anyway
@@ -111,7 +121,7 @@ class UartListener:
             try:
                 self.events.append(json.loads(line))
             except json.decoder.JSONDecodeError:
-                pass
+                self._logger.debug("Failed to decode payload: %s", line, exc_info=True)
 
     def __decode_read_data(self, data: bytearray) -> str:
         return data.decode("utf-8", errors="ignore")
