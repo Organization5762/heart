@@ -89,30 +89,50 @@ members = [
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["heart"]
-ignore_missing_imports = true
+packages = [
+    "heart.device",
+    "heart.environment",
+    "heart.loop",
+    "heart.peripheral",
+    "heart.utilities",
+]
 warn_unused_configs = true
+warn_unused_ignores = true
+check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = "heart.display.renderers.mandelbrot.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "heart.display.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "heart.navigation"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "heart.programs.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "toml"
+module = [
+    "bleak",
+    "bleak.*",
+    "cv2",
+    "cv2.*",
+    "moderngl",
+    "numpy",
+    "numpy.*",
+    "openant",
+    "openant.*",
+    "PIL",
+    "PIL.*",
+    "pygame",
+    "pygame.*",
+    "requests",
+    "rgbmatrix",
+    "serial",
+    "serial.*",
+    "bluezero",
+    "bluezero.*",
+    "typer",
+    "toml",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "requests"
-ignore_missing_imports = true
+module = [
+    "heart.assets",
+    "heart.assets.*",
+    "heart.display",
+    "heart.display.*",
+    "heart.navigation",
+    "heart.navigation.*",
+]
+follow_imports = "skip"
