@@ -69,6 +69,7 @@ heart = ["*.png"]
 
 [project.scripts]
 totem = "heart.loop:main"
+totem_debug = "heart.x.cli:main"
 
 [tool.docformatter]
 recursive = true
@@ -79,6 +80,6 @@ profile = "black"
 
 [tool.uv.workspace]
 members = [
-    "experimental/lapis",
-    "experimental/circuit",
+    "src/heart/x/experimental/lapis",
+    "src/heart/x/experimental/circuit",
 ]
