@@ -60,7 +60,7 @@ class PeripheralMQTTService:
         self._manager.detect()
         self._manager.start()
 
-        for peripheral in self._manager.peripheral:
+        for peripheral in self._manager.peripherals:
             source = self._allocate_source_name(peripheral)
             mappers = list(build_action_mappers(peripheral, source, self.config))
             if not mappers:
