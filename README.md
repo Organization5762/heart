@@ -30,6 +30,16 @@ The command: `totem run --configuration full_screen_test` should display a scene
 - MacOSX for local development
 - An appropriately setup Raspberry Pi 4 for portable use
 
+## Peripheral MQTT sidecar (experimental)
+
+The peripheral MQTT sidecar now lives in the standalone project under
+`experimental/peripheral_sidecar`. Install it alongside the main `heart`
+package and launch it via the `heart-peripheral-sidecar` console script.
+See that directory's README for setup details and configuration options.
+
+For a local MQTT broker, use the Mosquitto Docker Compose setup in
+`experimental/mqtt_broker`.
+
 ## Drivers setup
 
 ### ANT

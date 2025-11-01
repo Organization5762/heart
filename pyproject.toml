@@ -99,6 +99,7 @@ members = [
     "experimental/app",
     "experimental/lapis",
     "experimental/circuit",
+    "experimental/peripheral_sidecar",
     "experimental/isolated_rendering",
 ]
 
