@@ -1,5 +1,5 @@
 venv_dir = ".tilt-venv"
-python_bin = "python3"
+required_python = "3.11.2"
 
 config.define_string(
     "configuration",
@@ -19,10 +19,39 @@ config.define_bool(
 
 cfg = config.parse()
 
+python_candidates = [
+    "$PYENV_ROOT/versions/%s/bin/python" % required_python,
+    "$HOME/.pyenv/versions/%s/bin/python" % required_python,
+    "python%s" % required_python[:4],
+    "python3",
+]
+
+python_probe_lines = [
+    "python_bin=",
+    "for candidate in \\",
+]
+for candidate in python_candidates[:-1]:
+    python_probe_lines.append('    "%s" \\' % candidate)
+python_probe_lines.append('    "%s"' % python_candidates[-1])
+python_probe_lines.extend([
+    "do",
+    "  resolved=$(eval echo $candidate)",
+    "  if [ -x \"$resolved\" ]; then",
+    "    python_bin=$resolved",
+    "    break",
+    "  fi",
+    "done",
+    "if [ -z \"$python_bin\" ]; then",
+    "  echo 'Unable to find Python %s (tried pyenv and system interpreters)' >&2" % required_python,
+    "  exit 1",
+    "fi",
+])
+
 setup_script_lines = [
     "set -euo pipefail",
+] + python_probe_lines + [
     'if [ ! -d "%s" ]; then' % venv_dir,
-    '  %s -m venv %s' % (python_bin, venv_dir),
+    '  "$python_bin" -m venv %s' % venv_dir,
     "fi",
     "%s/bin/python -m ensurepip --upgrade" % venv_dir,
     "%s/bin/pip install --no-build-isolation -e .[dev]" % venv_dir,
@@ -38,7 +67,6 @@ local_resource(
         "Makefile",
     ],
     trigger_mode=TRIGGER_MODE_AUTO,
-    env={"PYENV_VERSION": "system"},
 )
 
 x11_flag = ""
@@ -67,7 +95,6 @@ local_resource(
         "pyproject.toml",
     ],
     resource_deps=["setup-env"],
-    env={"PYENV_VERSION": "system"},
 )
 
 local_resource(
@@ -76,5 +103,4 @@ local_resource(
     deps=["src", "test"],
     resource_deps=["setup-env"],
     trigger_mode=TRIGGER_MODE_MANUAL,
-    env={"PYENV_VERSION": "system"},
 )
