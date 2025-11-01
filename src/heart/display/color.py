@@ -15,9 +15,9 @@ class Color:
 
     def __post_init__(self) -> None:
         for variant in self._as_tuple():
-            assert (
-                variant >= 0 and variant <= 255
-            ), f"Expected all color values to be between 0 and 255. Found {self.rgb}"
+            assert variant >= 0 and variant <= 255, (
+                f"Expected all color values to be between 0 and 255. Found {self.rgb}"
+            )
 
     def tuple(self) -> tuple[int, int, int]:
         return self._as_tuple()

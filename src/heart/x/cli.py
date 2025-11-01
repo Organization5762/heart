@@ -59,7 +59,7 @@ def run_phone_text() -> None:
 
 @gamepad_app.command(name="scan")
 def scan_gamepads(
-    scan_duration: int = typer.Option(10, min=1, help="Scan duration in seconds.")
+    scan_duration: int = typer.Option(10, min=1, help="Scan duration in seconds."),
 ) -> None:
     """Scan for Bluetooth controllers."""
 
@@ -84,7 +84,7 @@ def scan_gamepads(
 def pair_gamepad(
     mac_address: str = typer.Argument(
         ..., help="MAC address of the controller to pair."
-    )
+    ),
 ) -> None:
     """Attempt to pair and connect to a Bluetooth gamepad."""
 
@@ -118,7 +118,7 @@ def pair_gamepad(
 
 @gamepad_app.command(name="status")
 def gamepad_status(
-    mac_address: str = typer.Argument(..., help="MAC address of the controller.")
+    mac_address: str = typer.Argument(..., help="MAC address of the controller."),
 ) -> None:
     """Display whether a controller is paired and/or connected."""
 

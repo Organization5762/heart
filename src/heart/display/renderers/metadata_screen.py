@@ -52,9 +52,7 @@ class MetadataScreen(BaseRenderer):
         self.time_between_frames_ms = DEFAULT_TIME_BETWEEN_FRAMES_MS
 
         # Track animation state for each heart rate monitor
-        self.heart_states = (
-            {}
-        )  # {id: {"up": bool, "color_index": int, "last_update": time}}
+        self.heart_states = {}  # {id: {"up": bool, "color_index": int, "last_update": time}}
 
     def display_number(self, window, number, x, y):
         my_font = Loader.load_font("Grand9K Pixel.ttf")
