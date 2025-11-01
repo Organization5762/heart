@@ -1,9 +1,15 @@
 import argparse
 import sys
+from typing import Optional
 
 from PIL import Image
 
 from heart.device import Device, Layout, Orientation
+from heart.device.isolated_render import MatrixClient
+from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class SampleBase(object):
@@ -255,35 +261,53 @@ class LEDMatrix(Device, SampleBase):
         self.row_size = 64
         self.col_size = 64
 
-        from rgbmatrix import RGBMatrix, RGBMatrixOptions
+        self._client: Optional[MatrixClient] = None
+        self.worker: Optional[MatrixDisplayWorker] = None
+        self.matrix = None
 
-        options = RGBMatrixOptions()
-        # TODO: Might need to change these if we want N screens
-        options.rows = self.row_size
-        options.cols = self.col_size
-        options.chain_length = self.chain_length
-        options.parallel = 1
-        options.pwm_bits = 11
+        if Configuration.use_isolated_renderer():
+            socket_path = Configuration.isolated_renderer_socket()
+            tcp_address = Configuration.isolated_renderer_tcp_address()
+            if socket_path and tcp_address:
+                logger.warning(
+                    "Both socket and TCP configuration detected; defaulting to TCP"
+                )
+                socket_path = None
+            logger.info("Using isolated renderer client for LED matrix output")
+            self._client = MatrixClient(
+                socket_path=socket_path,
+                tcp_address=tcp_address,
+            )
+        else:
+            from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
-        options.show_refresh_rate = 1
-        # Setting this to True can cause ghosting
-        options.disable_hardware_pulsing = False
-        options.multiplexing = 0
-        options.row_address_type = 0
-        options.brightness = 100
-        options.led_rgb_sequence = "RGB"
+            options = RGBMatrixOptions()
+            # TODO: Might need to change these if we want N screens
+            options.rows = self.row_size
+            options.cols = self.col_size
+            options.chain_length = self.chain_length
+            options.parallel = 1
+            options.pwm_bits = 11
 
-        # These two settings, pwm_lsb_nanoseconds and gpio_slowdown are sometimes associated with ghosting
-        # https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/README.md
-        options.pwm_lsb_nanoseconds = 100
-        options.gpio_slowdown = 4
-        options.pixel_mapper_config = ""
-        options.panel_type = ""
-        # I hate this option.
-        options.drop_privileges = False
+            options.show_refresh_rate = 1
+            # Setting this to True can cause ghosting
+            options.disable_hardware_pulsing = False
+            options.multiplexing = 0
+            options.row_address_type = 0
+            options.brightness = 100
+            options.led_rgb_sequence = "RGB"
 
-        self.matrix = RGBMatrix(options=options)
-        self.worker = MatrixDisplayWorker(self.matrix)
+            # These two settings, pwm_lsb_nanoseconds and gpio_slowdown are sometimes associated with ghosting
+            # https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/README.md
+            options.pwm_lsb_nanoseconds = 100
+            options.gpio_slowdown = 4
+            options.pixel_mapper_config = ""
+            options.panel_type = ""
+            # I hate this option.
+            options.drop_privileges = False
+
+            self.matrix = RGBMatrix(options=options)
+            self.worker = MatrixDisplayWorker(self.matrix)
 
     def layout(self) -> Layout:
         return Layout(columns=self.chain_length, rows=1)
@@ -298,4 +322,9 @@ class LEDMatrix(Device, SampleBase):
         self.display_mode = mode
 
     def set_image(self, image: Image.Image) -> None:
-        self.worker.set_image_async(image)
+        if self._client is not None:
+            self._client.send_image(image)
+        elif self.worker is not None:
+            self.worker.set_image_async(image)
+        else:
+            raise RuntimeError("LEDMatrix is not configured with a renderer")

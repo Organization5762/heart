@@ -81,4 +81,5 @@ profile = "black"
 members = [
     "experimental/lapis",
     "experimental/circuit",
+    "experimental/isolated_rendering",
 ]

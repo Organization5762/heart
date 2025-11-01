@@ -8,6 +8,8 @@ from typing import Iterator
 import serial.tools.list_ports
 from pygame.event import custom_type
 
+from heart.device.isolated_render import DEFAULT_SOCKET_PATH
+
 
 @dataclass
 class Pi:
@@ -50,6 +52,41 @@ class Configuration:
     @classmethod
     def use_mock_switch(cls) -> bool:
         return os.environ.get("MOCK_SWITCH", "False").lower() in {"true", "1"}
+
+    @classmethod
+    def use_isolated_renderer(cls) -> bool:
+        return os.environ.get("USE_ISOLATED_RENDERER", "False").lower() in {
+            "true",
+            "1",
+        }
+
+    @classmethod
+    def isolated_renderer_socket(cls) -> str | None:
+        socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
+        if socket_path == "":
+            return None
+        if socket_path is not None:
+            return socket_path
+        if cls.isolated_renderer_tcp_address() is not None:
+            return None
+        return DEFAULT_SOCKET_PATH
+
+    @classmethod
+    def isolated_renderer_tcp_address(cls) -> tuple[str, int] | None:
+        host = os.environ.get("ISOLATED_RENDER_HOST")
+        port = os.environ.get("ISOLATED_RENDER_PORT")
+        if host and port:
+            try:
+                return host, int(port)
+            except ValueError:
+                raise ValueError(
+                    "ISOLATED_RENDER_PORT must be an integer when ISOLATED_RENDER_HOST is set"
+                )
+        if host or port:
+            raise ValueError(
+                "Both ISOLATED_RENDER_HOST and ISOLATED_RENDER_PORT must be set together"
+            )
+        return None
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
