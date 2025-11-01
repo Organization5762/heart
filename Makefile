@@ -1,4 +1,5 @@
-PYTHON_SOURCES = src scripts test
+PYTHON_SOURCE_DIRS = src scripts test
+PYTHON_SOURCES = $(foreach dir,$(PYTHON_SOURCE_DIRS),$(if $(wildcard $(dir)),$(dir)))
 
 .PHONY: dev_install pi_install format lint check test
 
