@@ -1,5 +1,4 @@
 import enum
-import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-ACTIVE_GAME_LOOP = None
+ACTIVE_GAME_LOOP: "GameLoop" | None = None
 RGBA_IMAGE_FORMAT = "RGBA"
 
 
@@ -51,29 +50,29 @@ class GameLoop:
 
         self.max_fps = max_fps
         self.app_controller = AppController()
-        self.clock = None
-        self.screen = None
+        self.clock: pygame.time.Clock | None = None
+        self.screen: pygame.Surface | None = None
         self.renderer_variant = render_variant
 
         # jank slide animation state machine
-        self.mode_change = (0, 0)
+        self.mode_change: tuple[int, int] = (0, 0)
         self._last_mode_offset = 0
         self._last_offset_on_change = 0
         self._current_offset_on_change = 0
-        self.renderers_cache = None
+        self.renderers_cache: list["BaseRenderer"] | None = None
 
-        self.time_last_debugging_press = None
+        self.time_last_debugging_press: float | None = None
 
         self._active_mode_index = 0
 
         # Phone text display state
-        self._phone_text_display_time = None
+        self._phone_text_display_time: float | None = None
         self._phone_text_duration = 5.0  # Display phone text for 5 seconds
-        self._phone_text_renderer = None
+        self._phone_text_renderer: FreeTextRenderer | None = None
 
         # Lampe controller
-        self.feedback_buffer = None
-        self.tmp_float = None
+        self.feedback_buffer: np.ndarray | None = None
+        self.tmp_float: float | None = None
         self.edge_thresh = 1
 
         pygame.display.set_mode(
@@ -88,14 +87,17 @@ class GameLoop:
 
         self._last_render_mode = pygame.SHOWN
 
-    def add_mode(self, title: str | None = None) -> ComposedRenderer:
+    def add_mode(
+        self,
+        title: str | list["BaseRenderer"] | "BaseRenderer" | None = None,
+    ) -> ComposedRenderer:
         return self.app_controller.add_mode(title=title)
 
     def add_scene(self) -> MultiScene:
         return self.app_controller.add_scene()
 
     @classmethod
-    def get_game_loop(cls):
+    def get_game_loop(cls) -> "GameLoop" | None:
         return ACTIVE_GAME_LOOP
 
     @classmethod
@@ -124,21 +126,28 @@ class GameLoop:
             peripheral_manager=self.peripheral_manager,
             orientation=self.device.orientation,
         )
+        if self.clock is None or self.screen is None:
+            raise RuntimeError("GameLoop failed to initialize display surfaces")
+        clock = self.clock
         while self.running:
             self._handle_events()
             self._preprocess_setup()
 
             # Check for phone text
             phone_text = self.peripheral_manager.get_phone_text()
-            if phone_text.pop_text():
+            popped_text = phone_text.pop_text()
+            if popped_text:
                 # Set the time when text was received
                 self._phone_text_display_time = time.time()
                 # Create a text renderer for the phone text
                 self._phone_text_renderer = FreeTextRenderer()
 
             # If we're in the phone text display period, add the text renderer
+            renderers: list["BaseRenderer"]
             if self._phone_text_display_time is not None:
                 current_time = time.time()
+                if self._phone_text_renderer is None:
+                    self._phone_text_renderer = FreeTextRenderer()
                 renderers = [self._phone_text_renderer]
                 if (
                     current_time - self._phone_text_display_time
@@ -162,7 +171,7 @@ class GameLoop:
                     else:
                         renderers.append(FlameRenderer())
             self._one_loop(renderers)
-            self.clock.tick(self.max_fps)
+            clock.tick(self.max_fps)
 
         pygame.quit()
 
@@ -217,13 +226,12 @@ class GameLoop:
         image = pygame.surfarray.pixels3d(screen)
 
         # HACKKK
-        if self.peripheral_manager.bluetooth_switch() is not None:
+        bluetooth_switch = self.peripheral_manager.bluetooth_switch()
+        if bluetooth_switch is not None:
             ###
             # Button One
             ###
-            if (
-                switch_one := self.peripheral_manager.bluetooth_switch().switch_one()
-            ) is not None:
+            if (switch_one := bluetooth_switch.switch_one()) is not None:
                 rotation_delta = switch_one.get_rotation_since_last_long_button_press()
                 if rotation_delta != 0:
                     # 0.05 per detent, same feel as before
@@ -252,7 +260,7 @@ class GameLoop:
             ###
             if self.tmp_float is None:
                 self.tmp_float = np.empty_like(image, dtype=np.float32)
-            if hue_switch := self.peripheral_manager.bluetooth_switch().switch_two():
+            if (hue_switch := bluetooth_switch.switch_two()) is not None:
                 delta = hue_switch.get_rotation_since_last_long_button_press()
                 if delta:
                     # 0.03 ~= ~11° per detent; tune to taste
@@ -265,7 +273,7 @@ class GameLoop:
             ###
             # Button Three
             ###
-            if (edge_sw := self.peripheral_manager.bluetooth_switch().switch_three()):
+            if (edge_sw := bluetooth_switch.switch_three()) is not None:
                 d = edge_sw.get_rotation_since_last_long_button_press()
                 if d:  # ±10 % per detent
                     self.edge_thresh = int(
@@ -376,6 +384,8 @@ class GameLoop:
         renderers: list["BaseRenderer"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> None:
+        if self.screen is None:
+            raise RuntimeError("GameLoop screen is not initialized")
         # Add border in select mode
         result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
             renderers
@@ -440,4 +450,5 @@ class GameLoop:
 
     def __dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
-        self.screen.fill("black")
+        if self.screen is not None:
+            self.screen.fill("black")

@@ -1,6 +1,5 @@
 import math
 import time
-import traceback
 from collections import defaultdict
 
 import numpy as np
@@ -471,7 +470,7 @@ class FractalScene(BaseRenderer):
         try:
             self._process_gamepad_input(peripheral_manager)
             # self._process_keyboard_input(peripheral_manager)
-        except:  # i haven't actually seen it fail but just in case
+        except Exception:  # i haven't actually seen it fail but just in case
             pass
 
     def _process_gamepad_input(self, peripheral_manager: PeripheralManager):
@@ -671,7 +670,7 @@ class FractalScene(BaseRenderer):
 
         try:
             self._process_mouse()
-        except:
+        except Exception:
             # todo: tbh i'm just not sure if this will error if there's no mouse
             #  device detected (e.g. on pi) so just catching in case
             pass

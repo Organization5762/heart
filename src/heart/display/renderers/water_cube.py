@@ -12,7 +12,6 @@ This computes a 64x64 height-field that is projected onto the cube's four 64x64 
 from __future__ import annotations
 
 import math
-import time
 from typing import Tuple
 
 import numpy as np
@@ -46,10 +45,10 @@ DY = Y_COORDS - _centre
 
 
 def _norm(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
-    l = math.hypot(v[0], v[1]) + abs(v[2])
-    if l == 0:
+    length = math.hypot(v[0], v[1]) + abs(v[2])
+    if length == 0:
         return (0.0, 0.0, 0.0)
-    return (v[0] / l, v[1] / l, v[2] / l)
+    return (v[0] / length, v[1] / length, v[2] / length)
 
 
 def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
@@ -135,9 +134,6 @@ class WaterCube(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        # Start timing
-        start_time = time.time()
-
         # --- get gravity ---------------------------------------------------
         accel = peripheral_manager.get_accelerometer().get_acceleration()
         gx = accel.x if accel else 0.0
@@ -159,9 +155,6 @@ class WaterCube(BaseRenderer):
 
         # --- blit to LED surfaces -----------------------------------------
         pygame.surfarray.blit_array(window, frame)
-
-        # Calculate and print frame processing time
-        frame_time = (time.time() - start_time) * 1000  # Convert to milliseconds
 
         # maintain original display rate
         clock.tick_busy_loop(60)
