@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Render the runtime code flow mermaid diagram to an image file."""
+
 import argparse
 import pathlib
 import shutil

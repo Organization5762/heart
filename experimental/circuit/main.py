@@ -138,7 +138,7 @@ class Hub75DriverBoard:
         bufs = []
         for b in range(self.cfg.BUF_PER_PORT):
             buf = self.cfg.buffer_part()
-            buf.ref = f'UB{idx}_{chr(ord("A")+b)}'
+            buf.ref = f"UB{idx}_{chr(ord('A') + b)}"
             bufs.append(buf)
         return bufs
 

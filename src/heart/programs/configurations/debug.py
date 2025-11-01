@@ -4,7 +4,6 @@ from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
-
     a = loop.add_scene()
     a.scenes.append(RenderColor(Color(255, 0, 0)))
     a.scenes.append(RenderColor(Color(0, 255, 0)))

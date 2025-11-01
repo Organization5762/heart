@@ -269,9 +269,7 @@ class GameModes(BaseRenderer):
             self.last_long_button_value = new_long_button_value
 
         if self.in_select_mode:
-            self.mode_offset = (
-                peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
-            )
+            self.mode_offset = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)

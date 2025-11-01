@@ -94,9 +94,9 @@ class LocalScreen(Device):
         return max(result // 3, 1)
 
     def set_image(self, image: Image.Image) -> None:
-        assert (
-            image.size == self.full_display_size()
-        ), f"Image size does not match display size. Image size: {image.size}, Display size: {self.full_display_size()}"
+        assert image.size == self.full_display_size(), (
+            f"Image size does not match display size. Image size: {image.size}, Display size: {self.full_display_size()}"
+        )
 
         scaled_image = image.resize(
             (

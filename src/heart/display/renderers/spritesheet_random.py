@@ -76,9 +76,7 @@ class SpritesheetLoopRandom(BaseRenderer):
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def __duration_scale_factor(self, peripheral_manager: PeripheralManager):
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
-        )
+        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         return current_value / 20.00
 
     def process(

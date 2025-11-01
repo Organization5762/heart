@@ -239,9 +239,9 @@ def test_mqtt_integration_with_moving_average(monkeypatch: pytest.MonkeyPatch) -
     service_thread.start()
 
     try:
-        assert processing_complete.wait(
-            timeout=5.0
-        ), "Timed out waiting for MQTT actions"
+        assert processing_complete.wait(timeout=5.0), (
+            "Timed out waiting for MQTT actions"
+        )
     finally:
         service.shutdown()
         service_thread.join(timeout=5.0)
