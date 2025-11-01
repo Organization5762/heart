@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import numpy as np
 
 UniformValue = float | np.ndarray

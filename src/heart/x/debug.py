@@ -1,7 +1,5 @@
 """Helper utilities backing the :mod:`heart.x` debug CLI."""
 
-from __future__ import annotations
-
 import json
 import subprocess
 import time
