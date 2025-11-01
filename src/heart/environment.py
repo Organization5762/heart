@@ -1,5 +1,4 @@
 import enum
-import inspect
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING

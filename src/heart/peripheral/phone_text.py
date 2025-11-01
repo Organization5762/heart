@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """PhoneText Peripheral (TEXT-ONLY)
 
 This peripheral exposes a single writable BLE characteristic that accepts UTF-8
@@ -8,7 +6,8 @@ null terminator (`\0`).  The most-recent message is available via
 `PhoneText.get_last_text()` for inspection by other code/tests.
 """
 
-import time
+from __future__ import annotations
+
 from collections.abc import Iterator
 from types import ModuleType
 from typing import Self
@@ -69,7 +68,7 @@ class PhoneText(Peripheral):
         pi_ble.add_service(1, _SERVICE_UUID, True)
 
         # Print clear information about what we're using
-        print(f"📲 Starting PhoneText peripheral with:")
+        print("📲 Starting PhoneText peripheral with:")
         print(f"   Service UUID: {_SERVICE_UUID}")
         print(f"   Characteristic UUID: {_CHARACTERISTIC_UUID}")
         print(f"   Adapter: {hci_addr}")

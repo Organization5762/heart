@@ -1,12 +1,10 @@
-import time
-
 from pygame import Surface, font, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
-from heart.display.renderers.flame import FlameGenerator, FlameRenderer
+from heart.display.renderers.flame import FlameRenderer
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import (
@@ -56,7 +54,7 @@ class AvatarBpmRenderer(BaseRenderer):
         for name, sensor_id in AVATAR_MAPPINGS.items():
             try:
                 self.avatar_images[name] = Loader.load(f"avatars/{name}_32.png")
-            except:
+            except Exception:
                 print(f"Could not load avatar for {name}")
 
         # Default avatar

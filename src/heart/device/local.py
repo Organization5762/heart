@@ -2,7 +2,7 @@ import logging
 import platform
 import subprocess
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import pygame
 from PIL import Image

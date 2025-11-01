@@ -86,10 +86,10 @@ class SlideTransitionRenderer(BaseRenderer):
         surf_A = pygame.Surface(size, pygame.SRCALPHA)
         surf_B = pygame.Surface(size, pygame.SRCALPHA)
 
-        result_A = self.renderer_A._internal_process(
+        self.renderer_A._internal_process(
             surf_A, clock, peripheral_manager, Rectangle.with_layout(1, 1)
         )
-        result = self.renderer_B._internal_process(
+        self.renderer_B._internal_process(
             surf_B, clock, peripheral_manager, Rectangle.with_layout(1, 1)
         )
 

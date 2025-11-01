@@ -1,6 +1,3 @@
-import logging
-import time
-
 from pygame import Rect, Surface, draw, time
 
 from heart import DeviceDisplayMode
@@ -48,7 +45,7 @@ class MetadataScreen(BaseRenderer):
         for name, sensor_id in AVATAR_MAPPINGS.items():
             try:
                 self.avatar_images[sensor_id] = Loader.load(f"avatars/{name}_16.png")
-            except:
+            except Exception:
                 logger.warning(f"Could not load avatar for {name}")
 
         self.time_since_last_update = 0

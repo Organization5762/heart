@@ -4,11 +4,6 @@ import pytest
 from heart.device import Cube, Device
 from heart.environment import GameLoop
 from heart.peripheral.core.manager import PeripheralManager
-import numpy as np
-from scipy.optimize import curve_fit
-from pytest_benchmark.fixture import BenchmarkFixture
-import pytest
-import functools
 
 class FakeFixtureDevice(Device):
     def individual_display_size(self) -> tuple[int, int]:

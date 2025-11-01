@@ -4,8 +4,6 @@ import threading
 import time
 from typing import Dict, Iterator, List, Optional, Tuple
 
-from bleak import BleakClient, BleakScanner
-from bleak.backends.device import BLEDevice
 from openant.base.driver import DriverNotFound
 from openant.devices import ANTPLUS_NETWORK_KEY
 from openant.devices.common import DeviceType
@@ -75,9 +73,9 @@ class HeartRateManager(Peripheral):
 
     # ---------- Peripheral framework ----------
 
-    @staticmethod
-    def detect() -> Iterator["HeartRateManager"]:
-        yield HeartRateManager()
+    @classmethod
+    def detect(cls) -> Iterator["HeartRateManager"]:
+        yield cls()
 
     # ---------- Callbacks -----------------------------------------------------
 
@@ -167,7 +165,7 @@ class HeartRateManager(Peripheral):
             while True:
                 try:
                     self._ant_cycle()
-                except DriverNotFound as e:
+                except DriverNotFound:
                     logger.error("ANT driver not found - skipping HeartRateManager")
                     return
                 except (AntException, OSError, RuntimeError) as e:

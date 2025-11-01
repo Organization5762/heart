@@ -27,9 +27,6 @@ class SceneControls:
         zoom_scaling = 1.1
         return self.state.zoom * zoom_scaling
 
-    def clamp(self, n, low, high):
-        return max(low, min(n, high))
-
     def _reset_all(self):
         # self._reset_julia()
         # self._reset_mandelbrot()
@@ -41,8 +38,6 @@ class SceneControls:
         y_hi_bound = (self.state.msurface_height // 2) - padding  # - padding + 1
         x_lo_bound = -(self.state.msurface_width // 2) + padding  # + padding + 0.5
         x_hi_bound = (self.state.msurface_width // 2) - padding  # - padding - 1
-
-        bound_buffer = 5
 
         if cursor == "julia":
             virtual_cursor = self.state.cursor_pos
@@ -150,7 +145,7 @@ class SceneControls:
                 orbit.append(point)
                 # if abs(point) > 2:
                 #     break
-            except:
+            except Exception:
                 # todo: sometimes orbit calc fails bc overflow
                 pass
 
