@@ -12,6 +12,10 @@ Visual display project for LED screens.
 
 `make format` should install and run the correct formatting and linting tools
 
+**Linting**
+
+`make lint` runs static analysis with ruff over the Python sources
+
 **Testing Locally**
 
 The command: `totem run --configuration full_screen_test` should display a scene locally. If you see a scene, then the setup is correct.

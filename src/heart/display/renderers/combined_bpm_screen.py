@@ -1,5 +1,3 @@
-import time
-
 from pygame import Surface, time
 
 from heart import DeviceDisplayMode

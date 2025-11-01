@@ -1,9 +1,10 @@
 from heart.peripheral.switch import BluetoothSwitch
 
-for l in BluetoothSwitch.detect():
+
+for bluetooth_switch in BluetoothSwitch.detect():
     print("Starting")
-    l.listener.start()
+    bluetooth_switch.listener.start()
     print("Started listener")
     while True:
-        for event in l.listener.consume_events():
+        for event in bluetooth_switch.listener.consume_events():
             print(event)

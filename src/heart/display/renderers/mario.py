@@ -85,7 +85,7 @@ class MarioRenderer(BaseRenderer):
         else:
             try:
                 self.accel = peripheral_manager.get_accelerometer().get_acceleration()
-            except Exception as e:
+            except Exception:
                 time.sleep(0.1)
                 self.accel = None
             if self.accel is not None and (
