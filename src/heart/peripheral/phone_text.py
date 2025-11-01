@@ -10,6 +10,7 @@ null terminator (`\0`).  The most-recent message is available via
 
 import time
 from collections.abc import Iterator
+from typing import Self
 
 from heart.peripheral.core import Peripheral
 
@@ -98,10 +99,10 @@ class PhoneText(Peripheral):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _on_write(self, value: bytes, _options: dict | None):  # noqa: D401
+    def _on_write(self, value: bytes, _options: dict | None) -> None:  # noqa: D401
         """Bluezero callback executed whenever a central writes new data."""
 
-        print(f"Received value: {value}")
+        print(f"Received value: {value!r}")
         # Accumulate the incoming chunk and process as text only
         self._buffer.extend(value)
 
@@ -123,6 +124,6 @@ class PhoneText(Peripheral):
             # Clear the buffer for the next message
             self._buffer.clear()
 
-    @staticmethod
-    def detect() -> Iterator["PhoneText"]:
-        yield PhoneText()
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
+        yield cls()

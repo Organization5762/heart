@@ -2,8 +2,6 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Iterator, Self
 
-import pygame
-
 
 @dataclass
 class Input:
@@ -16,8 +14,8 @@ class Peripheral(abc.ABC):
     def run(self) -> None:
         pass
 
-    @staticmethod
-    def detect() -> Iterator[Self]:
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
         raise NotImplementedError("'detect' is not implemented")
 
     def handle_input(self, input: Input) -> None:

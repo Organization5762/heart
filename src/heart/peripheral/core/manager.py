@@ -70,11 +70,10 @@ class PeripheralManager:
     def _detect_switches(self) -> Iterator[Peripheral]:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             logger.info("Detecting switches")
-            switches = itertools.chain(
-                Switch.detect(),
-                BluetoothSwitch.detect(),
-            )
-            switches = list(switches)
+            switches: list[Peripheral] = [
+                *Switch.detect(),
+                *BluetoothSwitch.detect(),
+            ]
             logger.info("Found %d switches", len(switches))
             if len(switches) == 0:
                 logger.warning("No switches found")
@@ -86,7 +85,9 @@ class PeripheralManager:
         for switch in switches:
             logger.info(f"Adding switch - {switch}")
 
-            if self._deprecated_main_switch is None:
+            if self._deprecated_main_switch is None and isinstance(
+                switch, BaseSwitch
+            ):
                 self._deprecated_main_switch = switch
             yield switch
 

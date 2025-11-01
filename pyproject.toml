@@ -48,6 +48,9 @@ dev = [
     "pytest",
     "pytest-benchmark",
     "scipy",
+    "mypy",
+    "types-requests",
+    "types-toml",
     # Formatting
     "black",
     "docformatter[tomli]",
@@ -82,3 +85,34 @@ members = [
     "experimental/lapis",
     "experimental/circuit",
 ]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = ["heart"]
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "heart.display.renderers.mandelbrot.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "heart.display.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "heart.navigation"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "heart.programs.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "toml"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "requests"
+ignore_missing_imports = true
