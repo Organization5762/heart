@@ -123,6 +123,6 @@ class PhoneText(Peripheral):
             # Clear the buffer for the next message
             self._buffer.clear()
 
-    @staticmethod
-    def detect() -> Iterator["PhoneText"]:
-        yield PhoneText()
+    @classmethod
+    def detect(cls) -> Iterator["PhoneText"]:
+        yield cls()
