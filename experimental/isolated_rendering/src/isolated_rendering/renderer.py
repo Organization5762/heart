@@ -108,9 +108,7 @@ def create_device(x11_forward: bool) -> Device:
 
     if Configuration.is_pi() and not x11_forward and not Configuration.is_x11_forward():
         if LEDMatrix is None:
-            logger.warning(
-                "rgbmatrix library unavailable; falling back to LocalScreen"
-            )
+            logger.warning("rgbmatrix library unavailable; falling back to LocalScreen")
             return _local()
         return LEDMatrix(orientation=orientation)
 

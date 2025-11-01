@@ -1,6 +1,5 @@
-import numpy as np
 import mcubes
-
+import numpy as np
 import taichi as ti
 import taichi.math as tm
 
@@ -14,6 +13,7 @@ pixels = ti.field(dtype=float, shape=(n * 1, n))
 def complex_sqr(z):  # complex square of a 2D vector
     return tm.vec2(z[0] * z[0] - z[1] * z[1], 2 * z[0] * z[1])
 
+
 @ti.kernel
 def paint(t: float):
     for i, j in pixels:  # Parallelized over all pixels
@@ -25,17 +25,16 @@ def paint(t: float):
             iterations += 1
         pixels[i, j] = 1 - iterations * 0.02
 
+
 def _compute_volume(seed: int = 0):
     x, y, z = np.mgrid[:100, :100, :100]
-    return (x - 50)**2 + (y - 50)**2 + (z - 50)**2 - 25**2 < 0
+    return (x - 50) ** 2 + (y - 50) ** 2 + (z - 50) ** 2 - 25**2 < 0
+
 
 def _create_mesh(volume):
     smoothed = mcubes.smooth(volume)
     mesh = mcubes.marching_cubes(smoothed, 0)
     return mesh
-
-
-
 
 
 def main():

@@ -1,8 +1,9 @@
 # https://docs.circuitpython.org/en/latest/shared-bindings/rotaryio/index.html
 
-import rotaryio
 import board
+import rotaryio
 from digitalio import DigitalInOut, Direction, Pull
+
 from heart.firmware_io import rotary_encoder
 
 # I got ROTA and ROTB just by doing dir(board)

@@ -58,7 +58,17 @@ def render_diagram(source: str, output: pathlib.Path, fmt: str) -> None:
         tmp_path = pathlib.Path(tmp.name)
 
     try:
-        cmd = [*render_cmd, "-i", str(tmp_path), "-o", str(output), "-t", "neutral", "-e", fmt]
+        cmd = [
+            *render_cmd,
+            "-i",
+            str(tmp_path),
+            "-o",
+            str(output),
+            "-t",
+            "neutral",
+            "-e",
+            fmt,
+        ]
         subprocess.run(cmd, check=True)
     finally:
         tmp_path.unlink(missing_ok=True)

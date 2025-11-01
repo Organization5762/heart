@@ -1,13 +1,12 @@
+import json
+import time
+from collections import deque
+
 import board
 import digitalio
-import time
-import random
-
 from adafruit_ble import BLERadio
-from adafruit_ble.services.nordic import UARTService
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
-import json
-from collections import deque
+from adafruit_ble.services.nordic import UARTService
 
 raise NotImplementedError("Not working")
 
@@ -28,16 +27,14 @@ uart = UARTService()
 advertisement = ProvideServicesAdvertisement(uart)
 
 i = 0
+
+
 def gather_state() -> list[dict[str, str]]:
     global i
     i += 1
     print(i)
-    return [
-        {
-            "event_type": "rotation",
-            "data": i
-        }
-    ]
+    return [{"event_type": "rotation", "data": i}]
+
 
 ###
 ###

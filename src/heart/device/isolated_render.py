@@ -73,4 +73,3 @@ def send_image(
         client.send_image(image)
     finally:
         client.close()
-

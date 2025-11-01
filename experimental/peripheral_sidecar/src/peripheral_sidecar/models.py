@@ -15,11 +15,13 @@ class RawPeripheralSnapshot:
     timestamp: float = field(default_factory=time.time)
 
     def to_payload(self) -> str:
-        return json.dumps({
-            "source": self.source,
-            "timestamp": self.timestamp,
-            "data": self._encode(self.data),
-        })
+        return json.dumps(
+            {
+                "source": self.source,
+                "timestamp": self.timestamp,
+                "data": self._encode(self.data),
+            }
+        )
 
     @staticmethod
     def _encode(value: Any) -> Any:
@@ -42,12 +44,14 @@ class ActionEvent:
     timestamp: float = field(default_factory=time.time)
 
     def to_payload(self) -> str:
-        return json.dumps({
-            "action": self.action,
-            "payload": RawPeripheralSnapshot._encode(self.payload),
-            "source": self.source,
-            "timestamp": self.timestamp,
-        })
+        return json.dumps(
+            {
+                "action": self.action,
+                "payload": RawPeripheralSnapshot._encode(self.payload),
+                "source": self.source,
+                "timestamp": self.timestamp,
+            }
+        )
 
 
 @dataclass(slots=True)

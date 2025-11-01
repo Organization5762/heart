@@ -47,7 +47,9 @@ class PeripheralServiceConfig:
             broker_port=get_int("HEART_MQTT_PORT", 1883),
             client_id=get_env("HEART_MQTT_CLIENT_ID", "heart-peripheral-sidecar"),
             raw_topic=get_env("HEART_MQTT_RAW_TOPIC", "heart/peripherals/raw"),
-            action_topic=get_env("HEART_MQTT_ACTION_TOPIC", "heart/peripherals/actions"),
+            action_topic=get_env(
+                "HEART_MQTT_ACTION_TOPIC", "heart/peripherals/actions"
+            ),
             poll_interval=get_float("HEART_PERIPHERAL_POLL_INTERVAL", 0.1),
             mqtt_keepalive=get_int("HEART_MQTT_KEEPALIVE", 60),
             raw_qos=get_int("HEART_MQTT_RAW_QOS", 0),

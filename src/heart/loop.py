@@ -27,9 +27,7 @@ def _get_device(x11_forward: bool) -> Device:
     orientation = Cube.sides()
     if Configuration.use_isolated_renderer():
         if x11_forward:
-            logger.warning(
-                "USE_ISOLATED_RENDERER enabled; ignoring x11_forward flag"
-            )
+            logger.warning("USE_ISOLATED_RENDERER enabled; ignoring x11_forward flag")
         from heart.device.rgb_display import LEDMatrix
 
         return LEDMatrix(orientation=orientation)

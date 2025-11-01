@@ -31,11 +31,7 @@ class Phyphox(Peripheral):
             time.sleep(0.05)
 
     def get_acceleration(self) -> Acceleration | None:
-        if (
-            self.acc_x is None
-            or self.acc_y is None
-            or self.acc_z is None
-        ):
+        if self.acc_x is None or self.acc_y is None or self.acc_z is None:
             return None
         return Acceleration(
             self.acc_x,

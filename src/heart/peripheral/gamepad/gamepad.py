@@ -36,7 +36,9 @@ class Gamepad(Peripheral):
         self._pressed_prev_frame: defaultdict[int, bool] = defaultdict(bool)
         self._pressed_curr_frame: defaultdict[int, bool] = defaultdict(bool)
         self._axis_prev_frame: defaultdict[str, float] = defaultdict(float)
-        self._axis_tapped_prev_frame: defaultdict[str, bool] = defaultdict(lambda: False)
+        self._axis_tapped_prev_frame: defaultdict[str, bool] = defaultdict(
+            lambda: False
+        )
         self._axis_curr_frame: defaultdict[str, float] = defaultdict(float)
         self._dpad_last_frame: tuple[int, int] = (0, 0)
         self._dpad_curr_frame: tuple[int, int] = (0, 0)
@@ -105,9 +107,7 @@ class Gamepad(Peripheral):
         try:
             return GamepadIdentifier(self.joystick.get_name())
         except ValueError:
-            logger.warning(
-                "Unrecognized gamepad type: %s", self.joystick.get_name()
-            )
+            logger.warning("Unrecognized gamepad type: %s", self.joystick.get_name())
             # someone plugged in a rando controller, might as well try to use the bitdo mapping
             return GamepadIdentifier.BIT_DO_LITE_2
 
