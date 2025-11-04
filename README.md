@@ -15,7 +15,7 @@ Visual display project for LED screens.
 **Hardware debugging helpers**
 
 Legacy scripts for inspecting peripherals have moved into a single Typer-based command line interface. After installing the
-project in editable mode (for example via `pip install -e .[dev]`), run `totem_debug --help` for a summary of entry
+project in editable mode (for example via `uv pip install -e .[dev]`), run `totem_debug --help` for a summary of entry
 points. See [`docs/hardware_debug_cli.md`](docs/hardware_debug_cli.md) for details on each helper.
 **Linting**
 
