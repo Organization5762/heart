@@ -4,48 +4,48 @@ Possible future input types (Based on parts I've ordered):
 
 ## 🎛️ Direct Input Devices
 
-| Part Name                                                        | Description                                                                 | Supported | Driver Link                         |
+| Part Name | Description | Supported | Driver Link |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------- | --------- | ----------------------------------- |
-| [Rotary Encoder + Extras](https://www.adafruit.com/product/4964) | Adafruit Rotary Trinkey - USB NeoPixel Rotary Encoder                       | Yes       | [Driver](../drivers/rotary_encoder) |
-| [I2C Quad Rotary Encoder](https://www.adafruit.com/product/5752) | Adafruit I2C Quad Rotary Encoder Breakout with NeoPixel - STEMMA QT / Qwiic | No        | N/A                                 |
-| [Analog Thumb Joystick](https://www.adafruit.com/product/512)    | 2-axis joystick with select button + breakout board                         | No        | N/A                                 |
+| [Rotary Encoder + Extras](https://www.adafruit.com/product/4964) | Adafruit Rotary Trinkey - USB NeoPixel Rotary Encoder | Yes | [Driver](../drivers/rotary_encoder) |
+| [I2C Quad Rotary Encoder](https://www.adafruit.com/product/5752) | Adafruit I2C Quad Rotary Encoder Breakout with NeoPixel - STEMMA QT / Qwiic | No | N/A |
+| [Analog Thumb Joystick](https://www.adafruit.com/product/512) | 2-axis joystick with select button + breakout board | No | N/A |
 
 ______________________________________________________________________
 
 ## 🌡️ Sensors
 
-| Part Name                                                     | Description                                                    | Supported | Driver Link                        |
+| Part Name | Description | Supported | Driver Link |
 | ------------------------------------------------------------- | -------------------------------------------------------------- | --------- | ---------------------------------- |
-| [ISM330DHCX IMU](https://www.adafruit.com/product/4502)       | 6 DoF accelerometer + gyroscope – STEMMA QT / Qwiic            | Yes       | [Driver](../drivers/accelerometer) |
-| [SCD-41 CO₂ Sensor](https://www.adafruit.com/product/5190)    | True CO₂, temperature, and humidity sensor – STEMMA QT / Qwiic | No        | N/A                                |
-| [Piezoelectric Ribbon](https://www.adafruit.com/product/4931) | 2 ft (600mm) piezoelectric ribbon sensor                       | No        | N/A                                |
-| [MPL3115A2 Sensor](https://www.adafruit.com/product/1893)     | I2C barometric pressure / altitude / temperature               | No        | N/A                                |
+| [ISM330DHCX IMU](https://www.adafruit.com/product/4502) | 6 DoF accelerometer + gyroscope – STEMMA QT / Qwiic | Yes | [Driver](../drivers/accelerometer) |
+| [SCD-41 CO₂ Sensor](https://www.adafruit.com/product/5190) | True CO₂, temperature, and humidity sensor – STEMMA QT / Qwiic | No | N/A |
+| [Piezoelectric Ribbon](https://www.adafruit.com/product/4931) | 2 ft (600mm) piezoelectric ribbon sensor | No | N/A |
+| [MPL3115A2 Sensor](https://www.adafruit.com/product/1893) | I2C barometric pressure / altitude / temperature | No | N/A |
 
 ______________________________________________________________________
 
 ## 👁️ Visual Input
 
-| Part Name                                                          | Description                        | Supported | Driver Link |
+| Part Name | Description | Supported | Driver Link |
 | ------------------------------------------------------------------ | ---------------------------------- | --------- | ----------- |
-| [PiCowbell Camera Breakout](https://www.adafruit.com/product/5946) | Autofocus 120° lens                | No        | N/A         |
-| [MLX90640 Thermal Camera](https://www.adafruit.com/product/4469)   | 24x32 IR thermal camera – 110° FoV | No        | N/A         |
+| [PiCowbell Camera Breakout](https://www.adafruit.com/product/5946) | Autofocus 120° lens | No | N/A |
+| [MLX90640 Thermal Camera](https://www.adafruit.com/product/4469) | 24x32 IR thermal camera – 110° FoV | No | N/A |
 
 ______________________________________________________________________
 
 ## 🎤 Audio Input
 
-| Part Name                                                    | Description                         | Supported | Driver Link |
+| Part Name | Description | Supported | Driver Link |
 | ------------------------------------------------------------ | ----------------------------------- | --------- | ----------- |
-| [Mini USB Microphone](https://www.adafruit.com/product/3367) | Plug-and-play USB mic               | No        | N/A         |
-| [I2S MEMS Microphone](https://www.adafruit.com/product/3421) | SPH0645LM4H MEMS mic breakout – I2S | No        | N/A         |
+| [Mini USB Microphone](https://www.adafruit.com/product/3367) | Plug-and-play USB mic | No | N/A |
+| [I2S MEMS Microphone](https://www.adafruit.com/product/3421) | SPH0645LM4H MEMS mic breakout – I2S | No | N/A |
 
 ______________________________________________________________________
 
 ## 📡 Location & Navigation
 
-| Part Name                                                      | Description                         | Supported | Driver Link |
+| Part Name | Description | Supported | Driver Link |
 | -------------------------------------------------------------- | ----------------------------------- | --------- | ----------- |
-| [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No        | N/A         |
+| [Ultimate GPS USB GNSS](https://www.adafruit.com/product/4279) | USB GPS – 99 channels, 10Hz updates | No | N/A |
 | [Ultra-Wide-Band Positioning Development Kit (UWB, BU-03)](https://core-electronics.com.au/ultra-wide-band-module-development-kit-bu03.html) | Distance between two boards | No | N/A ~
 
 # Bridges

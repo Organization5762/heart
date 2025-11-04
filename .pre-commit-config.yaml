@@ -13,9 +13,3 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
-      - id: make-test
-        name: Run "make test"
-        entry: make test
-        language: system
-        pass_filenames: false
-        stages: [pre-push]

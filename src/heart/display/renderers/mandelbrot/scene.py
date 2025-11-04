@@ -14,11 +14,8 @@ from numba import jit, prange
 from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.mandelbrot.control_mappings import (
-    BitDoLite2Controls,
-    KeyboardControls,
-    SceneControlsMapping,
-    SwitchProControls,
-)
+    BitDoLite2Controls, KeyboardControls, SceneControlsMapping,
+    SwitchProControls)
 from heart.display.renderers.mandelbrot.controls import SceneControls
 from heart.display.renderers.mandelbrot.state import AppState, ViewMode
 from heart.environment import DeviceDisplayMode

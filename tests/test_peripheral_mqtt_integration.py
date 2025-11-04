@@ -20,12 +20,10 @@ if str(EXPERIMENTAL_SRC) not in sys.path:
 
 from peripheral_sidecar import aggregators as aggregators_module  # noqa: E402
 from peripheral_sidecar import mqtt_sidecar  # noqa: E402
-from peripheral_sidecar.aggregators import (  # noqa: E402
-    ActionEvent,
-    PeripheralActionMapper,
-    PeripheralPollResult,
-    RawPeripheralSnapshot,
-)
+from peripheral_sidecar.aggregators import ActionEvent  # noqa: E402
+from peripheral_sidecar.aggregators import PeripheralActionMapper  # noqa: E402
+from peripheral_sidecar.aggregators import PeripheralPollResult  # noqa: E402
+from peripheral_sidecar.aggregators import RawPeripheralSnapshot  # noqa: E402
 from peripheral_sidecar.config import PeripheralServiceConfig  # noqa: E402
 from peripheral_sidecar.mqtt_sidecar import PeripheralMQTTService  # noqa: E402
 

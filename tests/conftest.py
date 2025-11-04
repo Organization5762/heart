@@ -4,6 +4,10 @@ import types
 
 import pytest
 
+from heart.device import Cube, Device
+from heart.environment import GameLoop
+from heart.peripheral.core.manager import PeripheralManager
+
 
 class _StubMode:
     def __init__(self) -> None:
@@ -41,10 +45,6 @@ if "heart.navigation" not in sys.modules:
     navigation_stub.ComposedRenderer = object
     navigation_stub.MultiScene = object
     sys.modules["heart.navigation"] = navigation_stub
-
-from heart.device import Cube, Device
-from heart.environment import GameLoop
-from heart.peripheral.core.manager import PeripheralManager
 
 
 class FakeFixtureDevice(Device):
