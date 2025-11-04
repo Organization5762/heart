@@ -21,11 +21,18 @@ points. See [`docs/hardware_debug_cli.md`](docs/hardware_debug_cli.md) for detai
 
 `make lint` runs static analysis with ruff over the Python sources
 
-**Testing Locally**
+## Testing Locally
 
 The command: `totem run --configuration full_screen_test` should display a scene locally. If you see a scene, then the setup is correct.
 
-**Supported Platforms**
+###  Advanced Local Testing
+```
+curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
+```
+
+Install tilt and run `tilt up`
+
+## Supported Platforms**
 
 - MacOSX for local development
 - An appropriately setup Raspberry Pi 4 for portable use
