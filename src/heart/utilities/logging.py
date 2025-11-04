@@ -3,7 +3,6 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-
 LOG_LEVEL_ENV_VAR = "LOG_LEVEL"
 LOG_DIR_ENV_VAR = "HEART_LOG_DIR"
 DEFAULT_LOG_SUBDIR = Path(".heart") / "logs"

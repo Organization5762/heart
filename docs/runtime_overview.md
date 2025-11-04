@@ -13,11 +13,11 @@ At startup the `totem` CLI wires together three primary subsystems:
    discovers configuration modules under `heart/programs/configurations`. Each
    module exposes a `configure(loop: GameLoop)` function that mutates the loop
    with new modes, renderers, and playlists.
-2. **Game loop orchestration** – `heart.environment.GameLoop` encapsulates the
+1. **Game loop orchestration** – `heart.environment.GameLoop` encapsulates the
    pygame window, timing, and peripheral integration. The loop owns the
    `AppController`, a router that handles scene transitions and renders composed
    surfaces.
-3. **Device abstraction** – `heart.device.Device` implementations translate
+1. **Device abstraction** – `heart.device.Device` implementations translate
    pygame surfaces into concrete display updates. `LocalScreen` targets desktop
    development while `LEDMatrix` (from `heart.device.rgb_display`) streams frames
    to the RGB matrix via the `rgbmatrix` bindings.
@@ -61,9 +61,9 @@ Every frame follows the same rendering pipeline:
 
 1. The active mode asks each renderer for a frame. Complex modes often combine
    multiple renderers via `ComposedRenderer` or `MultiScene`.
-2. The resulting surface is passed to `heart.display.service.DisplayService`,
+1. The resulting surface is passed to `heart.display.service.DisplayService`,
    which manages timing and double buffering to avoid tearing.
-3. The `Device` implementation converts the surface into the final output. The
+1. The `Device` implementation converts the surface into the final output. The
    local screen writes to a pygame window, whereas the LED matrix driver extracts
    raw pixel data and streams it over SPI.
 
@@ -76,9 +76,9 @@ To add a new scene:
 
 1. Implement a renderer under `heart/display/renderers/`. See `water_cube.py` or
    `kirby.py` for patterns that leverage numpy-based effects and sprite sheets.
-2. Update an existing configuration module or create a new one under
+1. Update an existing configuration module or create a new one under
    `heart/programs/configurations/` and expose a `configure(loop)` function.
-3. Run `totem run --configuration <your-module>` to verify the scene locally.
+1. Run `totem run --configuration <your-module>` to verify the scene locally.
 
 New peripheral integrations should live under `heart/peripheral/`. They can
 register event handlers with the `PeripheralManager` so that the runtime picks

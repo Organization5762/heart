@@ -72,7 +72,7 @@ windowing dependencies are present (Ubuntu/Debian packages `libsdl2-dev` and
    sudo apt install -y git python3-dev python3-venv libsdl2-dev libsdl2-image-dev \
        libopenjp2-7 libtiff5 libatlas-base-dev libboost-all-dev
    ```
-2. Clone the project and install it in editable mode:
+1. Clone the project and install it in editable mode:
    ```bash
    git clone https://github.com/<your-org>/heart.git
    cd heart
@@ -81,14 +81,14 @@ windowing dependencies are present (Ubuntu/Debian packages `libsdl2-dev` and
    pip install --upgrade pip
    pip install -e .[dev]
    ```
-3. Configure the environment for the RGB matrix by exporting:
+1. Configure the environment for the RGB matrix by exporting:
    ```bash
    export SDL_VIDEODRIVER="dummy"
    export HEART_USE_ISOLATED_RENDERER=1
    ```
    The first variable allows pygame to create surfaces without an attached HDMI
    display; the second routes rendering to the isolated RGBMatrix driver.
-4. Launch the runtime:
+1. Launch the runtime:
    ```bash
    totem run --configuration lib_2025
    ```

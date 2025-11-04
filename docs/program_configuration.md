@@ -12,9 +12,9 @@ configuration for events or installations.
 on demand. When you run `totem run --configuration lib_2025` the CLI:
 
 1. Imports `heart.programs.registry.ConfigurationRegistry`.
-2. Loads every module under `heart.programs.configurations` and stores the
+1. Loads every module under `heart.programs.configurations` and stores the
    `configure` callable in a dictionary keyed by the module name.
-3. Retrieves the requested entry and executes it with the active
+1. Retrieves the requested entry and executes it with the active
    `GameLoop` instance.
 
 Any import errors are surfaced at startup so failures are easy to spot.
@@ -93,11 +93,11 @@ instantiate them manually inside configurations.
 
 1. Create your module under `heart/programs/configurations/`. Name it with a
    descriptive suffix (for example `festival_2025.py`).
-2. Run the configuration locally:
+1. Run the configuration locally:
    ```bash
    totem run --configuration festival_2025
    ```
-3. Iterate until the playlist looks right. Use `--no-add-low-power-mode` if you
+1. Iterate until the playlist looks right. Use `--no-add-low-power-mode` if you
    want the scenes to loop continuously without the sleep fallback.
 
 Check the console output for `Importing configuration: ...` lines to confirm that
