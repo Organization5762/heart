@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import importlib
 import time
@@ -16,9 +18,7 @@ from heart.display.renderers.free_text import FreeTextRenderer
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.heart_rates import (
-    current_bpms,
-)
+from heart.peripheral.heart_rates import current_bpms
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

@@ -7,9 +7,7 @@ from heart.display.renderers import BaseRenderer
 from heart.display.renderers.flame import FlameRenderer
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.heart_rates import (
-    current_bpms,
-)
+from heart.peripheral.heart_rates import current_bpms
 
 # Number of top BPMs to display (1-4)
 MAX_DISPLAYED_BPMS = 1

@@ -14,7 +14,8 @@ from heart.display.renderers import BaseRenderer
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth)
 from heart.utilities.env import Configuration
 
 

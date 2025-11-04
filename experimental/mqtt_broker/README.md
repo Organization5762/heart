@@ -20,9 +20,9 @@ The broker listens on:
 - TCP port `9001` for MQTT over WebSockets
 
 Both ports are published on `localhost` and allow anonymous access for local
-experimentation.  Press `Ctrl+C` to stop the broker when you are finished.
+experimentation. Press `Ctrl+C` to stop the broker when you are finished.
 
 ## Customisation
 
 Update `mosquitto.conf` before starting the container to tweak security or
-protocol options.  Any changes will be picked up on the next `docker compose up`.
+protocol options. Any changes will be picked up on the next `docker compose up`.

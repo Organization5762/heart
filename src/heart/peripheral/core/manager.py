@@ -8,7 +8,8 @@ from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
-from heart.peripheral.switch import BaseSwitch, BluetoothSwitch, FakeSwitch, Switch
+from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
+                                     Switch)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
