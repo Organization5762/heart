@@ -21,7 +21,7 @@ https://github.com/adafruit/Adafruit_nRF52_Arduino/tree/master?tab=readme-ov-fil
 
 Try to run the test sketch: nordicsemi.exceptions.NordicSemiException:
 
-- pip install nrfutil
+- uv tool install nrfutil
 - ls /dev/tty.\*
 
 I tried to download some drivers etc., what fixed it was hitting the double reset button fast.

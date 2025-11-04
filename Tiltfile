@@ -51,10 +51,9 @@ setup_script_lines = [
     "set -euo pipefail",
 ] + python_probe_lines + [
     'if [ ! -d "%s" ]; then' % venv_dir,
-    '  "$python_bin" -m venv %s' % venv_dir,
+    '  uv venv --python "$python_bin" %s' % venv_dir,
     "fi",
-    "%s/bin/python -m ensurepip --upgrade" % venv_dir,
-    "%s/bin/pip install --no-build-isolation -e .[dev]" % venv_dir,
+    "uv pip install --python %s/bin/python --no-build-isolation -e .[dev]" % venv_dir,
 ]
 setup_script = "\n".join(setup_script_lines)
 

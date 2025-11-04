@@ -10,10 +10,10 @@ react to device activity without coupling to the hardware drivers.
 Create a virtual environment and install both `heart` and the sidecar package::
 
 ```bash
-python -m venv .venv
+uv venv .venv
 source .venv/bin/activate
-pip install -e ../..
-pip install -e .
+uv pip install -e ../..
+uv pip install -e .
 ```
 
 The sidecar declares a runtime dependency on the `heart` package, so you can

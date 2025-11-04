@@ -6,8 +6,8 @@ DEV_INSTALL_STAMP = .dev_install.stamp
 dev_install: $(DEV_INSTALL_STAMP)
 
 $(DEV_INSTALL_STAMP):
-	@pip install -e ".[dev]"
-	@pre-commit install --hook-type pre-commit --hook-type pre-push
+	@uv pip install --system -e ".[dev]"
+	@uvx pre-commit install --hook-type pre-commit --hook-type pre-push
 	@touch $(DEV_INSTALL_STAMP)
 
 clean-dev-install:
@@ -15,26 +15,26 @@ clean-dev-install:
 
 pi_install:
 	@sudo bash src/heart/manage/install_rgb_matrix.sh
-	@sudo pip install -e . --break-system-packages
+	@sudo uv pip install --system -e . --break-system-packages
 
 format: ensure-dev-install
-	@ruff check $(PYTHON_SOURCES) --fix
-	@isort $(PYTHON_SOURCES)
-	@black $(PYTHON_SOURCES)
-	@docformatter -i -r --config ./pyproject.toml --black $(PYTHON_SOURCES)
-	@mdformat .
+	@uvx ruff check $(PYTHON_SOURCES) --fix
+	@uvx isort $(PYTHON_SOURCES)
+	@uvx black $(PYTHON_SOURCES)
+	@uvx docformatter -i -r --config ./pyproject.toml --black $(PYTHON_SOURCES)
+	@uvx mdformat .
 
 lint: ensure-dev-install
-	@ruff check $(PYTHON_SOURCES)
+	@uvx ruff check $(PYTHON_SOURCES)
 
 check: lint
-	@isort --check-only $(PYTHON_SOURCES)
-	@black --check $(PYTHON_SOURCES)
-	@docformatter --check -r --config ./pyproject.toml --black $(PYTHON_SOURCES)
-	@mdformat --check .
+	@uvx isort --check-only $(PYTHON_SOURCES)
+	@uvx black --check $(PYTHON_SOURCES)
+	@uvx docformatter --check -r --config ./pyproject.toml --black $(PYTHON_SOURCES)
+	@uvx mdformat --check .
 
 test: ensure-dev-install
-	@pytest test
+	@uvx pytest test
 
 ensure-dev-install:
 	@$(MAKE) --no-print-directory dev_install \
