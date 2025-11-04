@@ -102,6 +102,9 @@ members = [
     "experimental/isolated_rendering",
 ]
 
+[tool.uv.sources]
+heart = { workspace = true }
+
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
