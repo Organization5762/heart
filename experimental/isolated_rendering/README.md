@@ -25,6 +25,34 @@ uv run isolated-render run --unix-socket /tmp/heart_matrix.sock --fps 120
 
 Pass `--debug` to print frame/update metrics once per second.
 
+### Memory-Mapped Frames (Proof of Concept)
+
+For environments where a third-party renderer wants to share frames without
+touching sockets, the service can mirror a memory-mapped file into the live
+frame buffer:
+
+```bash
+uv run isolated-render run --disable-sockets --mmap-path /tmp/heart_matrix.mmap
+```
+
+The renderer process should open the same file and write RGB pixel data using
+the helper provided by this package:
+
+```python
+from pathlib import Path
+from PIL import Image
+from isolated_rendering.shared_memory import SharedMemoryFrameWriter
+
+writer = SharedMemoryFrameWriter(Path("/tmp/heart_matrix.mmap"), size=(64, 64))
+image = Image.new("RGB", (64, 64), "red")
+writer.write_image(image)
+```
+
+The writer takes care of the minimal handshake required so that the renderer
+never observes a partially written frame.  This mechanism is intentionally
+simple—it is a proof of concept that can be swapped out for a more elaborate
+protocol in the future.
+
 ## Sending Frames
 
 A simple client helper is provided:
