@@ -20,3 +20,7 @@ Running `make check` is recommended to verify formatting and linting without app
 ## Documentation Guidelines
 
 If any meaningful changes are made to the runtime architecture or service boundaries, update `docs/code_flow.md` and re-render the diagram via `scripts/render_code_flow.py` so that the documentation stays accurate.
+
+Any meaningfully innovative or thoughtful implementation should be paired with a research note in `docs/research/` that captures the reasoning, trade-offs, or techniques involved.
+When you touch areas of the codebase that already have related research notes, skim `docs/research/` to see whether an existing document needs an update or a new companion note.
+Research notes should cite the source files or external references that informed the write-up.
