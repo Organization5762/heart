@@ -1,3 +1,4 @@
+import importlib
 import sys
 import time
 from pathlib import Path
@@ -7,15 +8,28 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPERIMENTAL_SRC = ROOT / "experimental" / "isolated_rendering" / "src"
-if str(EXPERIMENTAL_SRC) not in sys.path:
-    sys.path.insert(0, str(EXPERIMENTAL_SRC))
 
-from isolated_rendering.buffer import FrameBuffer
-from isolated_rendering.shared_memory import (
+
+def _load_experimental_classes():
+    if str(EXPERIMENTAL_SRC) not in sys.path:
+        sys.path.insert(0, str(EXPERIMENTAL_SRC))
+
+    buffer_module = importlib.import_module("isolated_rendering.buffer")
+    shared_module = importlib.import_module("isolated_rendering.shared_memory")
+    return (
+        buffer_module.FrameBuffer,
+        shared_module.SharedMemoryError,
+        shared_module.SharedMemoryFrameWriter,
+        shared_module.SharedMemoryWatcher,
+    )
+
+
+(
+    FrameBuffer,
     SharedMemoryError,
     SharedMemoryFrameWriter,
     SharedMemoryWatcher,
-)
+) = _load_experimental_classes()
 
 
 def _wait_for(predicate, timeout: float = 1.0) -> bool:
