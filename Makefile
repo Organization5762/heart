@@ -1,6 +1,13 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
-.PHONY: pi_install format check test
+.PHONY: install pi_install format check test
+
+install:
+	@uv sync --all-extras --group dev
+	@uv tool install ruff
+	@uv tool install isort
+	@uv tool install docformatter
+	@uv tool install mdformat
 
 format:
 	@uvx isort $(PYTHON_SOURCES)
