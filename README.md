@@ -28,27 +28,25 @@ for both laptops and Raspberry Pi installations.
 ## Quick start
 
 1. Create and activate a Python 3.11+ virtual environment.
-2. Install dependencies and tooling:
+1. Install dependencies and tooling:
    ```bash
    make install
    ```
-3. Launch the default playlist in a window:
+1. Launch the default playlist in a window:
    ```bash
    totem run --configuration lib_2025
    ```
-4. Explore the [`docs/getting_started.md`](docs/getting_started.md) guide for Pi
+1. Explore the [`docs/getting_started.md`](docs/getting_started.md) guide for Pi
    deployment, hardware wiring, and advanced CLI flags.
 
 ## Command-line interface
 
 The project installs two Typer applications via console scripts:
 
-| Command        | Description                                                     |
-| -------------- | --------------------------------------------------------------- |
-| `totem`        | Runs the runtime (`totem run`), benchmarks devices, and flashes
-|                | firmware (`totem update-driver`).                                |
-| `totem_debug`  | Groups hardware debugging helpers, including Bluetooth gamepad
-|                | utilities, UART sniffers, and accelerometer readers.            |
+| Command | Description |
+| --- | --- |
+| `totem` | Runs the runtime (`totem run`), benchmarks devices, and flashes firmware (`totem update-driver`). |
+| `totem_debug` | Groups hardware debugging helpers, including Bluetooth gamepad utilities, UART sniffers, and accelerometer readers. |
 
 Key `totem run` flags:
 
@@ -121,8 +119,8 @@ bring-up, auto-boot flows, and rendering experiments.
 ## Contributing
 
 1. Fork the repository and create a topic branch.
-2. Run `make format` and `make test` before pushing changes.
-3. Update documentation whenever you add new renderers, configuration modules, or
+1. Run `make format` and `make test` before pushing changes.
+1. Update documentation whenever you add new renderers, configuration modules, or
    hardware capabilities. Major architecture changes should include updated
    diagrams via `scripts/render_code_flow.py`.
 
