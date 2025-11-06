@@ -1,6 +1,20 @@
 # Runtime Code Flow
 
-The diagram below summarizes how a `totem run` invocation moves through the CLI, runtime loop, peripherals, and display devices. It highlights where the system crosses service boundaries such as hardware peripherals and external LED drivers.
+## Problem Statement
+
+Describe how a `totem run` execution traverses configuration services, the runtime loop, peripheral handlers, and display hardware so that engineers can audit the control flow and identify integration boundaries.
+
+## Materials
+
+- Local checkout of this repository.
+- Python environment with the dependencies listed in `pyproject.toml` installed.
+- Access to `scripts/render_code_flow.py` and the diagram source in this document.
+
+## Technical Approach
+
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface.
+
+## Flow Diagram
 
 ```mermaid
 flowchart LR
@@ -65,12 +79,12 @@ flowchart LR
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix output;
 ```
 
-## Rendering the diagram
+## Rendering Procedure
 
-Run `scripts/render_code_flow.py` to regenerate the SVG using the service layout encoded in this repository whenever the architecture changes:
+Whenever the runtime architecture changes, regenerate the SVG with the helper script:
 
 ```bash
 python scripts/render_code_flow.py --output docs/code_flow.svg
 ```
 
-The renderer no longer relies on the mermaid CLI; it generates the SVG directly so that styling stays consistent across environments.
+`render_code_flow.py` parses the Mermaid definition in this document and emits `docs/code_flow.svg` with consistent styling. The implementation avoids the Mermaid CLI to keep the output reproducible across development environments.

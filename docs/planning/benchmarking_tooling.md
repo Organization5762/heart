@@ -1,61 +1,85 @@
 # Benchmarking Instrumentation Plan
 
-The benchmarking work should focus on instrumenting the existing game loop (`src/heart/environment.py::GameLoop`) and rendering pipelines (`src/heart/display/...`) while exposing reproducible tooling to profile runs end-to-end. **A core goal for every task below is to align the nomenclature and structure with OpenTelemetry (OTel) concepts**—treating measurements as traces, spans, metrics, and attributes—so the resulting data can plug into standard OTel tooling with minimal translation.
+## Problem Statement
 
-## 1. Capture raw input latency across the peripheral stack
+Instrument the Heart runtime to measure input latency, rendering performance, and loop throughput using OpenTelemetry-aligned primitives without perturbing gameplay.
 
-- Hook into the pygame event ingestion path in `GameLoop._handle_events` and the downstream event bus handlers in `src/heart/peripheral/core/` to timestamp each stage (hardware poll → pygame event → internal event bus → application handler).
-- Surface a tracing helper (e.g., `src/heart/utilities/metrics.py`) that behaves like an OTel tracer: create spans per event, attach span events and attributes, and emit structured telemetry frames that can be correlated later.
+## Materials
 
-### Task Stub — Instrument peripheral and event bus latency
+- Current runtime source (`src/heart/environment.py`, `src/heart/display`, `src/heart/peripheral`).
+- Python profiling tools (`py-spy`, `scalene`, `cProfile`).
+- Access to an OpenTelemetry collector or JSONL log sink for validation.
+- Workstations capable of running the runtime under profiling load.
 
-1. Add a lightweight `LatencyTracer` helper under `src/heart/utilities/metrics.py` that mirrors the OpenTelemetry tracer API with `start_span()`, `record_event(stage_name)`, and `end_span()` helpers backed by a dataclass.
-1. In `src/heart/environment.py::GameLoop._handle_events`, create a trace per pygame event (seeded with `time.perf_counter()`), recording span events for queue dequeue, event bus emission, and app controller handling (`AppController.process_events`).
-1. For physical peripherals (`src/heart/peripheral/core/manager.py`, `src/heart/peripheral/core/event_bus.py`), extend the manager to optionally call `span.add_event("peripheral", {"handler": <name>})` when a handler consumes the event.
-1. Expose the spans via an in-memory ring buffer and a debug CLI endpoint (e.g., `heart.loop:bench-input`) that dumps OTLP-compatible JSON for offline analysis or export to OTel backends.
+## Opening Abstract
 
-## 2. Measure rendering FPS and per-renderer costs
+We lack consistent visibility into input latency and frame pacing. The plan introduces instrumentation that models runtime behaviour as OTel traces, spans, and metrics so we can analyse regressions with standard tooling. By gating instrumentation behind flags and exporting both realtime overlays and offline artefacts, developers can profile locally, operators can validate deployments, and CI can capture regressions.
 
-- Instrument `GameLoop._render_surface_iterative`, `GameLoop._render_surfaces_binary`, and `GameLoop.__finalize_rendering` to track render durations per renderer (`BaseRenderer._internal_process`) and final blit/push to the physical device (`Device.set_image` implementations in `src/heart/device/`). Treat each renderer invocation as a child span of the frame span, tagging spans with renderer names and surface metadata attributes.
+### Why Now
 
-### Task Stub — Track rendering frame timings
+Upcoming feature work adds new peripherals and renderers, and installations demand predictable frame rates. Adding instrumentation ahead of those changes gives us baselines and integrates with existing observability stacks.
 
-1. Augment `src/heart/environment.py` to wrap each renderer call with `perf_counter()` timings, aggregating per-renderer averages and percentiles, and publishing them as OTel metrics (e.g., `FrameRenderDuration` histogram) alongside span timing data.
-1. For the binary/iterative renderer paths, capture total render time, GPU/upload time (`pygame.display.flip`), and device push time (`Device.set_image`), storing them as span attributes and histogram datapoints in the metrics helper.
-1. Update device drivers (`src/heart/device/rgb_display.py`, `src/heart/device/local.py`) to optionally emit timing callbacks back to the metrics subsystem, following OTel semantic conventions for device metrics where possible.
-1. Provide a periodic HUD/overlay renderer (`src/heart/display/renderers`) that can display current FPS, render cost per renderer, and upload latency when benchmarking mode is enabled, pulling values from the shared OTel metric instruments.
+## Success Criteria
 
-## 3. Track core loop processing FPS and scheduling jitter
+| Behaviour | Signal | Owner |
+| --- | --- | --- |
+| Input latency spans cover hardware poll through application handler | Trace export shows sequential events with timestamps per stage | Runtime engineer |
+| Renderer timing metrics recorded per renderer and device push | Histogram `FrameRenderDuration` emitted when benchmarking mode enabled | Graphics lead |
+| Benchmark workflow documented and reproducible | `make benchmark` generates logs, flamegraphs, and instructions without manual edits | Developer experience |
 
-- Record loop iteration durations around `_handle_events`, `_preprocess_setup`, renderer selection, and `clock.tick(self.max_fps)` to distinguish CPU-bound vs. IO-bound stalls, representing the entire frame as an OTel span with nested spans for each stage.
+## Task Breakdown Checklists
 
-### Task Stub — Measure core loop throughput
+### Discovery
 
-1. Encapsulate the main loop body in `GameLoop.start` with timing checkpoints (`loop_start`, `events_done`, `render_done`, `frame_presented`) represented as child spans within the frame span.
-1. Compute instantaneous FPS (1 / loop duration) and maintain histograms/rolling averages stored as OTel metrics (e.g., `GameLoopFrameRate`) in the metrics helper.
-1. Emit a structured record (e.g., JSON lines or OTLP export) at a configurable interval (`--benchmark-log /tmp/loop_metrics.jsonl`) for offline visualization and compatibility with OTel collectors.
-1. Add CLI switches on `heart.loop:run` to enable/disable benchmarking overlays and logging sinks without impacting normal gameplay, including toggles for trace sampling rates consistent with OTel configuration terminology.
+- [ ] Review current event handling in `GameLoop._handle_events` and peripheral managers.
+- [ ] Inventory renderer code paths (`_render_surface_iterative`, `_render_surfaces_binary`, device drivers).
+- [ ] Evaluate existing profiling scripts and gaps versus OTel concepts.
 
-## 4. Generate flame graphs and detailed profiles
+### Implementation – Instrumentation
 
-- Introduce scripts in `scripts/benchmark/` to run the loop under profilers like `py-spy`, `scalene`, or `yappi`, capturing wall-clock vs. CPU time and integrating with the OTel traces and metrics emitted by the instrumentation logs.
+- [ ] Add a `LatencyTracer` helper under `src/heart/utilities/metrics.py` mirroring OTel span APIs.
+- [ ] Wrap event handling, renderer invocation, and loop checkpoints with span creation and events.
+- [ ] Emit histograms for frame duration, renderer cost, and device upload latency.
+- [ ] Provide CLI toggles (`--benchmark-mode`, `--benchmark-log`) controlling sampling rates and sinks.
 
-### Task Stub — Automate flamegraph profiling
+### Implementation – Tooling
 
-1. Create `scripts/benchmark/run_pyspy.sh` that launches `python -m py_spy` against `heart.loop:run --benchmark-mode` and saves `pyspy.flamegraph.svg`, annotating the resulting trace metadata with the OTel trace ID for correlation.
-1. Add a Python entry point (`scripts/benchmark/profile_loop.py`) that can toggle between profilers (cProfile + `snakeviz`, `pyinstrument`) and align profiler timestamps with the OTel trace/metric export windows via shared start times.
-1. Document the workflow in `docs/benchmarking.md`, including commands for capturing input-latency traces, renderer timing logs, and flame graphs, plus guidance on interpreting the overlays with OTel viewers (e.g., Jaeger, Tempo, Trace Viewer).
-1. Optionally integrate with `make benchmark` to bundle log collection and flamegraph generation into a single reproducible command while emitting OTLP files for downstream collectors.
+- [ ] Create `scripts/benchmark/run_pyspy.sh` and `scripts/benchmark/profile_loop.py` for automated profiling runs.
+- [ ] Build a HUD renderer displaying live FPS and latency when benchmarking is active.
+- [ ] Write aggregation utilities (`scripts/benchmark/aggregate_metrics.py`) to convert traces into `speedscope`-compatible JSON.
 
-## 5. Correlate metrics and surface bottlenecks
+### Validation
 
-- Provide tooling to merge the recorded traces (input, rendering, loop) into an interactive visualization similar to a flame graph, possibly using `speedscope` or a custom Plotly dashboard, starting from the OTel trace data.
+- [ ] Capture sample runs on macOS and Linux, verifying trace exports and metrics formatting.
+- [ ] Run profiling scripts against simulated loads to confirm flamegraphs align with spans.
+- [ ] Ensure instrumentation overhead remains below 5% when disabled.
 
-### Task Stub — Visualize combined metrics
+## Narrative Walkthrough
 
-1. Write a post-processing script (`scripts/benchmark/aggregate_metrics.py`) that ingests JSONL or OTLP traces and outputs a Chrome trace (`.json`) compatible with `speedscope` for flamegraph-style analysis.
-1. Map each instrumentation stage (input, event, renderer, device upload) to hierarchical spans and span events to highlight bottlenecks per frame while preserving OTel semantic attributes.
-1. Bundle a convenience `make benchmark-report` target that runs aggregation and opens the generated visualization (or prints the path in headless environments), optionally exporting the data as an OTel trace for direct import into tools like Tempo or Jaeger.
-1. Expand `docs/benchmarking.md` with instructions for reading the combined trace, correlating OTel trace/metric IDs, and diagnosing latency hot spots.
+Discovery establishes where to capture timings and how current modules communicate so spans align with real behaviour. Instrumentation then introduces reusable helpers, wraps critical sections, and publishes metrics without changing business logic. Tooling builds the surrounding scripts and overlays to consume the new signals. Validation exercises the full workflow across platforms, checking export compatibility and runtime overhead.
 
-This plan keeps the benchmarking tooling self-contained, adds minimal overhead behind feature flags, and produces actionable visualizations to pinpoint latency and FPS regressions while speaking the same language as OpenTelemetry so we can lean on the broader ecosystem of tooling.
+## Visual Reference
+
+| Metric | Source Stage | Export Format |
+| --- | --- | --- |
+| Input latency | `GameLoop._handle_events`, peripheral managers | Span events + JSONL trace |
+| Renderer duration | Renderer invocations, device uploads | Histogram + span attributes |
+| Loop throughput | `GameLoop.start` checkpoints | OTel counter + trace |
+
+## Risk Analysis
+
+| Risk | Probability | Impact | Mitigation | Early Warning |
+| --- | --- | --- | --- | --- |
+| Instrumentation alters frame pacing | Medium | High | Guard with feature flags and benchmark overhead during validation | FPS drops >5% when benchmarking disabled |
+| Trace volume overwhelms log sinks | Medium | Medium | Implement sampling controls and rolling buffers | Log exporter reports backpressure |
+| Misaligned timestamps between tracers and profilers | Low | Medium | Synchronise start times and embed trace IDs in profiler output | Flamegraph annotations lack trace IDs |
+
+### Mitigation Tasks
+
+- [ ] Measure runtime overhead with instrumentation disabled and adjust sampling defaults.
+- [ ] Add configuration to cap export size and rotate log files.
+- [ ] Annotate profiler scripts with trace metadata for correlation.
+
+## Outcome Snapshot
+
+Developers can enable benchmarking mode to capture OTel-aligned traces, metrics, and flamegraphs. The resulting artefacts highlight input latency, renderer bottlenecks, and loop jitter, enabling regression detection across releases.

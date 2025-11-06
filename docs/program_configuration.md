@@ -1,27 +1,26 @@
-# Program configuration guide
+# Program Configuration Guide
 
-Program configurations define the playlist of scenes, overlays, and behaviors
-that run on the Heart totem. Each configuration is a Python module in
-`heart/programs/configurations/` and must expose a single `configure(loop)`
-function. This guide explains how the registry works and how to build your own
-configuration for events or installations.
+## Problem Statement
 
-## Registry basics
+Describe how to construct repeatable playlists of modes and renderers so the Heart runtime can be tailored to specific events or installations without modifying the core loop.
 
-`heart.programs.registry.ConfigurationRegistry` discovers configuration modules
-on demand. When you run `totem run --configuration lib_2025` the CLI:
+## Materials
 
-1. Imports `heart.programs.registry.ConfigurationRegistry`.
-1. Loads every module under `heart.programs.configurations` and stores the
-   `configure` callable in a dictionary keyed by the module name.
-1. Retrieves the requested entry and executes it with the active
-   `GameLoop` instance.
+- Local checkout of the repository with an activated development environment.
+- Familiarity with `heart.programs.registry.ConfigurationRegistry` and the `GameLoop` APIs.
+- Access to renderer implementations under `heart.display.renderers` and navigation helpers under `heart.navigation`.
 
-Any import errors are surfaced at startup so failures are easy to spot.
+## Technical Approach
 
-## Anatomy of a configuration module
+1. Implement a module in `heart/programs/configurations/` that exposes `configure(loop: GameLoop) -> None`.
+1. Register modes, compose renderers, and wire peripheral data sources through the provided navigation and renderer utilities.
+1. Load the module via `totem run --configuration <name>` to validate the playlist locally and on target hardware.
 
-A minimal configuration looks like this:
+## Registry Operation
+
+`ConfigurationRegistry` loads configuration modules on demand. When `totem run --configuration lib_2025` executes, the CLI imports every module under `heart.programs.configurations`, records their exported `configure` callables, and invokes the selected entry with the live `GameLoop`. Any import failure surfaces immediately in the console so authors can correct missing dependencies.
+
+## Minimal Module Example
 
 ```python
 from heart.display.renderers.text import TextRendering
@@ -35,28 +34,20 @@ def configure(loop: GameLoop) -> None:
     )
 ```
 
-Key concepts:
+Important behaviours:
 
-- `loop.add_mode(<name or renderer>)` registers a selectable mode in the UI. You
-  can pass a string label or a renderer instance that provides its own title
-  screen.
-- `mode.add_renderer(...)` attaches one or more renderers that draw each frame
-  for the mode. Renderers run sequentially, so you can stack overlays on top of
-  base animations.
-- `loop.app_controller.add_sleep_mode()` appends a low-power fallback that keeps
-  the LED wall dim when no primary scenes are playing. The CLI toggles this
-  behavior with the `--add-low-power-mode/--no-add-low-power-mode` flag.
+- `loop.add_mode(<label or renderer>)` registers a selectable mode. Pass a string for a simple label or a renderer that supplies its own title screen.
+- `mode.add_renderer(...)` appends renderers that execute sequentially each frame, enabling overlays or layered effects.
+- `loop.app_controller.add_sleep_mode()` inserts a low-power fallback. The CLI toggles this path with `--add-low-power-mode/--no-add-low-power-mode`.
 
-## Building playlists
+## Building Playlists
 
-The `heart.navigation` module includes helpers for composing scenes:
+Use `heart.navigation` helpers to manage scheduling:
 
-- `MultiScene` rotates through renderers on a timer. Use this to build playlists
-  that cycle automatically.
-- `ComposedRenderer` stacks multiple renderers together. A common pattern is to
-  place a text overlay on top of an animation.
+- `MultiScene` rotates through renderers on a fixed cadence.
+- `ComposedRenderer` stacks renderers to combine animations and overlays.
 
-Example snippet from `lib_2025.py`:
+Example fragment from `lib_2025.py`:
 
 ```python
 from heart.display.renderers.water_cube import WaterCube
@@ -71,10 +62,9 @@ def configure(loop: GameLoop) -> None:
     water_mode.add_renderer(WaterCube())
 ```
 
-## Accessing peripherals
+## Integrating Peripheral Data
 
-Peripherals publish data through modules under `heart.peripheral`. Renderers can
-pull the latest readings directly:
+Peripherals publish readings through modules in `heart.peripheral`. Renderers can pull values directly, as shown below:
 
 ```python
 from heart.peripheral.heart_rates import current_bpms
@@ -86,32 +76,21 @@ class HeartRateVisualization(BaseRenderer):
         # Draw something based on bpm
 ```
 
-Peripheral managers start automatically when the loop boots. You do not need to
-instantiate them manually inside configurations.
+Peripheral managers start with the loop, so configuration modules do not instantiate them manually.
 
-## Testing new configurations
+## Validation Workflow
 
-1. Create your module under `heart/programs/configurations/`. Name it with a
-   descriptive suffix (for example `festival_2025.py`).
-1. Run the configuration locally:
+1. Place the new module in `heart/programs/configurations/` with a descriptive name such as `festival_2025.py`.
+1. Launch it locally:
    ```bash
    totem run --configuration festival_2025
    ```
-1. Iterate until the playlist looks right. Use `--no-add-low-power-mode` if you
-   want the scenes to loop continuously without the sleep fallback.
+1. Iterate on renderers and scheduling. Use `--no-add-low-power-mode` if the playlist should loop continuously.
 
-Check the console output for `Importing configuration: ...` lines to confirm that
-your module loads successfully. When satisfied, commit the module alongside any
-assets it requires (sprite sheets, sound files, etc.).
+Watch for `Importing configuration:` log lines to confirm registry discovery. Commit auxiliary assets (sprite sheets, audio) alongside the module if they are required at runtime.
 
-## Shipping configurations
+## Operational Guidance
 
-- Store large assets in `src/heart/assets/` so they ship with the package.
-- Document special hardware dependencies in `docs/devlog/` or in a dedicated
-  README within the configuration folder.
-- Consider adding unit or integration tests under `tests/` if the configuration
-  includes complex business logic (for example, custom scheduling or state
-  machines).
-
-With these guidelines you can create repeatable playlists that take advantage of
-Heart's renderer ecosystem and hardware integrations.
+- Store large assets under `src/heart/assets/` so they deploy with the package.
+- Document hardware prerequisites in `docs/devlog/` or a README adjacent to the configuration if it depends on non-standard peripherals.
+- Add targeted tests under `tests/` when configurations contain scheduling or state management logic that benefits from regression coverage.
