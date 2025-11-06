@@ -18,6 +18,7 @@ from heart.display.renderers.flame import FlameRenderer
 from heart.display.renderers.free_text import FreeTextRenderer
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
+from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import current_bpms
 from heart.utilities.env import Configuration
@@ -259,6 +260,8 @@ class GameLoop:
         peripheral_manager: PeripheralManager,
         max_fps: int = 60,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
+        *,
+        event_bus: EventBus | None = None,
     ) -> None:
         self.initalized = False
         self.device = device
@@ -299,6 +302,10 @@ class GameLoop:
         self.tmp_float: float | None = None
         self.edge_thresh = 1
 
+        manager_bus = self.peripheral_manager.event_bus
+        self._event_bus = event_bus or manager_bus or EventBus()
+        self.peripheral_manager.attach_event_bus(self._event_bus)
+
         pygame.display.set_mode(
             (
                 device.full_display_size()[0] * device.scale_factor,
@@ -328,6 +335,10 @@ class GameLoop:
     def set_game_loop(cls, loop: "GameLoop") -> None:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
+
+    @property
+    def event_bus(self) -> EventBus:
+        return self._event_bus
 
     def start(self) -> None:
         logger.info("Starting GameLoop")
@@ -629,6 +640,7 @@ class GameLoop:
     def _handle_events(self) -> None:
         try:
             for event in pygame.event.get():
+                self._emit_event_bus(event)
                 if event.type == pygame.QUIT:
                     self.running = False
                 if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
@@ -639,7 +651,31 @@ class GameLoop:
             # (clem): gamepad shit is weird and can randomly put caught segfault
             #   events on queue, I see allusions to this online, people say
             #   try pygame-ce instead
+            self.event_bus.emit(
+                "system/event_queue_error",
+                data={"exception": "SystemError", "source": "pygame.event.get"},
+            )
             print("SystemError: Encountered segfaulted event")
+
+    def _emit_event_bus(self, event: pygame.event.Event) -> None:
+        event_type = self._resolve_event_type(event)
+        payload = self._resolve_event_payload(event)
+        self.event_bus.emit(event_type, data=payload)
+
+    def _resolve_event_type(self, event: pygame.event.Event) -> str:
+        if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
+            return "system/request_joystick_module_reset"
+        name = pygame.event.event_name(event.type) or "UNKNOWN"
+        slug = name.lower().replace(" ", "_")
+        if slug == "unknown":
+            slug = f"unknown_{event.type}"
+        return f"pygame/{slug}"
+
+    def _resolve_event_payload(self, event: pygame.event.Event) -> dict[str, object]:
+        payload = dict(getattr(event, "dict", {}))
+        payload["pygame_type"] = event.type
+        payload["pygame_event_name"] = pygame.event.event_name(event.type)
+        return payload
 
     def _preprocess_setup(self):
         self.__dim_display()
