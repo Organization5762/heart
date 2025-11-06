@@ -6,8 +6,10 @@ from heart.peripheral import switch as switch_module
 from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
+from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
@@ -36,7 +38,7 @@ class PeripheralManager:
 
         self._event_bus = event_bus
         for peripheral in self._peripherals:
-            peripheral.attach_event_bus(event_bus)
+            self._attach_event_bus(peripheral, event_bus)
 
     @property
     def peripherals(self) -> tuple[Peripheral, ...]:
@@ -61,6 +63,8 @@ class PeripheralManager:
             self._detect_gamepads(),
             self._detect_heart_rate_sensor(),
             self._detect_phone_text(),
+            self._detect_microphones(),
+            self._detect_drawing_pads(),
         )
 
     def start(self) -> None:
@@ -114,10 +118,26 @@ class PeripheralManager:
     def _detect_heart_rate_sensor(self) -> Iterator[Peripheral]:
         yield from itertools.chain(HeartRateManager.detect())
 
+    def _detect_microphones(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(Microphone.detect())
+
+    def _detect_drawing_pads(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(DrawingPad.detect())
+
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
         if self._event_bus is not None:
-            peripheral.attach_event_bus(self._event_bus)
+            self._attach_event_bus(peripheral, self._event_bus)
+
+    def _attach_event_bus(self, peripheral: Peripheral, event_bus: EventBus) -> None:
+        attach = getattr(peripheral, "attach_event_bus", None)
+        if callable(attach):
+            try:
+                attach(event_bus)
+            except Exception:
+                logger.exception(
+                    "Failed to attach event bus to peripheral %s", type(peripheral).__name__
+                )
 
     def _deprecated_get_main_switch(self) -> switch_module.BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now

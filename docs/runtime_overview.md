@@ -1,93 +1,70 @@
-# Runtime overview
+# Runtime Overview
 
-The Heart runtime is built around a pygame-powered game loop that streams
-content to either a simulated window or the LED matrix wall. This document
-explains how the major services interact and where to hook in new behavior for a
-major release.
+## Problem Statement
 
-## High-level architecture
+Explain how the Heart runtime composes configuration modules, orchestrates renderers, integrates peripherals, and targets display hardware so engineers can extend the system without reverse engineering the control flow.
 
-At startup the `totem` CLI wires together three primary subsystems:
+## Materials
 
-1. **Configuration loader** – `heart.programs.registry.ConfigurationRegistry`
-   discovers configuration modules under `heart/programs/configurations`. Each
-   module exposes a `configure(loop: GameLoop)` function that mutates the loop
-   with new modes, renderers, and playlists.
-1. **Game loop orchestration** – `heart.environment.GameLoop` encapsulates the
-   pygame window, timing, and peripheral integration. The loop owns the
-   `AppController`, a router that handles scene transitions and renders composed
-   surfaces.
-1. **Device abstraction** – `heart.device.Device` implementations translate
-   pygame surfaces into concrete display updates. `LocalScreen` targets desktop
-   development while `LEDMatrix` (from `heart.device.rgb_display`) streams frames
-   to the RGB matrix via the `rgbmatrix` bindings.
+- Installed `heart` development environment.
+- Access to the source modules referenced in this document.
+- Familiarity with pygame concepts and threaded peripheral IO.
 
-The code-flow diagram in [`docs/code_flow.md`](code_flow.md) visualizes these
-relationships and the threads used to communicate with peripherals.
+## Technical Approach
 
-## Renderers and modes
+1. Describe startup orchestration across configuration loading, game loop management, and device abstraction.
+1. Detail how renderers and modes cooperate to draw frames.
+1. Document peripheral lifecycle hooks and the display pipeline to aid future integrations.
 
-Renderers implement `heart.display.renderers.BaseRenderer` (or a concrete
-specialization) and draw into the pygame surface supplied by the runtime. A
-configuration file typically:
+## High-Level Architecture
 
-- Calls `loop.add_mode(<name or renderer>)` to create a new selectable mode.
-- Registers one or more renderers via `mode.add_renderer(...)`.
-- Optionally wraps renderers in `heart.navigation.MultiScene` or
-  `heart.navigation.ComposedRenderer` to build playlists and stacked overlays.
+At startup the `totem` CLI builds three core subsystems:
 
-For example, `lib_2025.py` mixes ambient animations (`WaterCube`), interactive
-scenes (`ArtistScene`), and text overlays. The default configuration also adds a
-sleep mode for low-power intervals.
+1. **Configuration loader** – `heart.programs.registry.ConfigurationRegistry` inspects `heart/programs/configurations` for modules exposing `configure(loop: GameLoop)`. Each callable mutates the loop with modes, renderers, and playlists.
+1. **Game loop orchestration** – `heart.environment.GameLoop` owns the pygame window, timing, and peripheral integration. Its `AppController` routes scene transitions and composes surfaces.
+1. **Device abstraction** – Implementations of `heart.device.Device` translate pygame surfaces into concrete outputs. `LocalScreen` targets desktop iteration, while `LEDMatrix` in `heart.device.rgb_display` streams frames through the `rgbmatrix` bindings.
 
-## Peripheral integration
+Refer to [code_flow.md](code_flow.md) for the full call graph and service boundaries.
 
-Peripheral workers are instantiated by
-`heart.peripheral.core.manager.PeripheralManager`. The manager spawns background
-threads for:
+## Renderers and Modes
 
-- Bluetooth switches and controllers (`heart.peripheral.switch`,
-  `heart.peripheral.gamepad`).
-- Serial-connected sensors such as accelerometers (`heart.peripheral.uart`).
-- Heart-rate monitors aggregated via `heart.peripheral.heart_rates`.
+Renderers extend `heart.display.renderers.BaseRenderer` (or a specialization) and draw into the surface supplied by the loop. Configuration modules typically:
 
-Each worker pushes events into the `AppController`, where they can trigger scene
-changes, animations, or custom render logic. Scenes can subscribe to the shared
-state exposed through helper modules like `heart.peripheral.heart_rates`.
+- Call `loop.add_mode(<label or renderer>)` to register selectable modes.
+- Attach renderers with `mode.add_renderer(...)` to run them sequentially each frame.
+- Wrap renderers in `heart.navigation.MultiScene` or `heart.navigation.ComposedRenderer` to control scheduling and overlays.
 
-## Display pipeline
+`lib_2025.py` demonstrates how to mix ambient animations (`WaterCube`), interactive scenes, and a low-power sleep mode managed through `loop.app_controller.add_sleep_mode()`.
 
-Every frame follows the same rendering pipeline:
+## Peripheral Integration
 
-1. The active mode asks each renderer for a frame. Complex modes often combine
-   multiple renderers via `ComposedRenderer` or `MultiScene`.
-1. The resulting surface is passed to `heart.display.service.DisplayService`,
-   which manages timing and double buffering to avoid tearing.
-1. The `Device` implementation converts the surface into the final output. The
-   local screen writes to a pygame window, whereas the LED matrix driver extracts
-   raw pixel data and streams it over SPI.
+`heart.peripheral.core.manager.PeripheralManager` spawns background threads for:
 
-The pipeline supports frame capture (`heart.device.bridge.DeviceBridge`) for the
-peripheral sidecar and for streaming previews to remote observers.
+- Bluetooth switches and controllers (`heart.peripheral.switch`, `heart.peripheral.gamepad`).
+- Serial-connected sensors (`heart.peripheral.uart`).
+- Heart-rate monitors aggregated by `heart.peripheral.heart_rates`.
 
-## Extending the runtime
+Workers push events into the `AppController`, which propagates state to renderers. Scene code can subscribe to helper modules such as `heart.peripheral.heart_rates` to retrieve the latest readings.
 
-To add a new scene:
+## Display Pipeline
 
-1. Implement a renderer under `heart/display/renderers/`. See `water_cube.py` or
-   `kirby.py` for patterns that leverage numpy-based effects and sprite sheets.
-1. Update an existing configuration module or create a new one under
-   `heart/programs/configurations/` and expose a `configure(loop)` function.
-1. Run `totem run --configuration <your-module>` to verify the scene locally.
+Each frame flows through the same stages:
 
-New peripheral integrations should live under `heart/peripheral/`. They can
-register event handlers with the `PeripheralManager` so that the runtime picks
-them up automatically.
+1. The active mode asks its renderers for frames. Composite modes may layer results through `ComposedRenderer` or rotate them with `MultiScene`.
+1. `heart.display.service.DisplayService` manages timing and double buffering to prevent tearing.
+1. The chosen `Device` implementation emits the output. `LocalScreen` writes to a pygame window, whereas the LED matrix driver streams pixel rows over SPI. Optional capture paths such as `heart.device.bridge.DeviceBridge` share frames with auxiliary processes.
 
-## Related tools
+## Extending the Runtime
 
-- [`docs/getting_started.md`](getting_started.md) – end-to-end setup guide.
-- [`docs/program_configuration.md`](program_configuration.md) – deep dive into
-  authoring and composing configuration modules.
-- [`docs/hardware_debug_cli.md`](hardware_debug_cli.md) – command reference for
-  the Typer-based hardware debugging suite.
+To add a scene or peripheral:
+
+1. Implement a renderer under `heart/display/renderers/` (see `water_cube.py` for reference).
+1. Register it in an existing configuration module or introduce a new module in `heart/programs/configurations/` with `configure(loop)`.
+1. Execute `totem run --configuration <module>` to validate behaviour.
+1. Place new peripheral integrations under `heart/peripheral/` and register them with the `PeripheralManager` so the runtime activates them automatically.
+
+## Related References
+
+- [getting_started.md](getting_started.md) – environment preparation and deployment steps.
+- [program_configuration.md](program_configuration.md) – authoring playlists and renderer compositions.
+- [hardware_debug_cli.md](hardware_debug_cli.md) – Typer commands for hardware validation.

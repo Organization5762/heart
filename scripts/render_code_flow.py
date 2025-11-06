@@ -426,7 +426,6 @@ def build_svg(layout: DiagramLayout) -> ET.Element:
                 tspan = ET.SubElement(text_element, "tspan", tspan_attrib)
                 tspan.text = line
 
-    ET.indent(svg)  # type: ignore[arg-type]
     return svg
 
 
@@ -435,6 +434,7 @@ def render(output_path: pathlib.Path) -> None:
     svg = build_svg(layout)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tree = ET.ElementTree(svg)
+    ET.indent(tree)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
 
 

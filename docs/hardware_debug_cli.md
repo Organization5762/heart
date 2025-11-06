@@ -1,82 +1,75 @@
-# Totem hardware debugging CLI
+# Totem Hardware Debugging CLI
 
-The legacy helpers from the `scripts/` directory have been folded into the
-`totem_debug` Typer command so that tooling stays discoverable and consistent.
-Install the project in editable mode first:
+## Problem Statement
 
-```bash
-uv pip install -e .[dev]
-```
+Provide repeatable console commands for validating peripherals, UART devices, and Bluetooth controllers used by the Heart runtime.
 
-Run `totem_debug --help` to see the full command tree. The most common entry
-points are listed below.
+## Materials
 
-## Peripheral inspection
+- Editable installation of the `heart` project (`uv pip install -e .[dev]`).
+- Access to target peripherals (accelerometers, Bluetooth switches, controllers, phone text bridge).
+- Terminal with permissions to access serial ports and Bluetooth adapters.
+
+## Technical Approach
+
+`totem_debug` is a Typer application that wraps the legacy scripts formerly stored in `scripts/`. Each subcommand exercises the same managers that power the runtime so test results align with production behaviour.
+
+Run `totem_debug --help` to inspect the full command tree.
+
+## Peripheral Inspection
 
 ```bash
 totem_debug peripherals
 ```
 
-Detects peripherals through `heart.peripheral.core.manager.PeripheralManager`
-and prints the number of discovered devices along with their names.
+Enumerates devices through `heart.peripheral.core.manager.PeripheralManager` and prints discovered types and counts.
 
-## Accelerometer streaming
+## Accelerometer Streaming
 
 ```bash
 totem_debug accelerometer [--raw] [--sleep-interval <seconds>]
 ```
 
-Streams accelerometer readings to the console using the same logic that backed
-`scripts/test_accelerometer.py`. Use `--raw` to echo serial frames and
-`--sleep-interval` to throttle polling.
+Reads serial frames from accelerometer peripherals. `--raw` echoes the unparsed payload, and `--sleep-interval` throttles polling.
 
-## UART helpers
+## UART Helpers
 
 ```bash
 totem_debug uart
 ```
 
-Starts a `BluetoothSwitch` UART listener and prints decoded JSON events. The
-command runs until it is interrupted with <kbd>Ctrl</kbd>+<kbd>C</kbd>.
+Starts a `BluetoothSwitch` UART listener and dumps decoded JSON events until interrupted with <kbd>Ctrl</kbd>+<kbd>C</kbd>.
 
 ```bash
 totem_debug bluetooth-switch
 ```
 
-Subscribes to events from every detected switch and dumps each payload to the
-console.
+Subscribes to every detected switch and prints the event payload stream.
 
-## PhoneText peripheral
+## PhoneText Peripheral
 
 ```bash
 totem_debug phone-text
 ```
 
-Launches the `heart.peripheral.phone_text.PhoneText` helper. This mirrors the
-old `scripts/test_phone_text.py` entry-point.
+Launches the `heart.peripheral.phone_text.PhoneText` helper to validate the SMS relay used in installations.
 
-## Bluetooth gamepad utilities
+## Bluetooth Gamepad Utilities
 
 ```bash
 totem_debug gamepad scan [--scan-duration <seconds>]
 ```
 
-Scans for Bluetooth devices, highlighting potential 8BitDo controllers. The
-output contains every device seen during the scan so it remains useful even if
-no matches are found.
+Scans for Bluetooth devices and highlights potential 8BitDo controllers while still listing all observed devices.
 
 ```bash
 totem_debug gamepad status <mac>
 ```
 
-Displays whether the selected controller is currently paired and/or connected.
-This is the command to reach for before attempting to reconnect to a known
-controller.
+Reports whether the specified controller is paired and connected.
 
 ```bash
 totem_debug gamepad pair <mac>
 ```
 
-Pairs with a controller if necessary and then attempts to connect, printing the
-result from `bluetoothctl`. The command also summarises the before/after
-connection state so you can quickly tell if the operation succeeded.
+Pairs and connects to a controller, printing the before/after state from `bluetoothctl` so you can confirm success.

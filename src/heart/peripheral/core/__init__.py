@@ -2,8 +2,14 @@ from __future__ import annotations
 
 import abc
 import logging
-from dataclasses import dataclass
-from typing import Any, Iterator, Mapping, Self
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, Self
+
+if TYPE_CHECKING:  # pragma: no cover - import-time convenience
+    from .state_store import StateEntry, StateSnapshot, StateStore
+
+__all__ = ["Input", "Peripheral", "StateEntry", "StateSnapshot", "StateStore"]
 
 from .event_bus import EventBus
 
@@ -15,6 +21,7 @@ class Input:
     event_type: str
     data: Any
     producer_id: int = 0
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Peripheral(abc.ABC):
@@ -80,3 +87,11 @@ class Peripheral(abc.ABC):
             self._logger.debug(
                 "Ignoring malformed peripheral payload: %s", data, exc_info=True
             )
+
+
+def __getattr__(name: str):
+    if name in {"StateEntry", "StateSnapshot", "StateStore"}:
+        from .state_store import StateEntry, StateSnapshot, StateStore
+
+        return {"StateEntry": StateEntry, "StateSnapshot": StateSnapshot, "StateStore": StateStore}[name]
+    raise AttributeError(name)

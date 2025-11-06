@@ -7,8 +7,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Iterable, List, MutableMapping, Optional
 
-if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
-    from . import Input
+from . import Input
+from .state_store import StateStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,9 +29,10 @@ class SubscriptionHandle:
 class EventBus:
     """Synchronous pub/sub dispatcher for :class:`Input` events."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, state_store: StateStore | None = None) -> None:
         self._subscribers: MutableMapping[Optional[str], List[SubscriptionHandle]] = defaultdict(list)
         self._next_sequence = 0
+        self._state_store = state_store or StateStore()
 
     # Public API ---------------------------------------------------------
     def subscribe(
@@ -69,8 +70,8 @@ class EventBus:
         if _is_input_instance(event):
             input_event = event  # type: ignore[assignment]
         else:
-            InputCls = _get_input_class()
-            input_event = InputCls(event_type=event, data=data, producer_id=producer_id)
+            input_event = Input(event_type=event, data=data, producer_id=producer_id)
+        self._state_store.update(input_event)
         for handle in self._iter_targets(input_event.event_type):
             try:
                 handle.callback(input_event)
@@ -90,6 +91,12 @@ class EventBus:
 
         return decorator
 
+    @property
+    def state_store(self) -> StateStore:
+        """Return the state store maintained by the bus."""
+
+        return self._state_store
+
     # Internal helpers ---------------------------------------------------
     def _iter_targets(self, event_type: str) -> Iterable[SubscriptionHandle]:
         """Yield subscribers in priority order, including wildcards."""
@@ -106,7 +113,7 @@ class EventBus:
 
 
 def _is_input_instance(event: object) -> bool:
-    CoreInput = _get_input_class()
+    CoreInput = _+_class()
     return isinstance(event, CoreInput)
 
 
