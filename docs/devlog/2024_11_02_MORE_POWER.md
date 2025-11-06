@@ -1,3 +1,3 @@
-8 works, 16 doesn't
-
-It feels lie it is something about the Ribbon cable; I think it'd be preferrable to have N parallel chains of 8 right now instead of trying to do 1 chain of. More you know! This bodes well for the 8 high vertical monolith
+Eight-panel chains remain stable, whereas a single chain of sixteen panels fails to initialise. The behaviour suggests a ribbon
+cable integrity issue at higher loads. The near-term strategy is to operate multiple eight-panel chains in parallel while we
+characterise signal quality and power distribution for taller assemblies.
