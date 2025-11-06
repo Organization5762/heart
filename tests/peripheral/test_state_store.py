@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from heart.peripheral.core import Input, StateStore
+from heart.peripheral import Input, StateStore
 
 
 def test_state_store_tracks_latest_events_by_producer() -> None:

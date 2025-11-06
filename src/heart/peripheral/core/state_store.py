@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Any, Dict, Iterator, Mapping, MutableMapping
 
-from . import Input
+from heart.peripheral import Input
 
 
 @dataclass(frozen=True, slots=True)

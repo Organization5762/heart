@@ -2,26 +2,16 @@ from __future__ import annotations
 
 import abc
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Self
 
 if TYPE_CHECKING:  # pragma: no cover - import-time convenience
     from .state_store import StateEntry, StateSnapshot, StateStore
 
-__all__ = ["Input", "Peripheral", "StateEntry", "StateSnapshot", "StateStore"]
+__all__ = ["Peripheral", "StateEntry", "StateSnapshot", "StateStore"]
+
+from heart.peripheral import Input
 
 from .event_bus import EventBus
-
-
-@dataclass(slots=True)
-class Input:
-    """Normalized structure for messages emitted by peripherals."""
-
-    event_type: str
-    data: Any
-    producer_id: int = 0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Peripheral(abc.ABC):

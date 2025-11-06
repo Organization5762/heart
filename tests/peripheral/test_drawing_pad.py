@@ -1,6 +1,6 @@
 import pytest
 
-from heart.peripheral.core import Input
+from heart.peripheral import Input
 from heart.peripheral.drawing_pad import DrawingPad, StylusSample
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from heart.peripheral.core import Input
+from heart.peripheral import Input
 from heart.peripheral.core.event_bus import EventBus
 
 

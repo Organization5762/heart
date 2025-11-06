@@ -21,7 +21,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Self
 
-from heart.peripheral.core import Input, Peripheral
+from heart.peripheral import Input
+from heart.peripheral.core import Peripheral
 
 __all__ = ["DrawingPad", "StylusSample"]
 

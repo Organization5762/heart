@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import Deque, Iterator, NoReturn, Self
 
 from heart.firmware_io import constants
-from heart.peripheral.core import Input, Peripheral
+from heart.peripheral import Input
+from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import SubscriptionHandle
 from heart.utilities.logging import get_logger
 

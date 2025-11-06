@@ -7,7 +7,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, MutableMapping, Optional
 
-from . import Input
+from heart.peripheral import Input
+
 from .state_store import StateStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,7 +67,6 @@ class EventBus:
 
     def emit(self, event: Input | str, /, data=None, *, producer_id: int = 0) -> None:
         """Emit an :class:`Input` instance to subscribed callbacks."""
-
         if isinstance(event, Input):
             input_event = event  # type: ignore[assignment]
         else:
