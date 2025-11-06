@@ -24,3 +24,5 @@ If any meaningful changes are made to the runtime architecture or service bounda
 Any meaningfully innovative or thoughtful implementation should be paired with a research note in `docs/research/` that captures the reasoning, trade-offs, or techniques involved.
 When you touch areas of the codebase that already have related research notes, skim `docs/research/` to see whether an existing document needs an update or a new companion note.
 Research notes should cite the source files or external references that informed the write-up.
+
+Planning documents that live under `docs/planning/` should read like polished facilitation guides. Break the task into well-scoped sub-tasks with checklists, highlight what successful outcomes look like, and use quick-reference diagrams or tables where they clarify the path forward. The `docs/planning/input_event_bus.md` plan illustrates the expected voice and level of detail.
