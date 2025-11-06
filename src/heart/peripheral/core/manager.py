@@ -3,6 +3,7 @@ import threading
 from typing import Iterable, Iterator
 
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.phone_text import PhoneText
@@ -19,11 +20,21 @@ logger = get_logger(__name__)
 class PeripheralManager:
     """Coordinate detection and execution of available peripherals."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, event_bus: EventBus | None = None) -> None:
         self._peripherals: list[Peripheral] = []
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
         self._started = False
+        self._event_bus = event_bus
+
+    @property
+    def event_bus(self) -> EventBus | None:
+        return self._event_bus
+
+    def attach_event_bus(self, event_bus: EventBus) -> None:
+        """Register ``event_bus`` for peripherals managed by this instance."""
+
+        self._event_bus = event_bus
 
     @property
     def peripherals(self) -> tuple[Peripheral, ...]:
