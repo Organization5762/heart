@@ -46,3 +46,20 @@ def test_subscriber_failures_do_not_block_others(caplog: pytest.LogCaptureFixtur
 
     assert calls == ["sensor"]
     assert any("EventBus subscriber" in message for message in caplog.messages)
+
+
+def test_emit_updates_state_store_before_callbacks():
+    bus = EventBus()
+
+    observed: list[int] = []
+
+    def _handler(event: Input) -> None:
+        entry = bus.state_store.get_latest(event.event_type, producer_id=event.producer_id)
+        assert entry is not None
+        observed.append(entry.producer_id)
+
+    bus.subscribe("button", _handler)
+
+    bus.emit("button", data={"pressed": True}, producer_id=2)
+
+    assert observed == [2]
