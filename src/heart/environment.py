@@ -470,9 +470,7 @@ class GameLoop:
                     # perceptual luma used by Rec. 601
                     lum = (
                         0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2]
-                    )[
-                        ..., None
-                    ]  # shape (H, W, 1)
+                    )[..., None]  # shape (H, W, 1)
 
                     # interpolate: lum + factor × (color – lum)
                     img_sat = lum + factor * (img - lum)
@@ -545,9 +543,9 @@ class GameLoop:
         self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
         # Ensure both surfaces are the same size
-        assert (
-            surface1.get_size() == surface2.get_size()
-        ), "Surfaces must be the same size to merge."
+        assert surface1.get_size() == surface2.get_size(), (
+            "Surfaces must be the same size to merge."
+        )
         surface1.blit(surface2, (0, 0))
         return surface1
 

@@ -134,9 +134,9 @@ class SpritesheetLoop(BaseRenderer):
         self.boomerang = boomerang
         self.reverse_direction = False
 
-        assert (
-            frame_data is not None or metadata_file_path is not None
-        ), "Must provide either frame_data or metadata_file_path"
+        assert frame_data is not None or metadata_file_path is not None, (
+            "Must provide either frame_data or metadata_file_path"
+        )
 
         self.start_frames = []
         self.loop_frames = []
@@ -209,9 +209,7 @@ class SpritesheetLoop(BaseRenderer):
         self._process_gamepad(peripheral_manager)
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
-        )
+        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
         if self._last_switch_rot_value is not None:
             if current_value > self._last_switch_rot_value:
                 self._current_duration_scale_factor += 0.05
