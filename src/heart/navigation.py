@@ -10,9 +10,11 @@ from heart.display.renderers.color import RenderColor
 from heart.display.renderers.slide import SlideTransitionRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
-from heart.firmware_io.constants import BUTTON_LONG_PRESS, BUTTON_PRESS, SWITCH_ROTATION
+from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
+                                         SWITCH_ROTATION)
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth)
 from heart.utilities.env import Configuration
 
 

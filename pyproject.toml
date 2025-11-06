@@ -44,29 +44,21 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    # Testing
-    "pytest",
-    "pytest-benchmark",
     "scipy",
     "mypy",
     "types-requests",
     "types-toml",
-    # Formatting
-    "black",
-    "docformatter[tomli]",
-    "isort",
-    "mdformat",
-    "ruff",
     # Git
     "pre-commit",
 ]
 
 [build-system]
-requires = [
-    "setuptools",
-    "setuptools-scm"
-]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.9.6,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+heart = { path = "./src/heart" }
+
 
 [tool.setuptools.package-data]
 heart = ["*.png"]
@@ -78,9 +70,6 @@ totem_debug = "heart.x.cli:main"
 [tool.docformatter]
 recursive = true
 blank = true
-
-[tool.isort]
-profile = "black"
 
 [tool.ruff]
 line-length = 88
@@ -94,13 +83,6 @@ ignore = ["E501", "F403", "F405"]
 "src/heart/display/shaders/shader.py" = ["F403", "F405"]
 "src/heart/display/renderers/three_fractal.py" = ["F403", "F405"]
 
-[tool.uv.workspace]
-members = [
-    "experimental/lapis",
-    "experimental/circuit",
-    "experimental/peripheral_sidecar",
-    "experimental/isolated_rendering",
-]
 
 [tool.mypy]
 python_version = "3.11"
@@ -152,3 +134,25 @@ module = [
     "heart.navigation.*",
 ]
 follow_imports = "skip"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-vv -n auto --dist=loadscope"
+
+[dependency-groups]
+dev = [
+  {include-group = "lint"},
+  {include-group = "test"}
+]
+test = [
+    "pytest>=8.4.2",
+    "pytest-benchmark>=5.2.0",
+    "pytest-xdist>=3.8.0",
+]
+lint = [
+    "docformatter[tomli]>=1.7.7",
+    "isort>=7.0.0",
+    "mdformat>=1.0.0",
+    "ruff>=0.14.3",
+]

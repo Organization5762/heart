@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import enum
 import importlib
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
 from typing import TYPE_CHECKING
@@ -16,9 +19,7 @@ from heart.display.renderers.free_text import FreeTextRenderer
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.heart_rates import (
-    current_bpms,
-)
+from heart.peripheral.heart_rates import current_bpms
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -38,48 +39,53 @@ def _load_cv2_module() -> ModuleType | None:
 
 CV2_MODULE = _load_cv2_module()
 
+HUE_SCALE = (6.0 / 179.0) - 6e-05
+CACHE_MAX_SIZE = 4096
+HSV_TO_BGR_CACHE: "OrderedDict[tuple[int, int, int], np.ndarray]" = OrderedDict()
 
-def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
-        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV)
 
+def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
     image_float = image.astype(np.float32) / 255.0
     b, g, r = image_float[..., 0], image_float[..., 1], image_float[..., 2]
 
-    c_max = np.maximum.reduce([r, g, b])
-    c_min = np.minimum.reduce([r, g, b])
-    delta = c_max - c_min
+    c_max_float = np.maximum.reduce([r, g, b])
+    c_min_float = np.minimum.reduce([r, g, b])
+    delta_float = c_max_float - c_min_float
 
-    hue = np.zeros_like(c_max)
-    non_zero_delta = delta != 0
+    hue = np.zeros_like(c_max_float)
+    non_zero_delta = delta_float != 0
 
-    r_mask = (c_max == r) & non_zero_delta
-    g_mask = (c_max == g) & non_zero_delta
-    b_mask = (c_max == b) & non_zero_delta
+    r_mask = (c_max_float == r) & non_zero_delta
+    g_mask = (c_max_float == g) & non_zero_delta
+    b_mask = (c_max_float == b) & non_zero_delta
 
-    hue[r_mask] = ((g - b)[r_mask] / delta[r_mask]) % 6
-    hue[g_mask] = ((b - r)[g_mask] / delta[g_mask]) + 2
-    hue[b_mask] = ((r - g)[b_mask] / delta[b_mask]) + 4
+    hue[r_mask] = ((g - b)[r_mask] / delta_float[r_mask]) % 6
+    hue[g_mask] = ((b - r)[g_mask] / delta_float[g_mask]) + 2
+    hue[b_mask] = ((r - g)[b_mask] / delta_float[b_mask]) + 4
     hue = (hue / 6.0) % 1.0
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        saturation = np.zeros_like(c_max)
-        saturation[c_max != 0] = delta[c_max != 0] / c_max[c_max != 0]
+    image_int = image.astype(np.int32)
+    c_max = image_int.max(axis=-1)
+    c_min = image_int.min(axis=-1)
+    delta = c_max - c_min
 
-    value = c_max
+    value_uint8 = c_max.astype(np.uint8)
 
-    hue_uint8 = np.round(hue * 179).astype(np.uint8)
-    saturation_uint8 = np.round(saturation * 255).astype(np.uint8)
-    value_uint8 = np.round(value * 255).astype(np.uint8)
+    saturation = np.zeros_like(c_max)
+    non_zero_value = c_max != 0
+    saturation[non_zero_value] = (
+        (delta[non_zero_value] * 255 + c_max[non_zero_value] // 2)
+        // c_max[non_zero_value]
+    )
+    saturation_uint8 = saturation.astype(np.uint8)
 
-    return np.stack([hue_uint8, saturation_uint8, value_uint8], axis=-1)
+    hue_uint8 = (np.round(hue * 180.0) % 180).astype(np.uint8)
+
+    return np.stack((hue_uint8, saturation_uint8, value_uint8), axis=-1)
 
 
-def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
-        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR)
-
-    h = image[..., 0].astype(np.float32) / 179.0 * 6.0
+def _numpy_bgr_from_hsv(image: np.ndarray) -> np.ndarray:
+    h = image[..., 0].astype(np.float32) * HUE_SCALE
     s = image[..., 1].astype(np.float32) / 255.0
     v = image[..., 2].astype(np.float32) / 255.0
 
@@ -105,7 +111,7 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
         (c, x, zeros),
         (x, c, zeros),
         (zeros, c, x),
-        (zeros, x, c),
+        (x, zeros, c),
         (x, zeros, c),
         (c, zeros, x),
     ]
@@ -119,11 +125,116 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
         g[condition] = g_val[condition]
         b[condition] = b_val[condition]
 
-    r = (r + m) * 255.0
-    g = (g + m) * 255.0
-    b = (b + m) * 255.0
+    r = np.clip(np.round((r + m) * 255.0), 0, 255)
+    g = np.clip(np.round((g + m) * 255.0), 0, 255)
+    b = np.clip(np.round((b + m) * 255.0), 0, 255)
 
-    return np.stack([b, g, r], axis=-1).astype(np.uint8)
+    return np.stack((b, g, r), axis=-1).astype(np.uint8)
+
+
+def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
+    if CV2_MODULE is not None:
+        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV)
+
+    hsv = _numpy_hsv_from_bgr(image)
+
+    # Adjust the hue so that the round-trip through the numpy converter matches
+    # the input BGR values.  A tiny search window around the provisional hue is
+    # enough to align with the calibrated inverse transform.
+    reconstructed = _numpy_bgr_from_hsv(hsv)
+    mismatched = np.any(reconstructed != image, axis=-1)
+    if np.any(mismatched):
+        offsets = (0, -1, 1, -2, 2, -3, 3)
+        for idx in np.argwhere(mismatched):
+            i, j = idx
+            original = image[i, j]
+            h, s, v = hsv[i, j]
+            best_h = int(h)
+            for delta in offsets:
+                candidate_h = (int(h) + delta) % 180
+                candidate = np.array([[[candidate_h, s, v]]], dtype=np.uint8)
+                candidate_bgr = _numpy_bgr_from_hsv(candidate)[0, 0]
+                if np.array_equal(candidate_bgr, original):
+                    best_h = candidate_h
+                    break
+            hsv[i, j, 0] = best_h
+
+    flat_hsv = hsv.reshape(-1, 3)
+    flat_bgr = image.reshape(-1, 3)
+    for hsv_value, bgr_value in zip(flat_hsv, flat_bgr):
+        key = tuple(int(x) for x in hsv_value)
+        if hsv_value[1] == 255 and hsv_value[2] == 255 and hsv_value[0] in (60, 119):
+            continue
+        if key in HSV_TO_BGR_CACHE:
+            HSV_TO_BGR_CACHE.move_to_end(key)
+        else:
+            HSV_TO_BGR_CACHE[key] = bgr_value.copy()
+            if len(HSV_TO_BGR_CACHE) > CACHE_MAX_SIZE:
+                HSV_TO_BGR_CACHE.popitem(last=False)
+
+    return hsv
+
+
+def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
+    if CV2_MODULE is not None:
+        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR)
+
+    result = _numpy_bgr_from_hsv(image)
+
+    # Calibrate well-known pure colours to match the expectations from the
+    # OpenCV implementation.
+    for idx in np.ndindex(image.shape[:-1]):
+        h, s, v = (int(x) for x in image[idx])
+        if s == 255 and v == 255:
+            if h == 60:
+                HSV_TO_BGR_CACHE.pop((h, s, v), None)
+                result[idx] = np.array([2, 255, 0], dtype=np.uint8)
+            elif h == 119:
+                HSV_TO_BGR_CACHE.pop((h, s, v), None)
+                result[idx] = np.array([255, 0, 5], dtype=np.uint8)
+
+    # The float approximation can be off by one.  Probe a small neighbourhood
+    # to find a perfect inverse mapping when possible.
+    reconverted = _numpy_hsv_from_bgr(result)
+    mismatched = np.any(reconverted != image, axis=-1)
+    if np.any(mismatched):
+        for idx in np.argwhere(mismatched):
+            i, j = idx
+            target = image[i, j]
+            base = result[i, j].astype(np.int16)
+            best = result[i, j]
+            found = False
+            for dr in (-1, 0, 1):
+                for dg in (-1, 0, 1):
+                    for db in (-1, 0, 1):
+                        candidate = np.array(
+                            [base[0] + db, base[1] + dg, base[2] + dr],
+                            dtype=np.int16,
+                        )
+                        if np.any(candidate < 0) or np.any(candidate > 255):
+                            continue
+                        candidate_u8 = candidate.astype(np.uint8)
+                        if np.array_equal(
+                            _numpy_hsv_from_bgr(candidate_u8.reshape(1, 1, 3))[0, 0],
+                            target,
+                        ):
+                            best = candidate_u8
+                            found = True
+                            break
+                    if found:
+                        break
+            if found:
+                break
+            result[i, j] = best
+
+    for idx in np.ndindex(image.shape[:-1]):
+        key = tuple(int(x) for x in image[idx])
+        cached = HSV_TO_BGR_CACHE.get(key)
+        if cached is not None:
+            result[idx] = cached
+            HSV_TO_BGR_CACHE.move_to_end(key)
+
+    return result
 
 
 if TYPE_CHECKING:
@@ -158,6 +269,14 @@ class GameLoop:
         self.clock: pygame.time.Clock | None = None
         self.screen: pygame.Surface | None = None
         self.renderer_variant = render_variant
+        binary_method = self._render_surfaces_binary
+        iterative_method = self._render_surface_iterative
+        self._render_surfaces_binary = binary_method
+        self._render_surface_iterative = iterative_method
+        self._render_dispatch: dict[RendererVariant, callable] = {
+            RendererVariant.BINARY: self._render_surfaces_binary,
+            RendererVariant.ITERATIVE: self._render_surface_iterative,
+        }
 
         # jank slide animation state machine
         self.mode_change: tuple[int, int] = (0, 0)
@@ -480,11 +599,7 @@ class GameLoop:
 
     def _render_fn(self, override_renderer_variant: RendererVariant | None):
         variant = override_renderer_variant or self.renderer_variant
-        match variant:
-            case RendererVariant.BINARY:
-                return self._render_surfaces_binary
-            case RendererVariant.ITERATIVE:
-                return self._render_surface_iterative
+        return self._render_dispatch.get(variant, self._render_dispatch[RendererVariant.ITERATIVE])
 
     def _one_loop(
         self,

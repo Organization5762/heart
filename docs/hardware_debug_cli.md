@@ -5,7 +5,7 @@ The legacy helpers from the `scripts/` directory have been folded into the
 Install the project in editable mode first:
 
 ```bash
-pip install -e .[dev]
+uv pip install -e .[dev]
 ```
 
 Run `totem_debug --help` to see the full command tree. The most common entry

@@ -1,7 +1,7 @@
 # Heart Peripheral Sidecar (Experimental)
 
 This experimental project packages the peripheral MQTT sidecar as a standalone
-service.  It polls all detected Heart peripherals, publishes raw readings, and
+service. It polls all detected Heart peripherals, publishes raw readings, and
 emits higher-level action events to MQTT topics so that other services can
 react to device activity without coupling to the hardware drivers.
 
@@ -10,10 +10,10 @@ react to device activity without coupling to the hardware drivers.
 Create a virtual environment and install both `heart` and the sidecar package::
 
 ```bash
-python -m venv .venv
+uv venv .venv
 source .venv/bin/activate
-pip install -e ../..
-pip install -e .
+uv pip install -e ../..
+uv pip install -e .
 ```
 
 The sidecar declares a runtime dependency on the `heart` package, so you can
@@ -28,7 +28,7 @@ heart-peripheral-sidecar
 ```
 
 By default the service connects to an MQTT broker listening on
-`localhost:1883`.  Use the provided experimental Mosquitto configuration under
+`localhost:1883`. Use the provided experimental Mosquitto configuration under
 `../mqtt_broker/` for local testing:
 
 ```bash
@@ -56,7 +56,7 @@ Tune connectivity and aggregation thresholds through environment variables:
 | `HEART_HR_THRESHOLD` | Heart rate alert threshold | `160` |
 | `HEART_GAMEPAD_AXIS_THRESHOLD` | Gamepad axis threshold for action triggers | `0.5` |
 
-Raw snapshots and action messages are published as JSON payloads.  Raw samples
+Raw snapshots and action messages are published as JSON payloads. Raw samples
 contain the latest values per device, while action events summarize higher-level
 behaviours such as switch rotation, accelerometer movement, or heart-rate alerts
 suitable for aggregation-driven triggers.

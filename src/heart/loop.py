@@ -2,7 +2,6 @@ import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
-import importlib
 from typing import Annotated
 
 import typer
@@ -83,30 +82,6 @@ def run(
         loop.app_controller.add_sleep_mode()
     loop.start()
 
-
-@app.command(
-    name="test-renderer",
-)
-def test_renderer(
-    renderer_name: Annotated[
-        str, typer.Option("--renderer", help="Renderer class name")
-    ] = "heart.display.renderers.tixyland:Tixyland",
-    add_low_power_mode: bool = typer.Option(
-        True, "--add-low-power-mode", help="Add a low power mode"
-    ),
-    x11_forward: bool = typer.Option(
-        False, "--x11-forward", help="Use X11 forwarding for RGB display"
-    ),
-) -> None:
-    module_name, class_name = renderer_name.split(":")
-    module = importlib.import_module(module_name)
-    renderer_class = getattr(module, class_name)
-    renderer = renderer_class()
-    loop = GameLoop(
-        device=_get_device(x11_forward), peripheral_manager=PeripheralManager()
-    )
-    loop.app_controller.add_mode(renderer)
-    loop.start()
 
 
 @app.command()

@@ -5,19 +5,13 @@ from collections import deque
 from typing import Deque, Iterable
 
 from peripheral_sidecar.config import PeripheralServiceConfig
-from peripheral_sidecar.models import (
-    ActionEvent,
-    PeripheralPollResult,
-    RawPeripheralSnapshot,
-)
+from peripheral_sidecar.models import (ActionEvent, PeripheralPollResult,
+                                       RawPeripheralSnapshot)
 
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import _mutex as heart_rate_mutex
-from heart.peripheral.heart_rates import (
-    battery_status,
-    current_bpms,
-    last_seen,
-)
+from heart.peripheral.heart_rates import (battery_status, current_bpms,
+                                          last_seen)
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BaseSwitch, BluetoothSwitch

@@ -9,7 +9,8 @@ from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad.peripheral_mappings import BitDoLite2, BitDoLite2Bluetooth
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth)
 from heart.utilities.env import Configuration
 
 
