@@ -1,3 +1,7 @@
+"""Lampe controller firmware entry point."""
+
+from __future__ import annotations
+
 import adafruit_seesaw.digitalio
 import adafruit_seesaw.rotaryio
 import adafruit_seesaw.seesaw
@@ -9,33 +13,62 @@ from heart.firmware_io import bluetooth, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 
-led = digitalio.DigitalInOut(board.LED)
-led.direction = digitalio.Direction.OUTPUT
-led.value = True
 
-i2c = busio.I2C(board.SCL, board.SDA, frequency=50000)
-# FeatherWings (the little add-on boards) almost always have ADDR → GND, so you’d use 0x48.
-# If you’re using a loose breakout and you tied its ADDR pin to VDD, then the 0x49 default in your code is correct.
-seesaw = adafruit_seesaw.seesaw.Seesaw(i2c, 0x49)
+class LampeControllerRuntime:
+    """Coordinates the Seesaw and Bluetooth bridge."""
 
-encoder = adafruit_seesaw.rotaryio.IncrementalEncoder(seesaw)
-seesaw.pin_mode(24, seesaw.INPUT_PULLUP)
+    def __init__(self, seesaw_controller, send_fn, led=None):
+        self._seesaw_controller = seesaw_controller
+        self._send_fn = send_fn
+        self.led = led
 
-encoders = [adafruit_seesaw.rotaryio.IncrementalEncoder(seesaw, n) for n in range(4)]
-switches = [adafruit_seesaw.digitalio.DigitalIO(seesaw, pin) for pin in (12, 14, 17, 9)]
-for switch in switches:
-    switch.switch_to_input(digitalio.Pull.UP)
+    def run_once(self) -> None:
+        events = list(self._seesaw_controller.handle())
+        self._send_fn(events)
 
-handlers = [
-    rotary_encoder.RotaryEncoderHandler(encoders[0], switches[0], 0),
-    rotary_encoder.RotaryEncoderHandler(encoders[1], switches[1], 1),
-    rotary_encoder.RotaryEncoderHandler(encoders[2], switches[2], 2),
-    rotary_encoder.RotaryEncoderHandler(encoders[3], switches[3], 3),
-]
 
-seesaw = rotary_encoder.Seesaw(handlers)
+def _initialise_led(board_module=board, digitalio_module=digitalio) -> digitalio.DigitalInOut:
+    led = digitalio_module.DigitalInOut(board_module.LED)
+    led.direction = digitalio_module.Direction.OUTPUT
+    led.value = True
+    return led
 
-while True:
-    seesaw_events = list(seesaw.handle())
 
-    bluetooth.send(seesaw_events)
+def _initialise_seesaw(
+    *,
+    board_module=board,
+    busio_module=busio,
+    seesaw_module=adafruit_seesaw.seesaw,
+    rotary_module=adafruit_seesaw.rotaryio,
+    seesaw_digital_module=adafruit_seesaw.digitalio,
+    digitalio_module=digitalio,
+) -> rotary_encoder.Seesaw:
+    i2c = busio_module.I2C(board_module.SCL, board_module.SDA, frequency=50000)
+    seesaw = seesaw_module.Seesaw(i2c, 0x49)
+
+    encoders = [rotary_module.IncrementalEncoder(seesaw, n) for n in range(4)]
+    switches = [seesaw_digital_module.DigitalIO(seesaw, pin) for pin in (12, 14, 17, 9)]
+    for switch in switches:
+        switch.switch_to_input(digitalio_module.Pull.UP)
+
+    handlers = [
+        rotary_encoder.RotaryEncoderHandler(encoders[index], switches[index], index)
+        for index in range(4)
+    ]
+    return rotary_encoder.Seesaw(handlers)
+
+
+def create_runtime() -> LampeControllerRuntime:
+    led = _initialise_led()
+    controller = _initialise_seesaw()
+    return LampeControllerRuntime(controller, bluetooth.send, led=led)
+
+
+def main(runtime: LampeControllerRuntime | None = None) -> None:  # pragma: no cover - hardware only
+    runtime = runtime or create_runtime()
+    while True:
+        runtime.run_once()
+
+
+if __name__ == "__main__":  # pragma: no cover - exercised on hardware
+    main()
