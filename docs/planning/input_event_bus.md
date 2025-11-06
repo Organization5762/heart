@@ -57,29 +57,46 @@ pygame -> GameLoop -> InputEventBus.emit() -> subscribers
 
 Each event is a dataclass or `TypedDict` containing:
 
-1. `type`: namespaced event label (`"switch/pressed"`).
+1. `type`: validated event label (see naming conventions below).
+1. `producer_id`: stable identifier for the component that emitted the event.
 1. `timestamp`: `datetime` in UTC; the emitter is responsible for populating it.
 1. `payload`: arbitrary structured data (e.g., `{"port": 1, "pressed": True}`).
 
 Guidelines:
 
-- Prefer namespaced event types (`<device>/<action>`) to avoid collisions.
 - Keep payloads JSON-serializable to enable future persistence/telemetry.
 - Standardize common fields (`device_id`, `user_id`, `strength`) so consumers
   can merge multiple devices.
 
+### Naming Conventions
+
+- `producer_id` must be a lowercase slug containing `[a-z0-9]` and dashes,
+  e.g., `gamepad-1`, `bluetooth-switch`, or `system-ui`. Each logical producer
+  (hardware device, virtual adapter, macro) owns exactly one ID for the lifetime
+  of the process.
+- Event `type` strings follow `<domain>.<verb>` and may optionally include a
+  qualifier segment (`<domain>.<qualifier>.<verb>`). Domains and qualifiers use
+  lowercase slug syntax identical to `producer_id`. Verbs use imperative form
+  (`pressed`, `moved`, `updated`). Examples: `switch.pressed`,
+  `cursor.delta.moved`, `navigation.mode.updated`.
+- The combination of `producer_id` + `type` must be unique per emission cycle;
+  downstream consumers rely on this tuple to key state snapshots.
+
 ### Helper Types
 
 Add `InputEvent` protocol in `src/heart/events/types.py` to capture the shape
-above and enable static typing in subscribers.
+above and enable static typing in subscribers. The protocol should surface a
+`producer_id: str` property and helper validation for the naming rules.
 
 ## State Store Semantics
 
-- The store tracks the latest event per `type` and optionally per `device_id`.
+- The store tracks the latest event per `(producer_id, type)` tuple and exposes
+  aggregation helpers for consumers dealing with multi-device input.
 - `StateStore.update(event)` stores the payload and timestamp under a composite
-  key. Provide helpers:
-  - `StateStore.get_latest(type, device_id=None)`
-  - `StateStore.get_all(type)`
+  key and applies the configured aggregation contract (see below). Provide
+  helpers:
+  - `StateStore.get_latest(type, producer_id=None)`
+  - `StateStore.get_all(type, aggregation="default")`
 - Expose a read-only `StateSnapshot` mapping for consumers who need bulk state
   without mutating rights.
 - The bus is responsible for invoking `StateStore.update()` before dispatching
@@ -104,7 +121,92 @@ above and enable static typing in subscribers.
   events, drive the bus through the game loop, and assert that both the state
   store and subscribers see expected results.
 - Include regression tests around multi-device arbitration to confirm that the
-  state store resolves conflicts deterministically.
+  state store resolves conflicts deterministically, including different
+  aggregation modes for the same event type.
+
+### Aggregation Contracts
+
+Multiple producers emitting the same event type must explicitly declare how
+their signals combine. Document the contract in a registry colocated with the
+bus:
+
+- `overwrite` (default): the latest payload replaces prior values for the
+  `(producer_id, type)` tuple and `StateStore.get_all()` returns a mapping of all
+  producers.
+- `sum`: numeric payload fields are summed across producers to produce a single
+  composite view.
+- `difference`: the newest payload is subtracted from the accumulated baseline,
+  useful for drift-correction devices.
+- `sequence`: payloads are appended to a per-type list to expose an ordered set
+  of simultaneous options.
+- Custom aggregators may be registered when domain-specific logic is needed;
+  they must accept the previous aggregate and the new event, and return the
+  updated aggregate plus the per-producer snapshot.
+
+Producers select an aggregation mode when registering with the bus. The bus
+persists per-producer snapshots regardless of aggregation so downstream actors
+can inspect individual contributions even when a composite aggregate is in use.
+
+### Producer Lifecycle & Disconnect Semantics
+
+Explicit producer registration is mandatory so the bus can associate a
+`producer_id` with its supported event types, aggregation contract, and optional
+disconnect policy. Registration returns a handle the producer must retain to
+refresh liveness. The lifecycle flows below illustrate how disconnects interact
+with the state store and subscribers:
+
+1. **First-time USB switch plug-in.**
+
+   - Device enumerator discovers a new HID peripheral and invokes
+     `InputEventBus.register_producer()` with `producer_id="usb-switch-1"`, the
+     supported event types (`switch.pressed`, `switch.released`), and an
+     `overwrite` aggregation contract.
+   - The bus records the producer metadata and seeds an initial state entry with
+     `status="available"` under the reserved event `system.lifecycle.connected`.
+   - Downstream consumers subscribed to lifecycle events initialize their own
+     bookkeeping (e.g., presenting the switch as an option in configuration
+     UIs).
+   - The device begins emitting `switch.*` events as normal.
+
+1. **Transient disconnect with automatic recovery.**
+
+   - Heartbeat threads associated with the producer periodically call
+     `producer_handle.touch()`; if the bus misses `N` consecutive touches, it
+     emits a synthetic `system.lifecycle.suspected_disconnect` event for that
+     `producer_id` and updates the state snapshot to
+     `{"status": "suspected_disconnect", "missed_heartbeats": N}`.
+   - Consumers may choose to soft-disable the device or prompt the user while
+     continuing to hold historical snapshots in case the device returns quickly.
+   - When the hardware rejoins and the heartbeat resumes, the producer reuses
+     its original ID to call `touch()`; the bus emits
+     `system.lifecycle.recovered`, promoting the state back to
+     `status="available"` and preserving prior aggregation state so the device
+     can seamlessly resume.
+
+1. **Explicit producer shutdown.**
+
+   - Software-backed producers (e.g., virtual remotes or cloud relays) should
+     call `producer_handle.disconnect(reason=...)` during teardown.
+   - The bus immediately emits `system.lifecycle.disconnected` with the supplied
+     reason and prunes active aggregation state for that producer. The historical
+     snapshot remains accessible via audit helpers for debugging.
+   - Consumers can confidently remove UI affordances or reassign bindings,
+     knowing that no further events will arrive for the `(producer_id, type)`
+     tuples associated with the disconnected producer.
+
+1. **Replacement hardware using a recycled port.**
+
+   - When a new physical device occupies the same port, the enumerator must
+     generate a fresh `producer_id` (e.g., `usb-switch-2`) to avoid conflating
+     historical events with the newcomer.
+   - Registration of the replacement automatically archives the old producer and
+     emits `system.lifecycle.replaced`, allowing consumers to migrate
+     configuration or solicit confirmation from the user.
+
+These flows keep `producer_id` stable across transient failures but force new
+IDs for genuinely different devices. Lifecycle events are ordinary bus events,
+so downstream actors can subscribe to `system.lifecycle.*` to drive UX, cleanup,
+or logging.
 
 ## Open Questions
 
