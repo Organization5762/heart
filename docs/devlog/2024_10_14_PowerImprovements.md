@@ -9,7 +9,7 @@ With new [Buck Converters](https://www.adafruit.com/product/1385), it draws 11.3
 | 5 | 1.717 | 8.58 | 1 |
 | 6 | 1.822 | 10.94 | 1 |
 
-Anything below 5V the screen starts glitching out
+Voltages below 5 V consistently produced visible artefacts, so the current recommendation is to operate at or above 6 V when testing single panels.
 
 Items:
 
@@ -20,7 +20,8 @@ Items:
 
 [Example](https://www.digikey.com/en/products/detail/assmann-wsw-components/H3CCS-1636G/999349)
 
-I couldn't find a Cable Ribbon that works with these, which is too bad. In general, seems like there isn't an easy way to extend the cable length.
+Could not locate a ribbon cable with the required pitch and connector combination, so extending the assembly remains an open
+mechanical question.
 
 | Specification | Value |
 | ------------------- | ---------------- |

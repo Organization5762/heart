@@ -1,43 +1,41 @@
 # Planning Docs Style Guide
 
-Planning documents in this directory serve as facilitation playbooks. They must feel energetic, pragmatic, and relentlessly organized so that a teammate could run with the plan without additional meetings. Use a voice that is optimistic, high-trust, and crisp about expectations. When in doubt, study `input_event_bus.md`—it is the canonical example.
+Planning documents in this directory are technical playbooks. They should read as precise, evidence-driven guides that help another contributor reproduce the same line of reasoning without additional meetings. Emphasise hypotheses, measurable outcomes, and the mechanisms that connect the two. `input_event_bus.md` illustrates the desired level of depth.
 
 ## Structure
 
-1. **Opening Snapshot.** Start every plan with a 3-4 sentence synopsis that names the product surface, the primary outcome we are pursuing, and the stakeholders who feel the impact. Anchor this introduction with a short "Why Now" paragraph that articulates urgency.
-1. **Success Criteria Table.** Immediately follow with a table that lists desired outcomes, the measurable signal that proves we hit them, and the owner responsible for validation. The table should have at least three rows and be phrased in present-tense, celebratory language (e.g., "Operators can replay sessions within 30 seconds").
-1. **Task Breakdown Checklists.** Break the work into no fewer than three sections ("Discovery", "Build", "Rollout", etc.). Within each section, include a checklist that decomposes the effort into bite-sized, verifiable tasks. Each checklist item should be an actionable verb, reference the artifact to produce, and, where relevant, link to adjacent planning docs. Encourage contributors to check off items as soon as they deliver traceable evidence (commit SHA, demo link, screenshot, etc.).
-1. **Narrative Walkthrough.** After the checklists, include a narrative walkthrough that reads like a tour guide explaining how the team will bring the plan to life. Describe the intended collaboration touchpoints, the rhythms of async updates, and the places where we expect to make critical decisions. Highlight how each phase reinforces the success criteria.
-1. **Visual Anchors.** Every plan needs at least one diagram or table beyond the success criteria table. Prefer simple ASCII art swimlanes, sequence diagrams, or tabular comparisons that make the flow obvious. If including externally rendered diagrams, note the source tool and export format. Ensure visuals are close to the text they support.
-1. **Risk Radar.** Dedicate a section to risks, mitigations, and contingency triggers. Present them in a table with columns for probability, impact, mitigation, and "early warning" signals. Close the section with a checklist of mitigation tasks.
-1. **Launch Narrative.** Finish with a vignette that describes the day the plan succeeds. Paint a picture of the launch moment, the metrics dashboard lighting up, the support channel reactions, and the follow-up steps that lock in momentum. This section should feel motivational while still citing concrete signals.
+1. **Opening abstract.** Begin with a concise summary describing the system surface, the outcome under investigation, and the primary users or operators. Include a short "Why now" paragraph that situates the work within current constraints or research questions.
+1. **Success criteria table.** Provide a table that lists the target behaviours, the quantitative or observable signal that demonstrates success, and the owner responsible for validation. Phrase each row in neutral, technical language so it stands on its own in design reviews.
+1. **Task breakdown checklists.** Divide the work into clearly named phases (for example, "Discovery", "Implementation", "Validation"). Within each phase include a checklist of verifiable steps, the artifacts they produce, and links to related notes or source modules.
+1. **Narrative walkthrough.** After the checklists, add a prose section that explains how the phases connect. Highlight expected collaboration points, decision gates, and the rationale for sequencing. The narrative should make it easy to interrogate assumptions during review.
+1. **Visual references.** Include at least one diagram or table beyond the success criteria table. Lightweight ASCII diagrams, sequence charts, or comparative tables are preferred. When importing diagrams from external tools, document the source and export format.
+1. **Risk analysis.** Dedicate a section to risks, mitigations, and contingency triggers. Present them in a table with columns for probability, impact, mitigation strategy, and early warning signals. Follow with a checklist of mitigation tasks.
+1. **Outcome snapshot.** Conclude with a short description of the system once the plan lands. Focus on the measurable signals, operator workflows, and any follow-on experiments it unlocks.
 
-## Tone and Formatting
+## Tone and formatting
 
 - Write in active voice with short, declarative sentences. Use bold headings for sections and sentence case for checklist items.
-- Keep paragraphs tight (2-4 sentences) and interleave them with tables, checklists, and diagrams so the reader never faces a wall of text.
-- Use markdown callout blocks ("Note", "Tip", "Warning") to surface the intent behind nuanced steps.
-- Sprinkle branded phrases like "heartbeats", "signal checks", and "win stories" where they reinforce our culture without feeling forced.
+- Keep paragraphs compact (2–4 sentences) and interleave them with tables, checklists, and diagrams so the reader can scan quickly.
+- Use markdown callouts ("Note", "Tip", "Warning") to surface nuances or dependencies that warrant additional attention.
+- Prefer precise technical vocabulary over colloquial phrases. Refer to internal concepts (for example, "signal capture" or "state synchronisation") only when they clarify intent.
 
-## Depth Expectations
+## Depth expectations
 
-Plans should aim for roughly 800-1200 words. Err on the side of over-explaining rationale, dependencies, and success signals. The goal is that someone unfamiliar with the initiative could drive execution after a single read-through.
+Plans should land in the 800–1200 word range. Err on the side of documenting assumptions, dependencies, and validation methods so a teammate can reproduce the analysis. Whenever tasks reference code or data, point to concrete modules, dashboards, or experiments.
 
-When describing tasks, explicitly mention the artifacts (docs, dashboards, PRs) that prove completion. Encourage linking to metrics definitions, previous research notes, and any living runbooks in `docs/devlog/`.
+## Quality checklist for authors
 
-## Quality Checklist for Authors
-
-- [ ] Opening snapshot captures the why, the who, and the promise in under 5 sentences.
-- [ ] Success criteria table is celebratory, measurable, and owner-assigned.
-- [ ] Every phase has a checklist with at least 4 actionable tasks.
-- [ ] Narrative walkthrough ties phases to success criteria and highlights collaboration rhythms.
+- [ ] Opening abstract captures the objective, the context, and the relevant stakeholders in under five sentences.
+- [ ] Success criteria table lists measurable signals and responsible owners.
+- [ ] Every phase contains a checklist with actionable, verifiable tasks.
+- [ ] Narrative walkthrough ties the phases together and motivates the sequencing.
 - [ ] At least one diagram or supplemental table clarifies flow or decision points.
-- [ ] Risk radar table plus mitigation checklist exist and feel realistic.
-- [ ] Launch narrative celebrates outcomes with vivid detail and concrete metrics.
-- [ ] Tone stays upbeat, authoritative, and aligned with Heart vocabulary.
+- [ ] Risk analysis includes both tabular assessment and mitigation tasks.
+- [ ] Outcome snapshot describes the observable state once the plan ships.
+- [ ] Tone remains technical, formal, and oriented around evidence.
 - [ ] References to related docs and artifacts are embedded where helpful.
 - [ ] Word count lands between 800 and 1200 words.
 
-## Review Guidance
+## Review guidance
 
-Reviewers should read the plan aloud (yes, literally) to ensure the cadence feels motivational and unambiguous. They should trace each success criterion to supporting tasks and confirm that every risk has a clear mitigation path. If any section feels thin, request additional detail or a visual aid before approving.
+Reviewers should interrogate each success criterion and confirm that the plan supplies a clear path to measure it. Trace risks to mitigations and ensure every dependency has an owner. Request revisions whenever rationale is missing or when additional visuals would illuminate the design.

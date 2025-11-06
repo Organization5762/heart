@@ -2,4 +2,5 @@
 
 This directory collects plans and roadmaps for future improvements to the Heart project.
 
-Each document outlines a specific proposal, the problems it addresses, and actionable steps for implementation.
+Each document frames a specific proposal, the technical questions it tackles, and the verifiable steps required for
+implementation and evaluation.

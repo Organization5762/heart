@@ -1,4 +1,5 @@
-RIP - unclear why this is a train wreck
+Current macOS builds continue to crash with an `NSInternalInconsistencyException` during window title updates; the stack trace
+below captures the failure for reference while we investigate thread-affinity assumptions in SDL.
 
 ```
 2024-10-15 22:49:38.795 Python[56724:1033560] *** Terminating app due to uncaught exception 'NSInternalInconsistencyException', reason: 'NSWindow drag regions should only be invalidated on the Main Thread!'
