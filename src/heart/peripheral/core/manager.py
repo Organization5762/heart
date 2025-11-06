@@ -2,6 +2,7 @@ import itertools
 import threading
 from typing import Iterable, Iterator
 
+from heart.peripheral import switch as switch_module
 from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
@@ -10,8 +11,6 @@ from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.sensor import Accelerometer
-from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
-                                     Switch)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -23,7 +22,7 @@ class PeripheralManager:
 
     def __init__(self, *, event_bus: EventBus | None = None) -> None:
         self._peripherals: list[Peripheral] = []
-        self._deprecated_main_switch: BaseSwitch | None = None
+        self._deprecated_main_switch: switch_module.BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
         self._started = False
         self._event_bus = event_bus
@@ -83,21 +82,23 @@ class PeripheralManager:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             logger.info("Detecting switches")
             switches: list[Peripheral] = [
-                *Switch.detect(),
-                *BluetoothSwitch.detect(),
+                *switch_module.Switch.detect(),
+                *switch_module.BluetoothSwitch.detect(),
             ]
             logger.info("Found %d switches", len(switches))
             if len(switches) == 0:
                 logger.warning("No switches found")
-                switches = list(FakeSwitch.detect())
+                switches = list(switch_module.FakeSwitch.detect())
         else:
             logger.info("Not running on pi, using fake switch")
-            switches = list(FakeSwitch.detect())
+            switches = list(switch_module.FakeSwitch.detect())
 
         for switch in switches:
             logger.info("Adding switch - %s", switch)
 
-            if self._deprecated_main_switch is None and isinstance(switch, BaseSwitch):
+            if self._deprecated_main_switch is None and isinstance(
+                switch, switch_module.BaseSwitch
+            ):
                 self._deprecated_main_switch = switch
             yield switch
 
@@ -118,7 +119,7 @@ class PeripheralManager:
         if self._event_bus is not None:
             peripheral.attach_event_bus(self._event_bus)
 
-    def _deprecated_get_main_switch(self) -> BaseSwitch:
+    def _deprecated_get_main_switch(self) -> switch_module.BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now
         subsumed by this."""
         if self._deprecated_main_switch is None:
@@ -126,9 +127,9 @@ class PeripheralManager:
 
         return self._deprecated_main_switch
 
-    def bluetooth_switch(self) -> BluetoothSwitch | None:
+    def bluetooth_switch(self) -> switch_module.BluetoothSwitch | None:
         for p in self._peripherals:
-            if isinstance(p, BluetoothSwitch):
+            if isinstance(p, switch_module.BluetoothSwitch):
                 return p
         return None
 
