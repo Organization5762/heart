@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from heart.environment import (RendererVariant, _convert_bgr_to_hsv,
-                               _convert_hsv_to_bgr, HSV_TO_BGR_CACHE)
+from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
+                               _convert_bgr_to_hsv, _convert_hsv_to_bgr)
 
 
 @pytest.fixture(autouse=True)
