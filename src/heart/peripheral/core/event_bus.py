@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, List, MutableMapping, Optional
 
 from . import Input
+from .state_store import StateStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,9 +29,10 @@ class SubscriptionHandle:
 class EventBus:
     """Synchronous pub/sub dispatcher for :class:`Input` events."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, state_store: StateStore | None = None) -> None:
         self._subscribers: MutableMapping[Optional[str], List[SubscriptionHandle]] = defaultdict(list)
         self._next_sequence = 0
+        self._state_store = state_store or StateStore()
 
     # Public API ---------------------------------------------------------
     def subscribe(
@@ -69,6 +71,7 @@ class EventBus:
             input_event = event
         else:
             input_event = Input(event_type=event, data=data, producer_id=producer_id)
+        self._state_store.update(input_event)
         for handle in self._iter_targets(input_event.event_type):
             try:
                 handle.callback(input_event)
@@ -87,6 +90,12 @@ class EventBus:
             return callback
 
         return decorator
+
+    @property
+    def state_store(self) -> StateStore:
+        """Return the state store maintained by the bus."""
+
+        return self._state_store
 
     # Internal helpers ---------------------------------------------------
     def _iter_targets(self, event_type: str) -> Iterable[SubscriptionHandle]:
