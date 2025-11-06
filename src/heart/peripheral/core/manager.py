@@ -4,6 +4,7 @@ from typing import Iterable, Iterator
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.microphone import Microphone
@@ -63,6 +64,7 @@ class PeripheralManager:
             self._detect_heart_rate_sensor(),
             self._detect_phone_text(),
             self._detect_microphones(),
+            self._detect_drawing_pads(),
         )
 
     def start(self) -> None:
@@ -116,6 +118,9 @@ class PeripheralManager:
 
     def _detect_microphones(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Microphone.detect())
+
+    def _detect_drawing_pads(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(DrawingPad.detect())
 
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
