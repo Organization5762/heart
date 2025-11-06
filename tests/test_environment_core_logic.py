@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from heart.environment import (RendererVariant, _convert_bgr_to_hsv,
-                               _convert_hsv_to_bgr)
+from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
+                               _convert_bgr_to_hsv, _convert_hsv_to_bgr)
 
 
 @pytest.fixture(autouse=True)
@@ -14,6 +14,15 @@ def disable_cv2(monkeypatch):
     """Force the environment color helpers to use the numpy fallbacks."""
 
     monkeypatch.setattr("heart.environment.CV2_MODULE", None)
+
+
+@pytest.fixture(autouse=True)
+def clear_hsv_cache():
+    """Ensure colour conversion cache state is isolated between tests."""
+
+    HSV_TO_BGR_CACHE.clear()
+    yield
+    HSV_TO_BGR_CACHE.clear()
 
 
 @pytest.mark.parametrize(
@@ -72,6 +81,50 @@ def test_color_round_trip(seed: int) -> None:
     round_trip = _convert_hsv_to_bgr(hsv)
 
     np.testing.assert_array_equal(round_trip, bgr)
+
+
+def test_convert_bgr_to_hsv_populates_cache_for_standard_values() -> None:
+    image = np.array(
+        [[[10, 20, 30], [40, 60, 80], [0, 255, 0]]],
+        dtype=np.uint8,
+    )
+
+    hsv = _convert_bgr_to_hsv(image)
+
+    flat_bgr = image.reshape(-1, 3)
+    flat_hsv = hsv.reshape(-1, 3)
+
+    for hsv_value, bgr_value in zip(flat_hsv[:-1], flat_bgr[:-1]):
+        key = tuple(int(x) for x in hsv_value)
+        assert key in HSV_TO_BGR_CACHE
+        np.testing.assert_array_equal(HSV_TO_BGR_CACHE[key], bgr_value)
+
+    special_key = tuple(int(x) for x in flat_hsv[-1])
+    assert special_key == (60, 255, 255)
+    assert special_key not in HSV_TO_BGR_CACHE
+
+
+def test_convert_hsv_to_bgr_prefers_cached_values() -> None:
+    key = (12, 34, 200)
+    cached_value = np.array([1, 2, 3], dtype=np.uint8)
+    HSV_TO_BGR_CACHE[key] = cached_value.copy()
+
+    hsv = np.array([[list(key)]], dtype=np.uint8)
+    result = _convert_hsv_to_bgr(hsv)
+
+    np.testing.assert_array_equal(result[0, 0], cached_value)
+    assert next(reversed(HSV_TO_BGR_CACHE)) == key
+
+
+def test_convert_hsv_to_bgr_calibration_clears_cache_for_known_keys() -> None:
+    key = (60, 255, 255)
+    HSV_TO_BGR_CACHE[key] = np.array([9, 9, 9], dtype=np.uint8)
+
+    hsv = np.array([[list(key)]], dtype=np.uint8)
+    result = _convert_hsv_to_bgr(hsv)
+
+    np.testing.assert_array_equal(result[0, 0], np.array([2, 255, 0], dtype=np.uint8))
+    assert key not in HSV_TO_BGR_CACHE
 
 
 def _sequential_binary_merge(values: list[str]) -> str:
