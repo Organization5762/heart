@@ -10,9 +10,9 @@ Flow toys such as pixel whips and LED poi broadcast status telemetry over low-po
 
 | Target behaviour | Observable signal | Validation owner |
 | --- | --- | --- |
-| Reliable passive capture of toy telemetry packets within 3 m | Replayed IQ captures reconstructed into packets with <5% packet loss during 10-minute capture windows | RF tooling lead |
-| Accurate protocol reverse-engineering | Decoder produces fields matching vendor mobile app logs with <2% variance over 100 messages | Embedded architect |
-| Bidirectional control from Heart runtime | Heart orchestrator toggles toy modes with end-to-end latency <150 ms | Runtime maintainer |
+| Reliable passive capture of toy telemetry packets within 3 m | Replayed IQ captures reconstructed into packets with \<5% packet loss during 10-minute capture windows | RF tooling lead |
+| Accurate protocol reverse-engineering | Decoder produces fields matching vendor mobile app logs with \<2% variance over 100 messages | Embedded architect |
+| Bidirectional control from Heart runtime | Heart orchestrator toggles toy modes with end-to-end latency \<150 ms | Runtime maintainer |
 | Safe multi-device arbitration | Two toys driven concurrently retain independent addressing without command bleed-over across 30 test cycles | QA automation |
 
 ## Phase breakdown
@@ -24,6 +24,8 @@ Flow toys such as pixel whips and LED poi broadcast status telemetry over low-po
 - [ ] Acquire SDR samples (HackRF + GQRX or PlutoSDR + SoapySDR) across 2.4 GHz and sub-GHz bands while toys operate in default modes.
 - [ ] Use `inspectrum`/`Universal Radio Hacker` to segment bursts, identify preambles, and estimate symbol rates.
 - [ ] Align captured messages with mobile app actions to map cadence and infer directionality.
+- [ ] Establish a capture log in `docs/research/logs/flow_toys/captures.md` summarizing date, toy firmware, antenna chain, gain, and environment noise floor measurements.
+- [ ] Build an RF calibration checklist (attenuator values, LNA state, clock source) to keep multi-session captures reproducible.
 
 ### Implementation – decoding and runtime integration
 
@@ -32,6 +34,8 @@ Flow toys such as pixel whips and LED poi broadcast status telemetry over low-po
 - [ ] Prototype a `FlowToyReceiver` that ingests demodulated payloads over a socket or file interface and publishes events on the input bus.
 - [ ] Evaluate candidate transceivers (nRF52840, TI CC2652, ESP32-C6) for transmit capability at the discovered modulation scheme.
 - [ ] Design a command serializer mirroring decoded frames, supporting sequence numbers and HMAC/signature fields if detected.
+- [ ] Define automated regression fixtures in `tests/peripherals/flow_toy/` that replay captures and assert decoder stability before firmware commits merge.
+- [ ] Outline a telemetry schema contract in `docs/runtime_interfaces.md` so choreography tooling can subscribe to normalized toy state.
 
 ### Validation – closed-loop testing & UX handoff
 
@@ -40,6 +44,8 @@ Flow toys such as pixel whips and LED poi broadcast status telemetry over low-po
 - [ ] Integrate multi-toy control scenarios into the sandbox demo, logging state transitions and verifying deterministic arbitration policies.
 - [ ] Document operator workflows covering capture setup, firmware flashing, and troubleshooting in `docs/ops/flow_toys.md`.
 - [ ] Align choreography cues with UX/audio stakeholders once control paths are stable.
+- [ ] Produce a compliance readiness packet summarizing channel plans, calculated duty cycles, and certification requirements for the selected transceiver.
+- [ ] Schedule a live rehearsal in the experience lab with production lighting to validate human-perceived synchronization and gather UX sign-off notes.
 
 ## Narrative walkthrough
 
@@ -48,6 +54,9 @@ Discovery anchors the plan by capturing real radio activity before any code is w
 Implementation begins once payload captures are repeatable. GNU Radio handles filtering, but we export symbol streams into Python so contributors can iterate without the GUI. Frame structure notes become the contract for runtime integration as the `FlowToyReceiver` feeds the event bus. In parallel we evaluate Nordic nRF52840, TI CC2652, and Espressif ESP32-C6 options against modulation support, stack maturity, and firmware pipeline fit.
 
 Validation closes the loop. A bench jig replays Heart commands while the SDR monitors on-air responses to verify legal waveforms. Long-duration trials quantify packet loss and interference susceptibility. Multi-device arbitration tests guarantee the command serializer respects per-toy addresses, and documentation plus UX coordination ensure operators can stage synchronized shows quickly.
+
+> **Note**
+> Store every validated capture, decoder release, and firmware build artifact in `s3://heart-rf/flow-toys/` with semantic version tags so field teams can stage regressions without rerunning the entire discovery workflow.
 
 ## Data path overview
 
@@ -67,6 +76,7 @@ Validation closes the loop. A bench jig replays Heart commands while the SDR mon
 | TI CC2652R7 | BLE, Zigbee, Thread, 2.4 GHz OOK/FSK | +5 dBm | TI SimpleLink SDK, SmartRF Studio | Zigbee-centric examples; custom modulation needs RF Studio scripting |
 | Espressif ESP32-C6 | BLE 5, Wi-Fi 6, 802.15.4 | +20 dBm (Wi-Fi), +10 dBm (BLE) | ESP-IDF, open-source MAC layers | Custom GFSK requires co-processor or firmware patching |
 | ADI ADF7242 + MCU | 2.4 GHz O-QPSK/FSK with raw mode | +4 dBm | Registers exposed for direct PHY manipulation | Requires separate MCU; limited community support |
+| Silicon Labs EFR32MG24 | Multi-protocol with advanced radio configurator | +10 dBm | Simplicity Studio tooling, strong Thread/Zigbee support | Proprietary tooling on macOS; licensed RAIL stack |
 
 ## Risk analysis
 
@@ -76,6 +86,7 @@ Validation closes the loop. A bench jig replays Heart commands while the SDR mon
 | SDR capture quality insufficient in noisy venues | High | Packet loss >10% | Deploy band-pass filters and shielded enclosures; schedule captures in RF isolation chamber before field trials | IQ recordings show inconsistent preamble detection |
 | Transmit experiments violate regional RF regulations | Low | Regulatory exposure | Use shielded box for initial TX tests, document channel/frequency, adhere to FCC Part 15 limits | SDR waterfall shows out-of-band splatter |
 | Toy firmware updates shift protocol | Medium | Decoder obsolescence | Automate nightly captures from toys with auto-update enabled; add version fingerprinting to frame parser | App release notes mention RF fixes |
+| Selected transceiver cannot meet real-time latency budget | Medium | Degraded choreography alignment | Bench-mark latency with loopback firmware before integration; retain alternate chipset for fallback | Latency logs exceed 150 ms in soak test |
 
 **Mitigation checklist**
 
@@ -83,6 +94,7 @@ Validation closes the loop. A bench jig replays Heart commands while the SDR mon
 - [ ] Budget for an RF isolation enclosure and calibrated attenuators in Q2 hardware spend.
 - [ ] Draft a regulatory compliance note covering duty cycle, frequency plan, and conducted power limits.
 - [ ] Implement frame versioning in the Heart runtime so protocol shifts trigger alerts.
+- [ ] Maintain parallel firmware branches for Nordic and TI development kits until latency and compliance benchmarks converge.
 
 ## Outcome snapshot
 

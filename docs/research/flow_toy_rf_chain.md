@@ -15,6 +15,7 @@ Characterize the passive radio emissions from commercially available light-up fl
 1. **Transmitter prototyping** – Once frame structure is understood, implement a replay tool using `pyspinel`, `nRF ESB` libraries, or raw PHY generation in GNU Radio. Validate on-air using a shielded enclosure to avoid interference.
 1. **Runtime integration** – Build a `FlowToyLink` abstraction in `src/heart/peripheral/flow_toy/` that can operate in capture-only or full-duplex modes. Integrate telemetry parsing and command emission with the existing event bus/state store infrastructure.
 1. **Regression harness** – Create automated tests that replay captured IQ files and assert deterministic decoding. Mirror those tests with hardware-in-the-loop runs triggered via `make flow-toy-hil` to ensure the transmitter path stays aligned with firmware updates.
+1. **Field validation** – Deploy a portable kit (laptop + SDR + selected transceiver) to live rehearsals, capturing RF traces alongside operator notes. Feed findings back into the regression harness to model real-world multipath and interference.
 
 ## Software toolchain
 
@@ -25,6 +26,7 @@ Characterize the passive radio emissions from commercially available light-up fl
 | Protocol spec | Kaitai Struct (`flow_toy_frame.ksy`) with generated Python parser | `src/heart/protocols/flow_toy/` |
 | Runtime bridge | Python driver + CFFI bindings for transceiver firmware | `src/heart/peripheral/flow_toy/driver.py` |
 | Test harness | Pytest suite with `pytest-sdr` fixtures and capture fixtures | `tests/peripherals/flow_toy/` |
+| Telemetry dashboard | Grafana + `prometheus-client` exporter summarizing packet quality metrics | `experimental/telemetry/flow_toys/` |
 
 ## Hardware platform options
 
@@ -35,12 +37,14 @@ Characterize the passive radio emissions from commercially available light-up fl
 | BLE/proprietary TX/RX | Nordic nRF52840 Dongle | Native BLE + ESB support, open-source sniffer firmware | USB form factor integrates with existing host tools |
 | Multi-protocol TX/RX | TI CC2652P LaunchPad | Amplified 2.4 GHz radio, multiprotocol SDK | Needs firmware build via Code Composer or `tiarmclang` |
 | Wi-Fi / 802.15.4 bridge | ESP32-C6 DevKitC | Combines Wi-Fi telemetry with BLE fallback | Custom RF path requires IDF 5.1+; ensure coexistence settings tuned |
+| Custom PHY experimentation | LimeSDR Mini 2.0 | Flexible LMS7002M transceiver for arbitrary waveforms | Requires USB 3.0 host and LimeSuite calibration before capture |
 
 ## Interfaces & firmware strategy
 
 - **Passive capture mode.** SDR streams IQ over USB to the host laptop. GNU Radio demodulates to symbols and forwards newline-delimited hex packets via ZeroMQ. The Heart runtime subscribes to the socket and records packets for offline analysis.
 - **Active control mode.** A USB-attached transceiver (nRF52840 or CC2652) runs custom firmware exposing a UART command channel. Heart sends serialized frame descriptors (address, opcode, payload, checksum), and firmware handles PHY timing. Responses are echoed back to Heart for logging.
 - **Safety interlocks.** Firmware enforces a whitelist of permitted frequencies and duty cycles. Host software requests a session lease before enabling transmit, and leases auto-expire after 120 seconds of inactivity.
+- **Data retention.** Persist IQ files, decoded payload CSVs, and firmware images in the RF artifact bucket with SHA-256 manifests. Tag each upload with the regression harness version to ensure replay parity.
 
 ## Open questions
 
@@ -53,3 +57,4 @@ Characterize the passive radio emissions from commercially available light-up fl
 - Draft detailed capture scripts referencing specific GNU Radio blocks and publish them with example IQ files.
 - Prototype the ZeroMQ bridge and integrate it into the sandbox demo for passive telemetry visualization.
 - Begin RF compliance review to ensure future transmit testing can occur within lab constraints.
+- Stand up nightly decoder regression jobs in CI that consume the latest capture artifacts and post dashboards to the telemetry workspace.
