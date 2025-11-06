@@ -1,43 +1,79 @@
 # Direct Sensor Access Plan
 
-Goal: allow developers to interrogate a hardware sensor from the host machine without launching the full game runtime. The tool should stream readings over USB serial and expose a thin API for automated tests.
+## Problem Statement
 
-## Requirements
+Provide a reproducible path to interrogate hardware sensors from a host workstation without launching the full Heart runtime.
 
-- **Board connection**: reuse the existing CircuitPython USB serial channel.
-- **Selectable sensors**: support choosing a sensor by module path (e.g., `drivers.sensors.imu`).
-- **Minimal dependencies**: run under CircuitPython with only built-in modules plus our driver.
-- **Host-side convenience**: provide a Python CLI in `scripts/` that sends commands and prints parsed readings.
-- **Automated quality check (QC)**: make it effortless to flash a new board, confirm the sensor responds, and record a short
-  diagnostic trace without manual intervention.
+## Materials
 
-## Proposed flow
+- CircuitPython-compatible sensor boards connected over USB.
+- Existing drivers under `drivers/` for the targeted sensors.
+- Host workstation with Python 3.11, `pyserial`, and access to the repository.
+- USB cable capable of data transfer.
 
-1. **Probe script template**
-   - Add `drivers/utils/probe_base.py` with a helper class that handles argument parsing from `sys.argv` and loops over reads.
-   - Each sensor provides a `probe.py` that subclasses the helper and implements `read_once()`.
-1. **Host CLI**
-   - Create `scripts/sensor_probe.py` that opens the board serial port, flashes the requested `probe.py`, and streams the responses.
-   - Support a `--record` flag to write samples to disk for offline analysis.
-1. **Documentation & examples**
-   - Extend `docs/debugging/circuitpython_peripherals.md` with instructions for running the probes.
-   - Ship one example (e.g., accelerometer) to validate the flow.
+## Opening Abstract
 
-## Automated QC happy-path
+We need a tooling flow that lets engineers and manufacturing technicians query a sensor board directly. The current runtime requires the entire game loop to boot before peripherals respond, slowing diagnosis and automated QC. This plan outlines a split design: lightweight CircuitPython probe scripts flashed to the board and a host CLI that streams responses. By standardising the interface, we can reuse the same scripts for lab validation, line-side checks, and regression tests.
 
-1. **Automated flashing**: wrap the UF2 copy procedure in a `scripts/flash_board.py` helper so CI or a developer can reset a
-   board and load the probe script with a single command.
-1. **Connectivity verification**: after flashing, issue a lightweight `ping` command over serial that expects a known response
-   (for example, firmware version plus sensor ID). Fail fast if the response is absent or malformed.
-1. **Sensor self-test**: run the associated `probe.py` in a bounded loop (e.g., 10 samples) and assert that the readings fall
-   within expected sanity ranges defined per sensor.
-1. **Report aggregation**: persist the flash log, ping outcome, and sample statistics to `docs/debugging/logs/` so hardware can
-   be baselined over time and regressions are obvious.
+### Why Now
 
-Keeping this QC path automated and low-friction is critical—every fresh board flash should produce a deterministic pass/fail
-signal within seconds so driver regressions are caught before they reach the wider runtime.
+Upcoming driver revisions introduce new sensors whose behaviour must be verified before integration. Establishing a direct-access workflow reduces turnaround time between hardware iterations and prevents regressions from slipping into the runtime.
 
-## Open questions
+## Success Criteria
 
-- How do we bundle per-sensor dependencies without filling the board storage? Possibly generate probes on the fly from templates.
-- Should the host CLI support live plotting (e.g., matplotlib) or stay text-only initially?
+| Behaviour | Signal | Owner |
+| --- | --- | --- |
+| Board responds to probe command without the runtime | Host CLI receives a structured payload within 2 seconds | Firmware maintainer |
+| Operators can select any supported sensor by module path | CLI `--sensor` flag resolves to the correct CircuitPython module | Tooling engineer |
+| QC run emits archived artefacts | Probe session writes a timestamped log to `docs/debugging/logs/` | Manufacturing lead |
+
+## Task Breakdown Checklists
+
+### Discovery
+
+- [ ] Audit existing drivers for dependencies beyond the CircuitPython standard library.
+- [ ] Catalogue serial port identifiers for supported boards on macOS, Linux, and Windows.
+- [ ] Document current flashing workflow and pain points.
+
+### Implementation
+
+- [ ] Add `drivers/utils/probe_base.py` with argument parsing and read loop helpers.
+- [ ] Create per-sensor `probe.py` scripts subclassing the base helper.
+- [ ] Implement `scripts/sensor_probe.py` with flags for sensor selection, serial device, and optional recording.
+- [ ] Provide automated flashing helper `scripts/flash_board.py` that copies UF2 images and selected probes.
+
+### Validation
+
+- [ ] Execute probes for accelerometer and heart-rate sensors, capturing sample logs.
+- [ ] Run probe sessions on macOS and Linux workstations to confirm cross-platform behaviour.
+- [ ] Add smoke tests that exercise the host CLI against a simulated serial port to guard the interface contract.
+
+## Narrative Walkthrough
+
+Discovery focuses on understanding driver footprints and host OS quirks so the tooling accounts for serial naming conventions and memory limits. Implementation builds two cooperating layers: CircuitPython probes that expose a minimal API and a host CLI that orchestrates flashing, command dispatch, and logging. Validation closes the loop by running probes across platforms, collecting artefacts, and introducing automated tests that simulate board responses. This sequencing ensures we only invest in tooling once the constraints are known and that every feature is immediately exercised.
+
+## Visual Reference
+
+| Layer | Responsibility | Key Modules |
+| --- | --- | --- |
+| CircuitPython probe | Initialise sensor, emit JSON payloads, respond to `ping` command | `drivers/utils/probe_base.py`, `drivers/<sensor>/probe.py` |
+| Host CLI | Flash probe, open serial port, stream and optionally persist readings | `scripts/flash_board.py`, `scripts/sensor_probe.py` |
+| QC Automation | Aggregate logs and raise failures on out-of-range readings | `docs/debugging/logs/`, CI harness |
+
+## Risk Analysis
+
+| Risk | Probability | Impact | Mitigation | Early Warning |
+| --- | --- | --- | --- | --- |
+| CircuitPython storage limits block multiple probes | Medium | Medium | Generate probe scripts from templates and copy only the requested sensor | Flash process reports out-of-space errors |
+| Serial port differences across OS cause connection failures | Medium | High | Provide configuration file with known port patterns and allow explicit override | CLI logs retries with enumerated device list |
+| Probes drift from runtime behaviour | Low | High | Share parsing utilities between runtime drivers and probes | Unit tests fail when shared helpers diverge |
+
+### Mitigation Tasks
+
+- [ ] Implement template generation for probes so optional modules stay off the board.
+- [ ] Add OS-specific serial detection logic with overrides.
+- [ ] Extract shared parsing code into a common module used by both runtime and probe scripts.
+
+## Outcome Snapshot
+
+Technicians can flash a board, run a single CLI command, and receive structured sensor readings plus archived logs in under two minutes. Developers reuse the same tooling for regression tests, and probe scripts share code with the runtime so behaviour stays aligned.

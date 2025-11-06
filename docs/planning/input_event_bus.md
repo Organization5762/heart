@@ -1,218 +1,84 @@
 # Input Event Bus & State Store Plan
 
-## Background
+## Problem Statement
 
-The current input pathway drains the global pygame queue inside `GameLoop` and has
-peripherals mutating their own state. To support reactive listeners and simple state
-queries, we need a project-local event bus paired with a shared state store.
+Replace the ad-hoc peripheral state mutations in the game loop with a structured event bus and shared state store so systems can subscribe to input changes and read deterministic snapshots.
 
-## Goals
+## Materials
 
-- Normalize how peripherals publish input and requests.
-- Let systems subscribe to events with lightweight callbacks or decorators.
-- Provide a `State.get()`-style API for the latest input snapshots.
-- Incrementally adopt the bus without breaking existing device integrations.
+- Existing `GameLoop` implementation and peripheral modules under `src/heart/peripheral`.
+- Proposed bus implementation in `src/heart/events`.
+- Access to hardware peripherals (switches, Bluetooth controllers, gamepads) for validation.
+- Test harness capable of simulating pygame events.
 
-## Incremental Checklist
+## Opening Abstract
 
-1. [x] Land an `EventBus` core module with subscribe/emit/unsubscribe helpers and unit tests
-   covering subscriber ordering, decorator registration, and failure isolation.
-1. [x] Thread the event bus through the `GameLoop`, bridging pygame/system events to
-   subscribers while maintaining current behavior.
-1. [ ] Introduce a shared `StateStore` that the bus can update on every emission,
-   exposing `State.get()` helpers for consumers.
-1. [ ] Migrate representative peripherals (switch, bluetooth switch, gamepad) to emit
-   structured events via the bus instead of mutating device-level state.
-1. [ ] Update high-level consumers (navigation, modes) to read from the state store and
-   add regression tests demonstrating multi-device arbitration.
+Today, peripherals mutate module-level state and the `GameLoop` drains pygame events directly. This makes it difficult to trace state changes, support multiple devices, or replay inputs. The goal is to introduce an in-process event bus coupled with a state store. Peripherals publish typed events, subscribers react synchronously, and consumers query the latest snapshots through a simple API. The migration must maintain backwards compatibility while we transition each device.
 
-## Notes
+### Why Now
 
-- Keep the bus synchronous for now; if latency becomes an issue we can explore
-  background dispatchers.
-- Focus early tests on pure Python logic so they remain deterministic in CI.
+Upcoming multi-device installations require deterministic arbitration between inputs, and the MQTT split plan depends on structured events. Establishing the bus now simplifies both efforts.
 
-## Architecture Overview
+## Success Criteria
 
-The first iteration keeps the event bus and state store in-process alongside the
-`GameLoop`. The loop will hydrate a singleton `InputEventBus` on start-up and
-pass it to peripherals during initialization. Peripherals emit domain events to
-the bus, which immediately notifies registered subscribers and writes the latest
-payload into the `StateStore`.
+| Behaviour | Signal | Owner |
+| --- | --- | --- |
+| Event bus delivers typed payloads for core peripherals | Unit tests show `switch.pressed` and `gamepad.moved` events emitted with timestamps | Peripheral lead |
+| State store exposes latest snapshots with aggregation | `StateStore.get_latest()` returns coherent values during integration tests | Runtime engineer |
+| Migration preserves existing scene behaviour | Regression suite passes with bus enabled and legacy code removed | QA owner |
 
-```
-pygame -> GameLoop -> InputEventBus.emit() -> subscribers
-                                   \-> StateStore.update()
-```
+## Task Breakdown Checklists
 
-- `GameLoop` remains the orchestrator that polls pygame and exposes lifecycle
-  hooks for peripherals.
-- `InputEventBus` exposes `subscribe`, `unsubscribe`, `emit`, and
-  `subscription` decorator helpers.
-- `StateStore` provides `get(path, default=None)` and `snapshot()` accessors.
-- Peripherals focus on translating hardware state to typed events without
-  retaining global mutable state.
+### Discovery
 
-## Event Model & Schema
+- [ ] Document current peripheral state mutations and identify consumers.
+- [ ] Define canonical event types, producer IDs, and payload schemas.
+- [ ] Assess lifecycle requirements (connect, disconnect, heartbeat).
 
-Each event is a dataclass or `TypedDict` containing:
+### Implementation – Core Infrastructure
 
-1. `type`: validated event label (see naming conventions below).
-1. `producer_id`: stable identifier for the component that emitted the event.
-1. `timestamp`: `datetime` in UTC; the emitter is responsible for populating it.
-1. `payload`: arbitrary structured data (e.g., `{"port": 1, "pressed": True}`).
+- [ ] Implement `InputEventBus` with `subscribe`, `unsubscribe`, decorator support, and synchronous dispatch.
+- [ ] Introduce `StateStore` with aggregation strategies (`overwrite`, `sum`, `sequence`).
+- [ ] Provide helper types (`InputEvent` protocol) enforcing naming conventions.
 
-Guidelines:
+### Implementation – Peripheral Migration
 
-- Keep payloads JSON-serializable to enable future persistence/telemetry.
-- Standardize common fields (`device_id`, `user_id`, `strength`) so consumers
-  can merge multiple devices.
+- [ ] Wrap switch, Bluetooth switch, and gamepad integrations to emit events while preserving existing behaviour.
+- [ ] Register producers with lifecycle hooks (connected, suspected_disconnect, recovered, disconnected).
+- [ ] Add feature flag (`ENABLE_INPUT_EVENT_BUS`) for staged rollout.
 
-### Naming Conventions
+### Validation
 
-- `producer_id` must be a lowercase slug containing `[a-z0-9]` and dashes,
-  e.g., `gamepad-1`, `bluetooth-switch`, or `system-ui`. Each logical producer
-  (hardware device, virtual adapter, macro) owns exactly one ID for the lifetime
-  of the process.
-- Event `type` strings follow `<domain>.<verb>` and may optionally include a
-  qualifier segment (`<domain>.<qualifier>.<verb>`). Domains and qualifiers use
-  lowercase slug syntax identical to `producer_id`. Verbs use imperative form
-  (`pressed`, `moved`, `updated`). Examples: `switch.pressed`,
-  `cursor.delta.moved`, `navigation.mode.updated`.
-- The combination of `producer_id` + `type` must be unique per emission cycle;
-  downstream consumers rely on this tuple to key state snapshots.
+- [ ] Build integration tests simulating pygame events and asserting bus emissions plus state updates.
+- [ ] Exercise multi-device arbitration scenarios to verify aggregation policies.
+- [ ] Capture logs demonstrating lifecycle events during hardware connect/disconnect.
 
-### Helper Types
+## Narrative Walkthrough
 
-Add `InputEvent` protocol in `src/heart/events/types.py` to capture the shape
-above and enable static typing in subscribers. The protocol should surface a
-`producer_id: str` property and helper validation for the naming rules.
+Discovery clarifies which modules mutate shared state and what schemas are required. Core infrastructure delivers the event bus, state store, and naming enforcement so all publishers and subscribers share expectations. Peripheral migration then adapts representative devices to the new system, ensuring lifecycle hooks and feature flags allow incremental rollout. Validation closes by simulating complex scenarios and confirming scenes behave identically while benefiting from structured state access.
 
-## State Store Semantics
+## Visual Reference
 
-- The store tracks the latest event per `(producer_id, type)` tuple and exposes
-  aggregation helpers for consumers dealing with multi-device input.
-- `StateStore.update(event)` stores the payload and timestamp under a composite
-  key and applies the configured aggregation contract (see below). Provide
-  helpers:
-  - `StateStore.get_latest(type, producer_id=None)`
-  - `StateStore.get_all(type, aggregation="default")`
-- Expose a read-only `StateSnapshot` mapping for consumers who need bulk state
-  without mutating rights.
-- The bus is responsible for invoking `StateStore.update()` before dispatching
-  subscribers so synchronous consumers always observe the latest state.
+| Flow Stage | Description | Artifact |
+| --- | --- | --- |
+| Pygame event intake | `GameLoop` drains events and emits typed bus events | `InputEventBus.emit()` |
+| State update | `StateStore.update()` records latest payload and aggregate | `StateStore` snapshot |
+| Subscriber reaction | Systems consume events synchronously | Navigation controllers, mode handlers |
 
-## Migration Strategy
+## Risk Analysis
 
-1. Introduce a thin compatibility layer inside each peripheral that wraps the
-   existing imperative code and emits equivalent events. Maintain the old code
-   path until downstream consumers migrate.
-1. Add toggleable feature flags (e.g., `ENABLE_INPUT_EVENT_BUS`) to allow staged
-   rollout and quick rollback.
-1. Update mode/navigation controllers to read from `StateStore` while leaving
-   their public API unchanged.
-1. Remove deprecated peripheral state mutations once confidence is gained.
+| Risk | Probability | Impact | Mitigation | Early Warning |
+| --- | --- | --- | --- | --- |
+| Synchronous bus introduces latency spikes | Medium | Medium | Keep handlers lightweight, consider background dispatch for heavy consumers | Frame timing logs show increased jitter |
+| Aggregation rules fail for edge cases | Medium | High | Document policies, add regression tests per event type | Snapshot diffs show inconsistent values |
+| Feature flag rollback incomplete | Low | High | Maintain legacy path until regression suite passes without it | Legacy toggle required after rollout |
 
-## Testing Approach
+### Mitigation Tasks
 
-- Unit test `InputEventBus` for ordering guarantees, subscriber isolation, and
-  decorator ergonomics.
-- Add integration tests in `tests/integration/input/` that simulate pygame
-  events, drive the bus through the game loop, and assert that both the state
-  store and subscribers see expected results.
-- Include regression tests around multi-device arbitration to confirm that the
-  state store resolves conflicts deterministically, including different
-  aggregation modes for the same event type.
+- [ ] Profile dispatch time and identify handlers requiring async offloading.
+- [ ] Create aggregation registry with test fixtures per mode.
+- [ ] Automate feature-flag toggles in CI to ensure both paths execute.
 
-### Aggregation Contracts
+## Outcome Snapshot
 
-Multiple producers emitting the same event type must explicitly declare how
-their signals combine. Document the contract in a registry colocated with the
-bus:
-
-- `overwrite` (default): the latest payload replaces prior values for the
-  `(producer_id, type)` tuple and `StateStore.get_all()` returns a mapping of all
-  producers.
-- `sum`: numeric payload fields are summed across producers to produce a single
-  composite view.
-- `difference`: the newest payload is subtracted from the accumulated baseline,
-  useful for drift-correction devices.
-- `sequence`: payloads are appended to a per-type list to expose an ordered set
-  of simultaneous options.
-- Custom aggregators may be registered when domain-specific logic is needed;
-  they must accept the previous aggregate and the new event, and return the
-  updated aggregate plus the per-producer snapshot.
-
-Producers select an aggregation mode when registering with the bus. The bus
-persists per-producer snapshots regardless of aggregation so downstream actors
-can inspect individual contributions even when a composite aggregate is in use.
-
-### Producer Lifecycle & Disconnect Semantics
-
-Explicit producer registration is mandatory so the bus can associate a
-`producer_id` with its supported event types, aggregation contract, and optional
-disconnect policy. Registration returns a handle the producer must retain to
-refresh liveness. The lifecycle flows below illustrate how disconnects interact
-with the state store and subscribers:
-
-1. **First-time USB switch plug-in.**
-
-   - Device enumerator discovers a new HID peripheral and invokes
-     `InputEventBus.register_producer()` with `producer_id="usb-switch-1"`, the
-     supported event types (`switch.pressed`, `switch.released`), and an
-     `overwrite` aggregation contract.
-   - The bus records the producer metadata and seeds an initial state entry with
-     `status="available"` under the reserved event `system.lifecycle.connected`.
-   - Downstream consumers subscribed to lifecycle events initialize their own
-     bookkeeping (e.g., presenting the switch as an option in configuration
-     UIs).
-   - The device begins emitting `switch.*` events as normal.
-
-1. **Transient disconnect with automatic recovery.**
-
-   - Heartbeat threads associated with the producer periodically call
-     `producer_handle.touch()`; if the bus misses `N` consecutive touches, it
-     emits a synthetic `system.lifecycle.suspected_disconnect` event for that
-     `producer_id` and updates the state snapshot to
-     `{"status": "suspected_disconnect", "missed_heartbeats": N}`.
-   - Consumers may choose to soft-disable the device or prompt the user while
-     continuing to hold historical snapshots in case the device returns quickly.
-   - When the hardware rejoins and the heartbeat resumes, the producer reuses
-     its original ID to call `touch()`; the bus emits
-     `system.lifecycle.recovered`, promoting the state back to
-     `status="available"` and preserving prior aggregation state so the device
-     can seamlessly resume.
-
-1. **Explicit producer shutdown.**
-
-   - Software-backed producers (e.g., virtual remotes or cloud relays) should
-     call `producer_handle.disconnect(reason=...)` during teardown.
-   - The bus immediately emits `system.lifecycle.disconnected` with the supplied
-     reason and prunes active aggregation state for that producer. The historical
-     snapshot remains accessible via audit helpers for debugging.
-   - Consumers can confidently remove UI affordances or reassign bindings,
-     knowing that no further events will arrive for the `(producer_id, type)`
-     tuples associated with the disconnected producer.
-
-1. **Replacement hardware using a recycled port.**
-
-   - When a new physical device occupies the same port, the enumerator must
-     generate a fresh `producer_id` (e.g., `usb-switch-2`) to avoid conflating
-     historical events with the newcomer.
-   - Registration of the replacement automatically archives the old producer and
-     emits `system.lifecycle.replaced`, allowing consumers to migrate
-     configuration or solicit confirmation from the user.
-
-These flows keep `producer_id` stable across transient failures but force new
-IDs for genuinely different devices. Lifecycle events are ordinary bus events,
-so downstream actors can subscribe to `system.lifecycle.*` to drive UX, cleanup,
-or logging.
-
-## Open Questions
-
-- Do we need backpressure or batching for high-frequency devices (e.g., analog
-  joysticks)? For now, the plan assumes no.
-- Should we persist event history for debugging? Consider adding optional
-  ring-buffer support to `StateStore` if visibility becomes an issue.
-- How do remote inputs (cloud, web) plug into the bus? Define adapters once the
-  local pathway stabilizes.
+Peripherals publish structured events through a shared bus, the state store exposes deterministic snapshots, and scenes rely on the new API without manual state plumbing. Lifecycle events help operators reason about device availability, and the system is ready for remote input pipelines.

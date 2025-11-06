@@ -1,107 +1,67 @@
-# Heart
+# Heart Runtime
 
-Heart powers an interactive LED totem used at events, dance floors, and art
-installations. The project combines a pygame-based runtime, a library of animated
-scenes, and hardware integrations for sensors, heart-rate monitors, and Bluetooth
-controllers. The v0.2 release consolidates tooling under a modern Typer CLI,
-ships a refreshed renderer playlist, and documents the full deployment workflow
-for both laptops and Raspberry Pi installations.
+## Problem Statement
 
-![Heart totem rendering](docs/code_flow.svg)
+Provide an extensible runtime that drives an LED totem using pygame-based renderers, configuration playlists, and peripheral integrations.
 
-## Feature highlights
+## Materials
 
-- **Modular renderer ecosystem** – dozens of animations, sprite loops, and text
-  overlays live under `heart.display.renderers` and can be composed into custom
-  playlists.
-- **Event-ready configurations** – the dynamic configuration registry lets you
-  switch between curated playlists (for example `lib_2025`) or run custom shows
-  created for a specific venue.
-- **Hardware-aware runtime** – peripherals such as Bluetooth gamepads, ANT+
-  heart-rate monitors, and accelerometers feed real-time data into scenes.
-- **First-class debugging tools** – the `totem_debug` CLI merges every hardware
-  helper into a single Typer application so field technicians can diagnose
-  devices quickly.
-- **Flexible deployment targets** – run locally on macOS/Linux for development or
-  push frames to an RGB LED matrix driven by a Raspberry Pi.
+- Python 3.11 or newer with `uv` or another virtual environment manager.
+- SDL-compatible graphics stack for local development (SDL2 libraries on Linux, built-ins on macOS).
+- Optional Raspberry Pi with RGB LED matrix hardware for deployment.
+- Access to Bluetooth controllers, switches, and sensors when exercising peripherals.
 
-## Quick start
+## Technical Approach
 
+The runtime packages two Typer CLIs: `totem` orchestrates configuration loading, render loops, and firmware updates, while `totem_debug` surfaces hardware diagnostics. Renderers run inside a pygame game loop, peripheral workers feed data through the `PeripheralManager`, and display services target either a local window or the LED matrix.
+
+## Quick Start
 1. Create and activate a Python 3.11+ virtual environment.
-1. Install dependencies and tooling:
+2. Install dependencies:
    ```bash
    make install
    ```
-1. Launch the default playlist in a window:
+3. Launch the default playlist:
    ```bash
    totem run --configuration lib_2025
    ```
-1. Explore the [`docs/getting_started.md`](docs/getting_started.md) guide for Pi
-   deployment, hardware wiring, and advanced CLI flags.
+4. Review [docs/getting_started.md](docs/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
-## Command-line interface
-
-The project installs two Typer applications via console scripts:
-
-| Command | Description |
+## Command-Line Interfaces
+| Command | Purpose |
 | --- | --- |
-| `totem` | Runs the runtime (`totem run`), benchmarks devices, and flashes firmware (`totem update-driver`). |
-| `totem_debug` | Groups hardware debugging helpers, including Bluetooth gamepad utilities, UART sniffers, and accelerometer readers. |
+| `totem` | Runs the runtime (`totem run`), updates firmware (`totem update-driver`), and manages renderer options. |
+| `totem_debug` | Provides hardware diagnostics, including Bluetooth scanning, UART inspection, and accelerometer streaming. |
 
 Key `totem run` flags:
+- `--configuration <name>` selects modules from `heart.programs.configurations`.
+- `--x11-forward` forces a pygame window even when the RGB matrix driver is active.
+- `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
 
-- `--configuration <name>` – selects a configuration module from
-  `heart.programs.configurations`. Use `lib_2025` for the flagship playlist or
-  author your own (see [Program configuration guide](docs/program_configuration.md)).
-- `--x11-forward` – forces a pygame window even when `HEART_USE_ISOLATED_RENDERER`
-  is set, making remote debugging over SSH+XQuartz possible.
-- `--add-low-power-mode/--no-add-low-power-mode` – toggles the standby mode that
-  keeps the LEDs dim when no primary scenes are active.
+## Architecture Summary
+- `heart/environment.py` defines the `GameLoop` responsible for frame pacing and peripheral coordination.
+- `heart.display.renderers` hosts animations, overlays, and HUDs that can be composed into playlists.
+- `heart.device` contains output adapters such as `LocalScreen` and `LEDMatrix`.
+- `heart.peripheral.core.manager.PeripheralManager` supervises switches, gamepads, heart-rate monitors, and other inputs.
 
-Run `totem --help` or `totem_debug --help` for the full command tree.
+See the following references for deeper analysis:
+- [docs/runtime_overview.md](docs/runtime_overview.md) for loop orchestration details.
+- [docs/code_flow.md](docs/code_flow.md) for a diagram of launch and render paths.
+- [docs/program_configuration.md](docs/program_configuration.md) for playlist authoring guidance.
 
-## Architecture overview
+## Hardware Integration
+- `LEDMatrix` streams frames to the RGB matrix when `HEART_USE_ISOLATED_RENDERER=1`.
+- Bluetooth gamepads, switches, accelerometers, and heart-rate sensors publish data through the event bus managed by the peripheral subsystem.
+- `totem update-driver --name <driver>` flashes device firmware located in `drivers/`.
+- [docs/hardware_debug_cli.md](docs/hardware_debug_cli.md) documents debugging helpers for pairing controllers and inspecting UART traffic.
 
-Heart's runtime centers on the `GameLoop` defined in
-[`heart/environment.py`](src/heart/environment.py). The loop pulls configuration
-from the registry, manages renderer playlists through the `AppController`, and
-streams frames to the active `Device` implementation. The supporting documents
-provide deeper dives:
+## Development Workflow
+- `make install` sets up the editable package and dev extras using `uv`.
+- `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
+- `make test` executes the pytest suite.
+- `make check` verifies formatting and linting without applying fixes.
 
-- [`docs/runtime_overview.md`](docs/runtime_overview.md) – textual explanation of
-  the runtime, renderer stack, and peripheral workers.
-- [`docs/code_flow.md`](docs/code_flow.md) – mermaid diagram showing the launch
-  sequence, background threads, and display pipeline.
-- [`docs/program_configuration.md`](docs/program_configuration.md) – building
-  custom playlists and accessing sensor data inside scenes.
-
-## Hardware and peripherals
-
-- **Display devices** – `LocalScreen` renders to a pygame window. `LEDMatrix`
-  writes frames to an RGB matrix using the `rgbmatrix` bindings when
-  `HEART_USE_ISOLATED_RENDERER=1`.
-- **Peripheral manager** – `heart.peripheral.core.manager.PeripheralManager`
-  spawns threads for Bluetooth switches, gamepads, accelerometers, and heart-rate
-  monitors. Renderers can consume readings via helper modules such as
-  `heart.peripheral.heart_rates`.
-- **Firmware updates** – device-specific flashers live under `drivers/`. Invoke
-  them with `totem update-driver --name <driver>`.
-- **Debug CLI** – `docs/hardware_debug_cli.md` documents the consolidated
-  diagnostics, including UART sniffers and Bluetooth pairing helpers.
-
-## Development workflow
-
-- `make install` – install the package and development extras using `uv`.
-- `make format` – apply Ruff fixes, isort, Black, docformatter, and mdformat to
-  the source tree and documentation (run before committing).
-- `make test` – execute the pytest suite in parallel.
-- `make check` – optional lint/format verification without applying fixes.
-
-We recommend using `uv` for dependency management because it provides reproducible
-lock files (`uv.lock`) and fast resolver performance.
-
-## Repository layout
-
+The repository layout is summarised below:
 ```
 heart/
 ├── docs/                     # Architecture guides, dev logs, hardware notes
@@ -113,16 +73,9 @@ heart/
 └── pyproject.toml            # Packaging metadata and tool configuration
 ```
 
-Explore the `docs/devlog/` directory for chronological field notes on hardware
-bring-up, auto-boot flows, and rendering experiments.
-
 ## Contributing
-
 1. Fork the repository and create a topic branch.
-1. Run `make format` and `make test` before pushing changes.
-1. Update documentation whenever you add new renderers, configuration modules, or
-   hardware capabilities. Major architecture changes should include updated
-   diagrams via `scripts/render_code_flow.py`.
+2. Run `make format` and `make test` before pushing changes.
+3. Update documentation when introducing new renderers, configurations, or hardware capabilities. Re-render diagrams with `scripts/render_code_flow.py` when architecture changes.
 
-Issues and pull requests are welcome! Share videos or photos of your installations
-in the issue tracker so others can learn from your setup.
+Please share findings, logs, or deployment results via issues or pull requests so the team can review them alongside the code changes.

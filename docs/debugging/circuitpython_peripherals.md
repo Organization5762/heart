@@ -1,31 +1,46 @@
 # Debugging CircuitPython Peripheral Drivers
 
-CircuitPython targets microcontrollers with limited RAM, storage, and tooling. The tips below capture the workflow we use for iterating on drivers in `drivers/` and the supporting scripts that speak to the board over USB.
+## Problem Statement
 
-## Preparing the board
+Iterate on CircuitPython-based drivers that back Heart peripherals while working within the RAM, storage, and tooling constraints of microcontroller boards.
 
-1. **Install the latest CircuitPython build** that supports the device. Adafruit publishes UF2 images for common boards.
-1. **Copy the project bundle**: upload the `lib/` dependencies and the driver under test to the board's storage volume.
-1. **Open a serial REPL** using `screen`, `minicom`, or the `adafruit-ampy` tooling. Set the baud rate published in the board manual (typically `115200`).
+## Materials
 
-## Iterating on code
+- Supported CircuitPython board with the latest UF2 firmware.
+- USB connection for file transfer and serial REPL access.
+- Required driver code from `drivers/` along with any third-party library bundles.
+- Terminal tools such as `screen`, `minicom`, or `adafruit-ampy` for REPL access.
 
-- **Hot reload with `code.py`**: save the driver to `code.py` or import it from a helper script. CircuitPython automatically restarts execution after the file write.
-- **Keep scripts tiny**: the board restarts when memory is exhausted. Split optional helpers into separate files that can be deleted from the board when chasing bugs.
-- **Toggle diagnostics via constants**: wrap verbose prints in `if DEBUG:` checks to avoid flooding the serial console.
+## Technical Approach
 
-## Capturing sensor traffic
+1. Prepare the board with the correct firmware and dependencies.
+1. Develop and reload the driver in small, testable increments to avoid exhausting memory.
+1. Capture sensor output and failure modes so issues can be reproduced without the board.
 
-- **Single-sensor probes**: write a `probe.py` script that only initializes the sensor under test, reads a handful of values, and prints them. This isolates hardware problems from the rest of the runtime.
-- **Record sample sessions**: copy the serial output to a text file and check it into `docs/debugging/logs/` (or discard after investigating) so regressions are easier to spot.
-- **Use deterministic timing**: avoid floating-point sleeps. Prefer `time.sleep(0.05)` or integer millisecond counters to make traces easier to compare.
+## Board Preparation
 
-## Handling failures
+1. Flash the most recent CircuitPython image for the target board.
+1. Copy the `lib/` dependencies and the driver under test to the board storage volume.
+1. Open a serial REPL at the documented baud rate (usually `115200`).
 
-- **Hard crashes / safe mode**: if the board boots into safe mode, remove the offending driver, reset, and reintroduce pieces incrementally.
-- **Bus lockups**: power-cycle the board and unplug other peripherals. Many I2C/SPI sensors need a full power reset to clear a wedged bus.
-- **Peripheral-specific notes**: document any errata or quirks directly in the driver docstrings per the guidance in `drivers/AGENTS.md`.
+## Iteration Practices
 
-## Desktop reproduction harness
+- Use `code.py` as an entry point so saving a file triggers an automatic reload.
+- Keep scripts minimal to prevent memory exhaustion; remove optional helpers when debugging.
+- Gate verbose logging behind constants (for example, `if DEBUG:`) to keep the REPL usable.
 
-When possible, mirror the driver API with a desktop shim (for example, `drivers/i2c/some_sensor_sim.py`) so pytest can exercise the core logic. This is invaluable when the only reproduction requires the real hardware.
+## Capturing Sensor Traffic
+
+- Build focused probe scripts that initialise a single sensor, read a fixed number of samples, and print them.
+- Record representative sessions and archive them in `docs/debugging/logs/` when they explain a regression.
+- Use deterministic delays (`time.sleep(0.05)` or integer millisecond loops) to simplify trace comparison.
+
+## Failure Handling
+
+- If the board enters safe mode, remove the suspect driver, reset, and reintroduce components incrementally.
+- Power-cycle the board when I2C or SPI buses wedge.
+- Capture peripheral-specific quirks in driver docstrings as outlined in `drivers/AGENTS.md`.
+
+## Desktop Reproduction Harness
+
+Where practical, mirror the driver API with a desktop shim (for example, `drivers/i2c/some_sensor_sim.py`) so pytest can cover computational logic without the physical hardware.
