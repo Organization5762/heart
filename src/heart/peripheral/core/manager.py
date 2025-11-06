@@ -2,6 +2,7 @@ import itertools
 import threading
 from typing import Iterable, Iterator
 
+from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.gamepad import Gamepad
@@ -35,6 +36,8 @@ class PeripheralManager:
         """Register ``event_bus`` for peripherals managed by this instance."""
 
         self._event_bus = event_bus
+        for peripheral in self._peripherals:
+            peripheral.attach_event_bus(event_bus)
 
     @property
     def peripherals(self) -> tuple[Peripheral, ...]:
@@ -102,7 +105,7 @@ class PeripheralManager:
         yield from itertools.chain(PhoneText.detect())
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
-        yield from itertools.chain(Accelerometer.detect())
+        yield from itertools.chain(Accelerometer.detect(), Compass.detect())
 
     def _detect_gamepads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Gamepad.detect())
@@ -112,6 +115,8 @@ class PeripheralManager:
 
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
+        if self._event_bus is not None:
+            peripheral.attach_event_bus(self._event_bus)
 
     def _deprecated_get_main_switch(self) -> BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now

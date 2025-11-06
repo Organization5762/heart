@@ -5,14 +5,15 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, MutableMapping, Optional
+from typing import TYPE_CHECKING, Callable, Iterable, List, MutableMapping, Optional
 
-from . import Input
+if TYPE_CHECKING:  # pragma: no cover - imported for type checking only
+    from . import Input
 
 _LOGGER = logging.getLogger(__name__)
 
 
-EventCallback = Callable[[Input], None]
+EventCallback = Callable[["Input"], None]
 
 
 @dataclass(frozen=True)
@@ -65,10 +66,11 @@ class EventBus:
     def emit(self, event: Input | str, /, data=None, *, producer_id: int = 0) -> None:
         """Emit an :class:`Input` instance to subscribed callbacks."""
 
-        if isinstance(event, Input):
-            input_event = event
+        if _is_input_instance(event):
+            input_event = event  # type: ignore[assignment]
         else:
-            input_event = Input(event_type=event, data=data, producer_id=producer_id)
+            InputCls = _get_input_class()
+            input_event = InputCls(event_type=event, data=data, producer_id=producer_id)
         for handle in self._iter_targets(input_event.event_type):
             try:
                 handle.callback(input_event)
@@ -101,3 +103,14 @@ class EventBus:
             handles.extend(specific)
         for handle in sorted(handles, key=lambda item: (-item.priority, item.sequence)):
             yield handle
+
+
+def _is_input_instance(event: object) -> bool:
+    CoreInput = _get_input_class()
+    return isinstance(event, CoreInput)
+
+
+def _get_input_class():
+    from . import Input as CoreInput
+
+    return CoreInput

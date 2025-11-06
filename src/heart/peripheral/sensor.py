@@ -6,7 +6,8 @@ from typing import Any, Iterator, NoReturn, Self
 
 import serial
 
-from heart.peripheral.core import Peripheral
+from heart.firmware_io import constants
+from heart.peripheral.core import Input, Peripheral
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -84,7 +85,19 @@ class Accelerometer(Peripheral):
         except json.JSONDecodeError:
             print(f"Failed to decode JSON: {bus_data}")
             return
-        self._update_due_to_data(parsed)
+
+        event_type = parsed.get("event_type")
+        payload = parsed.get("data")
+        if not isinstance(event_type, str):
+            logger.debug("Ignoring payload without valid event_type: %s", parsed)
+            return
+
+        if payload is None:
+            logger.debug("Ignoring payload without data: %s", parsed)
+            return
+
+        self.emit_event(event_type, payload)
+        self.update_due_to_data(parsed)
 
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:
@@ -101,12 +114,23 @@ class Accelerometer(Peripheral):
             )
             return None
 
-    def _update_due_to_data(self, data: dict[str, Any]) -> None:
-        event_type = data["event_type"]
-        data_value = data["data"]
+    def handle_input(self, input: Input) -> None:
+        if input.event_type in {constants.ACCELERATION, "acceleration"}:
+            data_value = input.data
+            if not isinstance(data_value, dict):
+                logger.debug(
+                    "Acceleration payload is not a mapping: event=%s payload=%s",
+                    input.event_type,
+                    data_value,
+                )
+                return
 
-        if event_type == "acceleration" or event_type == "sensor.acceleration":
             self.acceleration_value = data_value
-            self.x_distribution.add_value(data_value["x"])
-            self.y_distribution.add_value(data_value["y"])
-            self.z_distribution.add_value(data_value["z"])
+            try:
+                self.x_distribution.add_value(data_value["x"])
+                self.y_distribution.add_value(data_value["y"])
+                self.z_distribution.add_value(data_value["z"])
+            except KeyError:
+                logger.debug("Missing axis in acceleration payload: %s", data_value)
+        else:
+            super().handle_input(input)
