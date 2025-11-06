@@ -1,5 +1,6 @@
 import contextlib
 import importlib
+import importlib.abc
 import signal
 import sys
 import time
@@ -46,7 +47,7 @@ def _create_placeholder_mqtt() -> ModuleType:
         ) -> None:  # pragma: no cover
             raise RuntimeError("paho-mqtt is required to run the peripheral sidecar.")
 
-    module.Client = _PlaceholderClient  # type: ignore[attr-defined]
+    setattr(module, "Client", _PlaceholderClient)
     return module
 
 
@@ -58,15 +59,22 @@ def _load_mqtt_module() -> ModuleType:
         logger.warning("paho-mqtt not available; using placeholder client")
         return _create_placeholder_mqtt()
 
+    loader = spec.loader
+    if not isinstance(loader, importlib.abc.Loader):
+        logger.warning("paho-mqtt loader missing exec_module; using placeholder client")
+        return _create_placeholder_mqtt()
+
     module = importlib.util.module_from_spec(spec)
+    if not isinstance(module, ModuleType):
+        raise TypeError("module_from_spec returned unexpected type")
     try:
-        spec.loader.exec_module(module)  # type: ignore[call-arg]
+        loader.exec_module(module)
     except Exception:  # pragma: no cover - environment-specific dependency issues
         logger.warning(
             "Failed to import paho-mqtt; using placeholder client", exc_info=True
         )
         return _create_placeholder_mqtt()
-    return module  # type: ignore[return-value]
+    return module
 
 
 mqtt = _load_mqtt_module()

@@ -4,7 +4,7 @@ import json
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Iterable, Protocol, Sequence, cast
 
 from serial.serialutil import SerialException
 
@@ -13,10 +13,26 @@ from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import BluetoothSwitch
 
+
+class _UartListenerProtocol(Protocol):
+    def start(self) -> None:
+        ...
+
+    def consume_events(self) -> Iterable[object]:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
 try:  # pragma: no cover - optional dependency on Linux hosts
-    from heart.peripheral.bluetooth import UartListener
+    from heart.peripheral.bluetooth import UartListener as _UartListener
 except ImportError:  # pragma: no cover - fallback for minimal environments
-    UartListener = None  # type: ignore[assignment]
+    _UartListener = None
+
+UartListener: type[_UartListenerProtocol] | None = cast(
+    type[_UartListenerProtocol] | None, _UartListener
+)
 
 
 @dataclass(frozen=True)
@@ -103,7 +119,7 @@ def listen_to_uart() -> None:
 
     devices = list(BluetoothSwitch.detect())
     if devices:
-        listener: object = devices[0].listener
+        listener = cast(_UartListenerProtocol, devices[0].listener)
     elif UartListener is not None:
         listener = UartListener()
     else:
