@@ -1,6 +1,11 @@
 import importlib
+import io
+import json
 
+import pytest
 from driver_loader import load_driver_module, make_module, temporary_modules
+
+from heart.firmware_io import constants
 
 
 class FakeDigitalInOut:
@@ -41,9 +46,14 @@ STUBS = {
     "digitalio": digitalio_stub,
 }
 
-rotary_driver = load_driver_module("rotary_encoder", stubs=STUBS)
-create_handler = rotary_driver.create_handler
-read_events = rotary_driver.read_events
+
+@pytest.fixture()
+def rotary_driver(monkeypatch, tmp_path):
+    device_id_path = tmp_path / "device_id.txt"
+    monkeypatch.setenv("HEART_DEVICE_ID_PATH", str(device_id_path))
+    monkeypatch.setenv("HEART_DEVICE_ID", "rotary-encoder-test-id")
+    module = load_driver_module("rotary_encoder", stubs=STUBS)
+    return module
 
 
 class StubDigitalInOut:
@@ -64,9 +74,9 @@ class StubHandler:
         yield from self._events
 
 
-def test_create_handler_uses_injected_modules():
+def test_create_handler_uses_injected_modules(rotary_driver):
     StubDigitalInOut.instances.clear()
-    handler = create_handler(
+    handler = rotary_driver.create_handler(
         board_module=make_module("board", ROTA="rota", ROTB="rotb", SWITCH="switch"),
         rotary_module=StubRotaryModule,
         digital_in_out_cls=StubDigitalInOut,
@@ -81,6 +91,19 @@ def test_create_handler_uses_injected_modules():
     assert created_switch.pull == FakePull.DOWN
 
 
-def test_read_events_returns_handler_values():
+def test_read_events_returns_handler_values(rotary_driver):
     handler = StubHandler(["event1", "event2"])
-    assert read_events(handler) == ["event1", "event2"]
+    assert rotary_driver.read_events(handler) == ["event1", "event2"]
+
+
+def test_rotary_driver_emits_identity_payload(rotary_driver):
+    stream = io.StringIO("Identify\n")
+    outputs: list[str] = []
+
+    handled = rotary_driver.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+
+    assert handled is True
+    payload = json.loads(outputs[0])
+    assert payload["event_type"] == constants.DEVICE_IDENTIFY
+    assert payload["data"]["device_name"] == rotary_driver.IDENTITY.device_name
+    assert payload["data"]["device_id"] == "rotary-encoder-test-id"
