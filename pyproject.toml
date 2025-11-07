@@ -136,7 +136,7 @@ module = [
 follow_imports = "skip"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 testpaths = ["tests"]
 addopts = "-vv -n auto --dist=loadscope"
 
