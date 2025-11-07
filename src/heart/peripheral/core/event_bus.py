@@ -2,16 +2,38 @@
 
 from __future__ import annotations
 
+import abc
 import logging
-from collections import defaultdict
+import threading
+import uuid
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Callable, Iterable, List, MutableMapping, Optional
+from types import MappingProxyType
+from typing import (Any, Callable, Deque, Iterable, List, Mapping,
+                    MutableMapping, Optional, Sequence)
 
 from . import Input
 from .state_store import StateStore
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__ = [
+    "EventBus",
+    "EventPlaylist",
+    "EventPlaylistManager",
+    "PlaylistHandle",
+    "PlaylistStep",
+    "SequenceMatcher",
+    "SubscriptionHandle",
+    "VirtualPeripheralContext",
+    "VirtualPeripheralDefinition",
+    "VirtualPeripheralHandle",
+    "VirtualPeripheralManager",
+    "double_tap_virtual_peripheral",
+    "sequence_virtual_peripheral",
+    "simultaneous_virtual_peripheral",
+]
 
 
 EventCallback = Callable[[Input], None]
@@ -27,6 +49,856 @@ class SubscriptionHandle:
     sequence: int
 
 
+@dataclass(frozen=True, slots=True)
+class SequenceMatcher:
+    """Matcher describing a single step in a sequence detector."""
+
+    event_type: str
+    predicate: Callable[[Input], bool] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistStep:
+    """Descriptor describing a scheduled event emitted by a playlist."""
+
+    event_type: str
+    data: Any = None
+    offset: float = 0.0
+    repeat: int = 1
+    interval: float | None = None
+    producer_id: int = 0
+
+    def __post_init__(self) -> None:
+        if self.offset < 0:
+            raise ValueError("PlaylistStep.offset must be non-negative")
+        if self.repeat < 1:
+            raise ValueError("PlaylistStep.repeat must be at least 1")
+        if self.repeat > 1 and (self.interval is None or self.interval <= 0):
+            raise ValueError(
+                "PlaylistStep.interval must be positive when repeat > 1"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class EventPlaylist:
+    """Immutable playlist definition that can be triggered on the bus."""
+
+    name: str
+    steps: Sequence[PlaylistStep]
+    trigger_event_type: str | None = None
+    interrupt_events: Sequence[str] = ()
+    completion_event_type: str | None = None
+    metadata: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.steps:
+            raise ValueError("EventPlaylist requires at least one step")
+        object.__setattr__(self, "steps", tuple(self.steps))
+        object.__setattr__(self, "interrupt_events", frozenset(self.interrupt_events))
+        if self.metadata is not None:
+            object.__setattr__(
+                self, "metadata", MappingProxyType(dict(self.metadata))
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistHandle:
+    """Handle referencing a registered playlist definition."""
+
+    playlist_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class VirtualPeripheralHandle:
+    """Handle referencing a registered virtual peripheral."""
+
+    peripheral_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class VirtualPeripheralDefinition:
+    """Definition describing how to construct a virtual peripheral."""
+
+    name: str
+    event_types: Sequence[str]
+    factory: Callable[["VirtualPeripheralContext"], "_VirtualPeripheral"]
+    priority: int = 0
+    metadata: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if not self.event_types:
+            raise ValueError("VirtualPeripheralDefinition requires event_types")
+        object.__setattr__(self, "event_types", tuple(self.event_types))
+        if self.metadata is not None:
+            object.__setattr__(
+                self, "metadata", MappingProxyType(dict(self.metadata))
+            )
+
+
+class VirtualPeripheralContext:
+    """Execution context shared with virtual peripherals."""
+
+    def __init__(
+        self,
+        bus: "EventBus",
+        definition: VirtualPeripheralDefinition,
+        handle: VirtualPeripheralHandle,
+    ) -> None:
+        self._bus = bus
+        self._definition = definition
+        self._handle = handle
+
+    @property
+    def definition(self) -> VirtualPeripheralDefinition:
+        return self._definition
+
+    @property
+    def state_store(self) -> StateStore:
+        return self._bus.state_store
+
+    def monotonic(self) -> float:
+        return perf_counter()
+
+    def emit(self, event_type: str, data: Any, *, producer_id: int = 0) -> None:
+        payload: Any
+        if isinstance(data, dict):
+            payload = dict(data)
+        else:
+            payload = {"value": data}
+
+        if "virtual_peripheral" not in payload:
+            descriptor: dict[str, Any] = {
+                "id": self._handle.peripheral_id,
+                "name": self._definition.name,
+            }
+            if self._definition.metadata is not None:
+                descriptor["metadata"] = dict(self._definition.metadata)
+            payload["virtual_peripheral"] = descriptor
+
+        self._bus.emit(event_type, data=payload, producer_id=producer_id)
+
+    @staticmethod
+    def describe(event: Input) -> Mapping[str, Any]:
+        return {
+            "event_type": event.event_type,
+            "producer_id": event.producer_id,
+            "data": event.data,
+            "timestamp": event.timestamp.isoformat(),
+        }
+
+
+class _VirtualPeripheral(abc.ABC):
+    """Base class for virtual peripherals managed by the bus."""
+
+    def __init__(self, context: VirtualPeripheralContext) -> None:
+        self._context = context
+
+    @abc.abstractmethod
+    def handle(self, event: Input) -> None:
+        """Process ``event`` and emit any aggregated outputs."""
+
+    def shutdown(self) -> None:
+        """Hook invoked when the peripheral is unregistered."""
+
+
+class _PlaylistRunner:
+    """Internal helper that plays a playlist in a background thread."""
+
+    def __init__(
+        self,
+        manager: "EventPlaylistManager",
+        playlist_id: str,
+        playlist: EventPlaylist,
+        trigger_event: Input | None,
+    ) -> None:
+        self._manager = manager
+        self.playlist_id = playlist_id
+        self.playlist = playlist
+        self.trigger_event = trigger_event
+        self.run_id = uuid.uuid4().hex
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"EventPlaylist-{playlist.name}-{self.run_id[:8]}",
+            daemon=True,
+        )
+        self._stop_event = threading.Event()
+        self._finished = threading.Event()
+        self._stop_reason: str | None = None
+        self._interrupt_event: Input | None = None
+
+        ordered = sorted(
+            enumerate(self.playlist.steps),
+            key=lambda item: (item[1].offset, item[0]),
+        )
+        self._ordered_steps: Sequence[tuple[int, PlaylistStep]] = tuple(ordered)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self, reason: str, interrupt_event: Input | None = None) -> None:
+        if reason not in {"cancelled", "interrupted"}:
+            raise ValueError("Unsupported stop reason")
+        if self._finished.is_set():
+            return
+        if self._stop_reason is None:
+            self._stop_reason = reason
+            self._interrupt_event = interrupt_event
+            self._stop_event.set()
+
+    def join(self, timeout: float | None = None) -> bool:
+        self._thread.join(timeout)
+        return self._finished.is_set()
+
+    def _wait_until(self, target_time: float) -> bool:
+        remaining = max(0.0, target_time - perf_counter())
+        if remaining <= 0:
+            return not self._stop_event.is_set()
+        return not self._stop_event.wait(remaining)
+
+    def _run(self) -> None:
+        start_time = perf_counter()
+        for step_index, step in self._ordered_steps:
+            scheduled_time = start_time + step.offset
+            if not self._wait_until(scheduled_time):
+                break
+
+            occurrences = step.repeat
+            for repeat_index in range(occurrences):
+                if self._stop_event.is_set():
+                    break
+                if repeat_index and step.interval is not None:
+                    scheduled_time += step.interval
+                    if not self._wait_until(scheduled_time):
+                        break
+
+                if self._stop_event.is_set():
+                    break
+
+                elapsed = scheduled_time - start_time
+                self._manager._dispatch_step(
+                    self,
+                    step,
+                    step_index,
+                    repeat_index,
+                    max(0.0, elapsed),
+                )
+
+            if self._stop_event.is_set():
+                break
+
+        if self._stop_reason is None and self._stop_event.is_set():
+            self._stop_reason = "cancelled"
+
+        reason = self._stop_reason or "completed"
+        self._manager._finalize_run(self, reason, self._interrupt_event)
+        self._finished.set()
+
+
+class EventPlaylistManager:
+    """Coordinator for event playlists executed on the bus."""
+
+    EVENT_CREATED = "event.playlist.created"
+    EVENT_EMITTED = "event.playlist.emitted"
+    EVENT_STOPPED = "event.playlist.stopped"
+
+    def __init__(self, bus: "EventBus") -> None:
+        self._bus = bus
+        self._lock = threading.RLock()
+        self._playlists: MutableMapping[str, EventPlaylist] = {}
+        self._triggers: MutableMapping[str, SubscriptionHandle] = {}
+        self._interrupt_subscribers: MutableMapping[str, SubscriptionHandle] = {}
+        self._runs_by_interrupt: MutableMapping[str, set[str]] = defaultdict(set)
+        self._active_runs: MutableMapping[str, _PlaylistRunner] = {}
+
+    def register(self, playlist: EventPlaylist) -> PlaylistHandle:
+        """Register ``playlist`` and return a handle."""
+
+        playlist_id = uuid.uuid4().hex
+        handle = PlaylistHandle(playlist_id)
+
+        with self._lock:
+            self._playlists[playlist_id] = playlist
+
+        if playlist.trigger_event_type is not None:
+            trigger_handle = self._bus.subscribe(
+                playlist.trigger_event_type,
+                lambda event, pid=playlist_id: self.start(pid, trigger_event=event),
+                priority=100,
+            )
+            with self._lock:
+                self._triggers[playlist_id] = trigger_handle
+
+        return handle
+
+    def update(self, handle: PlaylistHandle, playlist: EventPlaylist) -> None:
+        """Replace the definition referenced by ``handle`` with ``playlist``."""
+
+        trigger_handle: SubscriptionHandle | None = None
+        with self._lock:
+            if handle.playlist_id not in self._playlists:
+                raise KeyError(f"Unknown playlist id: {handle.playlist_id}")
+            previous_trigger = self._triggers.pop(handle.playlist_id, None)
+
+        if previous_trigger is not None:
+            self._bus.unsubscribe(previous_trigger)
+
+        if playlist.trigger_event_type is not None:
+            trigger_handle = self._bus.subscribe(
+                playlist.trigger_event_type,
+                lambda event, pid=handle.playlist_id: self.start(
+                    pid, trigger_event=event
+                ),
+                priority=100,
+            )
+
+        with self._lock:
+            self._playlists[handle.playlist_id] = playlist
+            if trigger_handle is not None:
+                self._triggers[handle.playlist_id] = trigger_handle
+
+    def remove(self, handle: PlaylistHandle) -> None:
+        """Unregister the playlist referenced by ``handle``."""
+
+        trigger_handle: SubscriptionHandle | None = None
+        with self._lock:
+            self._playlists.pop(handle.playlist_id, None)
+            trigger_handle = self._triggers.pop(handle.playlist_id, None)
+
+        if trigger_handle is not None:
+            self._bus.unsubscribe(trigger_handle)
+
+    def list_definitions(self) -> Mapping[str, EventPlaylist]:
+        """Return a read-only mapping of registered playlist definitions."""
+
+        with self._lock:
+            return MappingProxyType(dict(self._playlists))
+
+    def start(
+        self,
+        handle: PlaylistHandle | str,
+        *,
+        trigger_event: Input | None = None,
+    ) -> str:
+        """Start executing the playlist referenced by ``handle``."""
+
+        playlist_id = handle if isinstance(handle, str) else handle.playlist_id
+        with self._lock:
+            playlist = self._playlists.get(playlist_id)
+            if playlist is None:
+                raise KeyError(f"Unknown playlist id: {playlist_id}")
+
+        runner = _PlaylistRunner(self, playlist_id, playlist, trigger_event)
+
+        with self._lock:
+            self._active_runs[runner.run_id] = runner
+            for event_type in playlist.interrupt_events:
+                runs = self._runs_by_interrupt[event_type]
+                runs.add(runner.run_id)
+                if event_type not in self._interrupt_subscribers:
+                    self._interrupt_subscribers[event_type] = self._bus.subscribe(
+                        event_type,
+                        lambda event, et=event_type: self._handle_interrupt(et, event),
+                        priority=100,
+                    )
+
+            payload = self._build_created_payload(runner)
+
+        self._bus.emit(self.EVENT_CREATED, data=payload)
+        runner.start()
+        return runner.run_id
+
+    def stop(self, run_id: str, *, reason: str = "cancelled") -> None:
+        with self._lock:
+            runner = self._active_runs.get(run_id)
+        if runner is None:
+            return
+        runner.stop(reason)
+
+    def join(self, run_id: str, timeout: float | None = None) -> bool:
+        with self._lock:
+            runner = self._active_runs.get(run_id)
+        if runner is None:
+            return True
+        return runner.join(timeout)
+
+    def _handle_interrupt(self, event_type: str, event: Input) -> None:
+        with self._lock:
+            run_ids = tuple(self._runs_by_interrupt.get(event_type, ()))
+
+        for run_id in run_ids:
+            with self._lock:
+                runner = self._active_runs.get(run_id)
+            if runner is None:
+                continue
+            runner.stop("interrupted", interrupt_event=event)
+
+    def _dispatch_step(
+        self,
+        runner: _PlaylistRunner,
+        step: PlaylistStep,
+        step_index: int,
+        repeat_index: int,
+        scheduled_offset: float,
+    ) -> None:
+        event = Input(
+            event_type=step.event_type,
+            data=step.data,
+            producer_id=step.producer_id,
+        )
+        self._bus.emit(event)
+
+        payload = {
+            "playlist_id": runner.run_id,
+            "definition_id": runner.playlist_id,
+            "playlist_name": runner.playlist.name,
+            "step_index": step_index,
+            "repeat_index": repeat_index,
+            "event_type": step.event_type,
+            "producer_id": step.producer_id,
+            "offset": scheduled_offset,
+            "data": step.data,
+        }
+        if runner.playlist.metadata is not None:
+            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+        if runner.trigger_event is not None:
+            payload["trigger_event"] = {
+                "event_type": runner.trigger_event.event_type,
+                "producer_id": runner.trigger_event.producer_id,
+                "data": runner.trigger_event.data,
+            }
+        self._bus.emit(self.EVENT_EMITTED, data=payload)
+
+    def _finalize_run(
+        self,
+        runner: _PlaylistRunner,
+        reason: str,
+        interrupt_event: Input | None,
+    ) -> None:
+        with self._lock:
+            if runner.run_id not in self._active_runs:
+                return
+            self._active_runs.pop(runner.run_id, None)
+            for event_type in runner.playlist.interrupt_events:
+                runs = self._runs_by_interrupt.get(event_type)
+                if runs is None:
+                    continue
+                runs.discard(runner.run_id)
+                if not runs:
+                    self._runs_by_interrupt.pop(event_type, None)
+                    handle = self._interrupt_subscribers.pop(event_type, None)
+                    if handle is not None:
+                        self._bus.unsubscribe(handle)
+
+        payload = {
+            "playlist_id": runner.run_id,
+            "definition_id": runner.playlist_id,
+            "playlist_name": runner.playlist.name,
+            "reason": reason,
+        }
+        if runner.playlist.metadata is not None:
+            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+        if interrupt_event is not None:
+            payload["interrupt_event"] = {
+                "event_type": interrupt_event.event_type,
+                "producer_id": interrupt_event.producer_id,
+                "data": interrupt_event.data,
+            }
+        self._bus.emit(self.EVENT_STOPPED, data=payload)
+
+        if reason == "completed" and runner.playlist.completion_event_type:
+            completion_payload = {
+                "playlist_id": runner.run_id,
+                "definition_id": runner.playlist_id,
+                "playlist_name": runner.playlist.name,
+            }
+            if runner.playlist.metadata is not None:
+                completion_payload["playlist_metadata"] = dict(
+                    runner.playlist.metadata
+                )
+            if runner.trigger_event is not None:
+                completion_payload["trigger_event"] = {
+                    "event_type": runner.trigger_event.event_type,
+                    "producer_id": runner.trigger_event.producer_id,
+                    "data": runner.trigger_event.data,
+                }
+            self._bus.emit(
+                runner.playlist.completion_event_type,
+                data=completion_payload,
+            )
+
+    def _build_created_payload(self, runner: _PlaylistRunner) -> Mapping[str, Any]:
+        payload: dict[str, Any] = {
+            "playlist_id": runner.run_id,
+            "definition_id": runner.playlist_id,
+            "playlist_name": runner.playlist.name,
+            "steps": [
+                {
+                    "event_type": step.event_type,
+                    "offset": step.offset,
+                    "repeat": step.repeat,
+                    "interval": step.interval,
+                    "producer_id": step.producer_id,
+                    "data": step.data,
+                }
+                for step in runner.playlist.steps
+            ],
+        }
+        if runner.playlist.metadata is not None:
+            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+        if runner.trigger_event is not None:
+            payload["trigger_event"] = {
+                "event_type": runner.trigger_event.event_type,
+                "producer_id": runner.trigger_event.producer_id,
+                "data": runner.trigger_event.data,
+            }
+        return payload
+
+
+class VirtualPeripheralManager:
+    """Coordinator for virtual peripherals attached to the bus."""
+
+    def __init__(self, bus: "EventBus") -> None:
+        self._bus = bus
+        self._lock = threading.RLock()
+        self._definitions: MutableMapping[str, VirtualPeripheralDefinition] = {}
+        self._instances: MutableMapping[str, _VirtualPeripheral] = {}
+        self._subscriptions: MutableMapping[str, List[SubscriptionHandle]] = {}
+
+    def register(self, definition: VirtualPeripheralDefinition) -> VirtualPeripheralHandle:
+        handle = VirtualPeripheralHandle(uuid.uuid4().hex)
+        self._bind(handle, definition)
+        return handle
+
+    def update(
+        self,
+        handle: VirtualPeripheralHandle,
+        definition: VirtualPeripheralDefinition,
+    ) -> None:
+        with self._lock:
+            if handle.peripheral_id not in self._definitions:
+                raise KeyError(f"Unknown virtual peripheral id: {handle.peripheral_id}")
+        self._unbind(handle)
+        self._bind(handle, definition)
+
+    def remove(self, handle: VirtualPeripheralHandle) -> None:
+        self._unbind(handle)
+
+    def list_definitions(self) -> Mapping[str, VirtualPeripheralDefinition]:
+        with self._lock:
+            return MappingProxyType(dict(self._definitions))
+
+    def _bind(
+        self,
+        handle: VirtualPeripheralHandle,
+        definition: VirtualPeripheralDefinition,
+    ) -> None:
+        context = VirtualPeripheralContext(self._bus, definition, handle)
+        instance = definition.factory(context)
+        subscriptions: List[SubscriptionHandle] = []
+
+        for event_type in definition.event_types:
+            subscription = self._bus.subscribe(
+                event_type,
+                lambda event, pid=handle.peripheral_id: self._route_event(pid, event),
+                priority=definition.priority,
+            )
+            subscriptions.append(subscription)
+
+        with self._lock:
+            self._definitions[handle.peripheral_id] = definition
+            self._instances[handle.peripheral_id] = instance
+            self._subscriptions[handle.peripheral_id] = subscriptions
+
+    def _unbind(self, handle: VirtualPeripheralHandle) -> None:
+        with self._lock:
+            definition = self._definitions.pop(handle.peripheral_id, None)
+            instance = self._instances.pop(handle.peripheral_id, None)
+            subscriptions = self._subscriptions.pop(handle.peripheral_id, None)
+
+        if subscriptions:
+            for subscription in subscriptions:
+                self._bus.unsubscribe(subscription)
+
+        if instance is not None:
+            try:
+                instance.shutdown()
+            except Exception:  # pragma: no cover - defensive logging
+                _LOGGER.exception(
+                    "Virtual peripheral %s shutdown failed", handle.peripheral_id
+                )
+
+        if definition is not None:
+            _LOGGER.debug(
+                "Unregistered virtual peripheral %s", definition.name
+            )
+
+    def _route_event(self, peripheral_id: str, event: Input) -> None:
+        with self._lock:
+            instance = self._instances.get(peripheral_id)
+            definition = self._definitions.get(peripheral_id)
+
+        if instance is None:
+            return
+
+        try:
+            instance.handle(event)
+        except Exception:
+            name = definition.name if definition is not None else peripheral_id
+            _LOGGER.exception(
+                "Virtual peripheral %s failed for event %s", name, event
+            )
+
+
+class _DoubleTapVirtualPeripheral(_VirtualPeripheral):
+    def __init__(
+        self,
+        context: VirtualPeripheralContext,
+        *,
+        window: float,
+        output_event_type: str,
+    ) -> None:
+        super().__init__(context)
+        if window <= 0:
+            raise ValueError("window must be positive")
+        self._window = window
+        self._output_event_type = output_event_type
+        self._last_event: MutableMapping[int, tuple[float, Input]] = {}
+
+    def handle(self, event: Input) -> None:
+        now = self._context.monotonic()
+        previous = self._last_event.get(event.producer_id)
+
+        if previous is not None:
+            last_time, last_event = previous
+            if now - last_time <= self._window:
+                payload = {
+                    "events": [
+                        VirtualPeripheralContext.describe(last_event),
+                        VirtualPeripheralContext.describe(event),
+                    ]
+                }
+                self._context.emit(
+                    self._output_event_type,
+                    payload,
+                    producer_id=event.producer_id,
+                )
+                self._last_event.pop(event.producer_id, None)
+                return
+
+        self._last_event[event.producer_id] = (now, event)
+
+    def shutdown(self) -> None:
+        self._last_event.clear()
+
+
+class _SimultaneousVirtualPeripheral(_VirtualPeripheral):
+    def __init__(
+        self,
+        context: VirtualPeripheralContext,
+        *,
+        window: float,
+        required_sources: int,
+        output_event_type: str,
+    ) -> None:
+        super().__init__(context)
+        if window <= 0:
+            raise ValueError("window must be positive")
+        if required_sources < 2:
+            raise ValueError("required_sources must be at least 2")
+        self._window = window
+        self._required_sources = required_sources
+        self._output_event_type = output_event_type
+        self._pending: MutableMapping[str, Deque[tuple[float, Input]]] = defaultdict(deque)
+
+    def handle(self, event: Input) -> None:
+        bucket = self._pending[event.event_type]
+        now = self._context.monotonic()
+
+        while bucket and now - bucket[0][0] > self._window:
+            bucket.popleft()
+
+        bucket.append((now, event))
+
+        unique: dict[int, Input] = {}
+        for _, pending_event in reversed(bucket):
+            if pending_event.producer_id not in unique:
+                unique[pending_event.producer_id] = pending_event
+
+        if len(unique) >= self._required_sources:
+            ordered = list(reversed(list(unique.values())))
+            payload = {
+                "events": [
+                    VirtualPeripheralContext.describe(candidate)
+                    for candidate in ordered
+                ]
+            }
+            self._context.emit(
+                self._output_event_type,
+                payload,
+                producer_id=0,
+            )
+            bucket.clear()
+
+    def shutdown(self) -> None:
+        self._pending.clear()
+
+
+class _SequenceVirtualPeripheral(_VirtualPeripheral):
+    def __init__(
+        self,
+        context: VirtualPeripheralContext,
+        matchers: Sequence[SequenceMatcher],
+        *,
+        timeout: float | None,
+        output_event_type: str,
+    ) -> None:
+        super().__init__(context)
+        if not matchers:
+            raise ValueError("matchers cannot be empty")
+        if timeout is not None and timeout <= 0:
+            raise ValueError("timeout must be positive when provided")
+        self._matchers = tuple(matchers)
+        self._timeout = timeout
+        self._output_event_type = output_event_type
+        self._progress: MutableMapping[int, tuple[int, float, List[Input]]] = {}
+
+    def handle(self, event: Input) -> None:
+        now = self._context.monotonic()
+        state = self._progress.get(event.producer_id)
+        index = 0
+        history: List[Input] = []
+
+        if state is not None:
+            index, last_time, history = state
+            if self._timeout is not None and now - last_time > self._timeout:
+                index = 0
+                history = []
+
+        if self._matches(index, event):
+            new_history = history + [event]
+            next_index = index + 1
+            if next_index == len(self._matchers):
+                payload = {
+                    "sequence": [
+                        VirtualPeripheralContext.describe(item)
+                        for item in new_history
+                    ]
+                }
+                self._context.emit(
+                    self._output_event_type,
+                    payload,
+                    producer_id=event.producer_id,
+                )
+                self._progress.pop(event.producer_id, None)
+            else:
+                self._progress[event.producer_id] = (next_index, now, new_history)
+            return
+
+        if self._matches(0, event):
+            self._progress[event.producer_id] = (1, now, [event])
+        else:
+            self._progress.pop(event.producer_id, None)
+
+    def shutdown(self) -> None:
+        self._progress.clear()
+
+    def _matches(self, index: int, event: Input) -> bool:
+        if index >= len(self._matchers):
+            return False
+        matcher = self._matchers[index]
+        if event.event_type != matcher.event_type:
+            return False
+        if matcher.predicate is not None:
+            return matcher.predicate(event)
+        return True
+
+
+def double_tap_virtual_peripheral(
+    source_event_type: str,
+    *,
+    output_event_type: str,
+    window: float = 0.3,
+    name: str | None = None,
+    priority: int = 50,
+    metadata: Mapping[str, Any] | None = None,
+) -> VirtualPeripheralDefinition:
+    resolved_name = name or f"{source_event_type}.double_tap"
+
+    def factory(context: VirtualPeripheralContext) -> _VirtualPeripheral:
+        return _DoubleTapVirtualPeripheral(
+            context,
+            window=window,
+            output_event_type=output_event_type,
+        )
+
+    return VirtualPeripheralDefinition(
+        name=resolved_name,
+        event_types=(source_event_type,),
+        factory=factory,
+        priority=priority,
+        metadata=metadata,
+    )
+
+
+def simultaneous_virtual_peripheral(
+    event_type: str,
+    *,
+    output_event_type: str,
+    window: float = 0.01,
+    required_sources: int = 2,
+    name: str | None = None,
+    priority: int = 50,
+    metadata: Mapping[str, Any] | None = None,
+) -> VirtualPeripheralDefinition:
+    resolved_name = name or f"{event_type}.simultaneous"
+
+    def factory(context: VirtualPeripheralContext) -> _VirtualPeripheral:
+        return _SimultaneousVirtualPeripheral(
+            context,
+            window=window,
+            required_sources=required_sources,
+            output_event_type=output_event_type,
+        )
+
+    return VirtualPeripheralDefinition(
+        name=resolved_name,
+        event_types=(event_type,),
+        factory=factory,
+        priority=priority,
+        metadata=metadata,
+    )
+
+
+def sequence_virtual_peripheral(
+    name: str,
+    matchers: Sequence[SequenceMatcher],
+    *,
+    output_event_type: str,
+    timeout: float | None = 1.0,
+    priority: int = 50,
+    metadata: Mapping[str, Any] | None = None,
+) -> VirtualPeripheralDefinition:
+    if not matchers:
+        raise ValueError("matchers must not be empty")
+    event_types = tuple({matcher.event_type for matcher in matchers})
+
+    def factory(context: VirtualPeripheralContext) -> _VirtualPeripheral:
+        return _SequenceVirtualPeripheral(
+            context,
+            matchers,
+            timeout=timeout,
+            output_event_type=output_event_type,
+        )
+
+    return VirtualPeripheralDefinition(
+        name=name,
+        event_types=event_types,
+        factory=factory,
+        priority=priority,
+        metadata=metadata,
+    )
+
+
 class EventBus:
     """Synchronous pub/sub dispatcher for :class:`Input` events."""
 
@@ -34,6 +906,8 @@ class EventBus:
         self._subscribers: MutableMapping[Optional[str], List[SubscriptionHandle]] = defaultdict(list)
         self._next_sequence = 0
         self._state_store = state_store or StateStore()
+        self._playlist_manager = EventPlaylistManager(self)
+        self._virtual_peripherals = VirtualPeripheralManager(self)
 
     # Public API ---------------------------------------------------------
     def subscribe(
@@ -108,6 +982,18 @@ class EventBus:
         """Return the state store maintained by the bus."""
 
         return self._state_store
+
+    @property
+    def playlists(self) -> EventPlaylistManager:
+        """Return the playlist manager bound to this bus."""
+
+        return self._playlist_manager
+
+    @property
+    def virtual_peripherals(self) -> VirtualPeripheralManager:
+        """Return the virtual peripheral manager bound to this bus."""
+
+        return self._virtual_peripherals
 
     # Internal helpers ---------------------------------------------------
     def _iter_targets(self, event_type: str) -> Iterable[SubscriptionHandle]:
