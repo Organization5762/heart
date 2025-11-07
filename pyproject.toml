@@ -139,6 +139,9 @@ follow_imports = "skip"
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-vv -n auto --dist=loadscope"
+markers = [
+    "timeout(duration): mark tests that should fail if they exceed the given duration",
+]
 
 [dependency-groups]
 dev = [
