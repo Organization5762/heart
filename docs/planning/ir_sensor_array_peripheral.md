@@ -16,7 +16,7 @@ The Heart hardware stack needs an infrared (IR) sensor array peripheral capable 
 
 ### Discovery
 
-- [ ] Map the existing IR decoding flow in `drivers/` and document timing resolution limits in `docs/research/ir_sensor_array_positioning.md`.
+- [x] Map the existing IR decoding flow in `drivers/` and document timing resolution limits in `docs/research/ir_sensor_array_positioning.md`.
 - [ ] Benchmark wide-angle versus narrow field-of-view IR sensor packages; capture a comparison table with responsivity, latency, and ambient rejection metrics.
 - [ ] Prototype a four-sensor breadboard with synchronized capture, saving logic analyzer traces and timestamp alignment notes to the lab share.
 - [ ] Draft a communications spec for the peripheral-to-MCU interface (SPI vs. I²C + DMA) and solicit asynchronous feedback via architecture review notes.
@@ -26,9 +26,9 @@ The Heart hardware stack needs an infrared (IR) sensor array peripheral capable 
 
 - [ ] Design PCB v1 with radial IR sensor placement, precision clock distribution, and diagnostic headers; store KiCad sources alongside BOM revisions.
 - [ ] Implement the embedded driver module `src/hw/ir_array.rs` that streams timestamped interrupts into a double-buffered DMA queue with CRC tagging.
-- [ ] Extend the signal processing pipeline with a multilateration solver, confidence scoring, and unit tests using synthetic pulse fixtures.
+- [x] Extend the signal processing pipeline with a multilateration solver, confidence scoring, and unit tests using synthetic pulse fixtures.
 - [ ] Create an arrayed remote prototype with three IR LEDs at 120° offsets, each modulating distinct preamble sequences and payload slots.
-- [ ] Develop a calibration CLI (`scripts/ir_calibrate.py`) that records sweeps, solves for sensor offsets, and uploads results to the telemetry store.
+- [x] Develop a calibration CLI (`scripts/ir_calibrate.py`) that records sweeps, solves for sensor offsets, and uploads results to the telemetry store.
 
 ### Rollout
 
