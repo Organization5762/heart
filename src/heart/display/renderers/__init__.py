@@ -1,9 +1,11 @@
+import time
 from dataclasses import dataclass
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
+from heart.display.renderers.internal import FrameAccumulator
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 
@@ -11,6 +13,8 @@ logger = get_logger(__name__)
 
 
 class BaseRenderer:
+    supports_frame_accumulator: bool = False
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -89,10 +93,27 @@ class BaseRenderer:
             self.initialize(window, clock, peripheral_manager, orientation)
 
         screen = self._get_input_screen(window, orientation)
-        self.process(screen, clock, peripheral_manager, orientation)
+        start_ns = time.perf_counter_ns()
+        if self.supports_frame_accumulator:
+            accumulator = FrameAccumulator.from_surface(screen)
+            self.process_with_accumulator(
+                accumulator, clock, peripheral_manager, orientation
+            )
+            screen = accumulator.flush(screen)
+        else:
+            self.process(screen, clock, peripheral_manager, orientation)
+        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         screen = self._postprocess_input_screen(screen, orientation)
 
         window.blit(screen, (0, 0))
+        logger.debug(
+            "renderer.frame",  # structured logging friendly key
+            extra={
+                "renderer": self.name,
+                "duration_ms": duration_ms,
+                "uses_accumulator": self.supports_frame_accumulator,
+            },
+        )
 
     def process(
         self,
@@ -102,6 +123,17 @@ class BaseRenderer:
         orientation: Orientation,
     ) -> None:
         pass
+
+    def process_with_accumulator(
+        self,
+        accumulator: FrameAccumulator,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        """Render into a :class:`FrameAccumulator` (optional override)."""
+
+        self.process(accumulator.surface, clock, peripheral_manager, orientation)
 
     def _tile_surface(
         self, screen: pygame.Surface, rows: int, cols: int
