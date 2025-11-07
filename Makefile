@@ -8,20 +8,21 @@ install:
 	@uv tool install isort
 	@uv tool install docformatter
 	@uv tool install mdformat
+	@uv tool install mypy
 
 format:
 	@uvx isort $(PYTHON_SOURCES)
 	@uvx ruff check --fix
 	@uvx docformatter -i -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat $(DOCS_SOURCES)
-	@uv run mypy
+	@uvx mypy
 
 check:
 	@uvx ruff check $(PYTHON_SOURCES)
 	@uvx isort --check-only $(PYTHON_SOURCES)
 	@uvx docformatter --check -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat --check $(DOCS_SOURCES)
-	@uv run mypy
+	@uvx mypy
 
 test:
 	@uv run pytest
