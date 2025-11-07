@@ -1,50 +1,84 @@
-# IR Sensor Array Positioning Research Note
+# IR Sensor Array Positioning Notes
 
-## Context
+## Problem statement
 
-This note captures the technical rationale for adding an IR sensor array peripheral that decodes remote-control bit streams while estimating emitter pose. It complements the implementation plan documented in `docs/planning/ir_sensor_array_peripheral.md` by diving into timing tolerances, sensor geometry, and signal processing trade-offs.
+The firmware stack needs a reproducible method to convert timestamped edges from
+an infrared (IR) sensor array into centimetre-scale pose estimates. Legacy IR
+decoders in `drivers/` capture level transitions but discard precise arrival
+times, which prevents multilateration. We require a data model that preserves
+microsecond timing, a solver that tolerates sensor skew, and supporting tooling
+for calibration.
 
-## Timing and sampling requirements
+## Materials and context
 
-- Target end-to-end latency is \<50 ms from photon detection to multilateration output, matching the success criteria in the plan.
-- Each sensor channel must support microsecond-scale timestamping. With sensors spaced 15–20 cm apart, a 10 cm path difference corresponds to ~333 ns in air; sub-microsecond precision with oversampling and interpolation is required to differentiate arrival times reliably.
-- Use a phase-locked loop (PLL) disciplined clock distributed to all capture channels. Breadboard experiments should log phase noise and drift across temperature ranges before committing to PCB layout.
+- Four-channel IR sensor breadboard driven over USB/UART for prototyping.
+- Host workstation capable of running the Python event loop and PyTest suite.
+- Existing Heart runtime modules (`heart.peripheral.core`, event bus, logging).
+- Synthetic capture fixtures stored as JSON for calibration experiments.
 
-## Sensor package evaluation
+## Timing capture audit
 
-| Package | FOV | Responsivity | Rise time | Notes |
-| --- | --- | --- | --- | --- |
-| TSOP-like demodulators | 90° | High | 400 µs | Integrated AGC may mask fine timing; suitable for decoding but weak for triangulation |
-| PIN photodiodes + transimpedance | 60° (with lens) | Medium | \<10 µs | Requires custom amplification but preserves edge timing |
-| Multi-element IR receivers | 120° | Medium | 50 µs | Wider coverage but higher crosstalk risk; useful for hybrid arrays |
+The existing sensor bus code paths in `drivers/` timestamp rising edges with
+millisecond precision before forwarding payloads to the host. This is
+insufficient for triangulation: 1 ms of uncertainty at the speed of light
+produces ~300 km of spatial error. We therefore implemented
+`IRArrayDMAQueue` in `src/heart/peripheral/ir_sensor_array.py` to simulate the
+embedded double-buffered DMA queue. The queue stores raw `IRSample` objects with
+microsecond resolution, computes a lightweight CRC across each buffer, and emits
+`IRDMAPacket` instances that the host peripheral validates prior to decoding.
 
-**Recommendation:** Combine narrow-FOV PIN photodiodes for timing accuracy with secondary demodulation channels to retain compatibility with legacy remotes.
+## Geometry model and solver
 
-## Geometry and solver design
+`MultilaterationSolver` consumes a fixed array of sensor positions and solves
+for the burst origin via a constrained least-squares fit. The implementation
+wraps `scipy.optimize.least_squares` so the solver can explore the joint space
+of pose and emission time while respecting tight convergence thresholds. The
+radial layout helper staggers sensors vertically (±15% of the radius) to break
+planar degeneracy. The solver returns both a pose estimate and a confidence
+score derived from the residual root mean square error (RMSE). Unit tests in
+`tests/peripheral/test_ir_sensor_array.py::test_multilateration_solver_converges_on_known_point`
+exercise the solver with synthetic geometry and confirm convergence to a known
+point within a millimetre.【F:src/heart/peripheral/ir_sensor_array.py†L118-L207】【F:tests/peripheral/test_ir_sensor_array.py†L28-L52】
 
-- Arrange four sensors in a non-coplanar radial geometry to maximize baseline diversity. A tetrahedral layout yields better vertical resolution than a flat plane.
-- Implement a multilateration solver that ingests time-of-arrival (ToA) differences plus binary hit flags for robustness when signals clip.
-- Confidence scoring should weight solutions by the variance of measured ToA residuals and ambient light noise captured during calibration sweeps.
+## Frame assembly and decoding
 
-## Directional remote encoding
+`FrameAssembler` groups samples by `frame_id` until every sensor contributes.
+When a frame is complete, the peripheral assembles an `IRFrame` that exposes
+both calibrated arrival times and a coarse payload bitstream. The current
+decoder treats pulses longer than 1 ms as logical ones; shorter pulses map to
+zeros. This heuristic matches the directional remote fixture described in the
+planning document and can be tuned once actual modulation measurements arrive.
 
-- Prototype a remote with three IR LEDs spaced at 120° and mounted on a small dome to project distinct beams.
-- Assign unique preambles (P1, P2, P3) per emitter and stagger bursts with 3 ms guard intervals. This approach aligns with the frame sequencing table in the plan and mitigates reflective interference.
-- Encode pose hints within payload bits when possible (e.g., beam ID + sync pulse) so the solver can reject ambiguous detections.
+`IRSensorArray` feeds the solver, applies optional per-channel calibration
+offsets, and emits pose events through the runtime `EventBus`. Tests in
+`tests/peripheral/test_ir_sensor_array.py::test_sensor_array_emits_frame_event`
+demonstrate that the peripheral produces a frame event with centimetre accuracy
+and expected payload bits after applying synthetic calibration offsets.【F:src/heart/peripheral/ir_sensor_array.py†L191-L264】【F:tests/peripheral/test_ir_sensor_array.py†L54-L90】
 
-## Calibration and observability
+## Calibration workflow
 
-- Calibration CLI should capture static sweeps at multiple distances (1–3 m) and solve for sensor offsets, temperature coefficients, and photodiode gain factors.
-- Store calibration artifacts in the telemetry backend so soak tests can correlate drift with environment data.
-- Dashboard visualizations must expose per-sensor status, timing residuals, and confidence metrics to aid troubleshooting.
+The CLI defined in `scripts/ir_calibrate.py` ingests JSON captures generated
+from lab sweeps. Each record describes the emitting pose, sensor index, and the
+observed timestamp. The tool groups captures by `frame_id`, compares observed
+arrival times to the theoretical propagation delay given a supplied sensor
+layout, and writes the per-sensor median offset and aggregate metrics (RMSE,
+frames used, maximum skew). Operators can optionally push the resulting payload
+to a telemetry endpoint directly from the CLI to prime runtime dashboards.【F:scripts/ir_calibrate.py†L1-L144】
 
-## Open research questions
+## Validation snapshot
 
-1. What modulation frequencies minimize ambient sunlight interference while staying within component tolerances?
-1. How does reflective clutter (glass, metal) impact ToA measurements, and can adaptive filtering compensate without increasing latency?
-1. Can we multiplex multiple directional remotes without sacrificing ToA resolution? Potential solutions include orthogonal frequency codes or time-sliced frames beyond the current five-segment schedule.
+- `IRArrayDMAQueue` toggles buffers correctly and preserves sample ordering.
+- Multilateration unit test reproduces emitter coordinates within 1 mm.
+- Peripheral integration test verifies confidence scoring above 0.95 with
+  residuals below `1e-10` seconds.
+- CLI computes offsets from synthetic fixtures and enforces input validation to
+  avoid silent miscalibrations.
 
-## References
+## Follow-up
 
-- Implementation plan: `docs/planning/ir_sensor_array_peripheral.md`
-- DMA and timestamping prototypes: to be stored in `src/hw/ir_array.rs` and accompanying test fixtures once development begins.
+- Integrate live capture tooling on the embedded board to populate
+  `IRDMAPacket` directly from DMA hardware.
+- Replace the pulse-width heuristic with protocol-specific decoding once the
+  remote modulation scheme is finalised.
+- Extend the calibration CLI to stream results to the telemetry store outlined
+  in the planning document.
