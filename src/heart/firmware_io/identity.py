@@ -102,7 +102,6 @@ def default_device_id_path(env: Mapping[str, str] | None = None) -> str:
 def persistent_device_id(
     *,
     storage_path: str | None = None,
-    default_identifier: str | None = None,
     env: Mapping[str, str] | None = None,
     opener: Callable[[str, str], TextIO] | None = None,
     microcontroller_module=None,
@@ -113,9 +112,8 @@ def persistent_device_id(
 
     1. ``storage_path`` contents if the file exists.
     2. ``DEVICE_ID_ENV_VAR`` (``HEART_DEVICE_ID``) environment variable.
-    3. ``default_identifier`` argument when provided.
-    4. The hardware UID exposed by ``microcontroller.cpu.uid``.
-    5. A randomly generated hexadecimal token.
+    3. The hardware UID exposed by ``microcontroller.cpu.uid``.
+    4. A randomly generated hexadecimal token.
 
     When a non-file source is used, the identifier is written back to
     ``storage_path`` so subsequent boots re-use the same value without
@@ -133,8 +131,6 @@ def persistent_device_id(
     candidate = None
     if env_mapping is not None:
         candidate = env_mapping.get(DEVICE_ID_ENV_VAR)
-    if not candidate and default_identifier:
-        candidate = default_identifier
     if not candidate:
         candidate = _hardware_device_uid(microcontroller_module)
     if not candidate:
