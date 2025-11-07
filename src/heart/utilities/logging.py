@@ -31,6 +31,19 @@ def _sanitize_logger_name(name: str) -> str:
     return sanitized.replace(".", "_") or "root"
 
 
+def _attach_handler(
+    logger: logging.Logger,
+    handler: logging.Handler,
+    formatter: logging.Formatter,
+    level: int,
+) -> None:
+    """Attach a handler to ``logger`` with shared configuration."""
+
+    handler.setFormatter(formatter)
+    handler.setLevel(level)
+    logger.addHandler(handler)
+
+
 def _configure_logger(logger: logging.Logger, log_level: str) -> None:
     level = getattr(logging, log_level, logging.INFO)
     logger.setLevel(level)
@@ -44,18 +57,15 @@ def _configure_logger(logger: logging.Logger, log_level: str) -> None:
     )
 
     stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    stream_handler.setLevel(level)
-    logger.addHandler(stream_handler)
+    _attach_handler(logger, stream_handler, formatter, level)
 
+    log_filename = _resolve_log_directory() / f"{_sanitize_logger_name(logger.name)}.log"
     file_handler = RotatingFileHandler(
-        _resolve_log_directory() / f"{_sanitize_logger_name(logger.name)}.log",
+        log_filename,
         maxBytes=MAX_LOG_BYTES,
         backupCount=BACKUP_COUNT,
     )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(level)
-    logger.addHandler(file_handler)
+    _attach_handler(logger, file_handler, formatter, level)
     logger.propagate = False
 
 
