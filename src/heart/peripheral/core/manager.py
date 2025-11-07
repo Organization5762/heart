@@ -28,15 +28,19 @@ class PeripheralManager:
         self._threads: list[threading.Thread] = []
         self._started = False
         self._event_bus = event_bus
+        self._propagate_event_bus = event_bus is not None
 
     @property
     def event_bus(self) -> EventBus | None:
         return self._event_bus
 
-    def attach_event_bus(self, event_bus: EventBus) -> None:
+    def attach_event_bus(self, event_bus: EventBus, *, propagate: bool = True) -> None:
         """Register ``event_bus`` for peripherals managed by this instance."""
 
         self._event_bus = event_bus
+        self._propagate_event_bus = propagate
+        if not propagate:
+            return
         for peripheral in self._peripherals:
             self._attach_event_bus(peripheral, event_bus)
 
@@ -124,7 +128,7 @@ class PeripheralManager:
 
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
-        if self._event_bus is not None:
+        if self._event_bus is not None and self._propagate_event_bus:
             self._attach_event_bus(peripheral, self._event_bus)
 
     def _attach_event_bus(self, peripheral: Peripheral, event_bus: EventBus) -> None:

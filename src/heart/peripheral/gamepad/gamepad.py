@@ -1,3 +1,4 @@
+import math
 import subprocess
 import time
 from collections import defaultdict
@@ -7,7 +8,8 @@ from typing import Iterator, NoReturn, Self
 import pygame.joystick
 from pygame.event import Event
 
-from heart.peripheral.core import Peripheral, events
+from heart.peripheral.core import Input, Peripheral, events
+from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -22,6 +24,11 @@ class GamepadIdentifier(Enum):
 
 
 class Gamepad(Peripheral):
+    EVENT_BUTTON = "gamepad.button"
+    EVENT_AXIS = "gamepad.axis"
+    EVENT_DPAD = "gamepad.dpad"
+    EVENT_LIFECYCLE = "gamepad.lifecycle"
+
     def __init__(
         self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
     ) -> None:
@@ -42,6 +49,9 @@ class Gamepad(Peripheral):
         self._axis_curr_frame: defaultdict[str, float] = defaultdict(float)
         self._dpad_last_frame: tuple[int, int] = (0, 0)
         self._dpad_curr_frame: tuple[int, int] = (0, 0)
+
+        self._event_bus: EventBus | None = None
+        self._last_lifecycle_status: str | None = None
 
     def is_held(self, button_id: int) -> bool:
         return self._pressed_curr_frame[button_id]
@@ -87,6 +97,12 @@ class Gamepad(Peripheral):
         self._pressed_curr_frame.clear()
         self._axis_prev_frame.clear()
         self._axis_curr_frame.clear()
+        self._mark_disconnect(suspected=False)
+
+    def attach_event_bus(self, event_bus: EventBus) -> None:
+        self._event_bus = event_bus
+        if self.is_connected():
+            self._mark_connected()
 
     @property
     def num_buttons(self) -> int:
@@ -139,6 +155,7 @@ class Gamepad(Peripheral):
         self._dpad_last_frame = self._dpad_curr_frame
 
         self._dpad_curr_frame = self.joystick.get_hat(0)
+        self._emit_dpad_if_changed()
         for button_id in range(self.num_buttons):
             pressed = bool(self.joystick.get_button(button_id))
             self._pressed_curr_frame[button_id] = pressed
@@ -150,6 +167,9 @@ class Gamepad(Peripheral):
                 t0 = self._press_time.pop(button_id, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[button_id] = True
+
+            if pressed != self._pressed_prev_frame[button_id]:
+                self._emit_button_event(button_id, pressed)
 
         for axis_id in range(self.num_axes):
             axis_value = self.joystick.get_axis(axis_id)
@@ -164,6 +184,14 @@ class Gamepad(Peripheral):
                 t0 = self._press_time.pop(axis_key, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
+
+            if not math.isclose(
+                self._axis_curr_frame[axis_key],
+                self._axis_prev_frame[axis_key],
+                rel_tol=1e-6,
+                abs_tol=1e-6,
+            ):
+                self._emit_axis_event(axis_id, self._axis_curr_frame[axis_key])
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -191,6 +219,7 @@ class Gamepad(Peripheral):
                     try:
                         self.joystick = pygame.joystick.Joystick(0)
                         self.joystick.init()
+                        self._mark_connected()
                         print(f"{self.joystick.get_name()} ready")
                     except pygame.error as e:
                         print(f"Error connecting joystick: {e}")
@@ -203,6 +232,7 @@ class Gamepad(Peripheral):
 
                 if not Gamepad.gamepad_detected() and self.is_connected():
                     cached_name = self.joystick.get_name() if self.joystick else None
+                    self._mark_disconnect(suspected=True)
                     self.reset()
                     if cached_name is not None:
                         print(f"{cached_name} disconnected")
@@ -231,3 +261,61 @@ class Gamepad(Peripheral):
 
             # check every 1 second for controller state
             time.sleep(1)
+
+    # ------------------------------------------------------------------
+    # Event bus helpers
+    # ------------------------------------------------------------------
+    def _emit_button_event(self, button_id: int, pressed: bool) -> None:
+        if self._event_bus is None:
+            return
+        event = Input(
+            event_type=self.EVENT_BUTTON,
+            data={"button": button_id, "pressed": pressed},
+            producer_id=self.joystick_id,
+        )
+        self._event_bus.emit(event)
+
+    def _emit_axis_event(self, axis_id: int, value: float) -> None:
+        if self._event_bus is None:
+            return
+        event = Input(
+            event_type=self.EVENT_AXIS,
+            data={"axis": axis_id, "value": float(value)},
+            producer_id=self.joystick_id,
+        )
+        self._event_bus.emit(event)
+
+    def _emit_dpad_if_changed(self) -> None:
+        if self._event_bus is None:
+            return
+        if self._dpad_curr_frame == self._dpad_last_frame:
+            return
+        event = Input(
+            event_type=self.EVENT_DPAD,
+            data={"x": self._dpad_curr_frame[0], "y": self._dpad_curr_frame[1]},
+            producer_id=self.joystick_id,
+        )
+        self._event_bus.emit(event)
+
+    def _emit_lifecycle(self, status: str) -> None:
+        if self._event_bus is None:
+            return
+        if self._last_lifecycle_status == status:
+            return
+        event = Input(
+            event_type=self.EVENT_LIFECYCLE,
+            data={"status": status},
+            producer_id=self.joystick_id,
+        )
+        self._event_bus.emit(event)
+        self._last_lifecycle_status = status
+
+    def _mark_connected(self) -> None:
+        if self._last_lifecycle_status is None:
+            self._emit_lifecycle("connected")
+        elif self._last_lifecycle_status == "suspected_disconnect":
+            self._emit_lifecycle("recovered")
+
+    def _mark_disconnect(self, *, suspected: bool) -> None:
+        status = "suspected_disconnect" if suspected else "disconnected"
+        self._emit_lifecycle(status)
