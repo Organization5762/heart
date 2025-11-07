@@ -17,7 +17,7 @@ WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 IDENTITY = identity.Identity(
     device_name="sensor-bus",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(default_identifier="sensor-bus"),
+    device_id=identity.persistent_device_id(),
 )
 
 

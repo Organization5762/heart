@@ -17,7 +17,7 @@ MINIMUM_LIGHT_ON_SECONDS = 0.05
 IDENTITY = identity.Identity(
     device_name="lampe-controller",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(default_identifier="lampe-controller"),
+    device_id=identity.persistent_device_id(),
 )
 
 

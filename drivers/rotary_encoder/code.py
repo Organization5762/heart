@@ -11,7 +11,7 @@ from heart.firmware_io import identity, rotary_encoder
 IDENTITY = identity.Identity(
     device_name="rotary-encoder",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(default_identifier="rotary-encoder"),
+    device_id=identity.persistent_device_id(),
 )
 
 

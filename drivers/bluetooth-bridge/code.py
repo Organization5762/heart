@@ -47,7 +47,7 @@ ENCODING = "utf-8"
 IDENTITY = identity.Identity(
     device_name="bluetooth-bridge",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(default_identifier="bluetooth-bridge"),
+    device_id=identity.persistent_device_id(),
 )
 
 
