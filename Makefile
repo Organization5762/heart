@@ -14,12 +14,14 @@ format:
 	@uvx ruff check --fix
 	@uvx docformatter -i -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat $(DOCS_SOURCES)
+	@uv run mypy
 
 check:
 	@uvx ruff check $(PYTHON_SOURCES)
 	@uvx isort --check-only $(PYTHON_SOURCES)
 	@uvx docformatter --check -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat --check $(DOCS_SOURCES)
+	@uv run mypy
 
 test:
 	@uv run pytest

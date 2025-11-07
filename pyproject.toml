@@ -105,35 +105,56 @@ module = [
     "cv2",
     "cv2.*",
     "moderngl",
-    "numpy",
-    "numpy.*",
-    "openant",
-    "openant.*",
-    "PIL",
-    "PIL.*",
-    "pygame",
-    "pygame.*",
-    "requests",
-    "rgbmatrix",
-    "serial",
-    "serial.*",
-    "bluezero",
-    "bluezero.*",
-    "typer",
-    "toml",
-]
-ignore_missing_imports = true
+    "numpy", 
+    "numpy.*", 
+    "openant", 
+    "openant.*", 
+    "PIL", 
+    "PIL.*", 
+    "pygame", 
+    "pygame.*", 
+    "requests", 
+    "rgbmatrix", 
+    "serial", 
+    "serial.*", 
+    "bluezero", 
+    "bluezero.*", 
+    "typer", 
+    "toml", 
+    "sounddevice", 
+    "sounddevice.*", 
+    "scipy", 
+    "scipy.*", 
+] 
+ignore_missing_imports = true 
 
-[[tool.mypy.overrides]]
-module = [
+[[tool.mypy.overrides]] 
+module = [ 
     "heart.assets",
     "heart.assets.*",
     "heart.display",
     "heart.display.*",
     "heart.navigation",
     "heart.navigation.*",
+] 
+follow_imports = "skip" 
+
+[[tool.mypy.overrides]]
+module = [
+    "heart.device.local",
+    "heart.environment",
+    "heart.loop",
+    "heart.peripheral.bluetooth",
+    "heart.peripheral.core.event_bus",
+    "heart.peripheral.gamepad.gamepad",
+    "heart.peripheral.heart_rates",
+    "heart.peripheral.ir_sensor_array",
+    "heart.peripheral.microphone",
+    "heart.peripheral.sensor",
+    "heart.peripheral.switch",
+    "heart.peripheral.uwb",
 ]
-follow_imports = "skip"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -155,4 +176,5 @@ lint = [
     "isort>=7.0.0",
     "mdformat>=1.0.0",
     "ruff>=0.14.3",
+    "mypy>=1.11.1",
 ]
