@@ -27,8 +27,11 @@ jobs:
       - name: Install the project
         run: make install
 
-      - name: Run formatting checks
-        run: make check
+      - name: Run formatting
+        run: make format
+
+      - name: Ensure no formatting changes
+        run: git diff --exit-code
 
       - name: Run tests
         run: make test
