@@ -1,5 +1,6 @@
 import threading
 import time
+from typing import Any
 
 import pytest
 
@@ -190,6 +191,96 @@ def test_playlist_trigger_interrupted_by_event() -> None:
     assert created_events[0]["playlist_metadata"] == {"mode": "interrupt"}
     assert emitted_events
     assert len(emitted_events) < 10
+
+
+@pytest.mark.parametrize(
+    "data_factory, mutator",
+    [
+        (
+            lambda: {"value": 0},
+            lambda event: event.data.__setitem__(
+                "value", event.data["value"] + 1
+            ),
+        ),
+        (
+            lambda: [1, 2],
+            lambda event: event.data.append("mutated"),
+        ),
+        (
+            lambda: ("base", {"count": 0}),
+            lambda event: event.data[1].__setitem__(
+                "count", event.data[1]["count"] + 1
+            ),
+        ),
+    ],
+)
+def test_playlist_step_payloads_are_isolated(data_factory, mutator) -> None:
+    bus = EventBus()
+    mutated_payloads: list[Any] = []
+    telemetry_snapshots: list[Any] = []
+
+    bus.subscribe(
+        "mutable.event",
+        lambda event: (mutator(event), mutated_payloads.append(event.data)),
+    )
+    bus.subscribe(
+        EventPlaylistManager.EVENT_EMITTED,
+        lambda event: telemetry_snapshots.append(event.data["data"]),
+    )
+
+    playlist = EventPlaylist(
+        name="mutable",
+        steps=[
+            PlaylistStep(
+                event_type="mutable.event",
+                data=data_factory(),
+                offset=0.0,
+                repeat=2,
+                interval=0.01,
+            )
+        ],
+    )
+    handle = bus.playlists.register(playlist)
+
+    run_id = bus.playlists.start(handle)
+    assert bus.playlists.join(run_id, timeout=1.0)
+
+    expected = data_factory()
+    assert telemetry_snapshots == [expected, expected]
+    assert len(mutated_payloads) == 2
+    assert mutated_payloads[0] == mutated_payloads[1]
+    assert mutated_payloads[0] != expected
+
+
+def test_playlist_created_payload_mutation_does_not_affect_run() -> None:
+    bus = EventBus()
+    observed: list[int] = []
+
+    bus.subscribe(
+        EventPlaylistManager.EVENT_CREATED,
+        lambda event: event.data["steps"][0]["data"].__setitem__("value", 99),
+    )
+    bus.subscribe(
+        "color.update",
+        lambda event: observed.append(event.data["value"]),
+    )
+
+    playlist = EventPlaylist(
+        name="immutable",
+        steps=[
+            PlaylistStep(
+                event_type="color.update",
+                data={"value": 7},
+                offset=0.0,
+            )
+        ],
+    )
+    handle = bus.playlists.register(playlist)
+
+    run_id = bus.playlists.start(handle)
+    assert bus.playlists.join(run_id, timeout=1.0)
+
+    assert observed == [7]
 
 
 def test_virtual_double_tap_emits_enriched_payload() -> None:

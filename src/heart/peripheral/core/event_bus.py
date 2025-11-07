@@ -7,6 +7,8 @@ import logging
 import threading
 import uuid
 from collections import defaultdict, deque
+from collections.abc import Mapping as MappingABC
+from copy import deepcopy
 from dataclasses import dataclass
 from time import perf_counter
 from types import MappingProxyType
@@ -37,6 +39,27 @@ __all__ = [
 
 
 EventCallback = Callable[[Input], None]
+
+
+def _clone_payload(value: Any) -> Any:
+    """Return a defensive copy of ``value`` suitable for reuse."""
+
+    if isinstance(value, MappingABC):
+        return {key: _clone_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_clone_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_clone_payload(item) for item in value)
+    if isinstance(value, set):
+        return {_clone_payload(item) for item in value}
+    if isinstance(value, frozenset):
+        return frozenset(_clone_payload(item) for item in value)
+    if isinstance(value, deque):
+        return deque(_clone_payload(item) for item in value)
+    try:
+        return deepcopy(value)
+    except Exception:
+        return value
 
 
 @dataclass(frozen=True)
@@ -440,9 +463,11 @@ class EventPlaylistManager:
         repeat_index: int,
         scheduled_offset: float,
     ) -> None:
+        event_data = _clone_payload(step.data)
+        telemetry_data = _clone_payload(event_data)
         event = Input(
             event_type=step.event_type,
-            data=step.data,
+            data=event_data,
             producer_id=step.producer_id,
         )
         self._bus.emit(event)
@@ -456,15 +481,17 @@ class EventPlaylistManager:
             "event_type": step.event_type,
             "producer_id": step.producer_id,
             "offset": scheduled_offset,
-            "data": step.data,
+            "data": telemetry_data,
         }
         if runner.playlist.metadata is not None:
-            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+            payload["playlist_metadata"] = _clone_payload(
+                runner.playlist.metadata
+            )
         if runner.trigger_event is not None:
             payload["trigger_event"] = {
                 "event_type": runner.trigger_event.event_type,
                 "producer_id": runner.trigger_event.producer_id,
-                "data": runner.trigger_event.data,
+                "data": _clone_payload(runner.trigger_event.data),
             }
         self._bus.emit(self.EVENT_EMITTED, data=payload)
 
@@ -496,12 +523,14 @@ class EventPlaylistManager:
             "reason": reason,
         }
         if runner.playlist.metadata is not None:
-            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+            payload["playlist_metadata"] = _clone_payload(
+                runner.playlist.metadata
+            )
         if interrupt_event is not None:
             payload["interrupt_event"] = {
                 "event_type": interrupt_event.event_type,
                 "producer_id": interrupt_event.producer_id,
-                "data": interrupt_event.data,
+                "data": _clone_payload(interrupt_event.data),
             }
         self._bus.emit(self.EVENT_STOPPED, data=payload)
 
@@ -512,14 +541,14 @@ class EventPlaylistManager:
                 "playlist_name": runner.playlist.name,
             }
             if runner.playlist.metadata is not None:
-                completion_payload["playlist_metadata"] = dict(
+                completion_payload["playlist_metadata"] = _clone_payload(
                     runner.playlist.metadata
                 )
             if runner.trigger_event is not None:
                 completion_payload["trigger_event"] = {
                     "event_type": runner.trigger_event.event_type,
                     "producer_id": runner.trigger_event.producer_id,
-                    "data": runner.trigger_event.data,
+                    "data": _clone_payload(runner.trigger_event.data),
                 }
             self._bus.emit(
                 runner.playlist.completion_event_type,
@@ -538,18 +567,20 @@ class EventPlaylistManager:
                     "repeat": step.repeat,
                     "interval": step.interval,
                     "producer_id": step.producer_id,
-                    "data": step.data,
+                    "data": _clone_payload(step.data),
                 }
                 for step in runner.playlist.steps
             ],
         }
         if runner.playlist.metadata is not None:
-            payload["playlist_metadata"] = dict(runner.playlist.metadata)
+            payload["playlist_metadata"] = _clone_payload(
+                runner.playlist.metadata
+            )
         if runner.trigger_event is not None:
             payload["trigger_event"] = {
                 "event_type": runner.trigger_event.event_type,
                 "producer_id": runner.trigger_event.producer_id,
-                "data": runner.trigger_event.data,
+                "data": _clone_payload(runner.trigger_event.data),
             }
         return payload
 
