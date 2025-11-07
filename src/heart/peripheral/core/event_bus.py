@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Callable, Iterable, List, MutableMapping, Optional
 
 from . import Input
@@ -72,13 +73,24 @@ class EventBus:
         else:
             input_event = Input(event_type=event, data=data, producer_id=producer_id)
         self._state_store.update(input_event)
+        started_at = perf_counter()
+        dispatched = 0
         for handle in self._iter_targets(input_event.event_type):
             try:
                 handle.callback(input_event)
+                dispatched += 1
             except Exception:
                 _LOGGER.exception(
                     "EventBus subscriber %s failed for event %s", handle.callback, input_event
                 )
+        duration = perf_counter() - started_at
+        _LOGGER.debug(
+            "Dispatched event %s from producer %s to %d subscriber(s) in %.3fms",
+            input_event.event_type,
+            input_event.producer_id,
+            dispatched,
+            duration * 1000,
+        )
 
     def run_on_event(
         self, event_type: Optional[str], *, priority: int = 0

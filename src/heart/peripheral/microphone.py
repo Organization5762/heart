@@ -10,6 +10,7 @@ from typing import Any, Self
 
 import numpy as np
 
+from heart.events.types import MicrophoneLevel
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
@@ -159,19 +160,20 @@ class Microphone(Peripheral):
         peak = float(np.max(np.abs(flattened)))
         timestamp = time.time()
 
-        level = {
-            "rms": rms,
-            "peak": peak,
-            "frames": frames,
-            "samplerate": self.samplerate,
-            "timestamp": timestamp,
-        }
-        self._latest_level = level
+        level = MicrophoneLevel(
+            rms=rms,
+            peak=peak,
+            frames=frames,
+            samplerate=self.samplerate,
+            timestamp=timestamp,
+        )
+        payload = level.to_input(producer_id=self._producer_id)
+        self._latest_level = payload.data  # type: ignore[assignment]
 
         event_bus = self._event_bus
         if event_bus is not None:
             try:
-                event_bus.emit(self.EVENT_LEVEL, data=level, producer_id=self._producer_id)
+                event_bus.emit(payload)
             except Exception:
                 logger.exception("Failed to emit microphone level event")
 
