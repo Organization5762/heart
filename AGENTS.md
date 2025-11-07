@@ -14,6 +14,9 @@ Run `make test` to execute the Pytest suite located in the `tests/` directory. E
 
 When adding tests, it is reasonable to stub hardware- or framework-heavy dependencies so the core logic can be exercised in isolation.
 
+- Parameterize new Pytest cases when validating multiple input permutations (especially for driver behaviour) to keep coverage
+  clear and maintainable.
+
 ## Linting (Optional Pre-Check)
 
 Running `make check` is recommended to verify formatting and linting without applying fixes.
