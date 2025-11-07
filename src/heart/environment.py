@@ -284,6 +284,8 @@ class GameLoop:
             RendererVariant.ITERATIVE: self._render_surface_iterative,
         }
 
+        self._render_queue_depth = 0
+
         # jank slide animation state machine
         self.mode_change: tuple[int, int] = (0, 0)
         self._last_mode_offset = 0
@@ -430,6 +432,7 @@ class GameLoop:
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
+            start_ns = time.perf_counter_ns()
             if renderer.device_display_mode == DeviceDisplayMode.OPENGL:
                 if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
                     logger.info("Switching to OPENGL mode")
@@ -468,6 +471,20 @@ class GameLoop:
                 clock=self.clock,
                 peripheral_manager=self.peripheral_manager,
                 orientation=self.device.orientation,
+            )
+
+            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+            logger.info(
+                "render.loop",
+                extra={
+                    "renderer": renderer.name,
+                    "duration_ms": duration_ms,
+                    "queue_depth": self._render_queue_depth,
+                    "display_mode": renderer.device_display_mode.name,
+                    "uses_opengl": renderer.device_display_mode
+                    == DeviceDisplayMode.OPENGL,
+                    "initialized": renderer.is_initialized(),
+                },
             )
 
             return screen
@@ -581,6 +598,7 @@ class GameLoop:
     def _render_surface_iterative(
         self, renderers: list["BaseRenderer"]
     ) -> pygame.Surface | None:
+        self._render_queue_depth = len(renderers)
         base = None
         for renderer in renderers:
             surface = self.process_renderer(renderer)
@@ -595,6 +613,7 @@ class GameLoop:
     def _render_surfaces_binary(
         self, renderers: list["BaseRenderer"]
     ) -> pygame.Surface | None:
+        self._render_queue_depth = len(renderers)
         with ThreadPoolExecutor() as executor:
             surfaces: list[pygame.Surface] = [
                 i
