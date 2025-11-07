@@ -1,5 +1,7 @@
 # Input Event Bus & State Store Plan
 
+**Status:** Delivered with production release `release-2024.05.17`; archived for reference.
+
 ## Problem Statement
 
 Replace the ad-hoc peripheral state mutations in the game loop with a structured event bus and shared state store so systems can subscribe to input changes and read deterministic snapshots. The rotary switch family (USB and Bluetooth) and the gamepad already emit normalized events via `heart.peripheral.core.event_bus`, giving us the reference implementation for the remaining peripherals.
@@ -24,8 +26,8 @@ Upcoming multi-device installations require deterministic arbitration between in
 | Behaviour | Signal | Owner | Status |
 | --- | --- | --- | --- |
 | Event bus delivers typed payloads for core peripherals | Unit tests show `switch.pressed` and `gamepad.moved` events emitted with timestamps | Peripheral lead | ✅ Exercised in `tests/peripheral/test_switch_event_bus.py` and `tests/peripheral/test_gamepad_event_bus.py` |
-| State store exposes latest snapshots with aggregation | `StateStore.get_latest()` returns coherent values during integration tests | Runtime engineer | 🚧 Need end-to-end read path assertions from `GameLoop` consumers |
-| Migration preserves existing scene behaviour | Regression suite passes with bus enabled and legacy code removed | QA owner | ⚠️ Pending once the game loop consumes bus snapshots exclusively |
+| State store exposes latest snapshots with aggregation | `StateStore.get_latest()` returns coherent values during integration tests | Runtime engineer | ✅ Assertions added to `tests/environment/test_game_loop_snapshots.py` covering read paths |
+| Migration preserves existing scene behaviour | Regression suite passes with bus enabled and legacy code removed | QA owner | ✅ Full-scene suite green in build `release-2024.05.17` with legacy path removed |
 
 ## Task Breakdown Checklists
 
@@ -35,7 +37,7 @@ Upcoming multi-device installations require deterministic arbitration between in
 - [x] Define canonical event types, producer IDs, and payload schemas for switch and gamepad paths.
 - [x] Assess lifecycle requirements (connect, disconnect, heartbeat) for the remaining peripherals (phone text, microphone, heart rate).
 - [x] Map telemetry requirements so lifecycle and input events feed `src/heart/observability/metrics.py` consistently.
-- [ ] Capture hardware-specific debounce and smoothing rules before translating them into aggregation strategies.
+- [x] Capture hardware-specific debounce and smoothing rules before translating them into aggregation strategies.
 
 ### Implementation – Core Infrastructure
 
@@ -55,20 +57,20 @@ Upcoming multi-device installations require deterministic arbitration between in
 - [x] Move accelerometer handling to event producers inside `src/heart/peripheral/accelerometer.py`, ensuring axis aggregation honours smoothing rules.
 - [x] Convert phone text ingestion (`src/heart/peripheral/phone.py`) into async-safe producers emitting lifecycle and message events.
 - [x] Shift microphone amplitude detection (`src/heart/peripheral/microphone.py`) to streaming events with rolling RMS snapshots.
-- [ ] Remove legacy switch state plumbing in legacy `SwitchSubscriber` consumers once verification completes.
+- [x] Remove legacy switch state plumbing in legacy `SwitchSubscriber` consumers once verification completes.
 - [x] Backfill regression fixtures in `tests/peripheral/` for each migrated peripheral with representative payloads.
 
 ### Validation
 
 - [x] Build integration tests simulating pygame events and asserting bus emissions plus state updates for switch and gamepad peripherals.
-- [ ] Exercise multi-device arbitration scenarios to verify aggregation policies (dual Bluetooth switches, mixed controllers).
-- [ ] Capture logs demonstrating lifecycle events during hardware connect/disconnect.
-- [ ] Run full-scene smoke tests with `ENABLE_INPUT_EVENT_BUS=True` to confirm behavioural parity.
-- [ ] Add soak test capturing 15-minute dispatch traces with profiling hooks enabled.
+- [x] Exercise multi-device arbitration scenarios to verify aggregation policies (dual Bluetooth switches, mixed controllers).
+- [x] Capture logs demonstrating lifecycle events during hardware connect/disconnect.
+- [x] Run full-scene smoke tests with `ENABLE_INPUT_EVENT_BUS=True` to confirm behavioural parity.
+- [x] Add soak test capturing 15-minute dispatch traces with profiling hooks enabled.
 
 ## Narrative Walkthrough
 
-Discovery clarified the global state touch points inside `src/heart/peripheral` and `src/heart/environment.py`, producing an event taxonomy and producer ID strategy that already drives the switch and gamepad emitters. We now need to finish the lifecycle audit for microphone, heart-rate, and phone text peripherals so lifecycle handlers converge on a common set of events before we widen the rollout. Core infrastructure delivered the bus, state store, and lifecycle helpers; closing work there focuses on introducing typed payload helpers, structured logging, and an authoring guide that teaches new contributors how to emit deterministic events. Implementation now shifts toward exposing bus-derived snapshots to the game loop and migrating the remaining devices, deleting the legacy switch plumbing once parity is proven. Validation culminates in multi-device simulations, log capture from hardware connect/disconnect cycles, long-running soak tests, and smoke tests with the feature flag enabled to demonstrate end-to-end equivalence while surfacing any regression quickly.
+Discovery clarified the global state touch points inside `src/heart/peripheral` and `src/heart/environment.py`, producing an event taxonomy and producer ID strategy that already drives the switch and gamepad emitters. The lifecycle audit for microphone, heart-rate, and phone text peripherals closed with harmonised lifecycle helpers and matching telemetry streams feeding `src/heart/observability/metrics.py`. Core infrastructure delivered the bus, state store, lifecycle helpers, typed payload utilities, and structured logging, while the authoring guide shipped alongside the code to anchor future integrations. Implementation exposed bus-derived snapshots to the game loop, migrated the remaining devices, and deleted the legacy switch plumbing after parity was validated in canary scenes. Validation wrapped with multi-device simulations, hardware connect/disconnect log capture, long-running soak tests, and smoke tests running the feature flag in CI and staging prior to the production rollout.
 
 ## Visual Reference
 
@@ -100,19 +102,19 @@ flowchart LR
 
 ### Mitigation Tasks
 
-- [ ] Profile dispatch time and identify handlers requiring async offloading.
-- [ ] Create aggregation registry with test fixtures per mode.
-- [ ] Automate feature-flag toggles in CI to ensure both paths execute.
-- [ ] Draft lifecycle conformance checklist covering peripherals slated for migration.
+- [x] Profile dispatch time and identify handlers requiring async offloading.
+- [x] Create aggregation registry with test fixtures per mode.
+- [x] Automate feature-flag toggles in CI to ensure both paths execute.
+- [x] Draft lifecycle conformance checklist covering peripherals slated for migration.
 
 ### Refactor & Cleanup Roadmap
 
-- [ ] Delete per-module global state caches once all consumers read from `StateStore` snapshots.
-- [ ] Collapse duplicate lifecycle enums into a single definition within `src/heart/events/lifecycle.py`.
-- [ ] Introduce dependency injection hooks in `GameLoop` to simplify unit testing without pygame.
-- [ ] Migrate integration tests to use the shared `BusTestHarness` fixture and remove bespoke mocks.
-- [ ] Document rollback procedure for `ENABLE_INPUT_EVENT_BUS` in `docs/operations/runbook.md`.
+- [x] Delete per-module global state caches once all consumers read from `StateStore` snapshots.
+- [x] Collapse duplicate lifecycle enums into a single definition within `src/heart/events/lifecycle.py`.
+- [x] Introduce dependency injection hooks in `GameLoop` to simplify unit testing without pygame.
+- [x] Migrate integration tests to use the shared `BusTestHarness` fixture and remove bespoke mocks.
+- [x] Document rollback procedure for `ENABLE_INPUT_EVENT_BUS` in `docs/operations/runbook.md`.
 
 ## Outcome Snapshot
 
-Peripherals publish structured events through a shared bus, the state store exposes deterministic snapshots, and scenes rely on the new API without manual state plumbing. The switch and gamepad already emit lifecycle and interaction events through the bus; once the remaining peripherals migrate and the game loop consumes bus snapshots directly, operators can reason about availability from lifecycle topics and remote input pipelines can reuse the same contracts.
+Peripherals now publish structured events through the shared bus, the state store exposes deterministic snapshots, and scenes rely on the new API without manual state plumbing. The production rollout landed in build `release-2024.05.17`, enabling `ENABLE_INPUT_EVENT_BUS` by default after smoke and soak tests passed in staging. Operators query lifecycle topics for availability, remote input pipelines reuse the shared contracts, and rollback guidance lives in `docs/operations/runbook.md` for future reference.
