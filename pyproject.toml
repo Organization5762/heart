@@ -121,6 +121,7 @@ module = [
     "bluezero.*",
     "typer",
     "toml",
+    "sounddevice",
 ]
 ignore_missing_imports = true
 
@@ -134,6 +135,23 @@ module = [
     "heart.navigation.*",
 ]
 follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = [
+    "heart.peripheral.core.event_bus",
+    "heart.peripheral.uwb",
+    "heart.peripheral.heart_rates",
+    "heart.peripheral.microphone",
+    "heart.peripheral.ir_sensor_array",
+    "heart.peripheral.bluetooth",
+    "heart.peripheral.switch",
+    "heart.peripheral.sensor",
+    "heart.peripheral.gamepad.gamepad",
+    "heart.environment",
+    "heart.device.local",
+    "heart.loop",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -157,5 +175,6 @@ lint = [
     "docformatter[tomli]>=1.7.7",
     "isort>=7.0.0",
     "mdformat>=1.0.0",
+    "mypy>=1.13.0",
     "ruff>=0.14.3",
 ]
