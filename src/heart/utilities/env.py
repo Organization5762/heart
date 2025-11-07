@@ -9,6 +9,15 @@ import serial.tools.list_ports
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 
+TRUE_FLAG_VALUES = {"true", "1"}
+
+
+def _env_flag(env_var: str, *, default: bool = False) -> bool:
+    value = os.environ.get(env_var)
+    if value is None:
+        return default
+    return value.lower() in TRUE_FLAG_VALUES
+
 
 @dataclass
 class Pi:
@@ -46,25 +55,19 @@ class Configuration:
 
     @classmethod
     def is_x11_forward(cls) -> bool:
-        return os.environ.get("X11_FORWARD", "False").lower() in {"true", "1"}
+        return _env_flag("X11_FORWARD")
 
     @classmethod
     def use_mock_switch(cls) -> bool:
-        return os.environ.get("MOCK_SWITCH", "False").lower() in {"true", "1"}
+        return _env_flag("MOCK_SWITCH")
 
     @classmethod
     def use_isolated_renderer(cls) -> bool:
-        return os.environ.get("USE_ISOLATED_RENDERER", "False").lower() in {
-            "true",
-            "1",
-        }
+        return _env_flag("USE_ISOLATED_RENDERER")
 
     @classmethod
     def enable_input_event_bus(cls) -> bool:
-        return os.environ.get("ENABLE_INPUT_EVENT_BUS", "False").lower() in {
-            "true",
-            "1",
-        }
+        return _env_flag("ENABLE_INPUT_EVENT_BUS")
 
     @classmethod
     def isolated_renderer_socket(cls) -> str | None:
