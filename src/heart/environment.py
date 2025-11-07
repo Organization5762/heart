@@ -24,6 +24,9 @@ from heart.peripheral.heart_rates import current_bpms
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
+if TYPE_CHECKING:
+    from heart.peripheral.core import StateEntry, StateSnapshot
+
 
 def _load_cv2_module() -> ModuleType | None:
     module: ModuleType | None = None
@@ -342,6 +345,18 @@ class GameLoop:
     @property
     def event_bus(self) -> EventBus:
         return self._event_bus
+
+    def latest_input(
+        self, event_type: str, *, producer_id: int | None = None
+    ) -> "StateEntry" | None:
+        """Return the most recent :class:`Input` for ``event_type``."""
+
+        return self._event_bus.state_store.get_latest(event_type, producer_id)
+
+    def input_snapshot(self) -> "StateSnapshot":
+        """Capture a point-in-time snapshot of the input state store."""
+
+        return self._event_bus.state_store.snapshot()
 
     def start(self) -> None:
         logger.info("Starting GameLoop")

@@ -6,7 +6,9 @@ from typing import Any, Iterator, NoReturn, Self
 
 import serial
 
+from heart.events.types import AccelerometerVector
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -35,7 +37,14 @@ class Distribution:
 
 
 class Accelerometer(Peripheral):
-    def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        port: str,
+        baudrate: int,
+        *,
+        event_bus: EventBus | None = None,
+        producer_id: int | None = None,
+    ) -> None:
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
@@ -44,7 +53,10 @@ class Accelerometer(Peripheral):
         self.y_distribution = Distribution()
         self.z_distribution = Distribution()
 
-        super().__init__(*args, **kwargs)
+        self._event_bus = event_bus
+        self._producer_id = producer_id if producer_id is not None else id(self)
+
+        super().__init__()
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -101,12 +113,38 @@ class Accelerometer(Peripheral):
             )
             return None
 
-    def _update_due_to_data(self, data: dict[str, Any]) -> None:
-        event_type = data["event_type"]
-        data_value = data["data"]
+    def attach_event_bus(self, event_bus: EventBus) -> None:
+        self._event_bus = event_bus
 
-        if event_type == "acceleration" or event_type == "sensor.acceleration":
-            self.acceleration_value = data_value
-            self.x_distribution.add_value(data_value["x"])
-            self.y_distribution.add_value(data_value["y"])
-            self.z_distribution.add_value(data_value["z"])
+    def _update_due_to_data(self, data: dict[str, Any]) -> None:
+        event_type = data.get("event_type")
+        payload = data.get("data")
+        if event_type not in {"acceleration", "sensor.acceleration"}:
+            return
+        if not isinstance(payload, dict):
+            logger.debug("Ignoring malformed accelerometer payload: %s", payload)
+            return
+
+        try:
+            vector = AccelerometerVector(
+                x=float(payload["x"]),
+                y=float(payload["y"]),
+                z=float(payload["z"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.debug("Accelerometer payload missing axis components: %s", payload)
+            return
+
+        input_event = vector.to_input(producer_id=self._producer_id)
+        self.acceleration_value = input_event.data  # type: ignore[assignment]
+
+        self.x_distribution.add_value(vector.x)
+        self.y_distribution.add_value(vector.y)
+        self.z_distribution.add_value(vector.z)
+
+        event_bus = self._event_bus
+        if event_bus is not None:
+            try:
+                event_bus.emit(input_event)
+            except Exception:
+                logger.exception("Failed to emit accelerometer vector")

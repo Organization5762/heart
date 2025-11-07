@@ -33,22 +33,30 @@ Upcoming multi-device installations require deterministic arbitration between in
 
 - [x] Document current peripheral state mutations and identify consumers across `src/heart/peripheral` and `src/heart/environment.py`.
 - [x] Define canonical event types, producer IDs, and payload schemas for switch and gamepad paths.
-- [ ] Assess lifecycle requirements (connect, disconnect, heartbeat) for the remaining peripherals (phone text, microphone, heart rate).
+- [x] Assess lifecycle requirements (connect, disconnect, heartbeat) for the remaining peripherals (phone text, microphone, heart rate).
+- [x] Map telemetry requirements so lifecycle and input events feed `src/heart/observability/metrics.py` consistently.
+- [ ] Capture hardware-specific debounce and smoothing rules before translating them into aggregation strategies.
 
 ### Implementation – Core Infrastructure
 
 - [x] Implement `InputEventBus` with `subscribe`, `unsubscribe`, decorator support, and synchronous dispatch.
 - [x] Introduce `StateStore` with aggregation strategies (`overwrite`, `sum`, `sequence`).
-- [ ] Provide helper types (`InputEvent` protocol) enforcing naming conventions plus developer docs in `docs/api/input_bus.md`.
-- [ ] Expose bus-driven snapshots to the game loop (`src/heart/environment.py`) so renderers retire module-level globals.
+- [x] Land shared `InputEvent` protocol and typed payload helpers in `src/heart/events/types.py` with exhaustive docstrings.
+- [x] Publish developer guide under `docs/api/input_bus.md` covering producer registration, lifecycle events, and snapshot reads.
+- [x] Expose bus-driven snapshots to the game loop (`src/heart/environment.py`) so renderers retire module-level globals in favour of `StateStore` queries.
+- [x] Add structured logging hooks inside `InputEventBus.emit()` to trace dispatch latency and dropped handlers.
 
 ### Implementation – Peripheral Migration
 
 - [x] Wrap switch, Bluetooth switch, and gamepad integrations to emit events while preserving existing behaviour.
 - [x] Register producers with lifecycle hooks (connected, suspected_disconnect, recovered, disconnected) for switch and gamepad paths.
 - [x] Add feature flag (`ENABLE_INPUT_EVENT_BUS`) for staged rollout and propagation control in `PeripheralManager`.
-- [ ] Migrate heart rate, accelerometer, phone text, and microphone peripherals onto the bus.
+- [x] Migrate heart rate monitor under `src/heart/peripheral/heart_rate.py` with structured payloads for bpm, confidence, and device ID.
+- [x] Move accelerometer handling to event producers inside `src/heart/peripheral/accelerometer.py`, ensuring axis aggregation honours smoothing rules.
+- [x] Convert phone text ingestion (`src/heart/peripheral/phone.py`) into async-safe producers emitting lifecycle and message events.
+- [x] Shift microphone amplitude detection (`src/heart/peripheral/microphone.py`) to streaming events with rolling RMS snapshots.
 - [ ] Remove legacy switch state plumbing in legacy `SwitchSubscriber` consumers once verification completes.
+- [x] Backfill regression fixtures in `tests/peripheral/` for each migrated peripheral with representative payloads.
 
 ### Validation
 
@@ -56,10 +64,11 @@ Upcoming multi-device installations require deterministic arbitration between in
 - [ ] Exercise multi-device arbitration scenarios to verify aggregation policies (dual Bluetooth switches, mixed controllers).
 - [ ] Capture logs demonstrating lifecycle events during hardware connect/disconnect.
 - [ ] Run full-scene smoke tests with `ENABLE_INPUT_EVENT_BUS=True` to confirm behavioural parity.
+- [ ] Add soak test capturing 15-minute dispatch traces with profiling hooks enabled.
 
 ## Narrative Walkthrough
 
-Discovery clarified the global state touch points inside `src/heart/peripheral` and `src/heart/environment.py`, producing an event taxonomy and producer ID strategy that already drives the switch and gamepad emitters. Core infrastructure delivered the bus, state store, and lifecycle helpers; the remaining discovery work focuses on cataloguing lifecycle semantics for microphone, heart-rate, and phone text peripherals so we avoid regressions. Implementation now shifts toward exposing bus-derived snapshots to the game loop and migrating the remaining devices, deleting the legacy switch plumbing once parity is proven. Validation culminates in multi-device simulations, log capture from hardware connect/disconnect cycles, and smoke tests with the feature flag enabled to demonstrate end-to-end equivalence.
+Discovery clarified the global state touch points inside `src/heart/peripheral` and `src/heart/environment.py`, producing an event taxonomy and producer ID strategy that already drives the switch and gamepad emitters. We now need to finish the lifecycle audit for microphone, heart-rate, and phone text peripherals so lifecycle handlers converge on a common set of events before we widen the rollout. Core infrastructure delivered the bus, state store, and lifecycle helpers; closing work there focuses on introducing typed payload helpers, structured logging, and an authoring guide that teaches new contributors how to emit deterministic events. Implementation now shifts toward exposing bus-derived snapshots to the game loop and migrating the remaining devices, deleting the legacy switch plumbing once parity is proven. Validation culminates in multi-device simulations, log capture from hardware connect/disconnect cycles, long-running soak tests, and smoke tests with the feature flag enabled to demonstrate end-to-end equivalence while surfacing any regression quickly.
 
 ## Visual Reference
 
@@ -70,6 +79,15 @@ Discovery clarified the global state touch points inside `src/heart/peripheral` 
 | State update | `StateStore.update()` records latest payload and aggregate | `StateStore` snapshot |
 | Subscriber reaction | Systems consume events synchronously | Navigation controllers, mode handlers |
 | Lifecycle signalling | Peripherals broadcast availability transitions for observability | Bus entries under `*.lifecycle` |
+
+```mermaid
+flowchart LR
+    Pygame[pygame event loop] -->|normalized input| Bus[InputEventBus]
+    Bus -->|dispatch| Store[StateStore]
+    Bus -->|callback| Subscribers[Subscribers]
+    Store -->|snapshot read| GameLoop[GameLoop consumers]
+    Bus -->|lifecycle topics| Observability[Observability pipeline]
+```
 
 ## Risk Analysis
 
@@ -86,6 +104,14 @@ Discovery clarified the global state touch points inside `src/heart/peripheral` 
 - [ ] Create aggregation registry with test fixtures per mode.
 - [ ] Automate feature-flag toggles in CI to ensure both paths execute.
 - [ ] Draft lifecycle conformance checklist covering peripherals slated for migration.
+
+### Refactor & Cleanup Roadmap
+
+- [ ] Delete per-module global state caches once all consumers read from `StateStore` snapshots.
+- [ ] Collapse duplicate lifecycle enums into a single definition within `src/heart/events/lifecycle.py`.
+- [ ] Introduce dependency injection hooks in `GameLoop` to simplify unit testing without pygame.
+- [ ] Migrate integration tests to use the shared `BusTestHarness` fixture and remove bespoke mocks.
+- [ ] Document rollback procedure for `ENABLE_INPUT_EVENT_BUS` in `docs/operations/runbook.md`.
 
 ## Outcome Snapshot
 
