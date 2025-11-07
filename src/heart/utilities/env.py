@@ -60,6 +60,13 @@ class Configuration:
         }
 
     @classmethod
+    def enable_input_event_bus(cls) -> bool:
+        return os.environ.get("ENABLE_INPUT_EVENT_BUS", "False").lower() in {
+            "true",
+            "1",
+        }
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":

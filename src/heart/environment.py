@@ -304,7 +304,10 @@ class GameLoop:
 
         manager_bus = self.peripheral_manager.event_bus
         self._event_bus = event_bus or manager_bus or EventBus()
-        self.peripheral_manager.attach_event_bus(self._event_bus)
+        propagate_bus = Configuration.enable_input_event_bus()
+        self.peripheral_manager.attach_event_bus(
+            self._event_bus, propagate=propagate_bus
+        )
 
         pygame.display.set_mode(
             (
