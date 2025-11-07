@@ -10,6 +10,7 @@ from heart.peripheral.core.event_bus import (EventBus, EventPlaylist,
                                              PlaylistHandle, PlaylistStep,
                                              SequenceMatcher,
                                              double_tap_virtual_peripheral,
+                                             gated_mirror_virtual_peripheral,
                                              sequence_virtual_peripheral,
                                              simultaneous_virtual_peripheral)
 
@@ -403,3 +404,56 @@ def test_sequence_virtual_peripheral_detects_konami_code() -> None:
     assert payload["virtual_peripheral"]["name"] == "konami.listener"
     assert payload["virtual_peripheral"]["metadata"] == {"combo": "konami"}
     assert [item["data"]["code"] for item in payload["sequence"]] == konami
+
+
+def test_gated_mirror_virtual_peripheral_re_emits_with_virtual_metadata() -> None:
+    bus = EventBus()
+    captured: list[Input] = []
+
+    definition = gated_mirror_virtual_peripheral(
+        "microphone.gated",
+        gate_event_type="button.toggle",
+        mirror_event_types="peripheral.microphone.level",
+        output_producer_id=99,
+        metadata={"mode": "gated"},
+    )
+    bus.virtual_peripherals.register(definition)
+
+    bus.subscribe(
+        "peripheral.microphone.level",
+        lambda event: captured.append(event),
+    )
+
+    # Events should be ignored while the gate is off.
+    bus.emit(
+        "peripheral.microphone.level",
+        data={"rms": 0.2, "peak": 0.3},
+        producer_id=7,
+    )
+    assert not [event for event in captured if event.producer_id == 99]
+
+    # Enable the gate and verify mirrored events include metadata.
+    bus.emit("button.toggle", data={"pressed": True}, producer_id=1)
+    bus.emit(
+        "peripheral.microphone.level",
+        data={"rms": 0.4, "peak": 0.5},
+        producer_id=7,
+    )
+
+    mirrored = [event for event in captured if event.producer_id == 99]
+    assert mirrored
+    mirrored_event = mirrored[-1]
+    assert mirrored_event.data["rms"] == 0.4
+    assert mirrored_event.data["virtual_peripheral"]["name"] == "microphone.gated"
+    assert mirrored_event.data["virtual_peripheral"]["metadata"] == {"mode": "gated"}
+
+    # Disable the gate and ensure mirroring stops.
+    bus.emit("button.toggle", data={"pressed": False}, producer_id=1)
+    bus.emit(
+        "peripheral.microphone.level",
+        data={"rms": 0.6, "peak": 0.7},
+        producer_id=7,
+    )
+
+    later_mirrored = [event for event in captured if event.producer_id == 99]
+    assert later_mirrored == mirrored
