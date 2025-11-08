@@ -42,12 +42,14 @@ class PhoneText(Peripheral):
 
     def __init__(self, *, event_bus: EventBus | None = None, producer_id: int | None = None) -> None:
         """Create a new *PhoneText* peripheral."""
+        super().__init__()
         self._last_text: str | None = None  # full text as received
         self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
-        self._event_bus = event_bus
         self._producer_id = producer_id if producer_id is not None else id(self)
-        super().__init__()
+
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     # ---------------------------------------------------------------------
     # Peripheral API
@@ -108,7 +110,7 @@ class PhoneText(Peripheral):
         return text
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -140,7 +142,7 @@ class PhoneText(Peripheral):
             self._buffer.clear()
 
     def _emit_text_event(self, text: str) -> None:
-        event_bus = self._event_bus
+        event_bus = self.event_bus
         if event_bus is None:
             return
         message = PhoneTextMessage(text=text).to_input(producer_id=self._producer_id)

@@ -32,6 +32,7 @@ class Gamepad(Peripheral):
     def __init__(
         self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
     ) -> None:
+        super().__init__()
         self.joystick_id = joystick_id
         self.joystick: pygame.joystick.JoystickType | None = joystick
         self.TAP_THRESHOLD_MS = 500
@@ -50,7 +51,6 @@ class Gamepad(Peripheral):
         self._dpad_last_frame: tuple[int, int] = (0, 0)
         self._dpad_curr_frame: tuple[int, int] = (0, 0)
 
-        self._event_bus: EventBus | None = None
         self._last_lifecycle_status: str | None = None
 
     def is_held(self, button_id: int) -> bool:
@@ -100,7 +100,7 @@ class Gamepad(Peripheral):
         self._mark_disconnect(suspected=False)
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
         if self.is_connected():
             self._mark_connected()
 
@@ -266,28 +266,22 @@ class Gamepad(Peripheral):
     # Event bus helpers
     # ------------------------------------------------------------------
     def _emit_button_event(self, button_id: int, pressed: bool) -> None:
-        if self._event_bus is None:
-            return
         event = Input(
             event_type=self.EVENT_BUTTON,
             data={"button": button_id, "pressed": pressed},
             producer_id=self.joystick_id,
         )
-        self._event_bus.emit(event)
+        self.emit_input(event)
 
     def _emit_axis_event(self, axis_id: int, value: float) -> None:
-        if self._event_bus is None:
-            return
         event = Input(
             event_type=self.EVENT_AXIS,
             data={"axis": axis_id, "value": float(value)},
             producer_id=self.joystick_id,
         )
-        self._event_bus.emit(event)
+        self.emit_input(event)
 
     def _emit_dpad_if_changed(self) -> None:
-        if self._event_bus is None:
-            return
         if self._dpad_curr_frame == self._dpad_last_frame:
             return
         event = Input(
@@ -295,11 +289,9 @@ class Gamepad(Peripheral):
             data={"x": self._dpad_curr_frame[0], "y": self._dpad_curr_frame[1]},
             producer_id=self.joystick_id,
         )
-        self._event_bus.emit(event)
+        self.emit_input(event)
 
     def _emit_lifecycle(self, status: str) -> None:
-        if self._event_bus is None:
-            return
         if self._last_lifecycle_status == status:
             return
         event = Input(
@@ -307,7 +299,7 @@ class Gamepad(Peripheral):
             data={"status": status},
             producer_id=self.joystick_id,
         )
-        self._event_bus.emit(event)
+        self.emit_input(event)
         self._last_lifecycle_status = status
 
     def _mark_connected(self) -> None:

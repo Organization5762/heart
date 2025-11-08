@@ -2,11 +2,11 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Iterator, NoReturn, Self
+from typing import Any, Iterator, Mapping, NoReturn, Self
 
 import serial
 
-from heart.events.types import AccelerometerVector
+from heart.events.types import AccelerometerVector, MagnetometerVector
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.env import get_device_ports
@@ -45,6 +45,7 @@ class Accelerometer(Peripheral):
         event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
+        super().__init__()
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
@@ -53,10 +54,10 @@ class Accelerometer(Peripheral):
         self.y_distribution = Distribution()
         self.z_distribution = Distribution()
 
-        self._event_bus = event_bus
         self._producer_id = producer_id if producer_id is not None else id(self)
 
-        super().__init__()
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -114,17 +115,22 @@ class Accelerometer(Peripheral):
             return None
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     def _update_due_to_data(self, data: dict[str, Any]) -> None:
         event_type = data.get("event_type")
         payload = data.get("data")
-        if event_type not in {"acceleration", "sensor.acceleration"}:
-            return
         if not isinstance(payload, dict):
-            logger.debug("Ignoring malformed accelerometer payload: %s", payload)
+            logger.debug("Ignoring malformed sensor payload: %s", payload)
             return
 
+        if event_type in {"acceleration", "sensor.acceleration"}:
+            self._handle_acceleration(payload)
+            return
+        if event_type in {"magnetic", "sensor.magnetic"}:
+            self._handle_magnetic(payload)
+
+    def _handle_acceleration(self, payload: Mapping[str, Any]) -> None:
         try:
             vector = AccelerometerVector(
                 x=float(payload["x"]),
@@ -142,9 +148,23 @@ class Accelerometer(Peripheral):
         self.y_distribution.add_value(vector.y)
         self.z_distribution.add_value(vector.z)
 
-        event_bus = self._event_bus
-        if event_bus is not None:
-            try:
-                event_bus.emit(input_event)
-            except Exception:
-                logger.exception("Failed to emit accelerometer vector")
+        try:
+            self.emit_input(input_event)
+        except Exception:
+            logger.exception("Failed to emit accelerometer vector")
+
+    def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
+        try:
+            vector = MagnetometerVector(
+                x=float(payload["x"]),
+                y=float(payload["y"]),
+                z=float(payload["z"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.debug("Magnetometer payload missing axis components: %s", payload)
+            return
+
+        try:
+            self.emit_input(vector.to_input(producer_id=self._producer_id))
+        except Exception:
+            logger.exception("Failed to emit magnetometer vector")

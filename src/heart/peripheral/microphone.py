@@ -38,17 +38,18 @@ class Microphone(Peripheral):
         producer_id: int | None = None,
         retry_delay: float = 1.0,
     ) -> None:
+        super().__init__()
         self.samplerate = samplerate
         self.block_duration = block_duration
         self.channels = channels
-        self._event_bus = event_bus
         self._producer_id = producer_id if producer_id is not None else id(self)
         self._retry_delay = retry_delay
 
         self._latest_level: dict[str, Any] | None = None
         self._stop_event = threading.Event()
 
-        super().__init__()
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Detection lifecycle
@@ -80,7 +81,7 @@ class Microphone(Peripheral):
     def attach_event_bus(self, event_bus: EventBus) -> None:
         """Attach ``event_bus`` so the microphone can emit streaming events."""
 
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -170,12 +171,10 @@ class Microphone(Peripheral):
         payload = level.to_input(producer_id=self._producer_id)
         self._latest_level = payload.data  # type: ignore[assignment]
 
-        event_bus = self._event_bus
-        if event_bus is not None:
-            try:
-                event_bus.emit(payload)
-            except Exception:
-                logger.exception("Failed to emit microphone level event")
+        try:
+            self.emit_input(payload)
+        except Exception:
+            logger.exception("Failed to emit microphone level event")
 
     # ------------------------------------------------------------------
     # Context manager helpers
