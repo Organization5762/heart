@@ -6,7 +6,7 @@ import contextlib
 import threading
 import time
 from collections.abc import Iterator
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import numpy as np
 
@@ -17,10 +17,11 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+sd: Any | None
 try:  # pragma: no cover - import guarded for optional dependency
     import sounddevice as sd
 except Exception:  # pragma: no cover - module may be missing on CI
-    sd = None  # type: ignore[assignment]
+    sd = None
 
 
 class Microphone(Peripheral):
@@ -168,7 +169,7 @@ class Microphone(Peripheral):
             timestamp=timestamp,
         )
         payload = level.to_input(producer_id=self._producer_id)
-        self._latest_level = payload.data  # type: ignore[assignment]
+        self._latest_level = cast(dict[str, Any], payload.data)
 
         event_bus = self._event_bus
         if event_bus is not None:

@@ -52,7 +52,7 @@ class MaxAgePolicy(WindowPolicy[T]):
 
     def prune(self, samples: Deque[EventSample[T]], *, now: float) -> None:
         cutoff = now - self._window
-        while samples and samples[0].timestamp < cutoff:
+        while samples and samples[0].timestamp <= cutoff:
             samples.popleft()
 
 
@@ -176,7 +176,7 @@ class _RollingState:
     def _prune(self, *, now: float, maxlen: int | None, window: float | None) -> None:
         if window is not None:
             cutoff = now - window
-            while self.samples and self.samples[0].timestamp < cutoff:
+            while self.samples and self.samples[0].timestamp <= cutoff:
                 removed = self.samples.popleft()
                 self.sum -= removed.value
                 self.sum_sq -= removed.value * removed.value

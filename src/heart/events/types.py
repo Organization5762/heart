@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import (Any, ClassVar, Mapping, MutableMapping, Protocol,
                     runtime_checkable)
@@ -39,10 +39,14 @@ class SwitchButton(InputEventPayload):
     long_press: bool = False
     EVENT_TYPE_PRESS: ClassVar[str] = BUTTON_PRESS
     EVENT_TYPE_LONG_PRESS: ClassVar[str] = BUTTON_LONG_PRESS
+    event_type: str = field(init=False)
 
-    @property
-    def event_type(self) -> str:  # type: ignore[override]
-        return self.EVENT_TYPE_LONG_PRESS if self.long_press else self.EVENT_TYPE_PRESS
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "event_type",
+            self.EVENT_TYPE_LONG_PRESS if self.long_press else self.EVENT_TYPE_PRESS,
+        )
 
     def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
         return Input(

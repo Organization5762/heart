@@ -22,7 +22,7 @@ def test_last_events_within_time_window_filters_by_age() -> None:
     window.append("event-1", timestamp=1.0)
     window.append("event-2", timestamp=3.1)
 
-    assert window.values() == ("event-1", "event-2")
+    assert window.values() == ("event-2",)
 
 
 def test_last_n_events_within_time_window_enforces_both_limits() -> None:
