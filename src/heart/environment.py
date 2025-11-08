@@ -4,6 +4,7 @@ import enum
 import importlib
 import time
 from collections import OrderedDict
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
 from typing import TYPE_CHECKING
@@ -709,7 +710,18 @@ class GameLoop:
         return f"pygame/{slug}"
 
     def _resolve_event_payload(self, event: pygame.event.Event) -> dict[str, object]:
-        payload = dict(getattr(event, "dict", {}))
+        raw_payload = getattr(event, "dict", None)
+
+        if isinstance(raw_payload, Mapping):
+            payload: dict[str, object] = dict(raw_payload)
+        elif raw_payload is None:
+            payload = {}
+        else:
+            try:
+                payload = dict(raw_payload)
+            except TypeError:
+                payload = {"value": raw_payload}
+
         payload["pygame_type"] = event.type
         payload["pygame_event_name"] = pygame.event.event_name(event.type)
         return payload

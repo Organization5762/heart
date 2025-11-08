@@ -82,3 +82,23 @@ def test_handle_events_emits_custom_system_event(loop: GameLoop, monkeypatch) ->
 
     assert calls == {"quit": 1, "init": 1}
     assert captured == [joystick_reset]
+
+
+def test_handle_events_supports_missing_event_payload(loop: GameLoop, monkeypatch) -> None:
+    captured: list[dict[str, object]] = []
+
+    loop.event_bus.subscribe(
+        "pygame/noevent", lambda evt: captured.append(evt.data)
+    )
+
+    fake_event = types.SimpleNamespace(type=pygame.NOEVENT, dict=None)
+    monkeypatch.setattr(pygame.event, "get", lambda: [fake_event])
+
+    loop._handle_events()
+
+    assert captured == [
+        {
+            "pygame_type": pygame.NOEVENT,
+            "pygame_event_name": pygame.event.event_name(pygame.NOEVENT),
+        }
+    ]
