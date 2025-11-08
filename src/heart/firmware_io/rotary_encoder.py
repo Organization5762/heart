@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable
 
 from digitalio import Pull
 
@@ -21,16 +22,24 @@ def form_json(name: str, data: int, producer_id: int):
 
 
 class RotaryEncoderHandler:
-    def __init__(self, encoder, switch, index=0):
+    def __init__(
+        self,
+        encoder,
+        switch,
+        index=0,
+        *,
+        clock: Callable[[], float] | None = None,
+    ):
         self.last_position = None
         self.press_started_timestamp = None
         self.long_pressed_sent = False
         self.encoder = encoder
         self.switch = switch
         self.index = index
+        self._clock = clock or time.monotonic
 
     def _current_time(self):
-        return time.monotonic()
+        return self._clock()
 
     def _handle_switch(self):
         switch_is_pressed = self.switch.value

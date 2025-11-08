@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import sys
+from types import ModuleType
 from typing import Callable, Iterable, Mapping, TextIO
 
 from heart.firmware_io import constants
 
+supervisor: ModuleType | None
 try:  # pragma: no cover - supervisor is unavailable on CPython
-    import supervisor  # type: ignore
+    supervisor = importlib.import_module("supervisor")
 except ImportError:  # pragma: no cover - exercised on hardware
-    supervisor = None  # type: ignore
+    supervisor = None
 
 
 _DEFAULT_COMMIT_CACHE: str | None = None
@@ -205,12 +208,13 @@ def _extract_command(raw: str) -> str | None:
 
 def _commit_from_generated_module() -> str | None:
     try:
-        from heart_firmware_build import FIRMWARE_COMMIT  # type: ignore
-
-        if isinstance(FIRMWARE_COMMIT, str) and FIRMWARE_COMMIT:
-            return FIRMWARE_COMMIT
+        module = importlib.import_module("heart_firmware_build")
     except ImportError:
         return None
+
+    commit = getattr(module, "FIRMWARE_COMMIT", None)
+    if isinstance(commit, str) and commit:
+        return commit
     return None
 
 
@@ -234,14 +238,13 @@ def _commit_from_git(default: str) -> str | None:
     return commit or default
 
 
-def _hardware_device_uid(microcontroller_module=None) -> str | None:
+def _hardware_device_uid(microcontroller_module: ModuleType | None = None) -> str | None:
     module = microcontroller_module
     if module is None:
         try:  # pragma: no cover - available on CircuitPython only
-            import microcontroller  # type: ignore
+            module = importlib.import_module("microcontroller")
         except ImportError:
             return None
-        module = microcontroller  # type: ignore
 
     cpu = getattr(module, "cpu", None)
     uid = getattr(cpu, "uid", None) if cpu is not None else None
@@ -305,13 +308,13 @@ def _ensure_directory(path: str) -> None:
     if not path or path == "/":
         return
 
-    try:
-        os.makedirs(path)  # type: ignore[attr-defined]
-        return
-    except AttributeError:
-        pass
-    except OSError:
-        return
+    makedirs = getattr(os, "makedirs", None)
+    if callable(makedirs):
+        try:
+            makedirs(path)
+            return
+        except OSError:
+            return
 
     try:
         os.mkdir(path)

@@ -6,8 +6,14 @@ This module remains so existing imports continue to resolve without change.
 
 from __future__ import annotations
 
+import sys
 from importlib import import_module
+from pathlib import Path
 from typing import Final
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 _METRIC_MODULES: Final[tuple[str, ...]] = (
     "tests.events.metrics.test_count_by_key",

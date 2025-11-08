@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import cast
 
 from heart.peripheral.core import Input, StateStore
 
@@ -32,7 +33,7 @@ def test_state_store_snapshot_is_immutable() -> None:
     assert 0 in bucket
 
     try:
-        bucket[1] = bucket[0]  # type: ignore[assignment]
+        cast(dict[int, Input], bucket)[1] = bucket[0]
     except TypeError:
         pass
     else:  # pragma: no cover - enforce immutability even if TypeError not raised
@@ -46,7 +47,7 @@ def test_get_all_returns_read_only_mapping() -> None:
     mapping = store.get_all("dial/rotate")
     assert 0 in mapping
     try:
-        mapping[1] = mapping[0]  # type: ignore[assignment]
+        cast(dict[int, Input], mapping)[1] = mapping[0]
     except TypeError:
         pass
     else:  # pragma: no cover

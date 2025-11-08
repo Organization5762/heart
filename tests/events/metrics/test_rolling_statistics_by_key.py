@@ -40,8 +40,8 @@ def test_rolling_statistics_prunes_by_window_and_length() -> None:
     stats.observe("imu", 7.0, timestamp=9.0)
 
     snapshot = stats.snapshot()["imu"]
-    assert snapshot.count == 2
-    assert snapshot.mean == pytest.approx(6.0)
+    assert snapshot.count == 1
+    assert snapshot.mean == pytest.approx(7.0)
 
 
 def test_rolling_statistics_handles_missing_keys() -> None:

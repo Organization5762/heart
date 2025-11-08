@@ -2,7 +2,7 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Iterator, NoReturn, Self
+from typing import Any, Iterator, NoReturn, Self, cast
 
 import serial
 
@@ -136,7 +136,7 @@ class Accelerometer(Peripheral):
             return
 
         input_event = vector.to_input(producer_id=self._producer_id)
-        self.acceleration_value = input_event.data  # type: ignore[assignment]
+        self.acceleration_value = cast(dict[str, float], input_event.data)
 
         self.x_distribution.add_value(vector.x)
         self.y_distribution.add_value(vector.y)

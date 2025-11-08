@@ -59,9 +59,10 @@ def test_handle_emits_button_press_for_press_release_sequence(
 ) -> None:
     encoder = SimpleNamespace(position=12)
     switch = SimpleNamespace(value=released_value, pull=getattr(dummy_pull, pull_direction))
-    handler = rotary_encoder.RotaryEncoderHandler(encoder, switch, index=2)
+    handler = rotary_encoder.RotaryEncoderHandler(
+        encoder, switch, index=2, clock=deterministic_clock.monotonic
+    )
     handler.last_position = encoder.position
-    handler._current_time = deterministic_clock.monotonic  # type: ignore[method-assign]
 
     steps = [
         HandlerStep("baseline"),
@@ -92,9 +93,10 @@ def test_handle_emits_long_press_once_when_threshold_elapsed(
 ) -> None:
     encoder = SimpleNamespace(position=5)
     switch = SimpleNamespace(value=True, pull=dummy_pull.UP)
-    handler = rotary_encoder.RotaryEncoderHandler(encoder, switch, index=1)
+    handler = rotary_encoder.RotaryEncoderHandler(
+        encoder, switch, index=1, clock=deterministic_clock.monotonic
+    )
     handler.last_position = encoder.position
-    handler._current_time = deterministic_clock.monotonic  # type: ignore[method-assign]
 
     steps = [
         HandlerStep("baseline"),
