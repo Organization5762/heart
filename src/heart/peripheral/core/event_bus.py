@@ -32,6 +32,7 @@ __all__ = [
     "VirtualPeripheralDefinition",
     "VirtualPeripheralHandle",
     "VirtualPeripheralManager",
+    "gated_mirror_virtual_peripheral",
     "double_tap_virtual_peripheral",
     "sequence_virtual_peripheral",
     "simultaneous_virtual_peripheral",
@@ -39,6 +40,7 @@ __all__ = [
 
 
 EventCallback = Callable[[Input], None]
+GatePredicate = Callable[["VirtualPeripheralContext", Input], bool]
 
 
 def _clone_payload(value: Any) -> Any:
@@ -680,6 +682,50 @@ class VirtualPeripheralManager:
             )
 
 
+class _GatedMirrorVirtualPeripheral(_VirtualPeripheral):
+    """Mirror events from another producer when a gate is enabled."""
+
+    def __init__(
+        self,
+        context: VirtualPeripheralContext,
+        *,
+        gate_event_types: Sequence[str],
+        mirror_event_types: Sequence[str],
+        output_producer_id: int,
+        predicate: GatePredicate,
+        initial_state: bool,
+    ) -> None:
+        super().__init__(context)
+        if not mirror_event_types:
+            raise ValueError("mirror_event_types must not be empty")
+        if not gate_event_types:
+            raise ValueError("gate_event_type must not be empty")
+        self._gate_event_types = frozenset(gate_event_types)
+        self._mirror_event_types = frozenset(mirror_event_types)
+        self._output_producer_id = output_producer_id
+        self._predicate = predicate
+        self._enabled = initial_state
+
+    def handle(self, event: Input) -> None:
+        if event.event_type in self._gate_event_types:
+            try:
+                self._enabled = bool(self._predicate(self._context, event))
+            except Exception:  # pragma: no cover - defensive logging
+                _LOGGER.exception(
+                    "Virtual peripheral %s failed to evaluate gate event",
+                    self._context.definition.name,
+                )
+            return
+
+        if event.event_type in self._mirror_event_types and self._enabled:
+            payload = _clone_payload(event.data)
+            self._context.emit(
+                event.event_type,
+                payload,
+                producer_id=self._output_producer_id,
+            )
+
+
 class _DoubleTapVirtualPeripheral(_VirtualPeripheral):
     def __init__(
         self,
@@ -924,6 +970,82 @@ def sequence_virtual_peripheral(
     return VirtualPeripheralDefinition(
         name=name,
         event_types=event_types,
+        factory=factory,
+        priority=priority,
+        metadata=metadata,
+    )
+
+
+def _default_gate_predicate(
+    context: "VirtualPeripheralContext", event: Input
+) -> bool:
+    data = event.data
+    if isinstance(data, Mapping):
+        for key in ("pressed", "state", "enabled", "value"):
+            if key in data:
+                return bool(data[key])
+        return bool(data)
+    return bool(data)
+
+
+def gated_mirror_virtual_peripheral(
+    name: str,
+    *,
+    gate_event_type: str | Sequence[str],
+    mirror_event_types: str | Sequence[str],
+    output_producer_id: int,
+    priority: int = 0,
+    metadata: Mapping[str, Any] | None = None,
+    gate_predicate: GatePredicate | None = None,
+    initial_state: bool = False,
+) -> VirtualPeripheralDefinition:
+    """Return a definition for a gate-controlled mirroring peripheral.
+
+    Parameters
+    ----------
+    gate_event_type:
+        Event type or types that toggle the gate. Each matching event is passed
+        to ``gate_predicate`` to determine whether mirroring should be enabled.
+    gate_predicate:
+        Callable receiving the :class:`VirtualPeripheralContext` and the gate
+        :class:`Input`. Returning ``True`` enables mirroring, while ``False``
+        disables it.
+    """
+
+    if isinstance(gate_event_type, str):
+        gate_types: tuple[str, ...] = (gate_event_type,)
+    else:
+        gate_types = tuple(gate_event_type)
+    if not gate_types:
+        raise ValueError("gate_event_type must not be empty")
+    if isinstance(mirror_event_types, str):
+        mirror_types: tuple[str, ...] = (mirror_event_types,)
+    else:
+        mirror_types = tuple(mirror_event_types)
+    if not mirror_types:
+        raise ValueError("mirror_event_types must not be empty")
+
+    if gate_predicate is None:
+        gate_predicate = _default_gate_predicate
+
+    event_types: list[str] = []
+    for candidate in (*gate_types, *mirror_types):
+        if candidate not in event_types:
+            event_types.append(candidate)
+
+    def factory(context: VirtualPeripheralContext) -> _VirtualPeripheral:
+        return _GatedMirrorVirtualPeripheral(
+            context,
+            gate_event_types=gate_types,
+            mirror_event_types=mirror_types,
+            output_producer_id=output_producer_id,
+            predicate=gate_predicate,
+            initial_state=initial_state,
+        )
+
+    return VirtualPeripheralDefinition(
+        name=name,
+        event_types=tuple(event_types),
         factory=factory,
         priority=priority,
         metadata=metadata,
