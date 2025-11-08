@@ -9,6 +9,8 @@ from heart.peripheral.core.event_bus import (EventBus, EventPlaylist,
                                              EventPlaylistManager,
                                              PlaylistHandle, PlaylistStep,
                                              SequenceMatcher,
+                                             VirtualPeripheralContext,
+                                             VirtualPeripheralDefinition,
                                              double_tap_virtual_peripheral,
                                              gated_mirror_virtual_peripheral,
                                              sequence_virtual_peripheral,
@@ -192,6 +194,59 @@ def test_playlist_trigger_interrupted_by_event() -> None:
     assert created_events[0]["playlist_metadata"] == {"mode": "interrupt"}
     assert emitted_events
     assert len(emitted_events) < 10
+
+
+def test_virtual_peripheral_definitions_bind_resources() -> None:
+    bus = EventBus()
+    captured: dict[str, Any] = {}
+    handled: list[int] = []
+
+    class DummyVirtualPeripheral:
+        def __init__(self, context: VirtualPeripheralContext) -> None:
+            self._context = context
+            captured["context"] = context
+            captured["foo"] = context.get_resource("foo")
+            captured["combo"] = context.get_resource("combo")
+            captured["state_store"] = context.resources["state_store"]
+
+        def handle(self, event: Input) -> None:
+            handled.append(self._context.get_resource("foo"))
+
+        def shutdown(self) -> None:
+            captured["shutdown"] = True
+
+    definition = VirtualPeripheralDefinition(
+        name="dummy.resources",
+        event_types=("button.press",),
+        factory=DummyVirtualPeripheral,
+        resources={
+            "foo": lambda ctx: 41,
+            "combo": lambda ctx: ctx.get_resource("foo") + 1,
+            "state_store": lambda ctx: ctx.state_store,
+        },
+    )
+
+    handle = bus.virtual_peripherals.register(definition)
+    bus.emit("button.press", data={})
+
+    assert handled == [41]
+    assert captured["foo"] == 41
+    assert captured["combo"] == 42
+    assert captured["state_store"] is bus.state_store
+
+    resources = bus.virtual_peripherals.list_definitions()[handle.peripheral_id].resources
+    assert resources is not None
+    with pytest.raises(TypeError):
+        resources["foo"] = 99  # type: ignore[index]
+
+    dummy_context = captured["context"]
+    with pytest.raises(TypeError):
+        dummy_context.resources["foo"] = 5  # type: ignore[index]
+    with pytest.raises(KeyError):
+        dummy_context.get_resource("missing")
+
+    bus.virtual_peripherals.remove(handle)
+    assert captured.get("shutdown") is True
 
 
 @pytest.mark.parametrize(
