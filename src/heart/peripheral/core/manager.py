@@ -7,6 +7,7 @@ from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
+from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
@@ -59,6 +60,11 @@ class PeripheralManager:
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():
             self._register_peripheral(peripheral)
+
+    def register(self, peripheral: Peripheral) -> None:
+        """Manually register ``peripheral`` with the manager."""
+
+        self._register_peripheral(peripheral)
 
     def _iter_detected_peripherals(self) -> Iterable[Peripheral]:
         yield from itertools.chain(
@@ -130,6 +136,12 @@ class PeripheralManager:
         self._peripherals.append(peripheral)
         if self._event_bus is not None and self._propagate_event_bus:
             self._attach_event_bus(peripheral, self._event_bus)
+
+    def get_led_matrix_display(self) -> LEDMatrixDisplay:
+        for peripheral in self._peripherals:
+            if isinstance(peripheral, LEDMatrixDisplay):
+                return peripheral
+        raise ValueError("No LEDMatrixDisplay peripheral registered")
 
     def _attach_event_bus(self, peripheral: Peripheral, event_bus: EventBus) -> None:
         attach = getattr(peripheral, "attach_event_bus", None)
