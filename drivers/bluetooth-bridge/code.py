@@ -25,6 +25,8 @@ from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 
+from heart.firmware_io import identity
+
 
 class SupportsWrite(Protocol):
     def write(self, data: bytes) -> None:  # pragma: no cover - typing protocol
@@ -41,6 +43,18 @@ MINIMUM_LIGHT_ON_SECONDS = 0.05
 
 END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
+
+IDENTITY = identity.Identity(
+    device_name="bluetooth-bridge",
+    firmware_commit=identity.default_firmware_commit(),
+    device_id=identity.persistent_device_id(),
+)
+
+
+def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
+    """Process any pending Identify query."""
+
+    return identity.poll_and_respond(IDENTITY, stdin=stdin, print_fn=print_fn)
 
 
 def _ensure_output_led() -> digitalio.DigitalInOut:
@@ -88,6 +102,7 @@ class BluetoothBridgeRuntime:
     def run_once(self) -> None:
         """Execute a single iteration of the firmware loop."""
 
+        respond_to_identify_query()
         self.led.value = True
         self._ensure_advertising()
 

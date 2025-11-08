@@ -8,11 +8,23 @@ from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
 
-from heart.firmware_io import constants
+from heart.firmware_io import constants, identity
 
 logger = logging.getLogger(__name__)
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
+
+IDENTITY = identity.Identity(
+    device_name="sensor-bus",
+    firmware_commit=identity.default_firmware_commit(),
+    device_id=identity.persistent_device_id(),
+)
+
+
+def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
+    """Process any pending Identify query."""
+
+    return identity.poll_and_respond(IDENTITY, stdin=stdin, print_fn=print_fn)
 
 
 def get_sample_rate(sensor) -> float:
@@ -163,6 +175,7 @@ def main() -> None:
 
     while True:
         try:
+            respond_to_identify_query()
             if sensors is None:
                 sensors = connect_to_sensors(i2c=i2c)
 

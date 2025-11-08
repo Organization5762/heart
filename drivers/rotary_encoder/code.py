@@ -6,7 +6,19 @@ import board
 import rotaryio
 from digitalio import DigitalInOut, Direction, Pull
 
-from heart.firmware_io import rotary_encoder
+from heart.firmware_io import identity, rotary_encoder
+
+IDENTITY = identity.Identity(
+    device_name="rotary-encoder",
+    firmware_commit=identity.default_firmware_commit(),
+    device_id=identity.persistent_device_id(),
+)
+
+
+def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
+    """Process any pending Identify query."""
+
+    return identity.poll_and_respond(IDENTITY, stdin=stdin, print_fn=print_fn)
 
 
 def create_handler(
@@ -40,6 +52,7 @@ def read_events(handler: rotary_encoder.RotaryEncoderHandler) -> list[str]:
 def main() -> None:  # pragma: no cover - exercised on hardware
     handler = create_handler()
     while True:
+        respond_to_identify_query()
         for event in read_events(handler):
             print(event)
 

@@ -9,9 +9,22 @@ import board
 import busio
 import digitalio
 
-from heart.firmware_io import bluetooth, rotary_encoder
+from heart.firmware_io import bluetooth, identity, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
+
+
+IDENTITY = identity.Identity(
+    device_name="lampe-controller",
+    firmware_commit=identity.default_firmware_commit(),
+    device_id=identity.persistent_device_id(),
+)
+
+
+def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
+    """Process any pending Identify query."""
+
+    return identity.poll_and_respond(IDENTITY, stdin=stdin, print_fn=print_fn)
 
 
 class LampeControllerRuntime:
@@ -23,6 +36,7 @@ class LampeControllerRuntime:
         self.led = led
 
     def run_once(self) -> None:
+        respond_to_identify_query()
         events = list(self._seesaw_controller.handle())
         self._send_fn(events)
 

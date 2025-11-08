@@ -1,4 +1,10 @@
+import io
+import json
+
+import pytest
 from driver_loader import load_driver_module, make_module
+
+from heart.firmware_io import constants
 
 
 class FakeDigitalInOut:
@@ -99,8 +105,14 @@ STUBS = {
     "adafruit_ble.services.nordic": services_nordic,
 }
 
-lampe_controller = load_driver_module("lampe-controller", stubs=STUBS)
-LampeControllerRuntime = lampe_controller.LampeControllerRuntime
+
+@pytest.fixture()
+def lampe_controller(monkeypatch, tmp_path):
+    device_id_path = tmp_path / "device_id.txt"
+    monkeypatch.setenv("HEART_DEVICE_ID_PATH", str(device_id_path))
+    monkeypatch.setenv("HEART_DEVICE_ID", "lampe-controller-test-id")
+    module = load_driver_module("lampe-controller", stubs=STUBS)
+    return module
 
 
 class StubSeesawController:
@@ -124,10 +136,10 @@ class StubSender:
         self.calls.append(list(events))
 
 
-def test_runtime_sends_events_to_bluetooth():
+def test_runtime_sends_events_to_bluetooth(lampe_controller):
     controller = StubSeesawController([["a"], ["b", "c"]])
     sender = StubSender()
-    runtime = LampeControllerRuntime(controller, sender)
+    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
 
     runtime.run_once()
     runtime.run_once()
@@ -135,11 +147,42 @@ def test_runtime_sends_events_to_bluetooth():
     assert sender.calls == [["a"], ["b", "c"]]
 
 
-def test_runtime_handles_empty_batches():
+def test_runtime_handles_empty_batches(lampe_controller):
     controller = StubSeesawController([[]])
     sender = StubSender()
-    runtime = LampeControllerRuntime(controller, sender)
+    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
 
     runtime.run_once()
 
     assert sender.calls == [[]]
+
+
+def test_respond_to_identify_query_emits_identity_payload(lampe_controller):
+    stream = io.StringIO("Identify\n")
+    outputs: list[str] = []
+
+    handled = lampe_controller.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+
+    assert handled is True
+    payload = json.loads(outputs[0])
+    assert payload["event_type"] == constants.DEVICE_IDENTIFY
+    assert payload["data"]["device_name"] == lampe_controller.IDENTITY.device_name
+    assert payload["data"]["device_id"] == "lampe-controller-test-id"
+
+
+def test_runtime_invokes_identify_responder(monkeypatch, lampe_controller):
+    calls = []
+
+    def responder(**_kwargs):
+        calls.append(True)
+        return False
+
+    monkeypatch.setattr(lampe_controller, "respond_to_identify_query", responder)
+
+    controller = StubSeesawController([["ignored"]])
+    sender = StubSender()
+    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
+
+    runtime.run_once()
+
+    assert calls

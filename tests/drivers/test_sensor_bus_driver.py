@@ -1,5 +1,7 @@
+import io
 import json
 
+import pytest
 from driver_loader import load_driver_module, make_module
 
 from heart.firmware_io import constants
@@ -21,7 +23,14 @@ STUBS = {
     "adafruit_lsm303_accel": make_module("adafruit_lsm303_accel", LSM303_Accel=object),
 }
 
-sensor_bus = load_driver_module("sensor_bus", stubs=STUBS)
+
+@pytest.fixture()
+def sensor_bus(monkeypatch, tmp_path):
+    device_id_path = tmp_path / "device_id.txt"
+    monkeypatch.setenv("HEART_DEVICE_ID_PATH", str(device_id_path))
+    monkeypatch.setenv("HEART_DEVICE_ID", "sensor-bus-test-id")
+    module = load_driver_module("sensor_bus", stubs=STUBS)
+    return module
 
 
 class StubAccelerationSensor:
@@ -56,28 +65,28 @@ class StubGyroSensor:
         return self.current
 
 
-def test_form_tuple_payload_returns_json():
+def test_form_tuple_payload_returns_json(sensor_bus):
     payload = sensor_bus.form_tuple_payload("rotation", (1.0, 2.0, 3.0))
     assert payload.startswith("\n")
     decoded = json.loads(payload.strip())
     assert decoded == {"event_type": "rotation", "data": {"x": 1.0, "y": 2.0, "z": 3.0}}
 
 
-def test_get_sample_rate_prefers_sensor_value():
+def test_get_sample_rate_prefers_sensor_value(sensor_bus):
     class Stub:
         accelerometer_data_rate = sensor_bus.Rate.RATE_208_HZ
 
     assert sensor_bus.get_sample_rate(Stub()) == sensor_bus.Rate.string[Stub.accelerometer_data_rate]
 
 
-def test_get_sample_rate_defaults_when_missing():
+def test_get_sample_rate_defaults_when_missing(sensor_bus):
     class Stub:
         pass
 
     assert sensor_bus.get_sample_rate(Stub()) == sensor_bus.Rate.string[sensor_bus.Rate.RATE_104_HZ]
 
 
-def test_connect_to_sensors_skips_failures(monkeypatch):
+def test_connect_to_sensors_skips_failures(monkeypatch, sensor_bus):
     created = []
 
     class GoodSensor:
@@ -97,7 +106,7 @@ def test_connect_to_sensors_skips_failures(monkeypatch):
     assert created == [("GoodSensor", "i2c-bus"), ("GoodSensor", "i2c-bus")]
 
 
-def test_sensor_reader_emits_when_change_exceeds_threshold():
+def test_sensor_reader_emits_when_change_exceeds_threshold(sensor_bus):
     accel_sensor = StubAccelerationSensor(
         acceleration=[
             (0.0, 0.0, 0.0),
@@ -132,3 +141,17 @@ def test_sensor_reader_emits_when_change_exceeds_threshold():
     gyro_payload = json.loads(third[1].strip())
     assert accel_payload["event_type"] == constants.ACCELERATION
     assert gyro_payload["event_type"] == constants.GYROSCOPE
+
+
+def test_respond_to_identify_query_emits_identity_payload(sensor_bus):
+    stream = io.StringIO("Identify\n")
+    outputs: list[str] = []
+
+    handled = sensor_bus.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+
+    assert handled is True
+    assert outputs
+    payload = json.loads(outputs[0])
+    assert payload["event_type"] == constants.DEVICE_IDENTIFY
+    assert payload["data"]["device_name"] == sensor_bus.IDENTITY.device_name
+    assert payload["data"]["device_id"] == "sensor-bus-test-id"

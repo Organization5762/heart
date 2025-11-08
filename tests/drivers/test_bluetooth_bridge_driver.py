@@ -1,8 +1,11 @@
+import io
 import json
 from collections import deque
 
 import driver_loader
 import pytest
+
+from heart.firmware_io import constants
 
 
 class FakeDigitalInOut:
@@ -70,12 +73,6 @@ STUBS = {
     "adafruit_ble.services.nordic": services_nordic,
 }
 
-bluetooth_bridge = driver_loader.load_driver_module("bluetooth-bridge", stubs=STUBS)
-BluetoothBridgeRuntime = bluetooth_bridge.BluetoothBridgeRuntime
-END_OF_MESSAGE_DELIMETER = bluetooth_bridge.END_OF_MESSAGE_DELIMETER
-ENCODING = bluetooth_bridge.ENCODING
-
-
 class StubBLE:
     def __init__(self):
         self.connected = False
@@ -109,7 +106,18 @@ class StubSleeper:
 
 
 @pytest.fixture()
-def runtime_factory():
+def bluetooth_bridge(monkeypatch, tmp_path):
+    device_id_path = tmp_path / "device_id.txt"
+    monkeypatch.setenv("HEART_DEVICE_ID_PATH", str(device_id_path))
+    monkeypatch.setenv("HEART_DEVICE_ID", "bluetooth-bridge-test-id")
+    module = driver_loader.load_driver_module("bluetooth-bridge", stubs=STUBS)
+    return module
+
+
+@pytest.fixture()
+def runtime_factory(bluetooth_bridge):
+    BluetoothBridgeRuntime = bluetooth_bridge.BluetoothBridgeRuntime
+
     def _factory(payloads):
         sequence = list(payloads)
         index = {"value": 0}
@@ -141,13 +149,13 @@ def runtime_factory():
     return _factory
 
 
-def _decode_payload(payload_bytes: bytes):
-    payload_str = payload_bytes.decode(ENCODING)
-    assert payload_str.endswith(END_OF_MESSAGE_DELIMETER)
+def _decode_payload(bluetooth_bridge, payload_bytes: bytes):
+    payload_str = payload_bytes.decode(bluetooth_bridge.ENCODING)
+    assert payload_str.endswith(bluetooth_bridge.END_OF_MESSAGE_DELIMETER)
     return json.loads(payload_str[:-1])
 
 
-def test_runtime_buffers_and_flushes_messages(runtime_factory):
+def test_runtime_buffers_and_flushes_messages(bluetooth_bridge, runtime_factory):
     runtime, ble, uart, led, sleeper = runtime_factory(
         [
             [{"event_type": "rotation", "data": 1}],
@@ -166,7 +174,7 @@ def test_runtime_buffers_and_flushes_messages(runtime_factory):
     ble.connected = True
     runtime.run_once()
     assert runtime.not_connected_buffer == deque([], 5)
-    assert [_decode_payload(data) for data in uart.writes] == [
+    assert [_decode_payload(bluetooth_bridge, data) for data in uart.writes] == [
         [{"event_type": "rotation", "data": 1}],
         [{"event_type": "rotation", "data": 2}],
     ]
@@ -176,7 +184,7 @@ def test_runtime_buffers_and_flushes_messages(runtime_factory):
     assert len(uart.writes) == 2
 
 
-def test_runtime_does_not_duplicate_buffer_entries(runtime_factory):
+def test_runtime_does_not_duplicate_buffer_entries(bluetooth_bridge, runtime_factory):
     runtime, ble, uart, *_ = runtime_factory(
         [[{"event_type": "rotation", "data": 99}]]
     )
@@ -185,5 +193,33 @@ def test_runtime_does_not_duplicate_buffer_entries(runtime_factory):
     runtime.run_once()
     assert len(runtime.not_connected_buffer) == 1
     stored = runtime.not_connected_buffer[0]
-    assert stored.endswith(END_OF_MESSAGE_DELIMETER)
+    assert stored.endswith(bluetooth_bridge.END_OF_MESSAGE_DELIMETER)
     assert json.loads(stored[:-1]) == [{"event_type": "rotation", "data": 99}]
+
+
+def test_bluetooth_bridge_identify_query(monkeypatch, bluetooth_bridge):
+    stream = io.StringIO("Identify\n")
+    outputs: list[str] = []
+
+    handled = bluetooth_bridge.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+
+    assert handled is True
+    payload = json.loads(outputs[0])
+    assert payload["event_type"] == constants.DEVICE_IDENTIFY
+    assert payload["data"]["device_name"] == bluetooth_bridge.IDENTITY.device_name
+    assert payload["data"]["device_id"] == "bluetooth-bridge-test-id"
+
+
+def test_runtime_calls_identify_responder(monkeypatch, bluetooth_bridge, runtime_factory):
+    calls = []
+
+    def responder(**_kwargs):
+        calls.append(True)
+        return False
+
+    monkeypatch.setattr(bluetooth_bridge, "respond_to_identify_query", responder)
+
+    runtime, *_ = runtime_factory([[{"event_type": "rotation", "data": 1}]])
+    runtime.run_once()
+
+    assert calls
