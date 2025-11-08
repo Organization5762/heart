@@ -42,6 +42,7 @@ __all__ = [
 
 EventCallback = Callable[[Input], None]
 GatePredicate = Callable[["VirtualPeripheralContext", Input], bool]
+ResourceFactory = Callable[["VirtualPeripheralContext"], Any]
 
 
 def _clone_payload(value: Any) -> Any:
@@ -150,6 +151,7 @@ class VirtualPeripheralDefinition:
     factory: Callable[["VirtualPeripheralContext"], "_VirtualPeripheral"]
     priority: int = 0
     metadata: Mapping[str, Any] | None = None
+    resources: Mapping[str, ResourceFactory] | None = None
 
     def __post_init__(self) -> None:
         if not self.event_types:
@@ -158,6 +160,12 @@ class VirtualPeripheralDefinition:
         if self.metadata is not None:
             object.__setattr__(
                 self, "metadata", MappingProxyType(dict(self.metadata))
+            )
+        if self.resources is not None:
+            object.__setattr__(
+                self,
+                "resources",
+                MappingProxyType(dict(self.resources)),
             )
 
 
@@ -169,10 +177,15 @@ class VirtualPeripheralContext:
         bus: "EventBus",
         definition: VirtualPeripheralDefinition,
         handle: VirtualPeripheralHandle,
+        *,
+        resources: Mapping[str, Any] | None = None,
     ) -> None:
         self._bus = bus
         self._definition = definition
         self._handle = handle
+        self._resources: Mapping[str, Any] = MappingProxyType({})
+        if resources:
+            self._bind_resources(resources)
 
     @property
     def definition(self) -> VirtualPeripheralDefinition:
@@ -215,6 +228,23 @@ class VirtualPeripheralContext:
             "data": event.data,
             "timestamp": event.timestamp.isoformat(),
         }
+
+    @property
+    def resources(self) -> Mapping[str, Any]:
+        """Return resources bound to this context."""
+
+        return self._resources
+
+    def get_resource(self, name: str) -> Any:
+        """Return a named resource declared by the definition."""
+
+        try:
+            return self._resources[name]
+        except KeyError as exc:  # pragma: no cover - defensive guard
+            raise KeyError(f"Unknown resource: {name}") from exc
+
+    def _bind_resources(self, resources: Mapping[str, Any]) -> None:
+        self._resources = MappingProxyType(dict(resources))
 
 
 class _VirtualPeripheral(abc.ABC):
@@ -631,6 +661,21 @@ class VirtualPeripheralManager:
         definition: VirtualPeripheralDefinition,
     ) -> None:
         context = VirtualPeripheralContext(self._bus, definition, handle)
+        resource_factories = definition.resources or {}
+        if resource_factories:
+            resolved_resources: dict[str, Any] = {}
+            for name, factory in resource_factories.items():
+                context._bind_resources(resolved_resources)
+                try:
+                    resolved_resources[name] = factory(context)
+                except Exception:
+                    _LOGGER.exception(
+                        "Virtual peripheral %s failed to resolve resource %s",
+                        definition.name,
+                        name,
+                    )
+                    raise
+            context._bind_resources(resolved_resources)
         instance = definition.factory(context)
         subscriptions: List[SubscriptionHandle] = []
 
