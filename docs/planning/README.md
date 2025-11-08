@@ -11,6 +11,7 @@ Consult this index before opening or updating plans. Each linked document must f
 - [ ] [Flow Toy Signal Interface](flow_toy_signal_interface.md)
 - [ ] [Light Dependent Resistor Peripheral](light_dependent_resistor_peripheral.md)
 - [ ] [Multi-App Split](multi_app_split.md)
+- [ ] [Peripheral Color Sync](peripheral_color_sync.md)
 - [ ] [UWB Peripheral Rollout](uwb_peripheral_rollout.md)
 
 ## Active
