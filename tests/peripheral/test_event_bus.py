@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Any
+from typing import Any, Mapping
 
 import pytest
 
@@ -457,3 +457,56 @@ def test_gated_mirror_virtual_peripheral_re_emits_with_virtual_metadata() -> Non
 
     later_mirrored = [event for event in captured if event.producer_id == 99]
     assert later_mirrored == mirrored
+
+
+def test_gated_mirror_virtual_peripheral_supports_composed_conditions() -> None:
+    bus = EventBus()
+    captured: list[Input] = []
+
+    def _truthy(data: Any) -> bool:
+        if isinstance(data, Mapping):
+            for key in ("pressed", "state", "enabled", "value", "active"):
+                if key in data:
+                    return bool(data[key])
+            return bool(data)
+        return bool(data)
+
+    def _predicate(context, event: Input) -> bool:
+        button_entry = context.state_store.get_latest("button.toggle")
+        combo_entry = context.state_store.get_latest("combo.activated")
+        button_active = _truthy(button_entry.data) if button_entry else False
+        combo_active = _truthy(combo_entry.data) if combo_entry else False
+        return button_active and combo_active
+
+    definition = gated_mirror_virtual_peripheral(
+        "microphone.combo",
+        gate_event_type=("button.toggle", "combo.activated"),
+        mirror_event_types="peripheral.microphone.level",
+        output_producer_id=101,
+        gate_predicate=_predicate,
+    )
+    bus.virtual_peripherals.register(definition)
+
+    bus.subscribe(
+        "peripheral.microphone.level",
+        lambda event: captured.append(event),
+    )
+
+    def _mirrored() -> list[Input]:
+        return [event for event in captured if event.producer_id == 101]
+
+    bus.emit("peripheral.microphone.level", data={"rms": 0.1}, producer_id=7)
+    assert not _mirrored()
+
+    bus.emit("combo.activated", data={"active": True}, producer_id=3)
+    bus.emit("peripheral.microphone.level", data={"rms": 0.2}, producer_id=7)
+    assert not _mirrored()
+
+    bus.emit("button.toggle", data={"pressed": True}, producer_id=1)
+    bus.emit("peripheral.microphone.level", data={"rms": 0.3}, producer_id=7)
+    mirrored = _mirrored()
+    assert mirrored and mirrored[-1].data["rms"] == 0.3
+
+    bus.emit("combo.activated", data={"active": False}, producer_id=3)
+    bus.emit("peripheral.microphone.level", data={"rms": 0.4}, producer_id=7)
+    assert mirrored == _mirrored()
