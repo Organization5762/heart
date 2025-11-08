@@ -33,6 +33,7 @@ __all__ = [
     "VirtualPeripheralHandle",
     "VirtualPeripheralManager",
     "gated_mirror_virtual_peripheral",
+    "gated_playlist_virtual_peripheral",
     "double_tap_virtual_peripheral",
     "sequence_virtual_peripheral",
     "simultaneous_virtual_peripheral",
@@ -196,6 +197,10 @@ class VirtualPeripheralContext:
 
     def monotonic(self) -> float:
         return perf_counter()
+
+    @property
+    def playlists(self) -> "EventPlaylistManager":
+        return self._bus.playlists
 
     def emit(self, event_type: str, data: Any, *, producer_id: int = 0) -> None:
         payload: Any
@@ -935,6 +940,82 @@ class _SequenceVirtualPeripheral(_VirtualPeripheral):
         return True
 
 
+class _PlaylistTriggerVirtualPeripheral(_VirtualPeripheral):
+    """Start a playlist when gate events satisfy an optional predicate."""
+
+    def __init__(
+        self,
+        context: VirtualPeripheralContext,
+        *,
+        gate_event_types: Sequence[str],
+        playlist: EventPlaylist,
+        predicate: GatePredicate | None,
+        cancel_active_runs: bool,
+    ) -> None:
+        super().__init__(context)
+        if not gate_event_types:
+            raise ValueError("gate_event_types must not be empty")
+        if playlist.trigger_event_type is not None:
+            raise ValueError(
+                "playlist.trigger_event_type must be None for gated playlists"
+            )
+        self._gate_event_types = frozenset(gate_event_types)
+        self._predicate = predicate
+        self._cancel_active_runs = cancel_active_runs
+        self._playlist_handle = context.playlists.register(playlist)
+        self._active_runs: set[str] = set()
+
+    def handle(self, event: Input) -> None:
+        if event.event_type == EventPlaylistManager.EVENT_STOPPED:
+            data = event.data if isinstance(event.data, MappingABC) else {}
+            definition_id = data.get("definition_id") if data else None
+            if definition_id == self._playlist_handle.playlist_id:
+                run_id = data.get("playlist_id") if data else None
+                if run_id:
+                    self._active_runs.discard(run_id)
+            return
+
+        if event.event_type not in self._gate_event_types:
+            return
+
+        should_trigger = True
+        if self._predicate is not None:
+            try:
+                should_trigger = bool(self._predicate(self._context, event))
+            except Exception:  # pragma: no cover - defensive logging
+                _LOGGER.exception(
+                    "Virtual peripheral %s failed to evaluate gate predicate",
+                    self._context.definition.name,
+                )
+                return
+
+        if not should_trigger:
+            return
+
+        if self._cancel_active_runs and self._active_runs:
+            for run_id in tuple(self._active_runs):
+                self._context.playlists.stop(run_id, reason="cancelled")
+
+        try:
+            run_id = self._context.playlists.start(
+                self._playlist_handle, trigger_event=event
+            )
+        except Exception:  # pragma: no cover - defensive logging
+            _LOGGER.exception(
+                "Virtual peripheral %s failed to start playlist",
+                self._context.definition.name,
+            )
+            return
+
+        self._active_runs.add(run_id)
+
+    def shutdown(self) -> None:
+        for run_id in tuple(self._active_runs):
+            self._context.playlists.stop(run_id, reason="cancelled")
+        self._active_runs.clear()
+        self._context.playlists.remove(self._playlist_handle)
+
+
 def double_tap_virtual_peripheral(
     source_event_type: str,
     *,
@@ -1091,6 +1172,46 @@ def gated_mirror_virtual_peripheral(
     return VirtualPeripheralDefinition(
         name=name,
         event_types=tuple(event_types),
+        factory=factory,
+        priority=priority,
+        metadata=metadata,
+    )
+
+
+def gated_playlist_virtual_peripheral(
+    gate_event_types: Sequence[str],
+    *,
+    playlist: EventPlaylist,
+    predicate: GatePredicate | None = None,
+    cancel_active_runs: bool = False,
+    name: str | None = None,
+    priority: int = 50,
+    metadata: Mapping[str, Any] | None = None,
+) -> VirtualPeripheralDefinition:
+    """Return a virtual peripheral that starts ``playlist`` when gated events fire."""
+
+    if not gate_event_types:
+        raise ValueError("gate_event_types must not be empty")
+
+    resolved_name = name or f"{playlist.name}.gated"
+    event_types = tuple(
+        dict.fromkeys(
+            (*gate_event_types, EventPlaylistManager.EVENT_STOPPED)
+        )
+    )
+
+    def factory(context: VirtualPeripheralContext) -> _VirtualPeripheral:
+        return _PlaylistTriggerVirtualPeripheral(
+            context,
+            gate_event_types=gate_event_types,
+            playlist=playlist,
+            predicate=predicate,
+            cancel_active_runs=cancel_active_runs,
+        )
+
+    return VirtualPeripheralDefinition(
+        name=resolved_name,
+        event_types=event_types,
         factory=factory,
         priority=priority,
         metadata=metadata,

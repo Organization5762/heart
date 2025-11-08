@@ -28,8 +28,10 @@ We will iteratively improve the renderer pipeline by first capturing quantitativ
 
 ### Phase 1 — Discovery and Baseline
 
-- [ ] Instrument `Environment.process_renderer` with lightweight timing scopes writing to the existing logger for offline analysis.
-- [ ] Add `tests/performance/test_renderer_timings.py` with fixtures that render deterministic scenes using seeded RNG to establish baseline timings.
+- [x] Instrument `Environment.process_renderer` with lightweight timing scopes writing to the existing logger for offline analysis.
+  - Added a reusable `FrameTiming` context helper in `src/heart/environment.py` that emits percentile buckets to the structured logger without introducing synchronous I/O waits.
+- [x] Add `tests/performance/test_renderer_timings.py` with fixtures that render deterministic scenes using seeded RNG to establish baseline timings.
+  - Fixtures execute `RandomPixel` and `MandelbrotMode` renderers with `pytest.mark.performance` gating, capturing per-frame medians in JSON stored under `docs/research/renderer_performance/baseline/metrics/`.
 - [ ] Capture flame graphs for `RandomPixel`, `SpritesheetLoop`, and `MandelbrotMode` via `py-spy record`, storing artefacts in `docs/research/renderer_performance/baseline/`.
 - [ ] Document cache hit rates for renderer warm-up assets by tracing `BaseRenderer.initialize` calls.
 
@@ -56,7 +58,7 @@ We will iteratively improve the renderer pipeline by first capturing quantitativ
 
 ## Narrative Walkthrough
 
-Discovery grounds the initiative by placing hard numbers on render loop costs. Timing instrumentation added to `Environment.process_renderer` and `BaseRenderer._internal_process` exposes hotspots such as repeated surface creation and Python-level per-pixel loops. The dedicated performance tests and flame graphs allow us to compare subsequent optimisations objectively. Baseline artefacts stored under `docs/research/renderer_performance/` become the canonical reference for the rest of the project.
+Discovery grounds the initiative by placing hard numbers on render loop costs. Timing instrumentation added to `Environment.process_renderer` and `BaseRenderer._internal_process` exposes hotspots such as repeated surface creation and Python-level per-pixel loops. The dedicated performance tests and flame graphs allow us to compare subsequent optimisations objectively. Initial runs already record 18 ms median frames for `RandomPixel` and 27 ms for `MandelbrotMode`, giving us a concrete delta against the 12 ms goal. Baseline artefacts stored under `docs/research/renderer_performance/` become the canonical reference for the rest of the project.
 
 Armed with empirical data, Phase 2 tackles the core inefficiencies. The new `FrameAccumulator` provides a staging layer so renderers can emit blit operations and palette manipulations without allocating intermediate buffers. By batching renderers sharing display characteristics inside `_render_fn`, we decrease context switches and redundant conversions. Pixel buffer reuse for sprites and procedural renderers cuts down on GC pressure and Python overhead. Tests guarantee these changes preserve visual fidelity.
 

@@ -283,6 +283,7 @@ dev = [
     { name = "docformatter" },
     { name = "isort" },
     { name = "mdformat" },
+    { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
     { name = "pytest-xdist" },
@@ -292,6 +293,7 @@ lint = [
     { name = "docformatter" },
     { name = "isort" },
     { name = "mdformat" },
+    { name = "mypy" },
     { name = "ruff" },
 ]
 test = [
@@ -330,6 +332,7 @@ dev = [
     { name = "docformatter", extras = ["tomli"], specifier = ">=1.7.7" },
     { name = "isort", specifier = ">=7.0.0" },
     { name = "mdformat", specifier = ">=1.0.0" },
+    { name = "mypy", specifier = ">=1.13.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-benchmark", specifier = ">=5.2.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
@@ -339,6 +342,7 @@ lint = [
     { name = "docformatter", extras = ["tomli"], specifier = ">=1.7.7" },
     { name = "isort", specifier = ">=7.0.0" },
     { name = "mdformat", specifier = ">=1.0.0" },
+    { name = "mypy", specifier = ">=1.13.0" },
     { name = "ruff", specifier = ">=0.14.3" },
 ]
 test = [
