@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import random
 from dataclasses import dataclass
@@ -21,11 +20,11 @@ class Color:
                 f"Expected all color values to be between 0 and 255. Found {self.rgb}"
             )
 
-    def tuple(self) -> tuple[int, int, int]:
+    def tuple(self) -> "tuple[int, int, int]":
         return self._as_tuple()
 
     # todo (clem): why is this private anyway, re-exposed above
-    def _as_tuple(self) -> tuple[int, int, int]:
+    def _as_tuple(self) -> "tuple[int, int, int]":
         return (self.r, self.g, self.b)
 
     def __iter__(self) -> Iterator[int]:

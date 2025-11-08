@@ -1,6 +1,5 @@
 """Lampe controller firmware entry point."""
 
-from __future__ import annotations
 
 import adafruit_seesaw.digitalio
 import adafruit_seesaw.rotaryio

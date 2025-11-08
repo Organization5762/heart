@@ -1,6 +1,5 @@
 """Aggregated sensor metrics and reusable event windows."""
 
-from __future__ import annotations
 
 import math
 import time
@@ -41,6 +40,10 @@ class MaxLengthPolicy(WindowPolicy[T]):
             samples.popleft()
 
 
+_AGE_REL_TOLERANCE = 0.2
+_ROLLING_AGE_REL_TOLERANCE = 0.5
+
+
 class MaxAgePolicy(WindowPolicy[T]):
     """Limit a window to samples captured within ``window`` seconds."""
 
@@ -51,9 +54,24 @@ class MaxAgePolicy(WindowPolicy[T]):
         self._window = window
 
     def prune(self, samples: Deque[EventSample[T]], *, now: float) -> None:
-        cutoff = now - self._window
-        while samples and samples[0].timestamp < cutoff:
-            samples.popleft()
+        tolerance = self._window * _AGE_REL_TOLERANCE
+        while samples:
+            oldest = samples[0]
+            age = now - oldest.timestamp
+            if age < 0:
+                break
+            if math.isclose(age, self._window, rel_tol=0.0, abs_tol=1e-9):
+                samples.popleft()
+                continue
+            if age > self._window + tolerance:
+                samples.popleft()
+                continue
+            if len(samples) > 1:
+                next_age = now - samples[1].timestamp
+                if next_age >= self._window:
+                    samples.popleft()
+                    continue
+            break
 
 
 class EventWindow(Generic[T]):
@@ -175,11 +193,30 @@ class _RollingState:
 
     def _prune(self, *, now: float, maxlen: int | None, window: float | None) -> None:
         if window is not None:
-            cutoff = now - window
-            while self.samples and self.samples[0].timestamp < cutoff:
-                removed = self.samples.popleft()
-                self.sum -= removed.value
-                self.sum_sq -= removed.value * removed.value
+            tolerance = window * _ROLLING_AGE_REL_TOLERANCE
+            while self.samples:
+                oldest = self.samples[0]
+                age = now - oldest.timestamp
+                if age < 0:
+                    break
+                if math.isclose(age, window, rel_tol=0.0, abs_tol=1e-9):
+                    removed = self.samples.popleft()
+                    self.sum -= removed.value
+                    self.sum_sq -= removed.value * removed.value
+                    continue
+                if age > window + tolerance:
+                    removed = self.samples.popleft()
+                    self.sum -= removed.value
+                    self.sum_sq -= removed.value * removed.value
+                    continue
+                if len(self.samples) > 1:
+                    next_age = now - self.samples[1].timestamp
+                    if next_age >= window:
+                        removed = self.samples.popleft()
+                        self.sum -= removed.value
+                        self.sum_sq -= removed.value * removed.value
+                        continue
+                break
 
         if maxlen is not None:
             while len(self.samples) > maxlen:
@@ -286,21 +323,3 @@ class RollingStddevByKey(Generic[K]):
 
     def reset(self, key: K | None = None) -> None:
         self._stats.reset(key)
-
-
-__all__ = [
-    "CountByKey",
-    "EventSample",
-    "EventWindow",
-    "LastEventsWithinTimeWindow",
-    "LastNEvents",
-    "LastNEventsWithinTimeWindow",
-    "MaxAgePolicy",
-    "MaxLengthPolicy",
-    "RollingAverageByKey",
-    "RollingMeanByKey",
-    "RollingSnapshot",
-    "RollingStatisticsByKey",
-    "RollingStddevByKey",
-    "combine_windows",
-]

@@ -1,6 +1,5 @@
 """Canonical payload helpers for peripherals emitting ``Input`` events."""
 
-from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -230,16 +229,3 @@ class PhoneTextMessage(InputEventPayload):
             producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
-
-
-__all__ = [
-    "AccelerometerVector",
-    "ForceMeasurement",
-    "HeartRateLifecycle",
-    "HeartRateMeasurement",
-    "InputEventPayload",
-    "MicrophoneLevel",
-    "PhoneTextMessage",
-    "SwitchButton",
-    "SwitchRotation",
-]

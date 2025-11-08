@@ -1,6 +1,5 @@
 """Microphone peripheral that publishes audio loudness events."""
 
-from __future__ import annotations
 
 import contextlib
 import threading

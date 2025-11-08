@@ -1,6 +1,5 @@
 """Infrared sensor array peripheral and positioning solver."""
 
-from __future__ import annotations
 
 import json
 import math
@@ -339,4 +338,3 @@ def radial_layout(radius: float = 0.12) -> list[list[float]]:
         [half, 0.0, vertical],
         [0.0, -half, -vertical],
     ]
-

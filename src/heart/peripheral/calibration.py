@@ -1,6 +1,5 @@
 """Calibration helpers for sensor peripherals."""
 
-from __future__ import annotations
 
 import logging
 from collections.abc import Mapping as MappingABC
@@ -11,8 +10,6 @@ from heart.peripheral.core import Input
 from heart.peripheral.core.event_bus import (VirtualPeripheralContext,
                                              VirtualPeripheralDefinition,
                                              _VirtualPeripheral)
-
-__all__ = ["CalibrationProfile", "calibrated_virtual_peripheral"]
 
 LOGGER = logging.getLogger(__name__)
 

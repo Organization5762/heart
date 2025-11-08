@@ -1,5 +1,7 @@
 """Internal helpers for renderer performance features."""
 
-from .frame_accumulator import FrameAccumulator
+from . import frame_accumulator as _frame_accumulator
 
-__all__ = ["FrameAccumulator"]
+FrameAccumulator = _frame_accumulator.FrameAccumulator
+
+del _frame_accumulator

@@ -2,12 +2,7 @@ import abc
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Self
-
-if TYPE_CHECKING:  # pragma: no cover - import-time convenience
-    from .state_store import StateEntry, StateSnapshot, StateStore
-
-__all__ = ["Input", "Peripheral", "StateEntry", "StateSnapshot", "StateStore"]
+from typing import Any, Iterator, Mapping, Self
 
 
 @dataclass(slots=True)

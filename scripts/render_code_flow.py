@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Render the runtime service-level diagram as an SVG without external CLIs."""
 
-from __future__ import annotations
 
 import argparse
 import pathlib

@@ -1,6 +1,5 @@
 """Expose a testable entry point for the rotary encoder driver."""
 
-from __future__ import annotations
 
 import board
 import rotaryio

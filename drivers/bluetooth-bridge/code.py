@@ -12,7 +12,6 @@ with fake values and assert on the produced UART output without needing any of
 the real hardware modules.
 """
 
-from __future__ import annotations
 
 import json
 from collections import deque

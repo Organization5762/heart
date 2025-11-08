@@ -1,5 +1,7 @@
 """Utility and experimental tooling for Totem hardware debugging."""
 
-from .cli import app
+from . import cli as _cli
 
-__all__ = ["app"]
+app = _cli.app
+
+del _cli

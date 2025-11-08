@@ -1,6 +1,5 @@
 """Tests covering :class:`EventWindow` and associated policies."""
 
-from __future__ import annotations
 
 import pytest
 

@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import enum
 import importlib
@@ -7,7 +6,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pygame
@@ -247,7 +246,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-ACTIVE_GAME_LOOP: "GameLoop" | None = None
+ACTIVE_GAME_LOOP: Optional["GameLoop"] = None
 RGBA_IMAGE_FORMAT = "RGBA"
 
 
@@ -329,7 +328,7 @@ class GameLoop:
 
     def add_mode(
         self,
-        title: str | list["BaseRenderer"] | "BaseRenderer" | None = None,
+        title: "str | BaseRenderer | list[BaseRenderer] | None" = None,
     ) -> ComposedRenderer:
         return self.app_controller.add_mode(title=title)
 
@@ -337,7 +336,7 @@ class GameLoop:
         return self.app_controller.add_scene()
 
     @classmethod
-    def get_game_loop(cls) -> "GameLoop" | None:
+    def get_game_loop(cls) -> "GameLoop | None":
         return ACTIVE_GAME_LOOP
 
     @classmethod
@@ -351,7 +350,7 @@ class GameLoop:
 
     def latest_input(
         self, event_type: str, *, producer_id: int | None = None
-    ) -> "StateEntry" | None:
+    ) -> "StateEntry | None":
         """Return the most recent :class:`Input` for ``event_type``."""
 
         return self._event_bus.state_store.get_latest(event_type, producer_id)

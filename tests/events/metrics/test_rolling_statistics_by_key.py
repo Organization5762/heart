@@ -1,6 +1,5 @@
 """Tests for rolling statistics helpers grouped by key."""
 
-from __future__ import annotations
 
 import math
 

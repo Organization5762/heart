@@ -1,6 +1,5 @@
 """Force sensor peripheral emitting normalized measurement events."""
 
-from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal, Mapping, cast

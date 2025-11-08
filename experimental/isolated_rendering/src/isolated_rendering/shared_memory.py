@@ -19,7 +19,6 @@ be replaced with event based notifications in the future if we need to scale
 the design beyond an experiment.
 """
 
-from __future__ import annotations
 
 import mmap
 import os
@@ -227,10 +226,3 @@ class SharedMemoryWatcher:
             image = Image.frombytes(self._frame_buffer.mode, self._frame_buffer.size, payload)
             self._frame_buffer.update_image(image)
             self._last_version = version
-
-
-__all__ = [
-    "SharedMemoryError",
-    "SharedMemoryFrameWriter",
-    "SharedMemoryWatcher",
-]

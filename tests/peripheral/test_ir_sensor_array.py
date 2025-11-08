@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import numpy as np
 
@@ -102,4 +101,3 @@ def test_sensor_array_emits_frame_event():
     assert event["confidence"] > 0.95
     assert event["rmse"] < 1e-10
     assert event["bits"] == [0, 1, 0, 1]
-

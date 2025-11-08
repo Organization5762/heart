@@ -1,6 +1,5 @@
 """Tests for :mod:`heart.utilities.env`."""
 
-from __future__ import annotations
 
 from collections.abc import Iterator
 from types import SimpleNamespace
@@ -137,4 +136,3 @@ def test_get_device_ports_fallback_to_serial(monkeypatch: pytest.MonkeyPatch) ->
     ports = list(get_device_ports("heart"))
 
     assert ports == ["/dev/cu.usbserial-0001"]
-

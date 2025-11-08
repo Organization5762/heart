@@ -11,7 +11,6 @@ The utilities live under :mod:`tests` so that engineers can quickly iterate on
 triangulation heuristics without impacting the production firmware images.
 """
 
-from __future__ import annotations
 
 import math
 from dataclasses import dataclass

@@ -1,6 +1,5 @@
 """Frame accumulation utilities for renderer batching and tracing."""
 
-from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass

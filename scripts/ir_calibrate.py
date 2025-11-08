@@ -1,6 +1,5 @@
 """CLI utilities for calibrating the IR sensor array peripheral."""
 
-from __future__ import annotations
 
 import json
 from dataclasses import dataclass
@@ -183,4 +182,3 @@ def calibrate(
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     app()
-

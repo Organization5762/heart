@@ -13,7 +13,6 @@ setting ``units="inches"``.  A stylus event writes pressure values into the
 underlying grid, while an erase event clears a circular region.
 """
 
-from __future__ import annotations
 
 import threading
 import time
@@ -22,8 +21,6 @@ from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Self
 
 from heart.peripheral.core import Input, Peripheral
-
-__all__ = ["DrawingPad", "StylusSample"]
 
 
 @dataclass(slots=True)

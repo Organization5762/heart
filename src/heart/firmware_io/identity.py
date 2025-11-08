@@ -1,6 +1,5 @@
 """Helpers for responding to identity queries over the serial bus."""
 
-from __future__ import annotations
 
 import json
 import os

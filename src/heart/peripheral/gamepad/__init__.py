@@ -1,3 +1,8 @@
-from .gamepad import Gamepad, GamepadIdentifier
+"""Gamepad peripheral abstractions."""
 
-__all__ = ["Gamepad", "GamepadIdentifier"]
+from . import gamepad as _gamepad
+
+Gamepad = _gamepad.Gamepad
+GamepadIdentifier = _gamepad.GamepadIdentifier
+
+del _gamepad

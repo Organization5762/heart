@@ -1,12 +1,12 @@
 """Simulation utilities for the IR sensor array peripheral."""
 
-from .ir_sensor_array_simulation import (IRArrayScenario, SimulationResult,
-                                         run_scenarios,
-                                         simulate_activation_geometry)
+from . import ir_sensor_array_simulation as _ir_sensor_array_simulation
 
-__all__ = [
-    "IRArrayScenario",
-    "SimulationResult",
-    "simulate_activation_geometry",
-    "run_scenarios",
-]
+IRArrayScenario = _ir_sensor_array_simulation.IRArrayScenario
+SimulationResult = _ir_sensor_array_simulation.SimulationResult
+run_scenarios = _ir_sensor_array_simulation.run_scenarios
+simulate_activation_geometry = (
+    _ir_sensor_array_simulation.simulate_activation_geometry
+)
+
+del _ir_sensor_array_simulation

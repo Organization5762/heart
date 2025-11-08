@@ -1,6 +1,5 @@
 """Utilities for recording :class:`~heart.environment.GameLoop` output."""
 
-from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -83,6 +82,3 @@ class ScreenRecorder:
             loop=0,
         )
         return path
-
-
-__all__ = ["ScreenRecorder"]

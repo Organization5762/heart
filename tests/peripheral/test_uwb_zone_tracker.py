@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from collections import deque
 
@@ -108,4 +107,3 @@ def test_falls_back_to_producer_id_when_tag_missing(event_bus: EventBus) -> None
     entry = entries[0]
     assert entry.data["tag_id"] == "99"
     assert tracker.get_active_zones("99") == ("office",)
-

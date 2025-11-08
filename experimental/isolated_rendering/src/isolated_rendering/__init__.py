@@ -1,5 +1,8 @@
 """Isolated rendering service for the heart LED matrix."""
 
-from .client import MatrixClient, send_image
+from . import client as _client
 
-__all__ = ["MatrixClient", "send_image"]
+MatrixClient = _client.MatrixClient
+send_image = _client.send_image
+
+del _client

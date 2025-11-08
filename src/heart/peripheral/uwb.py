@@ -7,7 +7,6 @@ classes in this module implement that adapter on top of the existing
 ``EventBus`` infrastructure.
 """
 
-from __future__ import annotations
 
 import math
 from dataclasses import dataclass
@@ -260,7 +259,4 @@ class UwbZoneTracker:
                 producer_id=observation.producer_id,
             )
         )
-
-
-__all__ = ["UwbZoneDefinition", "UwbZoneTracker"]
 

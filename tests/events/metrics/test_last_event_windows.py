@@ -1,6 +1,5 @@
 """Tests for high-level event window helpers."""
 
-from __future__ import annotations
 
 from heart.events.metrics import (LastEventsWithinTimeWindow, LastNEvents,
                                   LastNEventsWithinTimeWindow)

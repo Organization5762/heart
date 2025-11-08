@@ -1,5 +1,7 @@
 """Service layer for sidecar processes and integrations."""
 
-from .mqtt_sidecar import PeripheralMQTTService
+from . import mqtt_sidecar as _mqtt_sidecar
 
-__all__ = ["PeripheralMQTTService"]
+PeripheralMQTTService = _mqtt_sidecar.PeripheralMQTTService
+
+del _mqtt_sidecar
