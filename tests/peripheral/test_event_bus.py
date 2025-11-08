@@ -11,6 +11,7 @@ from heart.peripheral.core.event_bus import (EventBus, EventPlaylist,
                                              SequenceMatcher,
                                              double_tap_virtual_peripheral,
                                              gated_mirror_virtual_peripheral,
+                                             gated_playlist_virtual_peripheral,
                                              sequence_virtual_peripheral,
                                              simultaneous_virtual_peripheral)
 
@@ -193,6 +194,128 @@ def test_playlist_trigger_interrupted_by_event() -> None:
     assert emitted_events
     assert len(emitted_events) < 10
 
+
+def test_gated_playlist_virtual_peripheral_runs_playlist() -> None:
+    bus = EventBus()
+    outputs: list[int] = []
+    created_payloads: list[Mapping[str, Any]] = []
+    stop_payloads: list[Mapping[str, Any]] = []
+
+    created_ready = threading.Event()
+    stopped_ready = threading.Event()
+
+    bus.subscribe(
+        "color.update",
+        lambda event: outputs.append(event.data["value"]),
+    )
+    bus.subscribe(
+        EventPlaylistManager.EVENT_CREATED,
+        lambda event: (created_payloads.append(event.data), created_ready.set()),
+    )
+    bus.subscribe(
+        EventPlaylistManager.EVENT_STOPPED,
+        lambda event: (stop_payloads.append(event.data), stopped_ready.set()),
+    )
+
+    playlist = EventPlaylist(
+        name="flash",
+        steps=[
+            PlaylistStep(
+                event_type="color.update",
+                data={"value": 1},
+                offset=0.0,
+                repeat=2,
+                interval=0.01,
+                producer_id=7,
+            )
+        ],
+        metadata={"mode": "flash"},
+    )
+
+    definition = gated_playlist_virtual_peripheral(
+        ("button.press",),
+        playlist=playlist,
+        name="button.flash",
+    )
+    bus.virtual_peripherals.register(definition)
+
+    bus.emit("button.press", data={"intensity": 3}, producer_id=2)
+
+    assert created_ready.wait(timeout=1.0)
+    run_id = created_payloads[0]["playlist_id"]
+    assert bus.playlists.join(run_id, timeout=1.0)
+    assert stopped_ready.wait(timeout=1.0)
+
+    assert outputs == [1, 1]
+    assert created_payloads[0]["trigger_event"]["data"] == {"intensity": 3}
+    assert stop_payloads[0]["reason"] == "completed"
+
+
+def test_gated_playlist_virtual_peripheral_cancels_previous_runs() -> None:
+    bus = EventBus()
+    created_payloads: list[Mapping[str, Any]] = []
+    stop_payloads: list[Mapping[str, Any]] = []
+
+    first_created = threading.Event()
+    second_created = threading.Event()
+    first_stopped = threading.Event()
+    second_stopped = threading.Event()
+
+    def handle_created(event: Input) -> None:
+        created_payloads.append(event.data)
+        if len(created_payloads) == 1:
+            first_created.set()
+        elif len(created_payloads) == 2:
+            second_created.set()
+
+    def handle_stopped(event: Input) -> None:
+        stop_payloads.append(event.data)
+        if len(stop_payloads) == 1:
+            first_stopped.set()
+        elif len(stop_payloads) == 2:
+            second_stopped.set()
+
+    bus.subscribe(EventPlaylistManager.EVENT_CREATED, handle_created)
+    bus.subscribe(EventPlaylistManager.EVENT_STOPPED, handle_stopped)
+
+    playlist = EventPlaylist(
+        name="long",
+        steps=[
+            PlaylistStep(
+                event_type="color.update",
+                data={"value": 9},
+                offset=0.0,
+                repeat=5,
+                interval=0.05,
+            )
+        ],
+    )
+
+    definition = gated_playlist_virtual_peripheral(
+        ("button.press",),
+        playlist=playlist,
+        cancel_active_runs=True,
+    )
+    bus.virtual_peripherals.register(definition)
+
+    bus.emit("button.press", data={"sequence": 1})
+    assert first_created.wait(timeout=1.0)
+    assert created_payloads[0]["trigger_event"]["data"] == {"sequence": 1}
+
+    bus.emit("button.press", data={"sequence": 2})
+    assert second_created.wait(timeout=1.0)
+    assert created_payloads[1]["trigger_event"]["data"] == {"sequence": 2}
+
+    first_run = created_payloads[0]["playlist_id"]
+    second_run = created_payloads[1]["playlist_id"]
+
+    assert first_stopped.wait(timeout=1.0)
+    assert stop_payloads[0]["reason"] == "cancelled"
+    assert bus.playlists.join(first_run, timeout=1.0)
+
+    assert second_stopped.wait(timeout=1.0)
+    assert stop_payloads[1]["reason"] == "completed"
+    assert bus.playlists.join(second_run, timeout=1.0)
 
 @pytest.mark.parametrize(
     "data_factory, mutator",

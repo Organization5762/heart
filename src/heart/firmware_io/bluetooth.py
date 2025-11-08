@@ -1,46 +1,33 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 
 if importlib.util.find_spec("adafruit_ble") is not None:
     from adafruit_ble import BLERadio
     from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
     from adafruit_ble.services.nordic import UARTService
-else:  # pragma: no cover - exercised in environments without BLE dependencies
-    class BLERadio:  # type: ignore[override]
-        advertising = False
-        connected = False
+else:
+    BLERadio = None  # type: ignore[assignment]
+    ProvideServicesAdvertisement = None  # type: ignore[assignment]
+    UARTService = None  # type: ignore[assignment]
 
-        def start_advertising(self, *_args, **_kwargs) -> None:  # noqa: D401 - simple stub
-            """Signal that BLE support is unavailable."""
 
-            msg = "adafruit_ble is required for Bluetooth LE support"
-            raise ModuleNotFoundError(msg)
-
-    class UARTService:  # type: ignore[override]
-        def write(self, *_args, **_kwargs) -> None:  # noqa: D401 - simple stub
-            """Signal that BLE support is unavailable."""
-
-            msg = "adafruit_ble is required for Bluetooth LE support"
-            raise ModuleNotFoundError(msg)
-
-    class ProvideServicesAdvertisement:  # type: ignore[override]
-        def __init__(self, *_args, **_kwargs) -> None:  # noqa: D401 - simple stub
-            """Signal that BLE support is unavailable."""
-
-            msg = "adafruit_ble is required for Bluetooth LE support"
-            raise ModuleNotFoundError(msg)
-
-try:
+if BLERadio is not None and UARTService is not None and ProvideServicesAdvertisement is not None:
     ble = BLERadio()
     uart = UARTService()
     advertisement = ProvideServicesAdvertisement(uart)
-except ModuleNotFoundError:
-    # ``tests/firmware_io/test_bluetooth.py`` monkeypatches these objects, so we
-    # can safely provide inert placeholders when the dependency is missing.
-    ble = BLERadio()
-    uart = UARTService()
-    advertisement = object()
+else:
+    ble = None
+    uart = None
+    advertisement = None
+
+
+def _require_ble_dependencies() -> None:
+    if ble is None or uart is None:
+        raise ModuleNotFoundError(
+            "adafruit_ble is required to use heart.firmware_io.bluetooth. "
+            "Install the CircuitPython BLE libraries to enable Bluetooth communication."
+        )
 
 END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
@@ -48,7 +35,14 @@ ENCODING = "utf-8"
 
 # TODO: AAddDd a bulk write command
 def send(messages: list[str]):
+    _require_ble_dependencies()
+
     if not ble.advertising:
+        if advertisement is None:
+            raise ModuleNotFoundError(
+                "ProvideServicesAdvertisement is unavailable. "
+                "Install the adafruit_ble package to advertise over BLE."
+            )
         ble.start_advertising(advertisement)
 
     if ble.connected:
