@@ -2,7 +2,7 @@ import collections
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Iterator, Mapping, NoReturn, Self
+from typing import Any, Iterator, Mapping, NoReturn, Self, cast
 
 import serial
 

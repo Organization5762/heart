@@ -17,6 +17,19 @@ from heart.peripheral.core import Input
 from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
 from heart.utilities.logging import get_logger
 
+
+def _to_float(value: object, *, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError as exc:  # pragma: no cover - defensive guard
+            raise ValueError("Vector components must be numeric") from exc
+    raise TypeError("Vector components must be numeric")
+
 logger = get_logger(__name__)
 
 
@@ -34,13 +47,9 @@ def _normalize_vector(value: Sequence[float]) -> Vector3:
 
 def _mapping_to_vector(mapping: Mapping[str, object]) -> Vector3:
     try:
-        x = float(mapping.get("x", 0.0))
-        y = float(mapping.get("y", 0.0))
-        z_raw = mapping.get("z")
-        if z_raw is None:
-            z = 0.0
-        else:
-            z = float(z_raw)
+        x = _to_float(mapping.get("x", 0.0))
+        y = _to_float(mapping.get("y", 0.0))
+        z = _to_float(mapping.get("z"), default=0.0)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive guard
         raise ValueError("Position components must be numeric") from exc
     return (x, y, z)

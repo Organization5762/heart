@@ -37,7 +37,6 @@ class LEDMatrixDisplay(Peripheral):
 
         self._width = width
         self._height = height
-        self._event_bus = event_bus
         self._producer_id = producer_id if producer_id is not None else id(self)
         self._frame_lock = threading.Lock()
         self._latest_frame: DisplayFrame | None = None
@@ -45,6 +44,8 @@ class LEDMatrixDisplay(Peripheral):
         self._stop = threading.Event()
 
         super().__init__()
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     @property
     def width(self) -> int:
@@ -62,7 +63,7 @@ class LEDMatrixDisplay(Peripheral):
             return self._latest_frame
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     def publish_image(
         self,
@@ -87,10 +88,10 @@ class LEDMatrixDisplay(Peripheral):
             self._sequence += 1
             self._latest_frame = frame
 
-        event_bus = self._event_bus
-        if event_bus is not None:
+        bus = self.event_bus
+        if bus is not None:
             try:
-                event_bus.emit(
+                self.emit_input(
                     frame.to_input(
                         producer_id=self._producer_id,
                         timestamp=timestamp,

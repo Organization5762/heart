@@ -17,11 +17,12 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
-sd: Any | None
+sd: Any | None = None
 try:  # pragma: no cover - import guarded for optional dependency
-    import sounddevice as sd
+    import sounddevice as _sounddevice
 except Exception:  # pragma: no cover - module may be missing on CI
-    sd = None
+    _sounddevice = None
+sd = cast(Any | None, _sounddevice)
 
 
 class Microphone(Peripheral):

@@ -693,11 +693,11 @@ class GameLoop:
         if len(renderers) > 0:
             pygame.display.flip()
             # Convert screen to PIL Image
-            image = pygame.surfarray.array3d(self.screen)
-            image = np.transpose(image, (1, 0, 2))
-            image = Image.fromarray(image)
-            self.device.set_image(image)
-            self._display_peripheral.publish_image(image)
+            frame_array = pygame.surfarray.array3d(self.screen)
+            frame_array = np.transpose(frame_array, (1, 0, 2))
+            frame_image = Image.fromarray(frame_array)
+            self.device.set_image(frame_image)
+            self._display_peripheral.publish_image(frame_image)
 
     def _handle_events(self) -> None:
         try:

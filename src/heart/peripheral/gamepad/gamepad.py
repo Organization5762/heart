@@ -3,7 +3,7 @@ import subprocess
 import time
 from collections import defaultdict
 from enum import Enum
-from typing import Iterator, NoReturn, Self
+from typing import Iterator, NoReturn, Self, cast
 
 import pygame.joystick
 from pygame.event import Event
@@ -154,7 +154,7 @@ class Gamepad(Peripheral):
         self._axis_prev_frame = self._axis_curr_frame.copy()
         self._dpad_last_frame = self._dpad_curr_frame
 
-        self._dpad_curr_frame = self.joystick.get_hat(0)
+        self._dpad_curr_frame = cast(tuple[int, int], self.joystick.get_hat(0))
         self._emit_dpad_if_changed()
         for button_id in range(self.num_buttons):
             pressed = bool(self.joystick.get_button(button_id))
