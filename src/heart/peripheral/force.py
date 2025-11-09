@@ -29,8 +29,8 @@ class ForcePeripheral(Peripheral):
         event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
-        super().__init__()
         self._producer_id = producer_id if producer_id is not None else id(self)
+        super().__init__()
         if event_bus is not None:
             self.attach_event_bus(event_bus)
 

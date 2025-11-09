@@ -1,6 +1,6 @@
 """Typed helpers for composing input events and sensor metrics."""
 
-from .metrics import (CountByKey, EventSample, EventWindow,
+from .metrics import (CountByKey, EventSample, EventWindow, KeyedMetric,
                       LastEventsWithinTimeWindow, LastNEvents,
                       LastNEventsWithinTimeWindow, MaxAgePolicy,
                       MaxLengthPolicy, RollingAverageByKey, RollingMeanByKey,
@@ -18,6 +18,7 @@ __all__ = [
     "HeartRateLifecycle",
     "HeartRateMeasurement",
     "InputEventPayload",
+    "KeyedMetric",
     "LastEventsWithinTimeWindow",
     "LastNEvents",
     "LastNEventsWithinTimeWindow",

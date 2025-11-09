@@ -682,22 +682,22 @@ class GameLoop:
         result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
             renderers
         )
-        image = self.__finalize_rendering(result) if result else None
-        if image is not None:
-            pixel_bytes = image.tobytes()
+        render_image = self.__finalize_rendering(result) if result else None
+        if render_image is not None:
+            pixel_bytes = render_image.tobytes()
             surface = pygame.image.frombytes(
-                pixel_bytes, image.size, RGBA_IMAGE_FORMAT
+                pixel_bytes, render_image.size, RGBA_IMAGE_FORMAT
             )
             self.screen.blit(surface, (0, 0))
 
         if len(renderers) > 0:
             pygame.display.flip()
             # Convert screen to PIL Image
-            frame_array = pygame.surfarray.array3d(self.screen)
-            frame_array = np.transpose(frame_array, (1, 0, 2))
-            frame_image = Image.fromarray(frame_array)
-            self.device.set_image(frame_image)
-            self._display_peripheral.publish_image(frame_image)
+            screen_array = pygame.surfarray.array3d(self.screen)
+            transposed_array = np.transpose(screen_array, (1, 0, 2))
+            pil_image = Image.fromarray(transposed_array)
+            self.device.set_image(pil_image)
+            self._display_peripheral.publish_image(pil_image)
 
     def _handle_events(self) -> None:
         try:

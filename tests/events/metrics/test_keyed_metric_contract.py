@@ -1,0 +1,53 @@
+"""Regression coverage for the :class:`KeyedMetric` scaffolding."""
+
+from __future__ import annotations
+
+import pytest
+
+from heart.events.metrics import CountByKey, KeyedMetric, RollingAverageByKey
+
+
+def test_count_by_key_obeys_keyed_metric_contract() -> None:
+    metric: KeyedMetric[str, int] = CountByKey[str]()
+
+    assert isinstance(metric, KeyedMetric)
+
+    metric.observe("imu", amount=2)
+    metric.observe("imu", amount=3)
+
+    assert metric.get("imu") == 5
+
+    snapshot = metric.snapshot()
+    snapshot["imu"] = 0
+
+    assert metric.get("imu") == 5
+
+    metric.reset("imu")
+    assert metric.get("imu") == 0
+
+    metric.observe("imu", amount=7)
+    metric.reset()
+
+    assert metric.get("imu") == 0
+
+
+def test_rolling_average_keyed_metric_example() -> None:
+    metric: KeyedMetric[str, float | None] = RollingAverageByKey[str](maxlen=2)
+
+    metric.observe("imu", 5.0, timestamp=0.0)
+    metric.observe("imu", 7.0, timestamp=1.0)
+
+    assert metric.get("imu") == pytest.approx(6.0)
+
+    snapshot = metric.snapshot()
+    snapshot["imu"] = None
+
+    assert metric.get("imu") == pytest.approx(6.0)
+
+    metric.reset("imu")
+    assert metric.get("imu") is None
+
+    metric.observe("imu", 9.0, timestamp=2.0)
+    metric.reset()
+
+    assert metric.get("imu") is None
