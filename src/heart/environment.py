@@ -7,7 +7,7 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import numpy as np
 import pygame
@@ -47,7 +47,9 @@ CV2_MODULE = _load_cv2_module()
 
 HUE_SCALE = (6.0 / 179.0) - 6e-05
 CACHE_MAX_SIZE = 4096
-HSV_TO_BGR_CACHE: "OrderedDict[tuple[int, int, int], np.ndarray]" = OrderedDict()
+HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
+
+RenderMethod = Callable[[list["BaseRenderer"]], pygame.Surface | None]
 
 
 def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
@@ -168,7 +170,7 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
     flat_hsv = hsv.reshape(-1, 3)
     flat_bgr = image.reshape(-1, 3)
     for hsv_value, bgr_value in zip(flat_hsv, flat_bgr):
-        key = tuple(int(x) for x in hsv_value)
+        key = cast(tuple[int, int, int], tuple(int(x) for x in hsv_value))
         if hsv_value[1] == 255 and hsv_value[2] == 255 and hsv_value[0] in (60, 119):
             continue
         if key in HSV_TO_BGR_CACHE:
@@ -234,7 +236,7 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
             result[i, j] = best
 
     for idx in np.ndindex(image.shape[:-1]):
-        key = tuple(int(x) for x in image[idx])
+        key = cast(tuple[int, int, int], tuple(int(x) for x in image[idx]))
         cached = HSV_TO_BGR_CACHE.get(key)
         if cached is not None:
             result[idx] = cached
@@ -249,7 +251,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
-RGBA_IMAGE_FORMAT = "RGBA"
+RGBA_IMAGE_FORMAT: Literal["RGBA"] = "RGBA"
 
 
 class RendererVariant(enum.Enum):
@@ -278,13 +280,13 @@ class GameLoop:
         self.clock: pygame.time.Clock | None = None
         self.screen: pygame.Surface | None = None
         self.renderer_variant = render_variant
-        binary_method = self._render_surfaces_binary
-        iterative_method = self._render_surface_iterative
-        self._render_surfaces_binary = binary_method
-        self._render_surface_iterative = iterative_method
-        self._render_dispatch: dict[RendererVariant, callable] = {
-            RendererVariant.BINARY: self._render_surfaces_binary,
-            RendererVariant.ITERATIVE: self._render_surface_iterative,
+        binary_method = cast(RenderMethod, self._render_surfaces_binary)
+        iterative_method = cast(RenderMethod, self._render_surface_iterative)
+        object.__setattr__(self, "_render_surfaces_binary", binary_method)
+        object.__setattr__(self, "_render_surface_iterative", iterative_method)
+        self._render_dispatch: dict[RendererVariant, RenderMethod] = {
+            RendererVariant.BINARY: binary_method,
+            RendererVariant.ITERATIVE: iterative_method,
         }
 
         self._render_queue_depth = 0
@@ -307,7 +309,7 @@ class GameLoop:
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
-        self.tmp_float: float | None = None
+        self.tmp_float: np.ndarray | None = None
         self.edge_thresh = 1
 
         manager_bus = self.peripheral_manager.event_bus
@@ -508,7 +510,7 @@ class GameLoop:
             return None
 
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
-        image = pygame.surfarray.pixels3d(screen)
+        image_array = pygame.surfarray.pixels3d(screen)
 
         # HACKKK
         bluetooth_switch = self.peripheral_manager.bluetooth_switch()
@@ -526,32 +528,34 @@ class GameLoop:
                     )  # allow full desat → heavy oversat
 
                     # ---------- saturation tweak (RGB → lerp with luminance) -------------
-                    img = image.astype(np.float32)
+                    img = image_array.astype(np.float32)
 
                     # perceptual luma used by Rec. 601
                     lum = (
-                        0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2]
+                        0.299 * img[..., 0]
+                        + 0.587 * img[..., 1]
+                        + 0.114 * img[..., 2]
                     )[..., None]  # shape (H, W, 1)
 
                     # interpolate: lum + factor × (color – lum)
                     img_sat = lum + factor * (img - lum)
 
-                    image[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
+                    image_array[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
 
             ###
             # Button Two
             ###
             if self.tmp_float is None:
-                self.tmp_float = np.empty_like(image, dtype=np.float32)
+                self.tmp_float = np.empty_like(image_array, dtype=np.float32)
             if (hue_switch := bluetooth_switch.switch_two()) is not None:
                 delta = hue_switch.get_rotation_since_last_long_button_press()
                 if delta:
                     # 0.03 ~= ~11° per detent; tune to taste
                     hue_delta = (delta * 0.03) % 1.0
                     # Convert to HSV, roll H channel, convert back
-                    hsv = _convert_bgr_to_hsv(image).astype(np.float32)
+                    hsv = _convert_bgr_to_hsv(image_array).astype(np.float32)
                     hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
-                    image[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
+                    image_array[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
 
             ###
             # Button Three
@@ -565,9 +569,9 @@ class GameLoop:
 
                     # --- fast edge magnitude (same math as before) -----------------------------
                     lum = (
-                        0.299 * image[..., 0]  # perceptual luminance
-                        + 0.587 * image[..., 1]
-                        + 0.114 * image[..., 2]
+                        0.299 * image_array[..., 0]  # perceptual luminance
+                        + 0.587 * image_array[..., 1]
+                        + 0.114 * image_array[..., 2]
                     ).astype(np.int16)
 
                     gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))
@@ -587,18 +591,17 @@ class GameLoop:
                     alpha = alpha[..., None]  # shape => (H,W,1) for RGB broadcasting
 
                     # --- composite: dim base layer, add white edges ----------------------------
-                    base = image.astype(np.float32) * 0.75  # 25 % darker background
+                    base = image_array.astype(np.float32) * 0.75  # 25 % darker background
                     edges = alpha * 255.0  # white strokes
                     out = np.clip(base + edges, 0, 255)
 
-                    image[:] = out.astype(np.uint8)
+                    image_array[:] = out.astype(np.uint8)
 
         # TODO: This operation will be slow.
         alpha = pygame.surfarray.pixels_alpha(screen)
-        image = np.dstack((image, alpha))
-        image = np.transpose(image, (1, 0, 2))
-        image = Image.fromarray(image, RGBA_IMAGE_FORMAT)
-        return image
+        rgba = np.dstack((image_array, alpha))
+        rgba = np.transpose(rgba, (1, 0, 2))
+        return Image.fromarray(rgba, RGBA_IMAGE_FORMAT)
 
     def merge_surfaces(
         self, surface1: pygame.Surface, surface2: pygame.Surface
@@ -660,9 +663,13 @@ class GameLoop:
         else:
             return None
 
-    def _render_fn(self, override_renderer_variant: RendererVariant | None):
+    def _render_fn(
+        self, override_renderer_variant: RendererVariant | None
+    ) -> RenderMethod:
         variant = override_renderer_variant or self.renderer_variant
-        return self._render_dispatch.get(variant, self._render_dispatch[RendererVariant.ITERATIVE])
+        return self._render_dispatch.get(
+            variant, self._render_dispatch[RendererVariant.ITERATIVE]
+        )
 
     def _one_loop(
         self,
@@ -677,8 +684,10 @@ class GameLoop:
         )
         image = self.__finalize_rendering(result) if result else None
         if image is not None:
-            bytes = image.tobytes()
-            surface = pygame.image.frombytes(bytes, image.size, image.mode)
+            pixel_bytes = image.tobytes()
+            surface = pygame.image.frombytes(
+                pixel_bytes, image.size, RGBA_IMAGE_FORMAT
+            )
             self.screen.blit(surface, (0, 0))
 
         if len(renderers) > 0:
@@ -758,8 +767,11 @@ class GameLoop:
     def _initialize_peripherals(self) -> None:
         logger.info("Attempting to detect attached peripherals")
         self.peripheral_manager.detect()
+        peripherals = self.peripheral_manager.peripherals
         logger.info(
-            f"Detected attached peripherals - found {len(self.peripheral_manager.peripheral)}. {self.peripheral_manager.peripheral=}"
+            "Detected attached peripherals - found %d. peripherals=%s",
+            len(peripherals),
+            peripherals,
         )
         logger.info("Starting all peripherals")
         self.peripheral_manager.start()

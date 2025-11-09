@@ -258,18 +258,20 @@ class IRSensorArray(Peripheral):
         event_bus: EventBus | None = None,
         propagation_speed: float = SPEED_OF_LIGHT,
     ) -> None:
+        super().__init__()
         self._assembler = FrameAssembler(sensor_count=len(sensor_positions))
         self._solver = MultilaterationSolver(
             sensor_positions, propagation_speed=propagation_speed
         )
         self._calibration_offsets: dict[int, float] = {}
-        self._event_bus = event_bus
         self._producer_id = id(self)
-        super().__init__()
+
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     def apply_calibration(self, offsets: Mapping[int, float]) -> None:
         self._calibration_offsets = dict(offsets)
@@ -312,12 +314,11 @@ class IRSensorArray(Peripheral):
             "timestamp": generated_at.isoformat(),
         }
 
-        if self._event_bus is not None:
-            self._event_bus.emit(
-                self.EVENT_FRAME,
-                data=payload,
-                producer_id=self._producer_id,
-            )
+        self.emit_event(
+            self.EVENT_FRAME,
+            data=payload,
+            producer_id=self._producer_id,
+        )
 
         self.handle_input(
             Input(

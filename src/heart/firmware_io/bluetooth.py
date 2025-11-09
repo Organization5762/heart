@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import importlib
+from typing import Any
 
-if importlib.util.find_spec("adafruit_ble") is not None:
-    from adafruit_ble import BLERadio
-    from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
-    from adafruit_ble.services.nordic import UARTService
+BLERadio: type[Any] | None = None
+ProvideServicesAdvertisement: type[Any] | None = None
+UARTService: type[Any] | None = None
+
+try:
+    ble_module = importlib.import_module("adafruit_ble")
+    advertising_module = importlib.import_module("adafruit_ble.advertising.standard")
+    services_module = importlib.import_module("adafruit_ble.services.nordic")
+except ImportError:
+    pass
 else:
-    BLERadio = None  # type: ignore[assignment]
-    ProvideServicesAdvertisement = None  # type: ignore[assignment]
-    UARTService = None  # type: ignore[assignment]
+    BLERadio = getattr(ble_module, "BLERadio", None)
+    ProvideServicesAdvertisement = getattr(advertising_module, "ProvideServicesAdvertisement", None)
+    UARTService = getattr(services_module, "UARTService", None)
 
 
 if BLERadio is not None and UARTService is not None and ProvideServicesAdvertisement is not None:

@@ -2,6 +2,7 @@ import itertools
 import threading
 from typing import Iterable, Iterator
 
+from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.drawing_pad import DrawingPad
@@ -118,7 +119,7 @@ class PeripheralManager:
         yield from itertools.chain(PhoneText.detect())
 
     def _detect_sensors(self) -> Iterator[Peripheral]:
-        yield from itertools.chain(Accelerometer.detect())
+        yield from itertools.chain(Accelerometer.detect(), Compass.detect())
 
     def _detect_gamepads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(Gamepad.detect())

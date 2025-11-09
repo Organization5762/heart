@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import (TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping,
@@ -43,10 +43,14 @@ class SwitchButton(InputEventPayload):
     long_press: bool = False
     EVENT_TYPE_PRESS: ClassVar[str] = BUTTON_PRESS
     EVENT_TYPE_LONG_PRESS: ClassVar[str] = BUTTON_LONG_PRESS
+    event_type: str = field(init=False)
 
-    @property
-    def event_type(self) -> str:  # type: ignore[override]
-        return self.EVENT_TYPE_LONG_PRESS if self.long_press else self.EVENT_TYPE_PRESS
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "event_type",
+            self.EVENT_TYPE_LONG_PRESS if self.long_press else self.EVENT_TYPE_PRESS,
+        )
 
     def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
         return Input(
@@ -180,6 +184,62 @@ class AccelerometerVector(InputEventPayload):
 
 
 @dataclass(frozen=True, slots=True)
+class MagnetometerVector(InputEventPayload):
+    """Three-axis magnetic field sample from the sensor bus."""
+
+    x: float
+    y: float
+    z: float
+
+    EVENT_TYPE: ClassVar[str] = "peripheral.magnetometer.vector"
+    event_type: str = EVENT_TYPE
+
+    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+        return Input(
+            event_type=self.event_type,
+            data={"x": float(self.x), "y": float(self.y), "z": float(self.z)},
+            producer_id=producer_id,
+            timestamp=_normalize_timestamp(timestamp),
+        )
+class ForceMeasurement(InputEventPayload):
+    """Normalized payload describing a tensile or magnetic force reading."""
+
+    magnitude: float
+    force_type: str
+    unit: str = "N"
+
+    VALID_FORCE_TYPES: ClassVar[tuple[str, ...]] = ("tensile", "magnetic")
+    DEFAULT_UNIT: ClassVar[str] = "N"
+    EVENT_TYPE: ClassVar[str] = "peripheral.force.measurement"
+    event_type: str = EVENT_TYPE
+
+    def __post_init__(self) -> None:
+        normalized = self.force_type.lower()
+        if normalized not in self.VALID_FORCE_TYPES:
+            raise ValueError(
+                f"force_type must be one of {self.VALID_FORCE_TYPES}, got '{self.force_type}'"
+            )
+        if not self.unit:
+            raise ValueError("unit must be a non-empty string")
+        object.__setattr__(self, "force_type", normalized)
+
+    def to_input(
+        self, *, producer_id: int = 0, timestamp: datetime | None = None
+    ) -> Input:
+        payload = {
+            "type": self.force_type,
+            "magnitude": float(self.magnitude),
+            "unit": self.unit,
+        }
+        return Input(
+            event_type=self.event_type,
+            data=payload,
+            producer_id=producer_id,
+            timestamp=_normalize_timestamp(timestamp),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class PhoneTextMessage(InputEventPayload):
     """Represents a BLE text payload received by the phone-text peripheral."""
 
@@ -257,6 +317,8 @@ class DisplayFrame(InputEventPayload):
 __all__ = [
     "AccelerometerVector",
     "DisplayFrame",
+    "MagnetometerVector",
+    "ForceMeasurement",
     "HeartRateLifecycle",
     "HeartRateMeasurement",
     "InputEventPayload",

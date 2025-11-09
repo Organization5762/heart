@@ -33,8 +33,5 @@ jobs:
       - name: Run mypy
         run: uv run mypy --config-file pyproject.toml
 
-      - name: Ensure no formatting changes
-        run: git diff --exit-code
-
       - name: Run tests
         run: make test

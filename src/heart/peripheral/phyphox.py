@@ -9,6 +9,7 @@ from heart.peripheral.sensor import Acceleration
 
 class Phyphox(Peripheral):
     def __init__(self, url: str) -> None:
+        super().__init__()
         self.url = url
         self.acc_x: float | None = None
         self.acc_y: float | None = None
