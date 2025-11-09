@@ -24,14 +24,22 @@ def _normalize_timestamp(timestamp: datetime | None) -> datetime:
     return timestamp
 
 
-@runtime_checkable
-class InputEventPayload(Protocol):
-    """Protocol for payload helpers that can materialise :class:`Input`."""
+if TYPE_CHECKING:
+    @runtime_checkable
+    class InputEventPayload(Protocol):
+        """Protocol for payload helpers that can materialise :class:`Input`."""
 
-    event_type: str
+        event_type: str
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
-        """Render the payload as an :class:`Input` instance."""
+        def to_input(
+            self, *, producer_id: int = 0, timestamp: datetime | None = None
+        ) -> Input:
+            """Render the payload as an :class:`Input` instance."""
+else:
+    class InputEventPayload:
+        """Runtime shim so dataclass payloads remain instantiable."""
+
+        __slots__ = ()
 
 
 @dataclass(frozen=True, slots=True)

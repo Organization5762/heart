@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 from collections import deque
-from typing import Any, Iterator, NoReturn
+from typing import Any, Iterator, NoReturn, cast
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -79,7 +79,7 @@ class UartListener:
             # 2. Is a weird failure case where the Totem / main controller would need to be restarted
             async with self.__get_client(device) as client:
                 # Try to connect if not connected
-                if not await client.is_connected():
+                if not client.is_connected:
                     await client.connect()
 
                 # Otherwise use the notify channel
@@ -101,7 +101,9 @@ class UartListener:
             disconnected_callback=on_disconnect,
         )
         # https://github.com/adafruit/Adafruit_CircuitPython_BLE/blob/main/adafruit_ble/services/nordic.py#L47
-        client._backend._mtu_size = 512
+        backend = cast(Any, client._backend)
+        if hasattr(backend, "_mtu_size"):
+            backend._mtu_size = 512
         return client
 
     def __callback(self, sender: BleakGATTCharacteristic, data: bytearray):

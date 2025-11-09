@@ -10,7 +10,8 @@ from PIL import Image
 
 from heart.events.types import DisplayFrame
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core.
+import EventBus
 from heart.utilities.logging import get_logger
 
 __all__ = ["LEDMatrixDisplay"]
@@ -62,6 +63,9 @@ class LEDMatrixDisplay(Peripheral):
         with self._frame_lock:
             return self._latest_frame
 
+    def attach_event_bus(self, event_bus: EventBus) -> None:
+        super().attach_event_bus(event_bus)
+
     def publish_image(
         self,
         image: Image.Image,
@@ -88,7 +92,7 @@ class LEDMatrixDisplay(Peripheral):
         event_bus = self.event_bus
         if event_bus is not None:
             try:
-                event_bus.emit(
+                self.emit_input(
                     frame.to_input(
                         producer_id=self._producer_id,
                         timestamp=timestamp,

@@ -3,6 +3,7 @@ import platform
 import subprocess
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
+from typing import Literal, cast
 
 import pygame
 from PIL import Image
@@ -107,7 +108,26 @@ class LocalScreen(Device):
 
         self.scaled_screen.blit(
             pygame.image.fromstring(
-                scaled_image.tobytes(), scaled_image.size, scaled_image.mode
+                scaled_image.tobytes(),
+                scaled_image.size,
+                _normalize_surface_mode(scaled_image.mode),
             ),
             (0, 0),
         )
+
+
+_SURFACE_MODES = {
+    "P",
+    "RGB",
+    "RGBX",
+    "RGBA",
+    "ARGB",
+    "BGRA",
+}
+
+
+def _normalize_surface_mode(mode: str) -> Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"]:
+    if mode not in _SURFACE_MODES:
+        raise ValueError(f"Unsupported image mode for pygame surface: {mode}")
+    return cast(Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"], mode)
+

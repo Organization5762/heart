@@ -14,7 +14,6 @@ logger = get_logger(__name__)
 
 ForceKind = Literal["tensile", "magnetic"]
 
-
 class ForcePeripheral(Peripheral):
     """Peripheral that converts force readings into bus events.
 
@@ -72,7 +71,7 @@ class ForcePeripheral(Peripheral):
         event = measurement.to_input(
             producer_id=self._producer_id, timestamp=timestamp
         )
-        self._emit(event)
+        self.emit_input(event)
         return event
 
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
@@ -108,11 +107,3 @@ class ForcePeripheral(Peripheral):
     def handle_input(self, input: Input) -> None:  # pragma: no cover - no-op hook
         return
 
-    def _emit(self, event: Input) -> None:
-        event_bus = self._event_bus
-        if event_bus is None:
-            return
-        try:
-            event_bus.emit(event)
-        except Exception:
-            logger.exception("Failed to emit force measurement event")

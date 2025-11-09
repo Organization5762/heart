@@ -230,7 +230,7 @@ class HeartRateManager(Peripheral):
         self._lifecycle_status[device_id] = status
         detail = None
         if suspected:
-            detail = {"timeout_seconds": DEVICE_TIMEOUT}
+            detail = {"timeout_seconds": float(DEVICE_TIMEOUT)}
         self._emit_lifecycle(device_id, status, detail)
 
     @staticmethod
