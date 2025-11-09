@@ -1,0 +1,1 @@
+"""Peripheral detection configuration modules."""

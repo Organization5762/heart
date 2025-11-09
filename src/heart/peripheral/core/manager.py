@@ -1,10 +1,14 @@
 import itertools
 import threading
+from types import MappingProxyType
 from typing import Iterable, Iterator
 
 from heart.peripheral.compass import Compass
+from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core.event_bus import (EventBus,
+                                             VirtualPeripheralDefinition,
+                                             VirtualPeripheralHandle)
 from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
@@ -13,6 +17,7 @@ from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.radio import RadioPeripheral
+from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
                                      Switch)
@@ -25,13 +30,28 @@ logger = get_logger(__name__)
 class PeripheralManager:
     """Coordinate detection and execution of available peripherals."""
 
-    def __init__(self, *, event_bus: EventBus | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus | None = None,
+        configuration: str | None = None,
+        configuration_registry: PeripheralConfigurationRegistry | None = None,
+    ) -> None:
         self._peripherals: list[Peripheral] = []
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
         self._started = False
         self._event_bus = event_bus
         self._propagate_event_bus = event_bus is not None
+        self._configuration_registry = (
+            configuration_registry or PeripheralConfigurationRegistry()
+        )
+        self._configuration_name = (
+            configuration or Configuration.peripheral_configuration()
+        )
+        self._configuration: PeripheralConfiguration | None = None
+        self._virtual_peripheral_definitions: dict[str, VirtualPeripheralDefinition] = {}
+        self._virtual_peripheral_handles: dict[str, VirtualPeripheralHandle] = {}
 
     @property
     def event_bus(self) -> EventBus | None:
@@ -40,16 +60,31 @@ class PeripheralManager:
     def attach_event_bus(self, event_bus: EventBus, *, propagate: bool = True) -> None:
         """Register ``event_bus`` for peripherals managed by this instance."""
 
+        previous_bus = self._event_bus
+        if (
+            previous_bus is not None
+            and previous_bus is not event_bus
+            and self._virtual_peripheral_handles
+        ):
+            for handle in tuple(self._virtual_peripheral_handles.values()):
+                previous_bus.virtual_peripherals.remove(handle)
+            self._virtual_peripheral_handles.clear()
+
         self._event_bus = event_bus
         self._propagate_event_bus = propagate
         if not propagate:
             return
         for peripheral in self._peripherals:
             self._attach_event_bus(peripheral, event_bus)
+        self._synchronize_virtual_peripherals()
 
     @property
     def peripherals(self) -> tuple[Peripheral, ...]:
         return tuple(self._peripherals)
+
+    @property
+    def virtual_peripheral_definitions(self) -> MappingProxyType[str, VirtualPeripheralDefinition]:
+        return MappingProxyType(dict(self._virtual_peripheral_definitions))
 
     def get_gamepad(self) -> Gamepad:
         """Return the first detected gamepad."""
@@ -62,6 +97,8 @@ class PeripheralManager:
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():
             self._register_peripheral(peripheral)
+        configuration = self._ensure_configuration()
+        self._register_virtual_peripherals(configuration.virtual_peripherals)
 
     def register(self, peripheral: Peripheral) -> None:
         """Manually register ``peripheral`` with the manager."""
@@ -69,16 +106,50 @@ class PeripheralManager:
         self._register_peripheral(peripheral)
 
     def _iter_detected_peripherals(self) -> Iterable[Peripheral]:
-        yield from itertools.chain(
-            self._detect_switches(),
-            self._detect_sensors(),
-            self._detect_gamepads(),
-            self._detect_heart_rate_sensor(),
-            self._detect_phone_text(),
-            self._detect_microphones(),
-            self._detect_drawing_pads(),
-            self._detect_radios(),
-        )
+        configuration = self._ensure_configuration()
+        for detector in configuration.detectors:
+            yield from detector()
+
+    def _ensure_configuration(self) -> PeripheralConfiguration:
+        if self._configuration is None:
+            self._configuration = self._load_configuration(self._configuration_name)
+        return self._configuration
+
+    def _load_configuration(self, name: str) -> PeripheralConfiguration:
+        factory = self._configuration_registry.get(name)
+        if factory is None:
+            raise ValueError(f"Peripheral configuration '{name}' not found")
+        logger.info("Loading peripheral configuration: %s", name)
+        return factory(self)
+
+    def _register_virtual_peripherals(
+        self, definitions: Iterable[VirtualPeripheralDefinition]
+    ) -> None:
+        updated = False
+        for definition in definitions:
+            self._virtual_peripheral_definitions[definition.name] = definition
+            updated = True
+        if not updated:
+            return
+        self._synchronize_virtual_peripherals()
+
+    def _synchronize_virtual_peripherals(self) -> None:
+        if self._event_bus is None or not self._propagate_event_bus:
+            return
+        for definition in self._virtual_peripheral_definitions.values():
+            self._bind_virtual_peripheral(definition)
+
+    def _bind_virtual_peripheral(self, definition: VirtualPeripheralDefinition) -> None:
+        if self._event_bus is None or not self._propagate_event_bus:
+            return
+        handle = self._virtual_peripheral_handles.get(definition.name)
+        if handle is None:
+            handle = self._event_bus.virtual_peripherals.register(definition)
+            self._virtual_peripheral_handles[definition.name] = handle
+            logger.info("Registered virtual peripheral %s", definition.name)
+        else:
+            self._event_bus.virtual_peripherals.update(handle, definition)
+            logger.info("Updated virtual peripheral %s", definition.name)
 
     def start(self) -> None:
         if self._started:
