@@ -1,3 +1,4 @@
-from .gamepad import Gamepad, GamepadIdentifier
+"""Convenience imports for the gamepad peripheral."""
 
-__all__ = ["Gamepad", "GamepadIdentifier"]
+from .gamepad import Gamepad as Gamepad
+from .gamepad import GamepadIdentifier as GamepadIdentifier

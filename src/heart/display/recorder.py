@@ -83,6 +83,3 @@ class ScreenRecorder:
             loop=0,
         )
         return path
-
-
-__all__ = ["ScreenRecorder"]

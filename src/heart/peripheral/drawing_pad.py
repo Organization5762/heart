@@ -23,8 +23,6 @@ from typing import Any, Iterator, Mapping, Self
 
 from heart.peripheral.core import Input, Peripheral
 
-__all__ = ["DrawingPad", "StylusSample"]
-
 
 @dataclass(slots=True)
 class StylusSample:

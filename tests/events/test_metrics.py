@@ -24,5 +24,3 @@ _METRIC_MODULES: Final[tuple[str, ...]] = (
 
 for module_name in _METRIC_MODULES:
     import_module(module_name)
-
-__all__ = ("_METRIC_MODULES",)

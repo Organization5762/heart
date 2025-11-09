@@ -227,10 +227,3 @@ class SharedMemoryWatcher:
             image = Image.frombytes(self._frame_buffer.mode, self._frame_buffer.size, payload)
             self._frame_buffer.update_image(image)
             self._last_version = version
-
-
-__all__ = [
-    "SharedMemoryError",
-    "SharedMemoryFrameWriter",
-    "SharedMemoryWatcher",
-]

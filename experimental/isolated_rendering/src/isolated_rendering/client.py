@@ -1,3 +1,3 @@
-from heart.device.isolated_render import MatrixClient, send_image
+"""Compatibility re-export for isolated rendering helpers."""
 
-__all__ = ["MatrixClient", "send_image"]
+from heart.device.isolated_render import MatrixClient as MatrixClient, send_image as send_image
