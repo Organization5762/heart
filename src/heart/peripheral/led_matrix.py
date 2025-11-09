@@ -10,8 +10,7 @@ from PIL import Image
 
 from heart.events.types import DisplayFrame
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.
-import EventBus
+from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 __all__ = ["LEDMatrixDisplay"]

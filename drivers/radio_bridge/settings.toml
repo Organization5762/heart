@@ -1,0 +1,4 @@
+# https://docs.circuitpython.org/en/stable/docs/environment.html#core-circuitpython-keys
+# Update these values once the target radio receiver board is confirmed.
+VALID_BOARD_IDS=""
+CIRCUIT_PY_DRIVER_LIBS=""
