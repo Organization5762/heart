@@ -12,8 +12,6 @@ from heart.peripheral.core.event_bus import (VirtualPeripheralContext,
                                              VirtualPeripheralDefinition,
                                              _VirtualPeripheral)
 
-__all__ = ["CalibrationProfile", "calibrated_virtual_peripheral"]
-
 LOGGER = logging.getLogger(__name__)
 
 

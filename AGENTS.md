@@ -8,6 +8,8 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 
 Run `make format` before committing changes. This applies Ruff fixes, isort, Black, docformatter, and mdformat to Python sources and documentation. Documentation updates should avoid marketing language, state the technical problem in plain terms, and include a materials list when relevant.
 
+- Avoid declaring module-level `__all__` exports. Prefer explicit imports at call sites instead of curating export lists.
+
 ## Testing
 
 Run `make test` to execute the Pytest suite located in the `tests/` directory. Ensure all tests pass before submitting changes.

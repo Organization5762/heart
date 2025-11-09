@@ -13,9 +13,6 @@ from heart.peripheral.core import Peripheral
 from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
-__all__ = ["LEDMatrixDisplay"]
-
-
 _LOGGER = get_logger(__name__)
 
 

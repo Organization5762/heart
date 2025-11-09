@@ -379,18 +379,3 @@ class DisplayFrame(InputEventPayload):
             producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
-
-
-__all__ = [
-    "AccelerometerVector",
-    "DisplayFrame",
-    "MagnetometerVector",
-    "ForceMeasurement",
-    "HeartRateLifecycle",
-    "HeartRateMeasurement",
-    "InputEventPayload",
-    "MicrophoneLevel",
-    "PhoneTextMessage",
-    "SwitchButton",
-    "SwitchRotation",
-]

@@ -269,7 +269,3 @@ class UwbZoneTracker:
                 producer_id=observation.producer_id,
             )
         )
-
-
-__all__ = ["UwbZoneDefinition", "UwbZoneTracker"]
-
