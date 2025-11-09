@@ -30,15 +30,16 @@ class ForcePeripheral(Peripheral):
         event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
-        self._event_bus = event_bus
         self._producer_id = producer_id if producer_id is not None else id(self)
         super().__init__()
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     def run(self) -> None:
         """No background loop is required for the force peripheral."""
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     def record_force(
         self,
