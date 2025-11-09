@@ -1,15 +1,78 @@
-"""Aggregated sensor metrics and reusable event windows."""
+"""Aggregated sensor metrics and reusable event windows.
+
+The helpers in this module are deliberately small and composable so that new
+metrics can be introduced without duplicating bookkeeping logic.  Most keyed
+metrics in the code base expose a shared interface consisting of four methods:
+
+``observe``
+    Accept a new input sample for a key.  The exact arguments depend on the
+    metric (for example, a count metric records an amount while a rolling
+    average records a numeric value), but every implementation must store the
+    observation without mutating previously returned snapshots.
+
+``get``
+    Return the current aggregated value for a single key.  Implementations may
+    return ``None`` when no value has been observed yet or when the internal
+    window has been pruned.
+
+``snapshot``
+    Produce a defensive mapping of keys to their aggregate value.  The return
+    type should be safe to hand to callers without exposing internal state.
+
+``reset``
+    Clear data for either a specific key or the entire metric when ``key`` is
+    omitted.  Resetting must not raise when the key is unknown.
+
+The :class:`KeyedMetric` abstract base class below captures these conventions so
+that new metrics can inherit ready-made documentation and tooling support.
+"""
 
 from __future__ import annotations
 
 import math
 import time
+from abc import ABC, abstractmethod
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
-from typing import Deque, Dict, Generic, Iterable, Iterator, Mapping, TypeVar
+from typing import (Any, Deque, Dict, Generic, Iterable, Iterator, Mapping,
+                    TypeVar)
 
 T = TypeVar("T")
 K = TypeVar("K")
+ValueT_co = TypeVar("ValueT_co", covariant=True)
+
+
+class KeyedMetric(Generic[K, ValueT_co], ABC):
+    """Interface describing the lifecycle of keyed aggregate metrics.
+
+    Subclasses must implement the four primitive operations documented in the
+    module docstring.  The signatures intentionally accept ``*args`` and
+    ``**kwargs`` so that a wide variety of metrics (counters, averages, rolling
+    statistics, etc.) can share the same base type while exposing
+    metric-specific inputs.
+
+    When overriding ``snapshot`` the returned mapping *must* be detached from
+    any internal mutable state.  Returning ``dict(...)`` or a tuple-backed
+    mapping keeps callers from mutating the metric by accident.  Likewise,
+    ``reset`` implementations should tolerate unknown keys so that callers can
+    treat the method as idempotent.
+    """
+
+    @abstractmethod
+    def observe(self, key: K, *args: Any, **kwargs: Any) -> None:  # pragma: no cover - interface
+        """Record a new observation for ``key``."""
+
+    @abstractmethod
+    def get(self, key: K) -> ValueT_co:  # pragma: no cover - interface
+        """Return the current aggregate for ``key``."""
+
+    @abstractmethod
+    def snapshot(self) -> Mapping[K, ValueT_co]:  # pragma: no cover - interface
+        """Return a point-in-time mapping of all aggregates."""
+
+    @abstractmethod
+    def reset(self, key: K | None = None) -> None:  # pragma: no cover - interface
+        """Clear stored observations for ``key`` or every key when omitted."""
 
 
 @dataclass(slots=True)
@@ -130,7 +193,7 @@ class LastNEventsWithinTimeWindow(EventWindow[T]):
         super().__init__(policies=combined.policies)
 
 
-class CountByKey(Generic[K]):
+class CountByKey(KeyedMetric[K, int]):
     """Count observations grouped by ``key``."""
 
     def __init__(self) -> None:
@@ -145,8 +208,11 @@ class CountByKey(Generic[K]):
     def snapshot(self) -> Mapping[K, int]:
         return dict(self._counts)
 
-    def reset(self) -> None:
-        self._counts.clear()
+    def reset(self, key: K | None = None) -> None:
+        if key is None:
+            self._counts.clear()
+            return
+        self._counts.pop(key, None)
 
 
 @dataclass(slots=True)
@@ -246,7 +312,7 @@ class RollingStatisticsByKey(Generic[K]):
         self._states.pop(key, None)
 
 
-class RollingAverageByKey(Generic[K]):
+class RollingAverageByKey(KeyedMetric[K, float | None]):
     """Rolling mean of float samples grouped by key."""
 
     def __init__(self, *, maxlen: int | None = None, window: float | None = None) -> None:
@@ -269,7 +335,7 @@ class RollingMeanByKey(RollingAverageByKey[K]):
     """Alias for :class:`RollingAverageByKey`."""
 
 
-class RollingStddevByKey(Generic[K]):
+class RollingStddevByKey(KeyedMetric[K, float | None]):
     """Rolling standard deviation of float samples grouped by key."""
 
     def __init__(self, *, maxlen: int | None = None, window: float | None = None) -> None:
@@ -292,6 +358,7 @@ __all__ = [
     "CountByKey",
     "EventSample",
     "EventWindow",
+    "KeyedMetric",
     "LastEventsWithinTimeWindow",
     "LastNEvents",
     "LastNEventsWithinTimeWindow",
