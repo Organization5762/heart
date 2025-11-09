@@ -492,7 +492,16 @@ class GameLoop:
 
             duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
             logger.info(
-                "render.loop",
+                (
+                    "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
+                    "display_mode=%s uses_opengl=%s initialized=%s"
+                ),
+                renderer.name,
+                duration_ms,
+                self._render_queue_depth,
+                renderer.device_display_mode.name,
+                renderer.device_display_mode == DeviceDisplayMode.OPENGL,
+                renderer.is_initialized(),
                 extra={
                     "renderer": renderer.name,
                     "duration_ms": duration_ms,
