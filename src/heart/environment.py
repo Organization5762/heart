@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import importlib
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Mapping
@@ -25,6 +26,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
     from heart.peripheral.core import Input, StateEntry, StateSnapshot
@@ -249,6 +251,7 @@ if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
 
 logger = get_logger(__name__)
+log_controller = get_logging_controller()
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 RGBA_IMAGE_FORMAT: Literal["RGBA"] = "RGBA"
@@ -344,7 +347,6 @@ class GameLoop:
             pygame.event.set_grab(True)
 
         self._last_render_mode = pygame.SHOWN
-        self._next_render_log_time = 0.0
 
     def add_mode(
         self,
@@ -574,12 +576,15 @@ class GameLoop:
                 "initialized": renderer.is_initialized(),
             }
 
-            current_time = time.monotonic()
-            if current_time >= self._next_render_log_time:
-                logger.info(log_message, *log_args, extra=log_extra)
-                self._next_render_log_time = current_time + 1.0
-            else:
-                logger.debug(log_message, *log_args, extra=log_extra)
+            log_controller.log(
+                key="render.loop",
+                logger=logger,
+                level=logging.INFO,
+                msg=log_message,
+                args=log_args,
+                extra=log_extra,
+                fallback_level=logging.DEBUG,
+            )
 
             return screen
         except Exception as e:
