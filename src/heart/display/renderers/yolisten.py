@@ -9,15 +9,17 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 # TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 
-class YoListenRenderer(BaseRenderer):
+class YoListenRenderer(SwitchStateConsumer, BaseRenderer):
     def __init__(self, color: Color = Color(255, 0, 0)) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.base_color = color  # Store the base color
         self.color = color  # This will be the flickering color
@@ -76,6 +78,7 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        self.bind_switch(peripheral_manager)
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             # Calculate and store the width of each word
@@ -165,14 +168,12 @@ class YoListenRenderer(BaseRenderer):
             self.color = Color(r, g, b)
             self.last_flicker_update = current_time
 
-    def _calibrate_scroll_speed(self, peripheral_manager: PeripheralManager):
-        self._scroll_speed_offset = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+    def _calibrate_scroll_speed(self) -> None:
+        self._scroll_speed_offset = self.get_switch_state().rotation_since_last_button_press
         self._should_calibrate = False
 
-    def _scroll_speed_scale_factor(
-        self, peripheral_manager: PeripheralManager
-    ) -> float:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+    def _scroll_speed_scale_factor(self) -> float:
+        current_value = self.get_switch_state().rotation_since_last_button_press
         return 1.0 + (current_value - self._scroll_speed_offset) / 20.0
 
     def process(
@@ -183,10 +184,8 @@ class YoListenRenderer(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         if self._should_calibrate:
-            self._calibrate_scroll_speed(peripheral_manager)
-        self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(
-            peripheral_manager
-        )
+            self._calibrate_scroll_speed()
+        self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor()
 
         # Update the flickering effect
         current_time = time.time()

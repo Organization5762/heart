@@ -2,13 +2,16 @@ from collections import defaultdict
 
 import pygame
 
+from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class MultiScene(BaseRenderer):
+class MultiScene(SwitchStateConsumer, BaseRenderer):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.scenes = scenes
         self.current_scene_index = 0
         self.key_pressed_last_frame = defaultdict(lambda: False)
@@ -24,14 +27,24 @@ class MultiScene(BaseRenderer):
             )
         ]
 
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: "Orientation",
+    ) -> None:
+        self.bind_switch(peripheral_manager)
+        for scene in self.scenes:
+            scene.initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, clock, peripheral_manager, orientation)
+
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch(peripheral_manager)
         self._process_keyboard()
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_button_value()
-        )
+        current_value = self.get_switch_state().button_value
         self._set_scene_index(current_value)
 
     def _process_keyboard(self) -> None:

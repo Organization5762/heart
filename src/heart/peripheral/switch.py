@@ -1,7 +1,8 @@
 import json
+import threading
 import time
-from dataclasses import replace
-from typing import Any, Iterator, Mapping, NoReturn, Self
+from dataclasses import dataclass, replace
+from typing import Any, Callable, Iterator, Mapping, NoReturn, Self
 
 import serial
 from bleak.backends.device import BLEDevice
@@ -15,6 +16,17 @@ from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class SwitchState:
+    """Immutable snapshot of ``BaseSwitch`` state values."""
+
+    rotational_value: int
+    button_value: int
+    long_button_value: int
+    rotation_since_last_button_press: int
+    rotation_since_last_long_button_press: int
 
 
 class BaseSwitch(Peripheral):
@@ -38,6 +50,8 @@ class BaseSwitch(Peripheral):
         self._default_producer_id = producer_id if producer_id is not None else 0
         self._has_explicit_producer = producer_id is not None
         self._last_lifecycle_status: str | None = None
+        self._state_callbacks: list[Callable[[SwitchState], None]] = []
+        self._state_lock = threading.RLock()
 
         if event_bus is not None:
             self.attach_event_bus(event_bus)
@@ -64,6 +78,47 @@ class BaseSwitch(Peripheral):
     def get_long_button_value(self) -> int:
         return self.button_long_press_value
 
+    def get_state(self) -> SwitchState:
+        """Return the latest switch state snapshot."""
+
+        with self._state_lock:
+            return self._snapshot()
+
+    def subscribe_state(
+        self, callback: Callable[[SwitchState], None], *, replay: bool = True
+    ) -> Callable[[], None]:
+        """Register ``callback`` for state updates.
+
+        Parameters
+        ----------
+        callback:
+            Callable invoked whenever the switch state changes.
+        replay:
+            Emit the current state to the callback immediately after
+            subscription.  Defaults to ``True``.
+
+        Returns
+        -------
+        Callable[[], None]
+            Function that removes ``callback`` from future notifications.
+        """
+
+        with self._state_lock:
+            self._state_callbacks.append(callback)
+            snapshot = self._snapshot()
+
+        if replay:
+            callback(snapshot)
+
+        def _unsubscribe() -> None:
+            with self._state_lock:
+                try:
+                    self._state_callbacks.remove(callback)
+                except ValueError:
+                    return
+
+        return _unsubscribe
+
     def handle_input(self, data: Input) -> None:
         event = self._normalize_event(data)
         if event is None:
@@ -83,6 +138,7 @@ class BaseSwitch(Peripheral):
             self.rotational_value = int(event.data)
 
         self._publish_event(event)
+        self._notify_state_changed()
 
     # ------------------------------------------------------------------
     # Event bus helpers
@@ -108,6 +164,26 @@ class BaseSwitch(Peripheral):
 
     def _publish_event(self, event: Input) -> None:
         self.emit_input(event)
+
+    def _snapshot(self) -> SwitchState:
+        return SwitchState(
+            rotational_value=self.rotational_value,
+            button_value=self.button_value,
+            long_button_value=self.button_long_press_value,
+            rotation_since_last_button_press=self.get_rotation_since_last_button_press(),
+            rotation_since_last_long_button_press=self.get_rotation_since_last_long_button_press(),
+        )
+
+    def _notify_state_changed(self) -> None:
+        with self._state_lock:
+            callbacks = tuple(self._state_callbacks)
+            snapshot = self._snapshot()
+
+        for callback in callbacks:
+            try:
+                callback(snapshot)
+            except Exception:
+                logger.exception("Switch state callback failed", exc_info=True)
 
     def _emit_lifecycle(self, status: str, *, extra: Mapping[str, Any] | None = None) -> None:
         if self._last_lifecycle_status == status:

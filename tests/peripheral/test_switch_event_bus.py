@@ -7,7 +7,32 @@ import pytest
 from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          SWITCH_ROTATION)
 from heart.peripheral.core.event_bus import EventBus
-from heart.peripheral.switch import BluetoothSwitch, FakeSwitch
+from heart.peripheral.switch import BluetoothSwitch, FakeSwitch, SwitchState
+
+
+def test_switch_state_subscription() -> None:
+    bus = EventBus()
+    switch = FakeSwitch()
+    switch.attach_event_bus(bus)
+
+    snapshots: list[SwitchState] = []
+    switch.subscribe_state(snapshots.append)
+
+    switch.update_due_to_data(
+        {"event_type": SWITCH_ROTATION, "data": 5, "producer_id": 1}
+    )
+    switch.update_due_to_data({"event_type": BUTTON_PRESS, "data": 1, "producer_id": 1})
+    switch.update_due_to_data(
+        {"event_type": BUTTON_LONG_PRESS, "data": 1, "producer_id": 1}
+    )
+
+    assert snapshots
+    latest = snapshots[-1]
+    assert latest.rotational_value == 5
+    assert latest.button_value == 1
+    assert latest.long_button_value == 1
+    assert latest.rotation_since_last_button_press == 0
+    assert latest.rotation_since_last_long_button_press == 0
 
 
 def test_fake_switch_emits_bus_events() -> None:

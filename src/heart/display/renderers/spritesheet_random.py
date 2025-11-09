@@ -8,6 +8,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -18,7 +19,7 @@ class LoopPhase(StrEnum):
 
 
 # Renders a looping spritesheet on a random screen.
-class SpritesheetLoopRandom(BaseRenderer):
+class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
     def __init__(
         self,
         screen_width: int,
@@ -27,7 +28,8 @@ class SpritesheetLoopRandom(BaseRenderer):
         metadata_file_path: str,
         screen_count: int,
     ) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
@@ -73,10 +75,11 @@ class SpritesheetLoopRandom(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
+        self.bind_switch(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
-    def __duration_scale_factor(self, peripheral_manager: PeripheralManager):
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+    def __duration_scale_factor(self) -> float:
+        current_value = self.get_switch_state().rotation_since_last_button_press
         return current_value / 20.00
 
     def process(
@@ -89,7 +92,7 @@ class SpritesheetLoopRandom(BaseRenderer):
         current_kf = self.frames[self.phase][self.current_frame]
         kf_duration = current_kf.duration - (
             current_kf.duration
-            * self.__duration_scale_factor(peripheral_manager=peripheral_manager)
+            * self.__duration_scale_factor()
         )
         if (
             self.time_since_last_update is None
@@ -108,3 +111,4 @@ class SpritesheetLoopRandom(BaseRenderer):
         if self.time_since_last_update is None:
             self.time_since_last_update = 0
         self.time_since_last_update += clock.get_time()
+

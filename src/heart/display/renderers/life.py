@@ -7,12 +7,14 @@ from scipy.ndimage import convolve
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class Life(BaseRenderer):
+class Life(SwitchStateConsumer, BaseRenderer):
     def __init__(self) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
@@ -29,15 +31,21 @@ class Life(BaseRenderer):
 
         return new_grid.astype(int)
 
-    def _maybe_update_seed(
-        self, window: Surface, peripheral_manager: PeripheralManager
-    ) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_rotational_value()
-        )
+    def _maybe_update_seed(self, window: Surface) -> None:
+        current_value = self.get_switch_state().rotational_value
         if current_value != self.seed:
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())
+
+    def initialize(
+        self,
+        window: Surface,
+        clock: Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        self.bind_switch(peripheral_manager)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
         self,
@@ -46,7 +54,7 @@ class Life(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self._maybe_update_seed(window=window, peripheral_manager=peripheral_manager)
+        self._maybe_update_seed(window=window)
         self.state = self._update_grid(self.state)
 
         # if 1, make white, else make black
@@ -55,3 +63,4 @@ class Life(BaseRenderer):
         pygame.surfarray.blit_array(window, updated_colors)
 
         assert self.state.shape == window.get_size(), "Grid size must match window size"
+
