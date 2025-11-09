@@ -380,9 +380,12 @@ class EventPlaylistManager:
             self._playlists[playlist_id] = playlist
 
         if playlist.trigger_event_type is not None:
+            def _start_playlist(event: Input, *, _playlist_id: str = playlist_id) -> None:
+                self.start(_playlist_id, trigger_event=event)
+
             trigger_handle = self._bus.subscribe(
                 playlist.trigger_event_type,
-                lambda event, pid=playlist_id: self.start(pid, trigger_event=event),
+                _start_playlist,
                 priority=100,
             )
             with self._lock:
@@ -403,11 +406,12 @@ class EventPlaylistManager:
             self._bus.unsubscribe(previous_trigger)
 
         if playlist.trigger_event_type is not None:
+            def _start_playlist(event: Input, *, _playlist_id: str = handle.playlist_id) -> None:
+                self.start(_playlist_id, trigger_event=event)
+
             trigger_handle = self._bus.subscribe(
                 playlist.trigger_event_type,
-                lambda event, pid=handle.playlist_id: self.start(
-                    pid, trigger_event=event
-                ),
+                _start_playlist,
                 priority=100,
             )
 
@@ -455,9 +459,12 @@ class EventPlaylistManager:
                 runs = self._runs_by_interrupt[event_type]
                 runs.add(runner.run_id)
                 if event_type not in self._interrupt_subscribers:
+                    def _handle(event: Input, *, _event_type: str = event_type) -> None:
+                        self._handle_interrupt(_event_type, event)
+
                     self._interrupt_subscribers[event_type] = self._bus.subscribe(
                         event_type,
-                        lambda event, et=event_type: self._handle_interrupt(et, event),
+                        _handle,
                         priority=100,
                     )
 
@@ -553,7 +560,7 @@ class EventPlaylistManager:
                     if handle is not None:
                         self._bus.unsubscribe(handle)
 
-        payload = {
+        payload: dict[str, Any] = {
             "playlist_id": runner.run_id,
             "definition_id": runner.playlist_id,
             "playlist_name": runner.playlist.name,
@@ -572,7 +579,7 @@ class EventPlaylistManager:
         self._bus.emit(self.EVENT_STOPPED, data=payload)
 
         if reason == "completed" and runner.playlist.completion_event_type:
-            completion_payload = {
+            completion_payload: dict[str, Any] = {
                 "playlist_id": runner.run_id,
                 "definition_id": runner.playlist_id,
                 "playlist_name": runner.playlist.name,
@@ -680,9 +687,12 @@ class VirtualPeripheralManager:
         subscriptions: List[SubscriptionHandle] = []
 
         for event_type in definition.event_types:
+            def _route(event: Input, *, _peripheral_id: str = handle.peripheral_id) -> None:
+                self._route_event(_peripheral_id, event)
+
             subscription = self._bus.subscribe(
                 event_type,
-                lambda event, pid=handle.peripheral_id: self._route_event(pid, event),
+                _route,
                 priority=definition.priority,
             )
             subscriptions.append(subscription)

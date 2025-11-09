@@ -201,6 +201,9 @@ class MagnetometerVector(InputEventPayload):
             producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
+
+
+@dataclass(frozen=True, slots=True)
 class ForceMeasurement(InputEventPayload):
     """Normalized payload describing a tensile or magnetic force reading."""
 

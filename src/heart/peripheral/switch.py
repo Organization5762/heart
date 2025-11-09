@@ -202,9 +202,17 @@ class BluetoothSwitch(BaseSwitch):
         for switch in self.switches:
             switch.attach_event_bus(event_bus)
 
-    def update_due_to_data(self, data: dict[str, int]) -> None:
-        producer_id = data.get("producer_id", 0)
-        self.switches[producer_id].update_due_to_data(data)
+    def update_due_to_data(self, data: Mapping[str, Any]) -> None:
+        payload = dict(data)
+        producer_raw = payload.get("producer_id", 0)
+        try:
+            producer_id = int(producer_raw)
+        except (TypeError, ValueError):
+            logger.debug("Switch payload has invalid producer_id: %s", producer_raw)
+            producer_id = 0
+        payload["producer_id"] = producer_id
+
+        self.switches[producer_id].update_due_to_data(payload)
 
         # Update first producer as if it is the main switch
         if producer_id == 0:

@@ -141,13 +141,11 @@ follow_imports = "skip"
 
 [[tool.mypy.overrides]]
 module = [
-    "heart.peripheral.core.event_bus",
     "heart.peripheral.uwb",
     "heart.peripheral.heart_rates",
     "heart.peripheral.microphone",
     "heart.peripheral.ir_sensor_array",
     "heart.peripheral.bluetooth",
-    "heart.peripheral.switch",
     "heart.peripheral.sensor",
     "heart.peripheral.gamepad.gamepad",
     "heart.device.local",
