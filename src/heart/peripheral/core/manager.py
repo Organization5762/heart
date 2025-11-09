@@ -12,6 +12,7 @@ from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
+from heart.peripheral.radio import RadioPeripheral
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
                                      Switch)
@@ -76,6 +77,7 @@ class PeripheralManager:
             self._detect_phone_text(),
             self._detect_microphones(),
             self._detect_drawing_pads(),
+            self._detect_radios(),
         )
 
     def start(self) -> None:
@@ -132,6 +134,9 @@ class PeripheralManager:
 
     def _detect_drawing_pads(self) -> Iterator[Peripheral]:
         yield from itertools.chain(DrawingPad.detect())
+
+    def _detect_radios(self) -> Iterator[Peripheral]:
+        yield from itertools.chain(RadioPeripheral.detect())
 
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
