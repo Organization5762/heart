@@ -62,6 +62,7 @@ class HeartRateManager(Peripheral):
     """Continuously scans for ANT+ HR straps and publishes measurements."""
 
     def __init__(self, *, event_bus: EventBus | None = None) -> None:
+        super().__init__()
         self._node: Optional[Node] = None
         self._scanner: Optional[Scanner] = None
         self._devices: List[HeartRate] = []
@@ -73,8 +74,10 @@ class HeartRateManager(Peripheral):
         )
         self._janitor.start()
 
-        self._event_bus = event_bus
         self._lifecycle_status: Dict[str, str] = {}
+
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     # ---------- Peripheral framework ----------
 
@@ -85,7 +88,7 @@ class HeartRateManager(Peripheral):
     def attach_event_bus(self, event_bus: EventBus) -> None:
         """Attach the shared input event bus for publishing samples."""
 
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
 
     # ---------- Callbacks -----------------------------------------------------
 
@@ -173,7 +176,7 @@ class HeartRateManager(Peripheral):
     # ---------- Event bus helpers -------------------------------------------
 
     def _publish_measurement(self, device_id: str, data: HeartRateData) -> None:
-        event_bus = self._event_bus
+        event_bus = self.event_bus
         if event_bus is None:
             return
 
@@ -196,7 +199,7 @@ class HeartRateManager(Peripheral):
     def _emit_lifecycle(
         self, device_id: str, status: str, detail: Dict[str, float] | None = None
     ) -> None:
-        event_bus = self._event_bus
+        event_bus = self.event_bus
         if event_bus is None:
             return
 

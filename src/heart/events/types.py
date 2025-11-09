@@ -180,6 +180,23 @@ class AccelerometerVector(InputEventPayload):
 
 
 @dataclass(frozen=True, slots=True)
+class MagnetometerVector(InputEventPayload):
+    """Three-axis magnetic field sample from the sensor bus."""
+
+    x: float
+    y: float
+    z: float
+
+    EVENT_TYPE: ClassVar[str] = "peripheral.magnetometer.vector"
+    event_type: str = EVENT_TYPE
+
+    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+        return Input(
+            event_type=self.event_type,
+            data={"x": float(self.x), "y": float(self.y), "z": float(self.z)},
+            producer_id=producer_id,
+            timestamp=_normalize_timestamp(timestamp),
+        )
 class ForceMeasurement(InputEventPayload):
     """Normalized payload describing a tensile or magnetic force reading."""
 
@@ -238,6 +255,7 @@ class PhoneTextMessage(InputEventPayload):
 
 __all__ = [
     "AccelerometerVector",
+    "MagnetometerVector",
     "ForceMeasurement",
     "HeartRateLifecycle",
     "HeartRateMeasurement",

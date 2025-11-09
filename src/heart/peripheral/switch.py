@@ -26,6 +26,7 @@ class BaseSwitch(Peripheral):
         event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
+        super().__init__()
         self.rotational_value = 0
 
         self.button_value = 0
@@ -34,16 +35,18 @@ class BaseSwitch(Peripheral):
         self.button_long_press_value = 0
         self.rotation_value_at_last_long_button_press = self.rotational_value
 
-        self._event_bus = event_bus
         self._default_producer_id = producer_id if producer_id is not None else 0
         self._has_explicit_producer = producer_id is not None
         self._last_lifecycle_status: str | None = None
+
+        if event_bus is not None:
+            self.attach_event_bus(event_bus)
 
     def run(self) -> None:
         return
 
     def attach_event_bus(self, event_bus: EventBus) -> None:
-        self._event_bus = event_bus
+        super().attach_event_bus(event_bus)
         self._mark_connected()
 
     def get_rotation_since_last_button_press(self) -> int:
@@ -104,13 +107,9 @@ class BaseSwitch(Peripheral):
         return data.producer_id
 
     def _publish_event(self, event: Input) -> None:
-        if self._event_bus is None:
-            return
-        self._event_bus.emit(event)
+        self.emit_input(event)
 
     def _emit_lifecycle(self, status: str, *, extra: Mapping[str, Any] | None = None) -> None:
-        if self._event_bus is None:
-            return
         if self._last_lifecycle_status == status:
             return
 
@@ -123,7 +122,7 @@ class BaseSwitch(Peripheral):
             data=payload,
             producer_id=self._default_producer_id,
         )
-        self._event_bus.emit(event)
+        self.emit_input(event)
         self._last_lifecycle_status = status
 
     def _mark_connected(self) -> None:
