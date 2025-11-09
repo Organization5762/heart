@@ -32,9 +32,11 @@ class Life(BaseRenderer):
     def _maybe_update_seed(
         self, window: Surface, peripheral_manager: PeripheralManager
     ) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_rotational_value()
-        )
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return
+        current_value = switch.get_rotational_value()
         if current_value != self.seed:
             self.seed = current_value
             self.state = np.random.choice([0, 1], size=window.get_size())

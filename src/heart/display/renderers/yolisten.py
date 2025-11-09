@@ -166,13 +166,21 @@ class YoListenRenderer(BaseRenderer):
             self.last_flicker_update = current_time
 
     def _calibrate_scroll_speed(self, peripheral_manager: PeripheralManager):
-        self._scroll_speed_offset = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return
+        self._scroll_speed_offset = switch.get_rotation_since_last_button_press()
         self._should_calibrate = False
 
     def _scroll_speed_scale_factor(
         self, peripheral_manager: PeripheralManager
     ) -> float:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return 1.0
+        current_value = switch.get_rotation_since_last_button_press()
         return 1.0 + (current_value - self._scroll_speed_offset) / 20.0
 
     def process(

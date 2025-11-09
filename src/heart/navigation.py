@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict, deque
 from collections.abc import Callable, Iterable
+from typing import Any, Mapping
 
 import pygame
 
@@ -8,6 +9,7 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.color import RenderColor
+from heart.display.renderers.multi_scene import MultiScene as DisplayMultiScene
 from heart.display.renderers.slide import SlideTransitionRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
@@ -16,6 +18,7 @@ from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
+from heart.peripheral.switch_consumer import SwitchStateConsumer
 from heart.utilities.env import Configuration
 
 
@@ -123,6 +126,29 @@ class GameModes(BaseRenderer):
         self.key_pressed_last_frame = defaultdict(lambda: False)
         self.gamepad_last_frame = defaultdict(lambda: False)
 
+    def _switch_state(
+        self, peripheral_manager: PeripheralManager
+    ) -> SwitchStateConsumer | None:
+        try:
+            return peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _emit_switch_payload(
+        peripheral_manager: PeripheralManager,
+        payload: Mapping[str, Any],
+    ) -> None:
+        bus = peripheral_manager.event_bus
+        if bus is None:
+            return
+        event_type = payload.get("event_type")
+        if not event_type:
+            return
+        producer_id = int(payload.get("producer_id", 0))
+        data = payload.get("data")
+        bus.emit(event_type, data, producer_id=producer_id)
+
     def __repr__(self) -> str:
         return (
             f"GameModes("
@@ -169,37 +195,44 @@ class GameModes(BaseRenderer):
         gamepad = peripheral_manager.get_gamepad()
         mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
 
-        switch = peripheral_manager._deprecated_get_main_switch()
+        switch_state = self._switch_state(peripheral_manager)
         gamepad.update()
 
-        payload = None
+        payload: dict[str, Any] | None = None
         if gamepad.is_connected() and self.in_select_mode:
-            # print("gamepad connectee")
             x_dir, y_dir = gamepad.get_dpad_value()
             if x_dir != 0 and x_dir != self.gamepad_last_frame["DPAD_X"]:
+                base_rotation = (
+                    switch_state.get_rotational_value()
+                    if switch_state is not None
+                    else 0
+                )
                 payload = {
                     "event_type": SWITCH_ROTATION,
-                    "data": switch.rotational_value + x_dir,
+                    "data": base_rotation + x_dir,
                 }
             self.gamepad_last_frame["DPAD_X"] = x_dir
             if y_dir != 0 and y_dir != self.gamepad_last_frame["DPAD_Y"]:
                 payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
             self.gamepad_last_frame["DPAD_Y"] = y_dir
 
-        # i.e. this branch to listen for exit request when inside a scene
         elif gamepad.is_connected():
-            # i.e. press plus + minus to exit from any mode
             plus_tapped = gamepad.is_held(mapping.BUTTON_PLUS)
             minus_tapped = gamepad.is_held(mapping.BUTTON_MINUS)
             if plus_tapped and minus_tapped:
                 payload = {"event_type": BUTTON_LONG_PRESS, "data": 1}
 
         if payload is not None:
-            switch.update_due_to_data(payload)
+            self._emit_switch_payload(peripheral_manager, payload)
 
-        pygame.display.set_caption(
-            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
-        )
+        if switch_state is not None:
+            pygame.display.set_caption(
+                "R: "
+                f"{switch_state.get_rotational_value()}, NR: "
+                f"{switch_state.get_rotation_since_last_button_press()}, B: "
+                f"{switch_state.get_button_value()}, BL: "
+                f"{switch_state.get_long_button_value()}"
+            )
 
     def _process_debugging_key_presses(
         self, peripheral_manager: PeripheralManager
@@ -210,31 +243,34 @@ class GameModes(BaseRenderer):
 
         keys = pygame.key.get_pressed()
 
-        switch = peripheral_manager._deprecated_get_main_switch()
-        payload = None
+        switch_state = self._switch_state(peripheral_manager)
+        if switch_state is None:
+            return
+
+        payload: dict[str, Any] | None = None
 
         # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
-        DEFAULT_PRODUCER_ID = 0
+        default_producer_id = 0
         if keys[pygame.K_LEFT] and not self.key_pressed_last_frame[pygame.K_LEFT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
-                "producer_id": DEFAULT_PRODUCER_ID,
-                "data": switch.rotational_value - 1,
+                "producer_id": default_producer_id,
+                "data": switch_state.get_rotational_value() - 1,
             }
         self.key_pressed_last_frame[pygame.K_LEFT] = keys[pygame.K_LEFT]
 
         if keys[pygame.K_RIGHT] and not self.key_pressed_last_frame[pygame.K_RIGHT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
-                "producer_id": DEFAULT_PRODUCER_ID,
-                "data": switch.rotational_value + 1,
+                "producer_id": default_producer_id,
+                "data": switch_state.get_rotational_value() + 1,
             }
         self.key_pressed_last_frame[pygame.K_RIGHT] = keys[pygame.K_RIGHT]
 
         if keys[pygame.K_UP] and not self.key_pressed_last_frame[pygame.K_UP]:
             payload = {
                 "event_type": BUTTON_LONG_PRESS,
-                "producer_id": DEFAULT_PRODUCER_ID,
+                "producer_id": default_producer_id,
                 "data": 1,
             }
         self.key_pressed_last_frame[pygame.K_UP] = keys[pygame.K_UP]
@@ -242,25 +278,31 @@ class GameModes(BaseRenderer):
         if keys[pygame.K_DOWN] and not self.key_pressed_last_frame[pygame.K_DOWN]:
             payload = {
                 "event_type": BUTTON_PRESS,
-                "producer_id": DEFAULT_PRODUCER_ID,
+                "producer_id": default_producer_id,
                 "data": 1,
             }
 
         self.key_pressed_last_frame[pygame.K_DOWN] = keys[pygame.K_DOWN]
 
         if payload is not None:
-            switch.update_due_to_data(payload)
+            self._emit_switch_payload(peripheral_manager, payload)
 
         pygame.display.set_caption(
-            f"R: {switch.get_rotational_value()}, NR: {switch.get_rotation_since_last_button_press()}, B: {switch.get_button_value()}, BL: {switch.get_long_button_value()}"
+            "R: "
+            f"{switch_state.get_rotational_value()}, NR: "
+            f"{switch_state.get_rotation_since_last_button_press()}, B: "
+            f"{switch_state.get_button_value()}, BL: "
+            f"{switch_state.get_long_button_value()}"
         )
 
     def handle_inputs(self, peripheral_manager: PeripheralManager) -> None:
         self._process_debugging_key_presses(peripheral_manager)
         self._process_gamepad_key_input(peripheral_manager)
-        new_long_button_value = (
-            peripheral_manager._deprecated_get_main_switch().get_long_button_value()
-        )
+        switch_state = self._switch_state(peripheral_manager)
+        if switch_state is None:
+            return
+
+        new_long_button_value = switch_state.get_long_button_value()
         if new_long_button_value != self.last_long_button_value:
             # Swap select modes
             if self.in_select_mode:
@@ -272,7 +314,9 @@ class GameModes(BaseRenderer):
             self.last_long_button_value = new_long_button_value
 
         if self.in_select_mode:
-            self.mode_offset = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_long_button_press()
+            self.mode_offset = (
+                switch_state.get_rotation_since_last_long_button_press()
+            )
 
     def active_renderer(self, mode_offset: int) -> BaseRenderer:
         mode_index = (self._active_mode_index + mode_offset) % len(self.renderers)
@@ -425,8 +469,8 @@ def switch_controlled_renderer_order(
         return renderers
 
     try:
-        switch = peripheral_manager._deprecated_get_main_switch()
-    except Exception:
+        switch = peripheral_manager.get_switch_state_consumer()
+    except ValueError:
         return renderers
 
     ordered = sorted(renderers, key=lambda renderer: renderer.name.lower())
@@ -443,25 +487,11 @@ def switch_controlled_renderer_order(
     return tuple(ordered)
 
 
-class MultiScene(BaseRenderer):
+class MultiScene(DisplayMultiScene):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
-        super().__init__()
-        self.scenes = scenes
-        self.current_scene_index = 0
+        super().__init__(scenes)
         self.last_switch_value = None
-        self.key_pressed_last_frame = defaultdict(lambda: False)
         self.gamepad_last_frame = defaultdict(lambda: False)
-
-    def get_renderers(
-        self, peripheral_manager: PeripheralManager
-    ) -> list[BaseRenderer]:
-        self._process_input(peripheral_manager)
-        # This multi-scene could be composed of multiple renderers
-        return [
-            *self.scenes[self.current_scene_index].get_renderers(
-                peripheral_manager=peripheral_manager
-            )
-        ]
 
     def initialize(
         self,
@@ -479,8 +509,7 @@ class MultiScene(BaseRenderer):
             scene.reset()
 
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
-        self._process_switch(peripheral_manager)
-        self._process_keyboard()
+        super()._process_input(peripheral_manager)
         self._process_gamepad(peripheral_manager)
 
     def _process_gamepad(self, peripheral_manager: PeripheralManager):
@@ -496,9 +525,11 @@ class MultiScene(BaseRenderer):
         gamepad.update()
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_button_value()
-        )
+        try:
+            switch_state = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return
+        current_value = switch_state.get_button_value()
         if self.last_switch_value and self.last_switch_value != current_value:
             self._increment_scene()
 

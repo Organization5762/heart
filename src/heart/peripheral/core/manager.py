@@ -21,6 +21,7 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
                                      Switch)
+from heart.peripheral.switch_consumer import SwitchStateConsumer
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -52,6 +53,7 @@ class PeripheralManager:
         self._configuration: PeripheralConfiguration | None = None
         self._virtual_peripheral_definitions: dict[str, VirtualPeripheralDefinition] = {}
         self._virtual_peripheral_handles: dict[str, VirtualPeripheralHandle] = {}
+        self._switch_state_consumers: dict[int | None, SwitchStateConsumer] = {}
 
     @property
     def event_bus(self) -> EventBus | None:
@@ -61,14 +63,12 @@ class PeripheralManager:
         """Register ``event_bus`` for peripherals managed by this instance."""
 
         previous_bus = self._event_bus
-        if (
-            previous_bus is not None
-            and previous_bus is not event_bus
-            and self._virtual_peripheral_handles
-        ):
-            for handle in tuple(self._virtual_peripheral_handles.values()):
-                previous_bus.virtual_peripherals.remove(handle)
-            self._virtual_peripheral_handles.clear()
+        if previous_bus is not None and previous_bus is not event_bus:
+            if self._virtual_peripheral_handles:
+                for handle in tuple(self._virtual_peripheral_handles.values()):
+                    previous_bus.virtual_peripherals.remove(handle)
+                self._virtual_peripheral_handles.clear()
+            self._reset_switch_state_consumers()
 
         self._event_bus = event_bus
         self._propagate_event_bus = propagate
@@ -230,6 +230,30 @@ class PeripheralManager:
                     "Failed to attach event bus to peripheral %s", type(peripheral).__name__
                 )
 
+    def get_switch_state_consumer(
+        self, *, producer_id: int | None = None
+    ) -> SwitchStateConsumer:
+        if self._event_bus is None:
+            raise ValueError("No event bus attached to peripheral manager")
+        key = producer_id
+        consumer = self._switch_state_consumers.get(key)
+        if consumer is None:
+            consumer = SwitchStateConsumer(self._event_bus, producer_id=producer_id)
+            self._switch_state_consumers[key] = consumer
+        return consumer
+
+    def _reset_switch_state_consumers(self) -> None:
+        if not self._switch_state_consumers:
+            return
+        for consumer in tuple(self._switch_state_consumers.values()):
+            try:
+                consumer.close()
+            except Exception:
+                logger.exception(
+                    "Failed to close switch state consumer %s", type(consumer).__name__
+                )
+        self._switch_state_consumers.clear()
+
     def _deprecated_get_main_switch(self) -> BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now
         subsumed by this."""
@@ -273,6 +297,7 @@ class PeripheralManager:
     def close(self, join_timeout: float = 3.0) -> None:
         """Attempt to stop all background threads started by the manager."""
 
+        self._reset_switch_state_consumers()
         for thread in self._threads:
             if thread.is_alive():
                 logger.debug(

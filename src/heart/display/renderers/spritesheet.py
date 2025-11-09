@@ -209,7 +209,11 @@ class SpritesheetLoop(BaseRenderer):
         self._process_gamepad(peripheral_manager)
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return
+        current_value = switch.get_rotation_since_last_button_press()
         if self._last_switch_rot_value is not None:
             if current_value > self._last_switch_rot_value:
                 self._current_duration_scale_factor += 0.05

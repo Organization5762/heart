@@ -1,8 +1,11 @@
 import pytest
 
 from heart.display.renderers import BaseRenderer
+from heart.firmware_io.constants import BUTTON_PRESS, SWITCH_ROTATION
 from heart.navigation import (SortedComposedRenderer,
                               switch_controlled_renderer_order)
+from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core.manager import PeripheralManager
 
 
 class _StubRenderer(BaseRenderer):
@@ -34,7 +37,7 @@ class _StubPeripheralManager:
     def __init__(self, switch: _StubSwitch) -> None:
         self._switch = switch
 
-    def _deprecated_get_main_switch(self) -> _StubSwitch:
+    def get_switch_state_consumer(self, *, producer_id: int | None = None) -> _StubSwitch:
         return self._switch
 
 
@@ -79,3 +82,28 @@ def test_switch_controlled_renderer_order(rotation, button, expected) -> None:
     ordered = switch_controlled_renderer_order(renderers, manager)
 
     assert [renderer.label for renderer in ordered] == expected
+
+
+def test_switch_controlled_renderer_order_uses_event_bus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bus = EventBus()
+    manager = PeripheralManager(event_bus=bus)
+    manager.get_switch_state_consumer()
+
+    def _fail():  # pragma: no cover - sanity guard
+        raise AssertionError("deprecated switch access")
+
+    monkeypatch.setattr(manager, "_deprecated_get_main_switch", _fail)
+
+    renderers = tuple(
+        _StubRenderer(label) for label in ["gamma", "alpha", "beta"]
+    )
+
+    bus.emit(SWITCH_ROTATION, 0)
+    bus.emit(BUTTON_PRESS, 1)
+    bus.emit(SWITCH_ROTATION, 0)
+
+    ordered = switch_controlled_renderer_order(renderers, manager)
+
+    assert [renderer.label for renderer in ordered] == ["gamma", "beta", "alpha"]

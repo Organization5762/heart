@@ -48,7 +48,11 @@ class TextRendering(BaseRenderer):
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def _current_text(self, peripheral_manager: PeripheralManager) -> str:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return self.text[0]
+        current_value = switch.get_rotation_since_last_button_press()
         current_text_idx = current_value % len(self.text)
         return self.text[current_text_idx]
 

@@ -29,9 +29,11 @@ class MultiScene(BaseRenderer):
         self._process_keyboard()
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = (
-            peripheral_manager._deprecated_get_main_switch().get_button_value()
-        )
+        try:
+            switch = peripheral_manager.get_switch_state_consumer()
+        except ValueError:
+            return
+        current_value = switch.get_button_value()
         self._set_scene_index(current_value)
 
     def _process_keyboard(self) -> None:
