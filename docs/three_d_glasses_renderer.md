@@ -35,6 +35,19 @@ renderer = ThreeDGlassesRenderer([
 Integrate the renderer into a program configuration the same way you
 would add any other `BaseRenderer` subclass.
 
+## Program configuration
+
+`heart/programs/configurations/three_d_glasses_demo.py` wires the
+renderer into the runtime with the stock `heart.png` assets. Launch it
+with:
+
+```bash
+totem run --configuration three_d_glasses_demo
+```
+
+The configuration adds a single mode so the demo starts immediately in
+the 3D view.
+
 ## Hardware notes
 
 Because only the red and blue subpixels are driven, brightness may be
