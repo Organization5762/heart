@@ -12,7 +12,7 @@ from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
 from openant.easy.exception import AntException
 from openant.easy.node import Node
-from usb.core import NoBackendError
+from usb.core import NoBackendError  # type: ignore[import-untyped]
 
 from heart.events.types import HeartRateLifecycle, HeartRateMeasurement
 from heart.peripheral.core import Peripheral
