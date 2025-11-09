@@ -45,7 +45,7 @@ flowchart LR
     end
 
     subgraph DisplayFeedback[LEDMatrixDisplay Peripheral]
-        LedPublish[publish_image()\nperipheral.display.frame]
+        LedPublish[publish_image()<br/>peripheral.display.frame]
         Downstream[Derived Loop / Ambient Sampler]
     end
 
