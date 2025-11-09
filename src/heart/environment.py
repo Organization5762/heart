@@ -22,6 +22,7 @@ from heart.peripheral.core import events
 from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import current_bpms
+from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -268,6 +269,7 @@ class GameLoop:
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
         *,
         event_bus: EventBus | None = None,
+        display_peripheral: LEDMatrixDisplay | None = None,
     ) -> None:
         self.initalized = False
         self.device = device
@@ -317,6 +319,14 @@ class GameLoop:
             self._event_bus, propagate=propagate_bus
         )
 
+        width, height = self.device.full_display_size()
+        self._display_peripheral = display_peripheral or LEDMatrixDisplay(
+            width=width,
+            height=height,
+        )
+        self._display_peripheral.attach_event_bus(self._event_bus)
+        self.peripheral_manager.register(self._display_peripheral)
+
         pygame.display.set_mode(
             (
                 device.full_display_size()[0] * device.scale_factor,
@@ -350,6 +360,10 @@ class GameLoop:
     @property
     def event_bus(self) -> EventBus:
         return self._event_bus
+
+    @property
+    def display_peripheral(self) -> LEDMatrixDisplay:
+        return self._display_peripheral
 
     def latest_input(
         self, event_type: str, *, producer_id: int | None = None
@@ -679,10 +693,11 @@ class GameLoop:
         if len(renderers) > 0:
             pygame.display.flip()
             # Convert screen to PIL Image
-            screen_array = pygame.surfarray.array3d(self.screen)
-            screen_array = np.transpose(screen_array, (1, 0, 2))
-            screen_image = Image.fromarray(screen_array)
-            self.device.set_image(screen_image)
+            image = pygame.surfarray.array3d(self.screen)
+            image = np.transpose(image, (1, 0, 2))
+            image = Image.fromarray(image)
+            self.device.set_image(image)
+            self._display_peripheral.publish_image(image)
 
     def _handle_events(self) -> None:
         try:

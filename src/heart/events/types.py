@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import (Any, ClassVar, Mapping, MutableMapping, Protocol,
-                    runtime_checkable)
+from types import MappingProxyType
+from typing import (TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping,
+                    Protocol, runtime_checkable)
+
+if TYPE_CHECKING:  # pragma: no cover - import for type checking only
+    from PIL import Image
 
 from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          SWITCH_ROTATION)
@@ -253,8 +257,66 @@ class PhoneTextMessage(InputEventPayload):
         )
 
 
+@dataclass(frozen=True, slots=True)
+class DisplayFrame(InputEventPayload):
+    """Raw image payload emitted by the LED matrix peripheral."""
+
+    frame_id: int
+    width: int
+    height: int
+    mode: str
+    data: bytes
+    metadata: Mapping[str, Any] | None = None
+
+    EVENT_TYPE: ClassVar[str] = "peripheral.display.frame"
+    event_type: str = EVENT_TYPE
+
+    def __post_init__(self) -> None:
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("DisplayFrame dimensions must be positive")
+        if self.metadata is not None and not isinstance(self.metadata, Mapping):
+            raise TypeError("DisplayFrame metadata must be a mapping when provided")
+        if self.metadata is not None:
+            object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @classmethod
+    def from_image(
+        cls,
+        image: Image.Image,
+        *,
+        frame_id: int,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> "DisplayFrame":
+        from PIL import Image
+
+        if not isinstance(image, Image.Image):
+            raise TypeError("image must be a PIL.Image.Image instance")
+        return cls(
+            frame_id=frame_id,
+            width=image.width,
+            height=image.height,
+            mode=image.mode,
+            data=image.tobytes(),
+            metadata=metadata,
+        )
+
+    def to_image(self) -> Image.Image:
+        from PIL import Image
+
+        return Image.frombytes(self.mode, (self.width, self.height), self.data)
+
+    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+        return Input(
+            event_type=self.event_type,
+            data=self,
+            producer_id=producer_id,
+            timestamp=_normalize_timestamp(timestamp),
+        )
+
+
 __all__ = [
     "AccelerometerVector",
+    "DisplayFrame",
     "MagnetometerVector",
     "ForceMeasurement",
     "HeartRateLifecycle",
