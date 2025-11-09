@@ -8,6 +8,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
@@ -67,7 +68,7 @@ class LoopPhase(Enum):
 
 
 # Searching mode loop.
-class SpritesheetLoop(BaseRenderer):
+class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
     @classmethod
     def from_frame_data(
         cls,
@@ -126,7 +127,8 @@ class SpritesheetLoop(BaseRenderer):
         boomerang: bool = False,
         frame_data: list[FrameDescription] | None = None,
     ) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.disable_input = disable_input
         self.current_frame = 0
         self.loop_count = 0
@@ -199,6 +201,8 @@ class SpritesheetLoop(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         self.spritesheet = Loader.load_spirtesheet(self.file)
+        if not self.disable_input:
+            self.bind_switch(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def reset(self):
@@ -209,7 +213,7 @@ class SpritesheetLoop(BaseRenderer):
         self._process_gamepad(peripheral_manager)
 
     def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
+        current_value = self.get_switch_state().rotation_since_last_button_press
         if self._last_switch_rot_value is not None:
             if current_value > self._last_switch_rot_value:
                 self._current_duration_scale_factor += 0.05

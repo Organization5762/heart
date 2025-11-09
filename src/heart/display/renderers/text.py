@@ -3,10 +3,11 @@ import pygame
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class TextRendering(BaseRenderer):
+class TextRendering(SwitchStateConsumer, BaseRenderer):
     def __init__(
         self,
         text: list[str],
@@ -16,7 +17,8 @@ class TextRendering(BaseRenderer):
         x_location: int | None = None,
         y_location: int | None = None,
     ) -> None:
-        super().__init__()
+        SwitchStateConsumer.__init__(self)
+        BaseRenderer.__init__(self)
         self.color = color
         self.font_name = font
         self.font_size = font_size
@@ -45,12 +47,14 @@ class TextRendering(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         self.font = pygame.font.SysFont(self.font_name, self.font_size)
+        self.bind_switch(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
-    def _current_text(self, peripheral_manager: PeripheralManager) -> str:
-        current_value = peripheral_manager._deprecated_get_main_switch().get_rotation_since_last_button_press()
-        current_text_idx = current_value % len(self.text)
+    def _current_text(self) -> str:
+        state = self.get_switch_state()
+        current_text_idx = state.rotation_since_last_button_press % len(self.text)
         return self.text[current_text_idx]
+
 
     def process(
         self,
@@ -59,7 +63,7 @@ class TextRendering(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        current_text = self._current_text(peripheral_manager=peripheral_manager)
+        current_text = self._current_text()
 
         lines = current_text.split("\n")
         total_text_height = len(lines) * self.font.get_linesize()

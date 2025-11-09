@@ -1,7 +1,7 @@
 import itertools
 import threading
 from types import MappingProxyType
-from typing import Iterable, Iterator
+from typing import Callable, Iterable, Iterator
 
 from heart.peripheral.compass import Compass
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -20,7 +20,7 @@ from heart.peripheral.radio import RadioPeripheral
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.sensor import Accelerometer
 from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
-                                     Switch)
+                                     Switch, SwitchState)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -237,6 +237,22 @@ class PeripheralManager:
             raise Exception("Unable to get switch as it has not been registered")
 
         return self._deprecated_main_switch
+
+    def get_main_switch_state(self) -> SwitchState:
+        """Return the latest state snapshot for the primary switch."""
+
+        if self._deprecated_main_switch is None:
+            raise RuntimeError("Main switch is not registered")
+        return self._deprecated_main_switch.get_state()
+
+    def subscribe_main_switch(
+        self, callback: Callable[[SwitchState], None]
+    ) -> Callable[[], None]:
+        """Register ``callback`` for main switch state updates."""
+
+        if self._deprecated_main_switch is None:
+            raise RuntimeError("Main switch is not registered")
+        return self._deprecated_main_switch.subscribe_state(callback)
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
         for p in self._peripherals:
