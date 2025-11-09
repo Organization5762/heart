@@ -23,28 +23,35 @@ This roadmap enumerates the metrics required for the next observability push and
 | Wire priority metrics into exporter prototypes | Telemetry snapshots emitted through `src/heart/utilities/metrics.py` during staging runs | Runtime maintainer |
 | Capture validation data sets for each metric category | Fixture updates stored under `drivers/fixtures/metrics/` with provenance notes | QA engineer |
 
+# Progress Update (2025-11-09)
+
+| Completed Work | Evidence | Next Focus |
+| --- | --- | --- |
+| Keyed extrema, percentile, moment, and inter-arrival metrics implemented with pruning policies. | `src/heart/events/metrics.py` plus targeted coverage in `tests/events/metrics/test_advanced_metrics.py`. | Extend exporters to emit scaffold cadence metadata and hook peripheral publishers. |
+| Signal and statistics helper suites for FFT, Hilbert envelopes, cross-correlation, histogram, and EWMA flows landed with validation. | `src/heart/utilities/metrics.py`, `src/heart/utilities/signal.py`, `src/heart/utilities/statistics.py`, and the regression suites in `tests/utilities/`. | Capture representative fixtures under `drivers/fixtures/metrics/` for long-horizon validation. |
+
 # Task Breakdown
 
 ## Discovery
 
-- [ ] Audit current metric usage in `src/heart/events/metrics.py` and `src/heart/utilities/metrics.py` to confirm existing primitives.
+- [x] Audit current metric usage in `src/heart/events/metrics.py` and `src/heart/utilities/metrics.py` to confirm existing primitives.
 - [ ] Inventory signal emitters in `src/heart/peripheral` and `src/heart/environment.py` to identify data availability for each category.
 - [ ] Collect representative traces (motion, audio, RF, environmental) and store them under a shared `drivers/fixtures/metrics/` namespace with README annotations.
 - [ ] Review exporter interfaces (`src/heart/utilities/telemetry.py`) to understand payload constraints and required schema fields.
 
 ## Implementation
 
-- [ ] Define keyed-metric subclasses for each category using rolling window policies in `src/heart/events/metrics.py`.
-- [ ] Introduce shared signal processing helpers (FFT, Hilbert transform, envelope followers) under `src/heart/utilities/signal.py` with pure-Python fallbacks.
+- [x] Define keyed-metric subclasses for each category using rolling window policies in `src/heart/events/metrics.py`.
+- [x] Introduce shared signal processing helpers (FFT, Hilbert transform, envelope followers) under `src/heart/utilities/signal.py` with pure-Python fallbacks.
 - [ ] Extend peripheral publishers (accelerometer, IR array, microphone, UWB) to feed the new metrics through `EventBus.observe()` hooks.
 - [ ] Update the telemetry exporter to include scaffold snapshot metadata (window bounds, cadence hints) inside emitted payloads.
 
 ## Validation
 
-- [ ] Add regression tests in `tests/events/metrics/` covering snapshot immutability, window pruning, and derived signal accuracy for each metric.
+- [x] Add regression tests in `tests/events/metrics/` covering snapshot immutability, window pruning, and derived signal accuracy for each metric.
 - [ ] Create integration tests simulating multi-stream ingestion via `tests/peripheral/test_event_bus_metrics.py` to validate concurrency behavior.
 - [ ] Replay captured traces with `scripts/peripheral/replay_events.py` and compare emitted aggregates against documented success thresholds.
-- [ ] Run `make test` and `make format` prior to landing changes.
+- [ ] Run `make test` and `make format` prior to landing changes. (Formatting currently blocked by offline dependency resolution; rerun once package index access is restored.)
 
 # Narrative Walkthrough
 

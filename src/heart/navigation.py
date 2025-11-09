@@ -1,4 +1,5 @@
-from collections import defaultdict
+from collections import Counter, defaultdict, deque
+from collections.abc import Callable, Iterable
 
 import pygame
 
@@ -373,7 +374,95 @@ class ComposedRenderer(BaseRenderer):
             renderer._internal_process(window, clock, peripheral_manager, orientation)
 
 
-class MultiScene(SwitchStateConsumer, BaseRenderer):
+RendererSorter = Callable[[tuple[BaseRenderer, ...], PeripheralManager], Iterable[BaseRenderer]]
+
+
+class SortedComposedRenderer(ComposedRenderer):
+    """Compose renderers while dynamically reordering them.
+
+    ``SortedComposedRenderer`` works like :class:`ComposedRenderer` but delegates
+    ordering to a ``sorter`` callback. The callback receives the renderers as a
+    tuple and must return an iterable with the same renderers, potentially in a
+    different order. This makes it easy to express ordering strategies based on
+    runtime signals such as peripheral input.
+    """
+
+    def __init__(
+        self,
+        renderers: Iterable[BaseRenderer],
+        *,
+        sorter: RendererSorter,
+    ) -> None:
+        super().__init__(list(renderers))
+        self._sorter = sorter
+
+    def _ordered_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> tuple[BaseRenderer, ...]:
+        unordered = tuple(self.renderers)
+        ordered = tuple(self._sorter(unordered, peripheral_manager))
+
+        if Counter(ordered) != Counter(unordered):
+            raise ValueError(
+                "Sorter must return an iterable containing the original renderers"
+            )
+
+        return ordered
+
+    def get_renderers(
+        self, peripheral_manager: PeripheralManager
+    ) -> list[BaseRenderer]:
+        result: list[BaseRenderer] = []
+        for renderer in self._ordered_renderers(peripheral_manager):
+            result.extend(renderer.get_renderers(peripheral_manager))
+        return result
+
+    def process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        for renderer in self._ordered_renderers(peripheral_manager):
+            renderer._internal_process(window, clock, peripheral_manager, orientation)
+
+
+def switch_controlled_renderer_order(
+    renderers: tuple[BaseRenderer, ...],
+    peripheral_manager: PeripheralManager,
+) -> tuple[BaseRenderer, ...]:
+    """Order renderers using the main switch's rotation and button state.
+
+    The renderers are alphabetised by name, rotated according to the current
+    rotary position since the last button press, and flipped when the button has
+    been pressed an odd number of times. Falling back to the original ordering
+    keeps the composition usable when the switch is unavailable.
+    """
+
+    if not renderers:
+        return renderers
+
+    try:
+        switch = peripheral_manager._deprecated_get_main_switch()
+    except Exception:
+        return renderers
+
+    ordered = sorted(renderers, key=lambda renderer: renderer.name.lower())
+
+    if switch.get_button_value() % 2 == 1:
+        ordered.reverse()
+
+    rotation = switch.get_rotation_since_last_button_press()
+    if rotation:
+        rotated = deque(ordered)
+        rotated.rotate(-rotation)
+        ordered = list(rotated)
+
+    return tuple(ordered)
+
+
+class MultiScene(BaseRenderer):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
         SwitchStateConsumer.__init__(self)
         BaseRenderer.__init__(self)

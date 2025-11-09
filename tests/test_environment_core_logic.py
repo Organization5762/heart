@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import types
+
 import numpy as np
 import pytest
 
+from heart.display.renderers.free_text import FreeTextRenderer
 from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
                                _convert_bgr_to_hsv, _convert_hsv_to_bgr)
+from heart.events.types import PhoneTextMessage
 
 
 @pytest.fixture(autouse=True)
@@ -199,3 +203,31 @@ def test_render_fn_default_uses_loop_variant(loop) -> None:
 )
 def test_render_fn_handles_unknown_variant(loop, variant: RendererVariant) -> None:
     assert callable(loop._render_fn(variant))
+
+
+def test_phone_text_event_triggers_transient_renderer(loop, monkeypatch) -> None:
+    current_time = 1000.0
+
+    monkeypatch.setattr("heart.environment.time.monotonic", lambda: current_time)
+    loop.app_controller = types.SimpleNamespace(
+        get_renderers=lambda *args, **kwargs: [],
+    )
+
+    assert loop._select_renderers() == []
+
+    loop.event_bus.emit(
+        PhoneTextMessage.EVENT_TYPE,
+        {"text": "Heart: hello"},
+    )
+
+    active_renderers = loop._select_renderers()
+    assert len(active_renderers) == 1
+    renderer = active_renderers[0]
+    assert isinstance(renderer, FreeTextRenderer)
+
+    current_time += loop._phone_text_duration - 1.0
+    assert loop._select_renderers() == [renderer]
+
+    current_time += 2.0
+    assert loop._select_renderers() == []
+    assert loop._phone_text_display_started_at is None
