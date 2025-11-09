@@ -344,6 +344,7 @@ class GameLoop:
             pygame.event.set_grab(True)
 
         self._last_render_mode = pygame.SHOWN
+        self._next_render_log_time = 0.0
 
     def add_mode(
         self,
@@ -551,27 +552,34 @@ class GameLoop:
             )
 
             duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-            logger.info(
-                (
-                    "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
-                    "display_mode=%s uses_opengl=%s initialized=%s"
-                ),
+            log_message = (
+                "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
+                "display_mode=%s uses_opengl=%s initialized=%s"
+            )
+            log_args = (
                 renderer.name,
                 duration_ms,
                 self._render_queue_depth,
                 renderer.device_display_mode.name,
                 renderer.device_display_mode == DeviceDisplayMode.OPENGL,
                 renderer.is_initialized(),
-                extra={
-                    "renderer": renderer.name,
-                    "duration_ms": duration_ms,
-                    "queue_depth": self._render_queue_depth,
-                    "display_mode": renderer.device_display_mode.name,
-                    "uses_opengl": renderer.device_display_mode
-                    == DeviceDisplayMode.OPENGL,
-                    "initialized": renderer.is_initialized(),
-                },
             )
+            log_extra = {
+                "renderer": renderer.name,
+                "duration_ms": duration_ms,
+                "queue_depth": self._render_queue_depth,
+                "display_mode": renderer.device_display_mode.name,
+                "uses_opengl": renderer.device_display_mode
+                == DeviceDisplayMode.OPENGL,
+                "initialized": renderer.is_initialized(),
+            }
+
+            current_time = time.monotonic()
+            if current_time >= self._next_render_log_time:
+                logger.info(log_message, *log_args, extra=log_extra)
+                self._next_render_log_time = current_time + 1.0
+            else:
+                logger.debug(log_message, *log_args, extra=log_extra)
 
             return screen
         except Exception as e:
