@@ -122,13 +122,15 @@ module = [
     "pygame.*",
     "requests",
     "rgbmatrix",
-    "serial",
-    "serial.*",
-    "bluezero",
-    "bluezero.*",
-    "typer",
-    "toml",
-    "sounddevice",
+    "serial", 
+    "serial.*", 
+    "bluezero", 
+    "bluezero.*", 
+    "typer", 
+    "toml", 
+    "sounddevice", 
+    "usb", 
+    "usb.*", 
 ]
 ignore_missing_imports = true
 
