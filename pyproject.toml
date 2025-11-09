@@ -40,10 +40,13 @@ dependencies = [
     "typer-slim",
     "PyOpenGL>=3.1.0",
     "moderngl",
+    "sounddevice",
+    "paho-mqtt",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "Pillow",
     "scipy",
     "mypy",
     "types-requests",
@@ -147,9 +150,7 @@ module = [
     "heart.peripheral.switch",
     "heart.peripheral.sensor",
     "heart.peripheral.gamepad.gamepad",
-    "heart.environment",
     "heart.device.local",
-    "heart.loop",
 ]
 ignore_errors = true
 

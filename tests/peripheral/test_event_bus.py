@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -238,11 +238,11 @@ def test_virtual_peripheral_definitions_bind_resources() -> None:
     resources = bus.virtual_peripherals.list_definitions()[handle.peripheral_id].resources
     assert resources is not None
     with pytest.raises(TypeError):
-        resources["foo"] = 99  # type: ignore[index]
+        cast(dict[str, Any], resources)["foo"] = 99
 
     dummy_context = captured["context"]
     with pytest.raises(TypeError):
-        dummy_context.resources["foo"] = 5  # type: ignore[index]
+        cast(dict[str, Any], dummy_context.resources)["foo"] = 5
     with pytest.raises(KeyError):
         dummy_context.get_resource("missing")
 
