@@ -12,6 +12,7 @@ from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
 from openant.easy.exception import AntException
 from openant.easy.node import Node
+from usb.core import NoBackendError
 
 from heart.events.types import HeartRateLifecycle, HeartRateMeasurement
 from heart.peripheral.core import Peripheral
@@ -249,6 +250,11 @@ class HeartRateManager(Peripheral):
                     self._ant_cycle()
                 except DriverNotFound:
                     logger.error("ANT driver not found - skipping HeartRateManager")
+                    return
+                except NoBackendError:
+                    logger.error(
+                        "USB backend not available - skipping HeartRateManager"
+                    )
                     return
                 except (AntException, OSError, RuntimeError) as e:
                     logger.error("ANT error: %s – retrying in %d s", e, RETRY_DELAY)
