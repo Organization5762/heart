@@ -53,6 +53,12 @@ class LEDMatrixDisplay(Peripheral):
         return self._height
 
     @property
+    def producer_id(self) -> int:
+        """Return the producer identifier used for emitted frames."""
+
+        return self._producer_id
+
+    @property
     def latest_frame(self) -> DisplayFrame | None:
         """Return the most recently published frame, if any."""
 

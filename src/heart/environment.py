@@ -763,10 +763,13 @@ class GameLoop:
         self.__dim_display()
 
     def __set_singleton(self) -> None:
-        if self.get_game_loop() is not None:
-            raise Exception("An active GameLoop exists already, please re-use that one")
-
-        GameLoop.set_game_loop(self)
+        active_loop = self.get_game_loop()
+        if active_loop is None:
+            GameLoop.set_game_loop(self)
+        elif active_loop is not self:
+            logger.debug(
+                "GameLoop initialized alongside existing instance; keeping original active"
+            )
 
     def _initialize_screen(self) -> None:
         pygame.init()

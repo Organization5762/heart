@@ -1,3 +1,4 @@
+import os
 import types
 
 import pygame
@@ -7,6 +8,8 @@ from pytest_benchmark.fixture import BenchmarkFixture
 from heart.display.renderers.pixels import RandomPixel
 from heart.environment import GameLoop, RendererVariant
 from heart.peripheral.core import events
+from heart.peripheral.core.manager import PeripheralManager
+from tests.conftest import FakeFixtureDevice
 
 
 @pytest.mark.parametrize("num_renderers", [1, 5, 10, 25, 50, 100, 1000])
@@ -102,3 +105,21 @@ def test_handle_events_supports_missing_event_payload(loop: GameLoop, monkeypatc
             "pygame_event_name": pygame.event.event_name(pygame.NOEVENT),
         }
     ]
+
+
+def test_multiple_game_loops_can_coexist(orientation) -> None:
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
+    manager_one = PeripheralManager()
+    device_one = FakeFixtureDevice(orientation=orientation)
+    loop_one = GameLoop(device=device_one, peripheral_manager=manager_one)
+    loop_one._initialize_screen()
+
+    manager_two = PeripheralManager()
+    device_two = FakeFixtureDevice(orientation=orientation)
+    loop_two = GameLoop(device=device_two, peripheral_manager=manager_two)
+    loop_two._initialize_screen()
+
+    assert loop_one.device is device_one
+    assert loop_two.device is device_two
+
+    pygame.quit()

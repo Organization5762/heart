@@ -56,6 +56,8 @@ flowchart LR
         Capture["Frame Capture\n(share surface)"]
         DeviceBridge["Device Bridge"]
         LedMatrix["LEDMatrix Driver\n(rgbmatrix)"]
+        AverageMirror["AverageColorLED Peripheral"]
+        SingleLED["Single LED Device"]
     end
 
     CLI --> Registry --> Configurer --> Loop
@@ -65,6 +67,7 @@ flowchart LR
     AppRouter --> ModeServices --> FrameComposer --> DisplaySvc
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
+    Capture --> AverageMirror --> SingleLED
 
     Loop --> PeripheralMgr
     PeripheralMgr --> Switch --> AppRouter
@@ -76,7 +79,7 @@ flowchart LR
     class CLI,Registry,Configurer,ModeServices,FrameComposer service;
     class Loop,AppRouter orchestrator;
     class PeripheralMgr,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
-    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix output;
+    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
 
 ## Rendering Procedure
