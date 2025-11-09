@@ -17,17 +17,17 @@ from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.display.renderers.flame import FlameRenderer
 from heart.display.renderers.free_text import FreeTextRenderer
+from heart.events.types import HeartRateMeasurement, PhoneTextMessage
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.heart_rates import current_bpms
 from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
-    from heart.peripheral.core import StateEntry, StateSnapshot
+    from heart.peripheral.core import Input, StateEntry, StateSnapshot
 
 
 def _load_cv2_module() -> ModuleType | None:
@@ -303,14 +303,18 @@ class GameLoop:
         self._active_mode_index = 0
 
         # Phone text display state
-        self._phone_text_display_time: float | None = None
+        self._phone_text_display_started_at: float | None = None
         self._phone_text_duration = 5.0  # Display phone text for 5 seconds
         self._phone_text_renderer: FreeTextRenderer | None = None
+        self._event_bus_subscriptions: list[SubscriptionHandle] = []
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
         self.tmp_float: np.ndarray | None = None
         self.edge_thresh = 1
+
+        self._flame_renderer: FlameRenderer | None = None
+        self._flame_bpm_threshold = 150.0
 
         manager_bus = self.peripheral_manager.event_bus
         self._event_bus = event_bus or manager_bus or EventBus()
@@ -326,6 +330,8 @@ class GameLoop:
         )
         self._display_peripheral.attach_event_bus(self._event_bus)
         self.peripheral_manager.register(self._display_peripheral)
+
+        self._register_event_bus_observers()
 
         pygame.display.set_mode(
             (
@@ -401,51 +407,105 @@ class GameLoop:
         if self.clock is None or self.screen is None:
             raise RuntimeError("GameLoop failed to initialize display surfaces")
         clock = self.clock
-        while self.running:
-            self._handle_events()
-            self._preprocess_setup()
+        try:
+            while self.running:
+                self._handle_events()
+                self._preprocess_setup()
 
-            # Check for phone text
-            phone_text = self.peripheral_manager.get_phone_text()
-            popped_text = phone_text.pop_text()
-            if popped_text:
-                # Set the time when text was received
-                self._phone_text_display_time = time.time()
-                # Create a text renderer for the phone text
-                self._phone_text_renderer = FreeTextRenderer()
+                renderers = self._select_renderers()
+                self._one_loop(renderers)
+                clock.tick(self.max_fps)
+        finally:
+            pygame.quit()
+            self._unsubscribe_event_bus_observers()
 
-            # If we're in the phone text display period, add the text renderer
-            renderers: list["BaseRenderer"]
-            if self._phone_text_display_time is not None:
-                current_time = time.time()
-                if self._phone_text_renderer is None:
-                    self._phone_text_renderer = FreeTextRenderer()
-                renderers = [self._phone_text_renderer]
-                if (
-                    current_time - self._phone_text_display_time
-                    > self._phone_text_duration
-                ):
-                    # Reset phone text display time after duration expires
-                    self._phone_text_display_time = None
+    def _register_event_bus_observers(self) -> None:
+        handle = self._event_bus.subscribe(
+            PhoneTextMessage.EVENT_TYPE, self._on_phone_text_message
+        )
+        self._event_bus_subscriptions.append(handle)
+        latest = self.event_bus.state_store.get_latest(PhoneTextMessage.EVENT_TYPE)
+        if latest is not None:
+            self._phone_text_display_started_at = time.monotonic()
+            self._ensure_phone_text_renderer()
 
-            else:
-                renderers = self.app_controller.get_renderers(
-                    peripheral_manager=self.peripheral_manager
+    def _unsubscribe_event_bus_observers(self) -> None:
+        for handle in self._event_bus_subscriptions:
+            try:
+                self._event_bus.unsubscribe(handle)
+            except Exception:
+                logger.exception(
+                    "Failed to unsubscribe %s from event bus", handle.callback
                 )
+        self._event_bus_subscriptions.clear()
 
-            # Check if the average BPM is above 80 and show flames if so
-            if current_bpms and len(current_bpms) >= 5:
-                bpm_values = [bpm for bpm in current_bpms.values() if bpm > 0]
-                if bpm_values and sum(bpm_values) / len(bpm_values) > 150:
-                    for r in renderers:
-                        if hasattr(r, "is_flame_renderer") and r.is_flame_renderer:
-                            break
-                    else:
-                        renderers.append(FlameRenderer())
-            self._one_loop(renderers)
-            clock.tick(self.max_fps)
+    def _on_phone_text_message(self, _: "Input") -> None:
+        self._phone_text_display_started_at = time.monotonic()
+        self._ensure_phone_text_renderer()
 
-        pygame.quit()
+    def _ensure_phone_text_renderer(self) -> FreeTextRenderer:
+        if self._phone_text_renderer is None:
+            self._phone_text_renderer = FreeTextRenderer()
+        return self._phone_text_renderer
+
+    def _ensure_flame_renderer(self) -> FlameRenderer:
+        if self._flame_renderer is None:
+            self._flame_renderer = FlameRenderer()
+            setattr(self._flame_renderer, "is_flame_renderer", True)
+        return self._flame_renderer
+
+    def _select_renderers(self) -> list["BaseRenderer"]:
+        if self._should_show_phone_text():
+            return [self._ensure_phone_text_renderer()]
+
+        base_renderers = self.app_controller.get_renderers(
+            peripheral_manager=self.peripheral_manager
+        )
+        renderers = list(base_renderers) if base_renderers else []
+        if self._should_add_flame_renderer(renderers):
+            renderers.append(self._ensure_flame_renderer())
+        return renderers
+
+    def _should_show_phone_text(self) -> bool:
+        if self._phone_text_display_started_at is None:
+            return False
+        elapsed = time.monotonic() - self._phone_text_display_started_at
+        if elapsed > self._phone_text_duration:
+            self._phone_text_display_started_at = None
+            return False
+        return True
+
+    def _should_add_flame_renderer(
+        self, renderers: list["BaseRenderer"]
+    ) -> bool:
+        if any(self._is_flame_renderer(renderer) for renderer in renderers):
+            return False
+
+        entries = self.event_bus.state_store.get_all(
+            HeartRateMeasurement.EVENT_TYPE
+        )
+        if len(entries) < 5:
+            return False
+
+        bpm_values: list[int] = []
+        for entry in entries.values():
+            data = entry.data
+            if isinstance(data, Mapping):
+                bpm = data.get("bpm")
+                if isinstance(bpm, (int, float)) and bpm > 0:
+                    bpm_values.append(int(bpm))
+
+        if len(bpm_values) < 5:
+            return False
+
+        average_bpm = sum(bpm_values) / len(bpm_values)
+        return average_bpm > self._flame_bpm_threshold
+
+    @staticmethod
+    def _is_flame_renderer(renderer: "BaseRenderer") -> bool:
+        if getattr(renderer, "is_flame_renderer", False):
+            return True
+        return isinstance(renderer, FlameRenderer)
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
