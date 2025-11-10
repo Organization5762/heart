@@ -22,10 +22,13 @@ status so incremental updates stay coordinated.
   - `SlideTransitionRenderer` (`src/heart/display/renderers/slide.py`) – tracks
     slide offsets atomically while orchestrating transition timing across two
     child renderers.
+  - `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) – stores
+    wrapped text layout and font sizing in atomic state while preserving
+    phone-text integration.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[#####>----------------]`
+Progress indicator: `[######>---------------]`
 
 ## Validation
 

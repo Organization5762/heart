@@ -1,54 +1,43 @@
+from __future__ import annotations
+
 import textwrap
-from typing import Optional
+from dataclasses import dataclass
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.phone_text import PhoneText
 
 
-class FreeTextRenderer(BaseRenderer):
+@dataclass(frozen=True)
+class FreeTextRendererState:
+    cached_text: str | None = None
+    wrapped_lines: tuple[str, ...] = ()
+    window_size: tuple[int, int] | None = None
+    font_size: int | None = None
+    line_height: int = 0
+
+
+class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
     """Render the most recent text message that arrived via *PhoneText*."""
 
     def __init__(self) -> None:
-        """Create a *FreeTextRenderer*.
+        """Create a *FreeTextRenderer*."""
 
-        Parameters
-        ----------
-        font_path:
-            Filename inside the *assets* directory to load as a font.  If *None*
-            the default pygame system font is used.
-        font_size:
-            Font size in pixels.
-        color:
-            RGB colour for the text.
-        wrap_at_chars:
-            Soft wrap column when incoming text does not contain new‐lines.  Set
-            to *None* to disable wrapping.
-
-        """
-        super().__init__()
-        self.device_display_mode = DeviceDisplayMode.MIRRORED
-
-        self._font: Optional[pygame.font.Font] = None
-        self._phone_text: Optional[PhoneText] = None
-        self._line_height: int = 0  # Store line height as instance variable
         self._font_cache: dict[int, pygame.font.Font] = {}
-
-        # Dynamic sizing helpers
-        self._cached_text: str | None = None  # Last text we rendered
-        self._wrapped_lines: list[str] = []  # Cached wrapped lines for drawing
-        self._last_window_size: tuple[int, int] | None = (
-            None  # Cache of last window size used for sizing
-        )
+        self._phone_text: PhoneText | None = None
 
         # Font size bounds (inclusive)
         self._font_size_max: int = 12
         self._font_size_min: int = 6
+        self._initial_font_size: int = 10
+
+        super().__init__()
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -60,14 +49,18 @@ class FreeTextRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        """Initialise the renderer and warm the default font cache."""
+
         # Locate the PhoneText peripheral once – it's expected to be present if
         # this renderer is used, but we handle the case where it isn't to avoid
         # crashes.
         self._phone_text = peripheral_manager.get_phone_text()
 
-        self._font = self._get_font(10)
-        if self._font:
-            self._line_height = self._font.get_linesize()
+        initial_font = self._get_font(self._initial_font_size)
+        self.update_state(
+            font_size=self._initial_font_size,
+            line_height=initial_font.get_linesize(),
+        )
 
         super().initialize(window, clock, peripheral_manager, orientation)
 
@@ -76,15 +69,8 @@ class FreeTextRenderer(BaseRenderer):
     # ------------------------------------------------------------------
     def _fit_font_and_wrap(
         self, text: str, window_width: int, window_height: int
-    ) -> tuple[pygame.font.Font, list[str]]:
-        """Return a font (within bounds) and wrapped lines that fit *text* on screen.
-
-        The function iterates from the largest to the smallest allowed font size and
-        picks the first one where every wrapped line fits horizontally and the
-        accumulated height fits vertically.  If *no* font size satisfies those
-        constraints we fall back to the minimum size.
-
-        """
+    ) -> tuple[int, list[str], int]:
+        """Return font size, wrapped lines, and line height that fit *text* on screen."""
 
         # Iterate from largest to smallest size to find the best fit.
         for size in range(self._font_size_max, self._font_size_min - 1, -1):
@@ -116,7 +102,7 @@ class FreeTextRenderer(BaseRenderer):
 
             # Check if the text fits.
             if max_line_width_px <= window_width and total_height_px <= window_height:
-                return font_candidate, wrapped
+                return size, wrapped, font_candidate.get_linesize()
 
         # If nothing fit, return the smallest size anyway.
         fallback_font = self._get_font(self._font_size_min)
@@ -131,7 +117,7 @@ class FreeTextRenderer(BaseRenderer):
             ) or [""]
             wrapped.extend(wrapped_lines)
 
-        return fallback_font, wrapped
+        return self._font_size_min, wrapped, fallback_font.get_linesize()
 
     # ------------------------------------------------------------------
     # Render loop
@@ -156,40 +142,46 @@ class FreeTextRenderer(BaseRenderer):
 
         window_width, window_height = window.get_size()
 
+        state = self.state
         # Recalculate font/wrapping if the text or available space changed.
         if (
-            last_text != self._cached_text
-            or self._last_window_size != (window_width, window_height)
-            or self._font is None
+            last_text != state.cached_text
+            or state.window_size != (window_width, window_height)
+            or state.font_size is None
         ):
-            self._font, self._wrapped_lines = self._fit_font_and_wrap(
+            font_size, wrapped_lines, line_height = self._fit_font_and_wrap(
                 last_text, window_width, window_height
             )
-            self._cached_text = last_text
-            self._last_window_size = (window_width, window_height)
-
-            # Update line height for the current font
-            self._line_height = self._font.get_linesize()
+            self.update_state(
+                cached_text=last_text,
+                wrapped_lines=tuple(wrapped_lines),
+                window_size=(window_width, window_height),
+                font_size=font_size,
+                line_height=line_height,
+            )
+            state = self.state
 
         # Calculate how many lines can fit in the window height
-        max_lines_visible = max(1, window_height // self._line_height)
+        font_for_rendering = self._get_font(state.font_size or self._font_size_min)
+        line_height = state.line_height or font_for_rendering.get_linesize()
+        max_lines_visible = max(1, window_height // line_height)
 
         # Truncate lines to only show what fits in the window
-        visible_lines = self._wrapped_lines[:max_lines_visible]
+        visible_lines = list(state.wrapped_lines[:max_lines_visible])
 
         # Calculate total height of visible lines
-        total_height = len(visible_lines) * self._line_height
+        total_height = len(visible_lines) * line_height
 
         # Calculate vertical centring.
         y = (window_height - total_height) // 2
 
         # Draw each line centred horizontally.
         for line in visible_lines:
-            rendered = self._font.render(line, True, (255, 105, 180))
+            rendered = font_for_rendering.render(line, True, (255, 105, 180))
             text_width, _ = rendered.get_size()
             x = (window_width - text_width) // 2
             window.blit(rendered, (x, y))
-            y += self._line_height
+            y += line_height
 
     def _get_font(self, size: int) -> pygame.font.Font:
         """Return a cached *pygame.font.Font* for ``size``."""
@@ -199,3 +191,6 @@ class FreeTextRenderer(BaseRenderer):
                 "Grand9K Pixel.ttf", font_size=size
             )
         return self._font_cache[size]
+
+    def _create_initial_state(self) -> FreeTextRendererState:
+        return FreeTextRendererState()
