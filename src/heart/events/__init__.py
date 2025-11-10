@@ -21,5 +21,6 @@ from .types import HeartRateMeasurement as HeartRateMeasurement
 from .types import InputEventPayload as InputEventPayload
 from .types import MicrophoneLevel as MicrophoneLevel
 from .types import PhoneTextMessage as PhoneTextMessage
+from .types import RendererFrame as RendererFrame
 from .types import SwitchButton as SwitchButton
 from .types import SwitchRotation as SwitchRotation

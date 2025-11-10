@@ -10,6 +10,7 @@ from typing import (TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping,
 
 if TYPE_CHECKING:  # pragma: no cover - import for type checking only
     from PIL import Image
+    import pygame
 
 from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          RADIO_PACKET, SWITCH_ROTATION)
@@ -371,6 +372,90 @@ class DisplayFrame(InputEventPayload):
         from PIL import Image
 
         return Image.frombytes(self.mode, (self.width, self.height), self.data)
+
+    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+        return Input(
+            event_type=self.event_type,
+            data=self,
+            producer_id=producer_id,
+            timestamp=_normalize_timestamp(timestamp),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RendererFrame(InputEventPayload):
+    """Intermediate surface snapshot emitted by renderers via the event bus."""
+
+    channel: str
+    renderer: str
+    frame_id: int
+    width: int
+    height: int
+    pixel_format: str
+    data: bytes
+    metadata: Mapping[str, Any] | None = None
+
+    EVENT_TYPE: ClassVar[str] = "display.renderer.frame"
+    event_type: str = EVENT_TYPE
+
+    def __post_init__(self) -> None:
+        if not self.channel:
+            raise ValueError("RendererFrame channel must be a non-empty string")
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("RendererFrame dimensions must be positive")
+        if not self.pixel_format:
+            raise ValueError("RendererFrame pixel_format must be provided")
+        if not isinstance(self.data, (bytes, bytearray, memoryview)):
+            raise TypeError("RendererFrame data must be a bytes-like object")
+        if self.metadata is not None and not isinstance(self.metadata, Mapping):
+            raise TypeError("RendererFrame metadata must be a mapping when provided")
+        if isinstance(self.data, bytearray):
+            object.__setattr__(self, "data", bytes(self.data))
+        if isinstance(self.metadata, Mapping):
+            object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @classmethod
+    def from_surface(
+        cls,
+        channel: str,
+        surface: "pygame.Surface",
+        *,
+        renderer: str,
+        frame_id: int,
+        pixel_format: str = "RGBA",
+        metadata: Mapping[str, Any] | None = None,
+    ) -> "RendererFrame":
+        """Capture ``surface`` pixels into a :class:`RendererFrame` payload."""
+
+        import pygame
+
+        if not isinstance(surface, pygame.Surface):
+            raise TypeError("surface must be a pygame.Surface instance")
+        if pixel_format not in {"RGBA", "RGB", "ARGB", "BGRA"}:
+            raise ValueError(f"Unsupported pixel format: {pixel_format}")
+        width, height = surface.get_size()
+        pixels = pygame.image.tostring(surface, pixel_format)
+        return cls(
+            channel=channel,
+            renderer=renderer,
+            frame_id=frame_id,
+            width=width,
+            height=height,
+            pixel_format=pixel_format,
+            data=pixels,
+            metadata=metadata,
+        )
+
+    def to_surface(self) -> "pygame.Surface":
+        """Materialize the stored buffer as a :class:`pygame.Surface`."""
+
+        import pygame
+
+        surface = pygame.image.frombuffer(
+            self.data, (self.width, self.height), self.pixel_format
+        )
+        # frombuffer shares the underlying memory; copy to decouple from payload
+        return surface.copy()
 
     def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
         return Input(
