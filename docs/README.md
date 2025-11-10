@@ -25,11 +25,13 @@ This guide outlines the preferred conventions for writing Markdown documents in 
 ## Call Out Key Syntax Elements
 
 - Use fenced code blocks with a language identifier for command-line or code snippets, for example:
-  
+
   ```bash
   make format
   ```
+
 - Use inline code (`` `like this` ``) to highlight filenames, commands, or configuration keys.
+
 - Bold important warnings or decision points. Reserve italics for emphasis or terminology being defined.
 
 ## Organize Tabular and Supplementary Information
@@ -47,7 +49,7 @@ This guide outlines the preferred conventions for writing Markdown documents in 
 
 ## Maintain Cross-References and Context
 
-- When referencing code, cite the module path or script name explicitly, e.g., `See \`src/drivers/imu.py\``.
+- When referencing code, cite the module path or script name explicitly, e.g., `See \`src/drivers/imu.py\`\`.
 - Link to related documents within the repository using relative paths so navigation works from any branch, for example: `[Driver bring-up checklist](./planning/driver_bringup.md)`.
 - Provide a short "Further reading" section at the end of long-form guides to aggregate related resources.
 
