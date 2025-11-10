@@ -1,5 +1,6 @@
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Any, Callable, Generic, TypeVar
 
 import pygame
 
@@ -149,6 +150,36 @@ class BaseRenderer:
                 tiled_surface.blit(screen, dest_pos)
 
         return tiled_surface
+
+
+StateT = TypeVar("StateT")
+
+
+class AtomicBaseRenderer(BaseRenderer, Generic[StateT]):
+    """Base renderer that manages an immutable state snapshot."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._state: StateT = self._create_initial_state()
+
+    def _create_initial_state(self) -> StateT:
+        raise NotImplementedError
+
+    @property
+    def state(self) -> StateT:
+        return self._state
+
+    def set_state(self, state: StateT) -> None:
+        self._state = state
+
+    def update_state(self, **changes: Any) -> None:
+        self._state = replace(self._state, **changes)
+
+    def mutate_state(self, mutator: Callable[[StateT], StateT]) -> None:
+        self._state = mutator(self._state)
+
+    def reset(self) -> None:
+        self._state = self._create_initial_state()
 
 
 @dataclass

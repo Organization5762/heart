@@ -1,17 +1,22 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any
 
 import pygame
 
 from heart.assets.loader import Loader
+from heart.assets.loader import spritesheet as SpritesheetAsset
 from heart.device import Orientation
 from heart.display.models import KeyFrame
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad.gamepad import Gamepad
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
+from heart.peripheral.switch import SwitchState
 from heart.utilities.env import Configuration
 
 
@@ -68,7 +73,20 @@ class LoopPhase(Enum):
 
 
 # Searching mode loop.
-class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
+@dataclass
+class SpritesheetLoopState:
+    spritesheet: SpritesheetAsset | None = None
+    current_frame: int = 0
+    loop_count: int = 0
+    phase: LoopPhase = LoopPhase.LOOP
+    time_since_last_update: float | None = None
+    duration_scale: float = 0.0
+    last_switch_rotation: float | None = None
+    reverse_direction: bool = False
+    gamepad: Gamepad | None = None
+
+
+class SpritesheetLoop(SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopState]):
     @classmethod
     def from_frame_data(
         cls,
@@ -83,11 +101,9 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
     ):
         sheet = Loader.load_spirtesheet(sheet_file_path)
         size = sheet.get_size()
-        # X / 64 = number of frames
         number_of_frames = size[0] // 64
         if skip_last_frame:
             number_of_frames -= 1
-        # Create FrameDescriptions
         frame_descriptions = []
         for frame_number in range(number_of_frames):
             x = frame_number * 64
@@ -128,21 +144,14 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
         frame_data: list[FrameDescription] | None = None,
     ) -> None:
         SwitchStateConsumer.__init__(self)
-        BaseRenderer.__init__(self)
         self.disable_input = disable_input
-        self.current_frame = 0
-        self.loop_count = 0
         self.file = sheet_file_path
         self.boomerang = boomerang
-        self.reverse_direction = False
 
         assert frame_data is not None or metadata_file_path is not None, (
             "Must provide either frame_data or metadata_file_path"
         )
 
-        self.start_frames = []
-        self.loop_frames = []
-        self.end_frames = []
         self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
 
         if frame_data is None:
@@ -180,18 +189,18 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
                     )
                 )
 
-        self.phase = LoopPhase.LOOP
-        if len(self.frames[LoopPhase.START]) > 0:
-            self.phase = LoopPhase.START
-
-        self.time_since_last_update = None
-
         self.image_scale = image_scale
         self.offset_x = offset_x
         self.offset_y = offset_y
 
-        self._current_duration_scale_factor = 0.0
-        self._last_switch_rot_value = None
+        self._initial_phase = (
+            LoopPhase.START if len(self.frames[LoopPhase.START]) > 0 else LoopPhase.LOOP
+        )
+
+        AtomicBaseRenderer.__init__(self)
+
+    def _create_initial_state(self) -> SpritesheetLoopState:
+        return SpritesheetLoopState(phase=self._initial_phase)
 
     def initialize(
         self,
@@ -200,36 +209,73 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.spritesheet = Loader.load_spirtesheet(self.file)
-        if not self.disable_input:
-            self.bind_switch(peripheral_manager)
+        self.configure_peripherals(peripheral_manager)
+        spritesheet = Loader.load_spirtesheet(self.file)
+        self.update_state(spritesheet=spritesheet)
         super().initialize(window, clock, peripheral_manager, orientation)
 
-    def reset(self):
-        self._current_duration_scale_factor = 0.0
+    def configure_peripherals(self, peripheral_manager: PeripheralManager) -> None:
+        if self.disable_input:
+            return
+        self.bind_switch(peripheral_manager)
+        try:
+            gamepad = peripheral_manager.get_gamepad()
+        except ValueError:
+            gamepad = None
+        self.set_gamepad(gamepad)
 
-    def _process_input(self, peripheral_manager: PeripheralManager) -> None:
-        self._process_switch(peripheral_manager)
-        self._process_gamepad(peripheral_manager)
+    def set_gamepad(self, gamepad: Gamepad | None) -> None:
+        self.update_state(gamepad=gamepad)
 
-    def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
-        current_value = self.get_switch_state().rotation_since_last_button_press
-        if self._last_switch_rot_value is not None:
-            if current_value > self._last_switch_rot_value:
-                self._current_duration_scale_factor += 0.05
-            elif current_value < self._last_switch_rot_value:
-                self._current_duration_scale_factor -= 0.05
+    def reset(self) -> None:
+        preserved_state = self.state
+        new_state = replace(
+            self._create_initial_state(),
+            spritesheet=preserved_state.spritesheet,
+            gamepad=preserved_state.gamepad,
+        )
+        self.set_state(new_state)
 
-        self._last_switch_rot_value = current_value
+    def on_switch_state(self, state: SwitchState) -> None:
+        if self.disable_input:
+            return
 
-    def _process_gamepad(self, peripheral_manager: PeripheralManager):
-        gamepad = peripheral_manager.get_gamepad()
+        def _mutate(current: SpritesheetLoopState) -> SpritesheetLoopState:
+            duration_scale = current.duration_scale
+            last_rotation = current.last_switch_rotation
+            current_rotation = state.rotation_since_last_button_press
+            if last_rotation is not None:
+                if current_rotation > last_rotation:
+                    duration_scale += 0.05
+                elif current_rotation < last_rotation:
+                    duration_scale -= 0.05
+            return replace(
+                current,
+                duration_scale=duration_scale,
+                last_switch_rotation=current_rotation,
+            )
+
+        self.mutate_state(_mutate)
+
+    def _apply_gamepad_input(self) -> None:
+        if self.disable_input:
+            return
+
+        gamepad = self.state.gamepad
+        if gamepad is None or not gamepad.is_connected():
+            return
+
         mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        if gamepad.is_connected():
+
+        def _mutate(current: SpritesheetLoopState) -> SpritesheetLoopState:
+            duration_scale = current.duration_scale
             if gamepad.axis_passed_threshold(mapping.AXIS_R):
-                self._current_duration_scale_factor += 0.005
+                duration_scale += 0.005
             elif gamepad.axis_passed_threshold(mapping.AXIS_L):
-                self._current_duration_scale_factor -= 0.005
+                duration_scale -= 0.005
+            return replace(current, duration_scale=duration_scale)
+
+        self.mutate_state(_mutate)
 
     def process(
         self,
@@ -238,65 +284,79 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        state = self.state
+        spritesheet = state.spritesheet
+        if spritesheet is None:
+            return
+
         screen_width, screen_height = window.get_size()
-        current_kf = self.frames[self.phase][self.current_frame]
+        current_kf = self.frames[state.phase][state.current_frame]
+
+        if not self.disable_input:
+            self._apply_gamepad_input()
+            state = self.state
+
+        duration_scale = state.duration_scale
         if self.disable_input:
             kf_duration = current_kf.duration
         else:
-            self._process_input(peripheral_manager)
             kf_duration = current_kf.duration - (
-                current_kf.duration * self._current_duration_scale_factor
+                current_kf.duration * duration_scale
             )
-        if (
-            self.time_since_last_update is None
-            or self.time_since_last_update > kf_duration
-        ):
-            if self.boomerang and self.phase == LoopPhase.LOOP:
-                if self.reverse_direction:
-                    self.current_frame -= 1
+
+        current_frame = state.current_frame
+        loop_count = state.loop_count
+        phase = state.phase
+        reverse_direction = state.reverse_direction
+        time_since_last_update = state.time_since_last_update
+
+        if time_since_last_update is None or time_since_last_update > kf_duration:
+            if self.boomerang and phase == LoopPhase.LOOP:
+                if reverse_direction:
+                    current_frame -= 1
                 else:
-                    self.current_frame += 1
+                    current_frame += 1
             else:
-                self.current_frame += 1
+                current_frame += 1
 
-            self.time_since_last_update = 0
+            time_since_last_update = 0
 
-            if self.boomerang and self.phase == LoopPhase.LOOP:
-                if self.current_frame >= len(self.frames[self.phase]) - 1:
-                    self.reverse_direction = True
-                    self.current_frame = len(self.frames[self.phase]) - 1
-                elif self.current_frame <= 0:
-                    self.reverse_direction = False
-                    self.current_frame = 0
-                    self.loop_count += 1
-                    if self.loop_count >= 4:
-                        self.loop_count = 0
+            if self.boomerang and phase == LoopPhase.LOOP:
+                if current_frame >= len(self.frames[phase]) - 1:
+                    reverse_direction = True
+                    current_frame = len(self.frames[phase]) - 1
+                elif current_frame <= 0:
+                    reverse_direction = False
+                    current_frame = 0
+                    loop_count += 1
+                    if loop_count >= 4:
+                        loop_count = 0
                         if len(self.frames[LoopPhase.END]) > 0:
-                            self.phase = LoopPhase.END
-                            self.current_frame = 0
-                            self.reverse_direction = False
+                            phase = LoopPhase.END
+                            current_frame = 0
+                            reverse_direction = False
                         elif len(self.frames[LoopPhase.START]) > 0:
-                            self.phase = LoopPhase.START
-                            self.current_frame = 0
-                            self.reverse_direction = False
-            elif self.current_frame >= len(self.frames[self.phase]):
-                self.current_frame = 0
-                match self.phase:
+                            phase = LoopPhase.START
+                            current_frame = 0
+                            reverse_direction = False
+            elif current_frame >= len(self.frames[phase]):
+                current_frame = 0
+                match phase:
                     case LoopPhase.START:
-                        self.phase = LoopPhase.LOOP
+                        phase = LoopPhase.LOOP
                     case LoopPhase.LOOP:
-                        if self.loop_count < 4:
-                            self.loop_count += 1
+                        if loop_count < 4:
+                            loop_count += 1
                         else:
-                            self.loop_count = 0
+                            loop_count = 0
                             if len(self.frames[LoopPhase.END]) > 0:
-                                self.phase = LoopPhase.END
+                                phase = LoopPhase.END
                             elif len(self.frames[LoopPhase.START]) > 0:
-                                self.phase = LoopPhase.START
+                                phase = LoopPhase.START
                     case LoopPhase.END:
-                        self.phase = LoopPhase.START
+                        phase = LoopPhase.START
 
-        image = self.spritesheet.image_at(current_kf.frame)
+        image = spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(
             image, (screen_width * self.image_scale, screen_height * self.image_scale)
         )
@@ -308,6 +368,26 @@ class SpritesheetLoop(SwitchStateConsumer, BaseRenderer):
 
         window.blit(scaled, (final_x, final_y))
 
-        if self.time_since_last_update is None:
-            self.time_since_last_update = 0
-        self.time_since_last_update += clock.get_time()
+        if time_since_last_update is None:
+            time_since_last_update = 0
+        time_since_last_update += clock.get_time()
+
+        updated_state = replace(
+            state,
+            current_frame=current_frame,
+            loop_count=loop_count,
+            phase=phase,
+            reverse_direction=reverse_direction,
+            time_since_last_update=time_since_last_update,
+        )
+        self.set_state(updated_state)
+
+
+def create_spritesheet_loop(
+    peripheral_manager: PeripheralManager,
+    *args: Any,
+    **kwargs: Any,
+) -> SpritesheetLoop:
+    renderer = SpritesheetLoop(*args, **kwargs)
+    renderer.configure_peripherals(peripheral_manager)
+    return renderer
