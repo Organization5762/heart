@@ -13,10 +13,13 @@ status so incremental updates stay coordinated.
   - `RenderColor` (`src/heart/display/renderers/color.py`) – now maintains
     immutable colour state and exposes `set_color` for callers that need to
     refresh the fill value.
+  - `TextRendering` (`src/heart/display/renderers/text.py`) – migrates text
+    layout to an immutable state snapshot while preserving switch-driven
+    rotation across copy decks.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[#>--------------------]`
+Progress indicator: `[###>------------------]`
 
 ## Validation
 
