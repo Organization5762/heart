@@ -1,4 +1,3 @@
-import os
 import sys
 import types
 from collections import deque
@@ -40,6 +39,18 @@ def init_pygame() -> None:
     pygame.init()
     yield
     pygame.quit()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def configure_sdl_video_driver() -> None:
+    """Force pygame to use the dummy SDL driver so headless tests remain stable."""
+
+    patcher = pytest.MonkeyPatch()
+    patcher.setenv("SDL_VIDEODRIVER", "dummy")
+    try:
+        yield
+    finally:
+        patcher.undo()
 
 
 @pytest.fixture
@@ -110,7 +121,6 @@ def manager() -> PeripheralManager:
 
 @pytest.fixture()
 def loop(manager, device) -> GameLoop:
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
     loop = GameLoop(device=device, peripheral_manager=manager)
     # We just initialize the PyGame screen because peripherals and the fact that we expect, in practice,
     # for this to be a singleton _shouldn't_ be that important for testing

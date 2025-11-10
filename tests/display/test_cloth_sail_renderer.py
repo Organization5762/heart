@@ -1,9 +1,6 @@
 import importlib
-import os
 import sys
 import types
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import numpy as np
 import pygame
