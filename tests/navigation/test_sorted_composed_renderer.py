@@ -38,44 +38,52 @@ class _StubPeripheralManager:
         return self._switch
 
 
-def test_sorted_composed_renderer_uses_sorter(manager) -> None:
-    renderers = [_StubRenderer(label) for label in ["beta", "alpha", "gamma"]]
+class TestNavigationSortedComposedRenderer:
+    """Group Navigation Sorted Composed Renderer tests so navigation sorted composed renderer behaviour stays reliable. This preserves confidence in navigation sorted composed renderer for end-to-end scenarios."""
 
-    composer = SortedComposedRenderer(
-        renderers, sorter=lambda rs, _: sorted(rs, key=lambda item: item.label)
+    def test_sorted_composed_renderer_uses_sorter(self, manager) -> None:
+        """Verify that SortedComposedRenderer applies the sorter to reorder renderers. This enables dynamic presentation logic so layouts can adjust to context."""
+        renderers = [_StubRenderer(label) for label in ["beta", "alpha", "gamma"]]
+
+        composer = SortedComposedRenderer(
+            renderers, sorter=lambda rs, _: sorted(rs, key=lambda item: item.label)
+        )
+
+        ordered = composer.get_renderers(manager)
+        assert [renderer.label for renderer in ordered] == ["alpha", "beta", "gamma"]
+
+
+
+    def test_sorted_composed_renderer_rejects_invalid_permutation(self, manager) -> None:
+        """Verify that SortedComposedRenderer raises when the sorter drops renderers from the result. This prevents subtle bugs where UI sections disappear due to mis-sorted lists."""
+        renderers = [_StubRenderer(label) for label in ["a", "b"]]
+
+        composer = SortedComposedRenderer(
+            renderers, sorter=lambda rs, _: rs[:-1]  # drop one renderer
+        )
+
+        with pytest.raises(ValueError):
+            composer.get_renderers(manager)
+
+
+
+    @pytest.mark.parametrize(
+        "rotation,button,expected",
+        [
+            (0, 0, ["alpha", "beta", "gamma"]),
+            (1, 0, ["beta", "gamma", "alpha"]),
+            (2, 1, ["alpha", "gamma", "beta"]),
+        ],
     )
+    def test_switch_controlled_renderer_order(self, rotation, button, expected) -> None:
+        """Verify that switch_controlled_renderer_order rotates renderers based on switch state and button offset. This ties hardware controls to visual ordering for user-driven customization."""
+        renderers = tuple(
+            _StubRenderer(label) for label in ["gamma", "alpha", "beta"]
+        )
+        manager = _StubPeripheralManager(
+            _StubSwitch(rotation=rotation, button=button)
+        )
 
-    ordered = composer.get_renderers(manager)
-    assert [renderer.label for renderer in ordered] == ["alpha", "beta", "gamma"]
+        ordered = switch_controlled_renderer_order(renderers, manager)
 
-
-def test_sorted_composed_renderer_rejects_invalid_permutation(manager) -> None:
-    renderers = [_StubRenderer(label) for label in ["a", "b"]]
-
-    composer = SortedComposedRenderer(
-        renderers, sorter=lambda rs, _: rs[:-1]  # drop one renderer
-    )
-
-    with pytest.raises(ValueError):
-        composer.get_renderers(manager)
-
-
-@pytest.mark.parametrize(
-    "rotation,button,expected",
-    [
-        (0, 0, ["alpha", "beta", "gamma"]),
-        (1, 0, ["beta", "gamma", "alpha"]),
-        (2, 1, ["alpha", "gamma", "beta"]),
-    ],
-)
-def test_switch_controlled_renderer_order(rotation, button, expected) -> None:
-    renderers = tuple(
-        _StubRenderer(label) for label in ["gamma", "alpha", "beta"]
-    )
-    manager = _StubPeripheralManager(
-        _StubSwitch(rotation=rotation, button=button)
-    )
-
-    ordered = switch_controlled_renderer_order(renderers, manager)
-
-    assert [renderer.label for renderer in ordered] == expected
+        assert [renderer.label for renderer in ordered] == expected

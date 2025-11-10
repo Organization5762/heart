@@ -41,30 +41,36 @@ def _wait_for(predicate, timeout: float = 1.0) -> bool:
     return predicate()
 
 
-def test_shared_memory_roundtrip_updates_frame_buffer(tmp_path: Path) -> None:
-    size = (4, 4)
-    target = FrameBuffer(size=size)
-    watcher = SharedMemoryWatcher(tmp_path / "frame.mmap", target, poll_interval=0.0005)
-    writer = SharedMemoryFrameWriter(tmp_path / "frame.mmap", size=size)
+class TestExperimentalSharedMemory:
+    """Group Experimental Shared Memory tests so experimental shared memory behaviour stays reliable. This preserves confidence in experimental shared memory for end-to-end scenarios."""
 
-    try:
-        watcher.start()
-        image = Image.new("RGB", size, (10, 20, 30))
-        writer.write_image(image)
+    def test_shared_memory_roundtrip_updates_frame_buffer(self, tmp_path: Path) -> None:
+        """Verify that the shared memory watcher reflects images written by the frame writer. This confirms the IPC bridge works for external render processes to stream frames."""
+        size = (4, 4)
+        target = FrameBuffer(size=size)
+        watcher = SharedMemoryWatcher(tmp_path / "frame.mmap", target, poll_interval=0.0005)
+        writer = SharedMemoryFrameWriter(tmp_path / "frame.mmap", size=size)
 
-        assert _wait_for(
-            lambda: list(target.snapshot().image.getdata())[0] == (10, 20, 30)
-        )
-    finally:
-        watcher.stop()
-        writer.close()
+        try:
+            watcher.start()
+            image = Image.new("RGB", size, (10, 20, 30))
+            writer.write_image(image)
+
+            assert _wait_for(
+                lambda: list(target.snapshot().image.getdata())[0] == (10, 20, 30)
+            )
+        finally:
+            watcher.stop()
+            writer.close()
 
 
-def test_writer_rejects_wrong_payload_size(tmp_path: Path) -> None:
-    path = tmp_path / "frame.mmap"
-    writer = SharedMemoryFrameWriter(path, size=(2, 2))
-    try:
-        with pytest.raises(SharedMemoryError):
-            writer.write_bytes(b"short")
-    finally:
-        writer.close()
+
+    def test_writer_rejects_wrong_payload_size(self, tmp_path: Path) -> None:
+        """Verify that SharedMemoryFrameWriter rejects byte payloads that are smaller than the frame size. This avoids corrupting shared memory by catching truncated writes early."""
+        path = tmp_path / "frame.mmap"
+        writer = SharedMemoryFrameWriter(path, size=(2, 2))
+        try:
+            with pytest.raises(SharedMemoryError):
+                writer.write_bytes(b"short")
+        finally:
+            writer.close()

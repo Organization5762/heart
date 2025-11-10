@@ -3,17 +3,21 @@ from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.phone_text import PhoneText
 
 
-def test_phone_text_emits_message_event():
-    bus = EventBus()
-    captured: list[str] = []
+class TestPeripheralPhoneTextEventBus:
+    """Group Peripheral Phone Text Event Bus tests so peripheral phone text event bus behaviour stays reliable. This preserves confidence in peripheral phone text event bus for end-to-end scenarios."""
 
-    bus.subscribe(
-        PhoneTextMessage.EVENT_TYPE, lambda event: captured.append(event.data["text"])
-    )
+    def test_phone_text_emits_message_event(self):
+        """Verify that phone text emits message event. This ensures event orchestration remains reliable."""
+        bus = EventBus()
+        captured: list[str] = []
 
-    phone = PhoneText(event_bus=bus, producer_id=3)
+        bus.subscribe(
+            PhoneTextMessage.EVENT_TYPE, lambda event: captured.append(event.data["text"])
+        )
 
-    phone._on_write(b"hello world\0", None)
+        phone = PhoneText(event_bus=bus, producer_id=3)
 
-    assert captured == ["hello world"]
-    assert phone.pop_text() == "hello world"
+        phone._on_write(b"hello world\0", None)
+
+        assert captured == ["hello world"]
+        assert phone.pop_text() == "hello world"

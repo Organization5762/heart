@@ -15,50 +15,58 @@ def _solid_image(width: int, height: int, *, value: int) -> Image.Image:
     return Image.fromarray(array, mode="RGB")
 
 
-def test_publish_image_emits_event_and_updates_state_store() -> None:
-    bus = EventBus()
-    peripheral = LEDMatrixDisplay(width=4, height=2, event_bus=bus)
+class TestPeripheralLedMatrixDisplay:
+    """Group Peripheral Led Matrix Display tests so peripheral led matrix display behaviour stays reliable. This preserves confidence in peripheral led matrix display for end-to-end scenarios."""
 
-    image = _solid_image(4, 2, value=128)
-    peripheral.publish_image(
-        image, timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
-    )
+    def test_publish_image_emits_event_and_updates_state_store(self) -> None:
+        """Verify that publish image emits event and updates state store. This ensures event orchestration remains reliable."""
+        bus = EventBus()
+        peripheral = LEDMatrixDisplay(width=4, height=2, event_bus=bus)
 
-    latest = peripheral.latest_frame
-    assert latest is not None
-    assert latest.frame_id == 0
-    assert latest.width == 4 and latest.height == 2
-    assert latest.mode == "RGB"
-    assert latest.data == image.tobytes()
-    reconstructed = latest.to_image()
-    assert reconstructed.tobytes() == image.tobytes()
+        image = _solid_image(4, 2, value=128)
+        peripheral.publish_image(
+            image, timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
+        )
 
-    state_entry = bus.state_store.get_latest(DisplayFrame.EVENT_TYPE)
-    assert state_entry is not None
-    assert isinstance(state_entry.data, DisplayFrame)
-    assert state_entry.data.data == image.tobytes()
+        latest = peripheral.latest_frame
+        assert latest is not None
+        assert latest.frame_id == 0
+        assert latest.width == 4 and latest.height == 2
+        assert latest.mode == "RGB"
+        assert latest.data == image.tobytes()
+        reconstructed = latest.to_image()
+        assert reconstructed.tobytes() == image.tobytes()
 
-
-def test_publish_image_increments_frame_id(monkeypatch) -> None:
-    bus = EventBus()
-    peripheral = LEDMatrixDisplay(width=2, height=2, event_bus=bus)
-    image = _solid_image(2, 2, value=64)
-
-    first = peripheral.publish_image(image)
-    second = peripheral.publish_image(image)
-
-    assert first.frame_id == 0
-    assert second.frame_id == 1
-    assert bus.state_store.get_latest(DisplayFrame.EVENT_TYPE).data.frame_id == 1
+        state_entry = bus.state_store.get_latest(DisplayFrame.EVENT_TYPE)
+        assert state_entry is not None
+        assert isinstance(state_entry.data, DisplayFrame)
+        assert state_entry.data.data == image.tobytes()
 
 
-def test_publish_image_validates_dimensions() -> None:
-    peripheral = LEDMatrixDisplay(width=2, height=2)
-    image = _solid_image(3, 2, value=10)
 
-    try:
-        peripheral.publish_image(image)
-    except ValueError as exc:
-        assert "dimensions" in str(exc)
-    else:  # pragma: no cover - defensive
-        raise AssertionError("ValueError expected when dimensions do not match")
+    def test_publish_image_increments_frame_id(self, monkeypatch) -> None:
+        """Verify that publish image increments frame id. This keeps rendering behaviour consistent across scenes."""
+        bus = EventBus()
+        peripheral = LEDMatrixDisplay(width=2, height=2, event_bus=bus)
+        image = _solid_image(2, 2, value=64)
+
+        first = peripheral.publish_image(image)
+        second = peripheral.publish_image(image)
+
+        assert first.frame_id == 0
+        assert second.frame_id == 1
+        assert bus.state_store.get_latest(DisplayFrame.EVENT_TYPE).data.frame_id == 1
+
+
+
+    def test_publish_image_validates_dimensions(self) -> None:
+        """Verify that publish image validates dimensions. This keeps the system behaviour reliable for operators."""
+        peripheral = LEDMatrixDisplay(width=2, height=2)
+        image = _solid_image(3, 2, value=10)
+
+        try:
+            peripheral.publish_image(image)
+        except ValueError as exc:
+            assert "dimensions" in str(exc)
+        else:  # pragma: no cover - defensive
+            raise AssertionError("ValueError expected when dimensions do not match")
