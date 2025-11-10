@@ -1,4 +1,3 @@
-import os
 import types
 
 import pygame
@@ -123,7 +122,6 @@ class TestEnvironment:
 
     def test_multiple_game_loops_can_coexist(self, orientation) -> None:
         """Verify that multiple game loops can coexist. This maintains stable runtime control flow."""
-        os.environ["SDL_VIDEODRIVER"] = "dummy"
         manager_one = PeripheralManager()
         device_one = FakeFixtureDevice(orientation=orientation)
         loop_one = GameLoop(device=device_one, peripheral_manager=manager_one)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 
 import pygame
@@ -85,11 +84,7 @@ def _fused_metrics_definition(
     )
 
 
-def test_virtual_feedback_flow(orientation) -> None:
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
-    previous_bus_flag = os.environ.get("ENABLE_INPUT_EVENT_BUS")
-    os.environ["ENABLE_INPUT_EVENT_BUS"] = "1"
-
+def test_virtual_feedback_flow(orientation, enable_input_event_bus) -> None:
     try:
         sensor_events = ("tests.sensor.alpha", "tests.sensor.beta")
         fused_event = "tests.virtual.metrics"
@@ -147,8 +142,4 @@ def test_virtual_feedback_flow(orientation) -> None:
         assert feedback_loop.event_bus is primary_loop.event_bus
         assert single_led.last_color == colour
     finally:
-        if previous_bus_flag is None:
-            os.environ.pop("ENABLE_INPUT_EVENT_BUS", None)
-        else:
-            os.environ["ENABLE_INPUT_EVENT_BUS"] = previous_bus_flag
         pygame.quit()

@@ -1,7 +1,4 @@
-import os
 from pathlib import Path
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pytest
 from PIL import Image, ImageSequence
