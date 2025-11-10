@@ -37,10 +37,16 @@ status so incremental updates stay coordinated.
   - `Life` (`src/heart/display/renderers/life.py`) – records the seeded grid
     and latest switch-derived seed in immutable state so cellular automata
     updates remain deterministic across warm-up and loop execution.
+  - `SlidingImage` (`src/heart/display/renderers/sliding_image.py`) – caches
+    the scaled surface during initialization and tracks the wrap-around offset
+    in atomic state so cube-sized slides remain deterministic for consumers.
+  - `SlidingRenderer` (`src/heart/display/renderers/sliding_image.py`) – wraps
+    a composed renderer while keeping the sliding offset immutable for
+    downstream loops that expect predictable frame hand-offs.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[##########>-----------]`
+Progress indicator: `[############>---------]`
 
 ## Validation
 
