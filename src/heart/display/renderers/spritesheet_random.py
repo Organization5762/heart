@@ -1,13 +1,15 @@
 import random
+from dataclasses import dataclass
 from enum import StrEnum
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
+from heart.assets.loader import spritesheet as SpritesheetAsset
 from heart.device import Orientation
 from heart.display.models import KeyFrame
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
@@ -18,8 +20,21 @@ class LoopPhase(StrEnum):
     END = "end"
 
 
+# Renderer state snapshot for `SpritesheetLoopRandom`.
+@dataclass
+class SpritesheetLoopRandomState:
+    spritesheet: SpritesheetAsset | None = None
+    current_frame: int = 0
+    loop_count: int = 0
+    phase: LoopPhase = LoopPhase.LOOP
+    time_since_last_update: float | None = None
+    current_screen: int = 0
+
+
 # Renders a looping spritesheet on a random screen.
-class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
+class SpritesheetLoopRandom(
+    SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopRandomState]
+):
     def __init__(
         self,
         screen_width: int,
@@ -29,18 +44,11 @@ class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
         screen_count: int,
     ) -> None:
         SwitchStateConsumer.__init__(self)
-        BaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
-        self.current_frame = 0
-        self.loop_count = 0
         self.file = sheet_file_path
         frame_data = Loader.load_json(metadata_file_path)
-
-        self.start_frames = []
-        self.loop_frames = []
-        self.end_frames = []
         self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
         for key in frame_data["frames"]:
             frame_obj = frame_data["frames"][key]
@@ -56,16 +64,15 @@ class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
                     frame_obj["duration"],
                 )
             )
-        self.phase = LoopPhase.LOOP
-        if len(self.frames[LoopPhase.START]) > 0:
-            self.phase = LoopPhase.START
-
-        self.time_since_last_update = None
-        self.current_screen = 0
+        self._initial_phase = (
+            LoopPhase.START if len(self.frames[LoopPhase.START]) > 0 else LoopPhase.LOOP
+        )
 
         # TODO: Why is this 30 30 / should we be pulling this from somewhere
         self.x = 30
         self.y = 30
+
+        AtomicBaseRenderer.__init__(self)
 
     def initialize(
         self,
@@ -74,7 +81,8 @@ class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.spritesheet = Loader.load_spirtesheet(self.file)
+        spritesheet = Loader.load_spirtesheet(self.file)
+        self.update_state(spritesheet=spritesheet)
         self.bind_switch(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
@@ -89,26 +97,37 @@ class SpritesheetLoopRandom(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        current_kf = self.frames[self.phase][self.current_frame]
+        state = self.state
+        current_phase_frames = self.frames[state.phase]
+        current_kf = current_phase_frames[state.current_frame]
         kf_duration = current_kf.duration - (
             current_kf.duration
             * self.__duration_scale_factor()
         )
-        if (
-            self.time_since_last_update is None
-            or self.time_since_last_update > kf_duration
-        ):
-            self.current_frame += 1
-            self.time_since_last_update = 0
-            if self.current_frame >= len(self.frames[self.phase]):
-                self.current_frame = 0
-                self.current_screen = random.randint(0, self.screen_count - 1)
+        if state.time_since_last_update is None or state.time_since_last_update > kf_duration:
+            next_frame = state.current_frame + 1
+            next_screen = state.current_screen
+            if next_frame >= len(current_phase_frames):
+                next_frame = 0
+                next_screen = random.randint(0, self.screen_count - 1)
+            self.update_state(
+                current_frame=next_frame,
+                time_since_last_update=0,
+                current_screen=next_screen,
+            )
+            state = self.state
 
-        image = self.spritesheet.image_at(current_kf.frame)
+        spritesheet = state.spritesheet
+        if spritesheet is None:
+            return
+
+        image = spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
-        window.blit(scaled, (self.current_screen * self.screen_width, 0))
+        window.blit(scaled, (state.current_screen * self.screen_width, 0))
 
-        if self.time_since_last_update is None:
-            self.time_since_last_update = 0
-        self.time_since_last_update += clock.get_time()
+        elapsed = (state.time_since_last_update or 0) + clock.get_time()
+        self.update_state(time_since_last_update=elapsed)
+
+    def _create_initial_state(self) -> SpritesheetLoopRandomState:
+        return SpritesheetLoopRandomState(phase=self._initial_phase)
 

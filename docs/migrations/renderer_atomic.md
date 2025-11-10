@@ -28,10 +28,13 @@ status so incremental updates stay coordinated.
   - `WaterTitleScreen` (`src/heart/display/renderers/water_title_screen.py`) –
     tracks wave animation timing atomically so consumer loops receive
     consistent offsets across frames.
+  - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random.py`)
+    – keeps the switch consumer while moving frame counters and screen
+    selection into immutable state for per-frame randomisation safety.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[#######>--------------]`
+Progress indicator: `[########>-------------]`
 
 ## Validation
 
