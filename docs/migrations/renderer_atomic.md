@@ -34,10 +34,13 @@ status so incremental updates stay coordinated.
   - `Tixyland` (`src/heart/display/renderers/tixyland.py`) – carries the
     time-tracking accumulator atomically so shader functions invoked by loops
     receive a deterministic elapsed time value.
+  - `Life` (`src/heart/display/renderers/life.py`) – records the seeded grid
+    and latest switch-derived seed in immutable state so cellular automata
+    updates remain deterministic across warm-up and loop execution.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[#########>------------]`
+Progress indicator: `[##########>-----------]`
 
 ## Validation
 
