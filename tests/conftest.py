@@ -1,11 +1,10 @@
-import os
 import sys
 import types
 from collections import deque
 from typing import Callable
 
-import pytest
 import pygame
+import pytest
 
 from heart.device import Cube, Device
 from heart.environment import GameLoop
@@ -36,10 +35,22 @@ class _StubClock:
 
 
 @pytest.fixture(autouse=True)
+def dummy_sdl_video_driver(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    yield
+
+
+@pytest.fixture(autouse=True)
 def init_pygame() -> None:
     pygame.init()
     yield
     pygame.quit()
+
+
+@pytest.fixture
+def enable_input_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENABLE_INPUT_EVENT_BUS", "1")
+    yield
 
 
 @pytest.fixture
@@ -110,7 +121,6 @@ def manager() -> PeripheralManager:
 
 @pytest.fixture()
 def loop(manager, device) -> GameLoop:
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
     loop = GameLoop(device=device, peripheral_manager=manager)
     # We just initialize the PyGame screen because peripherals and the fact that we expect, in practice,
     # for this to be a singleton _shouldn't_ be that important for testing
