@@ -18,6 +18,11 @@ When adding tests, it is reasonable to stub hardware- or framework-heavy depende
 
 - Parameterize new Pytest cases when validating multiple input permutations (especially for driver behaviour) to keep coverage
   clear and maintainable.
+- Write tests with precise assertions and include a short docstring at the top of every test function that explains the behaviour
+  being validated. Each test docstring must mention both the specific behaviour under test and why that behaviour matters at a
+  higher level (e.g., performance, resilience, integration, documentation value). Group related tests into descriptive `pytest`
+  classes and give every class a docstring that states the shared focus and broader value of the grouped scenarios so readers can
+  immediately understand the collection's intent.
 
 ## Linting (Optional Pre-Check)
 

@@ -136,53 +136,63 @@ class StubSender:
         self.calls.append(list(events))
 
 
-def test_runtime_sends_events_to_bluetooth(lampe_controller):
-    controller = StubSeesawController([["a"], ["b", "c"]])
-    sender = StubSender()
-    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
+class TestDriversLampeControllerDriver:
+    """Group Drivers Lampe Controller Driver tests so drivers lampe controller driver behaviour stays reliable. This preserves confidence in drivers lampe controller driver for end-to-end scenarios."""
 
-    runtime.run_once()
-    runtime.run_once()
+    def test_runtime_sends_events_to_bluetooth(self, lampe_controller):
+        """Verify that LampeControllerRuntime forwards controller events through the BLE sender. This ensures hand inputs reach paired devices so lighting interactions stay responsive."""
+        controller = StubSeesawController([["a"], ["b", "c"]])
+        sender = StubSender()
+        runtime = lampe_controller.LampeControllerRuntime(controller, sender)
 
-    assert sender.calls == [["a"], ["b", "c"]]
+        runtime.run_once()
+        runtime.run_once()
 
-
-def test_runtime_handles_empty_batches(lampe_controller):
-    controller = StubSeesawController([[]])
-    sender = StubSender()
-    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
-
-    runtime.run_once()
-
-    assert sender.calls == [[]]
+        assert sender.calls == [["a"], ["b", "c"]]
 
 
-def test_respond_to_identify_query_emits_identity_payload(lampe_controller):
-    stream = io.StringIO("Identify\n")
-    outputs: list[str] = []
 
-    handled = lampe_controller.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+    def test_runtime_handles_empty_batches(self, lampe_controller):
+        """Verify that LampeControllerRuntime still sends an empty batch when no events are produced. This keeps the protocol well-formed so idle periods do not stall the receiver."""
+        controller = StubSeesawController([[]])
+        sender = StubSender()
+        runtime = lampe_controller.LampeControllerRuntime(controller, sender)
 
-    assert handled is True
-    payload = json.loads(outputs[0])
-    assert payload["event_type"] == constants.DEVICE_IDENTIFY
-    assert payload["data"]["device_name"] == lampe_controller.IDENTITY.device_name
-    assert payload["data"]["device_id"] == "lampe-controller-test-id"
+        runtime.run_once()
+
+        assert sender.calls == [[]]
 
 
-def test_runtime_invokes_identify_responder(monkeypatch, lampe_controller):
-    calls = []
 
-    def responder(**_kwargs):
-        calls.append(True)
-        return False
+    def test_respond_to_identify_query_emits_identity_payload(self, lampe_controller):
+        """Verify that respond_to_identify_query prints the Lampe controller identity payload. This allows operations tooling to discover deployed controllers for diagnostics."""
+        stream = io.StringIO("Identify\n")
+        outputs: list[str] = []
 
-    monkeypatch.setattr(lampe_controller, "respond_to_identify_query", responder)
+        handled = lampe_controller.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
 
-    controller = StubSeesawController([["ignored"]])
-    sender = StubSender()
-    runtime = lampe_controller.LampeControllerRuntime(controller, sender)
+        assert handled is True
+        payload = json.loads(outputs[0])
+        assert payload["event_type"] == constants.DEVICE_IDENTIFY
+        assert payload["data"]["device_name"] == lampe_controller.IDENTITY.device_name
+        assert payload["data"]["device_id"] == "lampe-controller-test-id"
 
-    runtime.run_once()
 
-    assert calls
+
+    def test_runtime_invokes_identify_responder(self, monkeypatch, lampe_controller):
+        """Verify that the runtime asks respond_to_identify_query to handle identify requests. This keeps runtime logic composable so new commands stay centralized."""
+        calls = []
+
+        def responder(**_kwargs):
+            calls.append(True)
+            return False
+
+        monkeypatch.setattr(lampe_controller, "respond_to_identify_query", responder)
+
+        controller = StubSeesawController([["ignored"]])
+        sender = StubSender()
+        runtime = lampe_controller.LampeControllerRuntime(controller, sender)
+
+        runtime.run_once()
+
+        assert calls

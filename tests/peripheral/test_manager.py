@@ -20,38 +20,42 @@ class _StubRegistry:
         return (lambda manager: self._configuration) if name == "test" else None
 
 
-def test_peripheral_manager_uses_configured_detectors() -> None:
-    captured: list[str] = []
-    sentinel = _StubPeripheral()
+class TestPeripheralManager:
+    """Group Peripheral Manager tests so peripheral manager behaviour stays reliable. This preserves confidence in peripheral manager for end-to-end scenarios."""
 
-    def detector():
-        captured.append("detector")
-        yield sentinel
+    def test_peripheral_manager_uses_configured_detectors(self) -> None:
+        """Verify that peripheral manager uses configured detectors. This keeps hardware telemetry responsive for interactive experiences."""
+        captured: list[str] = []
+        sentinel = _StubPeripheral()
 
-    virtual = double_tap_virtual_peripheral(
-        "input.event", output_event_type="output.event", name="virtual.test"
-    )
+        def detector():
+            captured.append("detector")
+            yield sentinel
 
-    configuration = PeripheralConfiguration(
-        detectors=(detector,),
-        virtual_peripherals=(virtual,),
-    )
+        virtual = double_tap_virtual_peripheral(
+            "input.event", output_event_type="output.event", name="virtual.test"
+        )
 
-    manager = PeripheralManager(
-        configuration="test",
-        configuration_registry=_StubRegistry(configuration),
-    )
-    bus = EventBus()
-    manager.attach_event_bus(bus)
+        configuration = PeripheralConfiguration(
+            detectors=(detector,),
+            virtual_peripherals=(virtual,),
+        )
 
-    manager.detect()
+        manager = PeripheralManager(
+            configuration="test",
+            configuration_registry=_StubRegistry(configuration),
+        )
+        bus = EventBus()
+        manager.attach_event_bus(bus)
 
-    assert manager.peripherals == (sentinel,)
-    assert captured == ["detector"]
+        manager.detect()
 
-    definitions = manager.virtual_peripheral_definitions
-    assert set(definitions) == {virtual.name}
-    assert definitions[virtual.name] is virtual
+        assert manager.peripherals == (sentinel,)
+        assert captured == ["detector"]
 
-    registered = bus.virtual_peripherals.list_definitions().values()
-    assert {definition.name for definition in registered} == {virtual.name}
+        definitions = manager.virtual_peripheral_definitions
+        assert set(definitions) == {virtual.name}
+        assert definitions[virtual.name] is virtual
+
+        registered = bus.virtual_peripherals.list_definitions().values()
+        assert {definition.name for definition in registered} == {virtual.name}

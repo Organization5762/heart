@@ -170,92 +170,95 @@ class MovingAverageActionMapper(PeripheralActionMapper):
         return PeripheralPollResult(raw_snapshots=[snapshot], action_events=[action])
 
 
-@pytest.mark.timeout(10)
-def test_mqtt_integration_with_moving_average(monkeypatch: pytest.MonkeyPatch) -> None:
-    """End-to-end verification of raw sensor ingestion and action publication."""
+class TestPeripheralMqttIntegration:
+    """Group Peripheral Mqtt Integration tests so peripheral mqtt integration behaviour stays reliable. This preserves confidence in peripheral mqtt integration for end-to-end scenarios."""
 
-    samples = [
-        FakeSample(timestamp=0.0, value=10.0),
-        FakeSample(timestamp=30.0, value=20.0),
-        FakeSample(timestamp=59.0, value=30.0),
-        FakeSample(timestamp=61.0, value=40.0),
-    ]
-    sensor = FakeMovingAveragePeripheral(samples)
-    broker = FakeMQTTBroker()
+    @pytest.mark.timeout(10)
+    def test_mqtt_integration_with_moving_average(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """End-to-end verification of raw sensor ingestion and action publication."""
 
-    monkeypatch.setattr(
-        mqtt_sidecar.mqtt,
-        "Client",
-        lambda client_id: FakeMQTTClient(broker, client_id),
-    )
+        samples = [
+            FakeSample(timestamp=0.0, value=10.0),
+            FakeSample(timestamp=30.0, value=20.0),
+            FakeSample(timestamp=59.0, value=30.0),
+            FakeSample(timestamp=61.0, value=40.0),
+        ]
+        sensor = FakeMovingAveragePeripheral(samples)
+        broker = FakeMQTTBroker()
 
-    fake_manager = FakePeripheralManager([sensor])
-    monkeypatch.setattr(mqtt_sidecar, "PeripheralManager", lambda: fake_manager)
-
-    original_builder = aggregators_module.build_action_mappers
-
-    def patched_build_action_mappers(
-        peripheral: Peripheral, source: str, config: PeripheralServiceConfig
-    ):
-        if isinstance(peripheral, FakeMovingAveragePeripheral):
-            return [MovingAverageActionMapper(peripheral, source, config)]
-        return list(original_builder(peripheral, source, config))
-
-    monkeypatch.setattr(
-        aggregators_module, "build_action_mappers", patched_build_action_mappers
-    )
-
-    raw_messages: list[dict] = []
-    action_messages: list[dict] = []
-    core_messages: list[dict] = []
-    processing_complete = threading.Event()
-
-    def record_raw(_topic: str, payload: str) -> None:
-        raw_messages.append(json.loads(payload))
-
-    def record_action(_topic: str, payload: str) -> None:
-        parsed = json.loads(payload)
-        action_messages.append(parsed)
-        core_messages.append(parsed)
-        if len(action_messages) == len(samples):
-            processing_complete.set()
-
-    config = PeripheralServiceConfig(
-        broker_host="localhost",
-        broker_port=1883,
-        client_id="sidecar-test",
-        raw_topic="test/raw",
-        action_topic="test/actions",
-        poll_interval=0.0,
-    )
-
-    broker.subscribe(config.raw_topic, record_raw)
-    broker.subscribe(config.action_topic, record_action)
-
-    service = PeripheralMQTTService(config=config)
-    service_thread = threading.Thread(target=service.run, daemon=True)
-    service_thread.start()
-
-    try:
-        assert processing_complete.wait(timeout=5.0), (
-            "Timed out waiting for MQTT actions"
+        monkeypatch.setattr(
+            mqtt_sidecar.mqtt,
+            "Client",
+            lambda client_id: FakeMQTTClient(broker, client_id),
         )
-    finally:
-        service.shutdown()
-        service_thread.join(timeout=5.0)
 
-    assert [entry["data"]["value"] for entry in raw_messages] == [
-        10.0,
-        20.0,
-        30.0,
-        40.0,
-    ]
-    assert [entry["action"] for entry in action_messages] == [
-        "sensor.moving_average"
-    ] * len(samples)
+        fake_manager = FakePeripheralManager([sensor])
+        monkeypatch.setattr(mqtt_sidecar, "PeripheralManager", lambda: fake_manager)
 
-    final_action = action_messages[-1]
-    assert final_action["payload"]["count"] == 3
-    assert final_action["payload"]["window_s"] == 60.0
-    assert final_action["payload"]["average"] == pytest.approx(30.0)
-    assert core_messages == action_messages
+        original_builder = aggregators_module.build_action_mappers
+
+        def patched_build_action_mappers(
+            peripheral: Peripheral, source: str, config: PeripheralServiceConfig
+        ):
+            if isinstance(peripheral, FakeMovingAveragePeripheral):
+                return [MovingAverageActionMapper(peripheral, source, config)]
+            return list(original_builder(peripheral, source, config))
+
+        monkeypatch.setattr(
+            aggregators_module, "build_action_mappers", patched_build_action_mappers
+        )
+
+        raw_messages: list[dict] = []
+        action_messages: list[dict] = []
+        core_messages: list[dict] = []
+        processing_complete = threading.Event()
+
+        def record_raw(_topic: str, payload: str) -> None:
+            raw_messages.append(json.loads(payload))
+
+        def record_action(_topic: str, payload: str) -> None:
+            parsed = json.loads(payload)
+            action_messages.append(parsed)
+            core_messages.append(parsed)
+            if len(action_messages) == len(samples):
+                processing_complete.set()
+
+        config = PeripheralServiceConfig(
+            broker_host="localhost",
+            broker_port=1883,
+            client_id="sidecar-test",
+            raw_topic="test/raw",
+            action_topic="test/actions",
+            poll_interval=0.0,
+        )
+
+        broker.subscribe(config.raw_topic, record_raw)
+        broker.subscribe(config.action_topic, record_action)
+
+        service = PeripheralMQTTService(config=config)
+        service_thread = threading.Thread(target=service.run, daemon=True)
+        service_thread.start()
+
+        try:
+            assert processing_complete.wait(timeout=5.0), (
+                "Timed out waiting for MQTT actions"
+            )
+        finally:
+            service.shutdown()
+            service_thread.join(timeout=5.0)
+
+        assert [entry["data"]["value"] for entry in raw_messages] == [
+            10.0,
+            20.0,
+            30.0,
+            40.0,
+        ]
+        assert [entry["action"] for entry in action_messages] == [
+            "sensor.moving_average"
+        ] * len(samples)
+
+        final_action = action_messages[-1]
+        assert final_action["payload"]["count"] == 3
+        assert final_action["payload"]["window_s"] == 60.0
+        assert final_action["payload"]["average"] == pytest.approx(30.0)
+        assert core_messages == action_messages
