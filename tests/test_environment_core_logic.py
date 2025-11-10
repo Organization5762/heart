@@ -5,12 +5,14 @@ from __future__ import annotations
 import types
 
 import numpy as np
+import pygame
 import pytest
 
 from heart.display.renderers.free_text import FreeTextRenderer
 from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
                                _convert_bgr_to_hsv, _convert_hsv_to_bgr)
-from heart.events.types import PhoneTextMessage
+from heart.events.types import HeartRateMeasurement, PhoneTextMessage
+from heart.peripheral.core import events
 
 
 @pytest.fixture(autouse=True)
@@ -249,6 +251,141 @@ class TestEnvironmentCoreLogic:
         current_time += 2.0
         assert loop._select_renderers() == []
         assert loop._phone_text_display_started_at is None
+
+
+    def test_resolve_event_type_normalizes_standard_and_unknown(
+        self, loop, monkeypatch
+    ) -> None:
+        """Verify that _resolve_event_type normalizes pygame names into predictable bus topics. This keeps downstream subscribers aligned on consistent routing keys."""
+
+        quit_event = types.SimpleNamespace(type=pygame.QUIT)
+        assert loop._resolve_event_type(quit_event) == "pygame/quit"
+
+        unknown_type = pygame.USEREVENT + 99
+        original_event_name = pygame.event.event_name
+
+        def _fake_event_name(value: int) -> str:
+            if value == unknown_type:
+                return ""
+            return original_event_name(value)
+
+        monkeypatch.setattr(pygame.event, "event_name", _fake_event_name)
+        unknown_event = types.SimpleNamespace(type=unknown_type)
+
+        assert (
+            loop._resolve_event_type(unknown_event)
+            == f"pygame/unknown_{unknown_type}"
+        )
+
+
+    def test_resolve_event_type_handles_system_reset_event(self, loop) -> None:
+        """Verify that _resolve_event_type rewrites the joystick reset sentinel to the system namespace. This preserves the dedicated control flow for hardware resets."""
+
+        reset_event = types.SimpleNamespace(type=events.REQUEST_JOYSTICK_MODULE_RESET)
+
+        assert (
+            loop._resolve_event_type(reset_event)
+            == "system/request_joystick_module_reset"
+        )
+
+
+    def test_resolve_event_payload_copies_mapping_payload(self, loop) -> None:
+        """Verify that _resolve_event_payload clones mapping payloads while enriching metadata. This ensures pygame events surface stable dictionaries to analytics consumers."""
+
+        payload = {"foo": "bar"}
+        event_type = pygame.USEREVENT + 1
+        event = types.SimpleNamespace(type=event_type, dict=payload)
+
+        resolved = loop._resolve_event_payload(event)
+
+        assert resolved["foo"] == "bar"
+        assert resolved["pygame_type"] == event_type
+        assert resolved["pygame_event_name"] == pygame.event.event_name(event_type)
+        assert resolved is not payload
+
+
+    def test_resolve_event_payload_supports_convertible_sequences(self, loop) -> None:
+        """Verify that _resolve_event_payload accepts dict-convertible sequences and annotates metadata. This keeps flexible emitters compatible without custom shims."""
+
+        raw_payload = [("alpha", 1), ("beta", 2)]
+        event_type = pygame.USEREVENT + 2
+        event = types.SimpleNamespace(type=event_type, dict=raw_payload)
+
+        resolved = loop._resolve_event_payload(event)
+
+        assert resolved["alpha"] == 1
+        assert resolved["beta"] == 2
+        assert resolved["pygame_type"] == event_type
+        assert resolved["pygame_event_name"] == pygame.event.event_name(event_type)
+
+
+    def test_resolve_event_payload_wraps_non_convertible_objects(self, loop) -> None:
+        """Verify that _resolve_event_payload falls back to wrapping opaque payloads. This ensures diagnostics still carry raw values when conversion is impossible."""
+
+        raw_payload = object()
+        event_type = pygame.USEREVENT + 3
+        event = types.SimpleNamespace(type=event_type, dict=raw_payload)
+
+        resolved = loop._resolve_event_payload(event)
+
+        assert resolved["value"] is raw_payload
+        assert resolved["pygame_type"] == event_type
+        assert resolved["pygame_event_name"] == pygame.event.event_name(event_type)
+
+
+    def test_ensure_flame_renderer_returns_singleton_with_marker(self, loop) -> None:
+        """Verify that _ensure_flame_renderer caches a marked flame renderer instance. This keeps flame overlays stable and avoids churn in render queues."""
+
+        first = loop._ensure_flame_renderer()
+        second = loop._ensure_flame_renderer()
+
+        assert first is second
+        assert getattr(first, "is_flame_renderer") is True
+
+
+    def test_should_add_flame_renderer_requires_multiple_measurements(self, loop) -> None:
+        """Verify that _should_add_flame_renderer ignores sparse heart-rate samples. This prevents transient spikes from triggering intensive flame effects."""
+
+        renderers: list[object] = []
+        for producer_id, bpm in enumerate([120, 130, 140, 150]):
+            loop.event_bus.emit(
+                HeartRateMeasurement.EVENT_TYPE,
+                {"bpm": bpm},
+                producer_id=producer_id,
+            )
+
+        assert loop._should_add_flame_renderer(renderers) is False
+
+
+    def test_should_add_flame_renderer_checks_average_threshold(self, loop) -> None:
+        """Verify that _should_add_flame_renderer only activates when the average BPM beats the threshold. This keeps the flame overlay reserved for sustained exertion signals."""
+
+        renderers: list[object] = []
+        loop._flame_bpm_threshold = 120.0
+
+        for producer_id, bpm in enumerate([110, 115, 118, 119, 120]):
+            loop.event_bus.emit(
+                HeartRateMeasurement.EVENT_TYPE,
+                {"bpm": bpm},
+                producer_id=producer_id,
+            )
+
+        assert loop._should_add_flame_renderer(renderers) is False
+
+        for producer_id, bpm in enumerate([140, 150, 155, 160, 165]):
+            loop.event_bus.emit(
+                HeartRateMeasurement.EVENT_TYPE,
+                {"bpm": bpm},
+                producer_id=producer_id,
+            )
+
+        assert loop._should_add_flame_renderer(renderers) is True
+
+        flame_renderer = loop._ensure_flame_renderer()
+        assert (
+            loop._should_add_flame_renderer([flame_renderer])
+            is False
+        )
 
 def _sequential_binary_merge(values: list[str]) -> str:
     surfaces = list(values)
