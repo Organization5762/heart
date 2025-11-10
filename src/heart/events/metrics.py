@@ -34,8 +34,9 @@ import time
 from abc import ABC, abstractmethod
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
-from typing import (Any, Deque, Dict, Generic, Iterable, Iterator, Mapping,
-                    Sequence, TypeVar)
+from threading import Lock
+from typing import (Any, Callable, ClassVar, Deque, Dict, Generic, Iterable,
+                    Iterator, Mapping, Sequence, TypeVar)
 
 import numpy as np
 
@@ -585,3 +586,116 @@ class RollingStddevByKey(KeyedMetric[K, float | None]):
 
     def reset(self, key: K | None = None) -> None:
         self._stats.reset(key)
+
+
+@dataclass(slots=True)
+class TimeDecayedValue:
+    """Snapshot of a decayed activity value for a single key."""
+
+    decayed_value: float
+    samples: int
+    horizon_s: float
+    decay_curve: str
+
+
+class TimeDecayedActivity(KeyedMetric[K, TimeDecayedValue]):
+    """Track activity that decays over a fixed horizon using linear or quadratic curves."""
+
+    _CURVE_EXPONENTS: ClassVar[Mapping[str, int]] = {"linear": 1, "quadratic": 2}
+
+    def __init__(
+        self,
+        *,
+        horizon: float,
+        curve: str = "linear",
+        clock: Callable[[], float] | None = None,
+    ) -> None:
+        if horizon <= 0:
+            msg = "horizon must be a positive duration"
+            raise ValueError(msg)
+        if curve not in self._CURVE_EXPONENTS:
+            msg = "curve must be one of {'linear', 'quadratic'}"
+            raise ValueError(msg)
+        self._horizon = float(horizon)
+        self._curve = curve
+        self._curve_power = self._CURVE_EXPONENTS[curve]
+        self._clock = clock or time.monotonic
+        self._states: Dict[K, Deque[EventSample[float]]] = {}
+        self._lock = Lock()
+
+    def _prune(self, samples: Deque[EventSample[float]], *, now: float) -> None:
+        cutoff = now - self._horizon
+        while samples and samples[0].timestamp <= cutoff:
+            samples.popleft()
+
+    def _decay_factor(self, *, age: float) -> float:
+        if age <= 0:
+            return 1.0
+        ratio = min(1.0, max(0.0, age / self._horizon))
+        remaining = 1.0 - ratio
+        if remaining <= 0.0:
+            return 0.0
+        return remaining**self._curve_power
+
+    def _decayed_value(self, samples: Deque[EventSample[float]], *, now: float) -> float:
+        total = 0.0
+        for sample in samples:
+            age = max(0.0, now - sample.timestamp)
+            factor = self._decay_factor(age=age)
+            if factor <= 0.0:
+                continue
+            total += sample.value * factor
+        return total
+
+    def _state_for(self, key: K) -> Deque[EventSample[float]]:
+        samples = self._states.get(key)
+        if samples is None:
+            samples = deque()
+            self._states[key] = samples
+        return samples
+
+    def _snapshot_for(self, key: K, samples: Deque[EventSample[float]], *, now: float) -> TimeDecayedValue:
+        self._prune(samples, now=now)
+        value = self._decayed_value(samples, now=now)
+        return TimeDecayedValue(
+            decayed_value=value,
+            samples=len(samples),
+            horizon_s=self._horizon,
+            decay_curve=self._curve,
+        )
+
+    def observe(self, key: K, value: float = 1.0, *, timestamp: float | None = None) -> None:
+        now = self._clock() if timestamp is None else timestamp
+        with self._lock:
+            samples = self._state_for(key)
+            samples.append(EventSample(value=float(value), timestamp=now))
+            self._prune(samples, now=now)
+
+    def get(self, key: K) -> TimeDecayedValue:
+        now = self._clock()
+        with self._lock:
+            samples = self._states.get(key)
+            if samples is None:
+                return TimeDecayedValue(
+                    decayed_value=0.0,
+                    samples=0,
+                    horizon_s=self._horizon,
+                    decay_curve=self._curve,
+                )
+            snapshot = self._snapshot_for(key, samples, now=now)
+        return snapshot
+
+    def snapshot(self) -> Mapping[K, TimeDecayedValue]:
+        now = self._clock()
+        with self._lock:
+            return {
+                key: self._snapshot_for(key, samples, now=now)
+                for key, samples in self._states.items()
+            }
+
+    def reset(self, key: K | None = None) -> None:
+        with self._lock:
+            if key is None:
+                self._states.clear()
+                return
+            self._states.pop(key, None)
