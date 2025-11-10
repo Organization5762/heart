@@ -23,7 +23,7 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```
 3. Launch the default playlist:
    ```bash
-   totem run --configuration lib_2025
+   uv run totem run --configuration lib_2025
    ```
 4. Review [docs/getting_started.md](docs/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
