@@ -1,13 +1,23 @@
+from dataclasses import dataclass
+
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class SlidingImage(BaseRenderer):
+@dataclass
+class SlidingImageState:
+    image: pygame.Surface | None = None
+    offset: int = 0
+    speed: int = 1
+    width: int = 0
+
+
+class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
     """Render a 256×64 image that continuously slides horizontally.
 
     The renderer operates in *FULL* display mode so it receives the complete
@@ -19,16 +29,15 @@ class SlidingImage(BaseRenderer):
     """
 
     def __init__(self, image_file: str, *, speed: int = 1) -> None:
-        super().__init__()
+        self._configured_speed = max(1, speed)
+        self.file = image_file
+
+        AtomicBaseRenderer.__init__(self)
         # We want to draw across the full 4-face surface
         self.device_display_mode = DeviceDisplayMode.FULL
 
-        self.file = image_file
-        self.image: pygame.Surface | None = None  # will be loaded at init
-
-        # slide state
-        self._offset = 0  # current left-shift in pixels
-        self._speed = max(1, speed)  # guard against 0 / negative speeds
+    def _create_initial_state(self) -> SlidingImageState:
+        return SlidingImageState(speed=self._configured_speed)
 
     # ---------------------------------------------------------------------
     # lifecycle hooks
@@ -41,8 +50,10 @@ class SlidingImage(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         # load and scale once we know the LED surface size
-        self.image = Loader.load(self.file)
-        self.image = pygame.transform.scale(self.image, window.get_size())
+        image = Loader.load(self.file)
+        image = pygame.transform.scale(image, window.get_size())
+        width, _ = image.get_size()
+        self.update_state(image=image, width=width)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     # ---------------------------------------------------------------------
@@ -55,24 +66,31 @@ class SlidingImage(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if self.image is None:
+        state = self.state
+        image = state.image
+        if image is None or state.width == 0:
             # should not happen – initialize() guarantees loading
             return
 
-        img_w, _ = self.image.get_size()
-
         # advance offset and wrap
-        self._offset = (self._offset + self._speed) % img_w
+        offset = (state.offset + state.speed) % state.width
+        self.update_state(offset=offset)
 
         # First blit: main image shifted left by current offset
-        window.blit(self.image, (-self._offset, 0))
+        window.blit(image, (-offset, 0))
 
         # Second blit: fill the gap on the right with the wrapped part
-        if self._offset:
-            window.blit(self.image, (img_w - self._offset, 0))
+        if offset:
+            window.blit(image, (state.width - offset, 0))
 
 
-class SlidingRenderer(BaseRenderer):
+@dataclass
+class SlidingRendererState:
+    offset: int = 0
+    speed: int = 1
+
+
+class SlidingRenderer(AtomicBaseRenderer[SlidingRendererState]):
     """Render a 256×64 image that continuously slides horizontally.
 
     The renderer operates in *FULL* display mode so it receives the complete
@@ -84,13 +102,15 @@ class SlidingRenderer(BaseRenderer):
     """
 
     def __init__(self, renderer: BaseRenderer, *, speed: int = 1) -> None:
-        super().__init__()
+        self._configured_speed = max(1, speed)
+        self.composed = renderer
+
+        AtomicBaseRenderer.__init__(self)
         # We want to draw across the full 4-face surface
         self.device_display_mode = DeviceDisplayMode.FULL
 
-        self._offset = 0  # current left-shift in pixels
-        self._speed = max(1, speed)  # guard against 0 / negative speeds
-        self.composed = renderer
+    def _create_initial_state(self) -> SlidingRendererState:
+        return SlidingRendererState(speed=self._configured_speed)
 
     # ---------------------------------------------------------------------
     # lifecycle hooks
@@ -117,17 +137,19 @@ class SlidingRenderer(BaseRenderer):
     ) -> None:
         self.composed._internal_process(window, clock, peripheral_manager, orientation)
 
+        state = self.state
         img_w, _ = window.get_size()
         # advance offset and wrap
-        self._offset = (self._offset + self._speed) % img_w
+        offset = (state.offset + state.speed) % img_w
+        self.update_state(offset=offset)
 
         # Copy window
         surface = window.copy()
 
         window.fill((0, 0, 0, 0))
         # First blit: main image shifted left by current offset
-        window.blit(surface, (-self._offset, 0))
+        window.blit(surface, (-offset, 0))
 
         # Second blit: fill the gap on the right with the wrapped part
-        if self._offset:
-            window.blit(surface, (img_w - self._offset, 0))
+        if offset:
+            window.blit(surface, (img_w - offset, 0))
