@@ -326,6 +326,7 @@ class ClothSailRenderer(BaseRenderer):
 
         flipped = np.flipud(self._pixel_buffer)
         frame_array = np.transpose(flipped, (1, 0, 2))
+        frame_array = np.ascontiguousarray(frame_array)
 
         if (frame_width, frame_height) == (surface_width, surface_height):
             pygame.surfarray.blit_array(window, frame_array)

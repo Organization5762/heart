@@ -47,6 +47,18 @@ def init_pygame() -> None:
     pygame.quit()
 
 
+@pytest.fixture(autouse=True, scope="session")
+def configure_sdl_video_driver() -> None:
+    """Force pygame to use the dummy SDL driver so headless tests remain stable."""
+
+    patcher = pytest.MonkeyPatch()
+    patcher.setenv("SDL_VIDEODRIVER", "dummy")
+    try:
+        yield
+    finally:
+        patcher.undo()
+
+
 @pytest.fixture
 def enable_input_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENABLE_INPUT_EVENT_BUS", "1")

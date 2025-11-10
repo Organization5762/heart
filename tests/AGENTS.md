@@ -11,6 +11,7 @@
 
 - Reuse fixtures defined in `tests/conftest.py` or `tests/helpers/` before creating new ones. Any new reusable fixture should be added to `conftest.py` with a descriptive docstring covering setup cost and primary use case.
 - Place helper utilities shared across multiple domains in `tests/utilities/`. Keep helper names aligned with the behaviour they abstract and avoid test-specific logic in fixtures that should live alongside the production code.
+- Centralize environment variable setup in `tests/conftest.py` fixtures so graphical and hardware stubs stay consistent across the suite.
 
 ## Assertions and Diagnostics
 
