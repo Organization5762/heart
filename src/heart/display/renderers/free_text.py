@@ -37,6 +37,7 @@ class FreeTextRenderer(BaseRenderer):
         self._font: Optional[pygame.font.Font] = None
         self._phone_text: Optional[PhoneText] = None
         self._line_height: int = 0  # Store line height as instance variable
+        self._font_cache: dict[int, pygame.font.Font] = {}
 
         # Dynamic sizing helpers
         self._cached_text: str | None = None  # Last text we rendered
@@ -64,7 +65,7 @@ class FreeTextRenderer(BaseRenderer):
         # crashes.
         self._phone_text = peripheral_manager.get_phone_text()
 
-        self._font = Loader.load_font("Grand9K Pixel.ttf")
+        self._font = self._get_font(10)
         if self._font:
             self._line_height = self._font.get_linesize()
 
@@ -87,7 +88,7 @@ class FreeTextRenderer(BaseRenderer):
 
         # Iterate from largest to smallest size to find the best fit.
         for size in range(self._font_size_max, self._font_size_min - 1, -1):
-            font_candidate = Loader.load_font("Grand9K Pixel.ttf", font_size=size)
+            font_candidate = self._get_font(size)
 
             # Approximate the maximum number of characters per line based on the
             # width of the character "M", which is usually close to the widest
@@ -118,9 +119,7 @@ class FreeTextRenderer(BaseRenderer):
                 return font_candidate, wrapped
 
         # If nothing fit, return the smallest size anyway.
-        fallback_font = Loader.load_font(
-            "Grand9K Pixel.ttf", font_size=self._font_size_min
-        )
+        fallback_font = self._get_font(self._font_size_min)
         # Basic wrapping with very small char count to avoid overly long lines.
         char_width = max(1, fallback_font.size("M")[0])
         max_chars_per_line = max(1, window_width // char_width)
@@ -191,3 +190,12 @@ class FreeTextRenderer(BaseRenderer):
             x = (window_width - text_width) // 2
             window.blit(rendered, (x, y))
             y += self._line_height
+
+    def _get_font(self, size: int) -> pygame.font.Font:
+        """Return a cached *pygame.font.Font* for ``size``."""
+
+        if size not in self._font_cache:
+            self._font_cache[size] = Loader.load_font(
+                "Grand9K Pixel.ttf", font_size=size
+            )
+        return self._font_cache[size]
