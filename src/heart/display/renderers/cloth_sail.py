@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import importlib.util
 import math
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 import pygame
@@ -28,6 +29,15 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+
+_SDL2Window: Any | None
+_SDL2_WINDOW_SPEC = importlib.util.find_spec("pygame._sdl2.video")
+if _SDL2_WINDOW_SPEC is not None:
+    from pygame._sdl2 import video as _sdl2_video  # type: ignore[import]
+
+    _SDL2Window = _sdl2_video.Window
+else:
+    _SDL2Window = None
 
 VERT_SHADER = """
 #version 120
@@ -170,6 +180,29 @@ class ClothSailRenderer(BaseRenderer):
         self._uniform_wind: Optional[int] = None
         self._pixel_buffer: Optional[np.ndarray] = None
 
+    @staticmethod
+    def _get_drawable_size(window: pygame.Surface) -> tuple[int, int]:
+        if _SDL2Window is None:
+            return window.get_size()
+
+        try:
+            sdl_window = _SDL2Window.from_display_module()
+        except Exception:
+            return window.get_size()
+
+        if sdl_window is None:
+            return window.get_size()
+
+        drawable_size = getattr(sdl_window, "drawable_size", None)
+        if not drawable_size:
+            return window.get_size()
+
+        drawable_width, drawable_height = drawable_size
+        if drawable_width <= 0 or drawable_height <= 0:
+            return window.get_size()
+
+        return int(drawable_width), int(drawable_height)
+
     def _compile_shader(self, source: str, shader_type: int) -> int:
         shader = glCreateShader(shader_type)
         glShaderSource(shader, source)
@@ -251,11 +284,15 @@ class ClothSailRenderer(BaseRenderer):
         if self._program is None:
             self.initialize(window, clock, _peripheral_manager, _orientation)
 
-        width, height = window.get_size()
-        if width == 0 or height == 0:
+        surface_width, surface_height = window.get_size()
+        if surface_width == 0 or surface_height == 0:
             return
 
-        self._ensure_pixel_buffer((width, height))
+        frame_width, frame_height = self._get_drawable_size(window)
+        if frame_width == 0 or frame_height == 0:
+            return
+
+        self._ensure_pixel_buffer((frame_width, frame_height))
 
         elapsed = time.perf_counter() - self._start_time
 
@@ -264,10 +301,10 @@ class ClothSailRenderer(BaseRenderer):
 
         glUseProgram(self._program)
         glUniform1f(self._uniform_time, float(elapsed))
-        glUniform2f(self._uniform_resolution, float(width), float(height))
+        glUniform2f(self._uniform_resolution, float(frame_width), float(frame_height))
         glUniform2f(self._uniform_wind, wind_strength, wind_vertical)
 
-        glViewport(0, 0, width, height)
+        glViewport(0, 0, frame_width, frame_height)
         glClearColor(0.07, 0.1, 0.15, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
@@ -280,14 +317,23 @@ class ClothSailRenderer(BaseRenderer):
         glReadPixels(
             0,
             0,
-            width,
-            height,
+            frame_width,
+            frame_height,
             GL_RGB,
             GL_UNSIGNED_BYTE,
             self._pixel_buffer,
         )
 
         flipped = np.flipud(self._pixel_buffer)
-        pygame.surfarray.blit_array(window, np.transpose(flipped, (1, 0, 2)))
+        frame_array = np.transpose(flipped, (1, 0, 2))
+
+        if (frame_width, frame_height) == (surface_width, surface_height):
+            pygame.surfarray.blit_array(window, frame_array)
+        else:
+            frame_surface = pygame.surfarray.make_surface(frame_array)
+            scaled_surface = pygame.transform.smoothscale(
+                frame_surface, (surface_width, surface_height)
+            )
+            window.blit(scaled_surface, (0, 0))
 
         clock.tick_busy_loop(60)

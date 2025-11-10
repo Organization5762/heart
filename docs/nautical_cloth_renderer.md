@@ -21,6 +21,14 @@ even on low-powered hosts.
   `glReadPixels` and blits it into the provided Pygame surface so downstream
   components can stream pixels to hardware.
 
+## High-DPI handling
+
+On macOS hosts the renderer queries SDL2 for the drawable framebuffer size so
+the OpenGL viewport matches the actual pixel density of the window. The
+read-back buffer is scaled back to the logical Pygame surface, ensuring Retina
+displays show the sail at the intended size while maintaining cross-platform
+behaviour.
+
 ## Visual design
 
 The palette is limited to weathered sailcloth colours to match the farmhouse and
