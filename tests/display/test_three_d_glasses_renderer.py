@@ -11,6 +11,7 @@ from heart.device import Rectangle
 from heart.display.renderers.three_d_glasses import ThreeDGlassesRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
+
 class TestDisplayThreeDGlassesRenderer:
     """Group Display Three D Glasses Renderer tests so display three d glasses renderer behaviour stays reliable. This preserves confidence in display three d glasses renderer for end-to-end scenarios."""
 
