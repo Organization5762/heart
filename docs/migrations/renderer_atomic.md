@@ -16,10 +16,13 @@ status so incremental updates stay coordinated.
   - `TextRendering` (`src/heart/display/renderers/text.py`) – migrates text
     layout to an immutable state snapshot while preserving switch-driven
     rotation across copy decks.
+  - `RenderImage` (`src/heart/display/renderers/image.py`) – loads assets during
+    initialization, caches the scaled surface in renderer state, and remains
+    compatible with loops that expect simple blit-only behaviour.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[###>------------------]`
+Progress indicator: `[####>-----------------]`
 
 ## Validation
 
