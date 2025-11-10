@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import importlib
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Mapping
@@ -25,6 +26,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
     from heart.peripheral.core import Input, StateEntry, StateSnapshot
@@ -249,6 +251,7 @@ if TYPE_CHECKING:
     from heart.display.renderers import BaseRenderer
 
 logger = get_logger(__name__)
+log_controller = get_logging_controller()
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 RGBA_IMAGE_FORMAT: Literal["RGBA"] = "RGBA"
@@ -551,26 +554,36 @@ class GameLoop:
             )
 
             duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-            logger.info(
-                (
-                    "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
-                    "display_mode=%s uses_opengl=%s initialized=%s"
-                ),
+            log_message = (
+                "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
+                "display_mode=%s uses_opengl=%s initialized=%s"
+            )
+            log_args = (
                 renderer.name,
                 duration_ms,
                 self._render_queue_depth,
                 renderer.device_display_mode.name,
                 renderer.device_display_mode == DeviceDisplayMode.OPENGL,
                 renderer.is_initialized(),
-                extra={
-                    "renderer": renderer.name,
-                    "duration_ms": duration_ms,
-                    "queue_depth": self._render_queue_depth,
-                    "display_mode": renderer.device_display_mode.name,
-                    "uses_opengl": renderer.device_display_mode
-                    == DeviceDisplayMode.OPENGL,
-                    "initialized": renderer.is_initialized(),
-                },
+            )
+            log_extra = {
+                "renderer": renderer.name,
+                "duration_ms": duration_ms,
+                "queue_depth": self._render_queue_depth,
+                "display_mode": renderer.device_display_mode.name,
+                "uses_opengl": renderer.device_display_mode
+                == DeviceDisplayMode.OPENGL,
+                "initialized": renderer.is_initialized(),
+            }
+
+            log_controller.log(
+                key="render.loop",
+                logger=logger,
+                level=logging.INFO,
+                msg=log_message,
+                args=log_args,
+                extra=log_extra,
+                fallback_level=logging.DEBUG,
             )
 
             return screen
