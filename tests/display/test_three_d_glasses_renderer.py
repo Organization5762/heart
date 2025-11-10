@@ -39,9 +39,10 @@ def test_generate_profiles_vary_shift_and_weights() -> None:
     profiles = ThreeDGlassesRenderer._generate_profiles(4)
 
     assert len(profiles) == 4
-    assert [profile.red_shift for profile in profiles] == [1, 2, 3, 1]
-    assert profiles[0].red_weight < profiles[-1].red_weight
-    assert profiles[0].blue_weight > profiles[-1].blue_weight
+    assert [profile.red_shift for profile in profiles] == [4, 6, 8, 5]
+    assert [profile.cyan_shift for profile in profiles] == [-4, -6, -8, -5]
+    assert profiles[0].red_gain < profiles[-1].red_gain
+    assert profiles[0].cyan_gain > profiles[-1].cyan_gain
 
 
 def test_process_applies_anaglyph_and_cycles(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,8 +79,11 @@ def test_process_applies_anaglyph_and_cycles(monkeypatch: pytest.MonkeyPatch) ->
     renderer.process(window, clock, manager, orientation)
     frame_two = pygame.surfarray.array3d(window).copy()
 
-    assert np.all(frame_one[..., 1] == 0)
-    assert np.all(frame_two[..., 1] == 0)
     assert np.any(frame_one[..., 0] > 0)
-    assert np.any(frame_two[..., 2] > 0)
+    assert np.any(frame_one[..., 1] > 0)
+    assert np.any(frame_one[..., 2] > 0)
+    assert np.any(frame_two[..., 0] > 0)
+    assert np.any(frame_two[..., 1] > 0)
+    assert np.all(frame_one[..., 1] == frame_one[..., 2])
+    assert np.all(frame_two[..., 1] == frame_two[..., 2])
     assert not np.array_equal(frame_one, frame_two)

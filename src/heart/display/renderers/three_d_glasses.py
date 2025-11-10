@@ -1,7 +1,7 @@
 """Renderer for LED anaglyph imagery.
 
 This module implements a 3D glasses effect that remaps an image into
-per-channel (red / blue) components suitable for LED lenses. The
+per-channel (red / cyan) components suitable for LED lenses. The
 technique was developed in collaboration with Sri and Michael.
 """
 
@@ -24,9 +24,9 @@ class _ChannelProfile:
     """Parameter bundle describing how to tint a specific frame."""
 
     red_shift: int
-    blue_shift: int
-    red_weight: float
-    blue_weight: float
+    cyan_shift: int
+    red_gain: float
+    cyan_gain: float
 
 
 class ThreeDGlassesRenderer(BaseRenderer):
@@ -55,27 +55,27 @@ class ThreeDGlassesRenderer(BaseRenderer):
 
     @staticmethod
     def _generate_profiles(count: int) -> list[_ChannelProfile]:
-        """Create per-image tint profiles with distinct red/blue balance."""
+        """Create per-image tint profiles with distinct red/cyan balance."""
 
         if count <= 0:
             raise ValueError("Profile count must be positive")
 
         profiles: list[_ChannelProfile] = []
-        # Cycle through gentle horizontal parallax values while varying colour balance
-        shift_pattern = (1, 2, 3)
+        # Cycle through pronounced horizontal parallax values while varying colour balance
+        shift_pattern = (4, 6, 8, 5)
         denominator = max(count - 1, 1)
 
         for index in range(count):
             magnitude = shift_pattern[index % len(shift_pattern)]
             ratio = index / denominator
-            red_weight = 0.55 + 0.35 * ratio
-            blue_weight = 0.95 - 0.35 * ratio
+            red_gain = 0.9 + 0.4 * ratio
+            cyan_gain = 1.2 - 0.3 * ratio
             profiles.append(
                 _ChannelProfile(
                     red_shift=magnitude,
-                    blue_shift=-magnitude,
-                    red_weight=red_weight,
-                    blue_weight=blue_weight,
+                    cyan_shift=-magnitude,
+                    red_gain=red_gain,
+                    cyan_gain=cyan_gain,
                 )
             )
 
@@ -123,23 +123,45 @@ class ThreeDGlassesRenderer(BaseRenderer):
             shifted[shift:, :] = 0.0
         return shifted
 
+    @staticmethod
+    def _clamp_shift(shift: int, width: int) -> int:
+        """Limit channel shifts so small frames retain visible data."""
+
+        if shift == 0 or width <= 1:
+            return 0
+
+        max_shift = min(abs(shift), width - 1)
+        if max_shift == 0:
+            return 0
+
+        return max_shift if shift > 0 else -max_shift
+
     def _apply_profile(
         self, base_array: np.ndarray, profile: _ChannelProfile
     ) -> np.ndarray:
-        """Convert RGB input to a red/blue anaglyph frame."""
+        """Convert RGB input to a red/cyan anaglyph frame."""
 
-        grayscale = (
-            base_array[..., 0] * 0.299
-            + base_array[..., 1] * 0.587
-            + base_array[..., 2] * 0.114
+        left_eye = (
+            base_array[..., 0] * 0.75
+            + base_array[..., 1] * 0.20
+            + base_array[..., 2] * 0.05
+        )
+        right_eye = (
+            base_array[..., 1] * 0.55
+            + base_array[..., 2] * 0.45
         )
 
-        red = self._shift_channel(grayscale, profile.red_shift) * profile.red_weight
-        blue = self._shift_channel(grayscale, profile.blue_shift) * profile.blue_weight
+        width = base_array.shape[0]
+        red_shift = self._clamp_shift(profile.red_shift, width)
+        cyan_shift = self._clamp_shift(profile.cyan_shift, width)
+
+        red = self._shift_channel(left_eye, red_shift) * profile.red_gain
+        cyan = self._shift_channel(right_eye, cyan_shift) * profile.cyan_gain
 
         frame = np.zeros_like(base_array)
         frame[..., 0] = red
-        frame[..., 2] = blue
+        frame[..., 1] = cyan
+        frame[..., 2] = cyan
 
         np.clip(frame, 0.0, 1.0, out=frame)
         return (frame * 255).astype(np.uint8)
