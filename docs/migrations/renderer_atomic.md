@@ -31,10 +31,13 @@ status so incremental updates stay coordinated.
   - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random.py`)
     – keeps the switch consumer while moving frame counters and screen
     selection into immutable state for per-frame randomisation safety.
+  - `Tixyland` (`src/heart/display/renderers/tixyland.py`) – carries the
+    time-tracking accumulator atomically so shader functions invoked by loops
+    receive a deterministic elapsed time value.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[########>-------------]`
+Progress indicator: `[#########>------------]`
 
 ## Validation
 
