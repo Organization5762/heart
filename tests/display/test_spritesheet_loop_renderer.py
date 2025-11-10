@@ -1,5 +1,4 @@
 import os
-from collections import deque
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -12,17 +11,6 @@ from heart.display.renderers.spritesheet import (BoundingBox, FrameDescription,
                                                  LoopPhase, Size,
                                                  SpritesheetLoop)
 from heart.peripheral.switch import SwitchState
-
-
-class _StubClock:
-    def __init__(self, *times: int) -> None:
-        self._times: deque[int] = deque(times)
-        self._last: int = 0
-
-    def get_time(self) -> int:
-        if self._times:
-            self._last = self._times.popleft()
-        return self._last
 
 
 class _StubSpritesheet:
@@ -76,13 +64,6 @@ class _StubPeripheralManager:
         return self._gamepad
 
 
-@pytest.fixture(autouse=True)
-def init_pygame() -> None:
-    pygame.init()
-    yield
-    pygame.quit()
-
-
 @pytest.fixture
 def frame_data() -> list[FrameDescription]:
     return [
@@ -108,12 +89,12 @@ def orientation() -> Rectangle:
     return Rectangle.with_layout(1, 1)
 
 
-def test_boomerang_loop_stays_bounded(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle) -> None:
+def test_boomerang_loop_stays_bounded(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
     manager = _StubPeripheralManager()
     spritesheet = _StubSpritesheet()
     monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
 
-    clock = _StubClock(0, *([150] * 20))
+    clock = stub_clock_factory(0, *([150] * 20))
     renderer = SpritesheetLoop(
         "irrelevant.png",
         disable_input=True,
@@ -134,7 +115,7 @@ def test_boomerang_loop_stays_bounded(monkeypatch: pytest.MonkeyPatch, frame_dat
     assert history[-1].phase == LoopPhase.LOOP
 
 
-def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle) -> None:
+def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
     gamepad = _StubGamepad()
     manager = _StubPeripheralManager(gamepad=gamepad)
     spritesheet = _StubSpritesheet()
@@ -146,7 +127,7 @@ def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame
         boomerang=False,
         frame_data=frame_data,
     )
-    renderer.initialize(window, _StubClock(0), manager, orientation)
+    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
 
     renderer.update_state(
         current_frame=2,
@@ -168,7 +149,7 @@ def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame
     assert state.time_since_last_update is None
 
 
-def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle) -> None:
+def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
     gamepad = _StubGamepad()
     manager = _StubPeripheralManager(gamepad=gamepad)
     spritesheet = _StubSpritesheet()
@@ -180,7 +161,7 @@ def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame
         boomerang=False,
         frame_data=frame_data,
     )
-    renderer.initialize(window, _StubClock(0), manager, orientation)
+    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
 
     renderer.on_switch_state(SwitchState(0, 0, 0, 10, 0))
     renderer.on_switch_state(SwitchState(0, 0, 0, 25, 0))
@@ -194,7 +175,7 @@ def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame
     assert state_after_decrease.last_switch_rotation == 5
 
 
-def test_switch_state_ignored_when_input_disabled(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle) -> None:
+def test_switch_state_ignored_when_input_disabled(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
     manager = _StubPeripheralManager()
     spritesheet = _StubSpritesheet()
     monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
@@ -205,7 +186,7 @@ def test_switch_state_ignored_when_input_disabled(monkeypatch: pytest.MonkeyPatc
         boomerang=False,
         frame_data=frame_data,
     )
-    renderer.initialize(window, _StubClock(0), manager, orientation)
+    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
 
     initial_state = renderer.state
     renderer.on_switch_state(SwitchState(0, 0, 0, 10, 0))
