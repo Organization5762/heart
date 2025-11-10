@@ -25,10 +25,13 @@ status so incremental updates stay coordinated.
   - `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) – stores
     wrapped text layout and font sizing in atomic state while preserving
     phone-text integration.
+  - `WaterTitleScreen` (`src/heart/display/renderers/water_title_screen.py`) –
+    tracks wave animation timing atomically so consumer loops receive
+    consistent offsets across frames.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[######>---------------]`
+Progress indicator: `[#######>--------------]`
 
 ## Validation
 
