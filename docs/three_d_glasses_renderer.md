@@ -3,7 +3,8 @@
 ## Overview
 
 `ThreeDGlassesRenderer` remaps static imagery into an LED-friendly
-anaglyph so that only red and blue subpixels are energised. The
+anaglyph so that the red lens sees a warm-tinted offset while the cyan
+lens receives a matching counterpart. The
 technique originates from a pairing session with Sri and Michael, and it
 is designed for displays that rely on LED glasses or similar colour
 filtering hardware.
@@ -13,10 +14,12 @@ filtering hardware.
 - The renderer loads one or more source images using
   `heart.assets.loader.Loader` and scales them to the device window.
 - Each image receives a distinct `_ChannelProfile` that tweaks the
-  horizontal offset and balance between the red and blue channels.
-- `_apply_profile` converts the source frame to luma, shifts each colour
-  channel independently, and writes the result back into the rendering
-  surface with the green channel zeroed out.
+  horizontal offset and balance between the red and cyan channels to
+  emphasise parallax cues on 64×64 content.
+- `_apply_profile` blends the source frame into warm (left-eye) and cool
+  (right-eye) views, shifts them in opposite directions, and writes the
+  result back into the rendering surface with the cyan tint duplicated
+  across green and blue.
 - Frames advance on a configurable cadence (default `650ms`) using the
   renderer clock, so viewers perceive alternating depth cues when
   looking through LED glasses.

@@ -39,7 +39,6 @@ class TestDisplayThreeDGlassesRenderer:
             ThreeDGlassesRenderer([])
 
 
-
     def test_generate_profiles_vary_shift_and_weights(self) -> None:
         """Verify that _generate_profiles returns profiles with distinct colour shifts and weights. This underpins depth perception accuracy so 3D rendering preserves the intended effect."""
         profiles = ThreeDGlassesRenderer._generate_profiles(4)
