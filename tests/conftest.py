@@ -4,8 +4,8 @@ import types
 from collections import deque
 from typing import Callable
 
-import pytest
 import pygame
+import pytest
 
 from heart.device import Cube, Device
 from heart.environment import GameLoop
