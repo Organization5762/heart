@@ -6,8 +6,18 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+
+
+@dataclass
+class RandomPixelState:
+    color: Color | None
+
+
+@dataclass
+class BorderState:
+    color: Color
 
 
 @dataclass
@@ -22,14 +32,14 @@ class SlinkyState:
     current_y: int = 0
 
 
-class RandomPixel(BaseRenderer):
+class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
     def __init__(
         self, num_pixels=1, color: Color | None = None, brightness: float = 1.0
     ) -> None:
-        super().__init__()
+        self._initial_color = color
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.num_pixels = num_pixels
-        self.color = color
         self.brightness = brightness
 
     def process(
@@ -47,19 +57,26 @@ class RandomPixel(BaseRenderer):
             (random.randint(0, width - 1), random.randint(0, height - 1))
             for _ in range(self.num_pixels)
         ]
-        random_color = self.color or Color.random()
+        state = self.state
+        random_color = state.color or Color.random()
         color_value = [int(x * self.brightness) for x in random_color._as_tuple()]
         for x, y in pixels:
             window.set_at((x, y), color_value)
 
+    def _create_initial_state(self) -> RandomPixelState:
+        return RandomPixelState(color=self._initial_color)
 
-class Border(BaseRenderer):
+    def set_color(self, color: Color | None) -> None:
+        self.update_state(color=color)
+
+
+class Border(AtomicBaseRenderer[BorderState]):
     def __init__(self, width: int, color: Color | None = None) -> None:
         # TODO: This whole freaking this is broken
-        super().__init__()
+        self._initial_color = color or Color.random()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
-        self.color = color or Color.random()
 
     def process(
         self,
@@ -71,7 +88,7 @@ class Border(BaseRenderer):
         width, height = window.get_size()
 
         # Draw the border
-        color_value = self.color._as_tuple()
+        color_value = self.state.color._as_tuple()
         for x in range(width):
             # Top and Bottom
             for y in range(self.width):
@@ -83,6 +100,12 @@ class Border(BaseRenderer):
             for x in range(self.width):
                 window.set_at((x, y), color_value)
                 window.set_at((width - 1 - x, y), color_value)
+
+    def _create_initial_state(self) -> BorderState:
+        return BorderState(color=self._initial_color)
+
+    def set_color(self, color: Color) -> None:
+        self.update_state(color=color)
 
 
 class Rain(AtomicBaseRenderer[RainState]):
