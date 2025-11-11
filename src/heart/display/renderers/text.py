@@ -5,7 +5,6 @@ import pygame
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -20,9 +19,7 @@ class TextRenderingState:
     font: pygame.font.Font | None = None
 
 
-class TextRendering(
-    SwitchStateConsumer, AtomicBaseRenderer[TextRenderingState]
-):
+class TextRendering(AtomicBaseRenderer[TextRenderingState]):
     def __init__(
         self,
         text: list[str],
@@ -32,7 +29,6 @@ class TextRendering(
         x_location: int | None = None,
         y_location: int | None = None,
     ) -> None:
-        SwitchStateConsumer.__init__(self)
         self._initial_text = tuple(text)
         self._initial_font_name = font
         self._initial_font_size = font_size
@@ -40,6 +36,7 @@ class TextRendering(
         self._initial_x_location = x_location
         self._initial_y_location = y_location
         AtomicBaseRenderer.__init__(self)
+        self.enable_switch_state_cache()
 
     def _create_initial_state(self) -> TextRenderingState:
         return TextRenderingState(
@@ -74,7 +71,7 @@ class TextRendering(
             self.state.font_name, self.state.font_size
         )
         self.update_state(font=font)
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def _current_text(self) -> str:

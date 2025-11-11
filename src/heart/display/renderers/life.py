@@ -9,7 +9,6 @@ from scipy.ndimage import convolve
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -19,10 +18,8 @@ class LifeState:
     seed: float | None = None
 
 
-class Life(SwitchStateConsumer, AtomicBaseRenderer[LifeState]):
+class Life(AtomicBaseRenderer[LifeState]):
     def __init__(self) -> None:
-        SwitchStateConsumer.__init__(self)
-
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
 
         AtomicBaseRenderer.__init__(self)
@@ -30,6 +27,7 @@ class Life(SwitchStateConsumer, AtomicBaseRenderer[LifeState]):
         # preserve the original renderer behaviour of operating on the entire
         # device surface rather than the per-tile mirrored view.
         self.device_display_mode = DeviceDisplayMode.FULL
+        self.enable_switch_state_cache()
 
     def _update_grid(self, grid):
         # convolve the grid with the kernel to count neighbors
@@ -55,7 +53,7 @@ class Life(SwitchStateConsumer, AtomicBaseRenderer[LifeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(

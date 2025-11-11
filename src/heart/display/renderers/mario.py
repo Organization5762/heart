@@ -7,8 +7,12 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import AccelerometerConsumer
+from heart.events.types import AccelerometerVector
+from heart.peripheral.core import Input
 from heart.peripheral.core.manager import PeripheralManager
+from heart.utilities.logging import get_logger
+
+_LOGGER = get_logger(__name__)
 
 
 @dataclass
@@ -19,7 +23,7 @@ class MarioRendererState:
     highest_z: float = 0.0
 
 
-class MarioRenderer(AccelerometerConsumer, AtomicBaseRenderer[MarioRendererState]):
+class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
     def __init__(
         self,
         sheet_file_path: str,
@@ -40,8 +44,12 @@ class MarioRenderer(AccelerometerConsumer, AtomicBaseRenderer[MarioRendererState
                 )
             )
 
+        self._latest_accelerometer: tuple[float, float, float] | None = None
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self.register_event_listener(
+            AccelerometerVector.EVENT_TYPE, self._handle_accelerometer_event
+        )
 
     def _create_initial_state(self) -> MarioRendererState:
         return MarioRendererState()
@@ -55,7 +63,6 @@ class MarioRenderer(AccelerometerConsumer, AtomicBaseRenderer[MarioRendererState
     ) -> None:
         """Initialize any resources needed for rendering."""
         self._spritesheet = Loader.load_spirtesheet(self.file)
-        self.bind_accelerometer(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
@@ -117,3 +124,22 @@ class MarioRenderer(AccelerometerConsumer, AtomicBaseRenderer[MarioRendererState
         center_y = (screen_height - scaled.get_height()) // 2
 
         window.blit(scaled, (center_x, center_y))
+
+    def latest_acceleration(self) -> tuple[float, float, float] | None:
+        return self._latest_accelerometer
+
+    def _handle_accelerometer_event(self, event: Input) -> None:
+        payload = event.data
+        if isinstance(payload, AccelerometerVector):
+            vector = (payload.x, payload.y, payload.z)
+        else:
+            try:
+                vector = (
+                    float(payload["x"]),
+                    float(payload["y"]),
+                    float(payload["z"]),
+                )
+            except (KeyError, TypeError, ValueError):
+                _LOGGER.debug("Ignoring malformed accelerometer payload: %s", payload)
+                return
+        self._latest_accelerometer = vector

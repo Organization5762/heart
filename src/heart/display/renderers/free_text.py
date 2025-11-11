@@ -11,7 +11,6 @@ from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer
 from heart.events.types import PhoneTextMessage
 from heart.peripheral.core import Input
-from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 
@@ -35,8 +34,6 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
 
         self._font_cache: dict[int, pygame.font.Font] = {}
         self._latest_text: str | None = None
-        self._event_bus: EventBus | None = None
-        self._subscription: SubscriptionHandle | None = None
 
         # Font size bounds (inclusive)
         self._font_size_max: int = 12
@@ -45,6 +42,9 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
 
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self.register_event_listener(
+            PhoneTextMessage.EVENT_TYPE, self._handle_phone_text_event
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -58,8 +58,6 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
     ) -> None:
         """Initialise the renderer and warm the default font cache."""
 
-        self._ensure_subscription(peripheral_manager)
-
         initial_font = self._get_font(self._initial_font_size)
         self.update_state(
             font_size=self._initial_font_size,
@@ -69,35 +67,8 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def reset(self) -> None:
-        self._unsubscribe()
         self._latest_text = None
         super().reset()
-
-    def _ensure_subscription(self, peripheral_manager: PeripheralManager) -> None:
-        if self._subscription is not None:
-            return
-        bus = getattr(peripheral_manager, "event_bus", None)
-        if bus is None:
-            _LOGGER.debug("FreeTextRenderer missing event bus; text will remain static")
-            return
-        self._event_bus = bus
-        self._subscription = bus.subscribe(
-            PhoneTextMessage.EVENT_TYPE,
-            self._handle_phone_text_event,
-        )
-
-    def _unsubscribe(self) -> None:
-        if self._event_bus is None or self._subscription is None:
-            self._event_bus = None
-            self._subscription = None
-            return
-        try:
-            self._event_bus.unsubscribe(self._subscription)
-        except Exception:  # pragma: no cover - defensive cleanup
-            _LOGGER.exception("Failed to unsubscribe FreeTextRenderer")
-        finally:
-            self._event_bus = None
-            self._subscription = None
 
     def _handle_phone_text_event(self, event: Input) -> None:
         payload = event.data

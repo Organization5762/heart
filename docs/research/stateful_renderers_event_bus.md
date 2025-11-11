@@ -7,26 +7,24 @@ hydrate their internal snapshots. `FreeTextRenderer` queried
 `PeripheralManager.get_phone_text()` for the most recent BLE message while
 `MarioRenderer` called `PeripheralManager.get_accelerometer()` to check the
 current acceleration vector. Both patterns contradicted the push-based
-model used by `SwitchStateConsumer` and forced renderers to hold live
-references to peripherals during rendering.
+model provided by the switch subscription helpers and forced renderers to
+hold live references to peripherals during rendering.
 
 ## Changes
 
-- Added `AccelerometerConsumer` under
-  `src/heart/display/renderers/internal/accelerometer.py` to cache the last
-  `AccelerometerVector` published on the event bus and expose a
-  `latest_acceleration()` helper for renderers.
-- Updated `MarioRenderer` (`src/heart/display/renderers/mario.py`) to
-  inherit the new mixin, subscribe to accelerometer updates during
-  `initialize()`, and drive loop transitions from cached vectors instead of
-  polling the manager each frame.
+- Added `BaseRenderer.register_event_listener()` so renderers declare their
+  dependencies up front and receive callbacks once `ensure_input_bindings()`
+  executes.
+- Updated `MarioRenderer` (`src/heart/display/renderers/mario.py`) to use
+  the new helper, cache accelerometer vectors, and drive loop transitions
+  from cached data instead of polling the manager each frame.
 - Taught `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) to
-  subscribe directly to `PhoneTextMessage` events, cache the latest text, and
-  drop its stored `PhoneText` peripheral reference.
+  register a listener for `PhoneTextMessage` events, cache the latest text,
+  and drop its stored `PhoneText` peripheral reference.
 
 ## Impact
 
 Renderers rely solely on cached event-driven state during `process()`,
-eliminating per-frame calls to `PeripheralManager`. Subscriptions are
-established during `initialize()` and cleaned up in `reset()`, mirroring the
-pattern already in place for switch state consumers.
+eliminating per-frame calls to `PeripheralManager`. Subscriptions activate
+when `ensure_input_bindings()` runs (from `initialize()` or `get_renderers()`)
+and reuse the same mechanism as switch state caching.
