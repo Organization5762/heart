@@ -22,11 +22,14 @@ class LifeState:
 class Life(SwitchStateConsumer, AtomicBaseRenderer[LifeState]):
     def __init__(self) -> None:
         SwitchStateConsumer.__init__(self)
-        self.device_display_mode = DeviceDisplayMode.FULL
 
         self.kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
 
         AtomicBaseRenderer.__init__(self)
+        # AtomicBaseRenderer reinitializes device_display_mode; restore FULL to
+        # preserve the original renderer behaviour of operating on the entire
+        # device surface rather than the per-tile mirrored view.
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def _update_grid(self, grid):
         # convolve the grid with the kernel to count neighbors
