@@ -122,6 +122,16 @@ class TestUtilitiesEnv:
 
 
 
+    def test_is_debug_mode_recognizes_truthy_tokens(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Ensure debug mode helper recognises canonical truthy tokens so feature flags behave reliably."""
+
+        monkeypatch.setenv("DEBUG_MODE", " yes ")
+        assert Configuration.is_debug_mode() is True
+
+        monkeypatch.setenv("DEBUG_MODE", "false")
+        assert Configuration.is_debug_mode() is False
+
+
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
         fake_entries = ["ttyHeart-123", "other"]
@@ -137,6 +147,30 @@ class TestUtilitiesEnv:
 
         assert ports == ["/dev/serial/by-id/ttyHeart-123"]
 
+
+
+    def test_get_device_ports_falls_back_when_directory_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that get device ports falls back when directory lacks matches to keep discovery resilient."""
+
+        def fake_comports() -> Iterator[SimpleNamespace]:
+            return iter(
+                [
+                    SimpleNamespace(device="/dev/cu.usbserial-0001", description="Heart Foo"),
+                    SimpleNamespace(device="/dev/cu.Bluetooth-Incoming-Port", description="Other"),
+                ]
+            )
+
+        monkeypatch.setattr("heart.utilities.env.os.path.exists", lambda path: True)
+        monkeypatch.setattr("heart.utilities.env.os.listdir", lambda path: ["other-device"])
+        monkeypatch.setattr("heart.utilities.env.platform.system", lambda: "Darwin")
+        monkeypatch.setattr(
+            "heart.utilities.env.serial.tools.list_ports.comports",
+            fake_comports,
+        )
+
+        ports = list(get_device_ports("heart"))
+
+        assert ports == ["/dev/cu.usbserial-0001"]
 
 
     def test_get_device_ports_fallback_to_serial(self, monkeypatch: pytest.MonkeyPatch) -> None:

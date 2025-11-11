@@ -19,17 +19,17 @@ contacting the manager on every frame.
   `PeripheralManager.get_main_switch_state` and
   `PeripheralManager.subscribe_main_switch`, both delegating to the
   underlying switch so callers avoid the deprecated accessor.
-- `src/heart/display/renderers/internal/switch_state.py` introduces
-  `SwitchStateConsumer`, a mixin that subscribes once and caches the
-  latest snapshot for renderers or controller classes.
+- `BaseRenderer.enable_switch_state_cache()` now registers a managed
+  subscription that populates an internal cache while delegating update
+  hooks to `on_switch_state`.
 - Display renderers such as
   `src/heart/display/renderers/text.py`, `life.py`,
   `spritesheet.py`, `spritesheet_random.py`, `multi_scene.py`, and
-  `yolisten.py` extend the mixin and reuse the cached state inside their
-  render loops.
-- Navigation controllers in `src/heart/navigation.py` also adopt the
-  mixin, keeping selector logic synchronized with switch events without
-  ad hoc polling.
+  `yolisten.py` enable the cache and consume `get_switch_state()` during
+  their render loops.
+- Navigation controllers in `src/heart/navigation.py` call
+  `enable_switch_state_cache()` to synchronize selector logic with
+  switch events without ad hoc polling.
 
 ## Expected impact
 

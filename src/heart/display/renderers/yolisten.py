@@ -71,6 +71,7 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
         self.sim_accel_step = 0.1
         self.test_mode = False
         self.phyphox_db = 50.0
+        self.enable_switch_state_cache()
 
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -82,7 +83,7 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             # Calculate and store the width of each word

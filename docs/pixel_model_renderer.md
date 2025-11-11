@@ -24,9 +24,10 @@ It lives at `src/heart/display/renderers/pixel_model.py` and exposes the same
 
 ```
 from heart.display.renderers.pixel_model import PixelModelRenderer
+from heart.utilities.paths import docs_asset_path
 
 renderer = PixelModelRenderer(
-    model_path="docs/assets/models/pixel_runner.obj",
+    model_path=docs_asset_path("models", "pixel_runner.obj"),
     target_rows=96,
     palette_levels=6,
 )
@@ -43,6 +44,6 @@ screen is a high-resolution laptop display.
 
 ## Sample asset
 
-`docs/assets/models/pixel_runner.obj` provides a low-poly runner silhouette that
-is already centred and scaled. Use it to validate the renderer wiring before
-bringing in external assets.
+`docs_asset_path("models", "pixel_runner.obj")` resolves a low-poly runner
+silhouette that is already centred and scaled. Use it to validate the renderer
+wiring before bringing in external assets.

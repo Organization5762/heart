@@ -28,6 +28,7 @@ class MultiScene(SwitchStateConsumer, AtomicBaseRenderer[_MultiSceneState]):
     def get_renderers(
         self, peripheral_manager: PeripheralManager
     ) -> list[BaseRenderer]:
+        self.ensure_input_bindings(peripheral_manager)
         self._process_input(peripheral_manager)
         # This multi-scene could be composed of multiple renderers
         current_scene = self.scenes[self.state.current_scene_index]
@@ -42,16 +43,16 @@ class MultiScene(SwitchStateConsumer, AtomicBaseRenderer[_MultiSceneState]):
         peripheral_manager: PeripheralManager,
         orientation: "Orientation",
     ) -> None:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         for scene in self.scenes:
             scene.initialize(window, clock, peripheral_manager, orientation)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
-        self._process_switch(peripheral_manager)
+        self._process_switch()
         self._process_keyboard()
 
-    def _process_switch(self, peripheral_manager: PeripheralManager) -> None:
+    def _process_switch(self) -> None:
         current_value = self.get_switch_state().button_value
         self._set_scene_index(current_value)
 
