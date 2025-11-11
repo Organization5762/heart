@@ -81,10 +81,41 @@ status so incremental updates stay coordinated.
     snapshots the currently leading sensor ID, BPM, and avatar name to guarantee
     composed playlists always pull a coherent frame even when the leader
     changes mid-render.
+  - `YoListenRenderer` (`src/heart/display/renderers/yolisten.py`) – keeps the
+    flicker colour, calibration offset, and scroll position in atomic state so
+    switch-controlled speed adjustments stay deterministic between resets.
+  - `MultiScene` (`src/heart/display/renderers/multi_scene.py`) – tracks the
+    active child index and keyboard edge detection atomically so scene cycling
+    via switches and keys remains deterministic for composed playlists.
+  - `MetadataScreen` (`src/heart/display/renderers/metadata_screen.py`) –
+    snapshots per-monitor animation state and battery indicators to deliver
+    consistent beat visualisations even as heart rate sensors join or leave.
+  - `WaterCube` (`src/heart/display/renderers/water_cube.py`) – records the
+    simulated height field and velocity grid atomically so physics steps produce
+    deterministic ripples regardless of renderer reuse.
+  - `PixelSunriseRenderer` (`src/heart/display/renderers/pixel_sunrise.py`) –
+    stores the animation epoch atomically while keeping GPU resources cached for
+    repeatable shader timing across resets.
+  - `PixelModelRenderer` (`src/heart/display/renderers/pixel_model.py`) – keeps
+    the render start time immutable so orbiting camera animation progresses
+    predictably while leaving OpenGL assets cached on the renderer instance.
+  - `LSystem` (`src/heart/display/renderers/l_system.py`) – manages grammar
+    expansion timing atomically so recursive tree generation advances in
+    lockstep with the scheduler.
+  - `ThreeDGlassesRenderer` (`src/heart/display/renderers/three_d_glasses.py`)
+    – records the frame timer and index atomically so anaglyph slideshows stay
+    in sync after resets.
+  - `RendererEventPublisher` and `RendererEventSubscriber`
+    (`src/heart/display/renderers/internal/event_stream.py`) – promote sequence
+    counters and latest frames into atomic state so event bus producers and
+    consumers resume cleanly across scene transitions.
+  - `PacmanGhostRenderer` (`src/heart/display/renderers/pacman.py`) – keeps the
+    chase direction, animation toggle, and sprite position immutable so the
+    Pac-Man vignette restarts consistently between playlist entries.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[######################>--]`
+Progress indicator: `[#########################>-]`
 
 ## Validation
 

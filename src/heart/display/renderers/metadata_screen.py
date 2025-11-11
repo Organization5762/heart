@@ -1,9 +1,12 @@
+from dataclasses import dataclass, field, replace
+from typing import Dict
+
 from pygame import Rect, Surface, draw, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.display.renderers.max_bpm_screen import AVATAR_MAPPINGS
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import battery_status, current_bpms
@@ -14,13 +17,21 @@ DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 logger = get_logger("HeartRateManager")
 
 
-class MetadataScreen(BaseRenderer):
-    def __init__(self) -> None:
-        super().__init__()
-        self.device_display_mode = DeviceDisplayMode.FULL
-        self.current_frame = 0
+@dataclass(frozen=True)
+class HeartAnimationState:
+    up: bool
+    color_index: int
+    last_update_ms: float
 
-        # Define colors for different heart rate monitors
+
+@dataclass(frozen=True)
+class MetadataScreenState:
+    heart_states: Dict[str, HeartAnimationState] = field(default_factory=dict)
+    time_since_last_update_ms: float = 0.0
+
+
+class MetadataScreen(AtomicBaseRenderer[MetadataScreenState]):
+    def __init__(self) -> None:
         self.colors = [
             "bluer",
             "blue",
@@ -33,7 +44,7 @@ class MetadataScreen(BaseRenderer):
         ]
 
         # Load heart images for each color
-        self.heart_images = {}
+        self.heart_images: Dict[str, dict[str, Surface]] = {}
         for color in self.colors:
             self.heart_images[color] = {
                 "small": Loader.load(f"hearts/{color}/small.png"),
@@ -42,18 +53,17 @@ class MetadataScreen(BaseRenderer):
             }
 
         # Load avatar images
-        self.avatar_images = {}
+        self.avatar_images: Dict[str, Surface] = {}
         for name, sensor_id in AVATAR_MAPPINGS.items():
             try:
                 self.avatar_images[sensor_id] = Loader.load(f"avatars/{name}_16.png")
             except Exception:
                 logger.warning(f"Could not load avatar for {name}")
 
-        self.time_since_last_update = 0
         self.time_between_frames_ms = DEFAULT_TIME_BETWEEN_FRAMES_MS
 
-        # Track animation state for each heart rate monitor
-        self.heart_states = {}  # {id: {"up": bool, "color_index": int, "last_update": time}}
+        AtomicBaseRenderer.__init__(self)
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def display_number(self, window, number, x, y):
         my_font = Loader.load_font("Grand9K Pixel.ttf")
@@ -94,28 +104,20 @@ class MetadataScreen(BaseRenderer):
         # Get all active heart rate monitors
         active_monitors = list(current_bpms.keys())
 
-        # Initialize or update heart states for each monitor
-        for i, monitor_id in enumerate(active_monitors):
-            if monitor_id not in self.heart_states:
-                self.heart_states[monitor_id] = {
-                    "up": True,
-                    "color_index": i % len(self.colors),
-                    "last_update": 0,
-                }
-
-        # Remove heart states for monitors that are no longer active
-        for monitor_id in list(self.heart_states.keys()):
-            if monitor_id not in active_monitors:
-                del self.heart_states[monitor_id]
+        elapsed_ms = float(clock.get_time())
+        self._synchronise_heart_states(active_monitors, elapsed_ms)
+        state = self.state
+        heart_states = state.heart_states
 
         # Calculate positions for each heart rate display
         # Each metadata is 32x32, screen is 64x256
         # We can fit 2 across and 8 down
         max_per_col = 2
         max_cols = 8
+        max_visible = max_per_col * max_cols
 
         for i, monitor_id in enumerate(
-            active_monitors[: max_per_col * max_cols]
+            active_monitors[:max_visible]
         ):  # Limit to what fits on screen
             col = i // max_per_col
             row = i % max_per_col
@@ -123,26 +125,12 @@ class MetadataScreen(BaseRenderer):
             x = col * 32
             y = row * 32
 
+            heart_state = heart_states.get(monitor_id)
+            if heart_state is None:
+                continue
+
             # Get current BPM and update animation timing
-            current_bpm = current_bpms.get(
-                monitor_id, 60
-            )  # Default to 60 BPM if not found
-
-            if current_bpm > 0:
-                # Convert BPM to milliseconds between beats (60000ms / BPM)
-                time_between_beats = (
-                    60000 / current_bpm / 2
-                )  # Divide by 2 for heart animation (up/down)
-            else:
-                time_between_beats = DEFAULT_TIME_BETWEEN_FRAMES_MS
-
-            # Update animation state
-            state = self.heart_states[monitor_id]
-            state["last_update"] += clock.get_time()
-
-            if state["last_update"] > time_between_beats:
-                state["last_update"] = 0
-                state["up"] = not state["up"]
+            current_bpm = current_bpms.get(monitor_id, 0)
 
             # Check if we have an avatar for this monitor_id
             use_avatar = monitor_id in self.avatar_images
@@ -151,8 +139,8 @@ class MetadataScreen(BaseRenderer):
             if use_avatar:
                 image = self.avatar_images[monitor_id]
             else:
-                color = self.colors[state["color_index"]]
-                image_key = "small" if state["up"] else "med"
+                color = self.colors[heart_state.color_index]
+                image_key = "small" if heart_state.up else "med"
                 image = self.heart_images[color][image_key]
 
             # Calculate how many times to repeat based on number of active monitors
@@ -171,9 +159,58 @@ class MetadataScreen(BaseRenderer):
                     window.blit(image, (pos_x + 8, pos_y + 4))
                 else:
                     window.blit(image, (pos_x, pos_y - 8))
-                self.display_number(
-                    window, current_bpms.get(monitor_id, 0), pos_x, pos_y
-                )
+                self.display_number(window, current_bpm, pos_x, pos_y)
                 self.display_battery_status(window, monitor_id, pos_x, pos_y)
 
-            self.time_since_last_update += clock.get_time()
+    def _create_initial_state(self) -> MetadataScreenState:
+        return MetadataScreenState()
+
+    def _synchronise_heart_states(
+        self, active_monitors: list[str], elapsed_ms: float
+    ) -> None:
+        max_visible = 16
+
+        def mutator(state: MetadataScreenState) -> MetadataScreenState:
+            heart_states = dict(state.heart_states)
+
+            for i, monitor_id in enumerate(active_monitors):
+                if monitor_id not in heart_states:
+                    heart_states[monitor_id] = HeartAnimationState(
+                        up=True,
+                        color_index=i % len(self.colors),
+                        last_update_ms=0.0,
+                    )
+
+            for monitor_id in list(heart_states.keys()):
+                if monitor_id not in active_monitors:
+                    del heart_states[monitor_id]
+
+            for monitor_id in active_monitors[:max_visible]:
+                animation = heart_states.get(monitor_id)
+                if animation is None:
+                    continue
+
+                current_bpm = current_bpms.get(monitor_id, 60)
+                if current_bpm > 0:
+                    time_between_beats = 60000 / current_bpm / 2
+                else:
+                    time_between_beats = DEFAULT_TIME_BETWEEN_FRAMES_MS
+
+                accumulated = animation.last_update_ms + elapsed_ms
+                if accumulated > time_between_beats:
+                    accumulated = 0.0
+                    up = not animation.up
+                else:
+                    up = animation.up
+
+                heart_states[monitor_id] = replace(
+                    animation, up=up, last_update_ms=accumulated
+                )
+
+            return MetadataScreenState(
+                heart_states=heart_states,
+                time_since_last_update_ms=
+                    state.time_since_last_update_ms + elapsed_ms,
+            )
+
+        self.mutate_state(mutator)

@@ -1,6 +1,7 @@
 import random
 import threading
 import time
+from dataclasses import dataclass
 
 import pygame
 import requests
@@ -8,29 +9,32 @@ import requests
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
+from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 # TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 
-class YoListenRenderer(BaseRenderer):
+@dataclass
+class YoListenState:
+    color: Color
+    last_flicker_update: float = 0.0
+    should_calibrate: bool = True
+    scroll_speed_offset: float = 0.0
+    word_position: float = 0.0
+
+
+class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
     def __init__(self, color: Color = Color(255, 0, 0)) -> None:
-        super().__init__()
-        self.device_display_mode = DeviceDisplayMode.FULL
+        SwitchStateConsumer.__init__(self)
         self.base_color = color  # Store the base color
-        self.color = color  # This will be the flickering color
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
         self.screen_count = 4
         self.flicker_intensity = 0.4
         self.flicker_speed = 0.04  # How often to update the flicker (in seconds)
-        self.last_flicker_update = 0
-        self.scroll_speed = 0.5  # pixels per frame
         self._base_scroll_speed = 0.5  # Store the base scroll speed
-        self._should_calibrate = True
-        self._scroll_speed_offset = 0
-        self.word_positions = [0]  # Single position for all words
         self.word_widths = {}  # Store width of each word
         self.word_spacing = 0  # Space between words
         self.ascii_art = {
@@ -50,7 +54,6 @@ class YoListenRenderer(BaseRenderer):
                 "  █  █  █ █▀▀█   █ ",
             ],
         }
-        self.last_flash_time = 0
         self.flash_delay = 100
         self.ascii_font_sizes = {}
         # --- Phyphox phone accel ---
@@ -69,6 +72,9 @@ class YoListenRenderer(BaseRenderer):
         self.test_mode = False
         self.phyphox_db = 50.0
         self.enable_switch_state_cache()
+
+        AtomicBaseRenderer.__init__(self)
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def initialize(
         self,
@@ -112,13 +118,14 @@ class YoListenRenderer(BaseRenderer):
         self, word: str, y_offset: int, screen_surface: pygame.Surface
     ) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
+        color = self.state.color
         if word == "Y'HEAR":
             blocks = self.ascii_art[word]
             spacing = 1  # integer spacing for pygame
             line_idx = 0
             for block_i, block in enumerate(blocks):
                 for line in block:
-                    text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                    text_surface = ascii_font.render(line, True, color._as_tuple())
                     text_width, _ = text_surface.get_size()
                     x_centered = (screen_surface.get_width() - text_width) // 2
                     screen_surface.blit(
@@ -133,7 +140,7 @@ class YoListenRenderer(BaseRenderer):
                     line_idx += spacing  # add spacing only between blocks
         else:
             for j, line in enumerate(self.ascii_art[word]):
-                text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                text_surface = ascii_font.render(line, True, color._as_tuple())
                 text_width, _ = text_surface.get_size()
                 x_centered = (screen_surface.get_width() - text_width) // 2
                 screen_surface.blit(
@@ -154,8 +161,8 @@ class YoListenRenderer(BaseRenderer):
                 pass
             time.sleep(0.05)
 
-    def _update_flicker(self, current_time: float) -> None:
-        if current_time - self.last_flicker_update >= self.flicker_speed:
+    def _update_flicker(self, current_time: float, state: YoListenState) -> YoListenState:
+        if current_time - state.last_flicker_update >= self.flicker_speed:
             # Generate a random brightness factor between (1 - intensity) and (1 + intensity)
             brightness_factor = 1 + random.uniform(
                 -self.flicker_intensity, self.flicker_intensity
@@ -164,16 +171,24 @@ class YoListenRenderer(BaseRenderer):
             r = min(255, max(0, int(self.base_color.r * brightness_factor)))
             g = min(255, max(0, int(self.base_color.g * brightness_factor)))
             b = min(255, max(0, int(self.base_color.b * brightness_factor)))
-            self.color = Color(r, g, b)
-            self.last_flicker_update = current_time
+            self.update_state(
+                color=Color(r, g, b),
+                last_flicker_update=current_time,
+            )
+            return self.state
+        return state
 
-    def _calibrate_scroll_speed(self) -> None:
-        self._scroll_speed_offset = self.get_switch_state().rotation_since_last_button_press
-        self._should_calibrate = False
+    def _calibrate_scroll_speed(self, state: YoListenState) -> YoListenState:
+        rotation = self.get_switch_state().rotation_since_last_button_press
+        self.update_state(
+            scroll_speed_offset=rotation,
+            should_calibrate=False,
+        )
+        return self.state
 
-    def _scroll_speed_scale_factor(self) -> float:
+    def _scroll_speed_scale_factor(self, state: YoListenState) -> float:
         current_value = self.get_switch_state().rotation_since_last_button_press
-        return 1.0 + (current_value - self._scroll_speed_offset) / 20.0
+        return 1.0 + (current_value - state.scroll_speed_offset) / 20.0
 
     def process(
         self,
@@ -182,28 +197,36 @@ class YoListenRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        if self._should_calibrate:
-            self._calibrate_scroll_speed()
-        self.scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor()
+        state = self.state
+        if state.should_calibrate:
+            state = self._calibrate_scroll_speed(state)
+        scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(state)
 
         # Update the flickering effect
         current_time = time.time()
-        self._update_flicker(current_time)
+        state = self._update_flicker(current_time, state)
 
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
         window.fill((0, 0, 0))
 
         # Update the single position for all words
-        self.word_positions[0] -= self.scroll_speed
+        word_position = state.word_position - scroll_speed
         # Reset position when words move completely off screen
-        if self.word_positions[0] < -window_width:
-            self.word_positions[0] = 0
+        if word_position < -window_width:
+            word_position = 0
+
+        if word_position != state.word_position:
+            self.update_state(word_position=word_position)
+            state = self.state
+
+        color = state.color
+        word_position = state.word_position
 
         # Draw all words at their relative positions, including duplicates for looping
         for i, word in enumerate(self.words):
             # Calculate the word's x position relative to the entire display
-            word_x = self.word_positions[0] + (i * (screen_width + self.word_spacing))
+            word_x = word_position + (i * (screen_width + self.word_spacing))
 
             # Draw the word and its duplicate for looping
             for offset in [0, window_width]:
@@ -240,7 +263,11 @@ class YoListenRenderer(BaseRenderer):
 
                         # Draw the word with its current x position relative to the screen
                         self._draw_ascii_art_with_x_offset(
-                            word, y_offset, screen_surface, int(current_x - screen_x)
+                            word,
+                            y_offset,
+                            screen_surface,
+                            int(current_x - screen_x),
+                            color,
                         )
 
     def _draw_ascii_art_with_x_offset(
@@ -249,6 +276,7 @@ class YoListenRenderer(BaseRenderer):
         y_offset: int,
         screen_surface: pygame.Surface,
         x_offset_accel: int,
+        color: Color,
     ) -> None:
         ascii_font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
         if word == "Y'HEAR":
@@ -257,7 +285,7 @@ class YoListenRenderer(BaseRenderer):
             line_idx = 0
             for block_i, block in enumerate(blocks):
                 for line in block:
-                    text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                    text_surface = ascii_font.render(line, True, color._as_tuple())
                     text_width, _ = text_surface.get_size()
                     x_centered = (
                         screen_surface.get_width() - text_width
@@ -274,7 +302,7 @@ class YoListenRenderer(BaseRenderer):
                     line_idx += spacing  # add spacing only between blocks
         else:
             for j, line in enumerate(self.ascii_art[word]):
-                text_surface = ascii_font.render(line, True, self.color._as_tuple())
+                text_surface = ascii_font.render(line, True, color._as_tuple())
                 text_width, _ = text_surface.get_size()
                 x_centered = (
                     screen_surface.get_width() - text_width
@@ -283,6 +311,9 @@ class YoListenRenderer(BaseRenderer):
                     text_surface,
                     (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
                 )
+
+    def _create_initial_state(self) -> YoListenState:
+        return YoListenState(color=self.base_color)
 
 
 def poll_phyphox():

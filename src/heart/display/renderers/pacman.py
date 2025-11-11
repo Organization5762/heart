@@ -7,7 +7,7 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -31,6 +31,19 @@ class RainState:
 class SlinkyState:
     starting_point: int = 0
     current_y: int = 0
+
+
+@dataclass
+class PacmanGhostState:
+    screen_width: int = 0
+    screen_height: int = 0
+    last_corner: str | None = None
+    blood: bool = True
+    reverse: bool = False
+    x: int = 0
+    y: int = 0
+    pacman_idx: int = 0
+    switch_pacman: bool = True
 
 
 class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
@@ -221,11 +234,14 @@ class Slinky(AtomicBaseRenderer[SlinkyState]):
 
 
 ## More Ideas
-class PacmanGhostRenderer(BaseRenderer):
+class PacmanGhostRenderer(AtomicBaseRenderer[PacmanGhostState]):
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.last_corner = None  # Initialize the corner at the beginning
+        self.ghost1: pygame.Surface | None = None
+        self.ghost2: pygame.Surface | None = None
+        self.ghost3: pygame.Surface | None = None
+        self.pacman: pygame.Surface | None = None
 
     def initialize(
         self,
@@ -234,63 +250,65 @@ class PacmanGhostRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        self.screen_width, self.screen_height = window.get_size()
-        self.blood = True
+        width, height = window.get_size()
+        self.update_state(
+            screen_width=width,
+            screen_height=height,
+            blood=True,
+            pacman_idx=0,
+            switch_pacman=True,
+        )
         self._initialize_corner()
-        self.pacmanIdx = 0
-        self.switch_pacman = True
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def _initialize_corner(self) -> None:
-        corners = ["top_left", "top_right"]
+        state = self.state
+        corners = ["top_left", "top_right", "bottom_left", "bottom_right"]
         corner = random.choice(corners)
-        self.last_corner = corner
-
-        self.blood = not self.blood
+        blood = not state.blood
+        screen_width = state.screen_width
+        screen_height = state.screen_height
 
         if corner == "top_left":
-            self.x = -50
-            self.y = 16
-            self.reverse = False
+            x = -50
+            y = 16
+            reverse = False
         elif corner == "top_right":
-            self.x = self.screen_width + 50
-            self.y = 16
-            self.reverse = True
+            x = screen_width + 50
+            y = 16
+            reverse = True
         elif corner == "bottom_left":
-            self.x = -50
-            self.y = self.screen_height - 48
-            self.reverse = False
-        elif corner == "bottom_right":
-            self.x = self.screen_width + 50
-            self.y = self.screen_height - 48
-            self.reverse = True
+            x = -50
+            y = screen_height - 48
+            reverse = False
+        else:
+            x = screen_width + 50
+            y = screen_height - 48
+            reverse = True
 
-        if self.reverse:
+        load = Loader.load
+        if reverse:
             self.ghost1 = pygame.transform.flip(
-                Loader.load("scaredghost1.png" if self.blood else "pinkghost.png"),
-                True,
-                False,
+                load("scaredghost1.png" if blood else "pinkghost.png"), True, False
             )
             self.ghost2 = pygame.transform.flip(
-                Loader.load("scaredghost2.png" if self.blood else "blueghost.png"),
-                True,
-                False,
+                load("scaredghost2.png" if blood else "blueghost.png"), True, False
             )
             self.ghost3 = pygame.transform.flip(
-                Loader.load("scaredghost1.png" if self.blood else "redghost.png"),
-                True,
-                False,
+                load("scaredghost1.png" if blood else "redghost.png"), True, False
             )
         else:
-            self.ghost1 = Loader.load(
-                "scaredghost1.png" if self.blood else "pinkghost.png"
-            )
-            self.ghost2 = Loader.load(
-                "scaredghost2.png" if self.blood else "blueghost.png"
-            )
-            self.ghost3 = Loader.load(
-                "scaredghost1.png" if self.blood else "redghost.png"
-            )
+            self.ghost1 = load("scaredghost1.png" if blood else "pinkghost.png")
+            self.ghost2 = load("scaredghost2.png" if blood else "blueghost.png")
+            self.ghost3 = load("scaredghost1.png" if blood else "redghost.png")
+
+        self.update_state(
+            last_corner=corner,
+            blood=blood,
+            reverse=reverse,
+            x=x,
+            y=y,
+        )
 
     def process(
         self,
@@ -299,37 +317,50 @@ class PacmanGhostRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        state = self.state
+        screen_width = state.screen_width
+
         # Update position
-        if self.reverse:
-            self.x -= 5
-        else:
-            self.x += 5
+        delta = -5 if state.reverse else 5
+        new_x = state.x + delta
 
-        if self.x > self.screen_width + 50 or self.x < -150:
+        if new_x > screen_width + 50 or new_x < -150:
             self._initialize_corner()
-
-        if self.switch_pacman:
-            self.pacmanIdx = (self.pacmanIdx + 1) % 3
-            self.switch_pacman = False
+            state = self.state
+            new_x = state.x
+        
+        if state.switch_pacman:
+            pacman_idx = (state.pacman_idx + 1) % 3
         else:
-            self.switch_pacman = True
+            pacman_idx = state.pacman_idx
+        new_switch = not state.switch_pacman
 
-        if self.blood:
-            self.pacman = Loader.load(f"bloodpac{self.pacmanIdx + 1}.png")
+        self.update_state(x=new_x, pacman_idx=pacman_idx, switch_pacman=new_switch)
+        state = self.state
+
+        if state.blood:
+            self.pacman = Loader.load(f"bloodpac{state.pacman_idx + 1}.png")
         else:
-            self.pacman = Loader.load(f"pac{self.pacmanIdx + 1}.png")
+            self.pacman = Loader.load(f"pac{state.pacman_idx + 1}.png")
 
-        if (self.reverse and not self.blood) or (self.blood and not self.reverse):
+        if (state.reverse and not state.blood) or (state.blood and not state.reverse):
             self.pacman = pygame.transform.flip(self.pacman, True, False)
 
         # Draw the sprite
-        if (not self.blood and self.reverse) or (self.blood and not self.reverse):
-            window.blit(self.pacman, (self.x, self.y))
-            window.blit(self.ghost1, (self.x + 32, self.y))
-            window.blit(self.ghost2, (self.x + 64, self.y))
-            window.blit(self.ghost3, (self.x + 96, self.y))
-        if self.blood and self.reverse or (not self.blood and not self.reverse):
-            window.blit(self.ghost3, (self.x, self.y))
-            window.blit(self.ghost2, (self.x + 32, self.y))
-            window.blit(self.ghost1, (self.x + 64, self.y))
-            window.blit(self.pacman, (self.x + 96, self.y))
+        x = state.x
+        y = state.y
+        if (not state.blood and state.reverse) or (state.blood and not state.reverse):
+            window.blit(self.pacman, (x, y))
+            if self.ghost1 and self.ghost2 and self.ghost3:
+                window.blit(self.ghost1, (x + 32, y))
+                window.blit(self.ghost2, (x + 64, y))
+                window.blit(self.ghost3, (x + 96, y))
+        if state.blood and state.reverse or (not state.blood and not state.reverse):
+            if self.ghost1 and self.ghost2 and self.ghost3:
+                window.blit(self.ghost3, (x, y))
+                window.blit(self.ghost2, (x + 32, y))
+                window.blit(self.ghost1, (x + 64, y))
+            window.blit(self.pacman, (x + 96, y))
+
+    def _create_initial_state(self) -> PacmanGhostState:
+        return PacmanGhostState()

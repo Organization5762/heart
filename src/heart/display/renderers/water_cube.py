@@ -10,6 +10,7 @@ This computes a 64x64 height-field that is projected onto the cube's four 64x64 
 """
 
 import math
+from dataclasses import dataclass
 from typing import Tuple
 
 import numpy as np
@@ -19,7 +20,7 @@ from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 # ───────────────────────── constants & tunables ───────────────────────────────
@@ -60,55 +61,63 @@ def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
     return INIT_FILL + slope_x * DX + slope_y * DY
 
 
-class WaterCube(BaseRenderer):
+@dataclass
+class WaterCubeState:
+    heights: np.ndarray
+    velocities: np.ndarray
+
+
+class WaterCube(AtomicBaseRenderer[WaterCubeState]):
     """Height-field water simulation projected to four LED faces."""
 
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-        # physics state (float32 for speed on Pi)
-        self.h = np.full((GRID, GRID), INIT_FILL, dtype=np.float32)
-        self.v = np.zeros_like(self.h)
-
-        # reusable framebuffer (x, y, RGB)
-        self._frame = np.zeros((CUBE_PX_W, CUBE_PX_H, 3), np.uint8)
-
     # ─────────────────────── physics step ────────────────────────────────
-    def _step(self, gvec: Tuple[float, float, float]):
+    def _step(
+        self,
+        heights: np.ndarray,
+        velocities: np.ndarray,
+        gvec: Tuple[float, float, float],
+    ) -> WaterCubeState:
         h_target = _target_plane(gvec)
 
-        diff = self.h - h_target
+        diff = heights - h_target
 
-        lap = np.zeros_like(self.h)
-        lap[1:, :] += self.h[:-1, :] - self.h[1:, :]
-        lap[:-1, :] += self.h[1:, :] - self.h[:-1, :]
-        lap[:, 1:] += self.h[:, :-1] - self.h[:, 1:]
-        lap[:, :-1] += self.h[:, 1:] - self.h[:, :-1]
+        lap = np.zeros_like(heights)
+        lap[1:, :] += heights[:-1, :] - heights[1:, :]
+        lap[:-1, :] += heights[1:, :] - heights[:-1, :]
+        lap[:, 1:] += heights[:, :-1] - heights[:, 1:]
+        lap[:, :-1] += heights[:, 1:] - heights[:, :-1]
 
-        self.v += (-SPRING_K * diff + NEIGH_K * lap) * SIM_SPEED
-        self.v *= DAMPING
-        self.h += self.v * SIM_SPEED
+        new_velocities = velocities + (-SPRING_K * diff + NEIGH_K * lap) * SIM_SPEED
+        new_velocities = new_velocities * DAMPING
+        new_heights = heights + new_velocities * SIM_SPEED
 
-        # ── boundary handling ──
-        over = self.h >= FACE_PX
-        under = self.h <= 0
-        self.h[over] = FACE_PX
-        self.h[under] = 0
-        # zero outward velocity at the boundary
-        self.v[over & (self.v > 0)] = 0
-        self.v[under & (self.v < 0)] = 0
+        over = new_heights >= FACE_PX
+        under = new_heights <= 0
+
+        adjusted_heights = new_heights.copy()
+        adjusted_heights[over] = FACE_PX
+        adjusted_heights[under] = 0
+
+        adjusted_velocities = new_velocities.copy()
+        adjusted_velocities[np.logical_and(over, adjusted_velocities > 0)] = 0
+        adjusted_velocities[np.logical_and(under, adjusted_velocities < 0)] = 0
+
+        return WaterCubeState(heights=adjusted_heights, velocities=adjusted_velocities)
 
     # ─────────────────────── rendering helpers ───────────────────────────
-    def _face_heights(self, face_idx: int) -> np.ndarray:
+    def _face_heights(self, heights: np.ndarray, face_idx: int) -> np.ndarray:
         """Return 1-D array of GRID heights for cube *face_idx*."""
         if face_idx == 0:  # +X (east)
-            return np.flip(self.h[-1, :])  # x = GRID-1, varying y
+            return np.flip(heights[-1, :])  # x = GRID-1, varying y
         if face_idx == 1:  # +Y (north)
-            return np.flip(self.h[:, 0])  # y = 0, varying x
+            return np.flip(heights[:, 0])  # y = 0, varying x
         if face_idx == 2:  # −X (west)
-            return self.h[0, :]  # x = 0
-        return self.h[:, -1]  # −Y (south)
+            return heights[0, :]  # x = 0
+        return heights[:, -1]  # −Y (south)
 
     def _mask_from_heights(self, heights: np.ndarray, gz: float) -> np.ndarray:
         """Convert GRID-length *heights* → 64×64 boolean mask."""
@@ -132,6 +141,10 @@ class WaterCube(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        state = self.state
+        heights = state.heights
+        velocities = state.velocities
+
         # --- get gravity ---------------------------------------------------
         accel = peripheral_manager.get_accelerometer().get_acceleration()
         gx = accel.x if accel else 0.0
@@ -140,19 +153,25 @@ class WaterCube(BaseRenderer):
 
         gvec = _norm((gx, gy, gz))
         # --- physics -------------------------------------------------------
-        self._step(gvec)
+        updated_state = self._step(heights, velocities, gvec)
+        self.set_state(updated_state)
 
         # --- compose frame -------------------------------------------------
-        frame = self._frame
-        frame.fill(0)
+        frame = np.zeros((CUBE_PX_W, CUBE_PX_H, 3), dtype=np.uint8)
         for face in range(4):
-            heights = self._face_heights(face)
-            mask = self._mask_from_heights(heights, gz)
+            face_heights = self._face_heights(updated_state.heights, face)
+            mask = self._mask_from_heights(face_heights, gz)
             x0 = face * FACE_PX
-            frame[x0 : x0 + FACE_PX, :][mask] = BLUE
+            face_view = frame[x0 : x0 + FACE_PX, :]
+            face_view[mask] = BLUE
 
         # --- blit to LED surfaces -----------------------------------------
         pygame.surfarray.blit_array(window, frame)
 
         # maintain original display rate
         clock.tick_busy_loop(60)
+
+    def _create_initial_state(self) -> WaterCubeState:
+        heights = np.full((GRID, GRID), INIT_FILL, dtype=np.float32)
+        velocities = np.zeros_like(heights)
+        return WaterCubeState(heights=heights, velocities=velocities)

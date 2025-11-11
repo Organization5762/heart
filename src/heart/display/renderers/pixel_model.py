@@ -29,7 +29,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 VERT_SHADER = """
@@ -116,7 +116,12 @@ class _Mesh:
     scale: float
 
 
-class PixelModelRenderer(BaseRenderer):
+@dataclass
+class PixelModelState:
+    start_time: float | None = None
+
+
+class PixelModelRenderer(AtomicBaseRenderer[PixelModelState]):
     """Render arbitrary OBJ meshes with a quantised, pixel-art aesthetic."""
 
     def __init__(
@@ -126,7 +131,7 @@ class PixelModelRenderer(BaseRenderer):
         target_rows: int = 96,
         palette_levels: int = 6,
     ) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self.warmup = False
 
@@ -137,7 +142,6 @@ class PixelModelRenderer(BaseRenderer):
         self._program: Optional[int] = None
         self._mesh: Optional[_Mesh] = None
         self._pixel_buffer: Optional[np.ndarray] = None
-        self._start_time: float | None = None
 
         self._uniform_model: Optional[int] = None
         self._uniform_view: Optional[int] = None
@@ -351,8 +355,8 @@ class PixelModelRenderer(BaseRenderer):
         if self._mesh is None:
             self._mesh = self._load_mesh()
 
-        if self._start_time is None:
-            self._start_time = time.perf_counter()
+        if self.state.start_time is None:
+            self.update_state(start_time=time.perf_counter())
 
         glUseProgram(self._program)
         glEnable(GL_DEPTH_TEST)
@@ -383,7 +387,7 @@ class PixelModelRenderer(BaseRenderer):
         frame_width, frame_height = surface_width, surface_height
         self._ensure_pixel_buffer((frame_width, frame_height))
 
-        start_time = self._start_time or time.perf_counter()
+        start_time = self.state.start_time or time.perf_counter()
         elapsed = time.perf_counter() - start_time
 
         glUseProgram(self._program)
@@ -484,4 +488,7 @@ class PixelModelRenderer(BaseRenderer):
         window.blit(frame_surface, (0, 0))
 
         clock.tick_busy_loop(60)
+
+    def _create_initial_state(self) -> PixelModelState:
+        return PixelModelState()
 
