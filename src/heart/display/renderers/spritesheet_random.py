@@ -10,7 +10,6 @@ from heart.assets.loader import spritesheet as SpritesheetAsset
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -32,9 +31,7 @@ class SpritesheetLoopRandomState:
 
 
 # Renders a looping spritesheet on a random screen.
-class SpritesheetLoopRandom(
-    SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopRandomState]
-):
+class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
     def __init__(
         self,
         screen_width: int,
@@ -43,7 +40,6 @@ class SpritesheetLoopRandom(
         metadata_file_path: str,
         screen_count: int,
     ) -> None:
-        SwitchStateConsumer.__init__(self)
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
         self.file = sheet_file_path
@@ -73,6 +69,7 @@ class SpritesheetLoopRandom(
 
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
+        self.enable_switch_state_cache()
 
     def initialize(
         self,
@@ -83,7 +80,7 @@ class SpritesheetLoopRandom(
     ) -> None:
         spritesheet = Loader.load_spirtesheet(self.file)
         self.update_state(spritesheet=spritesheet)
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def __duration_scale_factor(self) -> float:

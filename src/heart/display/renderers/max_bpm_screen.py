@@ -1,9 +1,11 @@
+from dataclasses import dataclass
+
 from pygame import Surface, font, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.display.renderers.flame import FlameRenderer
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
@@ -41,11 +43,17 @@ class MaxBpmScreen(ComposedRenderer):
         self.is_flame_renderer = True
 
 
-class AvatarBpmRenderer(BaseRenderer):
+@dataclass
+class AvatarBpmRendererState:
+    sensor_id: str | None = None
+    bpm: int | None = None
+    avatar_name: str | None = None
+
+
+class AvatarBpmRenderer(AtomicBaseRenderer[AvatarBpmRendererState]):
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.current_frame = 0
 
         # Load avatar images for all users
         self.avatar_images = {}
@@ -57,9 +65,6 @@ class AvatarBpmRenderer(BaseRenderer):
 
         # Default avatar
         self.image = self.avatar_images["seb"]
-
-        self.time_since_last_update = 0
-        self.time_between_frames_ms = 400
 
     def display_number(self, window, number, x, y):
         my_font = font.Font(Loader._resolve_path("Grand9K Pixel.ttf"), 8)
@@ -78,46 +83,65 @@ class AvatarBpmRenderer(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         # --- BPM Calculation ---
-        top_bpm = None
-        if current_bpms:  # Check if the dictionary is not empty
-            try:
-                # Create a list of (address, bpm) tuples for non-zero BPM values
-                active_bpms = [
-                    (addr, bpm) for addr, bpm in current_bpms.items() if bpm > 0
-                ]
+        top_bpm = self._select_top_bpm()
+        if top_bpm is None:
+            if (
+                self.state.sensor_id is not None
+                or self.state.bpm is not None
+                or self.state.avatar_name is not None
+            ):
+                self.update_state(sensor_id=None, bpm=None, avatar_name=None)
+            window.fill((0, 0, 0))
+            return
 
-                if active_bpms:
-                    # Sort by BPM in descending order and get the highest
-                    sorted_bpms = sorted(active_bpms, key=lambda x: x[1], reverse=True)
-                    highest_bpm = sorted_bpms[0]
-
-                    # Map device ID to avatar name
-                    avatar_name = "faye"  # Default
-                    for name, device_id in AVATAR_MAPPINGS.items():
-                        if highest_bpm[0] == device_id:
-                            avatar_name = name
-                            break
-
-                    top_bpm = (highest_bpm[0], highest_bpm[1], avatar_name)
-            except ValueError:
-                # Handle cases where current_bpms might be temporarily empty or contain non-numeric data
-                pass
+        sensor_id, bpm, avatar_name = top_bpm
+        state = self.state
+        if (
+            sensor_id != state.sensor_id
+            or bpm != state.bpm
+            or avatar_name != state.avatar_name
+        ):
+            self.update_state(sensor_id=sensor_id, bpm=bpm, avatar_name=avatar_name)
 
         # Draw the highest BPM in the center of the screen
-        if top_bpm:
-            addr, bpm, avatar_name = top_bpm
+        window_width = window.get_width()
+        window_height = window.get_height()
 
-            # Get window dimensions
-            window_width = window.get_width()
-            window_height = window.get_height()
+        # Avatar --------------------------------------------------------------------
+        image = self.avatar_images.get(avatar_name, self.avatar_images["seb"])
+        center_x = (window_width - image.get_width()) // 2
+        center_y = (
+            window_height - image.get_height()
+        ) // 2 - 8  # retain visual offset
+        window.blit(image, (center_x, center_y))
 
-            # Avatar --------------------------------------------------------------------
-            image = self.avatar_images.get(avatar_name, self.avatar_images["seb"])
-            center_x = (window_width - image.get_width()) // 2
-            center_y = (
-                window_height - image.get_height()
-            ) // 2 - 8  # retain visual offset
-            window.blit(image, (center_x, center_y))
+        # BPM number ----------------------------------------------------------------
+        self.display_number(window, bpm, window_width // 2, center_y)
 
-            # BPM number ----------------------------------------------------------------
-            self.display_number(window, bpm, window_width // 2, center_y)
+    def _select_top_bpm(self) -> tuple[str, int, str] | None:
+        if not current_bpms:
+            return None
+
+        try:
+            active_bpms = [
+                (addr, bpm) for addr, bpm in current_bpms.items() if bpm > 0
+            ]
+        except ValueError:
+            return None
+
+        if not active_bpms:
+            return None
+
+        sorted_bpms = sorted(active_bpms, key=lambda x: x[1], reverse=True)
+        highest_bpm = sorted_bpms[0]
+
+        avatar_name = "faye"
+        for name, device_id in AVATAR_MAPPINGS.items():
+            if highest_bpm[0] == device_id:
+                avatar_name = name
+                break
+
+        return highest_bpm[0], highest_bpm[1], avatar_name
+
+    def _create_initial_state(self) -> AvatarBpmRendererState:
+        return AvatarBpmRendererState()

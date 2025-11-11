@@ -15,7 +15,7 @@ import pygame
 
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -29,7 +29,13 @@ class _ChannelProfile:
     cyan_gain: float
 
 
-class ThreeDGlassesRenderer(BaseRenderer):
+@dataclass(frozen=True)
+class ThreeDGlassesState:
+    current_index: int = 0
+    elapsed_ms: float = 0.0
+
+
+class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
     """Render a sequence of images with a red/blue anaglyph effect."""
 
     def __init__(
@@ -38,7 +44,7 @@ class ThreeDGlassesRenderer(BaseRenderer):
         *,
         frame_duration_ms: int = 650,
     ) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         if not image_files:
             raise ValueError("ThreeDGlassesRenderer requires at least one image file")
 
@@ -49,9 +55,6 @@ class ThreeDGlassesRenderer(BaseRenderer):
         self._image_arrays: list[np.ndarray] = []
         self._profiles: list[_ChannelProfile] = []
         self._effect_surface: pygame.Surface | None = None
-
-        self._current_index = 0
-        self._elapsed_ms = 0
 
     @staticmethod
     def _generate_profiles(count: int) -> list[_ChannelProfile]:
@@ -103,9 +106,7 @@ class ThreeDGlassesRenderer(BaseRenderer):
 
         self._profiles = self._generate_profiles(len(self._image_arrays))
         self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
-
-        self._current_index = 0
-        self._elapsed_ms = 0
+        self.set_state(self._create_initial_state())
 
         super().initialize(window, clock, peripheral_manager, orientation)
 
@@ -176,16 +177,23 @@ class ThreeDGlassesRenderer(BaseRenderer):
         if not self._image_arrays:
             return
 
-        self._elapsed_ms += clock.get_time()
-        if self._elapsed_ms >= self._frame_duration_ms:
-            self._elapsed_ms %= self._frame_duration_ms
-            self._current_index = (self._current_index + 1) % len(self._image_arrays)
+        elapsed = self.state.elapsed_ms + float(clock.get_time())
+        index = self.state.current_index
 
-        profile = self._profiles[self._current_index]
-        base_array = self._image_arrays[self._current_index]
+        if elapsed >= self._frame_duration_ms:
+            elapsed %= self._frame_duration_ms
+            index = (index + 1) % len(self._image_arrays)
+
+        self.update_state(current_index=index, elapsed_ms=elapsed)
+
+        profile = self._profiles[index]
+        base_array = self._image_arrays[index]
 
         frame_array = self._apply_profile(base_array, profile)
 
         assert self._effect_surface is not None
         pygame.surfarray.blit_array(self._effect_surface, frame_array)
         window.blit(self._effect_surface, (0, 0))
+
+    def _create_initial_state(self) -> ThreeDGlassesState:
+        return ThreeDGlassesState()

@@ -11,7 +11,6 @@ from heart.assets.loader import spritesheet as SpritesheetAsset
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.gamepad import Gamepad
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
@@ -86,7 +85,7 @@ class SpritesheetLoopState:
     gamepad: Gamepad | None = None
 
 
-class SpritesheetLoop(SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopState]):
+class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
     @classmethod
     def from_frame_data(
         cls,
@@ -143,7 +142,6 @@ class SpritesheetLoop(SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopSta
         boomerang: bool = False,
         frame_data: list[FrameDescription] | None = None,
     ) -> None:
-        SwitchStateConsumer.__init__(self)
         self.disable_input = disable_input
         self.file = sheet_file_path
         self.boomerang = boomerang
@@ -198,6 +196,8 @@ class SpritesheetLoop(SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopSta
         )
 
         AtomicBaseRenderer.__init__(self)
+        if not self.disable_input:
+            self.enable_switch_state_cache()
 
     def _create_initial_state(self) -> SpritesheetLoopState:
         return SpritesheetLoopState(phase=self._initial_phase)
@@ -217,7 +217,7 @@ class SpritesheetLoop(SwitchStateConsumer, AtomicBaseRenderer[SpritesheetLoopSta
     def configure_peripherals(self, peripheral_manager: PeripheralManager) -> None:
         if self.disable_input:
             return
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         try:
             gamepad = peripheral_manager.get_gamepad()
         except ValueError:
