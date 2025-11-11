@@ -68,10 +68,16 @@ status so incremental updates stay coordinated.
   - `Slinky` (`src/heart/display/renderers/pacman.py`) – keeps the falling
     anchor in atomic state so the animation restarts cleanly when composed in
     arcade sequences.
+  - `CombinedBpmScreen` (`src/heart/display/renderers/combined_bpm_screen.py`)
+    – maintains the swap timer atomically while delegating to metadata and max
+    BPM sub-renderers so playlists see deterministic rotation cadence.
+  - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
+    counter and shake-triggered loop flag in immutable state, keeping
+    accelerometer-driven transitions predictable across resets.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[####################>---]`
+Progress indicator: `[#####################-->-]`
 
 ## Validation
 

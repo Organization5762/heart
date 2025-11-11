@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 
 import pygame
 
@@ -6,24 +7,27 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class MarioRenderer(BaseRenderer):
+@dataclass
+class MarioRendererState:
+    current_frame: int = 0
+    time_since_last_update: float | None = None
+    in_loop: bool = False
+    highest_z: float = 0.0
+
+
+class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
     def __init__(
         self,
         sheet_file_path: str,
         metadata_file_path: str,
     ) -> None:
-        super().__init__()
-        self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.accel = None
-        self.current_frame = 0
-        self.time_since_last_update = None
+        self._accel = None
         self.file = sheet_file_path
-        self.in_loop = False
-        self.highest_z = 0
+        self._spritesheet: pygame.Surface | None = None
 
         frame_data = Loader.load_json(metadata_file_path)
         self.frames = []
@@ -37,15 +41,21 @@ class MarioRenderer(BaseRenderer):
                 )
             )
 
+        AtomicBaseRenderer.__init__(self)
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
+
+    def _create_initial_state(self) -> MarioRendererState:
+        return MarioRendererState()
+
     def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ):
+    ) -> None:
         """Initialize any resources needed for rendering."""
-        self.spritesheet = Loader.load_spirtesheet(self.file)
+        self._spritesheet = Loader.load_spirtesheet(self.file)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
@@ -55,48 +65,61 @@ class MarioRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        """Process and render the Mario scene.
+        """Process and render the Mario scene."""
 
-        Args:
-            window: The pygame surface to render to
-            clock: The pygame clock for timing
-            peripheral_manager: Manager for accessing peripheral devices
-            orientation: The current device orientation
+        if self._spritesheet is None:
+            return
 
-        """
-        current_kf = self.frames[self.current_frame]
+        state = self.state
+        current_kf = self.frames[state.current_frame]
+        current_frame = state.current_frame
+        time_since_last_update = state.time_since_last_update
+        in_loop = state.in_loop
+        highest_z = state.highest_z
+
         kf_duration = current_kf.duration
 
-        if self.in_loop:
-            if (
-                self.time_since_last_update is None
-                or self.time_since_last_update > kf_duration
-            ):
-                self.current_frame += 1
-                self.time_since_last_update = 0
+        if in_loop:
+            if time_since_last_update is None:
+                time_since_last_update = 0
 
-                if self.current_frame >= len(self.frames):
-                    self.current_frame = 0
-                    self.in_loop = False
+            time_since_last_update += clock.get_time()
 
-            if self.time_since_last_update is None:
-                self.time_since_last_update = 0
-            self.time_since_last_update += clock.get_time()
+            if time_since_last_update > kf_duration:
+                current_frame += 1
+                time_since_last_update = 0
+
+                if current_frame >= len(self.frames):
+                    current_frame = 0
+                    in_loop = False
         else:
             try:
-                self.accel = peripheral_manager.get_accelerometer().get_acceleration()
+                self._accel = (
+                    peripheral_manager.get_accelerometer().get_acceleration()
+                )
             except Exception:
                 time.sleep(0.1)
-                self.accel = None
-            if self.accel is not None and (
-                self.accel.z > 11.0
+                self._accel = None
+            if self._accel is not None and (
+                self._accel.z > 11.0
             ):  # vibes based constants found by shaking totem
-                self.highest_z = max(self.highest_z, self.accel.z)
-                print(f"highest z: {self.highest_z}, accel z: {self.accel.z}")
-                self.in_loop = True
+                highest_z = max(highest_z, self._accel.z)
+                print(f"highest z: {highest_z}, accel z: {self._accel.z}")
+                in_loop = True
+                time_since_last_update = 0
+
+        if not in_loop:
+            time_since_last_update = None
+
+        self.update_state(
+            current_frame=current_frame,
+            time_since_last_update=time_since_last_update,
+            in_loop=in_loop,
+            highest_z=highest_z,
+        )
 
         screen_width, screen_height = window.get_size()
-        image = self.spritesheet.image_at(current_kf.frame)
+        image = self._spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (screen_width, screen_height))
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2
