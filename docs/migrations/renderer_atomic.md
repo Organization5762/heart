@@ -49,10 +49,27 @@ status so incremental updates stay coordinated.
   - `Slinky` (`src/heart/display/renderers/pixels.py`) – tracks the falling
     anchor and bounce position in immutable state so loop consumers can safely
     reuse instances without carrying prior frame state.
+  - `RandomPixel` (`src/heart/display/renderers/pixels.py`) – keeps the optional
+    override colour in atomic state so brightness adjustments sample a stable
+    palette even when instances are re-used.
+  - `Border` (`src/heart/display/renderers/pixels.py`) – stores the configured
+    colour atomically so composed scenes can flip border hues without mutating
+    shared renderer attributes.
+  - `RandomPixel` (`src/heart/display/renderers/pacman.py`) – aligns the arcade
+    palette sampler with atomic state so switch-driven playlists can swap in a
+    fixed colour when required.
+  - `Border` (`src/heart/display/renderers/pacman.py`) – migrates the decorative
+    outline to atomic colour state while preserving configurable display modes.
+  - `Rain` (`src/heart/display/renderers/pacman.py`) – mirrors the drop state
+    tracking used elsewhere so the pacman playlist receives deterministic spawn
+    points across loop resets.
+  - `Slinky` (`src/heart/display/renderers/pacman.py`) – keeps the falling
+    anchor in atomic state so the animation restarts cleanly when composed in
+    arcade sequences.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[##############>-------]`
+Progress indicator: `[####################>---]`
 
 ## Validation
 
