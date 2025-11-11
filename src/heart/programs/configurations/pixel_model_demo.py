@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from heart.display.renderers.pixel_model import PixelModelRenderer
 from heart.programs.configurations import base
+from heart.utilities.paths import docs_asset_path
 
 
 def build_configuration() -> base.ProgramConfiguration:
@@ -13,10 +12,10 @@ def build_configuration() -> base.ProgramConfiguration:
 
     configuration = base.ProgramConfiguration()
     mode = configuration.create_mode("pixel_model")
-    model_path = Path("docs/assets/models/pixel_runner.obj")
+    model_path = docs_asset_path("models", "pixel_runner.obj")
     mode.add_renderer(
         PixelModelRenderer(
-            model_path=str(model_path),
+            model_path=model_path,
             target_rows=96,
             palette_levels=6,
         )
