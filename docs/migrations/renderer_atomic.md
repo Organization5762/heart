@@ -40,6 +40,8 @@ status so incremental updates stay coordinated.
   - `SlidingImage` (`src/heart/display/renderers/sliding_image.py`) – caches
     the scaled surface during initialization and tracks the wrap-around offset
     in atomic state so cube-sized slides remain deterministic for consumers.
+    Resetting the renderer now preserves the cached surface so returning to
+    scene select screens does not blank the banner animation.
   - `SlidingRenderer` (`src/heart/display/renderers/sliding_image.py`) – wraps
     a composed renderer while keeping the sliding offset immutable for
     downstream loops that expect predictable frame hand-offs.
