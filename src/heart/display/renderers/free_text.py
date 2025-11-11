@@ -9,8 +9,13 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer
+from heart.events.types import PhoneTextMessage
+from heart.peripheral.core import Input
+from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.phone_text import PhoneText
+from heart.utilities.logging import get_logger
+
+_LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -29,7 +34,9 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
         """Create a *FreeTextRenderer*."""
 
         self._font_cache: dict[int, pygame.font.Font] = {}
-        self._phone_text: PhoneText | None = None
+        self._latest_text: str | None = None
+        self._event_bus: EventBus | None = None
+        self._subscription: SubscriptionHandle | None = None
 
         # Font size bounds (inclusive)
         self._font_size_max: int = 12
@@ -51,10 +58,7 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
     ) -> None:
         """Initialise the renderer and warm the default font cache."""
 
-        # Locate the PhoneText peripheral once – it's expected to be present if
-        # this renderer is used, but we handle the case where it isn't to avoid
-        # crashes.
-        self._phone_text = peripheral_manager.get_phone_text()
+        self._ensure_subscription(peripheral_manager)
 
         initial_font = self._get_font(self._initial_font_size)
         self.update_state(
@@ -63,6 +67,49 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
         )
 
         super().initialize(window, clock, peripheral_manager, orientation)
+
+    def reset(self) -> None:
+        self._unsubscribe()
+        self._latest_text = None
+        super().reset()
+
+    def _ensure_subscription(self, peripheral_manager: PeripheralManager) -> None:
+        if self._subscription is not None:
+            return
+        bus = getattr(peripheral_manager, "event_bus", None)
+        if bus is None:
+            _LOGGER.debug("FreeTextRenderer missing event bus; text will remain static")
+            return
+        self._event_bus = bus
+        self._subscription = bus.subscribe(
+            PhoneTextMessage.EVENT_TYPE,
+            self._handle_phone_text_event,
+        )
+
+    def _unsubscribe(self) -> None:
+        if self._event_bus is None or self._subscription is None:
+            self._event_bus = None
+            self._subscription = None
+            return
+        try:
+            self._event_bus.unsubscribe(self._subscription)
+        except Exception:  # pragma: no cover - defensive cleanup
+            _LOGGER.exception("Failed to unsubscribe FreeTextRenderer")
+        finally:
+            self._event_bus = None
+            self._subscription = None
+
+    def _handle_phone_text_event(self, event: Input) -> None:
+        payload = event.data
+        if isinstance(payload, PhoneTextMessage):
+            text = payload.text
+        else:
+            try:
+                text = str(payload["text"])
+            except (KeyError, TypeError, ValueError):
+                _LOGGER.debug("Ignoring malformed phone text payload: %s", payload)
+                return
+        self._latest_text = text
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -130,11 +177,7 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
         orientation: Orientation,
     ) -> None:
         # Fetch the most recent text (or a placeholder).
-        last_text: str | None = (
-            self._phone_text.get_last_text()
-            if self._phone_text
-            else "Waiting for text..."
-        )
+        last_text = self._latest_text or "Waiting for text..."
 
         # Skip rendering if we have nothing to show.
         if not last_text:
