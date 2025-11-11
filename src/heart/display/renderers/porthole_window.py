@@ -1,25 +1,30 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class PortholeWindowRenderer(BaseRenderer):
+@dataclass(frozen=True)
+class PortholeWindowState:
+    elapsed: float
+
+
+class PortholeWindowRenderer(AtomicBaseRenderer[PortholeWindowState]):
     """Render a brass porthole with a softly animated outdoor scene."""
 
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
-        self._elapsed = 0.0
 
-    def reset(self) -> None:
-        self._elapsed = 0.0
+    def _create_initial_state(self) -> PortholeWindowState:
+        return PortholeWindowState(elapsed=0.0)
 
     def process(
         self,
@@ -28,7 +33,8 @@ class PortholeWindowRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self._elapsed += clock.get_time() / 1000.0
+        elapsed = self.state.elapsed + clock.get_time() / 1000.0
+        self.update_state(elapsed=elapsed)
         width, height = window.get_size()
         center = (width // 2, height // 2)
         radius = max(48, int(min(width, height) * 0.42))
@@ -39,7 +45,7 @@ class PortholeWindowRenderer(BaseRenderer):
         self._draw_shadow(window, center, radius, frame_width)
         self._draw_frame(window, center, radius, frame_width)
 
-        view_surface = self._build_view_surface(inner_radius * 2)
+        view_surface = self._build_view_surface(inner_radius * 2, elapsed)
         window.blit(
             view_surface,
             (center[0] - inner_radius, center[1] - inner_radius),
@@ -89,12 +95,12 @@ class PortholeWindowRenderer(BaseRenderer):
             max(2, frame_width // 3),
         )
 
-    def _build_view_surface(self, diameter: int) -> pygame.Surface:
+    def _build_view_surface(self, diameter: int, elapsed: float) -> pygame.Surface:
         view_surface = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
         self._draw_sky(view_surface)
         self._draw_roof(view_surface)
         self._draw_cityline(view_surface)
-        self._draw_clouds(view_surface)
+        self._draw_clouds(view_surface, elapsed)
         self._mask_circle(view_surface)
         return view_surface
 
@@ -159,11 +165,11 @@ class PortholeWindowRenderer(BaseRenderer):
         tower_rect = pygame.Rect(width * 0.75, base_y - tower_height, tower_width, tower_height)
         surface.fill(tower_color, tower_rect)
 
-    def _draw_clouds(self, surface: pygame.Surface) -> None:
+    def _draw_clouds(self, surface: pygame.Surface, elapsed: float) -> None:
         width, height = surface.get_size()
         cloud_surface = pygame.Surface((width, height), pygame.SRCALPHA)
         cloud_color = (255, 255, 255, 180)
-        drift = (math.sin(self._elapsed * 0.25) + 1) / 2
+        drift = (math.sin(elapsed * 0.25) + 1) / 2
         offset = int(drift * width * 0.25)
         primary_rect = pygame.Rect(-width // 6 + offset, height * 0.2, width // 2, height // 5)
         secondary_rect = pygame.Rect(width * 0.3 + offset, height * 0.28, width // 3, height // 6)

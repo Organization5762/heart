@@ -17,8 +17,9 @@ porthole.
 - The outdoor view is composited on an off-screen `pygame.Surface`. A vertical
   gradient establishes the sky, the roof plane is drawn with two polygons and a
   shingle pass, and the skyline uses `pygame.Rect` fills for distant buildings.
-- Cloud ellipses drift horizontally according to `sin` of the accumulated
-  runtime, keeping the viewport lively without introducing additional state.
+- Cloud ellipses drift horizontally according to `sin` of the elapsed runtime
+  tracked in the renderer's atomic state, keeping motion consistent across
+  resets and warm-up cycles.
 - After the scene is composed, a circular mask with `BLEND_RGBA_MULT` trims the
   surface before it is blitted back into the main framebuffer. Separate arcs add
   glass reflections on the primary surface to sell the curved glazing.

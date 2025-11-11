@@ -74,6 +74,9 @@ status so incremental updates stay coordinated.
   - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
     counter and shake-triggered loop flag in immutable state, keeping
     accelerometer-driven transitions predictable across resets.
+  - `PortholeWindowRenderer` (`src/heart/display/renderers/porthole_window.py`)
+    – tracks elapsed time in immutable state so cloud drift remains stable when
+    the renderer is reset or reused.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
