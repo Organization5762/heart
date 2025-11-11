@@ -34,6 +34,24 @@ unchanged lifecycle events.
 `GameLoop.latest_input()` and `GameLoop.input_snapshot()` wrap these calls for
 renderers and controllers.
 
+## Tracing event flow
+
+Call `EventBus.enable_stdout_trace()` to print every emitted event to stdout.
+The helper subscribes to the wildcard channel, so the output includes both the
+event type and producer identifier for each payload. Use
+`EventBus.disable_stdout_trace()` once the investigation ends to remove the
+subscription. `EventBus.stdout_trace_enabled` reports whether the trace handle
+is still registered, which is helpful when multiple tools toggle tracing.
+
+## Visualising subscriptions
+
+`EventBus.snapshot_graph()` captures the current subscription topology and
+returns an `EventBusGraph`. The snapshot exposes the registered event types and
+callback labels and can render a Graphviz DOT document via `to_dot()`. The DOT
+text shows edges annotated with subscription priority and sequence so you can
+check ordering decisions before deploying changes. Pipe the DOT into Graphviz or
+another renderer to produce diagrams for incident reports.
+
 ## Testing
 
 - Use the concrete `EventBus` in unit tests and subscribe to the event types
