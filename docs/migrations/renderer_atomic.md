@@ -74,10 +74,17 @@ status so incremental updates stay coordinated.
   - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
     counter and shake-triggered loop flag in immutable state, keeping
     accelerometer-driven transitions predictable across resets.
+  - `HeartTitleScreen` (`src/heart/display/renderers/heart_title_screen.py`) –
+    keeps the heartbeat toggle and elapsed timing in atomic state so mirrored
+    title loops resume a consistent animation cadence after resets.
+  - `AvatarBpmRenderer` (`src/heart/display/renderers/max_bpm_screen.py`) –
+    snapshots the currently leading sensor ID, BPM, and avatar name to guarantee
+    composed playlists always pull a coherent frame even when the leader
+    changes mid-render.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[#####################-->-]`
+Progress indicator: `[######################>--]`
 
 ## Validation
 
