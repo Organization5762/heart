@@ -1,4 +1,3 @@
-import time
 from dataclasses import dataclass
 
 import pygame
@@ -8,6 +7,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
+from heart.display.renderers.internal import AccelerometerConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -19,13 +19,12 @@ class MarioRendererState:
     highest_z: float = 0.0
 
 
-class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
+class MarioRenderer(AccelerometerConsumer, AtomicBaseRenderer[MarioRendererState]):
     def __init__(
         self,
         sheet_file_path: str,
         metadata_file_path: str,
     ) -> None:
-        self._accel = None
         self.file = sheet_file_path
         self._spritesheet: pygame.Surface | None = None
 
@@ -41,7 +40,7 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
                 )
             )
 
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
     def _create_initial_state(self) -> MarioRendererState:
@@ -56,6 +55,7 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
     ) -> None:
         """Initialize any resources needed for rendering."""
         self._spritesheet = Loader.load_spirtesheet(self.file)
+        self.bind_accelerometer(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
@@ -93,18 +93,10 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
                     current_frame = 0
                     in_loop = False
         else:
-            try:
-                self._accel = (
-                    peripheral_manager.get_accelerometer().get_acceleration()
-                )
-            except Exception:
-                time.sleep(0.1)
-                self._accel = None
-            if self._accel is not None and (
-                self._accel.z > 11.0
-            ):  # vibes based constants found by shaking totem
-                highest_z = max(highest_z, self._accel.z)
-                print(f"highest z: {highest_z}, accel z: {self._accel.z}")
+            vector = self.latest_acceleration()
+            if vector is not None and vector[2] > 11.0:  # vibes based constants
+                highest_z = max(highest_z, vector[2])
+                print(f"highest z: {highest_z}, accel z: {vector[2]}")
                 in_loop = True
                 time_since_last_update = 0
 
