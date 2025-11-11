@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import pygame
 
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.events.types import RendererFrame
 from heart.peripheral.core import Input
 from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
@@ -18,7 +19,12 @@ from heart.utilities.logging import get_logger
 _LOGGER = get_logger(__name__)
 
 
-class RendererEventPublisher(BaseRenderer):
+@dataclass(frozen=True)
+class RendererEventPublisherState:
+    sequence: int = 0
+
+
+class RendererEventPublisher(AtomicBaseRenderer[RendererEventPublisherState]):
     """Wrap a renderer and publish its frames onto the event bus."""
 
     def __init__(
@@ -30,7 +36,7 @@ class RendererEventPublisher(BaseRenderer):
         pixel_format: str = "RGBA",
         metadata_factory: Callable[[pygame.Surface], Mapping[str, Any]] | None = None,
     ) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         if not channel:
             raise ValueError("RendererEventPublisher channel must be provided")
         self._renderer = renderer
@@ -38,7 +44,6 @@ class RendererEventPublisher(BaseRenderer):
         self._producer_id = producer_id if producer_id is not None else id(renderer)
         self._pixel_format = pixel_format
         self._metadata_factory = metadata_factory
-        self._sequence = 0
 
         # Mirror display configuration so upstream sizing remains accurate.
         self.device_display_mode = renderer.device_display_mode
@@ -46,7 +51,6 @@ class RendererEventPublisher(BaseRenderer):
 
     def reset(self) -> None:
         self._renderer.reset()
-        self._sequence = 0
         super().reset()
 
     def process(
@@ -73,15 +77,25 @@ class RendererEventPublisher(BaseRenderer):
             self._channel,
             window,
             renderer=self._renderer.name,
-            frame_id=self._sequence,
+            frame_id=self.state.sequence,
             pixel_format=self._pixel_format,
             metadata=metadata,
         )
-        self._sequence += 1
+        self.update_state(sequence=self.state.sequence + 1)
         bus.emit(frame.to_input(producer_id=self._producer_id))
 
+    def _create_initial_state(self) -> RendererEventPublisherState:
+        return RendererEventPublisherState()
 
-class RendererEventSubscriber(BaseRenderer):
+
+@dataclass(frozen=True)
+class RendererEventSubscriberState:
+    latest_surface: pygame.Surface | None = None
+    target_size: tuple[int, int] | None = None
+    has_frame: bool = False
+
+
+class RendererEventSubscriber(AtomicBaseRenderer[RendererEventSubscriberState]):
     """Render the latest :class:`RendererFrame` observed on the event bus."""
 
     def __init__(
@@ -91,7 +105,7 @@ class RendererEventSubscriber(BaseRenderer):
         producer_id: int | None = None,
         priority: int = 0,
     ) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         if not channel:
             raise ValueError("RendererEventSubscriber channel must be provided")
         self._channel = channel
@@ -99,9 +113,7 @@ class RendererEventSubscriber(BaseRenderer):
         self._priority = priority
         self._subscription: SubscriptionHandle | None = None
         self._event_bus: EventBus | None = None
-        self._latest_surface: pygame.Surface | None = None
         self._frame_lock = threading.Lock()
-        self._target_size: tuple[int, int] | None = None
 
     def reset(self) -> None:
         if self._event_bus is not None and self._subscription is not None:
@@ -111,8 +123,6 @@ class RendererEventSubscriber(BaseRenderer):
                 _LOGGER.exception("Failed to unsubscribe renderer event subscriber")
         self._subscription = None
         self._event_bus = None
-        with self._frame_lock:
-            self._latest_surface = None
         super().reset()
 
     def initialize(
@@ -122,7 +132,7 @@ class RendererEventSubscriber(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation,
     ) -> None:
-        self._target_size = window.get_size()
+        self.update_state(target_size=window.get_size())
         self._ensure_subscription(peripheral_manager)
         super().initialize(window, clock, peripheral_manager, orientation)
 
@@ -136,7 +146,11 @@ class RendererEventSubscriber(BaseRenderer):
         if self._subscription is None:
             self._ensure_subscription(peripheral_manager)
         with self._frame_lock:
-            surface = self._latest_surface.copy() if self._latest_surface else None
+            surface = (
+                self.state.latest_surface.copy()
+                if self.state.latest_surface is not None
+                else None
+            )
         if surface is None:
             return
         window.blit(surface, (0, 0))
@@ -145,15 +159,16 @@ class RendererEventSubscriber(BaseRenderer):
         """Return ``True`` when at least one frame has been observed."""
 
         with self._frame_lock:
-            return self._latest_surface is not None
+            return self.state.has_frame
 
     def peek_latest_surface(self) -> pygame.Surface | None:
         """Return a copy of the most recent frame without mutating state."""
 
         with self._frame_lock:
-            if self._latest_surface is None:
+            surface = self.state.latest_surface
+            if surface is None:
                 return None
-            return self._latest_surface.copy()
+            return surface.copy()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -183,8 +198,12 @@ class RendererEventSubscriber(BaseRenderer):
         if self._producer_id is not None and event.producer_id != self._producer_id:
             return
         surface = payload.to_surface()
-        if self._target_size and surface.get_size() != self._target_size:
-            surface = pygame.transform.smoothscale(surface, self._target_size)
+        target_size = self.state.target_size
+        if target_size and surface.get_size() != target_size:
+            surface = pygame.transform.smoothscale(surface, target_size)
         with self._frame_lock:
-            self._latest_surface = surface
+            self.update_state(latest_surface=surface, has_frame=True)
+
+    def _create_initial_state(self) -> RendererEventSubscriberState:
+        return RendererEventSubscriberState()
 

@@ -1,5 +1,6 @@
 import math
 from collections import deque
+from dataclasses import dataclass
 
 import numpy as np
 import pygame
@@ -8,19 +9,24 @@ from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 
-class LSystem(BaseRenderer):
-    def __init__(self) -> None:
-        self.device_display_mode = DeviceDisplayMode.FULL
-        self.grammar = "X"
-        self.time_since_last_update = 0
+@dataclass
+class LSystemState:
+    grammar: str = "X"
+    time_since_last_update_ms: float = 0.0
 
-    def _update_grammar(self):
+
+class LSystem(AtomicBaseRenderer[LSystemState]):
+    def __init__(self) -> None:
+        AtomicBaseRenderer.__init__(self)
+        self.device_display_mode = DeviceDisplayMode.FULL
+
+    def _update_grammar(self, grammar: str) -> str:
         new_grammar = ""
-        for char in self.grammar:
+        for char in grammar:
             if char == "X":
                 new_grammar += "F+[[X]-X]-F[-FX]+X"
             elif char == "F":
@@ -31,9 +37,9 @@ class LSystem(BaseRenderer):
             #     new_grammar += "F-G"
             # else:
             #     new_grammar += char
-        self.grammar = new_grammar
+        return new_grammar
 
-    def _draw_grammar(self, window: Surface):
+    def _draw_grammar(self, window: Surface, grammar: str) -> None:
         # variables : F G
         # constants : + −
         # start  : F
@@ -67,7 +73,7 @@ class LSystem(BaseRenderer):
         current_angle = 0
         position = np.array(window.get_size()) // 2
         stack = deque()
-        for char in self.grammar:
+        for char in grammar:
             if char == "F" or char == "G":
                 direction = calc_movement(min_length, current_angle)
                 new_position = position + direction
@@ -91,8 +97,20 @@ class LSystem(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.time_since_last_update += clock.get_time()
-        if self.time_since_last_update > 1000:
-            self._update_grammar()
-            self.time_since_last_update = 0
-        self._draw_grammar(window)
+        elapsed_ms = float(clock.get_time())
+        state = self.state
+
+        accumulated = state.time_since_last_update_ms + elapsed_ms
+        grammar = state.grammar
+        if accumulated > 1000:
+            grammar = self._update_grammar(grammar)
+            accumulated = 0.0
+
+        self.update_state(
+            grammar=grammar,
+            time_since_last_update_ms=accumulated,
+        )
+        self._draw_grammar(window, grammar)
+
+    def _create_initial_state(self) -> LSystemState:
+        return LSystemState()

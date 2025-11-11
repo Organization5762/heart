@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import time
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import numpy as np
@@ -24,7 +25,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 
 _SDL2Window: Any | None
@@ -253,11 +254,16 @@ void main() {
 """
 
 
-class PixelSunriseRenderer(BaseRenderer):
+@dataclass
+class PixelSunriseState:
+    start_time: float | None = None
+
+
+class PixelSunriseRenderer(AtomicBaseRenderer[PixelSunriseState]):
     """Render a sun arc and ground with a pixel-art quantizing shader."""
 
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self.warmup = False
 
@@ -267,7 +273,6 @@ class PixelSunriseRenderer(BaseRenderer):
             [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0], dtype=np.float32
         )
 
-        self._start_time: float | None = None
         self._uniform_time: Optional[int] = None
         self._uniform_resolution: Optional[int] = None
         self._pixel_buffer: Optional[np.ndarray] = None
@@ -359,8 +364,8 @@ class PixelSunriseRenderer(BaseRenderer):
                 self._program, "u_resolution"
             )
 
-        if self._start_time is None:
-            self._start_time = time.perf_counter()
+        if self.state.start_time is None:
+            self.update_state(start_time=time.perf_counter())
 
         glUseProgram(self._program)
         width, height = self._get_drawable_size(window)
@@ -391,7 +396,7 @@ class PixelSunriseRenderer(BaseRenderer):
 
         self._ensure_pixel_buffer((frame_width, frame_height))
 
-        start_time = self._start_time or time.perf_counter()
+        start_time = self.state.start_time or time.perf_counter()
         elapsed = time.perf_counter() - start_time
 
         glUseProgram(self._program)
@@ -438,4 +443,7 @@ class PixelSunriseRenderer(BaseRenderer):
             window.blit(scaled_surface, (0, 0))
 
         clock.tick_busy_loop(60)
+
+    def _create_initial_state(self) -> PixelSunriseState:
+        return PixelSunriseState()
 
