@@ -44,7 +44,6 @@ class SpritesheetLoopRandom(
         screen_count: int,
     ) -> None:
         SwitchStateConsumer.__init__(self)
-        self.device_display_mode = DeviceDisplayMode.FULL
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
         self.file = sheet_file_path
@@ -73,6 +72,7 @@ class SpritesheetLoopRandom(
         self.y = 30
 
         AtomicBaseRenderer.__init__(self)
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def initialize(
         self,
