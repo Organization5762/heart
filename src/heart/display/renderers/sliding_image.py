@@ -83,6 +83,14 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
         if offset:
             window.blit(image, (state.width - offset, 0))
 
+    def reset(self) -> None:
+        state = self.state
+        if state.image is None or state.width == 0:
+            super().reset()
+            return
+
+        self.update_state(offset=0, speed=self._configured_speed)
+
 
 @dataclass
 class SlidingRendererState:
