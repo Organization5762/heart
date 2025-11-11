@@ -9,14 +9,16 @@ import serial.tools.list_ports
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 
-TRUE_FLAG_VALUES = {"true", "1"}
+TRUE_FLAG_VALUES = {"true", "1", "yes", "on"}
 
 
 def _env_flag(env_var: str, *, default: bool = False) -> bool:
+    """Return the boolean value of ``env_var`` respecting common true strings."""
+
     value = os.environ.get(env_var)
     if value is None:
         return default
-    return value.lower() in TRUE_FLAG_VALUES
+    return value.strip().lower() in TRUE_FLAG_VALUES
 
 
 @dataclass
@@ -28,7 +30,7 @@ class Configuration:
     @classmethod
     @cache
     def is_pi(cls) -> bool:
-        return platform.system() == "Linux" or bool(os.environ.get("ON_PI", False))
+        return platform.system() == "Linux" or _env_flag("ON_PI")
 
     @classmethod
     def pi(cls) -> Pi | None:
@@ -47,11 +49,11 @@ class Configuration:
 
     @classmethod
     def is_profiling_mode(cls) -> bool:
-        return bool(os.environ.get("PROFILING_MODE", False))
+        return _env_flag("PROFILING_MODE")
 
     @classmethod
     def is_debug_mode(cls) -> bool:
-        return bool(os.environ.get("DEBUG_MODE", False))
+        return _env_flag("DEBUG_MODE")
 
     @classmethod
     def is_x11_forward(cls) -> bool:
@@ -105,22 +107,35 @@ class Configuration:
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
 
-    try:
-        if os.path.exists(base_port):
-            for port in os.listdir(base_port):
-                if port.startswith(prefix):
-                    yield os.path.join(base_port, port)
-            return  # Exit if we successfully found ports
-    except (FileNotFoundError, PermissionError):
-        pass  # Continue to fallback methods
+    directory_matches = tuple(_iter_directory_ports(base_port, prefix))
+    if directory_matches:
+        yield from directory_matches
+        return
 
     # Fallback for macOS and other platforms
     if platform.system() == "Darwin":  # macOS
-        # On macOS, use pyserial but filter results that match the prefix
-        for port in serial.tools.list_ports.comports():
-            port_name = os.path.basename(port.device)
-            if (
-                prefix.lower() in port.description.lower()
-                or prefix.lower() in port_name.lower()
-            ):
-                yield port.device
+        yield from _iter_serial_ports(prefix)
+
+
+def _iter_directory_ports(base_port: str, prefix: str) -> Iterator[str]:
+    """Yield ports in ``base_port`` whose names begin with ``prefix``."""
+
+    try:
+        if not os.path.exists(base_port):
+            return
+        for entry in os.listdir(base_port):
+            if entry.startswith(prefix):
+                yield os.path.join(base_port, entry)
+    except (FileNotFoundError, PermissionError):
+        return
+
+
+def _iter_serial_ports(prefix: str) -> Iterator[str]:
+    """Yield serial devices whose metadata contains ``prefix``."""
+
+    lower_prefix = prefix.lower()
+    for port in serial.tools.list_ports.comports():
+        port_name = os.path.basename(port.device)
+        description = getattr(port, "description", "")
+        if lower_prefix in description.lower() or lower_prefix in port_name.lower():
+            yield port.device
