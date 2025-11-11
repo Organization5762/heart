@@ -8,7 +8,6 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
 from heart.display.renderers.color import RenderColor
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.display.renderers.slide import SlideTransitionRenderer
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
@@ -102,7 +101,7 @@ class AppController(BaseRenderer):
         return len(self.modes.renderers) == 0
 
 
-class GameModes(SwitchStateConsumer, BaseRenderer):
+class GameModes(BaseRenderer):
     """GameModes represents a collection of modes in the game loop where different
     renderers can be added.
 
@@ -111,8 +110,7 @@ class GameModes(SwitchStateConsumer, BaseRenderer):
     """
 
     def __init__(self) -> None:
-        SwitchStateConsumer.__init__(self)
-        BaseRenderer.__init__(self)
+        super().__init__()
         self.title_renderers: list[BaseRenderer] = []
         self.renderers: list[BaseRenderer] = []
         self.in_select_mode = True
@@ -125,6 +123,7 @@ class GameModes(SwitchStateConsumer, BaseRenderer):
         self.sliding_transition = None
         self.key_pressed_last_frame = defaultdict(lambda: False)
         self.gamepad_last_frame = defaultdict(lambda: False)
+        self.enable_switch_state_cache()
 
     def __repr__(self) -> str:
         return (
@@ -150,7 +149,7 @@ class GameModes(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         for renderer in self.renderers:
             if renderer.warmup:
                 renderer.initialize(window, clock, peripheral_manager, orientation)
@@ -164,7 +163,7 @@ class GameModes(SwitchStateConsumer, BaseRenderer):
     def get_renderers(
         self, peripheral_manager: PeripheralManager
     ) -> list[BaseRenderer]:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         self.handle_inputs(peripheral_manager)
         active_renderer = self.active_renderer(mode_offset=self.mode_offset)
         renderers = active_renderer.get_renderers(peripheral_manager)
@@ -464,17 +463,18 @@ def switch_controlled_renderer_order(
 
 class MultiScene(BaseRenderer):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
-        SwitchStateConsumer.__init__(self)
-        BaseRenderer.__init__(self)
+        super().__init__()
         self.scenes = scenes
         self.current_scene_index = 0
         self.last_switch_value = None
         self.key_pressed_last_frame = defaultdict(lambda: False)
         self.gamepad_last_frame = defaultdict(lambda: False)
+        self.enable_switch_state_cache()
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
     ) -> list[BaseRenderer]:
+        self.ensure_input_bindings(peripheral_manager)
         self._process_input(peripheral_manager)
         # This multi-scene could be composed of multiple renderers
         return [
@@ -490,7 +490,7 @@ class MultiScene(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         self.last_switch_value = self.get_switch_state().button_value
         for scene in self.scenes:
             scene.initialize(window, clock, peripheral_manager, orientation)

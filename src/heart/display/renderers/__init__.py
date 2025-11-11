@@ -7,7 +7,10 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.display.renderers.internal import FrameAccumulator
+from heart.peripheral.core import Input
+from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.switch import SwitchState
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -24,6 +27,14 @@ class BaseRenderer:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
         self.warmup = True
+        self._subscription_factories: list[
+            Callable[[PeripheralManager], Callable[[], None] | None]
+        ] = []
+        self._active_unsubscribers: list[Callable[[], None]] = []
+        self._subscriptions_active = False
+        self._subscription_context: PeripheralManager | None = None
+        self._switch_state_cache: SwitchState | None = None
+        self._switch_state_cache_enabled = False
 
     def is_initialized(self) -> bool:
         return self.initialized
@@ -35,6 +46,7 @@ class BaseRenderer:
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        self.ensure_input_bindings(peripheral_manager)
         # We call process once incase there is any implicit cachable work to do
         # e.g. for numba jitted functions we'll cache their compiled code
         try:
@@ -46,11 +58,12 @@ class BaseRenderer:
         self.initialized = True
 
     def reset(self):
-        pass
+        self._switch_state_cache = None
 
     def get_renderers(
         self, peripheral_manager: PeripheralManager
     ) -> list["BaseRenderer"]:
+        self.ensure_input_bindings(peripheral_manager)
         return [self]
 
     def _get_input_screen(self, window: pygame.Surface, orientation: Orientation):
@@ -136,6 +149,181 @@ class BaseRenderer:
 
         self.process(accumulator.surface, clock, peripheral_manager, orientation)
 
+    # ------------------------------------------------------------------
+    # Subscription helpers
+    # ------------------------------------------------------------------
+    def ensure_input_bindings(self, peripheral_manager: PeripheralManager) -> None:
+        """Ensure event and peripheral subscriptions are active for ``self``."""
+
+        self._activate_managed_subscriptions(peripheral_manager)
+
+    def detach_input_bindings(self) -> None:
+        """Remove active subscriptions registered via helper APIs."""
+
+        self._cleanup_managed_subscriptions()
+
+    def register_event_listener(
+        self,
+        event_type: str,
+        callback: Callable[[Input], None],
+        *,
+        priority: int = 0,
+    ) -> None:
+        """Register ``callback`` for ``event_type`` on the manager event bus."""
+
+        def factory(
+            peripheral_manager: PeripheralManager,
+        ) -> Callable[[], None] | None:
+            bus: EventBus | None = getattr(peripheral_manager, "event_bus", None)
+            if bus is None:
+                logger.debug(
+                    "Renderer %s missing event bus; subscription to %s skipped",
+                    self.name,
+                    event_type,
+                )
+                return None
+            handle = bus.subscribe(event_type, callback, priority=priority)
+
+            def unsubscribe() -> None:
+                try:
+                    bus.unsubscribe(handle)
+                except Exception:
+                    logger.exception(
+                        "Renderer %s failed to unsubscribe from %s",
+                        self.name,
+                        event_type,
+                    )
+
+            return unsubscribe
+
+        self._register_managed_subscription(factory)
+
+    def register_switch_state_callback(
+        self,
+        callback: Callable[[SwitchState], None],
+        *,
+        replay: bool = True,
+    ) -> None:
+        """Subscribe ``callback`` to primary switch state updates."""
+
+        def factory(
+            peripheral_manager: PeripheralManager,
+        ) -> Callable[[], None] | None:
+            def _dispatch(state: SwitchState) -> None:
+                try:
+                    callback(state)
+                except Exception:
+                    logger.exception(
+                        "Renderer %s switch callback failed", self.name
+                    )
+
+            try:
+                unsubscribe = peripheral_manager.subscribe_main_switch(_dispatch)
+            except Exception:
+                logger.debug(
+                    "Renderer %s could not subscribe to main switch", self.name,
+                    exc_info=True,
+                )
+                return None
+
+            if replay:
+                try:
+                    initial_state = peripheral_manager.get_main_switch_state()
+                except Exception:
+                    logger.debug(
+                        "Renderer %s could not fetch initial switch state", self.name,
+                        exc_info=True,
+                    )
+                else:
+                    _dispatch(initial_state)
+
+            return unsubscribe
+
+        self._register_managed_subscription(factory)
+
+    def enable_switch_state_cache(self, *, replay: bool = True) -> None:
+        """Cache switch state updates and expose :meth:`get_switch_state`."""
+
+        self._switch_state_cache_enabled = True
+
+        def _update(state: SwitchState) -> None:
+            self._switch_state_cache = state
+            try:
+                self.on_switch_state(state)
+            except Exception:
+                logger.exception(
+                    "Renderer %s failed inside on_switch_state", self.name
+                )
+
+        self.register_switch_state_callback(_update, replay=replay)
+
+    def get_switch_state(self) -> SwitchState:
+        """Return the most recently cached main switch state."""
+
+        if not self._switch_state_cache_enabled or self._switch_state_cache is None:
+            raise RuntimeError("Switch state has not been initialized")
+        return self._switch_state_cache
+
+    def on_switch_state(self, state: SwitchState) -> None:
+        """Hook executed when :meth:`enable_switch_state_cache` receives updates."""
+
+    def _register_managed_subscription(
+        self,
+        factory: Callable[[PeripheralManager], Callable[[], None] | None],
+    ) -> None:
+        self._subscription_factories.append(factory)
+        if self._subscription_context is not None:
+            try:
+                unsubscribe = factory(self._subscription_context)
+            except Exception:
+                logger.exception(
+                    "Renderer %s failed to register subscription immediately",
+                    self.name,
+                )
+            else:
+                if unsubscribe is not None:
+                    self._active_unsubscribers.append(unsubscribe)
+                    self._subscriptions_active = True
+
+    def _activate_managed_subscriptions(
+        self, peripheral_manager: PeripheralManager
+    ) -> None:
+        if (
+            self._subscriptions_active
+            and self._subscription_context is peripheral_manager
+        ):
+            return
+        if self._subscriptions_active:
+            self._cleanup_managed_subscriptions()
+        self._subscription_context = peripheral_manager
+        for factory in self._subscription_factories:
+            try:
+                unsubscribe = factory(peripheral_manager)
+            except Exception:
+                logger.exception(
+                    "Renderer %s failed to activate subscription", self.name
+                )
+                continue
+            if unsubscribe is not None:
+                self._active_unsubscribers.append(unsubscribe)
+        self._subscriptions_active = True
+
+    def _cleanup_managed_subscriptions(self) -> None:
+        if not self._active_unsubscribers:
+            self._subscriptions_active = False
+            self._subscription_context = None
+            return
+        for unsubscribe in self._active_unsubscribers:
+            try:
+                unsubscribe()
+            except Exception:
+                logger.exception(
+                    "Renderer %s failed while detaching subscription", self.name
+                )
+        self._active_unsubscribers.clear()
+        self._subscriptions_active = False
+        self._subscription_context = None
+
     def _tile_surface(
         self, screen: pygame.Surface, rows: int, cols: int
     ) -> pygame.Surface:
@@ -179,6 +367,7 @@ class AtomicBaseRenderer(BaseRenderer, Generic[StateT]):
         self._state = mutator(self._state)
 
     def reset(self) -> None:
+        super().reset()
         self._state = self._create_initial_state()
 
 

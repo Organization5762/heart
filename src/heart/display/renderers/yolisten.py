@@ -9,17 +9,15 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import BaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 # TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 
-class YoListenRenderer(SwitchStateConsumer, BaseRenderer):
+class YoListenRenderer(BaseRenderer):
     def __init__(self, color: Color = Color(255, 0, 0)) -> None:
-        SwitchStateConsumer.__init__(self)
-        BaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.base_color = color  # Store the base color
         self.color = color  # This will be the flickering color
@@ -70,6 +68,7 @@ class YoListenRenderer(SwitchStateConsumer, BaseRenderer):
         self.sim_accel_step = 0.1
         self.test_mode = False
         self.phyphox_db = 50.0
+        self.enable_switch_state_cache()
 
     def initialize(
         self,
@@ -78,7 +77,7 @@ class YoListenRenderer(SwitchStateConsumer, BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.bind_switch(peripheral_manager)
+        self.ensure_input_bindings(peripheral_manager)
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             # Calculate and store the width of each word
