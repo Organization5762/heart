@@ -21,6 +21,44 @@ from heart.peripheral.core.event_bus import (EventBus, EventPlaylist,
 class TestPeripheralEventBus:
     """Group Peripheral Event Bus tests so peripheral event bus behaviour stays reliable. This preserves confidence in peripheral event bus for end-to-end scenarios."""
 
+    def test_enable_stdout_trace_prints_events(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Verify stdout trace prints emitted events. This helps operators audit the event pipeline during investigations."""
+
+        bus = EventBus()
+        bus.enable_stdout_trace()
+
+        bus.emit("sensor.value", data={"value": 3}, producer_id=7)
+
+        captured = capsys.readouterr()
+        assert "sensor.value" in captured.out
+        assert "producer=7" in captured.out
+
+        bus.disable_stdout_trace()
+        bus.emit("sensor.value", data={"value": 9}, producer_id=9)
+
+        after_disable = capsys.readouterr()
+        assert after_disable.out == ""
+
+    def test_snapshot_graph_renders_dot(self) -> None:
+        """Verify snapshot_graph renders Graphviz DOT. This documents subscription topology for troubleshooting."""
+
+        bus = EventBus()
+
+        def _handler(_: Input) -> None:
+            return None
+
+        bus.subscribe("alpha.event", _handler, priority=2)
+        bus.subscribe(None, lambda _: None, priority=1)
+
+        graph = bus.snapshot_graph()
+        dot = graph.to_dot()
+
+        assert "digraph EventBus" in dot
+        assert 'label="alpha.event"' in dot
+        assert 'label="*"' in dot
+        assert "p=2" in dot
+        assert "p=1" in dot
+
     def test_emit_orders_callbacks_by_priority_then_fifo(self):
         """Verify that emit orders callbacks by priority then fifo. This guarantees deterministic fan-out so critical handlers run first."""
         bus = EventBus()

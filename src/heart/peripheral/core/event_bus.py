@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import json
 import logging
 import threading
 import uuid
@@ -10,6 +11,7 @@ from collections import defaultdict, deque
 from collections.abc import Mapping as MappingABC
 from copy import deepcopy
 from dataclasses import dataclass
+from pprint import pformat
 from time import perf_counter
 from types import MappingProxyType
 from typing import (Any, Callable, Deque, Iterable, List, Mapping,
@@ -55,6 +57,85 @@ class SubscriptionHandle:
     callback: EventCallback
     priority: int
     sequence: int
+
+
+@dataclass(frozen=True)
+class EventGraphEdge:
+    """Edge describing a subscription between an event type and a callback."""
+
+    event_type: Optional[str]
+    callback_label: str
+    priority: int
+    sequence: int
+
+
+@dataclass(frozen=True)
+class EventBusGraph:
+    """Snapshot of the event bus topology for visualisation and auditing."""
+
+    edges: tuple[EventGraphEdge, ...]
+
+    @property
+    def event_types(self) -> tuple[Optional[str], ...]:
+        """Return the distinct event types present in the snapshot."""
+
+        ordered: list[Optional[str]] = []
+        for edge in self.edges:
+            if edge.event_type not in ordered:
+                ordered.append(edge.event_type)
+        return tuple(ordered)
+
+    @property
+    def callbacks(self) -> tuple[str, ...]:
+        """Return the distinct callback labels present in the snapshot."""
+
+        ordered: list[str] = []
+        for edge in self.edges:
+            if edge.callback_label not in ordered:
+                ordered.append(edge.callback_label)
+        return tuple(ordered)
+
+    def to_dot(self) -> str:
+        """Render the snapshot as Graphviz DOT text."""
+
+        event_types = self.event_types
+        callbacks = self.callbacks
+
+        event_ids = {event: f"event_{index}" for index, event in enumerate(event_types)}
+        callback_ids = {
+            callback: f"callback_{index}"
+            for index, callback in enumerate(callbacks)
+        }
+
+        lines = ["digraph EventBus {", "    rankdir=LR;"]
+
+        if event_types:
+            lines.append("    node [shape=box];")
+            for event in event_types:
+                label = "*" if event is None else event
+                lines.append(
+                    f"    {event_ids[event]} [label={json.dumps(label)}];"
+                )
+
+        if callbacks:
+            lines.append("    node [shape=ellipse];")
+            for callback in callbacks:
+                lines.append(
+                    f"    {callback_ids[callback]} [label={json.dumps(callback)}];"
+                )
+
+        for edge in self.edges:
+            label = f"p={edge.priority} seq={edge.sequence}"
+            lines.append(
+                "    {source} -> {target} [label={label}];".format(
+                    source=event_ids[edge.event_type],
+                    target=callback_ids[edge.callback_label],
+                    label=json.dumps(label),
+                )
+            )
+
+        lines.append("}")
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1218,6 +1299,7 @@ class EventBus:
         self._state_store = state_store or StateStore()
         self._playlist_manager = EventPlaylistManager(self)
         self._virtual_peripherals = VirtualPeripheralManager(self)
+        self._stdout_trace_handle: SubscriptionHandle | None = None
 
     # Public API ---------------------------------------------------------
     def subscribe(
@@ -1276,6 +1358,9 @@ class EventBus:
             duration * 1000,
         )
 
+        if self._stdout_trace_handle is not None and not self._is_trace_active():
+            self._stdout_trace_handle = None
+
     def run_on_event(
         self, event_type: Optional[str], *, priority: int = 0
     ) -> Callable[[EventCallback], EventCallback]:
@@ -1305,6 +1390,57 @@ class EventBus:
 
         return self._virtual_peripherals
 
+    def enable_stdout_trace(self) -> SubscriptionHandle:
+        """Print every emitted event to stdout for ad-hoc tracing."""
+
+        if self._stdout_trace_handle is not None and self._is_trace_active():
+            return self._stdout_trace_handle
+
+        def _log_event(event: Input) -> None:
+            payload = pformat(event.data)
+            print(
+                f"[EventBus] event={event.event_type} producer={event.producer_id} data={payload}",
+                flush=True,
+            )
+
+        self._stdout_trace_handle = self.subscribe(
+            None,
+            _log_event,
+            priority=-10_000,
+        )
+        return self._stdout_trace_handle
+
+    def disable_stdout_trace(self) -> None:
+        """Stop printing events to stdout if tracing is enabled."""
+
+        handle = self._stdout_trace_handle
+        if handle is None:
+            return
+        self.unsubscribe(handle)
+        self._stdout_trace_handle = None
+
+    @property
+    def stdout_trace_enabled(self) -> bool:
+        """Return ``True`` when stdout tracing is active."""
+
+        return self._stdout_trace_handle is not None and self._is_trace_active()
+
+    def snapshot_graph(self) -> EventBusGraph:
+        """Return a snapshot of current subscriptions for visualisation."""
+
+        edges: list[EventGraphEdge] = []
+        for event_type, handles in self._subscribers.items():
+            for handle in handles:
+                edges.append(
+                    EventGraphEdge(
+                        event_type=event_type,
+                        callback_label=self._describe_callback(handle.callback),
+                        priority=handle.priority,
+                        sequence=handle.sequence,
+                    )
+                )
+        return EventBusGraph(tuple(edges))
+
     # Internal helpers ---------------------------------------------------
     def _iter_targets(self, event_type: str) -> Iterable[SubscriptionHandle]:
         """Yield subscribers in priority order, including wildcards."""
@@ -1318,3 +1454,28 @@ class EventBus:
             handles.extend(specific)
         for handle in sorted(handles, key=lambda item: (-item.priority, item.sequence)):
             yield handle
+
+    def _describe_callback(self, callback: EventCallback) -> str:
+        """Return a human-readable label for ``callback``."""
+
+        module = getattr(callback, "__module__", None)
+        qualname = getattr(callback, "__qualname__", None)
+        if module and qualname:
+            return f"{module}.{qualname}"
+        if hasattr(callback, "__name__"):
+            name = getattr(callback, "__name__")
+            if module:
+                return f"{module}.{name}"
+            return name
+        return repr(callback)
+
+    def _is_trace_active(self) -> bool:
+        """Return ``True`` when the trace handle is registered on the bus."""
+
+        handle = self._stdout_trace_handle
+        if handle is None:
+            return False
+        bucket = self._subscribers.get(handle.event_type)
+        if not bucket:
+            return False
+        return handle in bucket
