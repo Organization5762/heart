@@ -1,12 +1,25 @@
 import random
+from dataclasses import dataclass
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+
+
+@dataclass
+class RainState:
+    starting_point: int = 0
+    current_y: int = 0
+
+
+@dataclass
+class SlinkyState:
+    starting_point: int = 0
+    current_y: int = 0
 
 
 class RandomPixel(BaseRenderer):
@@ -72,17 +85,22 @@ class Border(BaseRenderer):
                 window.set_at((width - 1 - x, y), color_value)
 
 
-class Rain(BaseRenderer):
+class Rain(AtomicBaseRenderer[RainState]):
     def __init__(self) -> None:
         # TODO: This whole freaking this is broken
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
 
-    def _change_starting_point(self, width):
-        self.starting_point = random.randint(0, width)
-        self.current_y = 0
+    def _create_initial_state(self) -> RainState:
+        return RainState()
+
+    def _change_starting_point(self, width, *, current_y: int = 0) -> None:
+        self.update_state(
+            starting_point=random.randint(0, width),
+            current_y=current_y,
+        )
 
     def initialize(
         self,
@@ -91,8 +109,10 @@ class Rain(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        self._change_starting_point(width=window.get_width())
-        self.current_y = random.randint(0, 20)
+        initial_y = random.randint(0, 20)
+        self._change_starting_point(
+            width=window.get_width(), current_y=initial_y
+        )
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
@@ -105,30 +125,39 @@ class Rain(BaseRenderer):
         width, height = window.get_size()
 
         # Move one unit
-        self.current_y += 1
+        state = self.state
+        new_y = state.current_y + 1
+        starting_point = state.starting_point
 
         # Now draw a rain drop
         # It should decrease the saturation, but also dim
 
         for i in range(self.l):
             color = self.starting_color.dim(fraction=i / self.l)
-            window.set_at((self.starting_point, self.current_y - i), color)
+            window.set_at((starting_point, new_y - i), color)
 
-        if self.current_y > height:
+        if new_y > height:
             self._change_starting_point(width=width)
+        else:
+            self.update_state(current_y=new_y)
 
 
-class Slinky(BaseRenderer):
+class Slinky(AtomicBaseRenderer[SlinkyState]):
     def __init__(self) -> None:
         # TODO: This whole freaking this is broken
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)
 
-    def _change_starting_point(self, width):
-        self.starting_point = random.randint(0, width)
-        self.current_y = 0
+    def _create_initial_state(self) -> SlinkyState:
+        return SlinkyState()
+
+    def _change_starting_point(self, width, *, current_y: int = 0) -> None:
+        self.update_state(
+            starting_point=random.randint(0, width),
+            current_y=current_y,
+        )
 
     def initialize(
         self,
@@ -137,8 +166,10 @@ class Slinky(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ):
-        self._change_starting_point(width=window.get_width())
-        self.current_y = random.randint(0, 20)
+        initial_y = random.randint(0, 20)
+        self._change_starting_point(
+            width=window.get_width(), current_y=initial_y
+        )
         super().initialize(window, clock, peripheral_manager, orientation)
 
     def process(
@@ -151,15 +182,17 @@ class Slinky(BaseRenderer):
         width, height = window.get_size()
 
         # Move one unit
-        self.current_y += 1
+        state = self.state
+        new_y = state.current_y + 1
+        starting_point = state.starting_point
 
         # Now draw a rain drop
         # It should decrease the saturation, but also dim
 
-        window.set_at((self.starting_point, self.current_y), self.starting_color)
+        window.set_at((starting_point, new_y), self.starting_color)
         f = self.starting_color.dim(fraction=1 / self.l)
-        window.set_at((self.starting_point + 1, self.current_y), f)
-        window.set_at((self.starting_point - 1, self.current_y), f)
+        window.set_at((starting_point + 1, new_y), f)
+        window.set_at((starting_point - 1, new_y), f)
         for i in range(self.l):
             # Make a triangle:
             # Brightness
@@ -169,15 +202,17 @@ class Slinky(BaseRenderer):
             # I want this to transition from Orange to Yellow as it moves, going through black as a center point
             final_color = list(self.starting_color)
             final_color = self.starting_color.dim(fraction=i / self.l)
-            window.set_at((self.starting_point, self.current_y + i), final_color)
-            window.set_at((self.starting_point, self.current_y - i), final_color)
+            window.set_at((starting_point, new_y + i), final_color)
+            window.set_at((starting_point, new_y - i), final_color)
             if i < 3:
                 f = self.dim(self.starting_color, fraction=(i + 1) / self.l)
-                window.set_at((self.starting_point + 1, self.current_y + i), f)
-                window.set_at((self.starting_point - 1, self.current_y - i), f)
+                window.set_at((starting_point + 1, new_y + i), f)
+                window.set_at((starting_point - 1, new_y - i), f)
 
-        if self.current_y > height:
+        if new_y > height:
             self._change_starting_point(width=width)
+        else:
+            self.update_state(current_y=new_y)
 
 
 ## More Ideas

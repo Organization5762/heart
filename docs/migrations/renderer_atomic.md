@@ -43,10 +43,16 @@ status so incremental updates stay coordinated.
   - `SlidingRenderer` (`src/heart/display/renderers/sliding_image.py`) – wraps
     a composed renderer while keeping the sliding offset immutable for
     downstream loops that expect predictable frame hand-offs.
+  - `Rain` (`src/heart/display/renderers/pixels.py`) – stores the drop origin
+    and vertical sweep position atomically so successive frames don't rely on
+    mutable instance attributes between resets.
+  - `Slinky` (`src/heart/display/renderers/pixels.py`) – tracks the falling
+    anchor and bounce position in immutable state so loop consumers can safely
+    reuse instances without carrying prior frame state.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
-Progress indicator: `[############>---------]`
+Progress indicator: `[##############>-------]`
 
 ## Validation
 
