@@ -16,6 +16,7 @@ logger = get_logger("HeartRateManager")
 
 class MetadataScreen(BaseRenderer):
     def __init__(self) -> None:
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.current_frame = 0
 
