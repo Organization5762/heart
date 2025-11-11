@@ -74,6 +74,9 @@ status so incremental updates stay coordinated.
   - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
     counter and shake-triggered loop flag in immutable state, keeping
     accelerometer-driven transitions predictable across resets.
+  - `PortholeWindowRenderer` (`src/heart/display/renderers/porthole_window.py`)
+    – tracks elapsed time in immutable state so cloud drift remains stable when
+    the renderer is reset or reused.
   - `HeartTitleScreen` (`src/heart/display/renderers/heart_title_screen.py`) –
     keeps the heartbeat toggle and elapsed timing in atomic state so mirrored
     title loops resume a consistent animation cadence after resets.
