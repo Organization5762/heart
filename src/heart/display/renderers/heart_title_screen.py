@@ -1,9 +1,11 @@
+from dataclasses import dataclass
+
 from pygame import Surface, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
 
@@ -11,11 +13,16 @@ DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 logger = get_logger("HeartRateTitleScreen")
 
 
-class HeartTitleScreen(BaseRenderer):
+@dataclass
+class HeartTitleScreenState:
+    heart_up: bool = True
+    elapsed_ms: float = 0.0
+
+
+class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
     def __init__(self) -> None:
-        super().__init__()
+        AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.current_frame = 0
 
         # Load blue heart images
         self.heart_images = {
@@ -23,11 +30,6 @@ class HeartTitleScreen(BaseRenderer):
             "med": Loader.load("hearts/blue/med.png"),
             "big": Loader.load("hearts/blue/big.png"),
         }
-
-        # Heart animation state
-        self.heart_up = True
-        self.last_update = 0
-        self.time_between_beats = 500  # Default timing (ms)
 
     def display_number(self, window, number, x, y):
         my_font = Loader.load_font("Grand9K Pixel.ttf")
@@ -46,14 +48,19 @@ class HeartTitleScreen(BaseRenderer):
         window_width, window_height = window.get_size()
 
         # Update animation state
-        self.last_update += clock.get_time()
+        state = self.state
+        elapsed_ms = state.elapsed_ms + clock.get_time()
+        heart_up = state.heart_up
 
-        if self.last_update > DEFAULT_TIME_BETWEEN_FRAMES_MS:
-            self.last_update = 0
-            self.heart_up = not self.heart_up
+        if elapsed_ms > DEFAULT_TIME_BETWEEN_FRAMES_MS:
+            elapsed_ms = 0
+            heart_up = not heart_up
+
+        if heart_up != state.heart_up or elapsed_ms != state.elapsed_ms:
+            self.update_state(heart_up=heart_up, elapsed_ms=elapsed_ms)
 
         # Determine which image to use based on animation state
-        image_key = "small" if self.heart_up else "med"
+        image_key = "small" if heart_up else "med"
         image = self.heart_images[image_key]
 
         # Center the heart in the window
@@ -66,3 +73,6 @@ class HeartTitleScreen(BaseRenderer):
 
         # Draw the heart
         window.blit(image, (heart_x, heart_y))
+
+    def _create_initial_state(self) -> HeartTitleScreenState:
+        return HeartTitleScreenState()
