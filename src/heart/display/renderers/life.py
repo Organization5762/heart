@@ -14,8 +14,7 @@ from heart.peripheral.core.manager import PeripheralManager
 
 @dataclass
 class LifeState:
-    grid: np.ndarray | None = None
-    seed: float | None = None
+    grid: np.ndarray
 
 
 class Life(AtomicBaseRenderer[LifeState]):
@@ -27,7 +26,6 @@ class Life(AtomicBaseRenderer[LifeState]):
         # preserve the original renderer behaviour of operating on the entire
         # device surface rather than the per-tile mirrored view.
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.enable_switch_state_cache()
 
     def _update_grid(self, grid):
         # convolve the grid with the kernel to count neighbors
@@ -39,38 +37,16 @@ class Life(AtomicBaseRenderer[LifeState]):
 
         return new_grid.astype(int)
 
-    def _maybe_update_seed(self, window: Surface) -> None:
-        current_value = self.get_switch_state().rotational_value
-        state = self.state
-        if current_value != state.seed or state.grid is None:
-            grid = np.random.choice([0, 1], size=window.get_size())
-            self.update_state(seed=current_value, grid=grid)
-
-    def initialize(
+    def real_process(
         self,
         window: Surface,
         clock: Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.ensure_input_bindings(peripheral_manager)
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: Surface,
-        clock: Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        self._maybe_update_seed(window=window)
         state = self.state
         grid = state.grid
-        if grid is None:
-            return
-
         next_grid = self._update_grid(grid)
-        self.update_state(grid=next_grid)
+        self.state.grid = next_grid
 
         # if 1, make white, else make black
         # We need to project these all to 3 dimenesions
@@ -79,6 +55,28 @@ class Life(AtomicBaseRenderer[LifeState]):
 
         assert next_grid.shape == window.get_size(), "Grid size must match window size"
 
-    def _create_initial_state(self) -> LifeState:
-        return LifeState()
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> LifeState:
+        def create_new_grid():
+            return np.random.choice([0, 1], size=window.get_size())
+
+        def update_grid(v):
+            self.state.grid = create_new_grid()
+        
+        source = peripheral_manager.get_main_switch_subscription()
+
+        source.subscribe(
+            on_next = update_grid,
+            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+            on_completed = lambda: print("Done!"),
+        )
+        
+        return LifeState(
+            grid=create_new_grid()
+        )
 

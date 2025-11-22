@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, cast
+from typing import Callable, cast
 
 from PIL import Image, ImageStat
 
@@ -11,9 +11,6 @@ from heart.device import Device
 from heart.events.types import DisplayFrame
 from heart.peripheral.core import Input, Peripheral
 from heart.peripheral.led_matrix import LEDMatrixDisplay
-
-if TYPE_CHECKING:  # pragma: no cover - import cycle guard
-    from heart.peripheral.core.event_bus import EventBus
 
 
 def _rgb_mean(image: Image.Image) -> tuple[int, int, int]:
@@ -53,12 +50,6 @@ class AverageColorLED(Peripheral):
             source_display_id=source_display.producer_id,
             update_device=self._update_device,
         )
-        if source_display.event_bus is not None:
-            self.attach_event_bus(source_display.event_bus)
-
-    def on_event_bus_attached(self, event_bus: "EventBus") -> None:
-        super().on_event_bus_attached(event_bus)
-        self.subscribe_event(DisplayFrame.EVENT_TYPE, self._frame_handler)
 
     def _update_device(self, colour: tuple[int, int, int]) -> None:
         image = Image.new("RGB", self._device.full_display_size(), colour)

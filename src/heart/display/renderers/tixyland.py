@@ -24,14 +24,19 @@ class Tixyland(AtomicBaseRenderer[TixylandState]):
         self._fn = fn
         AtomicBaseRenderer.__init__(self)
 
-    def _create_initial_state(self) -> TixylandState:
-        return TixylandState()
-
-    def process(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        return TixylandState()
+
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
         time_since_last_update = self.state.time_since_last_update + clock.get_time()

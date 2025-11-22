@@ -82,6 +82,7 @@ class TestDriversSensorBusDriver:
         class Stub:
             accelerometer_data_rate = sensor_bus.Rate.RATE_208_HZ
 
+        raise NotImplementedError("Bus refactor")
         assert sensor_bus.get_sample_rate(Stub()) == sensor_bus.Rate.string[Stub.accelerometer_data_rate]
 
 

@@ -2,13 +2,16 @@ import collections
 import json
 import time
 from dataclasses import dataclass
+from datetime import timedelta
+from functools import cached_property
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
 
+import reactivex
 import serial
+from reactivex import operators as ops
 
-from heart.events.types import AccelerometerVector, MagnetometerVector
+from heart.events.types import AccelerometerVector
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -42,27 +45,31 @@ class Accelerometer(Peripheral):
         port: str,
         baudrate: int,
         *,
-        event_bus: EventBus | None = None,
-        producer_id: int | None = None,
+        producer_id: str
     ) -> None:
         super().__init__()
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
+        self._producer_id = producer_id
 
         self.x_distribution = Distribution()
         self.y_distribution = Distribution()
         self.z_distribution = Distribution()
 
-        self._producer_id = producer_id if producer_id is not None else id(self)
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
+    @cached_property
+    def observe(
+        self
+    ) -> reactivex.Observable[Acceleration | None]:
+        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            ops.map(lambda _: self.get_acceleration()),
+            ops.distinct_until_changed(lambda x: x)
+        )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
         for port in get_device_ports("usb-Adafruit_KB2040"):
-            yield cls(port=port, baudrate=115200)
+            yield cls(port=port, baudrate=115200, producer_id=str(port))
 
     def _connect_to_ser(self) -> serial.Serial:
         return serial.Serial(self.port, self.baudrate)
@@ -114,8 +121,6 @@ class Accelerometer(Peripheral):
             )
             return None
 
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
 
     def _update_due_to_data(self, data: dict[str, Any]) -> None:
         event_type = data.get("event_type")
@@ -148,23 +153,19 @@ class Accelerometer(Peripheral):
         self.y_distribution.add_value(vector.y)
         self.z_distribution.add_value(vector.z)
 
-        try:
-            self.emit_input(input_event)
-        except Exception:
-            logger.exception("Failed to emit accelerometer vector")
+        raise NotImplementedError("")
 
+    # TODO Separate
     def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
-        try:
-            vector = MagnetometerVector(
-                x=float(payload["x"]),
-                y=float(payload["y"]),
-                z=float(payload["z"]),
-            )
-        except (KeyError, TypeError, ValueError):
-            logger.debug("Magnetometer payload missing axis components: %s", payload)
-            return
+        raise NotImplementedError("")
+        # try:
+        #     vector = MagnetometerVector(
+        #         x=float(payload["x"]),
+        #         y=float(payload["y"]),
+        #         z=float(payload["z"]),
+        #     )
+        # except (KeyError, TypeError, ValueError):
+        #     logger.debug("Magnetometer payload missing axis components: %s", payload)
+        #     return
 
-        try:
-            self.emit_input(vector.to_input(producer_id=self._producer_id))
-        except Exception:
-            logger.exception("Failed to emit magnetometer vector")
+        # raise NotImplementedError("")

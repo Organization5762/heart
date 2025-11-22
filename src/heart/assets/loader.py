@@ -6,15 +6,16 @@ from typing import Any
 
 import pygame
 
-from heart.utilities.paths import heart_asset_path
-
 
 class Loader:
     @classmethod
     def resolve_path(cls, path: str | os.PathLike[str]) -> Path:
         """Return the absolute path to a file in ``src/heart/assets``."""
 
-        return heart_asset_path(path)
+        return os.path.join(
+            os.path.dirname(__file__),
+            path
+        )
 
     @classmethod
     def _resolve_path(cls, path):

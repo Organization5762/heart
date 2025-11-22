@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from heart.peripheral import microphone
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.microphone import Microphone
 
 
@@ -20,15 +19,14 @@ class TestPeripheralMicrophone:
     def test_process_audio_chunk_emits_event(self):
         """Processing an audio block stores metrics and emits an event."""
 
-        bus = EventBus()
         captured: list[dict] = []
 
         def _capture(event):
             captured.append(event.data)
 
-        bus.subscribe(Microphone.EVENT_LEVEL, _capture)
+        # subscribe(Microphone.EVENT_LEVEL, _capture)
 
-        mic = Microphone(event_bus=bus)
+        mic = Microphone()
         audio = np.array([[0.0], [0.5], [-0.5], [0.0]], dtype=np.float32)
 
         mic._process_audio_chunk(audio, frames=audio.shape[0])

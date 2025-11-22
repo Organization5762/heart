@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import pygame
 
@@ -17,10 +18,12 @@ _LOGGER = get_logger(__name__)
 
 @dataclass
 class MarioRendererState:
+    spritesheet: Any
     current_frame: int = 0
     time_since_last_update: float | None = None
     in_loop: bool = False
     highest_z: float = 0.0
+    latest_acceleration: tuple[float, float, float] | None = None
 
 
 class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
@@ -44,32 +47,27 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
                 )
             )
 
-        self._latest_accelerometer: tuple[float, float, float] | None = None
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.register_event_listener(
+
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> MarioRendererState:
+        # TODO: This might be borked
+        peripheral_manager.register_event_listener(
             AccelerometerVector.EVENT_TYPE, self._handle_accelerometer_event
         )
+        image = Loader.load_spirtesheet(self.file)
+        return MarioRendererState(spritesheet=image)
 
-    def _create_initial_state(self) -> MarioRendererState:
-        return MarioRendererState()
-
-    def initialize(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        """Initialize any resources needed for rendering."""
-        self._spritesheet = Loader.load_spirtesheet(self.file)
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         """Process and render the Mario scene."""
@@ -100,7 +98,7 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
                     current_frame = 0
                     in_loop = False
         else:
-            vector = self.latest_acceleration()
+            vector = self.state.latest_acceleration
             if vector is not None and vector[2] > 11.0:  # vibes based constants
                 highest_z = max(highest_z, vector[2])
                 print(f"highest z: {highest_z}, accel z: {vector[2]}")
@@ -118,17 +116,15 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
         )
 
         screen_width, screen_height = window.get_size()
-        image = self._spritesheet.image_at(current_kf.frame)
+        image = self.state.spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (screen_width, screen_height))
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2
 
         window.blit(scaled, (center_x, center_y))
 
-    def latest_acceleration(self) -> tuple[float, float, float] | None:
-        return self._latest_accelerometer
-
     def _handle_accelerometer_event(self, event: Input) -> None:
+        # TODO: Fold this into state
         payload = event.data
         if isinstance(payload, AccelerometerVector):
             vector = (payload.x, payload.y, payload.z)
@@ -142,4 +138,7 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
             except (KeyError, TypeError, ValueError):
                 _LOGGER.debug("Ignoring malformed accelerometer payload: %s", payload)
                 return
-        self._latest_accelerometer = vector
+            
+        self.update_state(
+            latest_acceleration=vector
+        )

@@ -215,9 +215,9 @@ class ClothSailRenderer(BaseRenderer):
     def initialize(
         self,
         window: pygame.Surface,
-        _clock: pygame.time.Clock,
-        _peripheral_manager: PeripheralManager,
-        _orientation: Orientation,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
     ) -> None:
 
         vertex_shader = self._compile_shader(VERT_SHADER, GL_VERTEX_SHADER)
@@ -262,7 +262,7 @@ class ClothSailRenderer(BaseRenderer):
         glDisable(GL_DEPTH_TEST)
         glDisable(GL_CULL_FACE)
 
-        super().initialize(window, _clock, _peripheral_manager, _orientation)
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _ensure_pixel_buffer(self, size: tuple[int, int]) -> None:
         width, height = size
@@ -277,12 +277,12 @@ class ClothSailRenderer(BaseRenderer):
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        _peripheral_manager: PeripheralManager,
-        _orientation: Orientation,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
     ) -> None:
 
         if self._program is None:
-            self.initialize(window, clock, _peripheral_manager, _orientation)
+            self.initialize(window, clock, peripheral_manager, orientation)
 
         surface_width, surface_height = window.get_size()
         if surface_width == 0 or surface_height == 0:

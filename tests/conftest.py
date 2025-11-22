@@ -60,12 +60,6 @@ def configure_sdl_video_driver() -> None:
 
 
 @pytest.fixture
-def enable_input_event_bus(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENABLE_INPUT_EVENT_BUS", "1")
-    yield
-
-
-@pytest.fixture
 def stub_clock_factory() -> Callable[..., _StubClock]:
     def _factory(*times: int, **kwargs) -> _StubClock:
         return _StubClock(*times, **kwargs)

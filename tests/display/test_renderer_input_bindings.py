@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Callable
 
+import pygame
+
+from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.events.types import AccelerometerVector
 from heart.peripheral.core import Input
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 
 
@@ -27,7 +30,13 @@ class _EventCapturingRenderer(AtomicBaseRenderer[_DummyState]):
             AccelerometerVector.EVENT_TYPE, self._handle_accelerometer
         )
 
-    def _create_initial_state(self) -> _DummyState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return _DummyState()
 
     def _handle_accelerometer(self, event: Input) -> None:
@@ -63,10 +72,8 @@ class _StubPeripheralManager:
     def __init__(
         self,
         *,
-        event_bus: EventBus | None = None,
         switch_state: SwitchState | None = None,
     ) -> None:
-        self.event_bus = event_bus
         self._switch_state = switch_state
         self._switch_callbacks: list[Callable[[SwitchState], None]] = []
 
@@ -96,14 +103,13 @@ def test_event_listener_activation_updates_cache() -> None:
     """Ensure register_event_listener attaches callbacks when bindings activate."""
 
     renderer = _EventCapturingRenderer()
-    bus = EventBus()
-    manager = _StubPeripheralManager(event_bus=bus)
+    manager = _StubPeripheralManager()
 
     renderer.ensure_input_bindings(manager)
-    bus.emit(
-        AccelerometerVector.EVENT_TYPE,
-        {"x": 0.1, "y": -0.2, "z": 9.7},
-    )
+    raise NotImplementedError("Bus refactor")
+    #     AccelerometerVector.EVENT_TYPE,
+    #     {"x": 0.1, "y": -0.2, "z": 9.7},
+    # )
 
     assert renderer.vectors == [(0.1, -0.2, 9.7)]
 

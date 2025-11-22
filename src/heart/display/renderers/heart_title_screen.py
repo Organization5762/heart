@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import pygame
 from pygame import Surface, time
 
 from heart import DeviceDisplayMode
@@ -37,17 +38,17 @@ class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
         text_rect = text.get_rect(center=(x, y))
         window.blit(text, text_rect)
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # Get window dimensions
         window_width, window_height = window.get_size()
 
         # Update animation state
+        # TODO: Move clock into _create_initial_state callbacks
         state = self.state
         elapsed_ms = state.elapsed_ms + clock.get_time()
         heart_up = state.heart_up
@@ -74,5 +75,11 @@ class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
         # Draw the heart
         window.blit(image, (heart_x, heart_y))
 
-    def _create_initial_state(self) -> HeartTitleScreenState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> HeartTitleScreenState:
         return HeartTitleScreenState()

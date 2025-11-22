@@ -5,7 +5,6 @@ from typing import Iterator
 import pytest
 
 from heart.events.types import RadioPacket
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver)
 
@@ -51,16 +50,15 @@ class TestPeripheralRadioPeripheral:
 
     def test_process_packet_emits_event(self) -> None:
         """Verify that process packet emits event. This ensures event orchestration remains reliable."""
-        bus = EventBus()
         captured: list[dict] = []
 
         def _capture(event):
             captured.append(event.data)
 
-        bus.subscribe(RadioPeripheral.EVENT_TYPE, _capture)
+        # subscribe(RadioPeripheral.EVENT_TYPE, _capture)
 
         driver = DummyDriver()
-        peripheral = RadioPeripheral(driver=driver, event_bus=bus, producer_id=11)
+        peripheral = RadioPeripheral(driver=driver, producer_id=11)
 
         sample = RawRadioPacket(
             payload=b"\xAA\xBB",

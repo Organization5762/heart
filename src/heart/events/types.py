@@ -239,7 +239,7 @@ class AccelerometerVector(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.accelerometer.vector"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, producer_id: str, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"x": float(self.x), "y": float(self.y), "z": float(self.z)},
@@ -250,7 +250,7 @@ class AccelerometerVector(InputEventPayload):
 
 @dataclass(frozen=True, slots=True)
 class MagnetometerVector(InputEventPayload):
-    """Three-axis magnetic field sample from the sensor bus."""
+    """Three-axis magnetic field sample"""
 
     x: float
     y: float
@@ -384,7 +384,7 @@ class DisplayFrame(InputEventPayload):
 
 @dataclass(frozen=True, slots=True)
 class RendererFrame(InputEventPayload):
-    """Intermediate surface snapshot emitted by renderers via the event bus."""
+    """Intermediate surface snapshot emitted by renderers."""
 
     channel: str
     renderer: str

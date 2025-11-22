@@ -6,17 +6,19 @@ import math
 import threading
 from collections import deque
 from collections.abc import Iterator
+from datetime import timedelta
+from functools import cached_property
 from typing import Deque, Mapping, Self
 
-from heart.events.types import MagnetometerVector
+import reactivex
+from reactivex import operators as ops
+
 from heart.peripheral.core import Input, Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
 Vector3 = tuple[float, float, float]
-
 
 class Compass(Peripheral):
     """Maintain a smoothed magnetic heading derived from sensor bus events."""
@@ -25,7 +27,6 @@ class Compass(Peripheral):
         self,
         *,
         window_size: int = 5,
-        event_bus: EventBus | None = None,
     ) -> None:
         if window_size < 1:
             raise ValueError("window_size must be at least one")
@@ -35,9 +36,6 @@ class Compass(Peripheral):
         self._history: Deque[Vector3] = deque(maxlen=window_size)
         self._latest: Vector3 | None = None
         self._lock = threading.Lock()
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Peripheral API
@@ -51,11 +49,6 @@ class Compass(Peripheral):
 
         yield cls()
 
-    # ------------------------------------------------------------------
-    # Event bus integration
-    # ------------------------------------------------------------------
-    def on_event_bus_attached(self, event_bus: EventBus) -> None:
-        self.subscribe_event(MagnetometerVector.EVENT_TYPE, self._handle_magnetometer)
 
     def _handle_magnetometer(self, event: Input) -> None:
         payload = event.data
@@ -77,6 +70,14 @@ class Compass(Peripheral):
             self._latest = vector
             self._history.append(vector)
 
+    @cached_property
+    def observe(
+        self
+    ) -> reactivex.Observable[Vector3 | None]:
+        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            ops.map(lambda _: self.get_latest_vector()),
+            ops.distinct_until_changed(lambda x: x)
+        )
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------

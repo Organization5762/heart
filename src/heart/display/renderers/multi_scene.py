@@ -4,7 +4,6 @@ import pygame
 
 from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -15,38 +14,33 @@ class _MultiSceneState:
     last_d_pressed: bool = False
 
 
-class MultiScene(SwitchStateConsumer, AtomicBaseRenderer[_MultiSceneState]):
+class MultiScene(AtomicBaseRenderer[_MultiSceneState]):
     def __init__(self, scenes: list[BaseRenderer]) -> None:
         self.scenes = scenes
-
-        SwitchStateConsumer.__init__(self)
         AtomicBaseRenderer.__init__(self)
 
-    def _create_initial_state(self) -> _MultiSceneState:
-        return _MultiSceneState()
-
-    def get_renderers(
-        self, peripheral_manager: PeripheralManager
-    ) -> list[BaseRenderer]:
-        self.ensure_input_bindings(peripheral_manager)
-        self._process_input(peripheral_manager)
-        # This multi-scene could be composed of multiple renderers
-        current_scene = self.scenes[self.state.current_scene_index]
-        return [
-            *current_scene.get_renderers(peripheral_manager=peripheral_manager)
-        ]
-
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: "Orientation",
-    ) -> None:
-        self.ensure_input_bindings(peripheral_manager)
+        orientation: Orientation
+    ):
         for scene in self.scenes:
             scene.initialize(window, clock, peripheral_manager, orientation)
-        super().initialize(window, clock, peripheral_manager, orientation)
+
+        # TODO: CRITICAL - On _process_input changed, do this
+        self._process_input(peripheral_manager)
+
+        return _MultiSceneState()
+
+    def get_renderers(
+        self
+    ) -> list[BaseRenderer]:
+        current_scene = self.scenes[self.state.current_scene_index]
+        return [
+            *current_scene.get_renderers()
+        ]
 
     def _process_input(self, peripheral_manager: PeripheralManager) -> None:
         self._process_switch()

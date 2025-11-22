@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import cached_property
 
 import pygame
 
@@ -6,17 +7,25 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.switch import SwitchState
 
 
 @dataclass
 class TextRenderingState:
+    switch_state: SwitchState | None
     text: tuple[str, ...]
     font_name: str
     font_size: int
     color: Color
     x_location: int | None
     y_location: int | None
-    font: pygame.font.Font | None = None
+
+    @cached_property
+    def font(self):
+        return pygame.font.SysFont(
+            self.font_name,
+            self.font_size
+        )
 
 
 class TextRendering(AtomicBaseRenderer[TextRenderingState]):
@@ -36,17 +45,33 @@ class TextRendering(AtomicBaseRenderer[TextRenderingState]):
         self._initial_x_location = x_location
         self._initial_y_location = y_location
         AtomicBaseRenderer.__init__(self)
-        self.enable_switch_state_cache()
 
-    def _create_initial_state(self) -> TextRenderingState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+
+        def new_switch_state(v):
+            self.state.switch_state = v
+        
+        source = peripheral_manager.get_main_switch_subscription()
+        source.subscribe(
+            on_next = new_switch_state,
+            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+            on_completed = lambda: print("Done!"),
+        )
+
         return TextRenderingState(
+            switch_state=None,
             text=self._initial_text,
             font_name=self._initial_font_name,
             font_size=self._initial_font_size,
             color=self._initial_color,
             x_location=self._initial_x_location,
             y_location=self._initial_y_location,
-            font=None,
         )
 
     @classmethod
@@ -60,33 +85,22 @@ class TextRendering(AtomicBaseRenderer[TextRenderingState]):
             y_location=None,
         )
 
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        font = pygame.font.SysFont(
-            self.state.font_name, self.state.font_size
-        )
-        self.update_state(font=font)
-        self.ensure_input_bindings(peripheral_manager)
-        super().initialize(window, clock, peripheral_manager, orientation)
-
     def _current_text(self) -> str:
-        state = self.get_switch_state()
-        current_text_idx = state.rotation_since_last_button_press % len(
+        if not self.state.switch_state:
+            state = 0
+        else:
+            state = self.state.switch_state.rotation_since_last_button_press
+
+        current_text_idx = state % len(
             self.state.text
         )
         return self.state.text[current_text_idx]
 
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         current_text = self._current_text()

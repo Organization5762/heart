@@ -2,19 +2,21 @@
 
 The ``docs/planning/uwb_peripheral_rollout.md`` plan calls for an adapter that
 consumes raw ranging payloads and emits zone entry/exit events with hysteresis
-so downstream automations do not thrash when a tag hovers near a boundary.  The
-classes in this module implement that adapter on top of the existing
-``EventBus`` infrastructure.
+so downstream automations do not thrash when a tag hovers near a boundary.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Iterable, Mapping, MutableMapping, Sequence
+from datetime import timedelta
+from functools import cached_property
+from typing import Any, Iterable, Mapping, MutableMapping, Sequence
+
+import reactivex
+from reactivex import operators as ops
 
 from heart.peripheral.core import Input
-from heart.peripheral.core.event_bus import EventBus, SubscriptionHandle
 from heart.utilities.logging import get_logger
 
 
@@ -92,7 +94,6 @@ class UwbZoneTracker:
         *,
         event_type: str = DEFAULT_EVENT_TYPE,
         exit_margin: float = 0.15,
-        event_bus: EventBus | None = None,
         priority: int = 0,
     ) -> None:
         if exit_margin < 0:
@@ -109,36 +110,11 @@ class UwbZoneTracker:
 
         self._event_type = event_type
         self._exit_margin = exit_margin
-        self._event_bus: EventBus | None = None
         self._priority = priority
-        self._subscription: SubscriptionHandle | None = None
+        self.zone_state: Any = None
 
         self._memberships: MutableMapping[str, MutableMapping[str, bool]] = {}
         self._last_positions: MutableMapping[str, Vector3] = {}
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        """Listen for ranging events on ``event_bus``."""
-
-        if self._subscription is not None and self._event_bus is not None:
-            self._event_bus.unsubscribe(self._subscription)
-
-        self._event_bus = event_bus
-        self._subscription = event_bus.subscribe(
-            self._event_type, self._handle_ranging_event, priority=self._priority
-        )
-
-    def detach_event_bus(self) -> None:
-        if self._subscription is None or self._event_bus is None:
-            return
-        self._event_bus.unsubscribe(self._subscription)
-        self._subscription = None
-        self._event_bus = None
 
     def get_active_zones(self, tag_id: str) -> tuple[str, ...]:
         """Return the zones currently occupied by ``tag_id``."""
@@ -236,10 +212,7 @@ class UwbZoneTracker:
         zone: UwbZoneDefinition,
         distance: float,
     ) -> None:
-        if self._event_bus is None:
-            return
-
-        payload = {
+        self.zone_state = {
             "tag_id": observation.tag_id,
             "zone_id": zone.zone_id,
             "distance": distance,
@@ -262,10 +235,11 @@ class UwbZoneTracker:
             "raw": observation.payload,
         }
 
-        self._event_bus.emit(
-            Input(
-                event_type=event_type,
-                data=payload,
-                producer_id=observation.producer_id,
-            )
+    @cached_property
+    def observe(
+        self
+    ) -> reactivex.Observable[dict[str, Any] | None]:
+        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            ops.map(lambda _: self.zone_state),
+            ops.distinct_until_changed(lambda x: x)
         )

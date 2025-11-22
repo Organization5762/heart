@@ -1,4 +1,4 @@
-"""Shared state store for the input event bus."""
+"""Shared state stor."""
 
 from __future__ import annotations
 

@@ -10,8 +10,8 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import AtomicBaseRenderer
-from heart.display.renderers.internal import SwitchStateConsumer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.switch import SwitchState
 
 # TODO: Move to peripheral
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
@@ -19,6 +19,7 @@ PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 
 @dataclass
 class YoListenState:
+    switch_state: SwitchState | None
     color: Color
     last_flicker_update: float = 0.0
     should_calibrate: bool = True
@@ -26,9 +27,8 @@ class YoListenState:
     word_position: float = 0.0
 
 
-class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
+class YoListenRenderer(AtomicBaseRenderer[YoListenState]):
     def __init__(self, color: Color = Color(255, 0, 0)) -> None:
-        SwitchStateConsumer.__init__(self)
         self.base_color = color  # Store the base color
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
         self.screen_count = 4
@@ -71,33 +71,9 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
         self.sim_accel_step = 0.1
         self.test_mode = False
         self.phyphox_db = 50.0
-        self.enable_switch_state_cache()
-
         AtomicBaseRenderer.__init__(self)
-        self.device_display_mode = DeviceDisplayMode.FULL
 
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        self.ensure_input_bindings(peripheral_manager)
-        for word in self.words:
-            self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
-            # Calculate and store the width of each word
-            font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
-            if word == "Y'HEAR":
-                # For Y'HEAR, calculate the width of both blocks and add them together
-                block1_width, _ = font.size(self.ascii_art[word][0][0])
-                block2_width, _ = font.size(self.ascii_art[word][1][0])
-                # Add a small spacing between blocks
-                self.word_widths[word] = max(block1_width, block2_width) + 5
-            else:
-                text_width, _ = font.size(self.ascii_art[word][0])
-                self.word_widths[word] = text_width
-        super().initialize(window, clock, peripheral_manager, orientation)
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def _calculate_optimal_ascii_font_size(self, word: str) -> int:
         art = self.ascii_art[word]
@@ -178,8 +154,11 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
             return self.state
         return state
 
+    # TODO: We could just narrow the state instead of storing two redundant values
     def _calibrate_scroll_speed(self, state: YoListenState) -> YoListenState:
-        rotation = self.get_switch_state().rotation_since_last_button_press
+        rotation = 0
+        if self.state.switch_state:
+            rotation = self.state.switch_state.rotation_since_last_button_press
         self.update_state(
             scroll_speed_offset=rotation,
             should_calibrate=False,
@@ -187,14 +166,15 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
         return self.state
 
     def _scroll_speed_scale_factor(self, state: YoListenState) -> float:
-        current_value = self.get_switch_state().rotation_since_last_button_press
+        current_value = 0
+        if self.state.switch_state:
+            current_value = self.state.switch_state.rotation_since_last_button_press
         return 1.0 + (current_value - state.scroll_speed_offset) / 20.0
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -312,8 +292,36 @@ class YoListenRenderer(SwitchStateConsumer, AtomicBaseRenderer[YoListenState]):
                     (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
                 )
 
-    def _create_initial_state(self) -> YoListenState:
-        return YoListenState(color=self.base_color)
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        for word in self.words:
+            self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
+            # Calculate and store the width of each word
+            font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
+            if word == "Y'HEAR":
+                # For Y'HEAR, calculate the width of both blocks and add them together
+                block1_width, _ = font.size(self.ascii_art[word][0][0])
+                block2_width, _ = font.size(self.ascii_art[word][1][0])
+                # Add a small spacing between blocks
+                self.word_widths[word] = max(block1_width, block2_width) + 5
+            else:
+                text_width, _ = font.size(self.ascii_art[word][0])
+                self.word_widths[word] = text_width
+
+        def new_switch_state(v):
+            self.state.switch_state = v
+        source = peripheral_manager.get_main_switch_subscription()
+        source.subscribe(
+            on_next = new_switch_state,
+            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+            on_completed = lambda: print("Done!"),
+        )
+        return YoListenState(color=self.base_color, switch_state=None)
 
 
 def poll_phyphox():

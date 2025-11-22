@@ -1,4 +1,4 @@
-"""Adapters for streaming proprietary 2.4 GHz packets into the event bus."""
+"""Adapters for streaming proprietary 2.4 GHz packets"""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from typing import Any, Iterator, Mapping
 
 from heart.events.types import RadioPacket
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 serial: Any
@@ -218,7 +217,7 @@ class SerialRadioDriver(RadioDriver):
 
 
 class RadioPeripheral(Peripheral):
-    """Bridge raw radio packets produced by firmware into the event bus."""
+    """Bridge raw radio packets produced by firmware"""
 
     EVENT_TYPE = RadioPacket.EVENT_TYPE
 
@@ -226,7 +225,6 @@ class RadioPeripheral(Peripheral):
         self,
         *,
         driver: RadioDriver,
-        event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
         super().__init__()
@@ -234,9 +232,6 @@ class RadioPeripheral(Peripheral):
         self._producer_id = producer_id if producer_id is not None else id(self)
         self._stop_event = threading.Event()
         self._latest_packet: RawRadioPacket | None = None
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
 
     @classmethod
     def detect(cls) -> Iterator["RadioPeripheral"]:
@@ -263,20 +258,17 @@ class RadioPeripheral(Peripheral):
 
     def process_packet(self, packet: RawRadioPacket) -> None:
         self._latest_packet = packet
-        try:
-            payload = RadioPacket(
-                frequency_hz=packet.frequency_hz,
-                channel=packet.channel,
-                modulation=packet.modulation,
-                rssi_dbm=packet.rssi_dbm,
-                payload=packet.payload,
-                metadata=packet.metadata,
-            ).to_input(producer_id=self._producer_id)
-        except Exception:
-            logger.exception("Failed to normalise radio packet")
-            return
+        # try:
+        #     payload = RadioPacket(
+        #         frequency_hz=packet.frequency_hz,
+        #         channel=packet.channel,
+        #         modulation=packet.modulation,
+        #         rssi_dbm=packet.rssi_dbm,
+        #         payload=packet.payload,
+        #         metadata=packet.metadata,
+        #     ).to_input(producer_id=self._producer_id)
+        # except Exception:
+        #     logger.exception("Failed to normalise radio packet")
+        #     return
 
-        try:
-            self.emit_input(payload)
-        except Exception:
-            logger.exception("Failed to emit radio packet event")
+        raise NotImplementedError("")

@@ -1,27 +1,23 @@
 from types import SimpleNamespace
 
-from heart.events.types import HeartRateLifecycle, HeartRateMeasurement
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.heart_rates import HeartRateManager
 
 
-class TestPeripheralHeartRateEventBus:
+class TestPeripheralHeartRateEvent:
     """Group Peripheral Heart Rate Event Bus tests so peripheral heart rate event bus behaviour stays reliable. This preserves confidence in peripheral heart rate event bus for end-to-end scenarios."""
 
     def test_heart_rate_manager_emits_measurements_and_lifecycle(self):
         """Verify that heart rate manager emits measurements and lifecycle. This ensures event orchestration remains reliable."""
-        bus = EventBus()
         measurements = []
         lifecycle = []
 
-        bus.subscribe(HeartRateMeasurement.EVENT_TYPE, measurements.append)
-        bus.subscribe(HeartRateLifecycle.EVENT_TYPE, lifecycle.append)
+        # subscribe(HeartRateMeasurement.EVENT_TYPE, measurements.append)
+        # subscribe(HeartRateLifecycle.EVENT_TYPE, lifecycle.append)
 
-        manager = HeartRateManager(event_bus=bus)
+        manager = HeartRateManager()
 
         sample = SimpleNamespace(heart_rate=72, battery_percentage=128)
 
-        manager._mark_connected("0A001")
         manager._publish_measurement("0A001", sample)
         manager._mark_disconnect("0A001", suspected=True)
 

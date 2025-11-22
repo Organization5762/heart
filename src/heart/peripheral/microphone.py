@@ -12,7 +12,6 @@ import numpy as np
 
 from heart.events.types import MicrophoneLevel
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,7 +25,7 @@ sd = cast(Any | None, _sounddevice)
 
 
 class Microphone(Peripheral):
-    """Capture audio input and emit loudness metrics via the event bus."""
+    """Capture audio input and emit loudness metrics"""
 
     EVENT_LEVEL = "peripheral.microphone.level"
 
@@ -36,7 +35,6 @@ class Microphone(Peripheral):
         samplerate: int = 16_000,
         block_duration: float = 0.1,
         channels: int = 1,
-        event_bus: EventBus | None = None,
         producer_id: int | None = None,
         retry_delay: float = 1.0,
     ) -> None:
@@ -49,9 +47,6 @@ class Microphone(Peripheral):
 
         self._latest_level: dict[str, Any] | None = None
         self._stop_event = threading.Event()
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Detection lifecycle
@@ -76,14 +71,6 @@ class Microphone(Peripheral):
             return
 
         yield cls()
-
-    # ------------------------------------------------------------------
-    # Event bus integration
-    # ------------------------------------------------------------------
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        """Attach ``event_bus`` so the microphone can emit streaming events."""
-
-        super().attach_event_bus(event_bus)
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -173,10 +160,7 @@ class Microphone(Peripheral):
         payload = level.to_input(producer_id=self._producer_id)
         self._latest_level = cast(dict[str, Any], payload.data)
 
-        try:
-            self.emit_input(payload)
-        except Exception:
-            logger.exception("Failed to emit microphone level event")
+        raise NotImplementedError("")
 
     # ------------------------------------------------------------------
     # Context manager helpers

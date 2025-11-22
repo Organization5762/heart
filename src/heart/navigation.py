@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
+from typing import Callable
 
 import pygame
 
@@ -24,6 +25,7 @@ class AppController(BaseRenderer):
         self.modes = GameModes()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.warmup = True
+        super().__init__()
 
     def initialize(
         self,
@@ -342,6 +344,13 @@ class ComposedRenderer(BaseRenderer):
         for renderer in self.renderers:
             result.extend(renderer.get_renderers(peripheral_manager))
         return result
+
+    @property
+    def name(self):
+        name = "ComposedRenderer:"
+        for renderer in self.renderers:
+            name += f"{renderer.name}+"
+        return name
 
     def initialize(
         self,

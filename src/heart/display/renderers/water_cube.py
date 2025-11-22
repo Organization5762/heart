@@ -22,6 +22,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.sensor import Acceleration
 
 # ───────────────────────── constants & tunables ───────────────────────────────
 FACE_PX = 64  # physical LED face resolution (square)
@@ -65,7 +66,14 @@ def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
 class WaterCubeState:
     heights: np.ndarray
     velocities: np.ndarray
+    gvec: Acceleration | None
 
+    def gvec_tuple(self):
+        accel = self.gvec
+        gx = accel.x if accel else 0.0
+        gy = -accel.y if accel else 0.0
+        gz = accel.z if accel else 1.0  # default "down"
+        return (gx, gy, gz)
 
 class WaterCube(AtomicBaseRenderer[WaterCubeState]):
     """Height-field water simulation projected to four LED faces."""
@@ -106,7 +114,14 @@ class WaterCube(AtomicBaseRenderer[WaterCubeState]):
         adjusted_velocities[np.logical_and(over, adjusted_velocities > 0)] = 0
         adjusted_velocities[np.logical_and(under, adjusted_velocities < 0)] = 0
 
-        return WaterCubeState(heights=adjusted_heights, velocities=adjusted_velocities)
+
+        # TODO:
+        # This is a good example of a state update that would benefit from itself being a virtual peripheral imo? Trying to think this one through
+        # Ok with this like this I think we have a path to just registering this as a callback that depends on gvec changing?
+        self.update_state(
+            heights=adjusted_heights,
+            velocities=adjusted_velocities
+        )
 
     # ─────────────────────── rendering helpers ───────────────────────────
     def _face_heights(self, heights: np.ndarray, face_idx: int) -> np.ndarray:
@@ -134,32 +149,24 @@ class WaterCube(AtomicBaseRenderer[WaterCubeState]):
                     mask[col_px, :h_pix] = True
         return mask
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
         heights = state.heights
         velocities = state.velocities
-
-        # --- get gravity ---------------------------------------------------
-        accel = peripheral_manager.get_accelerometer().get_acceleration()
-        gx = accel.x if accel else 0.0
-        gy = -accel.y if accel else 0.0
-        gz = accel.z if accel else 1.0  # default "down"
-
-        gvec = _norm((gx, gy, gz))
+        gvec = _norm(state.gvec_tuple())
+        gx, gy, gz = gvec
         # --- physics -------------------------------------------------------
-        updated_state = self._step(heights, velocities, gvec)
-        self.set_state(updated_state)
+        self._step(heights, velocities, gvec)
 
         # --- compose frame -------------------------------------------------
         frame = np.zeros((CUBE_PX_W, CUBE_PX_H, 3), dtype=np.uint8)
         for face in range(4):
-            face_heights = self._face_heights(updated_state.heights, face)
+            face_heights = self._face_heights(state.heights, face)
             mask = self._mask_from_heights(face_heights, gz)
             x0 = face * FACE_PX
             face_view = frame[x0 : x0 + FACE_PX, :]
@@ -171,7 +178,27 @@ class WaterCube(AtomicBaseRenderer[WaterCubeState]):
         # maintain original display rate
         clock.tick_busy_loop(60)
 
-    def _create_initial_state(self) -> WaterCubeState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         heights = np.full((GRID, GRID), INIT_FILL, dtype=np.float32)
         velocities = np.zeros_like(heights)
-        return WaterCubeState(heights=heights, velocities=velocities)
+
+        # TODO: Get this consistently
+        # --- get gravity ---------------------------------------------------
+        source = peripheral_manager.get_accelerometer_subscription()
+
+        def set_state(i):
+            self.state.gvec = i
+
+        source.subscribe(
+            on_next =set_state,
+            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+            on_completed = lambda: print("Done!"),
+        )
+
+        return WaterCubeState(heights=heights, velocities=velocities, gvec=None)

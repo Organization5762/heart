@@ -33,6 +33,7 @@ dependencies = [
     "Pillow",
     "pygame==2.6.1",
     "pyserial",
+    "reactivex",
     "requests",
     "scipy",
     "toml",

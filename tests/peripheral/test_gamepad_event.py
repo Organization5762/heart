@@ -4,7 +4,6 @@ from collections import deque
 
 import pytest
 
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.gamepad.gamepad import Gamepad
 
 
@@ -40,7 +39,7 @@ class _StubJoystick:
         return None
 
 
-class TestPeripheralGamepadEventBus:
+class TestPeripheralGamepadEvent:
     """Group Peripheral Gamepad Event Bus tests so peripheral gamepad event bus behaviour stays reliable. This preserves confidence in peripheral gamepad event bus for end-to-end scenarios."""
 
     def test_gamepad_update_emits_bus_events(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -53,19 +52,17 @@ class TestPeripheralGamepadEventBus:
         monkeypatch.setattr(gamepad_module.pygame.time, "get_ticks", lambda: tick_sequence.popleft())
 
         joystick = _StubJoystick()
-        bus = EventBus()
         captured: list[tuple[str, dict, int]] = []
 
-        for event_type in (Gamepad.EVENT_BUTTON, Gamepad.EVENT_AXIS, Gamepad.EVENT_DPAD):
-            bus.subscribe(
-                event_type,
-                lambda event, et=event_type: captured.append(
-                    (et, event.data, event.producer_id)
-                ),
-            )
+        # for event_type in (Gamepad.EVENT_BUTTON, Gamepad.EVENT_AXIS, Gamepad.EVENT_DPAD):
+        #     subscribe(
+        #         event_type,
+        #         lambda event, et=event_type: captured.append(
+        #             (et, event.data, event.producer_id)
+        #         ),
+        #     )
 
         gamepad = Gamepad(joystick_id=3, joystick=joystick)
-        gamepad.attach_event_bus(bus)
 
         joystick.buttons = [1, 0]
         joystick.axes = [0.5]
@@ -89,6 +86,7 @@ class TestPeripheralGamepadEventBus:
         assert (Gamepad.EVENT_AXIS, {"axis": 0, "value": 0.0}, 3) in captured
         assert (Gamepad.EVENT_DPAD, {"x": 0, "y": 0}, 3) in captured
 
-        entry = bus.state_store.get_latest(Gamepad.EVENT_BUTTON, producer_id=3)
+        # entry = state_store.get_latest(Gamepad.EVENT_BUTTON, producer_id=3)
+        entry = None
         assert entry is not None
         assert entry.data == {"button": 0, "pressed": False}

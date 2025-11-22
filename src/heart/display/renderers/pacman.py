@@ -53,11 +53,10 @@ class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -68,7 +67,13 @@ class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
             random_color = self.state.color or Color.random()
             window.set_at((x, y), random_color._as_tuple())
 
-    def _create_initial_state(self) -> RandomPixelState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return RandomPixelState(color=self._initial_color)
 
     def set_color(self, color: Color | None) -> None:
@@ -88,11 +93,10 @@ class Border(AtomicBaseRenderer[BorderState]):
         self.device_display_mode = display_mode
         self.width = width
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -103,7 +107,13 @@ class Border(AtomicBaseRenderer[BorderState]):
             self.width,
         )
 
-    def _create_initial_state(self) -> BorderState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return BorderState(color=self._initial_color)
 
     def set_color(self, color: Color) -> None:
@@ -118,8 +128,18 @@ class Rain(AtomicBaseRenderer[RainState]):
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
 
-    def _create_initial_state(self) -> RainState:
-        return RainState()
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        width, height = window.get_size()
+        return RainState(
+            starting_point=random.randint(0, width),
+            current_y=0,
+        )
 
     def _change_starting_point(self, width, *, current_y: int = 0) -> None:
         self.update_state(
@@ -127,22 +147,10 @@ class Rain(AtomicBaseRenderer[RainState]):
             current_y=current_y,
         )
 
-    def initialize(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ):
-        initial_y = random.randint(0, 20)
-        self._change_starting_point(width=window.get_width(), current_y=initial_y)
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -172,31 +180,23 @@ class Slinky(AtomicBaseRenderer[SlinkyState]):
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)
 
-    def _create_initial_state(self) -> SlinkyState:
-        return SlinkyState()
-
-    def _change_starting_point(self, width, *, current_y: int = 0) -> None:
-        self.update_state(
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        width, height = window.get_size()
+        return SlinkyState(
             starting_point=random.randint(0, width),
-            current_y=current_y,
+            current_y=0,
         )
 
-    def initialize(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ):
-        initial_y = random.randint(0, 20)
-        self._change_starting_point(width=window.get_width(), current_y=initial_y)
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -243,23 +243,21 @@ class PacmanGhostRenderer(AtomicBaseRenderer[PacmanGhostState]):
         self.ghost3: pygame.Surface | None = None
         self.pacman: pygame.Surface | None = None
 
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
+        orientation: Orientation
     ):
         width, height = window.get_size()
-        self.update_state(
+        return PacmanGhostState(
             screen_width=width,
             screen_height=height,
             blood=True,
             pacman_idx=0,
             switch_pacman=True,
         )
-        self._initialize_corner()
-        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _initialize_corner(self) -> None:
         state = self.state
@@ -310,11 +308,10 @@ class PacmanGhostRenderer(AtomicBaseRenderer[PacmanGhostState]):
             y=y,
         )
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -361,6 +358,3 @@ class PacmanGhostRenderer(AtomicBaseRenderer[PacmanGhostState]):
                 window.blit(self.ghost2, (x + 32, y))
                 window.blit(self.ghost1, (x + 64, y))
             window.blit(self.pacman, (x + 96, y))
-
-    def _create_initial_state(self) -> PacmanGhostState:
-        return PacmanGhostState()

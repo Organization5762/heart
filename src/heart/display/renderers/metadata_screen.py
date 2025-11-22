@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, replace
 from typing import Dict
 
+import pygame
 from pygame import Rect, Surface, draw, time
 
 from heart import DeviceDisplayMode
@@ -94,11 +95,10 @@ class MetadataScreen(AtomicBaseRenderer[MetadataScreenState]):
                 ),
             )
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # Get all active heart rate monitors
@@ -162,7 +162,13 @@ class MetadataScreen(AtomicBaseRenderer[MetadataScreenState]):
                 self.display_number(window, current_bpm, pos_x, pos_y)
                 self.display_battery_status(window, monitor_id, pos_x, pos_y)
 
-    def _create_initial_state(self) -> MetadataScreenState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return MetadataScreenState()
 
     def _synchronise_heart_states(

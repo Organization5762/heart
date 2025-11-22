@@ -2,24 +2,19 @@ import pytest
 
 from heart.events.types import MagnetometerVector
 from heart.peripheral.compass import Compass
-from heart.peripheral.core.event_bus import EventBus
-
-
-def _emit_vector(bus: EventBus, vector: MagnetometerVector) -> None:
-    bus.emit(vector.to_input(producer_id=0))
 
 
 class TestPeripheralCompass:
     """Group Peripheral Compass tests so peripheral compass behaviour stays reliable. This preserves confidence in peripheral compass for end-to-end scenarios."""
 
     def test_compass_tracks_latest_vector(self) -> None:
-        """Verify that Compass stores the latest magnetometer vector emitted on the event bus. This ensures heading queries always reflect the most recent sensor input."""
-        bus = EventBus()
+        """Verify that Compass stores the latest magnetometer vector emitted. This ensures heading queries always reflect the most recent sensor input."""
         compass = Compass(window_size=3)
-        compass.attach_event_bus(bus)
 
-        sample = MagnetometerVector(x=12.0, y=-5.0, z=1.5)
-        _emit_vector(bus, sample)
+        MagnetometerVector(x=12.0, y=-5.0, z=1.5)
+
+        # TODO: Needs an "add event" or something to sensors
+        # emit(sample.to_input(producer_id=0))
 
         vector = compass.get_latest_vector()
         assert vector is not None
@@ -31,14 +26,12 @@ class TestPeripheralCompass:
 
     def test_compass_heading_uses_smoothed_average(self) -> None:
         """Verify that Compass computes heading degrees from a smoothed average of recent vectors. This stabilises navigation so jittery measurements do not cause erratic bearings."""
-        bus = EventBus()
         compass = Compass(window_size=2)
-        compass.attach_event_bus(bus)
 
-        _emit_vector(bus, MagnetometerVector(x=0.0, y=1.0, z=0.0))
+        # _emit_vector(MagnetometerVector(x=0.0, y=1.0, z=0.0))
         assert compass.get_heading_degrees() == pytest.approx(0.0)
 
-        _emit_vector(bus, MagnetometerVector(x=1.0, y=0.0, z=0.0))
+        # _emit_vector(MagnetometerVector(x=1.0, y=0.0, z=0.0))
         assert compass.get_heading_degrees() == pytest.approx(45.0)
 
 
@@ -50,8 +43,6 @@ class TestPeripheralCompass:
         assert compass.get_heading_degrees() is None
         assert compass.get_average_vector() is None
 
-        bus = EventBus()
-        compass.attach_event_bus(bus)
-        _emit_vector(bus, MagnetometerVector(x=0.0, y=0.0, z=0.0))
+        # _emit_vector(MagnetometerVector(x=0.0, y=0.0, z=0.0))
 
         assert compass.get_heading_degrees() is None

@@ -68,10 +68,6 @@ class Configuration:
         return _env_flag("USE_ISOLATED_RENDERER")
 
     @classmethod
-    def enable_input_event_bus(cls) -> bool:
-        return _env_flag("ENABLE_INPUT_EVENT_BUS")
-
-    @classmethod
     def peripheral_configuration(cls) -> str:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 

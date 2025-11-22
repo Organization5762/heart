@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import pygame
 from pygame import Surface
 from pygame import time as pygame_time
 
@@ -13,6 +14,7 @@ from heart.peripheral.core.manager import PeripheralManager
 
 @dataclass
 class CombinedBpmScreenState:
+    peripheral_manager: PeripheralManager
     elapsed_time_ms: int = 0
     showing_metadata: bool = True
 
@@ -32,25 +34,23 @@ class CombinedBpmScreen(AtomicBaseRenderer[CombinedBpmScreenState]):
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _create_initial_state(self) -> CombinedBpmScreenState:
-        return CombinedBpmScreenState()
-
-    def initialize(
+    def _create_initial_state(
         self,
-        window: Surface,
-        clock: pygame_time.Clock,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
+        orientation: Orientation
+    ) -> CombinedBpmScreenState:
         self.metadata_screen.initialize(window, clock, peripheral_manager, orientation)
         self.max_bpm_screen.initialize(window, clock, peripheral_manager, orientation)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        return CombinedBpmScreenState(
+            peripheral_manager=peripheral_manager
+        )
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: pygame_time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         elapsed_time = self.state.elapsed_time_ms + clock.get_time()
@@ -63,15 +63,16 @@ class CombinedBpmScreen(AtomicBaseRenderer[CombinedBpmScreenState]):
             showing_metadata = True
             elapsed_time = 0
 
+        # TODO: Emit an event that will also be consumable as state here
         self.update_state(
             elapsed_time_ms=elapsed_time,
             showing_metadata=showing_metadata,
         )
 
         if showing_metadata:
-            self.metadata_screen.process(window, clock, peripheral_manager, orientation)
+            self.metadata_screen.process(window, clock, peripheral_manager=self.state.peripheral_manager, orientation=orientation)
         else:
-            self.max_bpm_screen.process(window, clock, peripheral_manager, orientation)
+            self.max_bpm_screen.process(window, clock, peripheral_manager=self.state.peripheral_manager, orientation=orientation)
 
     def reset(self) -> None:
         self.metadata_screen.reset()

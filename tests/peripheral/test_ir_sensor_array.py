@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.ir_sensor_array import (SPEED_OF_LIGHT, IRArrayDMAQueue,
                                               IRDMAPacket, IRSample,
                                               IRSensorArray,
@@ -72,12 +71,11 @@ class TestPeripheralIrSensorArray:
     def test_sensor_array_emits_frame_event(self):
         """Verify that sensor array emits frame event. This keeps rendering behaviour consistent across scenes."""
         sensors = radial_layout(radius=0.16)
-        bus = EventBus()
         captured: list[dict] = []
 
-        bus.subscribe(IRSensorArray.EVENT_FRAME, lambda event: captured.append(event.data))
+        # subscribe(IRSensorArray.EVENT_FRAME, lambda event: captured.append(event.data))
 
-        array = IRSensorArray(sensor_positions=sensors, event_bus=bus)
+        array = IRSensorArray(sensor_positions=sensors)
 
         true_position = np.array([0.04, -0.02, 0.01])
         offsets = {0: 2e-6, 1: -1e-6, 2: 3e-6, 3: -2e-6}

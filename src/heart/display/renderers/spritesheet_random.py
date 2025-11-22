@@ -11,6 +11,7 @@ from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.switch import SwitchState
 
 
 class LoopPhase(StrEnum):
@@ -22,6 +23,7 @@ class LoopPhase(StrEnum):
 # Renderer state snapshot for `SpritesheetLoopRandom`.
 @dataclass
 class SpritesheetLoopRandomState:
+    switch_state: SwitchState | None
     spritesheet: SpritesheetAsset | None = None
     current_frame: int = 0
     loop_count: int = 0
@@ -69,29 +71,17 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
 
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.enable_switch_state_cache()
-
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        spritesheet = Loader.load_spirtesheet(self.file)
-        self.update_state(spritesheet=spritesheet)
-        self.ensure_input_bindings(peripheral_manager)
-        super().initialize(window, clock, peripheral_manager, orientation)
 
     def __duration_scale_factor(self) -> float:
-        current_value = self.get_switch_state().rotation_since_last_button_press
+        current_value = 0
+        if self.state.switch_state:
+            current_value = self.state.switch_state.rotation_since_last_button_press
         return current_value / 20.00
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -125,6 +115,21 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
         elapsed = (state.time_since_last_update or 0) + clock.get_time()
         self.update_state(time_since_last_update=elapsed)
 
-    def _create_initial_state(self) -> SpritesheetLoopRandomState:
-        return SpritesheetLoopRandomState(phase=self._initial_phase)
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        def new_switch_state(v):
+            self.state.switch_state = v
+        
+        source = peripheral_manager.get_main_switch_subscription()
+        source.subscribe(
+            on_next = new_switch_state,
+            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+            on_completed = lambda: print("Done!"),
+        )
+        return SpritesheetLoopRandomState(phase=self._initial_phase, spritesheet = Loader.load_spirtesheet(self.file), switch_state=None)
 

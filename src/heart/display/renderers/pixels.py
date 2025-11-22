@@ -42,11 +42,10 @@ class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
         self.num_pixels = num_pixels
         self.brightness = brightness
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -63,7 +62,13 @@ class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
         for x, y in pixels:
             window.set_at((x, y), color_value)
 
-    def _create_initial_state(self) -> RandomPixelState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return RandomPixelState(color=self._initial_color)
 
     def set_color(self, color: Color | None) -> None:
@@ -78,11 +83,10 @@ class Border(AtomicBaseRenderer[BorderState]):
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -101,7 +105,13 @@ class Border(AtomicBaseRenderer[BorderState]):
                 window.set_at((x, y), color_value)
                 window.set_at((width - 1 - x, y), color_value)
 
-    def _create_initial_state(self) -> BorderState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return BorderState(color=self._initial_color)
 
     def set_color(self, color: Color) -> None:
@@ -116,41 +126,36 @@ class Rain(AtomicBaseRenderer[RainState]):
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
 
-    def _create_initial_state(self) -> RainState:
-        return RainState()
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        initial_y = random.randint(0, 20)
+        return RainState(
+            window.get_width(),
+            current_y=initial_y
+        )
 
     def _change_starting_point(self, width, *, current_y: int = 0) -> None:
         self.update_state(
             starting_point=random.randint(0, width),
-            current_y=current_y,
+            current_y=self.state.current_y,
         )
 
-    def initialize(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ):
-        initial_y = random.randint(0, 20)
-        self._change_starting_point(
-            width=window.get_width(), current_y=initial_y
-        )
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
 
         # Move one unit
-        state = self.state
-        new_y = state.current_y + 1
-        starting_point = state.starting_point
+        new_y = self.state.current_y + 1
+        starting_point = self.state.starting_point
 
         # Now draw a rain drop
         # It should decrease the saturation, but also dim
@@ -173,41 +178,35 @@ class Slinky(AtomicBaseRenderer[SlinkyState]):
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)
 
-    def _create_initial_state(self) -> SlinkyState:
-        return SlinkyState()
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        return SlinkyState(
+            starting_point=random.randint(0, window.get_size()[0]),
+            current_y=random.randint(0, 20)
+        )
 
     def _change_starting_point(self, width, *, current_y: int = 0) -> None:
         self.update_state(
             starting_point=random.randint(0, width),
-            current_y=current_y,
+            current_y=self.state.current_y,
         )
 
-    def initialize(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ):
-        initial_y = random.randint(0, 20)
-        self._change_starting_point(
-            width=window.get_width(), current_y=initial_y
-        )
-        super().initialize(window, clock, peripheral_manager, orientation)
-
-    def process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
 
         # Move one unit
-        state = self.state
-        new_y = state.current_y + 1
-        starting_point = state.starting_point
+        new_y = self.state.current_y + 1
+        starting_point = self.state.starting_point
 
         # Now draw a rain drop
         # It should decrease the saturation, but also dim

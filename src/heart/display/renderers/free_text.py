@@ -46,26 +46,6 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
             PhoneTextMessage.EVENT_TYPE, self._handle_phone_text_event
         )
 
-    # ------------------------------------------------------------------
-    # Lifecycle helpers
-    # ------------------------------------------------------------------
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        """Initialise the renderer and warm the default font cache."""
-
-        initial_font = self._get_font(self._initial_font_size)
-        self.update_state(
-            font_size=self._initial_font_size,
-            line_height=initial_font.get_linesize(),
-        )
-
-        super().initialize(window, clock, peripheral_manager, orientation)
-
     def reset(self) -> None:
         self._latest_text = None
         super().reset()
@@ -140,11 +120,10 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
     # ------------------------------------------------------------------
     # Render loop
     # ------------------------------------------------------------------
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # Fetch the most recent text (or a placeholder).
@@ -166,6 +145,8 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
             font_size, wrapped_lines, line_height = self._fit_font_and_wrap(
                 last_text, window_width, window_height
             )
+
+            # TODO: Emit event here
             self.update_state(
                 cached_text=last_text,
                 wrapped_lines=tuple(wrapped_lines),
@@ -206,5 +187,15 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
             )
         return self._font_cache[size]
 
-    def _create_initial_state(self) -> FreeTextRendererState:
-        return FreeTextRendererState()
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> FreeTextRendererState:
+        initial_font = self._get_font(self._initial_font_size)
+        return FreeTextRendererState(
+            font_size=self._initial_font_size,
+            line_height=initial_font.get_linesize(),
+        )

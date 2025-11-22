@@ -8,8 +8,7 @@ from typing import Iterator, NoReturn, Self, cast
 import pygame.joystick
 from pygame.event import Event
 
-from heart.peripheral.core import Input, Peripheral, events
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core import Peripheral, events
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -98,11 +97,6 @@ class Gamepad(Peripheral):
         self._axis_prev_frame.clear()
         self._axis_curr_frame.clear()
         self._mark_disconnect(suspected=False)
-
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        if self.is_connected():
-            self._mark_connected()
 
     @property
     def num_buttons(self) -> int:
@@ -266,41 +260,45 @@ class Gamepad(Peripheral):
     # Event bus helpers
     # ------------------------------------------------------------------
     def _emit_button_event(self, button_id: int, pressed: bool) -> None:
-        event = Input(
-            event_type=self.EVENT_BUTTON,
-            data={"button": button_id, "pressed": pressed},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
+        raise NotImplementedError("")
+        # event = Input(
+        #     event_type=self.EVENT_BUTTON,
+        #     data={"button": button_id, "pressed": pressed},
+        #     producer_id=self.joystick_id,
+        # )
+        # self.emit_input(event)
 
     def _emit_axis_event(self, axis_id: int, value: float) -> None:
-        event = Input(
-            event_type=self.EVENT_AXIS,
-            data={"axis": axis_id, "value": float(value)},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
+        raise NotImplementedError("")
+        # event = Input(
+        #     event_type=self.EVENT_AXIS,
+        #     data={"axis": axis_id, "value": float(value)},
+        #     producer_id=self.joystick_id,
+        # )
+        # self.emit_input(event)
 
     def _emit_dpad_if_changed(self) -> None:
-        if self._dpad_curr_frame == self._dpad_last_frame:
-            return
-        event = Input(
-            event_type=self.EVENT_DPAD,
-            data={"x": self._dpad_curr_frame[0], "y": self._dpad_curr_frame[1]},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
+        raise NotImplementedError("")
+        # if self._dpad_curr_frame == self._dpad_last_frame:
+        #     return
+        # event = Input(
+        #     event_type=self.EVENT_DPAD,
+        #     data={"x": self._dpad_curr_frame[0], "y": self._dpad_curr_frame[1]},
+        #     producer_id=self.joystick_id,
+        # )
+        # self.emit_input(event)
 
     def _emit_lifecycle(self, status: str) -> None:
-        if self._last_lifecycle_status == status:
-            return
-        event = Input(
-            event_type=self.EVENT_LIFECYCLE,
-            data={"status": status},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
-        self._last_lifecycle_status = status
+        raise NotImplementedError("")
+        # if self._last_lifecycle_status == status:
+        #     return
+        # event = Input(
+        #     event_type=self.EVENT_LIFECYCLE,
+        #     data={"status": status},
+        #     producer_id=self.joystick_id,
+        # )
+        # self.emit_input(event)
+        # self._last_lifecycle_status = status
 
     def _mark_connected(self) -> None:
         if self._last_lifecycle_status is None:

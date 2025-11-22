@@ -1,23 +1,22 @@
 import pytest
 
 from heart.events.types import ForceMeasurement
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.force import ForcePeripheral
 
 
-class TestPeripheralForceEventBus:
+class TestPeripheralForceEvent:
     """Group Peripheral Force Event Bus tests so peripheral force event bus behaviour stays reliable. This preserves confidence in peripheral force event bus for end-to-end scenarios."""
 
     def test_force_peripheral_emits_event(self) -> None:
         """Verify that force peripheral emits event. This confirms load cell readings reach consumers for haptic feedback."""
-        bus = EventBus()
         captured = []
 
         def _capture(event):
             captured.append(event)
 
-        bus.subscribe(ForceMeasurement.EVENT_TYPE, _capture)
-        peripheral = ForcePeripheral(event_bus=bus, producer_id=42)
+        # TODO: Refactor
+        # subscribe(ForceMeasurement.EVENT_TYPE, _capture)
+        peripheral = ForcePeripheral(producer_id=42)
 
         event = peripheral.record_force(force_type="tensile", magnitude=12.5, unit="N")
 
@@ -34,11 +33,10 @@ class TestPeripheralForceEventBus:
 
     def test_force_peripheral_normalizes_payload(self) -> None:
         """Verify that force peripheral normalizes payload. This ensures mixed-case inputs still produce canonical telemetry."""
-        bus = EventBus()
         captured = []
 
-        bus.subscribe(ForceMeasurement.EVENT_TYPE, captured.append)
-        peripheral = ForcePeripheral(event_bus=bus, producer_id=7)
+        # subscribe(ForceMeasurement.EVENT_TYPE, captured.append)
+        peripheral = ForcePeripheral(producer_id=7)
 
         peripheral.update_due_to_data(
             {
@@ -58,11 +56,10 @@ class TestPeripheralForceEventBus:
 
     def test_force_peripheral_rejects_invalid_payload(self) -> None:
         """Verify that force peripheral rejects invalid payload. This prevents malformed packets from polluting analytics."""
-        bus = EventBus()
         captured = []
 
-        bus.subscribe(ForceMeasurement.EVENT_TYPE, captured.append)
-        peripheral = ForcePeripheral(event_bus=bus)
+        # subscribe(ForceMeasurement.EVENT_TYPE, captured.append)
+        peripheral = ForcePeripheral()
 
         peripheral.update_due_to_data({"data": {"force_type": "gravity", "magnitude": 9.81}})
 

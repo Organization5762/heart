@@ -15,7 +15,6 @@ from typing import Any, Callable, Iterator, Mapping, Sequence, cast
 import numpy as np
 
 from heart.peripheral.core import Input, Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 LeastSquaresCallable = Callable[..., Any]
@@ -270,7 +269,6 @@ class IRSensorArray(Peripheral):
         self,
         *,
         sensor_positions: Sequence[Sequence[float]],
-        event_bus: EventBus | None = None,
         propagation_speed: float = SPEED_OF_LIGHT,
     ) -> None:
         super().__init__()
@@ -281,12 +279,6 @@ class IRSensorArray(Peripheral):
         self._calibration_offsets: dict[int, float] = {}
         self._producer_id = id(self)
 
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
-
-    # ------------------------------------------------------------------
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
 
     def apply_calibration(self, offsets: Mapping[int, float]) -> None:
         self._calibration_offsets = dict(offsets)
@@ -329,11 +321,11 @@ class IRSensorArray(Peripheral):
             "timestamp": generated_at.isoformat(),
         }
 
-        self.emit_event(
-            self.EVENT_FRAME,
-            data=payload,
-            producer_id=self._producer_id,
-        )
+        # self.emit_event(
+        #     self.EVENT_FRAME,
+        #     data=payload,
+        #     producer_id=self._producer_id,
+        # )
 
         self.handle_input(
             Input(

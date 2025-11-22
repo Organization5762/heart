@@ -1,14 +1,12 @@
 import itertools
 import threading
-from types import MappingProxyType
-from typing import Callable, Iterable, Iterator
+from typing import Callable, Iterable, Iterator, TypeVar
 
-from heart.peripheral.compass import Compass
+import reactivex
+
+from heart.peripheral.compass import Compass, Vector3
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import (EventBus,
-                                             VirtualPeripheralDefinition,
-                                             VirtualPeripheralHandle)
+from heart.peripheral.core import Input, Peripheral
 from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
@@ -18,7 +16,7 @@ from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.phyphox import Phyphox
 from heart.peripheral.radio import RadioPeripheral
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.sensor import Accelerometer
+from heart.peripheral.sensor import Acceleration, Accelerometer
 from heart.peripheral.switch import (BaseSwitch, BluetoothSwitch, FakeSwitch,
                                      Switch, SwitchState)
 from heart.utilities.env import Configuration
@@ -26,6 +24,8 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+T = TypeVar("T")
+R = TypeVar("R")
 
 class PeripheralManager:
     """Coordinate detection and execution of available peripherals."""
@@ -33,7 +33,6 @@ class PeripheralManager:
     def __init__(
         self,
         *,
-        event_bus: EventBus | None = None,
         configuration: str | None = None,
         configuration_registry: PeripheralConfigurationRegistry | None = None,
     ) -> None:
@@ -41,8 +40,6 @@ class PeripheralManager:
         self._deprecated_main_switch: BaseSwitch | None = None
         self._threads: list[threading.Thread] = []
         self._started = False
-        self._event_bus = event_bus
-        self._propagate_event_bus = event_bus is not None
         self._configuration_registry = (
             configuration_registry or PeripheralConfigurationRegistry()
         )
@@ -50,41 +47,11 @@ class PeripheralManager:
             configuration or Configuration.peripheral_configuration()
         )
         self._configuration: PeripheralConfiguration | None = None
-        self._virtual_peripheral_definitions: dict[str, VirtualPeripheralDefinition] = {}
-        self._virtual_peripheral_handles: dict[str, VirtualPeripheralHandle] = {}
-
-    @property
-    def event_bus(self) -> EventBus | None:
-        return self._event_bus
-
-    def attach_event_bus(self, event_bus: EventBus, *, propagate: bool = True) -> None:
-        """Register ``event_bus`` for peripherals managed by this instance."""
-
-        previous_bus = self._event_bus
-        if (
-            previous_bus is not None
-            and previous_bus is not event_bus
-            and self._virtual_peripheral_handles
-        ):
-            for handle in tuple(self._virtual_peripheral_handles.values()):
-                previous_bus.virtual_peripherals.remove(handle)
-            self._virtual_peripheral_handles.clear()
-
-        self._event_bus = event_bus
-        self._propagate_event_bus = propagate
-        if not propagate:
-            return
-        for peripheral in self._peripherals:
-            self._attach_event_bus(peripheral, event_bus)
-        self._synchronize_virtual_peripherals()
 
     @property
     def peripherals(self) -> tuple[Peripheral, ...]:
         return tuple(self._peripherals)
 
-    @property
-    def virtual_peripheral_definitions(self) -> MappingProxyType[str, VirtualPeripheralDefinition]:
-        return MappingProxyType(dict(self._virtual_peripheral_definitions))
 
     def get_gamepad(self) -> Gamepad:
         """Return the first detected gamepad."""
@@ -97,8 +64,7 @@ class PeripheralManager:
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():
             self._register_peripheral(peripheral)
-        configuration = self._ensure_configuration()
-        self._register_virtual_peripherals(configuration.virtual_peripherals)
+        self._ensure_configuration()
 
     def register(self, peripheral: Peripheral) -> None:
         """Manually register ``peripheral`` with the manager."""
@@ -122,34 +88,6 @@ class PeripheralManager:
         logger.info("Loading peripheral configuration: %s", name)
         return factory(self)
 
-    def _register_virtual_peripherals(
-        self, definitions: Iterable[VirtualPeripheralDefinition]
-    ) -> None:
-        updated = False
-        for definition in definitions:
-            self._virtual_peripheral_definitions[definition.name] = definition
-            updated = True
-        if not updated:
-            return
-        self._synchronize_virtual_peripherals()
-
-    def _synchronize_virtual_peripherals(self) -> None:
-        if self._event_bus is None or not self._propagate_event_bus:
-            return
-        for definition in self._virtual_peripheral_definitions.values():
-            self._bind_virtual_peripheral(definition)
-
-    def _bind_virtual_peripheral(self, definition: VirtualPeripheralDefinition) -> None:
-        if self._event_bus is None or not self._propagate_event_bus:
-            return
-        handle = self._virtual_peripheral_handles.get(definition.name)
-        if handle is None:
-            handle = self._event_bus.virtual_peripherals.register(definition)
-            self._virtual_peripheral_handles[definition.name] = handle
-            logger.info("Registered virtual peripheral %s", definition.name)
-        else:
-            self._event_bus.virtual_peripherals.update(handle, definition)
-            logger.info("Updated virtual peripheral %s", definition.name)
 
     def start(self) -> None:
         if self._started:
@@ -187,7 +125,7 @@ class PeripheralManager:
             if self._deprecated_main_switch is None and isinstance(switch, BaseSwitch):
                 self._deprecated_main_switch = switch
             yield switch
-
+    
     def _detect_phone_text(self) -> Iterator[Peripheral]:
         yield from itertools.chain(PhoneText.detect())
 
@@ -211,24 +149,12 @@ class PeripheralManager:
 
     def _register_peripheral(self, peripheral: Peripheral) -> None:
         self._peripherals.append(peripheral)
-        if self._event_bus is not None and self._propagate_event_bus:
-            self._attach_event_bus(peripheral, self._event_bus)
 
     def get_led_matrix_display(self) -> LEDMatrixDisplay:
         for peripheral in self._peripherals:
             if isinstance(peripheral, LEDMatrixDisplay):
                 return peripheral
         raise ValueError("No LEDMatrixDisplay peripheral registered")
-
-    def _attach_event_bus(self, peripheral: Peripheral, event_bus: EventBus) -> None:
-        attach = getattr(peripheral, "attach_event_bus", None)
-        if callable(attach):
-            try:
-                attach(event_bus)
-            except Exception:
-                logger.exception(
-                    "Failed to attach event bus to peripheral %s", type(peripheral).__name__
-                )
 
     def _deprecated_get_main_switch(self) -> BaseSwitch:
         """Added this to make the legacy conversion easier, SwitchSubscriber is now
@@ -244,6 +170,7 @@ class PeripheralManager:
         if self._deprecated_main_switch is None:
             raise RuntimeError("Main switch is not registered")
         return self._deprecated_main_switch.get_state()
+
 
     def subscribe_main_switch(
         self, callback: Callable[[SwitchState], None]
@@ -280,6 +207,14 @@ class PeripheralManager:
                 return p
         raise ValueError("No Accelerometer peripheral registered")
 
+    def get_compass(self) -> Compass:
+        for p in self._peripherals:
+            if isinstance(p, Compass):
+                return p
+        raise ValueError("No Accelerometer peripheral registered")
+
+
+
     def get_phone_text(self) -> PhoneText:
         for p in self._peripherals:
             if isinstance(p, PhoneText):
@@ -309,3 +244,31 @@ class PeripheralManager:
 
         """
         self.close()
+
+
+    ###
+    # New
+    ### 
+    def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+        return self._deprecated_get_main_switch().observe
+
+    def get_accelerometer_subscription(self) -> reactivex.Observable[Acceleration | None]:
+        try:
+            return self.get_accelerometer().observe
+        except BaseException:
+            return reactivex.empty()
+
+    def get_compass_subscription(self) -> reactivex.Observable[Vector3 | None]:
+        try:
+            return self.get_compass().observe
+        except BaseException:
+            return reactivex.empty()
+
+    def register_event_listener(
+        self,
+        event_type: str,
+        callback: Callable[[Input], None],
+        *,
+        priority: int = 0,
+    ) -> None:
+        raise ValueError("Use observe instead")

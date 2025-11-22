@@ -2,16 +2,19 @@ import json
 import threading
 import time
 from dataclasses import dataclass, replace
+from datetime import timedelta
+from functools import cached_property
 from typing import Any, Callable, Iterator, Mapping, NoReturn, Self
 
+import reactivex
 import serial
 from bleak.backends.device import BLEDevice
+from reactivex import operators as ops
 
 from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          SWITCH_ROTATION)
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import Input, Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -35,7 +38,6 @@ class BaseSwitch(Peripheral):
     def __init__(
         self,
         *,
-        event_bus: EventBus | None = None,
         producer_id: int | None = None,
     ) -> None:
         super().__init__()
@@ -53,15 +55,8 @@ class BaseSwitch(Peripheral):
         self._state_callbacks: list[Callable[[SwitchState], None]] = []
         self._state_lock = threading.RLock()
 
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
-
     def run(self) -> None:
         return
-
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        self._mark_connected()
 
     def get_rotation_since_last_button_press(self) -> int:
         return self.rotational_value - self.rotation_value_at_last_button_press
@@ -119,6 +114,16 @@ class BaseSwitch(Peripheral):
 
         return _unsubscribe
 
+    @cached_property
+    def observe(
+        self
+    ) -> reactivex.Observable[SwitchState]:
+        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            ops.map(lambda _: self._snapshot()),
+            ops.distinct_until_changed(lambda x: x)
+        )
+        
+
     def handle_input(self, data: Input) -> None:
         event = self._normalize_event(data)
         if event is None:
@@ -163,7 +168,7 @@ class BaseSwitch(Peripheral):
         return data.producer_id
 
     def _publish_event(self, event: Input) -> None:
-        self.emit_input(event)
+        raise NotImplementedError("")
 
     def _snapshot(self) -> SwitchState:
         return SwitchState(
@@ -193,12 +198,12 @@ class BaseSwitch(Peripheral):
         if extra:
             payload.update(extra)
 
-        event = Input(
-            event_type=self.EVENT_LIFECYCLE,
-            data=payload,
-            producer_id=self._default_producer_id,
-        )
-        self.emit_input(event)
+        # event = Input(
+        #     event_type=self.EVENT_LIFECYCLE,
+        #     data=payload,
+        #     producer_id=self._default_producer_id,
+        # )
+        raise NotImplementedError("")
         self._last_lifecycle_status = status
 
     def _mark_connected(self) -> None:
@@ -272,11 +277,6 @@ class BluetoothSwitch(BaseSwitch):
         ]
         self.connected = False
         super().__init__(*args, **kwargs)
-
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        for switch in self.switches:
-            switch.attach_event_bus(event_bus)
 
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
         producer_raw = data.get("producer_id", 0)

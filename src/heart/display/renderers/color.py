@@ -18,23 +18,25 @@ class RenderColor(AtomicBaseRenderer[RenderColorState]):
         self._initial_color = color
         super().__init__()
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         image = pygame.Surface(window.get_size())
         image.fill(self.state.color._as_tuple())
         window.blit(image, (0, 0))
 
-    def _create_initial_state(self) -> RenderColorState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> RenderColorState:
         return RenderColorState(color=self._initial_color)
 
     @property
     def color(self) -> Color:
         return self.state.color
-
-    def set_color(self, color: Color) -> None:
-        self.update_state(color=color)
