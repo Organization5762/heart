@@ -8,9 +8,8 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
-from heart.events.types import AccelerometerVector
-from heart.peripheral.core import Input
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.sensor import Acceleration
 from heart.utilities.logging import get_logger
 
 _LOGGER = get_logger(__name__)
@@ -23,7 +22,7 @@ class MarioRendererState:
     time_since_last_update: float | None = None
     in_loop: bool = False
     highest_z: float = 0.0
-    latest_acceleration: tuple[float, float, float] | None = None
+    latest_acceleration: Acceleration | None = None
 
 
 class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
@@ -57,10 +56,14 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation
     ) -> MarioRendererState:
-        # TODO: This might be borked
-        peripheral_manager.register_event_listener(
-            AccelerometerVector.EVENT_TYPE, self._handle_accelerometer_event
+        # TODO: This needs to get access to an accelerometer subscription
+        observable = peripheral_manager.get_accelerometer_subscription()
+
+        observable.subscribe(
+            on_next=self._handle_accelerometer_event
         )
+        
+
         image = Loader.load_spirtesheet(self.file)
         return MarioRendererState(spritesheet=image)
 
@@ -99,9 +102,9 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
                     in_loop = False
         else:
             vector = self.state.latest_acceleration
-            if vector is not None and vector[2] > 11.0:  # vibes based constants
-                highest_z = max(highest_z, vector[2])
-                print(f"highest z: {highest_z}, accel z: {vector[2]}")
+            if vector is not None and vector.z > 11.0:  # vibes based constants
+                highest_z = max(highest_z, vector.z)
+                print(f"highest z: {highest_z}, accel z: {vector.z}")
                 in_loop = True
                 time_since_last_update = 0
 
@@ -123,22 +126,10 @@ class MarioRenderer(AtomicBaseRenderer[MarioRendererState]):
 
         window.blit(scaled, (center_x, center_y))
 
-    def _handle_accelerometer_event(self, event: Input) -> None:
-        # TODO: Fold this into state
-        payload = event.data
-        if isinstance(payload, AccelerometerVector):
-            vector = (payload.x, payload.y, payload.z)
-        else:
-            try:
-                vector = (
-                    float(payload["x"]),
-                    float(payload["y"]),
-                    float(payload["z"]),
-                )
-            except (KeyError, TypeError, ValueError):
-                _LOGGER.debug("Ignoring malformed accelerometer payload: %s", payload)
-                return
-            
+    def _handle_accelerometer_event(self, event: Acceleration | None) -> None:
+        if event is None:
+            return
+
         self.update_state(
-            latest_acceleration=vector
+            latest_acceleration=event
         )

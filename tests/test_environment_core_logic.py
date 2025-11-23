@@ -223,7 +223,6 @@ class TestEnvironmentCoreLogic:
 
 
 
-    @pytest.skipped
     def test_phone_text_event_triggers_transient_renderer(self, loop, monkeypatch) -> None:
         """Verify that a phone text event spawns a transient renderer and expires after the timeout. This ensures pop-up messages show briefly without blocking other scenes."""
         current_time = 1000.0
@@ -342,7 +341,6 @@ class TestEnvironmentCoreLogic:
         assert getattr(first, "is_flame_renderer") is True
 
 
-    @pytest.skipped
     def test_should_add_flame_renderer_requires_multiple_measurements(self, loop) -> None:
         """Verify that _should_add_flame_renderer ignores sparse heart-rate samples. This prevents transient spikes from triggering intensive flame effects."""
 
@@ -356,7 +354,6 @@ class TestEnvironmentCoreLogic:
         assert loop._should_add_flame_renderer(renderers) is False
 
 
-    @pytest.skipped
     def test_should_add_flame_renderer_checks_average_threshold(self, loop) -> None:
         """Verify that _should_add_flame_renderer only activates when the average BPM beats the threshold. This keeps the flame overlay reserved for sustained exertion signals."""
 

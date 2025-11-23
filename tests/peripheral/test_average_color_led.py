@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from PIL import Image
 
 from heart.device.single_led import SingleLEDDevice
@@ -46,7 +45,6 @@ class TestPeripheralAverageColorLed:
 
 
 
-    @pytest.skipped
     def test_average_led_ignores_other_displays(self, loop) -> None:
         """Verify that AverageColorLED ignores frames produced by other displays. This prevents stray peripherals from hijacking the LED channel."""
         single_led, _ = _register_average(loop)
