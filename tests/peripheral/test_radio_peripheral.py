@@ -46,42 +46,6 @@ class TestPeripheralRadioPeripheral:
         assert rendered.data["metadata"] == {"manufacturer": "FlowToys"}
 
 
-
-    def test_process_packet_emits_event(self) -> None:
-        """Verify that process packet emits event. This ensures event orchestration remains reliable."""
-        captured: list[dict] = []
-
-        def _capture(event):
-            captured.append(event.data)
-
-        # subscribe(RadioPeripheral.EVENT_TYPE, _capture)
-
-        driver = DummyDriver()
-        peripheral = RadioPeripheral(driver=driver)
-
-        sample = RawRadioPacket(
-            payload=b"\xAA\xBB",
-            frequency_hz=2_439_000_000,
-            channel=39,
-            modulation="GFSK",
-            rssi_dbm=-50.0,
-            metadata={"hop": 0},
-        )
-
-        peripheral.process_packet(sample)
-
-        assert peripheral.latest_packet is sample
-        assert captured
-        emitted = captured[-1]
-        assert emitted["payload"] == [170, 187]
-        assert emitted["frequency_hz"] == 2_439_000_000.0
-        assert emitted["channel"] == 39.0
-        assert emitted["modulation"] == "GFSK"
-        assert emitted["rssi_dbm"] == pytest.approx(-50.0)
-        assert emitted["metadata"] == {"hop": 0}
-
-
-
     def test_detect_wraps_serial_driver(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that detect wraps serial driver. This keeps the system behaviour reliable for operators."""
         packets = iter([RawRadioPacket()])

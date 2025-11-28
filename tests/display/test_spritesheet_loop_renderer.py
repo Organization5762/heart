@@ -129,6 +129,7 @@ def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame
         duration_scale=0.5,
         time_since_last_update=123,
     )
+    renderer.reset()
 
     state = renderer.state
 
@@ -157,6 +158,7 @@ def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame
 
     renderer.on_switch_state(SwitchState(0, 0, 0, 10, 0))
     renderer.on_switch_state(SwitchState(0, 0, 0, 25, 0))
+
     state_after_increase = renderer.state
     assert state_after_increase.duration_scale == pytest.approx(0.10)
     assert state_after_increase.last_switch_rotation == 25

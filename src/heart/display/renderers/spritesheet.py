@@ -220,7 +220,13 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
         return gamepad
 
     def reset(self) -> None:
-        self.update_state(phase=self._initial_phase)
+        self.update_state(
+            phase=self._initial_phase,
+            current_frame=0,
+            loop_count=0,
+            duration_scale=0.0,
+            time_since_last_update=None
+        )
 
     def on_switch_state(self, state: SwitchState) -> None:
         if self.disable_input:
@@ -230,11 +236,12 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
             duration_scale = current.duration_scale
             last_rotation = current.last_switch_rotation
             current_rotation = state.rotation_since_last_button_press
-            if last_rotation is not None:
-                if current_rotation > last_rotation:
-                    duration_scale += 0.05
-                elif current_rotation < last_rotation:
-                    duration_scale -= 0.05
+
+            last_rotation = last_rotation or 0
+            if current_rotation > last_rotation:
+                duration_scale += 0.05
+            elif current_rotation < last_rotation:
+                duration_scale -= 0.05
             return replace(
                 current,
                 duration_scale=duration_scale,

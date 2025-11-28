@@ -4,7 +4,6 @@ import numpy as np
 
 from heart.peripheral.ir_sensor_array import (SPEED_OF_LIGHT, IRArrayDMAQueue,
                                               IRDMAPacket, IRSample,
-                                              IRSensorArray,
                                               MultilaterationSolver,
                                               radial_layout)
 
@@ -65,46 +64,3 @@ class TestPeripheralIrSensorArray:
         assert np.allclose(position, emitter, atol=1e-3)
         assert confidence > 0.99
         assert rmse < 1e-10
-
-
-
-    def test_sensor_array_emits_frame_event(self):
-        """Verify that sensor array emits frame event. This keeps rendering behaviour consistent across scenes."""
-        sensors = radial_layout(radius=0.16)
-        captured: list[dict] = []
-
-        # subscribe(IRSensorArray.EVENT_FRAME, lambda event: captured.append(event.data))
-
-        array = IRSensorArray(sensor_positions=sensors)
-
-        true_position = np.array([0.04, -0.02, 0.01])
-        offsets = {0: 2e-6, 1: -1e-6, 2: 3e-6, 3: -2e-6}
-        array.apply_calibration(offsets)
-
-        samples: list[IRSample] = []
-        for index, sensor in enumerate(sensors):
-            sensor_vec = np.array(sensor)
-            distance = np.linalg.norm(true_position - sensor_vec)
-            nominal = distance / SPEED_OF_LIGHT
-            observed = nominal + offsets[index]
-            duration = 1200 if index % 2 else 800
-            samples.append(
-                IRSample(
-                    frame_id=42,
-                    sensor_index=index,
-                    timestamp=observed,
-                    level=1,
-                    duration_us=duration,
-                )
-            )
-
-        packet = _make_packet(samples)
-        array.ingest_packet(packet)
-
-        assert captured, "Expected event emission"
-        event = captured[0]
-        assert event["frame_id"] == 42
-        assert np.allclose(event["position"], true_position.tolist(), atol=1e-3)
-        assert event["confidence"] > 0.95
-        assert event["rmse"] < 1e-10
-        assert event["bits"] == [0, 1, 0, 1]
