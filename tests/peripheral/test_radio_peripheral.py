@@ -35,10 +35,9 @@ class TestPeripheralRadioPeripheral:
             metadata={"manufacturer": "FlowToys"},
         )
 
-        rendered = packet.to_input(producer_id=7)
+        rendered = packet.to_input()
 
         assert rendered.event_type == RadioPacket.EVENT_TYPE
-        assert rendered.producer_id == 7
         assert rendered.data["frequency_hz"] == 2_439_000_000.0
         assert rendered.data["channel"] == 39.0
         assert rendered.data["modulation"] == "GFSK"
@@ -58,7 +57,7 @@ class TestPeripheralRadioPeripheral:
         # subscribe(RadioPeripheral.EVENT_TYPE, _capture)
 
         driver = DummyDriver()
-        peripheral = RadioPeripheral(driver=driver, producer_id=11)
+        peripheral = RadioPeripheral(driver=driver)
 
         sample = RawRadioPacket(
             payload=b"\xAA\xBB",

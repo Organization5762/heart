@@ -25,14 +25,12 @@ class LEDMatrixDisplay(Peripheral):
         *,
         width: int,
         height: int,
-        producer_id: int | None = None,
     ) -> None:
         if width <= 0 or height <= 0:
             raise ValueError("Display dimensions must be positive")
 
         self._width = width
         self._height = height
-        self._producer_id = producer_id if producer_id is not None else id(self)
         self._frame_lock = threading.Lock()
         self._latest_frame: DisplayFrame | None = None
         self._sequence = 0
@@ -47,12 +45,6 @@ class LEDMatrixDisplay(Peripheral):
     @property
     def height(self) -> int:
         return self._height
-
-    @property
-    def producer_id(self) -> int:
-        """Return the producer identifier used for emitted frames."""
-
-        return self._producer_id
 
     @property
     def latest_frame(self) -> DisplayFrame | None:
@@ -87,15 +79,3 @@ class LEDMatrixDisplay(Peripheral):
             self._latest_frame = frame
 
         return frame
-
-    def run(self) -> None:  # noqa: D401 - signature defined by base class
-        """Idle loop to satisfy the :class:`Peripheral` contract."""
-
-        while not self._stop.wait(timeout=60.0):
-            continue
-
-    def stop(self) -> None:
-        """Signal the background thread to exit."""
-
-        self._stop.set()
-

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import abc
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, Self
+from enum import StrEnum
+from functools import cached_property
+from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 
-if TYPE_CHECKING:  # pragma: no cover - import-time convenience
-    from .state_store import StateEntry as StateEntry
-    from .state_store import StateSnapshot as StateSnapshot
-    from .state_store import StateStore as StateStore
+import reactivex
+from reactivex import operators as ops
 
 
 @dataclass(slots=True)
@@ -18,18 +17,42 @@ class Input:
 
     event_type: str
     data: Any
-    producer_id: int = 0
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+A = TypeVar("A")
 
-class Peripheral(abc.ABC):
+class PeripheralGroup(StrEnum):
+    MAIN_SWITCH = "MAIN_SWITCH"
+
+@dataclass
+class PeripheralWrapper(Generic[A]):
+    data: A
+    group: Sequence[PeripheralGroup] = field(default_factory=list)
+
+    @classmethod
+    def unwrap_peripheral(cls, wrapper: PeripheralWrapper[A]) -> A:
+        return wrapper.data
+
+
+class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""
 
     _logger = logging.getLogger(__name__)
 
-    @abc.abstractmethod
-    def run(self) -> None:
-        """Start the peripheral's processing loop."""
+    def _event_stream(self) -> reactivex.Observable[A]:
+        # TODO: Implement
+        return reactivex.empty()
+        
+
+    @cached_property
+    def observe(
+        self
+    ) -> reactivex.Observable[PeripheralWrapper[A]]:
+        def wrap(a: A) -> PeripheralWrapper[A]:
+            return PeripheralWrapper[A](data=a)
+
+
+        return self._event_stream().pipe(ops.map(wrap))
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -43,6 +66,9 @@ class Peripheral(abc.ABC):
         keep backwards compatibility with peripherals that do not yet
         implement input handling.
         """
+
+    def run(self) -> None:
+        pass
 
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
         """Convert a raw payload into an :class:`Input` instance.
@@ -61,11 +87,3 @@ class Peripheral(abc.ABC):
             self._logger.debug(
                 "Ignoring malformed peripheral payload: %s", data, exc_info=True
             )
-
-
-def __getattr__(name: str):
-    if name in {"StateEntry", "StateSnapshot", "StateStore"}:
-        from .state_store import StateEntry, StateSnapshot, StateStore
-
-        return {"StateEntry": StateEntry, "StateSnapshot": StateSnapshot, "StateStore": StateStore}[name]
-    raise AttributeError(name)

@@ -10,9 +10,9 @@ from typing import Callable
 from heart.peripheral.configuration import PeripheralConfiguration
 
 if False:  # pragma: no cover - for type checkers only
-    from heart.peripheral.core.manager import PeripheralManager
+    pass
 
-ConfigurationFactory = Callable[["PeripheralManager"], PeripheralConfiguration]
+ConfigurationFactory = Callable[[], PeripheralConfiguration]
 
 
 class PeripheralConfigurationRegistry:

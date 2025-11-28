@@ -16,7 +16,7 @@ class TestPeripheralForceEvent:
 
         # TODO: Refactor
         # subscribe(ForceMeasurement.EVENT_TYPE, _capture)
-        peripheral = ForcePeripheral(producer_id=42)
+        peripheral = ForcePeripheral()
 
         event = peripheral.record_force(force_type="tensile", magnitude=12.5, unit="N")
 
@@ -27,7 +27,6 @@ class TestPeripheralForceEvent:
         assert emitted.data["type"] == "tensile"
         assert emitted.data["magnitude"] == pytest.approx(12.5)
         assert emitted.data["unit"] == "N"
-        assert emitted.producer_id == 42
 
 
 
@@ -36,7 +35,7 @@ class TestPeripheralForceEvent:
         captured = []
 
         # subscribe(ForceMeasurement.EVENT_TYPE, captured.append)
-        peripheral = ForcePeripheral(producer_id=7)
+        peripheral = ForcePeripheral()
 
         peripheral.update_due_to_data(
             {
@@ -50,7 +49,6 @@ class TestPeripheralForceEvent:
         assert event.data["type"] == "magnetic"
         assert event.data["magnitude"] == pytest.approx(3.5)
         assert event.data["unit"] == "mT"
-        assert event.producer_id == 7
 
 
 

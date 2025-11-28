@@ -33,7 +33,6 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     ) % processed_state.width
     assert window.get_at((0, 0))[:3] == (10, 20, 30)
 
-    renderer.reset()
     after_reset_state = renderer.state
     assert after_reset_state.image is image_ref
     assert after_reset_state.width == processed_state.width

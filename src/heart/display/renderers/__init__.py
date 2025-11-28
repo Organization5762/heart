@@ -3,10 +3,10 @@ from dataclasses import dataclass, replace
 from typing import Any, Callable, Generic, TypeVar, final
 
 import pygame
+from reactivex import Observable
 
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
-from heart.display.renderers.internal import FrameAccumulator
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.utilities.logging import get_logger
@@ -15,8 +15,6 @@ logger = get_logger(__name__)
 
 
 class BaseRenderer:
-    supports_frame_accumulator: bool = False
-
     @property
     def name(self):
         return self.__class__.__name__
@@ -44,24 +42,19 @@ class BaseRenderer:
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.ensure_input_bindings(peripheral_manager)
         # We call process once incase there is any implicit cachable work to do
         # e.g. for numba jitted functions we'll cache their compiled code
-        try:
-            if self.warmup:
-                screen = self._get_input_screen(window, orientation)
-                self.process(screen, clock, peripheral_manager, orientation)
-        except Exception as e:
-            logger.warning(f"Error initializing renderer ({type(self)}): {e}")
+        if self.warmup:
+            screen = self._get_input_screen(window, orientation)
+            self.process(screen, clock, peripheral_manager, orientation)
         self.initialized = True
 
     def reset(self):
         self._switch_state_cache = None
 
     def get_renderers(
-        self, peripheral_manager: PeripheralManager
+        self
     ) -> list["BaseRenderer"]:
-        self.ensure_input_bindings(peripheral_manager)
         return [self]
 
     def _get_input_screen(self, window: pygame.Surface, orientation: Orientation):
@@ -106,14 +99,7 @@ class BaseRenderer:
 
         screen = self._get_input_screen(window, orientation)
         start_ns = time.perf_counter_ns()
-        if self.supports_frame_accumulator:
-            accumulator = FrameAccumulator.from_surface(screen)
-            self.process_with_accumulator(
-                accumulator, clock, peripheral_manager, orientation
-            )
-            screen = accumulator.flush(screen)
-        else:
-            self.process(screen, clock, peripheral_manager, orientation)
+        self.process(screen, clock, peripheral_manager, orientation)
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         screen = self._postprocess_input_screen(screen, orientation)
 
@@ -123,7 +109,6 @@ class BaseRenderer:
             extra={
                 "renderer": self.name,
                 "duration_ms": duration_ms,
-                "uses_accumulator": self.supports_frame_accumulator,
             },
         )
 
@@ -135,157 +120,6 @@ class BaseRenderer:
         orientation: Orientation,
     ) -> None:
         pass
-
-    def process_with_accumulator(
-        self,
-        accumulator: FrameAccumulator,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        """Render into a :class:`FrameAccumulator` (optional override)."""
-
-        self.process(accumulator.surface, clock, peripheral_manager, orientation)
-
-    # ------------------------------------------------------------------
-    # Subscription helpers
-    # ------------------------------------------------------------------
-    def ensure_input_bindings(self, peripheral_manager: PeripheralManager) -> None:
-        """Ensure event and peripheral subscriptions are active for ``self``."""
-
-        self._activate_managed_subscriptions(peripheral_manager)
-
-    def detach_input_bindings(self) -> None:
-        """Remove active subscriptions registered via helper APIs."""
-
-        self._cleanup_managed_subscriptions()
-
-
-    def register_switch_state_callback(
-        self,
-        callback: Callable[[SwitchState], None],
-        *,
-        replay: bool = True,
-    ) -> None:
-        """Subscribe ``callback`` to primary switch state updates."""
-
-        def factory(
-            peripheral_manager: PeripheralManager,
-        ) -> Callable[[], None] | None:
-            def _dispatch(state: SwitchState) -> None:
-                try:
-                    callback(state)
-                except Exception:
-                    logger.exception(
-                        "Renderer %s switch callback failed", self.name
-                    )
-
-            try:
-                unsubscribe = peripheral_manager.subscribe_main_switch(_dispatch)
-            except Exception:
-                logger.debug(
-                    "Renderer %s could not subscribe to main switch", self.name,
-                    exc_info=True,
-                )
-                return None
-
-            if replay:
-                try:
-                    initial_state = peripheral_manager.get_main_switch_state()
-                except Exception:
-                    logger.debug(
-                        "Renderer %s could not fetch initial switch state", self.name,
-                        exc_info=True,
-                    )
-                else:
-                    _dispatch(initial_state)
-
-            return unsubscribe
-
-        self._register_managed_subscription(factory)
-
-    def enable_switch_state_cache(self, *, replay: bool = True) -> None:
-        """Cache switch state updates and expose :meth:`get_switch_state`."""
-
-        self._switch_state_cache_enabled = True
-
-        def _update(state: SwitchState) -> None:
-            self._switch_state_cache = state
-            try:
-                self.on_switch_state(state)
-            except Exception:
-                logger.exception(
-                    "Renderer %s failed inside on_switch_state", self.name
-                )
-
-        self.register_switch_state_callback(_update, replay=replay)
-
-    def get_switch_state(self) -> SwitchState:
-        """Return the most recently cached main switch state."""
-
-        if not self._switch_state_cache_enabled or self._switch_state_cache is None:
-            raise RuntimeError("Switch state has not been initialized")
-        return self._switch_state_cache
-
-    def on_switch_state(self, state: SwitchState) -> None:
-        """Hook executed when :meth:`enable_switch_state_cache` receives updates."""
-
-    def _register_managed_subscription(
-        self,
-        factory: Callable[[PeripheralManager], Callable[[], None] | None],
-    ) -> None:
-        self._subscription_factories.append(factory)
-        if self._subscription_context is not None:
-            try:
-                unsubscribe = factory(self._subscription_context)
-            except Exception:
-                logger.exception(
-                    "Renderer %s failed to register subscription immediately",
-                    self.name,
-                )
-            else:
-                if unsubscribe is not None:
-                    self._active_unsubscribers.append(unsubscribe)
-                    self._subscriptions_active = True
-
-    def _activate_managed_subscriptions(
-        self, peripheral_manager: PeripheralManager
-    ) -> None:
-        if (
-            self._subscriptions_active
-            and self._subscription_context is peripheral_manager
-        ):
-            return
-        if self._subscriptions_active:
-            self._cleanup_managed_subscriptions()
-        self._subscription_context = peripheral_manager
-        for factory in self._subscription_factories:
-            try:
-                unsubscribe = factory(peripheral_manager)
-            except Exception:
-                logger.exception(
-                    "Renderer %s failed to activate subscription", self.name
-                )
-                continue
-            if unsubscribe is not None:
-                self._active_unsubscribers.append(unsubscribe)
-        self._subscriptions_active = True
-
-    def _cleanup_managed_subscriptions(self) -> None:
-        if not self._active_unsubscribers:
-            self._subscriptions_active = False
-            self._subscription_context = None
-            return
-        for unsubscribe in self._active_unsubscribers:
-            try:
-                unsubscribe()
-            except Exception:
-                logger.exception(
-                    "Renderer %s failed while detaching subscription", self.name
-                )
-        self._active_unsubscribers.clear()
-        self._subscriptions_active = False
-        self._subscription_context = None
 
     def _tile_surface(
         self, screen: pygame.Surface, rows: int, cols: int
@@ -307,8 +141,6 @@ StateT = TypeVar("StateT")
 
 class AtomicBaseRenderer(Generic[StateT]):
     """Base renderer that manages an immutable state snapshot."""
-    supports_frame_accumulator: bool = False
-
     def __init__(self, *args, **kwargs) -> None:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
@@ -341,6 +173,7 @@ class AtomicBaseRenderer(Generic[StateT]):
                 self.process(screen, clock, peripheral_manager, orientation)
         except Exception as e:
             logger.warning(f"Error initializing renderer ({type(self)}): {e}")
+            raise e
         self.initialized = True
 
     @property
@@ -367,7 +200,7 @@ class AtomicBaseRenderer(Generic[StateT]):
         return self.initialized
 
     def get_renderers(
-        self, peripheral_manager: PeripheralManager
+        self
     ) -> list["BaseRenderer"]:
         return self._real_get_renderers()
 
@@ -439,53 +272,21 @@ class AtomicBaseRenderer(Generic[StateT]):
 
         screen = self._get_input_screen(window, orientation)
         start_ns = time.perf_counter_ns()
-        if self.supports_frame_accumulator:
-            accumulator = FrameAccumulator.from_surface(screen)
-            self._real_process_with_accumulator(accumulator=accumulator, clock=clock, orientation=orientation)
-            screen = accumulator.flush(screen)
-        else:
-            self.real_process(window=screen, clock=clock, orientation=orientation)
+        self.real_process(window=screen, clock=clock, orientation=orientation)
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         screen = self._postprocess_input_screen(screen, orientation)
 
         window.blit(screen, (0, 0))
         logger.debug(
-            "renderer.frame",  # structured logging friendly key
+            "renderer.frame",
             extra={
                 "renderer": self.name,
                 "duration_ms": duration_ms,
-                "uses_accumulator": self.supports_frame_accumulator,
             },
         )
-        
-    @final
-    def process_with_accumulator(
-        self,
-        accumulator: FrameAccumulator,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ):
-        return self._real_process_with_accumulator(
-            accumulator=accumulator,
-            clock=clock,
-            orientation=orientation
-        )
-
-    def _real_process_with_accumulator(
-        self,
-        accumulator: FrameAccumulator,
-        clock: pygame.time.Clock,
-        orientation: Orientation,
-    ) -> None:
-        """Render into a :class:`FrameAccumulator` (optional override)."""
-
-        self.process(accumulator.surface, clock, orientation)
 
     def reset(self):
-        # Optimally this should just default back to some initial state
         pass
-
 
     ##
     # Base helper gore
@@ -521,6 +322,26 @@ class AtomicBaseRenderer(Generic[StateT]):
                 tiled_surface.blit(screen, dest_pos)
 
         return tiled_surface
+
+class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
+    def state_obsessrvable(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> Observable[StateT]:
+        raise NotImplementedError()
+
+    def initialize(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        observable = self.state_observable(
+            peripheral_manager=peripheral_manager,
+        )
+        observable.subscribe(on_next=self.set_state)
+        self.initialized = True
 
 @dataclass
 class KeyFrame:

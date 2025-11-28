@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         event_type: str
 
         def to_input(
-            self, *, producer_id: int = 0, timestamp: datetime | None = None
+            self, *, timestamp: datetime | None = None
         ) -> Input:
             """Render the payload as an :class:`Input` instance."""
 else:
@@ -61,11 +61,10 @@ class SwitchButton(InputEventPayload):
             self.EVENT_TYPE_LONG_PRESS if self.long_press else self.EVENT_TYPE_PRESS,
         )
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"button": self.button, "pressed": self.pressed},
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -79,11 +78,10 @@ class SwitchRotation(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = SWITCH_ROTATION
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"position": int(self.position)},
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -101,7 +99,7 @@ class MicrophoneLevel(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.microphone.level"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload = {
             "rms": float(self.rms),
             "peak": float(self.peak),
@@ -112,7 +110,6 @@ class MicrophoneLevel(InputEventPayload):
         return Input(
             event_type=self.event_type,
             data=payload,
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -132,7 +129,7 @@ class RadioPacket(InputEventPayload):
     event_type: str = EVENT_TYPE
 
     def to_input(
-        self, *, producer_id: int = 0, timestamp: datetime | None = None
+        self, *, timestamp: datetime | None = None
     ) -> Input:
         payload: MutableMapping[str, Any] = {}
 
@@ -152,7 +149,6 @@ class RadioPacket(InputEventPayload):
         return Input(
             event_type=self.event_type,
             data=dict(payload),
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -185,7 +181,7 @@ class HeartRateMeasurement(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.heart_rate.measurement"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload: MutableMapping[str, Any] = {
             "device_id": self.device_id,
             "bpm": int(self.bpm),
@@ -197,7 +193,6 @@ class HeartRateMeasurement(InputEventPayload):
         return Input(
             event_type=self.event_type,
             data=dict(payload),
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -213,7 +208,7 @@ class HeartRateLifecycle(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.heart_rate.lifecycle"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload: MutableMapping[str, Any] = {
             "device_id": self.device_id,
             "status": self.status,
@@ -223,7 +218,6 @@ class HeartRateLifecycle(InputEventPayload):
         return Input(
             event_type=self.event_type,
             data=dict(payload),
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -239,11 +233,10 @@ class AccelerometerVector(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.accelerometer.vector"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: str, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"x": float(self.x), "y": float(self.y), "z": float(self.z)},
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -259,11 +252,10 @@ class MagnetometerVector(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.magnetometer.vector"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"x": float(self.x), "y": float(self.y), "z": float(self.z)},
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -292,7 +284,7 @@ class ForceMeasurement(InputEventPayload):
         object.__setattr__(self, "force_type", normalized)
 
     def to_input(
-        self, *, producer_id: int = 0, timestamp: datetime | None = None
+        self, *, timestamp: datetime | None = None
     ) -> Input:
         payload = {
             "type": self.force_type,
@@ -302,7 +294,6 @@ class ForceMeasurement(InputEventPayload):
         return Input(
             event_type=self.event_type,
             data=payload,
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -316,11 +307,10 @@ class PhoneTextMessage(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = "peripheral.phone_text.message"
     event_type: str = EVENT_TYPE
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data={"text": self.text},
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -373,11 +363,10 @@ class DisplayFrame(InputEventPayload):
 
         return Image.frombytes(self.mode, (self.width, self.height), self.data)
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data=self,
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )
 
@@ -457,10 +446,9 @@ class RendererFrame(InputEventPayload):
         # frombuffer shares the underlying memory; copy to decouple from payload
         return surface.copy()
 
-    def to_input(self, *, producer_id: int = 0, timestamp: datetime | None = None) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         return Input(
             event_type=self.event_type,
             data=self,
-            producer_id=producer_id,
             timestamp=_normalize_timestamp(timestamp),
         )

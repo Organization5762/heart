@@ -42,9 +42,10 @@ class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
 
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.register_event_listener(
-            PhoneTextMessage.EVENT_TYPE, self._handle_phone_text_event
-        )
+        # TODO: Re-register event listener
+        # self.register_event_listener(
+        #     PhoneTextMessage.EVENT_TYPE, self._handle_phone_text_event
+        # )
 
     def reset(self) -> None:
         self._latest_text = None

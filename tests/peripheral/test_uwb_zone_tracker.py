@@ -23,11 +23,6 @@ class TestPeripheralUwbZoneTracker:
 
         entries = collect_events("uwb.zone.entry")
 
-        #     "uwb.ranging_event",
-        #     data={"tag_id": "tag-1", "position": {"x": 0.5, "y": 0.3}},
-        #     producer_id=7,
-        # )
-
         assert len(entries) == 1
         entry = entries[0]
         assert entry.event_type == "uwb.zone.entry"

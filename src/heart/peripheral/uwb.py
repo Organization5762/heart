@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import timedelta
-from functools import cached_property
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 import reactivex
@@ -80,7 +79,6 @@ class _Observation:
     tag_id: str
     position: Vector3
     payload: Mapping[str, object]
-    producer_id: int
 
 
 class UwbZoneTracker:
@@ -145,7 +143,7 @@ class UwbZoneTracker:
             logger.debug("Ignoring non-mapping UWB payload: %s", payload)
             return None
 
-        tag_id = self._extract_tag_id(payload, event.producer_id)
+        tag_id = self._extract_tag_id(payload)
         position_raw = (
             payload.get("position")
             or payload.get("coordinates")
@@ -170,15 +168,14 @@ class UwbZoneTracker:
             tag_id=tag_id,
             position=position,
             payload=payload,
-            producer_id=event.producer_id,
         )
 
-    def _extract_tag_id(self, payload: Mapping[str, object], producer_id: int) -> str:
+    def _extract_tag_id(self, payload: Mapping[str, object]) -> str:
         for key in ("tag_id", "device_id", "peripheral_id", "tracker_id", "anchor_id"):
             value = payload.get(key)
             if value is not None:
                 return str(value)
-        return str(producer_id)
+        raise ValueError("")
 
     def _evaluate_zone(self, observation: _Observation, zone: UwbZoneDefinition) -> None:
         membership = self._memberships.setdefault(observation.tag_id, {})
@@ -235,8 +232,7 @@ class UwbZoneTracker:
             "raw": observation.payload,
         }
 
-    @cached_property
-    def observe(
+    def _event_stream(
         self
     ) -> reactivex.Observable[dict[str, Any] | None]:
         return reactivex.interval(timedelta(milliseconds=10)).pipe(

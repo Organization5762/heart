@@ -21,7 +21,7 @@ class TestPeripheralAccelerometerEvent:
 
         # TODO: Refactor
         # subscribe(AccelerometerVector.EVENT_TYPE, _capture)
-        accel = Accelerometer(port="/dev/null", baudrate=9600, producer_id=7)
+        accel = Accelerometer(port="/dev/null", baudrate=9600)
 
         accel._update_due_to_data(
             {"event_type": event_type, "data": {"x": 1.0, "y": -2.5, "z": 0.5}}
@@ -48,7 +48,7 @@ class TestPeripheralAccelerometerEvent:
 
         # TODO: Refactor
         # subscribe(MagnetometerVector.EVENT_TYPE, _capture)
-        accel = Accelerometer(port="/dev/null", baudrate=9600, producer_id=7)
+        accel = Accelerometer(port="/dev/null", baudrate=9600)
 
         accel._update_due_to_data(
             {"event_type": "sensor.magnetic", "data": {"x": -30.0, "y": 12.0, "z": 4.0}}

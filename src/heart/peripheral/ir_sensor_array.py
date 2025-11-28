@@ -277,15 +277,11 @@ class IRSensorArray(Peripheral):
             sensor_positions, propagation_speed=propagation_speed
         )
         self._calibration_offsets: dict[int, float] = {}
-        self._producer_id = id(self)
 
 
     def apply_calibration(self, offsets: Mapping[int, float]) -> None:
         self._calibration_offsets = dict(offsets)
 
-    # ------------------------------------------------------------------
-    def run(self) -> None:  # pragma: no cover - integration hook for hardware
-        logger.info("IRSensorArray run loop idle; use ingest_packet to feed data")
 
     # ------------------------------------------------------------------
     def ingest_packet(self, packet: IRDMAPacket) -> None:
@@ -321,17 +317,10 @@ class IRSensorArray(Peripheral):
             "timestamp": generated_at.isoformat(),
         }
 
-        # self.emit_event(
-        #     self.EVENT_FRAME,
-        #     data=payload,
-        #     producer_id=self._producer_id,
-        # )
-
         self.handle_input(
             Input(
                 event_type=self.EVENT_FRAME,
                 data=payload,
-                producer_id=self._producer_id,
             )
         )
 

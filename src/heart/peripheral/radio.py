@@ -225,11 +225,9 @@ class RadioPeripheral(Peripheral):
         self,
         *,
         driver: RadioDriver,
-        producer_id: int | None = None,
     ) -> None:
         super().__init__()
         self._driver = driver
-        self._producer_id = producer_id if producer_id is not None else id(self)
         self._stop_event = threading.Event()
         self._latest_packet: RawRadioPacket | None = None
 
@@ -257,18 +255,4 @@ class RadioPeripheral(Peripheral):
         self._stop_event.clear()
 
     def process_packet(self, packet: RawRadioPacket) -> None:
-        self._latest_packet = packet
-        # try:
-        #     payload = RadioPacket(
-        #         frequency_hz=packet.frequency_hz,
-        #         channel=packet.channel,
-        #         modulation=packet.modulation,
-        #         rssi_dbm=packet.rssi_dbm,
-        #         payload=packet.payload,
-        #         metadata=packet.metadata,
-        #     ).to_input(producer_id=self._producer_id)
-        # except Exception:
-        #     logger.exception("Failed to normalise radio packet")
-        #     return
-
         raise NotImplementedError("")

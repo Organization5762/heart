@@ -11,7 +11,7 @@ class TestPeripheralPhoneTextEvent:
         #     PhoneTextMessage.EVENT_TYPE, lambda event: captured.append(event.data["text"])
         # )
 
-        phone = PhoneText(producer_id=3)
+        phone = PhoneText()
 
         phone._on_write(b"hello world\0", None)
 

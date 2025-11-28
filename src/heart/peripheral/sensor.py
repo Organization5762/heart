@@ -3,7 +3,6 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from functools import cached_property
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
 
 import reactivex
@@ -39,26 +38,22 @@ class Distribution:
         self.historic_values.append((self._get_time(), value))
 
 
-class Accelerometer(Peripheral):
+class Accelerometer(Peripheral[Acceleration | None]):
     def __init__(
         self,
         port: str,
         baudrate: int,
-        *,
-        producer_id: str
     ) -> None:
         super().__init__()
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
-        self._producer_id = producer_id
 
         self.x_distribution = Distribution()
         self.y_distribution = Distribution()
         self.z_distribution = Distribution()
 
-    @cached_property
-    def observe(
+    def _event_stream(
         self
     ) -> reactivex.Observable[Acceleration | None]:
         return reactivex.interval(timedelta(milliseconds=10)).pipe(
@@ -69,7 +64,7 @@ class Accelerometer(Peripheral):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         for port in get_device_ports("usb-Adafruit_KB2040"):
-            yield cls(port=port, baudrate=115200, producer_id=str(port))
+            yield cls(port=port, baudrate=115200)
 
     def _connect_to_ser(self) -> serial.Serial:
         return serial.Serial(self.port, self.baudrate)
@@ -146,7 +141,7 @@ class Accelerometer(Peripheral):
             logger.debug("Accelerometer payload missing axis components: %s", payload)
             return
 
-        input_event = vector.to_input(producer_id=self._producer_id)
+        input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
 
         self.x_distribution.add_value(vector.x)

@@ -380,8 +380,13 @@ class GameLoop:
         if self.clock is None or self.screen is None:
             raise RuntimeError("GameLoop failed to initialize display surfaces")
         clock = self.clock
+
+        # Load the screen
         try:
             while self.running:
+                # Push an event for state that requires game tick
+                self.peripheral_manager.game_tick.on_next(True)
+
                 self._handle_events()
                 self._preprocess_setup()
 
@@ -390,6 +395,14 @@ class GameLoop:
                 clock.tick(self.max_fps)
         finally:
             pygame.quit()
+
+    def set_screen(self, screen: pygame.Surface) -> None:
+        self.screen = screen
+        self.peripheral_manager.window.on_next(self.screen)
+
+    def set_clock(self, clock: pygame.time.Clock) -> None:
+        self.clock = clock
+        self.peripheral_manager.clock.on_next(self.clock)
 
 
     def _on_phone_text_message(self, _: "Input") -> None:
@@ -411,7 +424,7 @@ class GameLoop:
         if self._should_show_phone_text():
             return [self._ensure_phone_text_renderer()]
 
-        base_renderers = self.app_controller.get_renderers(peripheral_manager=self.peripheral_manager)
+        base_renderers = self.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         if self._should_add_flame_renderer(renderers):
             renderers.append(self._ensure_flame_renderer())
@@ -550,89 +563,89 @@ class GameLoop:
 
         # HACKKK
         # TODO: Move this entire thing into a renderer
-        bluetooth_switch = self.peripheral_manager.bluetooth_switch()
-        if bluetooth_switch is not None:
-            ###
-            # Button One
-            ###
-            if (switch_one := bluetooth_switch.switch_one()) is not None:
-                rotation_delta = switch_one.get_rotation_since_last_long_button_press()
-                if rotation_delta != 0:
-                    # 0.05 per detent, same feel as before
-                    factor = 1.0 + 0.05 * rotation_delta
-                    factor = max(
-                        0.0, min(5.0, factor)
-                    )  # allow full desat → heavy oversat
+        # bluetooth_switch = self.peripheral_manager.bluetooth_switch()
+        # if bluetooth_switch is not None:
+        #     ###
+        #     # Button One
+        #     ###
+        #     if (switch_one := bluetooth_switch.switch_one()) is not None:
+        #         rotation_delta = switch_one.get_rotation_since_last_long_button_press()
+        #         if rotation_delta != 0:
+        #             # 0.05 per detent, same feel as before
+        #             factor = 1.0 + 0.05 * rotation_delta
+        #             factor = max(
+        #                 0.0, min(5.0, factor)
+        #             )  # allow full desat → heavy oversat
 
-                    # ---------- saturation tweak (RGB → lerp with luminance) -------------
-                    img = image_array.astype(np.float32)
+        #             # ---------- saturation tweak (RGB → lerp with luminance) -------------
+        #             img = image_array.astype(np.float32)
 
-                    # perceptual luma used by Rec. 601
-                    lum = (
-                        0.299 * img[..., 0]
-                        + 0.587 * img[..., 1]
-                        + 0.114 * img[..., 2]
-                    )[..., None]  # shape (H, W, 1)
+        #             # perceptual luma used by Rec. 601
+        #             lum = (
+        #                 0.299 * img[..., 0]
+        #                 + 0.587 * img[..., 1]
+        #                 + 0.114 * img[..., 2]
+        #             )[..., None]  # shape (H, W, 1)
 
-                    # interpolate: lum + factor × (color – lum)
-                    img_sat = lum + factor * (img - lum)
+        #             # interpolate: lum + factor × (color – lum)
+        #             img_sat = lum + factor * (img - lum)
 
-                    image_array[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
+        #             image_array[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
 
-            ###
-            # Button Two
-            ###
-            if self.tmp_float is None:
-                self.tmp_float = np.empty_like(image_array, dtype=np.float32)
-            if (hue_switch := bluetooth_switch.switch_two()) is not None:
-                delta = hue_switch.get_rotation_since_last_long_button_press()
-                if delta:
-                    # 0.03 ~= ~11° per detent; tune to taste
-                    hue_delta = (delta * 0.03) % 1.0
-                    # Convert to HSV, roll H channel, convert back
-                    hsv = _convert_bgr_to_hsv(image_array).astype(np.float32)
-                    hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
-                    image_array[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
+        #     ###
+        #     # Button Two
+        #     ###
+        #     if self.tmp_float is None:
+        #         self.tmp_float = np.empty_like(image_array, dtype=np.float32)
+        #     if (hue_switch := bluetooth_switch.switch_two()) is not None:
+        #         delta = hue_switch.get_rotation_since_last_long_button_press()
+        #         if delta:
+        #             # 0.03 ~= ~11° per detent; tune to taste
+        #             hue_delta = (delta * 0.03) % 1.0
+        #             # Convert to HSV, roll H channel, convert back
+        #             hsv = _convert_bgr_to_hsv(image_array).astype(np.float32)
+        #             hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
+        #             image_array[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
 
-            ###
-            # Button Three
-            ###
-            if (edge_sw := bluetooth_switch.switch_three()) is not None:
-                d = edge_sw.get_rotation_since_last_long_button_press()
-                if d:  # ±10 % per detent
-                    self.edge_thresh = int(
-                        np.clip(self.edge_thresh * (1.0 + 0.10 * d), 1, 255)
-                    )
+        #     ###
+        #     # Button Three
+        #     ###
+        #     if (edge_sw := bluetooth_switch.switch_three()) is not None:
+        #         d = edge_sw.get_rotation_since_last_long_button_press()
+        #         if d:  # ±10 % per detent
+        #             self.edge_thresh = int(
+        #                 np.clip(self.edge_thresh * (1.0 + 0.10 * d), 1, 255)
+        #             )
 
-                    # --- fast edge magnitude (same math as before) -----------------------------
-                    lum = (
-                        0.299 * image_array[..., 0]  # perceptual luminance
-                        + 0.587 * image_array[..., 1]
-                        + 0.114 * image_array[..., 2]
-                    ).astype(np.int16)
+        #             # --- fast edge magnitude (same math as before) -----------------------------
+        #             lum = (
+        #                 0.299 * image_array[..., 0]  # perceptual luminance
+        #                 + 0.587 * image_array[..., 1]
+        #                 + 0.114 * image_array[..., 2]
+        #             ).astype(np.int16)
 
-                    gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))
-                    gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum, 1, 0))
-                    edge_mag = gx + gy  # 0‥510
+        #             gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))
+        #             gy = np.abs(np.roll(lum, -1, 0) - np.roll(lum, 1, 0))
+        #             edge_mag = gx + gy  # 0‥510
 
-                    # --- convert to a *soft* alpha mask ----------------------------------------
-                    #   • everything below threshold fades to 0
-                    #   • values above threshold ramp smoothly toward 1
-                    alpha = np.clip(
-                        (edge_mag.astype(np.float32) - self.edge_thresh)
-                        / (255 - self.edge_thresh),
-                        0.0,
-                        1.0,
-                    )
-                    alpha **= 0.5  # gamma-soften: 0.5 ≈ thicker, lighter lines
-                    alpha = alpha[..., None]  # shape => (H,W,1) for RGB broadcasting
+        #             # --- convert to a *soft* alpha mask ----------------------------------------
+        #             #   • everything below threshold fades to 0
+        #             #   • values above threshold ramp smoothly toward 1
+        #             alpha = np.clip(
+        #                 (edge_mag.astype(np.float32) - self.edge_thresh)
+        #                 / (255 - self.edge_thresh),
+        #                 0.0,
+        #                 1.0,
+        #             )
+        #             alpha **= 0.5  # gamma-soften: 0.5 ≈ thicker, lighter lines
+        #             alpha = alpha[..., None]  # shape => (H,W,1) for RGB broadcasting
 
-                    # --- composite: dim base layer, add white edges ----------------------------
-                    base = image_array.astype(np.float32) * 0.75  # 25 % darker background
-                    edges = alpha * 255.0  # white strokes
-                    out = np.clip(base + edges, 0, 255)
+        #             # --- composite: dim base layer, add white edges ----------------------------
+        #             base = image_array.astype(np.float32) * 0.75  # 25 % darker background
+        #             edges = alpha * 255.0  # white strokes
+        #             out = np.clip(base + edges, 0, 255)
 
-                    image_array[:] = out.astype(np.uint8)
+        #             image_array[:] = out.astype(np.uint8)
 
         # TODO: This operation will be slow.
         alpha = pygame.surfarray.pixels_alpha(screen)
@@ -791,8 +804,8 @@ class GameLoop:
 
     def _initialize_screen(self) -> None:
         pygame.init()
-        self.screen = pygame.Surface(self.device.full_display_size(), pygame.SHOWN)
-        self.clock = pygame.time.Clock()
+        self.set_screen(pygame.Surface(self.device.full_display_size(), pygame.SHOWN))
+        self.set_clock(pygame.time.Clock())
 
     def _initialize_peripherals(self) -> None:
         logger.info("Attempting to detect attached peripherals")

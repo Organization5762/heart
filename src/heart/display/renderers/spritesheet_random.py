@@ -129,7 +129,6 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
         source.subscribe(
             on_next = new_switch_state,
             on_error = lambda e: print("Error Occurred: {0}".format(e)),
-            on_completed = lambda: print("Done!"),
         )
         return SpritesheetLoopRandomState(phase=self._initial_phase, spritesheet = Loader.load_spirtesheet(self.file), switch_state=None)
 

@@ -16,7 +16,6 @@ underlying grid, while an erase event clears a circular region.
 from __future__ import annotations
 
 import threading
-import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Self
@@ -80,25 +79,6 @@ class DrawingPad(Peripheral):
         self._polling_interval = polling_interval
         self._stop = threading.Event()
         super().__init__()
-
-    # ------------------------------------------------------------------
-    # Peripheral API
-    # ------------------------------------------------------------------
-    def run(self) -> None:  # noqa: D401 – keeping signature of base class
-        """Idle loop to match the :class:`Peripheral` contract.
-
-        The loop simply waits until :meth:`stop` is invoked.  This keeps the
-        interface compatible with other peripherals without burning CPU cycles
-        when no new input arrives.
-        """
-
-        while not self._stop.is_set():
-            time.sleep(self._polling_interval)
-
-    def stop(self) -> None:
-        """Signal the background loop started by :meth:`run` to exit."""
-
-        self._stop.set()
 
     # ------------------------------------------------------------------
     # Drawing helpers
@@ -175,7 +155,6 @@ class DrawingPad(Peripheral):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         """Expose a single virtual drawing pad instance."""
-
         yield cls()
 
     # ------------------------------------------------------------------

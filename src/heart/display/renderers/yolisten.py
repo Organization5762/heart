@@ -319,7 +319,6 @@ class YoListenRenderer(AtomicBaseRenderer[YoListenState]):
         source.subscribe(
             on_next = new_switch_state,
             on_error = lambda e: print("Error Occurred: {0}".format(e)),
-            on_completed = lambda: print("Done!"),
         )
         return YoListenState(color=self.base_color, switch_state=None)
 

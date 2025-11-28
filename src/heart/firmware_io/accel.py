@@ -21,7 +21,6 @@ def _form_payload(name: str, data) -> str:
     """
     payload = {
         "event_type": name,
-        "producer_id": 0,
         "data": {
             "value": data,
         },

@@ -7,7 +7,6 @@ import threading
 from collections import deque
 from collections.abc import Iterator
 from datetime import timedelta
-from functools import cached_property
 from typing import Deque, Mapping, Self
 
 import reactivex
@@ -20,7 +19,7 @@ logger = get_logger(__name__)
 
 Vector3 = tuple[float, float, float]
 
-class Compass(Peripheral):
+class Compass(Peripheral[Vector3 | None]):
     """Maintain a smoothed magnetic heading derived from sensor bus events."""
 
     def __init__(
@@ -70,8 +69,7 @@ class Compass(Peripheral):
             self._latest = vector
             self._history.append(vector)
 
-    @cached_property
-    def observe(
+    def _event_stream(
         self
     ) -> reactivex.Observable[Vector3 | None]:
         return reactivex.interval(timedelta(milliseconds=10)).pipe(

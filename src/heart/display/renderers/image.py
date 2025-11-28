@@ -21,8 +21,6 @@ class RenderImage(AtomicBaseRenderer[RenderImageState]):
     def __init__(
         self,
         image_file: str,
-        *,
-        producer_id: int | None = None,
     ) -> None:
         self._image_file = image_file
         AtomicBaseRenderer.__init__(self)

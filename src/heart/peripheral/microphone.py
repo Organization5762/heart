@@ -35,14 +35,12 @@ class Microphone(Peripheral):
         samplerate: int = 16_000,
         block_duration: float = 0.1,
         channels: int = 1,
-        producer_id: int | None = None,
         retry_delay: float = 1.0,
     ) -> None:
         super().__init__()
         self.samplerate = samplerate
         self.block_duration = block_duration
         self.channels = channels
-        self._producer_id = producer_id if producer_id is not None else id(self)
         self._retry_delay = retry_delay
 
         self._latest_level: dict[str, Any] | None = None
@@ -53,6 +51,7 @@ class Microphone(Peripheral):
     # ------------------------------------------------------------------
     @classmethod
     def detect(cls) -> Iterator[Self]:
+        return
         """Yield a microphone peripheral if audio backends are available."""
 
         if sd is None:
@@ -157,7 +156,7 @@ class Microphone(Peripheral):
             samplerate=self.samplerate,
             timestamp=timestamp,
         )
-        payload = level.to_input(producer_id=self._producer_id)
+        payload = level.to_input()
         self._latest_level = cast(dict[str, Any], payload.data)
 
         raise NotImplementedError("")

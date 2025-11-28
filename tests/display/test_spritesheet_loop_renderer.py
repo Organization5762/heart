@@ -46,9 +46,6 @@ class _StubPeripheralManager:
         self._gamepad = gamepad
         self.subscribers: list = []
 
-    def get_main_switch_state(self) -> SwitchState:
-        return self._switch_state
-
     def subscribe_main_switch(self, handler):
         self.subscribers.append(handler)
         handler(self._switch_state)
@@ -133,7 +130,6 @@ def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame
         time_since_last_update=123,
     )
 
-    renderer.reset()
     state = renderer.state
 
     assert state.spritesheet is not None

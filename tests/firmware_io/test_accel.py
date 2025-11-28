@@ -135,7 +135,6 @@ class TestFirmwareIoAccel:
         parsed = json.loads(result.strip())
         assert parsed == {
             "event_type": constants.ACCELERATION,
-            "producer_id": 0,
             "data": {
                 "value": {
                     "x": payload[0][0],

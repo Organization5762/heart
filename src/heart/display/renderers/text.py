@@ -61,7 +61,6 @@ class TextRendering(AtomicBaseRenderer[TextRenderingState]):
         source.subscribe(
             on_next = new_switch_state,
             on_error = lambda e: print("Error Occurred: {0}".format(e)),
-            on_completed = lambda: print("Done!"),
         )
 
         return TextRenderingState(
