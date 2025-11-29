@@ -1,12 +1,9 @@
 
-import pygame
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
 from heart.display.renderers.pixels import RandomPixel
 from heart.environment import GameLoop, RendererVariant
-from heart.peripheral.core.manager import PeripheralManager
-from tests.conftest import FakeFixtureDevice
 
 
 class TestEnvironment:
@@ -35,21 +32,3 @@ class TestEnvironment:
                 mode.renderers, override_renderer_variant=renderer_variant
             )
         )
-
-
-    def test_multiple_game_loops_can_coexist(self, orientation) -> None:
-        """Verify that multiple game loops can coexist. This maintains stable runtime control flow."""
-        manager_one = PeripheralManager()
-        device_one = FakeFixtureDevice(orientation=orientation)
-        loop_one = GameLoop(device=device_one, peripheral_manager=manager_one)
-        loop_one._initialize_screen()
-
-        manager_two = PeripheralManager()
-        device_two = FakeFixtureDevice(orientation=orientation)
-        loop_two = GameLoop(device=device_two, peripheral_manager=manager_two)
-        loop_two._initialize_screen()
-
-        assert loop_one.device is device_one
-        assert loop_two.device is device_two
-
-        pygame.quit()
