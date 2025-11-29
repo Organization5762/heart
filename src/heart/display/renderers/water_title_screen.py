@@ -41,7 +41,13 @@ class WaterTitleScreen(AtomicBaseRenderer[WaterTitleScreenState]):
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _create_initial_state(self) -> WaterTitleScreenState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return WaterTitleScreenState(wave_offset=0.0, last_frame_time=time.time())
 
     def _generate_wave_height(self, x: int, wave_offset: float) -> float:
@@ -51,11 +57,10 @@ class WaterTitleScreen(AtomicBaseRenderer[WaterTitleScreenState]):
         wave = math.sin(wave_pos * 2 * math.pi / self.wave_length) * self.wave_height
         return self.water_level + wave
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # Update animation

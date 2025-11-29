@@ -196,45 +196,37 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
         )
 
         AtomicBaseRenderer.__init__(self)
-        if not self.disable_input:
-            self.enable_switch_state_cache()
 
-    def _create_initial_state(self) -> SpritesheetLoopState:
-        return SpritesheetLoopState(phase=self._initial_phase)
-
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        self.configure_peripherals(peripheral_manager)
-        spritesheet = Loader.load_spirtesheet(self.file)
-        self.update_state(spritesheet=spritesheet)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        orientation: Orientation
+    ):
+        return SpritesheetLoopState(
+            phase=self._initial_phase,
+            spritesheet=Loader.load_spirtesheet(self.file),
+            gamepad=self.configure_gamepad(peripheral_manager)
+        )
 
-    def configure_peripherals(self, peripheral_manager: PeripheralManager) -> None:
+    def configure_gamepad(self, peripheral_manager: PeripheralManager) -> None:
         if self.disable_input:
             return
-        self.ensure_input_bindings(peripheral_manager)
         try:
             gamepad = peripheral_manager.get_gamepad()
         except ValueError:
             gamepad = None
-        self.set_gamepad(gamepad)
-
-    def set_gamepad(self, gamepad: Gamepad | None) -> None:
-        self.update_state(gamepad=gamepad)
+        return gamepad
 
     def reset(self) -> None:
-        preserved_state = self.state
-        new_state = replace(
-            self._create_initial_state(),
-            spritesheet=preserved_state.spritesheet,
-            gamepad=preserved_state.gamepad,
+        self.update_state(
+            phase=self._initial_phase,
+            current_frame=0,
+            loop_count=0,
+            duration_scale=0.0,
+            time_since_last_update=None
         )
-        self.set_state(new_state)
 
     def on_switch_state(self, state: SwitchState) -> None:
         if self.disable_input:
@@ -244,11 +236,12 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
             duration_scale = current.duration_scale
             last_rotation = current.last_switch_rotation
             current_rotation = state.rotation_since_last_button_press
-            if last_rotation is not None:
-                if current_rotation > last_rotation:
-                    duration_scale += 0.05
-                elif current_rotation < last_rotation:
-                    duration_scale -= 0.05
+
+            last_rotation = last_rotation or 0
+            if current_rotation > last_rotation:
+                duration_scale += 0.05
+            elif current_rotation < last_rotation:
+                duration_scale -= 0.05
             return replace(
                 current,
                 duration_scale=duration_scale,
@@ -277,11 +270,10 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
 
         self.mutate_state(_mutate)
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -292,6 +284,7 @@ class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
         screen_width, screen_height = window.get_size()
         current_kf = self.frames[state.phase][state.current_frame]
 
+        # TODO: Get from event bus
         if not self.disable_input:
             self._apply_gamepad_input()
             state = self.state

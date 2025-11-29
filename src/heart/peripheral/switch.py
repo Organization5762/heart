@@ -1,18 +1,21 @@
 import json
-import threading
 import time
-from dataclasses import dataclass, replace
-from typing import Any, Callable, Iterator, Mapping, NoReturn, Self
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any, Iterator, Mapping, NoReturn, Self
 
+import pygame
+import reactivex
 import serial
 from bleak.backends.device import BLEDevice
+from reactivex import create
+from reactivex import operators as ops
+from reactivex.scheduler import NewThreadScheduler
 
-from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
-                                         SWITCH_ROTATION)
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import Input, Peripheral
-from heart.peripheral.core.event_bus import EventBus
-from heart.utilities.env import get_device_ports
+from heart.peripheral.core import Peripheral
+from heart.peripheral.keyboard import KeyboardKey
+from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,15 +31,9 @@ class SwitchState:
     rotation_since_last_button_press: int
     rotation_since_last_long_button_press: int
 
-
 class BaseSwitch(Peripheral):
-    EVENT_LIFECYCLE = "switch.lifecycle"
-
     def __init__(
         self,
-        *,
-        event_bus: EventBus | None = None,
-        producer_id: int | None = None,
     ) -> None:
         super().__init__()
         self.rotational_value = 0
@@ -47,170 +44,25 @@ class BaseSwitch(Peripheral):
         self.button_long_press_value = 0
         self.rotation_value_at_last_long_button_press = self.rotational_value
 
-        self._default_producer_id = producer_id if producer_id is not None else 0
-        self._has_explicit_producer = producer_id is not None
-        self._last_lifecycle_status: str | None = None
-        self._state_callbacks: list[Callable[[SwitchState], None]] = []
-        self._state_lock = threading.RLock()
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
-
     def run(self) -> None:
         return
 
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        self._mark_connected()
-
-    def get_rotation_since_last_button_press(self) -> int:
-        return self.rotational_value - self.rotation_value_at_last_button_press
-
-    def get_rotation_since_last_long_button_press(self) -> int:
-        return self.rotational_value - self.rotation_value_at_last_long_button_press
-
-    def get_rotational_value(self) -> int:
-        return self.rotational_value
-
-    def get_button_value(self) -> int:
-        return self.button_value
-
-    def get_long_button_value(self) -> int:
-        return self.button_long_press_value
-
-    def get_state(self) -> SwitchState:
-        """Return the latest switch state snapshot."""
-
-        with self._state_lock:
-            return self._snapshot()
-
-    def subscribe_state(
-        self, callback: Callable[[SwitchState], None], *, replay: bool = True
-    ) -> Callable[[], None]:
-        """Register ``callback`` for state updates.
-
-        Parameters
-        ----------
-        callback:
-            Callable invoked whenever the switch state changes.
-        replay:
-            Emit the current state to the callback immediately after
-            subscription.  Defaults to ``True``.
-
-        Returns
-        -------
-        Callable[[], None]
-            Function that removes ``callback`` from future notifications.
-        """
-
-        with self._state_lock:
-            self._state_callbacks.append(callback)
-            snapshot = self._snapshot()
-
-        if replay:
-            callback(snapshot)
-
-        def _unsubscribe() -> None:
-            with self._state_lock:
-                try:
-                    self._state_callbacks.remove(callback)
-                except ValueError:
-                    return
-
-        return _unsubscribe
-
-    def handle_input(self, data: Input) -> None:
-        event = self._normalize_event(data)
-        if event is None:
-            return
-
-        if event.event_type == BUTTON_PRESS:
-            self.button_value += int(event.data)
-            # Button was pressed, update last_rotational_value
-            self.rotation_value_at_last_button_press = self.rotational_value
-
-        if event.event_type == BUTTON_LONG_PRESS:
-            self.button_long_press_value += int(event.data)
-            # Button was pressed, update last_rotational_value
-            self.rotation_value_at_last_long_button_press = self.rotational_value
-
-        if event.event_type == SWITCH_ROTATION:
-            self.rotational_value = int(event.data)
-
-        self._publish_event(event)
-        self._notify_state_changed()
-
-    # ------------------------------------------------------------------
-    # Event bus helpers
-    # ------------------------------------------------------------------
-    def _normalize_event(self, data: Input) -> Input | None:
-        if data.event_type not in {BUTTON_PRESS, BUTTON_LONG_PRESS, SWITCH_ROTATION}:
-            logger.debug("Ignoring unknown switch event type: %s", data.event_type)
-            return None
-
-        if data.event_type == SWITCH_ROTATION:
-            value = int(data.data)
-        else:
-            value = int(data.data)
-
-        producer_id = self._resolve_producer_id(data)
-        return replace(data, data=value, producer_id=producer_id)
-
-    def _resolve_producer_id(self, data: Input) -> int:
-        if self._has_explicit_producer:
-            return self._default_producer_id
-        self._default_producer_id = data.producer_id
-        return data.producer_id
-
-    def _publish_event(self, event: Input) -> None:
-        self.emit_input(event)
-
+    def _event_stream(
+        self
+    ) -> reactivex.Observable[SwitchState]:
+        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            ops.map(lambda _: self._snapshot()),
+            ops.distinct_until_changed(lambda x: x)
+        )
+        
     def _snapshot(self) -> SwitchState:
         return SwitchState(
             rotational_value=self.rotational_value,
             button_value=self.button_value,
+            rotation_since_last_button_press=self.rotation_value_at_last_button_press,
             long_button_value=self.button_long_press_value,
-            rotation_since_last_button_press=self.get_rotation_since_last_button_press(),
-            rotation_since_last_long_button_press=self.get_rotation_since_last_long_button_press(),
+            rotation_since_last_long_button_press=self.rotational_value - self.rotation_value_at_last_long_button_press,
         )
-
-    def _notify_state_changed(self) -> None:
-        with self._state_lock:
-            callbacks = tuple(self._state_callbacks)
-            snapshot = self._snapshot()
-
-        for callback in callbacks:
-            try:
-                callback(snapshot)
-            except Exception:
-                logger.exception("Switch state callback failed", exc_info=True)
-
-    def _emit_lifecycle(self, status: str, *, extra: Mapping[str, Any] | None = None) -> None:
-        if self._last_lifecycle_status == status:
-            return
-
-        payload: dict[str, Any] = {"status": status}
-        if extra:
-            payload.update(extra)
-
-        event = Input(
-            event_type=self.EVENT_LIFECYCLE,
-            data=payload,
-            producer_id=self._default_producer_id,
-        )
-        self.emit_input(event)
-        self._last_lifecycle_status = status
-
-    def _mark_connected(self) -> None:
-        if self._last_lifecycle_status is None:
-            self._emit_lifecycle("connected")
-        elif self._last_lifecycle_status == "suspected_disconnect":
-            self._emit_lifecycle("recovered")
-
-    def _mark_disconnect(self, *, suspected: bool) -> None:
-        status = "suspected_disconnect" if suspected else "disconnected"
-        self._emit_lifecycle(status)
-
 
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args, **kwargs) -> None:
@@ -221,8 +73,49 @@ class FakeSwitch(BaseSwitch):
         yield cls()
 
     def run(self) -> None:
-        return
+        if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
+            def handle_key_up(x):
+                self.button_long_press_value += 1
+                self.rotation_value_at_last_long_button_press = self.rotational_value
+            
+            def handle_key_down(x):
+                self.button_value += 1
+                self.rotation_value_at_last_button_press = self.rotational_value
 
+            def handle_key_left(x):
+                self.rotational_value -= 1
+
+            def handle_key_right(x):
+                self.rotational_value += 1
+
+            def is_first_press(x):
+                return x.data.first_press()
+
+            KeyboardKey.get(pygame.K_UP).observe.pipe(
+                ops.filter(is_first_press)
+            ).subscribe(on_next=handle_key_up)
+            KeyboardKey.get(pygame.K_DOWN).observe.pipe(
+                ops.filter(is_first_press)
+            ).subscribe(on_next=handle_key_down)
+            KeyboardKey.get(pygame.K_LEFT).observe.pipe(
+                ops.filter(is_first_press)
+            ).subscribe(on_next=handle_key_left)
+            KeyboardKey.get(pygame.K_RIGHT).observe.pipe(
+                ops.filter(is_first_press)
+            ).subscribe(on_next=handle_key_right)
+        else:
+            logger.warning("Not running FakeSwitch")
+
+    def _event_stream(
+        self
+    ) -> reactivex.Observable[SwitchState]:
+        if Configuration.is_pi() and not Configuration.is_x11_forward():
+            return reactivex.empty()
+        else:
+            return reactivex.interval(timedelta(milliseconds=10)).pipe(
+                ops.map(lambda _: self._snapshot()),
+                ops.distinct_until_changed(lambda x: x)
+            )
 
 class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
@@ -238,47 +131,45 @@ class Switch(BaseSwitch):
     def _connect_to_ser(self):
         return serial.Serial(self.port, self.baudrate)
 
-    def run(self) -> NoReturn:
-        # If it crashes, try to re-connect
+    def _read_from_switch(self, observer, scheduler):
         while True:
             try:
                 ser = self._connect_to_ser()
-                self._mark_connected()
                 try:
                     while True:
                         if ser.in_waiting > 0:
                             bus_data = ser.readline().decode("utf-8").rstrip()
                             data = json.loads(bus_data)
-                            self.update_due_to_data(data)
+                            observer.on_next(data)
                 except KeyboardInterrupt:
-                    self._mark_disconnect(suspected=False)
-                    print("Program terminated")
+                    pass
                 except Exception:
-                    self._mark_disconnect(suspected=True)
                     pass
                 finally:
                     ser.close()
             except Exception:
-                self._mark_disconnect(suspected=True)
+                pass
 
             time.sleep(0.1)
 
+    def run(self) -> None:
+        source = create(self._read_from_switch)
+        source.subscribe(
+            on_next=self.update_due_to_data,
+            scheduler=NewThreadScheduler()
+        )
 
 class BluetoothSwitch(BaseSwitch):
     def __init__(self, device: BLEDevice, *args, **kwargs) -> None:
         self.listener = UartListener(device=device)
         self.switches = [
-            BaseSwitch(producer_id=index) for index in range(4)
+            BaseSwitch() for index in range(4)
         ]
         self.connected = False
         super().__init__(*args, **kwargs)
 
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        for switch in self.switches:
-            switch.attach_event_bus(event_bus)
-
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
+        raise NotImplementedError("Haven't figured out how to handle this multi-input case well.  Likely just map it to the observable(s)?")
         producer_raw = data.get("producer_id", 0)
         try:
             producer_id = int(producer_raw)
@@ -346,18 +237,15 @@ class BluetoothSwitch(BaseSwitch):
                 number_of_retries_without_success = 0
                 slow_poll = False
                 self.connected = True
-                self._mark_connected()
                 try:
                     while True:
                         for event in self.listener.consume_events():
                             self.update_due_to_data(event)
                         time.sleep(0.1)
                 except KeyboardInterrupt:
-                    self._mark_disconnect(suspected=False)
                     print("Program terminated")
                 except Exception:
                     self.connected = False
-                    self._mark_disconnect(suspected=True)
                     pass
                 finally:
                     self.connected = False
@@ -365,7 +253,6 @@ class BluetoothSwitch(BaseSwitch):
             except Exception:
                 self.connected = False
                 number_of_retries_without_success += 1
-                self._mark_disconnect(suspected=True)
                 if number_of_retries_without_success > 5:
                     slow_poll = True
 

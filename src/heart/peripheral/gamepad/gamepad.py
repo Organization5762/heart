@@ -1,15 +1,18 @@
-import math
 import subprocess
 import time
 from collections import defaultdict
+from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
-from typing import Iterator, NoReturn, Self, cast
+from typing import Iterator, Self
 
 import pygame.joystick
+import reactivex
 from pygame.event import Event
+from reactivex import operators as ops
+from reactivex.scheduler import NewThreadScheduler
 
-from heart.peripheral.core import Input, Peripheral, events
-from heart.peripheral.core.event_bus import EventBus
+from heart.peripheral.core import Peripheral, events
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -22,6 +25,9 @@ class GamepadIdentifier(Enum):
     BIT_DO_LITE_2 = "8BitDo Lite 2"
     SWITCH_PRO = "Nintendo Switch Pro Controller"
 
+@dataclass
+class GamepadState:
+    pass
 
 class Gamepad(Peripheral):
     EVENT_BUTTON = "gamepad.button"
@@ -48,8 +54,8 @@ class Gamepad(Peripheral):
             lambda: False
         )
         self._axis_curr_frame: defaultdict[str, float] = defaultdict(float)
-        self._dpad_last_frame: tuple[int, int] = (0, 0)
-        self._dpad_curr_frame: tuple[int, int] = (0, 0)
+        self._dpad_last_frame: tuple[float, float] = (0.0, 0.0)
+        self._dpad_curr_frame: tuple[float, float] = (0.0, 0.0)
 
         self._last_lifecycle_status: str | None = None
 
@@ -82,7 +88,7 @@ class Gamepad(Peripheral):
         self._axis_tapped_prev_frame[self.axis_key(axis_id)] = tapped
         return tapped and not tapped_last_frame
 
-    def get_dpad_value(self) -> tuple[int, int]:
+    def get_dpad_value(self) -> tuple[float, float]:
         return self._dpad_curr_frame
 
     def reset(self):
@@ -97,12 +103,6 @@ class Gamepad(Peripheral):
         self._pressed_curr_frame.clear()
         self._axis_prev_frame.clear()
         self._axis_curr_frame.clear()
-        self._mark_disconnect(suspected=False)
-
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-        if self.is_connected():
-            self._mark_connected()
 
     @property
     def num_buttons(self) -> int:
@@ -138,7 +138,7 @@ class Gamepad(Peripheral):
             print(f"Error updating gamepad state: {e}")
 
     def _update(self) -> None:
-        if self.joystick is None:
+        if not self.joystick:
             return
 
         # Refresh Pygame's internal event queue so that joystick state is up-to-date
@@ -154,8 +154,7 @@ class Gamepad(Peripheral):
         self._axis_prev_frame = self._axis_curr_frame.copy()
         self._dpad_last_frame = self._dpad_curr_frame
 
-        self._dpad_curr_frame = cast(tuple[int, int], self.joystick.get_hat(0))
-        self._emit_dpad_if_changed()
+        self._dpad_curr_frame = self.joystick.get_hat(0)
         for button_id in range(self.num_buttons):
             pressed = bool(self.joystick.get_button(button_id))
             self._pressed_curr_frame[button_id] = pressed
@@ -167,9 +166,6 @@ class Gamepad(Peripheral):
                 t0 = self._press_time.pop(button_id, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[button_id] = True
-
-            if pressed != self._pressed_prev_frame[button_id]:
-                self._emit_button_event(button_id, pressed)
 
         for axis_id in range(self.num_axes):
             axis_value = self.joystick.get_axis(axis_id)
@@ -184,14 +180,6 @@ class Gamepad(Peripheral):
                 t0 = self._press_time.pop(axis_key, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
-
-            if not math.isclose(
-                self._axis_curr_frame[axis_key],
-                self._axis_prev_frame[axis_key],
-                rel_tol=1e-6,
-                abs_tol=1e-6,
-            ):
-                self._emit_axis_event(axis_id, self._axis_curr_frame[axis_key])
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -210,104 +198,60 @@ class Gamepad(Peripheral):
     def gamepad_detected() -> bool:
         return pygame.joystick.get_count() > 0
 
-    def run(self) -> NoReturn:
+    def _read_from_gamepad(self, interval):
+        try:
+            while Gamepad.gamepad_detected() and not self.is_connected():
+                try:
+                    self.joystick = pygame.joystick.Joystick(0)
+                    self.joystick.init()
+                    logger.info(f"{self.joystick.get_name()} ready")
+                except pygame.error as e:
+                    logger.warning(f"Error connecting joystick: {e}")
+                    # trying to touch joystick module from a thread becomes weird af
+                    pygame.event.post(Event(events.REQUEST_JOYSTICK_MODULE_RESET))
+                except Exception:
+                    pass
+
+            if not Gamepad.gamepad_detected() and self.is_connected():
+                cached_name = self.joystick.get_name() if self.joystick else None
+                self.reset()
+                if cached_name is not None:
+                    logger.info(f"{cached_name} disconnected")
+
+            # Todo: We're reaching unfathomable levels of hard-coding.
+            #  This will only work specifically with our pi4, and our 8bitdo
+            #  controller. We only know the mac address bc we've explicitly
+            #  paired the 8bitdo controller with the raspberry pi.
+            #  God help us if it ever unpairs.
+            if Configuration.is_pi():
+                if not Gamepad.gamepad_detected():
+                    result = subprocess.run(
+                        ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if result.returncode == 0:
+                        print("Successfully connected to 8bitdo controller")
+                    else:
+                        print("Failed to connect to 8bitdo controller")
+
+        except KeyboardInterrupt:
+            print("Program terminated")
+        except Exception:
+            pass
+
+    def run(self) -> None:
         # Give pygame and USB subsystems time to fully initialize
+        # TODO: Is this needed?
         time.sleep(1.5)
-        while True:
-            try:
-                while Gamepad.gamepad_detected() and not self.is_connected():
-                    try:
-                        self.joystick = pygame.joystick.Joystick(0)
-                        self.joystick.init()
-                        self._mark_connected()
-                        print(f"{self.joystick.get_name()} ready")
-                    except pygame.error as e:
-                        print(f"Error connecting joystick: {e}")
-                        # trying to touch joystick module from a thread becomes weird af
-                        pygame.event.post(Event(events.REQUEST_JOYSTICK_MODULE_RESET))
-                    except KeyboardInterrupt:
-                        print("Program terminated")
-                    except Exception:
-                        pass
 
-                if not Gamepad.gamepad_detected() and self.is_connected():
-                    cached_name = self.joystick.get_name() if self.joystick else None
-                    self._mark_disconnect(suspected=True)
-                    self.reset()
-                    if cached_name is not None:
-                        print(f"{cached_name} disconnected")
-
-                # Todo: We're reaching unfathomable levels of hard-coding.
-                #  This will only work specifically with our pi4, and our 8bitdo
-                #  controller. We only know the mac address bc we've explicitly
-                #  paired the 8bitdo controller with the raspberry pi.
-                #  God help us if it ever unpairs.
-                if Configuration.is_pi():
-                    if not Gamepad.gamepad_detected():
-                        result = subprocess.run(
-                            ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
-                            capture_output=True,
-                            text=True,
-                        )
-                        if result.returncode == 0:
-                            print("Successfully connected to 8bitdo controller")
-                        else:
-                            print("Failed to connect to 8bitdo controller")
-
-            except KeyboardInterrupt:
-                print("Program terminated")
-            except Exception:
-                pass
-
-            # check every 1 second for controller state
-            time.sleep(1)
-
-    # ------------------------------------------------------------------
-    # Event bus helpers
-    # ------------------------------------------------------------------
-    def _emit_button_event(self, button_id: int, pressed: bool) -> None:
-        event = Input(
-            event_type=self.EVENT_BUTTON,
-            data={"button": button_id, "pressed": pressed},
-            producer_id=self.joystick_id,
+        # check every 1 second for controller state, so that we can attempt to connect
+        reactivex.interval(timedelta(seconds=1)).subscribe(
+            on_next=self._read_from_gamepad,
+            scheduler=NewThreadScheduler()
         )
-        self.emit_input(event)
 
-    def _emit_axis_event(self, axis_id: int, value: float) -> None:
-        event = Input(
-            event_type=self.EVENT_AXIS,
-            data={"axis": axis_id, "value": float(value)},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
-
-    def _emit_dpad_if_changed(self) -> None:
-        if self._dpad_curr_frame == self._dpad_last_frame:
-            return
-        event = Input(
-            event_type=self.EVENT_DPAD,
-            data={"x": self._dpad_curr_frame[0], "y": self._dpad_curr_frame[1]},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
-
-    def _emit_lifecycle(self, status: str) -> None:
-        if self._last_lifecycle_status == status:
-            return
-        event = Input(
-            event_type=self.EVENT_LIFECYCLE,
-            data={"status": status},
-            producer_id=self.joystick_id,
-        )
-        self.emit_input(event)
-        self._last_lifecycle_status = status
-
-    def _mark_connected(self) -> None:
-        if self._last_lifecycle_status is None:
-            self._emit_lifecycle("connected")
-        elif self._last_lifecycle_status == "suspected_disconnect":
-            self._emit_lifecycle("recovered")
-
-    def _mark_disconnect(self, *, suspected: bool) -> None:
-        status = "suspected_disconnect" if suspected else "disconnected"
-        self._emit_lifecycle(status)
+        # Query the controller state frequently
+        reactivex.interval(timedelta(milliseconds=20)).pipe(
+            ops.observe_on(NewThreadScheduler()),
+        ).subscribe(on_next=lambda x: self._update())

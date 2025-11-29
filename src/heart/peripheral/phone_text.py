@@ -10,9 +10,7 @@ from collections.abc import Iterator
 from types import ModuleType
 from typing import Self
 
-from heart.events.types import PhoneTextMessage
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
 
 # Target iPhone information
 TARGET_DEVICE_NAME = "SEBASTIEN's iPhone"
@@ -40,16 +38,13 @@ _CHARACTERISTIC_UUID = "5679"
 class PhoneText(Peripheral):
     """Peripheral that stores the most recent text or image sent to it over BLE."""
 
-    def __init__(self, *, event_bus: EventBus | None = None, producer_id: int | None = None) -> None:
+    def __init__(self) -> None:
         """Create a new *PhoneText* peripheral."""
         super().__init__()
         self._last_text: str | None = None  # full text as received
         self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
-        self._producer_id = producer_id if producer_id is not None else id(self)
-
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
+        self._producer_id = id(self)
 
     # ---------------------------------------------------------------------
     # Peripheral API
@@ -109,9 +104,6 @@ class PhoneText(Peripheral):
         self.new_text = False
         return text
 
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        super().attach_event_bus(event_bus)
-
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -133,7 +125,6 @@ class PhoneText(Peripheral):
                 self._last_text = text
                 self.new_text = True
                 print(f"Processed text: '{text}'")
-                self._emit_text_event(text)
             except UnicodeDecodeError as e:
                 print(f"Error decoding text: {e}")
                 print(f"Raw bytes: {text_bytes}")
@@ -141,16 +132,6 @@ class PhoneText(Peripheral):
             # Clear the buffer for the next message
             self._buffer.clear()
 
-    def _emit_text_event(self, text: str) -> None:
-        event_bus = self.event_bus
-        if event_bus is None:
-            return
-        message = PhoneTextMessage(text=text).to_input(producer_id=self._producer_id)
-        try:
-            event_bus.emit(message)
-        except Exception:
-            # Keep BLE path resilient; log but do not propagate to bluezero
-            print("Failed to emit phone text message event")
 
     @classmethod
     def detect(cls) -> Iterator[Self]:

@@ -1,5 +1,5 @@
 import time
-from collections.abc import Callable
+from typing import Callable
 
 from digitalio import Pull
 

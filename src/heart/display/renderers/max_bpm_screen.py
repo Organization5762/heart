@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import pygame
 from pygame import Surface, font, time
 
 from heart import DeviceDisplayMode
@@ -75,11 +76,10 @@ class AvatarBpmRenderer(AtomicBaseRenderer[AvatarBpmRendererState]):
         )
         window.blit(text, text_rect)
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # --- BPM Calculation ---
@@ -143,5 +143,11 @@ class AvatarBpmRenderer(AtomicBaseRenderer[AvatarBpmRendererState]):
 
         return highest_bpm[0], highest_bpm[1], avatar_name
 
-    def _create_initial_state(self) -> AvatarBpmRendererState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
         return AvatarBpmRendererState()

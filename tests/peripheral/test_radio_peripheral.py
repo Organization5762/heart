@@ -5,7 +5,6 @@ from typing import Iterator
 import pytest
 
 from heart.events.types import RadioPacket
-from heart.peripheral.core.event_bus import EventBus
 from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver)
 
@@ -36,53 +35,15 @@ class TestPeripheralRadioPeripheral:
             metadata={"manufacturer": "FlowToys"},
         )
 
-        rendered = packet.to_input(producer_id=7)
+        rendered = packet.to_input()
 
         assert rendered.event_type == RadioPacket.EVENT_TYPE
-        assert rendered.producer_id == 7
         assert rendered.data["frequency_hz"] == 2_439_000_000.0
         assert rendered.data["channel"] == 39.0
         assert rendered.data["modulation"] == "GFSK"
         assert rendered.data["rssi_dbm"] == pytest.approx(-42.5)
         assert rendered.data["payload"] == [1, 2, 255]
         assert rendered.data["metadata"] == {"manufacturer": "FlowToys"}
-
-
-
-    def test_process_packet_emits_event(self) -> None:
-        """Verify that process packet emits event. This ensures event orchestration remains reliable."""
-        bus = EventBus()
-        captured: list[dict] = []
-
-        def _capture(event):
-            captured.append(event.data)
-
-        bus.subscribe(RadioPeripheral.EVENT_TYPE, _capture)
-
-        driver = DummyDriver()
-        peripheral = RadioPeripheral(driver=driver, event_bus=bus, producer_id=11)
-
-        sample = RawRadioPacket(
-            payload=b"\xAA\xBB",
-            frequency_hz=2_439_000_000,
-            channel=39,
-            modulation="GFSK",
-            rssi_dbm=-50.0,
-            metadata={"hop": 0},
-        )
-
-        peripheral.process_packet(sample)
-
-        assert peripheral.latest_packet is sample
-        assert captured
-        emitted = captured[-1]
-        assert emitted["payload"] == [170, 187]
-        assert emitted["frequency_hz"] == 2_439_000_000.0
-        assert emitted["channel"] == 39.0
-        assert emitted["modulation"] == "GFSK"
-        assert emitted["rssi_dbm"] == pytest.approx(-50.0)
-        assert emitted["metadata"] == {"hop": 0}
-
 
 
     def test_detect_wraps_serial_driver(self, monkeypatch: pytest.MonkeyPatch) -> None:

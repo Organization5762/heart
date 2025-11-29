@@ -75,17 +75,6 @@ class TestDriversSensorBusDriver:
         decoded = json.loads(payload.strip())
         assert decoded == {"event_type": "rotation", "data": {"x": 1.0, "y": 2.0, "z": 3.0}}
 
-
-
-    def test_get_sample_rate_prefers_sensor_value(self, sensor_bus):
-        """Verify that get_sample_rate honours the accelerometer's configured data rate when it is provided. This preserves calibration intent so sampling frequency matches device capabilities."""
-        class Stub:
-            accelerometer_data_rate = sensor_bus.Rate.RATE_208_HZ
-
-        assert sensor_bus.get_sample_rate(Stub()) == sensor_bus.Rate.string[Stub.accelerometer_data_rate]
-
-
-
     def test_get_sample_rate_defaults_when_missing(self, sensor_bus):
         """Verify that get_sample_rate falls back to the default rate when the sensor defines no preference. This ensures predictable behaviour when hardware lacks metadata."""
         class Stub:

@@ -90,11 +90,10 @@ class LSystem(AtomicBaseRenderer[LSystemState]):
             elif char == "]":
                 position, current_angle = stack.pop()
 
-    def process(
+    def real_process(
         self,
         window: Surface,
         clock: Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         elapsed_ms = float(clock.get_time())
@@ -112,5 +111,12 @@ class LSystem(AtomicBaseRenderer[LSystemState]):
         )
         self._draw_grammar(window, grammar)
 
-    def _create_initial_state(self) -> LSystemState:
+
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ) -> LSystemState:
         return LSystemState()

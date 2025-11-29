@@ -84,32 +84,6 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
 
         return profiles
 
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        window_size = window.get_size()
-
-        self._images.clear()
-        self._image_arrays.clear()
-
-        for file_path in self._image_files:
-            surface = Loader.load(file_path).convert_alpha()
-            surface = pygame.transform.smoothscale(surface, window_size)
-            self._images.append(surface)
-
-            array = pygame.surfarray.array3d(surface).astype(np.float32) / 255.0
-            self._image_arrays.append(array)
-
-        self._profiles = self._generate_profiles(len(self._image_arrays))
-        self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
-        self.set_state(self._create_initial_state())
-
-        super().initialize(window, clock, peripheral_manager, orientation)
-
     @staticmethod
     def _shift_channel(channel: np.ndarray, shift: int) -> np.ndarray:
         """Roll channel data horizontally while blanking the wrapped pixels."""
@@ -167,11 +141,10 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
         np.clip(frame, 0.0, 1.0, out=frame)
         return (frame * 255).astype(np.uint8)
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         if not self._image_arrays:
@@ -195,5 +168,27 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
         pygame.surfarray.blit_array(self._effect_surface, frame_array)
         window.blit(self._effect_surface, (0, 0))
 
-    def _create_initial_state(self) -> ThreeDGlassesState:
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        # TODO: Push more of this into state
+        window_size = window.get_size()
+
+        self._images.clear()
+        self._image_arrays.clear()
+
+        for file_path in self._image_files:
+            surface = Loader.load(file_path).convert_alpha()
+            surface = pygame.transform.smoothscale(surface, window_size)
+            self._images.append(surface)
+
+            array = pygame.surfarray.array3d(surface).astype(np.float32) / 255.0
+            self._image_arrays.append(array)
+
+        self._profiles = self._generate_profiles(len(self._image_arrays))
+        self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
         return ThreeDGlassesState()

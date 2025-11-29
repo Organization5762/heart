@@ -14,9 +14,7 @@ from openant.easy.exception import AntException
 from openant.easy.node import Node
 from usb.core import NoBackendError
 
-from heart.events.types import HeartRateLifecycle, HeartRateMeasurement
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.event_bus import EventBus
 from heart.utilities.logging import get_logger
 
 RETRY_DELAY = 5
@@ -62,7 +60,7 @@ class _SafeList(list):
 class HeartRateManager(Peripheral):
     """Continuously scans for ANT+ HR straps and publishes measurements."""
 
-    def __init__(self, *, event_bus: EventBus | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self._node: Optional[Node] = None
         self._scanner: Optional[Scanner] = None
@@ -77,19 +75,11 @@ class HeartRateManager(Peripheral):
 
         self._lifecycle_status: Dict[str, str] = {}
 
-        if event_bus is not None:
-            self.attach_event_bus(event_bus)
-
     # ---------- Peripheral framework ----------
 
     @classmethod
     def detect(cls) -> Iterator["HeartRateManager"]:
         yield cls()
-
-    def attach_event_bus(self, event_bus: EventBus) -> None:
-        """Attach the shared input event bus for publishing samples."""
-
-        super().attach_event_bus(event_bus)
 
     # ---------- Callbacks -----------------------------------------------------
 
@@ -114,8 +104,6 @@ class HeartRateManager(Peripheral):
                         battery_status[device_id] = data.battery_percentage * 100 / 256
 
                 logger.debug("HR %s BPM (device %s)", data.heart_rate, device_id)
-                self._mark_connected(device_id)
-                self._publish_measurement(device_id, data)
 
         return _inner
 
@@ -138,7 +126,6 @@ class HeartRateManager(Peripheral):
                     logger.info(
                         "Pruned silent HR strap %s (>%ds idle)", dev_id, DEVICE_TIMEOUT
                     )
-                    self._mark_disconnect(dev_id, suspected=True)
 
     # ---------- ANT+ life-cycle ---------------------------------------------
 
@@ -173,73 +160,6 @@ class HeartRateManager(Peripheral):
                 if self._node:
                     self._node.stop()
                 self._devices.clear()
-
-    # ---------- Event bus helpers -------------------------------------------
-
-    def _publish_measurement(self, device_id: str, data: HeartRateData) -> None:
-        event_bus = self.event_bus
-        if event_bus is None:
-            return
-
-        battery = None
-        if hasattr(data, "battery_percentage"):
-            battery = data.battery_percentage * 100 / 256
-
-        measurement = HeartRateMeasurement(
-            device_id=device_id,
-            bpm=data.heart_rate,
-            confidence=1.0,
-            battery_level=battery,
-        ).to_input(producer_id=self._producer_for_device(device_id))
-
-        try:
-            event_bus.emit(measurement)
-        except Exception:
-            logger.exception("Failed to emit heart rate measurement for %s", device_id)
-
-    def _emit_lifecycle(
-        self, device_id: str, status: str, detail: Dict[str, float] | None = None
-    ) -> None:
-        event_bus = self.event_bus
-        if event_bus is None:
-            return
-
-        lifecycle = HeartRateLifecycle(
-            status=status,
-            device_id=device_id,
-            detail=detail,
-        ).to_input(producer_id=self._producer_for_device(device_id))
-
-        try:
-            event_bus.emit(lifecycle)
-        except Exception:
-            logger.exception("Failed to emit heart rate lifecycle event for %s", device_id)
-
-    def _mark_connected(self, device_id: str) -> None:
-        previous = self._lifecycle_status.get(device_id)
-        if previous is None:
-            self._lifecycle_status[device_id] = "connected"
-            self._emit_lifecycle(device_id, "connected")
-        elif previous == "suspected_disconnect":
-            self._lifecycle_status[device_id] = "connected"
-            self._emit_lifecycle(device_id, "recovered")
-
-    def _mark_disconnect(self, device_id: str, *, suspected: bool) -> None:
-        status = "suspected_disconnect" if suspected else "disconnected"
-        if self._lifecycle_status.get(device_id) == status:
-            return
-        self._lifecycle_status[device_id] = status
-        detail = None
-        if suspected:
-            detail = {"timeout_seconds": float(DEVICE_TIMEOUT)}
-        self._emit_lifecycle(device_id, status, detail)
-
-    @staticmethod
-    def _producer_for_device(device_id: str) -> int:
-        try:
-            return int(device_id, 16)
-        except ValueError:
-            return abs(hash(device_id)) % (2**31)
 
     # ---------- Run loop -----------------------------------------------------
 

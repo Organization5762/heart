@@ -36,34 +36,29 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
         # We want to draw across the full 4-face surface
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _create_initial_state(self) -> SlidingImageState:
-        return SlidingImageState(speed=self._configured_speed)
-
-    # ---------------------------------------------------------------------
-    # lifecycle hooks
-    # ---------------------------------------------------------------------
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        # load and scale once we know the LED surface size
+        orientation: Orientation
+    ):
         image = Loader.load(self.file)
         image = pygame.transform.scale(image, window.get_size())
         width, _ = image.get_size()
-        self.update_state(image=image, width=width)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        return SlidingImageState(
+            speed=self._configured_speed,
+            image=image,
+            width=width
+        )
 
     # ---------------------------------------------------------------------
     # main draw routine
     # ---------------------------------------------------------------------
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -117,33 +112,26 @@ class SlidingRenderer(AtomicBaseRenderer[SlidingRendererState]):
         # We want to draw across the full 4-face surface
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _create_initial_state(self) -> SlidingRendererState:
-        return SlidingRendererState(speed=self._configured_speed)
-
-    # ---------------------------------------------------------------------
-    # lifecycle hooks
-    # ---------------------------------------------------------------------
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
+        orientation: Orientation
+    ):
         self.composed.initialize(window, clock, peripheral_manager, orientation)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        return SlidingRendererState(speed=self._configured_speed)
 
     # ---------------------------------------------------------------------
     # main draw routine
     # ---------------------------------------------------------------------
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self.composed._internal_process(window, clock, peripheral_manager, orientation)
+        self.composed._internal_process(window, clock, orientation)
 
         state = self.state
         img_w, _ = window.get_size()

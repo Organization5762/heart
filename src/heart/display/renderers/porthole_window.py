@@ -23,14 +23,19 @@ class PortholeWindowRenderer(AtomicBaseRenderer[PortholeWindowState]):
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _create_initial_state(self) -> PortholeWindowState:
-        return PortholeWindowState(elapsed=0.0)
-
-    def process(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        return PortholeWindowState(elapsed=0.0)
+
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
         elapsed = self.state.elapsed + clock.get_time() / 1000.0

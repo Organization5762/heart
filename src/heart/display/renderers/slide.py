@@ -1,3 +1,5 @@
+import logging
+import time
 from dataclasses import dataclass
 
 import pygame
@@ -6,10 +8,15 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.utilities.logging import get_logger
+from heart.utilities.logging_control import get_logging_controller
 
+logger = get_logger(__name__)
+log_controller = get_logging_controller()
 
 @dataclass
 class SlideTransitionState:
+    peripheral_manager: PeripheralManager
     x_offset: int = 0
     target_offset: int | None = None
     sliding: bool = True
@@ -40,17 +47,47 @@ class SlideTransitionRenderer(AtomicBaseRenderer[SlideTransitionState]):
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         AtomicBaseRenderer.__init__(self)
 
-    def _create_initial_state(self) -> SlideTransitionState:
-        return SlideTransitionState()
+        self.peripheral_manager = None
 
-    def is_done(self) -> bool:
-        return not self.state.sliding
-
-    def process(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
+        orientation: Orientation
+    ):
+        self.peripheral_manager = peripheral_manager
+        if not self.renderer_A.initialized:
+            self.renderer_A.initialize(
+                window=window,
+                clock=clock,
+                peripheral_manager=peripheral_manager,
+                orientation=orientation
+            )
+            # TODO: Why do i need to set this and it isn't set by the underlying
+            self.renderer_A.initialized = True
+
+        if not self.renderer_B.initialized:
+            self.renderer_B.initialize(
+                window=window,
+                clock=clock,
+                peripheral_manager=peripheral_manager,
+                orientation=orientation
+            )
+            # TODO: Why do i need to set this and it isn't set by the underlying
+            self.renderer_B.initialized = True
+        # meh hack so that we can persist this to real_process for now to support non-migrated renderers
+        return SlideTransitionState(
+            peripheral_manager=self.peripheral_manager
+        )
+
+    def is_done(self) -> bool:
+        return not self.state.sliding
+
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
         """
@@ -103,11 +140,44 @@ class SlideTransitionRenderer(AtomicBaseRenderer[SlideTransitionState]):
         surf_A = pygame.Surface(size, pygame.SRCALPHA)
         surf_B = pygame.Surface(size, pygame.SRCALPHA)
 
+        # This will break any composed renderer
+        start_ns = time.perf_counter_ns()
         self.renderer_A._internal_process(
-            surf_A, clock, peripheral_manager, Rectangle.with_layout(1, 1)
+            surf_A, clock, self.state.peripheral_manager, Rectangle.with_layout(1, 1)
         )
+        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+        log_message = (
+            "slide.A renderer=%s duration_ms=%.2f"
+        )
+        log_args = (
+            self.renderer_A.name,
+            duration_ms,
+        )
+        log_controller.log(
+            key="render.loop",
+            logger=logger,
+            level=logging.INFO,
+            msg=log_message,
+            args=log_args
+        )
+        start_ns = time.perf_counter_ns()
         self.renderer_B._internal_process(
-            surf_B, clock, peripheral_manager, Rectangle.with_layout(1, 1)
+            surf_B, clock, self.state.peripheral_manager, Rectangle.with_layout(1, 1)
+        )
+        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+        log_message = (
+            "slide.B renderer=%s duration_ms=%.2f"
+        )
+        log_args = (
+            self.renderer_B.name,
+            duration_ms,
+        )
+        log_controller.log(
+            key="render.loop",
+            logger=logger,
+            level=logging.INFO,
+            msg=log_message,
+            args=log_args
         )
 
         # ----------------------------------------------------------------- #

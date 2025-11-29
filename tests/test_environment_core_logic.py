@@ -8,10 +8,8 @@ import numpy as np
 import pygame
 import pytest
 
-from heart.display.renderers.free_text import FreeTextRenderer
 from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
                                _convert_bgr_to_hsv, _convert_hsv_to_bgr)
-from heart.events.types import HeartRateMeasurement, PhoneTextMessage
 from heart.peripheral.core import events
 
 
@@ -223,36 +221,6 @@ class TestEnvironmentCoreLogic:
         assert callable(loop._render_fn(variant))
 
 
-
-    def test_phone_text_event_triggers_transient_renderer(self, loop, monkeypatch) -> None:
-        """Verify that a phone text event spawns a transient renderer and expires after the timeout. This ensures pop-up messages show briefly without blocking other scenes."""
-        current_time = 1000.0
-
-        monkeypatch.setattr("heart.environment.time.monotonic", lambda: current_time)
-        loop.app_controller = types.SimpleNamespace(
-            get_renderers=lambda *args, **kwargs: [],
-        )
-
-        assert loop._select_renderers() == []
-
-        loop.event_bus.emit(
-            PhoneTextMessage.EVENT_TYPE,
-            {"text": "Heart: hello"},
-        )
-
-        active_renderers = loop._select_renderers()
-        assert len(active_renderers) == 1
-        renderer = active_renderers[0]
-        assert isinstance(renderer, FreeTextRenderer)
-
-        current_time += loop._phone_text_duration - 1.0
-        assert loop._select_renderers() == [renderer]
-
-        current_time += 2.0
-        assert loop._select_renderers() == []
-        assert loop._phone_text_display_started_at is None
-
-
     def test_resolve_event_type_normalizes_standard_and_unknown(
         self, loop, monkeypatch
     ) -> None:
@@ -342,50 +310,6 @@ class TestEnvironmentCoreLogic:
         assert first is second
         assert getattr(first, "is_flame_renderer") is True
 
-
-    def test_should_add_flame_renderer_requires_multiple_measurements(self, loop) -> None:
-        """Verify that _should_add_flame_renderer ignores sparse heart-rate samples. This prevents transient spikes from triggering intensive flame effects."""
-
-        renderers: list[object] = []
-        for producer_id, bpm in enumerate([120, 130, 140, 150]):
-            loop.event_bus.emit(
-                HeartRateMeasurement.EVENT_TYPE,
-                {"bpm": bpm},
-                producer_id=producer_id,
-            )
-
-        assert loop._should_add_flame_renderer(renderers) is False
-
-
-    def test_should_add_flame_renderer_checks_average_threshold(self, loop) -> None:
-        """Verify that _should_add_flame_renderer only activates when the average BPM beats the threshold. This keeps the flame overlay reserved for sustained exertion signals."""
-
-        renderers: list[object] = []
-        loop._flame_bpm_threshold = 120.0
-
-        for producer_id, bpm in enumerate([110, 115, 118, 119, 120]):
-            loop.event_bus.emit(
-                HeartRateMeasurement.EVENT_TYPE,
-                {"bpm": bpm},
-                producer_id=producer_id,
-            )
-
-        assert loop._should_add_flame_renderer(renderers) is False
-
-        for producer_id, bpm in enumerate([140, 150, 155, 160, 165]):
-            loop.event_bus.emit(
-                HeartRateMeasurement.EVENT_TYPE,
-                {"bpm": bpm},
-                producer_id=producer_id,
-            )
-
-        assert loop._should_add_flame_renderer(renderers) is True
-
-        flame_renderer = loop._ensure_flame_renderer()
-        assert (
-            loop._should_add_flame_renderer([flame_renderer])
-            is False
-        )
 
 def _sequential_binary_merge(values: list[str]) -> str:
     surfaces = list(values)
