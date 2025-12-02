@@ -1,5 +1,3 @@
-import random
-from datetime import timedelta
 from functools import cached_property
 from typing import Any, Iterable, TypeVar
 
@@ -10,7 +8,6 @@ from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core import Peripheral, PeripheralWrapper
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.sensor import Acceleration, Accelerometer
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.peripheral.uwb import ops
 from heart.utilities.env import Configuration
@@ -119,22 +116,3 @@ class PeripheralManager:
     @cached_property
     def clock(self) -> reactivex.Subject:
         return BehaviorSubject(None)
-
-    def get_accelerometer_subscription(self) -> reactivex.Observable[Acceleration | None]:
-        try:
-            accels = [peripheral.observe for peripheral in self.peripherals if isinstance(peripheral, Accelerometer)]
-
-            return reactivex.merge(*accels).pipe(
-                ops.map(PeripheralWrapper[Acceleration | None].unwrap_peripheral)
-            )
-        except BaseException:
-            def random_accel(x):
-                return Acceleration(
-                    x=random.random(),
-                    y=random.random(),
-                    z=9.8,
-                )
-            # Fake value
-            return reactivex.interval(timedelta(milliseconds=5)).pipe(
-                ops.map(random_accel)
-            )

@@ -1,11 +1,11 @@
 from heart.display.color import Color
-from heart.display.renderers.life import Life
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.pacman import PacmanGhostRenderer
 from heart.display.renderers.pixels import Border, RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.environment import GameLoop
+from heart.modules.life.renderer import Life
 
 
 def configure(loop: GameLoop) -> None:
@@ -58,7 +58,7 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.add_renderer(Life())
+    mode.resolve_renderer(container=loop, renderer=Life)
 
     mode = loop.add_mode()
     # MANDELBROT
@@ -118,4 +118,4 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.add_renderer(Life())
+    mode.resolve_renderer(container=loop, renderer=Life)

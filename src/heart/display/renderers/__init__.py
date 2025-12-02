@@ -8,6 +8,7 @@ from reactivex import Observable
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.utilities.logging import get_logger
 
@@ -324,11 +325,15 @@ class AtomicBaseRenderer(Generic[StateT]):
         return tiled_surface
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
-    def state_obsessrvable(
+    def __init__(self, builder: ObservableProvider[StateT], *args, **kwargs) -> None:
+        self.builder = builder
+        super().__init__(*args, **kwargs)
+
+    def state_observable(
         self,
         peripheral_manager: PeripheralManager,
     ) -> Observable[StateT]:
-        raise NotImplementedError()
+        return self.builder.observable()
 
     def initialize(
         self,

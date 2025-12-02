@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Self, Tuple
 
 import numpy as np
-import reactivex
 from reactivex import Observable
 from reactivex import operators as ops
 
@@ -115,25 +114,25 @@ class WaterCubeState:
         )
 
     @classmethod
-    def observable(cls, acceleration: Observable[Acceleration]) -> "Observable[WaterCubeState]":
-        def update_state(accumulated: WaterCubeState, acceleration: Acceleration):
-            if isinstance(accumulated, tuple):
-                accumulated = accumulated[0]
+    def observable(
+        cls,
+        acceleration: Observable["Acceleration"],
+    ) -> "Observable[Self]":
+        initial_state = cls.initial_state()
+
+        def update_state(
+            accumulated: Self,
+            a: "Acceleration",
+        ) -> Self:
+            # Advance the simulation one step using the new acceleration
             return accumulated._step(
                 heights=accumulated.heights,
                 velocities=accumulated.velocities,
-                acceleration=acceleration
+                acceleration=a,
             )
 
-        initial_state = WaterCubeState.initial_state()
-        values = reactivex.merge(
-            acceleration,
-            reactivex.with_latest_from(reactivex.of(initial_state))
-        )
-
-        observable = values.pipe(
-            ops.scan(update_state),
+        return acceleration.pipe(
+            ops.scan(update_state, seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),
         )
-        return observable

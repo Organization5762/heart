@@ -259,5 +259,3 @@ class LedWaveBoat(BaseRenderer):
 
         self._draw_particles(window)
         self._draw_boat(window, self._boat_x, self._boat_y, sway)
-
-        clock.tick_busy_loop(60)

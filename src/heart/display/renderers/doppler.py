@@ -192,5 +192,3 @@ class DopplerRenderer(BaseRenderer):
                 (int(px[index]), int(py[index])),
                 2,
             )
-
-        clock.tick_busy_loop(60)

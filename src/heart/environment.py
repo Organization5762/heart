@@ -5,29 +5,29 @@ import importlib
 import logging
 import time
 from collections import OrderedDict
-from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Literal, cast
+from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import numpy as np
 import pygame
+from lagom import Container
 from PIL import Image
 
 from heart import DeviceDisplayMode
 from heart.device import Device
-from heart.display.renderers.flame import FlameRenderer
-from heart.display.renderers.free_text import FreeTextRenderer
+# from heart.display.renderers.flame import FlameRenderer
+# from heart.display.renderers.free_text import FreeTextRenderer
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.led_matrix import LEDMatrixDisplay
+from heart.peripheral.core.providers import container
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
-    from heart.peripheral.core import Input
+    pass
 
 
 def _load_cv2_module() -> ModuleType | None:
@@ -265,15 +265,14 @@ class GameLoop:
     def __init__(
         self,
         device: Device,
-        peripheral_manager: PeripheralManager,
+        resolver: Container,
         max_fps: int = 60,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
-        *,
-        display_peripheral: LEDMatrixDisplay | None = None,
     ) -> None:
+        self.context_container = resolver
         self.initalized = False
         self.device = device
-        self.peripheral_manager = peripheral_manager
+        self.peripheral_manager = container.resolve(PeripheralManager)
 
         self.max_fps = max_fps
         self.app_controller = AppController()
@@ -305,22 +304,15 @@ class GameLoop:
         # Phone text display state
         self._phone_text_display_started_at: float | None = None
         self._phone_text_duration = 5.0  # Display phone text for 5 seconds
-        self._phone_text_renderer: FreeTextRenderer | None = None
+        # self._phone_text_renderer: FreeTextRenderer | None = None
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
         self.tmp_float: np.ndarray | None = None
         self.edge_thresh = 1
 
-        self._flame_renderer: FlameRenderer | None = None
+        # self._flame_renderer: FlameRenderer | None = None
         self._flame_bpm_threshold = 150.0
-
-        width, height = self.device.full_display_size()
-        self._display_peripheral = display_peripheral or LEDMatrixDisplay(
-            width=width,
-            height=height,
-        )
-        self.peripheral_manager.register(self._display_peripheral)
 
         pygame.display.set_mode(
             (
@@ -351,10 +343,6 @@ class GameLoop:
     def set_game_loop(cls, loop: "GameLoop") -> None:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
-
-    @property
-    def display_peripheral(self) -> LEDMatrixDisplay:
-        return self._display_peripheral
 
     def start(self) -> None:
         logger.info("Starting GameLoop")
@@ -405,70 +393,70 @@ class GameLoop:
         self.peripheral_manager.clock.on_next(self.clock)
 
 
-    def _on_phone_text_message(self, _: "Input") -> None:
-        self._phone_text_display_started_at = time.monotonic()
-        self._ensure_phone_text_renderer()
+    # def _on_phone_text_message(self, _: "Input") -> None:
+    #     self._phone_text_display_started_at = time.monotonic()
+    #     self._ensure_phone_text_renderer()
 
-    def _ensure_phone_text_renderer(self) -> FreeTextRenderer:
-        if self._phone_text_renderer is None:
-            self._phone_text_renderer = FreeTextRenderer()
-        return self._phone_text_renderer
+    # def _ensure_phone_text_renderer(self) -> FreeTextRenderer:
+    #     if self._phone_text_renderer is None:
+    #         self._phone_text_renderer = FreeTextRenderer()
+    #     return self._phone_text_renderer
 
-    def _ensure_flame_renderer(self) -> FlameRenderer:
-        if self._flame_renderer is None:
-            self._flame_renderer = FlameRenderer()
-            setattr(self._flame_renderer, "is_flame_renderer", True)
-        return self._flame_renderer
+    # def _ensure_flame_renderer(self) -> FlameRenderer:
+    #     if self._flame_renderer is None:
+    #         self._flame_renderer = FlameRenderer()
+    #         setattr(self._flame_renderer, "is_flame_renderer", True)
+    #     return self._flame_renderer
 
     def _select_renderers(self) -> list["BaseRenderer"]:
-        if self._should_show_phone_text():
-            return [self._ensure_phone_text_renderer()]
+        # if self._should_show_phone_text():
+        #     return [self._ensure_phone_text_renderer()]
 
         base_renderers = self.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
-        if self._should_add_flame_renderer(renderers):
-            renderers.append(self._ensure_flame_renderer())
+        # if self._should_add_flame_renderer(renderers):
+        #     renderers.append(self._ensure_flame_renderer())
         return renderers
 
-    def _should_show_phone_text(self) -> bool:
-        if self._phone_text_display_started_at is None:
-            return False
-        elapsed = time.monotonic() - self._phone_text_display_started_at
-        if elapsed > self._phone_text_duration:
-            self._phone_text_display_started_at = None
-            return False
-        return True
+    # def _should_show_phone_text(self) -> bool:
+    #     if self._phone_text_display_started_at is None:
+    #         return False
+    #     elapsed = time.monotonic() - self._phone_text_display_started_at
+    #     if elapsed > self._phone_text_duration:
+    #         self._phone_text_display_started_at = None
+    #         return False
+    #     return True
 
-    def _should_add_flame_renderer(
-        self, renderers: list["BaseRenderer"]
-    ) -> bool:
-        if any(self._is_flame_renderer(renderer) for renderer in renderers):
-            return False
+    # def _should_add_flame_renderer(
+    #     self, renderers: list["BaseRenderer"]
+    # ) -> bool:
+    #     if any(self._is_flame_renderer(renderer) for renderer in renderers):
+    #         return False
 
-        entries: Any = {}
+    #     entries: Any = {}
 
-        if len(entries) < 5:
-            return False
+    #     if len(entries) < 5:
+    #         return False
 
-        bpm_values: list[int] = []
-        for entry in entries.values():
-            data = entry.data
-            if isinstance(data, Mapping):
-                bpm = data.get("bpm")
-                if isinstance(bpm, (int, float)) and bpm > 0:
-                    bpm_values.append(int(bpm))
+    #     bpm_values: list[int] = []
+    #     for entry in entries.values():
+    #         data = entry.data
+    #         if isinstance(data, Mapping):
+    #             bpm = data.get("bpm")
+    #             if isinstance(bpm, (int, float)) and bpm > 0:
+    #                 bpm_values.append(int(bpm))
 
-        if len(bpm_values) < 5:
-            return False
+    #     if len(bpm_values) < 5:
+    #         return False
 
-        average_bpm = sum(bpm_values) / len(bpm_values)
-        return average_bpm > self._flame_bpm_threshold
+    #     average_bpm = sum(bpm_values) / len(bpm_values)
+    #     return average_bpm > self._flame_bpm_threshold
 
-    @staticmethod
-    def _is_flame_renderer(renderer: "BaseRenderer") -> bool:
-        if getattr(renderer, "is_flame_renderer", False):
-            return True
-        return isinstance(renderer, FlameRenderer)
+    # @staticmethod
+    # def _is_flame_renderer(renderer: "BaseRenderer") -> bool:
+    #     if getattr(renderer, "is_flame_renderer", False):
+    #         return True
+    #     # return isinstance(renderer, FlameRenderer)
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
@@ -747,7 +735,6 @@ class GameLoop:
             transposed_array = np.transpose(screen_array, (1, 0, 2))
             pil_image = Image.fromarray(transposed_array)
             self.device.set_image(pil_image)
-            self._display_peripheral.publish_image(pil_image)
 
     def _handle_events(self) -> None:
         try:
@@ -763,32 +750,6 @@ class GameLoop:
             #   events on queue, I see allusions to this online, people say
             #   try pygame-ce instead
             print("SystemError: Encountered segfaulted event")
-
-    def _resolve_event_type(self, event: pygame.event.Event) -> str:
-        if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
-            return "system/request_joystick_module_reset"
-        name = pygame.event.event_name(event.type) or "UNKNOWN"
-        slug = name.lower().replace(" ", "_")
-        if slug == "unknown":
-            slug = f"unknown_{event.type}"
-        return f"pygame/{slug}"
-
-    def _resolve_event_payload(self, event: pygame.event.Event) -> dict[str, object]:
-        raw_payload = getattr(event, "dict", None)
-
-        if isinstance(raw_payload, Mapping):
-            payload: dict[str, object] = dict(raw_payload)
-        elif raw_payload is None:
-            payload = {}
-        else:
-            try:
-                payload = dict(raw_payload)
-            except TypeError:
-                payload = {"value": raw_payload}
-
-        payload["pygame_type"] = event.type
-        payload["pygame_event_name"] = pygame.event.event_name(event.type)
-        return payload
 
     def _preprocess_setup(self):
         self.__dim_display()

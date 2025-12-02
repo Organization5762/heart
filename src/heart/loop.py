@@ -11,7 +11,7 @@ from heart.device import Cube, Device
 from heart.device.local import LocalScreen
 from heart.environment import GameLoop
 from heart.manage.update import main as update_driver_main
-from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import container
 from heart.programs.registry import ConfigurationRegistry
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
@@ -25,6 +25,11 @@ def _get_device(x11_forward: bool) -> Device:
     # TODO: Add a way of adding orientation either from Config or `run`
     orientation = Cube.sides()
     device: Device
+
+    if Configuration.forward_to_beats_app():
+        from heart.device.beats import StreamedScreen
+
+        return StreamedScreen(orientation=orientation)
 
     if Configuration.use_isolated_renderer():
         if x11_forward:
@@ -71,9 +76,7 @@ def run(
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         raise Exception(f"Configuration '{configuration}' not found in registry")
-
-    manager = PeripheralManager()
-    loop = GameLoop(device=_get_device(x11_forward), peripheral_manager=manager)
+    loop = GameLoop(device=_get_device(x11_forward), resolver=container)
     configuration_fn(loop)
 
     ## ============================= ##
