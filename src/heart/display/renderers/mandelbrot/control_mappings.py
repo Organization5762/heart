@@ -62,7 +62,8 @@ class KeyboardControls(SceneControlsMapping):
         self.key_pressed_last_frame = defaultdict(lambda: False)
 
     def update_movement(self):
-        pressed = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        pressed = get_key_pressed()
         if pressed[pygame.K_w]:
             self.scene_controls._move_up()
         if pressed[pygame.K_s]:
@@ -73,21 +74,24 @@ class KeyboardControls(SceneControlsMapping):
             self.scene_controls._move_right()
 
     def update_zoom(self):
-        pressed = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        pressed = get_key_pressed()
         if pressed[pygame.K_q]:
             self.scene_controls._zoom_out()
         if pressed[pygame.K_e]:
             self.scene_controls._zoom_in()
 
     def update_iterations(self):
-        pressed = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        pressed = get_key_pressed()
         if pressed[pygame.K_j]:
             self.scene_controls._increase_max_iterations()
         if pressed[pygame.K_k]:
             self.scene_controls._decrease_max_iterations()
 
     def update_mode(self):
-        pressed = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        pressed = get_key_pressed()
         if (
             pressed[pygame.K_LEFTBRACKET]
             and not self.key_pressed_last_frame[pygame.K_LEFTBRACKET]
@@ -107,7 +111,8 @@ class KeyboardControls(SceneControlsMapping):
         ]
 
     def update_additional(self):
-        pressed = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        pressed = get_key_pressed()
         if pressed[pygame.K_i] and not self.key_pressed_last_frame[pygame.K_i]:
             self.scene_controls._toggle_debug()
         self.key_pressed_last_frame[pygame.K_i] = pressed[pygame.K_i]

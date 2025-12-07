@@ -23,12 +23,6 @@ app = FastAPI(title="Heart Display Streaming")
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-@app.get("/")
-async def index():
-    """Serve the main webapp page."""
-    return FileResponse(STATIC_DIR / "index.html")
-
-
 @app.get("/health")
 async def health():
     """Health check endpoint."""
@@ -40,19 +34,28 @@ async def health():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for streaming frames to clients."""
+    """WebSocket endpoint for streaming frames and receiving input from clients."""
     await broadcaster.connect(websocket)
     try:
-        # Keep the connection open and send frames
+        # Listen for input events from the client
         while True:
-            # Just wait for client disconnect
-            # Frames are sent by the broadcast_loop
-            await asyncio.sleep(1)
+            try:
+                # Wait for messages with timeout
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                # Handle input event
+                await broadcaster.handle_input(message)
+            except asyncio.TimeoutError:
+                # No message received, continue loop
+                continue
     except WebSocketDisconnect:
         await broadcaster.disconnect(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         await broadcaster.disconnect(websocket)
+
+
+# Mount static files AFTER defining specific routes
+app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
 def get_broadcaster() -> FrameBroadcaster:
@@ -81,8 +84,9 @@ def start_server(host: str = "0.0.0.0", port: int = 8000) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Start broadcast task
+        # Start broadcast and bluetooth scan tasks (separate = non-blocking)
         loop.create_task(broadcaster.broadcast_loop())
+        loop.create_task(broadcaster.bluetooth_scan_loop())
 
         # Run uvicorn
         config = uvicorn.Config(

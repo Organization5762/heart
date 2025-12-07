@@ -203,49 +203,60 @@ class GameModes(BaseRenderer):
     def _process_debugging_key_presses(
         self, peripheral_manager: PeripheralManager
     ) -> None:
-        # Only run this if not on the Pi
-        if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return
+        # Only run this if not on the Pi (or if using remote browser input)
+        if Configuration.is_pi():
+            # Check if we have remote input from WebSocket streaming
+            from heart.environment import GameLoop
+            game_loop = GameLoop.get_game_loop()
+            if game_loop is None or game_loop._broadcaster is None:
+                return
+            broadcaster = game_loop._broadcaster
+        else:
+            broadcaster = None
 
-        keys = pygame.key.get_pressed()
+        # Helper function to check if a key is pressed (local OR remote)
+        def is_key_pressed(key):
+            local_pressed = pygame.key.get_pressed()[key]
+            remote_pressed = broadcaster.get_key_pressed(key) if broadcaster else False
+            return local_pressed or remote_pressed
 
         switch = peripheral_manager._deprecated_get_main_switch()
         payload = None
 
         # TODO: Start coming up with a better way of handling this + simulating N peripherals all with different signals
         DEFAULT_PRODUCER_ID = 0
-        if keys[pygame.K_LEFT] and not self.key_pressed_last_frame[pygame.K_LEFT]:
+        if is_key_pressed(pygame.K_LEFT) and not self.key_pressed_last_frame[pygame.K_LEFT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "producer_id": DEFAULT_PRODUCER_ID,
                 "data": switch.rotational_value - 1,
             }
-        self.key_pressed_last_frame[pygame.K_LEFT] = keys[pygame.K_LEFT]
+        self.key_pressed_last_frame[pygame.K_LEFT] = is_key_pressed(pygame.K_LEFT)
 
-        if keys[pygame.K_RIGHT] and not self.key_pressed_last_frame[pygame.K_RIGHT]:
+        if is_key_pressed(pygame.K_RIGHT) and not self.key_pressed_last_frame[pygame.K_RIGHT]:
             payload = {
                 "event_type": SWITCH_ROTATION,
                 "producer_id": DEFAULT_PRODUCER_ID,
                 "data": switch.rotational_value + 1,
             }
-        self.key_pressed_last_frame[pygame.K_RIGHT] = keys[pygame.K_RIGHT]
+        self.key_pressed_last_frame[pygame.K_RIGHT] = is_key_pressed(pygame.K_RIGHT)
 
-        if keys[pygame.K_UP] and not self.key_pressed_last_frame[pygame.K_UP]:
+        if is_key_pressed(pygame.K_UP) and not self.key_pressed_last_frame[pygame.K_UP]:
             payload = {
                 "event_type": BUTTON_LONG_PRESS,
                 "producer_id": DEFAULT_PRODUCER_ID,
                 "data": 1,
             }
-        self.key_pressed_last_frame[pygame.K_UP] = keys[pygame.K_UP]
+        self.key_pressed_last_frame[pygame.K_UP] = is_key_pressed(pygame.K_UP)
 
-        if keys[pygame.K_DOWN] and not self.key_pressed_last_frame[pygame.K_DOWN]:
+        if is_key_pressed(pygame.K_DOWN) and not self.key_pressed_last_frame[pygame.K_DOWN]:
             payload = {
                 "event_type": BUTTON_PRESS,
                 "producer_id": DEFAULT_PRODUCER_ID,
                 "data": 1,
             }
 
-        self.key_pressed_last_frame[pygame.K_DOWN] = keys[pygame.K_DOWN]
+        self.key_pressed_last_frame[pygame.K_DOWN] = is_key_pressed(pygame.K_DOWN)
 
         if payload is not None:
             switch.update_due_to_data(payload)
@@ -418,19 +429,21 @@ class MultiScene(BaseRenderer):
         self.last_switch_value = current_value
 
     def _process_keyboard(self) -> None:
+        from heart.input import get_key_pressed
+        
         if (
-            pygame.key.get_pressed()[pygame.K_a]
+            get_key_pressed(pygame.K_a)
             and not self.key_pressed_last_frame[pygame.K_a]
         ):
             self._decrement_scene()
-        self.key_pressed_last_frame[pygame.K_a] = pygame.key.get_pressed()[pygame.K_a]
+        self.key_pressed_last_frame[pygame.K_a] = get_key_pressed(pygame.K_a)
 
         if (
-            pygame.key.get_pressed()[pygame.K_d]
+            get_key_pressed(pygame.K_d)
             and not self.key_pressed_last_frame[pygame.K_d]
         ):
             self._increment_scene()
-        self.key_pressed_last_frame[pygame.K_d] = pygame.key.get_pressed()[pygame.K_d]
+        self.key_pressed_last_frame[pygame.K_d] = get_key_pressed(pygame.K_d)
 
     def _set_scene_index(self, index: int) -> None:
         self.current_scene_index = index % len(self.scenes)

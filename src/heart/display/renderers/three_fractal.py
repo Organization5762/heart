@@ -584,7 +584,8 @@ class FractalScene(BaseRenderer):
         gamepad.update()
 
     def _process_keyboard_input(self, peripheral_manager):
-        keys = pygame.key.get_pressed()
+        from heart.input import get_key_pressed
+        keys = get_key_pressed()
 
         # Calculate acceleration based on key input
         acc = np.zeros((3,), dtype=np.float32)

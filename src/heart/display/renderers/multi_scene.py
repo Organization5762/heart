@@ -35,19 +35,21 @@ class MultiScene(BaseRenderer):
         self._set_scene_index(current_value)
 
     def _process_keyboard(self) -> None:
+        from heart.input import get_key_pressed
+        
         if (
-            pygame.key.get_pressed()[pygame.K_a]
+            get_key_pressed(pygame.K_a)
             and not self.key_pressed_last_frame[pygame.K_a]
         ):
             self._decrement_scene()
-        self.key_pressed_last_frame[pygame.K_a] = pygame.key.get_pressed()[pygame.K_a]
+        self.key_pressed_last_frame[pygame.K_a] = get_key_pressed(pygame.K_a)
 
         if (
-            pygame.key.get_pressed()[pygame.K_d]
+            get_key_pressed(pygame.K_d)
             and not self.key_pressed_last_frame[pygame.K_d]
         ):
             self._increment_scene()
-        self.key_pressed_last_frame[pygame.K_d] = pygame.key.get_pressed()[pygame.K_d]
+        self.key_pressed_last_frame[pygame.K_d] = get_key_pressed(pygame.K_d)
 
     def _set_scene_index(self, index: int) -> None:
         self.current_scene_index = index % len(self.scenes)

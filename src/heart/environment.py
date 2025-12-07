@@ -44,6 +44,8 @@ class GameLoop:
         peripheral_manager: PeripheralManager,
         max_fps: int = 60,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
+        enable_streaming: bool = True,
+        streaming_port: int = 8000,
     ) -> None:
         self.initalized = False
         self.device = device
@@ -54,6 +56,11 @@ class GameLoop:
         self.clock = None
         self.screen = None
         self.renderer_variant = render_variant
+        
+        # WebSocket streaming support
+        self.enable_streaming = enable_streaming
+        self.streaming_port = streaming_port
+        self._broadcaster = None
 
         # jank slide animation state machine
         self.mode_change = (0, 0)
@@ -130,9 +137,17 @@ class GameLoop:
         last_fps_log = time.time()
         
         while self.running:
+            frame_start_time = time.time()
+            
+            t0 = time.time()
             self._handle_events()
+            events_time = (time.time() - t0) * 1000
+            
+            t1 = time.time()
             self._preprocess_setup()
+            preprocess_time = (time.time() - t1) * 1000
 
+            t2 = time.time()
             # Check for phone text
             phone_text = self.peripheral_manager.get_phone_text()
             if phone_text.pop_text():
@@ -166,8 +181,17 @@ class GameLoop:
                             break
                     else:
                         renderers.append(FlameRenderer())
+            get_renderers_time = (time.time() - t2) * 1000
+            
+            t3 = time.time()
             self._one_loop(renderers)
+            one_loop_time = (time.time() - t3) * 1000
+            
+            t4 = time.time()
             self.clock.tick(self.max_fps)
+            tick_time = (time.time() - t4) * 1000
+            
+            frame_total_time = (time.time() - frame_start_time) * 1000
             
             # FPS logging every 10 seconds
             frame_count += 1
@@ -175,9 +199,13 @@ class GameLoop:
             if current_time - last_fps_log >= 10.0:
                 elapsed = current_time - last_fps_log
                 fps = frame_count / elapsed
-                logger.info(f"FPS: {fps:.2f} (target: {self.max_fps})")
+                logger.info(f"[PERF SUMMARY] FPS: {fps:.2f} (target: {self.max_fps})")
                 frame_count = 0
                 last_fps_log = current_time
+            
+            # Log every frame if slow (>100ms = <10fps)
+            if frame_total_time > 100:
+                logger.warning(f"[PERF SLOW FRAME] Total={frame_total_time:.1f}ms: events={events_time:.1f}ms, preprocess={preprocess_time:.1f}ms, get_renderers={get_renderers_time:.1f}ms, one_loop={one_loop_time:.1f}ms, tick={tick_time:.1f}ms")
 
         pygame.quit()
 
@@ -391,26 +419,65 @@ class GameLoop:
         renderers: list["BaseRenderer"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> None:
+        t1 = time.time()
         # Add border in select mode
         result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
             renderers
         )
+        render_fn_time = time.time() - t1
+        
+        t2 = time.time()
         image = self.__finalize_rendering(result) if result else None
+        finalize_time = time.time() - t2
+        
+        t3 = time.time()
         if image is not None:
             bytes = image.tobytes()
             surface = pygame.image.frombytes(bytes, image.size, image.mode)
             self.screen.blit(surface, (0, 0))
+        blit_time = time.time() - t3
 
         if len(renderers) > 0:
+            t4 = time.time()
             pygame.display.flip()
+            flip_time = time.time() - t4
+            
+            t5 = time.time()
             # Convert screen to PIL Image
             image = pygame.surfarray.array3d(self.screen)
             image = np.transpose(image, (1, 0, 2))
             image = Image.fromarray(image)
+            convert_time = time.time() - t5
+            
+            t6 = time.time()
             self.device.set_image(image)
+            device_time = time.time() - t6
+            
+            # Broadcast frame to WebSocket clients if streaming is enabled
+            t7 = time.time()
+            if self._broadcaster is not None:
+                self._broadcaster.broadcast_frame(image)
+            broadcast_time = time.time() - t7
+            
+            # Log if any operation is slow (>10ms)
+            if any(t > 0.01 for t in [render_fn_time, finalize_time, blit_time, flip_time, convert_time, device_time, broadcast_time]):
+                logger.warning(f"[PERF _one_loop] render_fn={render_fn_time*1000:.2f}ms, "
+                              f"finalize={finalize_time*1000:.2f}ms, "
+                              f"blit={blit_time*1000:.2f}ms, "
+                              f"flip={flip_time*1000:.2f}ms, "
+                              f"convert={convert_time*1000:.2f}ms, "
+                              f"device.set_image={device_time*1000:.2f}ms, "
+                              f"broadcast={broadcast_time*1000:.2f}ms")
 
     def _handle_events(self) -> None:
         try:
+            # Inject remote input events from WebSocket clients
+            if self._broadcaster is not None:
+                remote_events = self._broadcaster.get_input_events()
+                for remote_event in remote_events:
+                    pygame.event.post(remote_event)
+            
+            # Process all pygame events (local + remote)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
@@ -451,7 +518,37 @@ class GameLoop:
         self.__set_singleton()
         self._initialize_screen()
         self._initialize_peripherals()
+        self._initialize_streaming()
         self.initalized = True
+    
+    def _initialize_streaming(self) -> None:
+        """Initialize the WebSocket streaming server if enabled."""
+        if self.enable_streaming:
+            try:
+                logger.info("[STREAMING] Starting initialization...")
+                start_time = time.time()
+                
+                from heart.server.app import start_server, get_broadcaster
+                import_time = time.time()
+                logger.info(f"[STREAMING] Import took {(import_time - start_time)*1000:.2f}ms")
+                
+                logger.info(f"[STREAMING] Starting WebSocket streaming server on port {self.streaming_port}")
+                start_server(host="0.0.0.0", port=self.streaming_port)
+                server_start_time = time.time()
+                logger.info(f"[STREAMING] Server start took {(server_start_time - import_time)*1000:.2f}ms")
+                
+                self._broadcaster = get_broadcaster()
+                # Pass peripheral manager to broadcaster for status updates
+                self._broadcaster.set_peripheral_manager(self.peripheral_manager)
+                end_time = time.time()
+                logger.info(f"[STREAMING] Total initialization took {(end_time - start_time)*1000:.2f}ms")
+                logger.info(f"[STREAMING] WebSocket streaming enabled. Open http://<pi-ip>:{self.streaming_port} in your browser")
+            except Exception as e:
+                logger.warning(f"[STREAMING] Failed to start streaming server: {e}. Streaming disabled.")
+                logger.exception(e)
+                self._broadcaster = None
+        else:
+            logger.info("[STREAMING] Streaming disabled (set enable_streaming=True to enable)")
 
     def __dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
