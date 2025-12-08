@@ -71,7 +71,7 @@ class FakeSwitch(BaseSwitch):
     
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
-            id="switch",
+            id="fake_switch",
             tags=[
                 PeripheralTag(
                     name="input_variant",

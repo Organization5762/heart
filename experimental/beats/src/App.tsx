@@ -2,7 +2,9 @@ import { RouterProvider } from "@tanstack/react-router";
 import React, { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { syncWithLocalTheme } from "./actions/theme";
-import { WSProvider } from "./components/websocket";
+import { PeripheralEventsProvider } from "./actions/ws/providers/PeripheralEventsProvider";
+import { PeripheralProvider } from "./actions/ws/providers/PeripheralProvider";
+import { WSProvider } from "./actions/ws/websocket";
 import { router } from "./utils/routes";
 
 export default function App() {
@@ -10,15 +12,19 @@ export default function App() {
     syncWithLocalTheme();
   }, []);
 
-  return <WSProvider url="ws://localhost:8765">
-      <RouterProvider router={router} />;
-  </WSProvider>
- 
+  return <RouterProvider router={router} />
 }
 
 const root = createRoot(document.getElementById("app")!);
 root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <WSProvider url="ws://localhost:8765">
+    <React.StrictMode>
+        <PeripheralEventsProvider>
+            <PeripheralProvider>
+              <App/>
+            </PeripheralProvider>
+        </PeripheralEventsProvider>
+    </React.StrictMode>
+  </WSProvider>
+  ,
 );

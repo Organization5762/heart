@@ -73,7 +73,7 @@ app
   .whenReady()
   .then(createWindow)
   .then(installExtensions)
-  .then(checkForUpdates)
+  // .then(checkForUpdates)
   .then(setupORPC);
 
 //osX only

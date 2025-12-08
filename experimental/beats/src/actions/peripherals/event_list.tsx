@@ -1,44 +1,7 @@
-import { useWS } from "./websocket";
-
-import { useEffect, useState } from "react";
-
-export function useEventList(
-  ws: WebSocket | null,
-  { eventType = "" } = {}
-) {
-  const [events, setEvents] = useState<
-    { ts: number; msg: any }[]
-  >([]);
-
-  useEffect(() => {
-    if (!ws) return;
-
-    const onMessage = async (event: MessageEvent) => {
-      const text = await event.data.text();
-      const msg = JSON.parse(text);
-
-      // Filter if eventType is set
-      if (eventType && msg.type !== eventType) return;
-
-      setEvents((prev) => [
-        { ts: Date.now(), msg }, // newest FIRST
-        ...prev,
-      ]);
-    };
-
-    ws.addEventListener("message", onMessage);
-
-    return () => {
-      ws.removeEventListener("message", onMessage);
-    };
-  }, [ws, eventType]);
-
-  return [events] as const;
-}
+import { usePeripheralEvents } from "../ws/providers/PeripheralEventsProvider";
 
 export function EventList() {
-    const ws = useWS();
-    const [events] = useEventList(ws, { eventType: "peripheral" });
+    const events = usePeripheralEvents();
   
     return (
       <div className="flex h-full flex-col select-none p-3">

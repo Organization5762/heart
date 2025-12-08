@@ -1,4 +1,4 @@
-import { EventList } from '@/components/event_list'
+import { EventList } from '@/actions/peripherals/event_list'
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/peripherals/events')({

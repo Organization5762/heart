@@ -1,8 +1,8 @@
 import { Antenna } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useWS } from "../actions/ws/websocket";
 import { Separator } from "./ui/separator";
 import { Skeleton } from "./ui/skeleton";
-import { useWS } from "./websocket";
 
 function getStatusClasses(streamIsActive: boolean) {
   return streamIsActive
