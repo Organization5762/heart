@@ -1,5 +1,3 @@
-import random
-from datetime import timedelta
 from functools import cached_property
 from typing import Any, Iterable, TypeVar
 
@@ -7,10 +5,9 @@ import reactivex
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core import Peripheral, PeripheralWrapper
+from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.sensor import Acceleration, Accelerometer
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.peripheral.uwb import ops
 from heart.utilities.env import Configuration
@@ -56,6 +53,7 @@ class PeripheralManager:
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():
             self._register_peripheral(peripheral)
+
         self._ensure_configuration()
 
     def register(self, peripheral: Peripheral) -> None:
@@ -94,18 +92,17 @@ class PeripheralManager:
 
     ###
     # New
-    ### 
+    ###
     def get_event_bus(self) -> reactivex.Observable[Any]:
         return reactivex.merge(
-            self.get_main_switch_subscription(),
-            self.get_accelerometer_subscription(),
+            *[peripheral.observe for peripheral in self.peripherals]
         )
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [peripheral.observe for peripheral in self.peripherals if isinstance(peripheral, FakeSwitch)]
 
         return reactivex.merge(*main_switches).pipe(
-            ops.map(PeripheralWrapper[SwitchState].unwrap_peripheral)
+            ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
 
     @cached_property
@@ -119,22 +116,3 @@ class PeripheralManager:
     @cached_property
     def clock(self) -> reactivex.Subject:
         return BehaviorSubject(None)
-
-    def get_accelerometer_subscription(self) -> reactivex.Observable[Acceleration | None]:
-        try:
-            accels = [peripheral.observe for peripheral in self.peripherals if isinstance(peripheral, Accelerometer)]
-
-            return reactivex.merge(*accels).pipe(
-                ops.map(PeripheralWrapper[Acceleration | None].unwrap_peripheral)
-            )
-        except BaseException:
-            def random_accel(x):
-                return Acceleration(
-                    x=random.random(),
-                    y=random.random(),
-                    z=9.8,
-                )
-            # Fake value
-            return reactivex.interval(timedelta(milliseconds=5)).pipe(
-                ops.map(random_accel)
-            )

@@ -1,4 +1,5 @@
 import numpy as np
+from lagom import Singleton
 
 from heart.display.color import Color
 from heart.display.renderers.artist import ArtistScene
@@ -7,10 +8,8 @@ from heart.display.renderers.heart_title_screen import HeartTitleScreen
 from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.image import RenderImage
 from heart.display.renderers.kirby import KirbyScene
-from heart.display.renderers.life import Life
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
-from heart.display.renderers.mario import MarioRenderer
 from heart.display.renderers.multicolor import MulticolorRenderer
 from heart.display.renderers.pixels import RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
@@ -18,9 +17,14 @@ from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.three_fractal import FractalScene
 from heart.display.renderers.tixyland import Tixyland
-from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.environment import GameLoop
+from heart.modules.devices.acceleration.provider import \
+    AllAccelerometersProvider
+from heart.modules.life.renderer import Life
+from heart.modules.mario.provider import MarioRendererProvider
+from heart.modules.mario.renderer import MarioRenderer
+from heart.modules.water_cube.renderer import WaterCube
 from heart.navigation import ComposedRenderer, MultiScene
 
 
@@ -70,11 +74,12 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    mario_mode.add_renderer(
-        MarioRenderer(
-            sheet_file_path="mario_64.png",
-            metadata_file_path="mario_64.json",
-        )
+    loop.context_container[MarioRendererProvider] = Singleton(
+        lambda builder: MarioRendererProvider(accel_stream=builder[AllAccelerometersProvider], sheet_file_path="mario_64.png", metadata_file_path="mario_64.json")
+    )
+    mario_mode.resolve_renderer(
+        container=loop.context_container,
+        renderer=MarioRenderer
     )
 
     shroomed_mode = loop.add_mode(
@@ -130,7 +135,8 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    water_mode.add_renderer(WaterCube())
+
+    water_mode.resolve_renderer(loop.context_container, WaterCube)
 
     artist_mode = loop.add_mode(ArtistScene.title_scene())
     artist_mode.add_renderer(ArtistScene())
@@ -200,7 +206,7 @@ def configure(loop: GameLoop) -> None:
     )
 
     life = loop.add_mode("life")
-    life.add_renderer(Life())
+    life.resolve_renderer(loop.context_container, Life)
 
     spooky = loop.add_mode("spook")
     spooky.add_renderer(

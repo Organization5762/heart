@@ -113,7 +113,7 @@ def _display_resolution_provider() -> DisplayResolutionProvider:
 
 
 @lru_cache(maxsize=1)
-def _get_display_resolution() -> tuple[int, int, float]:
+def get_display_resolution() -> tuple[int, int, float]:
     return _display_resolution_provider().get_resolution()
 
 
@@ -136,7 +136,7 @@ class LocalScreen(Device):
 
     @cached_property
     def scale_factor(self) -> int:
-        width, height, _ = _get_display_resolution()
+        width, height, _ = get_display_resolution()
         current_width, current_height = self.full_display_size()
 
         result = max(min(width // current_width, height // current_height), 1)

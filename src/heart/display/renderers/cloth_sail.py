@@ -336,5 +336,3 @@ class ClothSailRenderer(BaseRenderer):
                 frame_surface, (surface_width, surface_height)
             )
             window.blit(scaled_surface, (0, 0))
-
-        clock.tick_busy_loop(60)

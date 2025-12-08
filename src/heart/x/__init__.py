@@ -1,3 +1,0 @@
-"""Utility and experimental tooling for Totem hardware debugging."""
-
-from .cli import app as app

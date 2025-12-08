@@ -1,7 +1,7 @@
-from heart.display.renderers.life import Life
 from heart.environment import GameLoop
+from heart.modules.life.renderer import Life
 
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode()
-    mode.add_renderer(Life())
+    mode.resolve_renderer(container=loop, renderer=Life)
