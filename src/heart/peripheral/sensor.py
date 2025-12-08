@@ -1,5 +1,6 @@
 import collections
 import json
+import random
 import time
 from dataclasses import dataclass
 from datetime import timedelta
@@ -164,3 +165,21 @@ class Accelerometer(Peripheral[Acceleration | None]):
         #     return
 
         # raise NotImplementedError("")
+
+class FakeAccelerometer(Peripheral[Acceleration | None]):
+    @classmethod
+    def detect(cls) -> Iterator[Self]:
+        yield cls()
+
+    def _event_stream(
+        self
+    ) -> reactivex.Observable[Acceleration | None]:
+        def random_accel(x) -> Acceleration:
+            return Acceleration(
+                x=random.random(),
+                y=random.random(),
+                z=9.8,
+            )
+        return reactivex.interval(timedelta(milliseconds=500)).pipe(
+            ops.map(random_accel)
+        )

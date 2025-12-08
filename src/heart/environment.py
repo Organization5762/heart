@@ -18,6 +18,7 @@ from heart import DeviceDisplayMode
 from heart.device import Device
 # from heart.display.renderers.flame import FlameRenderer
 # from heart.display.renderers.free_text import FreeTextRenderer
+from heart.device.beats import WebSocket
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
@@ -370,6 +371,12 @@ class GameLoop:
         clock = self.clock
 
         # Load the screen
+        
+        ws = WebSocket()
+        self.peripheral_manager.get_event_bus().subscribe(
+            on_next=lambda x: ws.send(kind="peripheral", payload=x.data)
+        )
+
         try:
             while self.running:
                 # Push an event for state that requires game tick

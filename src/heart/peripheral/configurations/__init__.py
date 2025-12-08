@@ -12,7 +12,7 @@ from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.radio import RadioPeripheral
-from heart.peripheral.sensor import Accelerometer
+from heart.peripheral.sensor import Accelerometer, FakeAccelerometer
 from heart.peripheral.switch import BluetoothSwitch, FakeSwitch, Switch
 from heart.utilities.env import Configuration
 
@@ -40,7 +40,10 @@ def _detect_phone_text() -> Iterator[Peripheral]:
     yield from itertools.chain(PhoneText.detect())
 
 def _detect_sensors() -> Iterator[Peripheral]:
-    yield from itertools.chain(Accelerometer.detect(), Compass.detect())
+    if Configuration.is_pi() and not Configuration.is_x11_forward():
+        yield from itertools.chain(Accelerometer.detect(), Compass.detect())
+    else:
+        yield from FakeAccelerometer.detect()
 
 def _detect_gamepads() -> Iterator[Peripheral]:
     yield from itertools.chain(Gamepad.detect())

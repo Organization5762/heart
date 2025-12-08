@@ -5,7 +5,7 @@ import reactivex
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core import Peripheral, PeripheralWrapper
+from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
@@ -53,6 +53,7 @@ class PeripheralManager:
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():
             self._register_peripheral(peripheral)
+
         self._ensure_configuration()
 
     def register(self, peripheral: Peripheral) -> None:
@@ -91,18 +92,17 @@ class PeripheralManager:
 
     ###
     # New
-    ### 
+    ###
     def get_event_bus(self) -> reactivex.Observable[Any]:
         return reactivex.merge(
-            self.get_main_switch_subscription(),
-            self.get_accelerometer_subscription(),
+            *[peripheral.observe for peripheral in self.peripherals]
         )
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [peripheral.observe for peripheral in self.peripherals if isinstance(peripheral, FakeSwitch)]
 
         return reactivex.merge(*main_switches).pipe(
-            ops.map(PeripheralWrapper[SwitchState].unwrap_peripheral)
+            ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
 
     @cached_property
