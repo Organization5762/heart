@@ -11,7 +11,7 @@ import serial
 from reactivex import operators as ops
 
 from heart.events.types import AccelerometerVector
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -170,6 +170,14 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
+
+    def peripheral_info(self) -> PeripheralInfo:
+        return PeripheralInfo(
+            id="fake_accelerometer",
+            tags=[
+                PeripheralTag(name="input_variant", variant="accelerometer"),
+            ],
+        )
 
     def _event_stream(
         self

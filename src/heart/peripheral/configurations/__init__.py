@@ -14,6 +14,7 @@ from heart.peripheral.phone_text import PhoneText
 from heart.peripheral.radio import RadioPeripheral
 from heart.peripheral.sensor import Accelerometer, FakeAccelerometer
 from heart.peripheral.switch import BluetoothSwitch, FakeSwitch, Switch
+from heart.peripheral.uwb import FakeUWBPositioning
 from heart.utilities.env import Configuration
 
 
@@ -59,3 +60,6 @@ def _detect_drawing_pads() -> Iterator[Peripheral]:
 
 def _detect_radios() -> Iterator[Peripheral]:
     yield from itertools.chain(RadioPeripheral.detect())
+
+def _detect_uwb_position() -> Iterator[Peripheral]:
+    yield from itertools.chain(FakeUWBPositioning.detect())

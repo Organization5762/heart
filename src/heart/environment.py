@@ -371,10 +371,9 @@ class GameLoop:
         clock = self.clock
 
         # Load the screen
-        
         ws = WebSocket()
         self.peripheral_manager.get_event_bus().subscribe(
-            on_next=lambda x: ws.send(kind="peripheral", payload=x.data)
+            on_next=lambda x: ws.send(kind="peripheral", payload=x)
         )
 
         try:
