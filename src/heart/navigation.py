@@ -2,6 +2,7 @@ import dataclasses
 from dataclasses import dataclass
 
 import pygame
+from lagom import Container
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -249,6 +250,9 @@ class ComposedRenderer(BaseRenderer):
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
 
+    def resolve_renderer(self, container: Container, renderer: type[BaseRenderer]):
+        self.renderers.append(container.resolve(renderer))
+    
     def process(
         self,
         window: pygame.Surface,

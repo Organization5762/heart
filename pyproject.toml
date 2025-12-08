@@ -26,6 +26,7 @@ requires-python = ">= 3.11"
 
 dependencies = [
     "bleak",
+    "lagom",
     "numba",
     "numpy",
     "openant",
@@ -43,6 +44,7 @@ dependencies = [
     "moderngl",
     "sounddevice",
     "paho-mqtt",
+    "websockets>=15.0.1",
 ]
 
 [project.optional-dependencies]

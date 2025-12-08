@@ -68,6 +68,11 @@ class Configuration:
         return _env_flag("USE_ISOLATED_RENDERER")
 
     @classmethod
+    def forward_to_beats_app(cls) -> bool:
+        return True
+        return _env_flag("FORWARD_TO_BEATS_MAP")
+
+    @classmethod
     def peripheral_configuration(cls) -> str:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 

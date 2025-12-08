@@ -25,14 +25,30 @@ class PeripheralGroup(StrEnum):
     MAIN_SWITCH = "MAIN_SWITCH"
 
 @dataclass
-class PeripheralWrapper(Generic[A]):
+class PeripheralTag:
+    # Example of a tag specifying the input type
+    # PeripheralTag(
+    #     name="input_variant",
+    #     variant="button",
+    #     metadata={"version": "v1"}
+    # )
+    name: str
+    variant: str
+    metadata: dict[str, str] = field(default_factory=dict)
+
+@dataclass
+class PeripheralInfo:
+    id: str | None = None
+    tags: Sequence[PeripheralTag] = field(default_factory=list)
+
+@dataclass
+class PeripheralMessageEnvelope(Generic[A]):
+    peripheral_info: PeripheralInfo
     data: A
-    group: Sequence[PeripheralGroup] = field(default_factory=list)
 
     @classmethod
-    def unwrap_peripheral(cls, wrapper: PeripheralWrapper[A]) -> A:
+    def unwrap_peripheral(cls, wrapper: PeripheralMessageEnvelope[A]) -> A:
         return wrapper.data
-
 
 class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""
@@ -40,17 +56,23 @@ class Peripheral(Generic[A]):
     _logger = logging.getLogger(__name__)
 
     def _event_stream(self) -> reactivex.Observable[A]:
-        # TODO: Implement
         return reactivex.empty()
-        
+
+    def peripheral_info(self) -> PeripheralInfo:
+        # Default implementation returns a generic PeripheralInfo instance
+        # with no identifier or tags. Subclasses should override this method
+        # to supply meaningful identification and metadata relevant to their hardware.
+        return PeripheralInfo()
 
     @cached_property
     def observe(
         self
-    ) -> reactivex.Observable[PeripheralWrapper[A]]:
-        def wrap(a: A) -> PeripheralWrapper[A]:
-            return PeripheralWrapper[A](data=a)
-
+    ) -> reactivex.Observable[PeripheralMessageEnvelope[A]]:
+        def wrap(a: A) -> PeripheralMessageEnvelope[A]:
+            return PeripheralMessageEnvelope[A](
+                data=a,
+                peripheral_info=self.peripheral_info()
+            )
 
         return self._event_stream().pipe(ops.map(wrap))
 

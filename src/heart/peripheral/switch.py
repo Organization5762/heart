@@ -13,7 +13,7 @@ from reactivex import operators as ops
 from reactivex.scheduler import NewThreadScheduler
 
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.keyboard import KeyboardKey
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
@@ -44,9 +44,6 @@ class BaseSwitch(Peripheral):
         self.button_long_press_value = 0
         self.rotation_value_at_last_long_button_press = self.rotational_value
 
-    def run(self) -> None:
-        return
-
     def _event_stream(
         self
     ) -> reactivex.Observable[SwitchState]:
@@ -71,6 +68,23 @@ class FakeSwitch(BaseSwitch):
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
+    
+    def peripheral_info(self) -> PeripheralInfo:
+        return PeripheralInfo(
+            id="switch",
+            tags=[
+                PeripheralTag(
+                    name="input_variant",
+                    variant="button",
+                    metadata={"version": "v1"}
+                ),
+                # TODO: Allow the button to change its own tags in some cases
+                PeripheralTag(
+                    name="mode",
+                    variant="main_rotary_button",
+                ),
+            ]
+        )
 
     def run(self) -> None:
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):

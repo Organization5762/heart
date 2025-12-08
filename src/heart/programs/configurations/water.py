@@ -1,8 +1,7 @@
-from heart.display.renderers.water_cube import WaterCube
 from heart.environment import GameLoop
+from heart.modules.water_cube.renderer import WaterCube
 
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode("water")
-
-    mode.add_renderer(WaterCube())
+    mode.resolve_renderer(container=loop.context_container, renderer=WaterCube)

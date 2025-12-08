@@ -487,8 +487,6 @@
 #             frame_surface = pygame.transform.smoothscale(frame_surface, (surface_width, surface_height))
 #         window.blit(frame_surface, (0, 0))
 
-#         clock.tick_busy_loop(60)
-
 #     def _create_initial_state(
 #         self,
 #         window: pygame.Surface,

@@ -16,13 +16,12 @@ import numpy as np
 import pygame
 from pygame import Surface
 from pygame.time import Clock
-from reactivex import Observable
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.renderers import StatefulBaseRenderer
-from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.virtual.water_cube import WaterCubeState
+from heart.modules.water_cube.provider import WaterCubeStateProvider
+from heart.modules.water_cube.state import WaterCubeState
 
 # ───────────────────────── constants & tunables ───────────────────────────────
 FACE_PX = 64  # physical LED face resolution (square)
@@ -51,30 +50,12 @@ def _norm(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
     return (v[0] / length, v[1] / length, v[2] / length)
 
 
-def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
-    """Return GRID×GRID array of target heights for gravity **g**."""
-    gx, gy, gz = g
-    # avoid blow-up when gz ~ 0 (cube on its side)
-    denom = 0.001 + abs(gz)
-    slope_x = -gx / denom
-    slope_y = gy / denom
-
-    return INIT_FILL + slope_x * DX + slope_y * DY
-
-
 class WaterCube(StatefulBaseRenderer[WaterCubeState]):
     """Height-field water simulation projected to four LED faces."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, builder: WaterCubeStateProvider):
+        super().__init__(builder=builder)
         self.device_display_mode = DeviceDisplayMode.FULL
-
-    def state_observable(self,
-        peripheral_manager: PeripheralManager,
-    ) -> Observable[WaterCubeState]:
-        return WaterCubeState.observable(
-            peripheral_manager.get_accelerometer_subscription()
-        )
 
     # ─────────────────────── rendering helpers ───────────────────────────
     def _face_heights(self, heights: np.ndarray, face_idx: int) -> np.ndarray:
@@ -114,14 +95,11 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
         # --- compose frame -------------------------------------------------
         frame = np.zeros((CUBE_PX_W, CUBE_PX_H, 3), dtype=np.uint8)
         for face in range(4):
-            face_heights = self._face_heights(self.heights, face)
-            mask = self.state._mask_from_heights(face_heights, gz)
+            face_heights = self._face_heights(self.state.heights, face)
+            mask = self._mask_from_heights(face_heights, gz)
             x0 = face * FACE_PX
             face_view = frame[x0 : x0 + FACE_PX, :]
             face_view[mask] = BLUE
 
         # --- blit to LED surfaces -----------------------------------------
         pygame.surfarray.blit_array(window, frame)
-
-        # maintain original display rate
-        clock.tick_busy_loop(60)
