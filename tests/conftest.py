@@ -1,7 +1,7 @@
 import sys
 import types
 from collections import deque
-from typing import Callable
+from typing import Callable, Container
 
 import pygame
 import pytest
@@ -9,6 +9,7 @@ import pytest
 from heart.device import Cube, Device
 from heart.environment import GameLoop
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import container
 
 
 class _StubClock:
@@ -124,10 +125,14 @@ def device(orientation) -> Device:
 def manager() -> PeripheralManager:
     return PeripheralManager()
 
+@pytest.fixture()
+def resolver() -> Container:
+    return container
+
 
 @pytest.fixture()
-def loop(manager, device) -> GameLoop:
-    loop = GameLoop(device=device, peripheral_manager=manager)
+def loop(manager, device, resolver) -> GameLoop:
+    loop = GameLoop(device=device, resolver=resolver)
     # We just initialize the PyGame screen because peripherals and the fact that we expect, in practice,
     # for this to be a singleton _shouldn't_ be that important for testing
     loop._initialize_screen()
