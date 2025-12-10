@@ -1,12 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { peripheralStream } from "../streams";
 
-type PeripheralInfo = {
+export type PeripheralTag = {
+    name: string;
+    variant: string;
+    metadata?: Record<string, string>;
+  };
+
+export type PeripheralInfo = {
   id?: string | null;
-  tags: any[];
+  tags: PeripheralTag[];
 };
 
-type PeripheralMap = Record<string, { ts: number; info: PeripheralInfo }>;
+type PeripheralMap = Record<string, { ts: number; info: PeripheralInfo, last_data: any }>;
 
 const PeripheralContext = createContext<PeripheralMap>({});
 
@@ -16,6 +22,7 @@ export function PeripheralProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const sub = peripheralStream.subscribe((msg) => {
       const info = msg.payload.peripheral_info;
+      const data = msg.payload.data;
       if (!info.id) return;
 
       setPeripherals((prev) => ({

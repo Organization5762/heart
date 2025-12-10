@@ -9,7 +9,7 @@ export function EventList() {
           Events
         </h2>
   
-        <div className="overflow-auto border rounded-md p-2 bg-black/20">
+        <div className="overflow-auto border rounded-md p-2 bg-black/20 max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 mb-10">
           <table className="w-full text-xs font-mono">
             <thead className="text-muted-foreground border-b">
               <tr>

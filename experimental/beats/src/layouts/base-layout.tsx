@@ -16,6 +16,7 @@ export default function BaseLayout({
   );
 
   return (
+    <>
     <SidebarProvider>
       {/* justify-end */}
       <div className="fixed w-screen bg-background text-foreground border border-border h-[30px] z-[15] flex pl-16 justify-end [-webkit-app-region:drag]">
@@ -25,10 +26,11 @@ export default function BaseLayout({
       </div>
       <AppSidebar />
       <SidebarInset className="mt-[30px]">
-        <div className="m-2 h-full">
+        <div className="m-2 h-full overflow-y-auto">
           {children}
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </>
   )
 }

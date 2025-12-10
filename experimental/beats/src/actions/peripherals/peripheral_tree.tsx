@@ -1,15 +1,27 @@
+import { AccelerometerView } from "@/components/ui/peripherals/accelerometer";
+import { RotarySwitchView } from "@/components/ui/peripherals/rotary_button";
+import { UWBPositionView } from "@/components/ui/peripherals/uwb_positioning";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
-import { useConnectedPeripherals } from "../ws/providers/PeripheralProvider";
+import { PeripheralInfo, PeripheralTag, useConnectedPeripherals } from "../ws/providers/PeripheralProvider";
 
-type PeripheralTag = {
-  name: string;
-  variant: string;
-  metadata?: Record<string, string>;
+function tagsByName(peripheral: PeripheralInfo) {
+  return Object.fromEntries(
+    peripheral.tags.map((t) => [t.name, t])
+  );
 };
 
-type PeripheralInfo = {
-  id?: string | null;
-  tags: PeripheralTag[];
+const SpecialRenderer = ({ peripheral }: { peripheral: PeripheralInfo }) => {
+  const c = tagsByName(peripheral);
+  switch (c["input_variant"].variant) {
+    case "uwb_positioning":
+      return <UWBPositionView peripheral={peripheral} />
+    case "accelerometer":
+      return <AccelerometerView peripheral={peripheral} />
+    case "button":
+      return <RotarySwitchView peripheral={peripheral} />
+    default:
+      return <span>{peripheral.id}</span>
+  }
 };
 
 export function PeripheralTree({
@@ -24,7 +36,7 @@ export function PeripheralTree({
     : [hierarchy as string[]];
 
   return (
-    <div className="p-3 text-xs font-mono select-none">
+    <div className="p-3 text-xs font-mono max-h-[95vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
       {hierarchies.map((h, idx) => (
         <div key={idx} className={hierarchies.length > 1 ? "mb-6" : ""}>
           <span className="text-sm font-bold mb-2">
@@ -50,13 +62,9 @@ function PeripheralBranch({
   peripheral: PeripheralInfo;
   hierarchy: string[];
 }) {
-  const tagsByName = Object.fromEntries(
-    peripheral.tags.map((t) => [t.name, t])
-  );
-
   // Tags in the desired order
   const orderedTags = [
-    ...hierarchy.map((name) => tagsByName[name]).filter(Boolean),
+    ...hierarchy.map((name) => tagsByName(peripheral)[name]).filter(Boolean),
     ...peripheral.tags
       .filter((t) => !hierarchy.includes(t.name))
       .sort((a, b) => a.name.localeCompare(b.name)),
@@ -70,8 +78,8 @@ function PeripheralBranch({
 
       {/* Peripheral name at the final leaf */}
       <LeafPeripheralName
-        name={peripheral.id ?? "unknown"}
         depth={orderedTags.length}
+        renderAsComponent={<SpecialRenderer peripheral={peripheral} />}
       />
     </div>
   );
@@ -100,18 +108,18 @@ function TagNode({ tag, depth }: { tag: PeripheralTag; depth: number }) {
 }
 
 function LeafPeripheralName({
-  name,
   depth,
+  renderAsComponent,
 }: {
-  name: string;
   depth: number;
+  renderAsComponent?: React.ReactNode;
 }) {
   return (
     <div
       className="mt-2 font-semibold"
       style={{ marginLeft: depth * 16 }}
     >
-      {name}
+      {renderAsComponent}
     </div>
   );
 }

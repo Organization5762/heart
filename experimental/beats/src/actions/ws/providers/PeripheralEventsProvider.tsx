@@ -34,3 +34,8 @@ export function PeripheralEventsProvider({ children }: { children: React.ReactNo
 export function usePeripheralEvents() {
   return useContext(PeripheralEventsContext);
 }
+
+export function useSpecificPeripheralEvents(peripheralId: string) {
+    const events = useContext(PeripheralEventsContext);
+    return events.filter((event) => event.msg.payload.peripheral_info.id === peripheralId);
+  }

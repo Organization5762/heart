@@ -6,7 +6,6 @@ import {
 } from "electron-devtools-installer";
 import { ipcMain } from "electron/main";
 import path from "path";
-import { updateElectronApp, UpdateSourceType } from "update-electron-app";
 import { IPC_CHANNELS } from "./constants";
 
 const inDevelopment = process.env.NODE_ENV === "development";
@@ -14,22 +13,22 @@ const inDevelopment = process.env.NODE_ENV === "development";
 function createWindow() {
   const preload = path.join(__dirname, "preload.js");
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1600,
+    height: 800,
     webPreferences: {
       devTools: inDevelopment,
       contextIsolation: true,
       nodeIntegration: true,
       nodeIntegrationInSubFrames: false,
-
-      preload: preload,
+      preload,
     },
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
     trafficLightPosition:
       process.platform === "darwin" ? { x: 5, y: 5 } : undefined,
   });
+
   ipcContext.setMainWindow(mainWindow);
-  mainWindow.webContents.openDevTools()
+  mainWindow.webContents.openDevTools();
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -49,15 +48,6 @@ async function installExtensions() {
   }
 }
 
-function checkForUpdates() {
-  updateElectronApp({
-    updateSource: {
-      type: UpdateSourceType.ElectronPublicUpdateService,
-      repo: "LuanRoger/electron-shadcn",
-    },
-  });
-}
-
 async function setupORPC() {
   const { rpcHandler } = await import("./ipc/handler");
 
@@ -73,10 +63,9 @@ app
   .whenReady()
   .then(createWindow)
   .then(installExtensions)
-  // .then(checkForUpdates)
   .then(setupORPC);
 
-//osX only
+// osX only
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
@@ -88,4 +77,3 @@ app.on("activate", () => {
     createWindow();
   }
 });
-//osX only ends
