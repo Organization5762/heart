@@ -43,6 +43,7 @@ dependencies = [
     "moderngl",
     "sounddevice",
     "paho-mqtt",
+    "librosa>=0.11.0",
 ]
 
 [project.optional-dependencies]

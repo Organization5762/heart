@@ -95,6 +95,7 @@ class AppController(BaseRenderer):
     def is_empty(self) -> bool:
         return len(self.modes.state.renderers) == 0
 
+
 @dataclass
 class GameModeState:
     title_renderers: list[BaseRenderer] = dataclasses.field(default_factory=list)
@@ -110,7 +111,7 @@ class GameModeState:
 
     def active_renderer(self) -> BaseRenderer:
         assert len(self.renderers) > 0, "Must have at least one renderer to select from"
-        offset = (self._active_mode_index + self.mode_offset)
+        offset = self._active_mode_index + self.mode_offset
         mode_index = offset % len(self.renderers)
         last_scene_index = self.previous_mode_index
 
@@ -145,6 +146,7 @@ class GameModeState:
         self.previous_mode_index = mode_index
         return self.renderers[mode_index]
 
+
 class GameModes(AtomicBaseRenderer[GameModeState]):
     """GameModes represents a collection of modes in the game loop where different
     renderers can be added.
@@ -152,12 +154,13 @@ class GameModes(AtomicBaseRenderer[GameModeState]):
     Navigation is built-in to this, assuming the user long-presses
 
     """
+
     def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
+        orientation: Orientation,
     ) -> GameModeState:
         if self._state is not None:
             for renderer in self.state.renderers:
@@ -167,6 +170,7 @@ class GameModes(AtomicBaseRenderer[GameModeState]):
             state = self._state
         else:
             state = GameModeState()
+        self.peripheral_manager = peripheral_manager
         peripheral_manager.get_main_switch_subscription().subscribe(
             on_next=self.handle_state
         )
@@ -181,23 +185,28 @@ class GameModes(AtomicBaseRenderer[GameModeState]):
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
 
-    def get_renderers(
-        self
-    ) -> list[BaseRenderer]:
+    def get_renderers(self) -> list[BaseRenderer]:
         active_renderer = self.state.active_renderer()
         renderers = active_renderer.get_renderers()
         return renderers
 
-    def real_process(self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation) -> None:
+    def real_process(
+        self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation
+    ) -> None:
         for renderer in self.get_renderers():
-            renderer.real_process(window=window, clock=clock, orientation=orientation)
+            renderer.process(
+                window=window,
+                clock=clock,
+                peripheral_manager=self.peripheral_manager,
+                orientation=orientation,
+            )
 
     def handle_state(self, input: SwitchState) -> None:
         new_long_button_value = input.long_button_value
         if new_long_button_value != self.state.last_long_button_value:
             # Swap select modes
             if self.state.in_select_mode:
-                
+
                 # Combine the offset we're switching out of select mode
                 self.state._active_mode_index += self.state.mode_offset
                 self.state.mode_offset = 0
@@ -210,9 +219,7 @@ class GameModes(AtomicBaseRenderer[GameModeState]):
             self.state.last_long_button_value = new_long_button_value
 
         if self.state.in_select_mode:
-            self.state.mode_offset = (
-                input.rotation_since_last_long_button_press
-            )
+            self.state.mode_offset = input.rotation_since_last_long_button_press
 
 
 class ComposedRenderer(BaseRenderer):
@@ -220,9 +227,7 @@ class ComposedRenderer(BaseRenderer):
         super().__init__()
         self.renderers: list[BaseRenderer] = renderers
 
-    def get_renderers(
-        self
-    ) -> list[BaseRenderer]:
+    def get_renderers(self) -> list[BaseRenderer]:
         result = []
         for renderer in self.renderers:
             result.extend(renderer.get_renderers())
@@ -270,36 +275,38 @@ class MultiSceneState:
     current_button_value: int = 0
     offset_of_button_value: int | None = None
 
+
 class MultiScene(AtomicBaseRenderer[MultiSceneState]):
     def __init__(self, scenes: list[AtomicBaseRenderer]) -> None:
         super().__init__()
         self.scenes = scenes
 
-    def get_renderers(
-        self
-    ) -> list[AtomicBaseRenderer]:
-        index = (self.state.current_button_value - (self.state.offset_of_button_value or 0)) % len(self.scenes)
-        return [
-            *self.scenes[index].get_renderers()
-        ]
+    def get_renderers(self) -> list[AtomicBaseRenderer]:
+        index = (
+            self.state.current_button_value - (self.state.offset_of_button_value or 0)
+        ) % len(self.scenes)
+        return [*self.scenes[index].get_renderers()]
 
-    def _create_initial_state(self, window: pygame.Surface, clock: pygame.time.Clock, peripheral_manager: PeripheralManager, orientation: Orientation) -> MultiSceneState:
-        state = MultiSceneState(
-            current_button_value=0,
-            offset_of_button_value=None
-        )
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> MultiSceneState:
+        state = MultiSceneState(current_button_value=0, offset_of_button_value=None)
         self.set_state(state)
         observable = peripheral_manager.get_main_switch_subscription()
-        observable.subscribe(
-            on_next=self._process_switch
-        )
+        observable.subscribe(on_next=self._process_switch)
 
         for scene in self.scenes:
             scene.initialize(window, clock, peripheral_manager, orientation)
 
         return state
 
-    def real_process(self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation) -> None:
+    def real_process(
+        self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation
+    ) -> None:
         for render in self.get_renderers():
             render.real_process(window=window, clock=clock, orientation=orientation)
 

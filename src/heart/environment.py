@@ -82,9 +82,8 @@ def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
     saturation = np.zeros_like(c_max)
     non_zero_value = c_max != 0
     saturation[non_zero_value] = (
-        (delta[non_zero_value] * 255 + c_max[non_zero_value] // 2)
-        // c_max[non_zero_value]
-    )
+        delta[non_zero_value] * 255 + c_max[non_zero_value] // 2
+    ) // c_max[non_zero_value]
     saturation_uint8 = saturation.astype(np.uint8)
 
     hue_uint8 = (np.round(hue * 180.0) % 180).astype(np.uint8)
@@ -404,7 +403,6 @@ class GameLoop:
         self.clock = clock
         self.peripheral_manager.clock.on_next(self.clock)
 
-
     def _on_phone_text_message(self, _: "Input") -> None:
         self._phone_text_display_started_at = time.monotonic()
         self._ensure_phone_text_renderer()
@@ -439,9 +437,7 @@ class GameLoop:
             return False
         return True
 
-    def _should_add_flame_renderer(
-        self, renderers: list["BaseRenderer"]
-    ) -> bool:
+    def _should_add_flame_renderer(self, renderers: list["BaseRenderer"]) -> bool:
         if any(self._is_flame_renderer(renderer) for renderer in renderers):
             return False
 
@@ -538,15 +534,14 @@ class GameLoop:
                 "duration_ms": duration_ms,
                 "queue_depth": self._render_queue_depth,
                 "display_mode": renderer.device_display_mode.name,
-                "uses_opengl": renderer.device_display_mode
-                == DeviceDisplayMode.OPENGL,
+                "uses_opengl": renderer.device_display_mode == DeviceDisplayMode.OPENGL,
                 "initialized": renderer.is_initialized(),
             }
 
             log_controller.log(
                 key="render.loop",
                 logger=logger,
-                level=logging.INFO,
+                level=logging.DEBUG,
                 msg=log_message,
                 args=log_args,
                 extra=log_extra,
@@ -657,9 +652,9 @@ class GameLoop:
         self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
         # Ensure both surfaces are the same size
-        assert surface1.get_size() == surface2.get_size(), (
-            "Surfaces must be the same size to merge."
-        )
+        assert (
+            surface1.get_size() == surface2.get_size()
+        ), "Surfaces must be the same size to merge."
         surface1.blit(surface2, (0, 0))
         return surface1
 

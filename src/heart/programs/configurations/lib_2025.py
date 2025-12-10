@@ -2,6 +2,8 @@ import numpy as np
 
 from heart.display.color import Color
 from heart.display.renderers.artist import ArtistScene
+from heart.display.renderers.beat_flash import BeatFlashRenderer
+from heart.display.renderers.beat_sync_sprite import BeatSyncSprite
 from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.display.renderers.heart_title_screen import HeartTitleScreen
 from heart.display.renderers.hilbert_curve import HilbertScene
@@ -13,7 +15,6 @@ from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.mario import MarioRenderer
 from heart.display.renderers.multicolor import MulticolorRenderer
 from heart.display.renderers.pixels import RandomPixel
-from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.three_fractal import FractalScene
@@ -95,7 +96,10 @@ def configure(loop: GameLoop) -> None:
         ComposedRenderer(
             [
                 MulticolorRenderer(),
-                SpritesheetLoop("ness.png", "ness.json"),
+                # Beat detection (invisible - just updates shared beat state)
+                BeatFlashRenderer(sensitivity=1.0, render_flash=False),
+                # Beat-synced Ness animation
+                BeatSyncSprite("ness.png", frame_width=32, scale=2.0),
             ]
         )
     )
