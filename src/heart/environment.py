@@ -267,7 +267,7 @@ class GameLoop:
         self,
         device: Device,
         resolver: Container,
-        max_fps: int = 60,
+        max_fps: int = 500,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
         self.context_container = resolver
