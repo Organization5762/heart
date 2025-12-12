@@ -36,19 +36,24 @@ class TestNavigationGameModes:
         """Verify that active_renderer builds a slide transition when the active mode index changes. This keeps navigation animations smooth when switching between games."""
         game_modes = _make_game_modes(count=2)
 
-        with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
+            "heart.navigation.SlideTransitionRenderer"
+        ) as slide_cls:
+            provider = Mock()
             transition = Mock()
+            provider_cls.return_value = provider
             slide_cls.return_value = transition
 
             game_modes.state.mode_offset = 1
             result = game_modes.state.active_renderer()
 
         assert result is transition
-        slide_cls.assert_called_once_with(
-            renderer_A=game_modes.state.title_renderers[0],
-            renderer_B=game_modes.state.title_renderers[1],
+        provider_cls.assert_called_once_with(
+            renderer_a=game_modes.state.title_renderers[0],
+            renderer_b=game_modes.state.title_renderers[1],
             direction=1,
         )
+        slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == 1
 
 
@@ -57,19 +62,24 @@ class TestNavigationGameModes:
         """Verify that active_renderer wraps from the first mode to the last when stepping negatively. This preserves intuitive cycling so users can scroll backwards seamlessly."""
         game_modes = _make_game_modes(count=3)
 
-        with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
+            "heart.navigation.SlideTransitionRenderer"
+        ) as slide_cls:
+            provider = Mock()
             transition = Mock()
+            provider_cls.return_value = provider
             slide_cls.return_value = transition
 
             game_modes.state.mode_offset = -1
             result = game_modes.state.active_renderer()
 
         assert result is transition
-        slide_cls.assert_called_once_with(
-            renderer_A=game_modes.state.title_renderers[0],
-            renderer_B=game_modes.state.title_renderers[-1],
+        provider_cls.assert_called_once_with(
+            renderer_a=game_modes.state.title_renderers[0],
+            renderer_b=game_modes.state.title_renderers[-1],
             direction=-1,
         )
+        slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == len(game_modes.state.renderers) - 1
 
 
@@ -95,19 +105,24 @@ class TestNavigationGameModes:
         game_modes.state.previous_mode_index = 0
         game_modes.state._active_mode_index = 2
 
-        with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
+            "heart.navigation.SlideTransitionRenderer"
+        ) as slide_cls:
+            provider = Mock()
             transition = Mock()
+            provider_cls.return_value = provider
             slide_cls.return_value = transition
 
             game_modes.state.mode_offset = 0
             result = game_modes.state.active_renderer()
 
         assert result is transition
-        slide_cls.assert_called_once_with(
-            renderer_A=game_modes.state.title_renderers[0],
-            renderer_B=game_modes.state.title_renderers[2],
+        provider_cls.assert_called_once_with(
+            renderer_a=game_modes.state.title_renderers[0],
+            renderer_b=game_modes.state.title_renderers[2],
             direction=1,
         )
+        slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == 2
 
 
@@ -118,19 +133,24 @@ class TestNavigationGameModes:
         game_modes.state.previous_mode_index = 0
         game_modes.state._active_mode_index = len(game_modes.state.renderers) - 1
 
-        with patch("heart.navigation.SlideTransitionRenderer") as slide_cls:
+        with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
+            "heart.navigation.SlideTransitionRenderer"
+        ) as slide_cls:
+            provider = Mock()
             transition = Mock()
+            provider_cls.return_value = provider
             slide_cls.return_value = transition
 
             game_modes.state.mode_offset = 0
             result = game_modes.state.active_renderer()
 
         assert result is transition
-        slide_cls.assert_called_once_with(
-            renderer_A=game_modes.state.title_renderers[0],
-            renderer_B=game_modes.state.title_renderers[-1],
+        provider_cls.assert_called_once_with(
+            renderer_a=game_modes.state.title_renderers[0],
+            renderer_b=game_modes.state.title_renderers[-1],
             direction=-1,
         )
+        slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == len(game_modes.state.renderers) - 1
 
 
