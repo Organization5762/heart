@@ -124,7 +124,7 @@ def configure(loop: GameLoop) -> None:
     water_mode = loop.add_mode(
         ComposedRenderer(
             [
-                WaterTitleScreen(),
+                loop.context_container.resolve(WaterTitleScreen),
                 TextRendering(
                     text=["water"],
                     font="Roboto",

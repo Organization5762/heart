@@ -25,9 +25,9 @@ status so incremental updates stay coordinated.
   - `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) – stores
     wrapped text layout and font sizing in atomic state while preserving
     phone-text integration.
-  - `WaterTitleScreen` (`src/heart/display/renderers/water_title_screen.py`) –
-    tracks wave animation timing atomically so consumer loops receive
-    consistent offsets across frames.
+  - `WaterTitleScreen` (`src/heart/display/renderers/water_title_screen/renderer.py`) –
+    tracks wave animation timing via a provider-driven state stream so consumer
+    loops receive consistent offsets across frames.
   - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random.py`)
     – keeps the switch consumer while moving frame counters and screen
     selection into immutable state for per-frame randomisation safety.
