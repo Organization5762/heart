@@ -19,9 +19,9 @@ status so incremental updates stay coordinated.
   - `RenderImage` (`src/heart/display/renderers/image.py`) – loads assets during
     initialization, caches the scaled surface in renderer state, and remains
     compatible with loops that expect simple blit-only behaviour.
-  - `SlideTransitionRenderer` (`src/heart/display/renderers/slide.py`) – tracks
-    slide offsets atomically while orchestrating transition timing across two
-    child renderers.
+  - `SlideTransitionRenderer` (`src/heart/display/renderers/slide_transition/renderer.py`) –
+    tracks slide offsets atomically while orchestrating transition timing across
+    two child renderers via a dedicated provider and state module.
   - `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) – stores
     wrapped text layout and font sizing in atomic state while preserving
     phone-text integration.

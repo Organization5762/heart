@@ -9,7 +9,8 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
 from heart.display.renderers.color import RenderColor
-from heart.display.renderers.slide import SlideTransitionRenderer
+from heart.display.renderers.slide_transition import (SlideTransitionProvider,
+                                                      SlideTransitionRenderer)
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.text import TextRendering
 from heart.peripheral.core.manager import PeripheralManager
@@ -125,11 +126,12 @@ class GameModeState:
                 backward_steps = (last_scene_index - mode_index) % len(self.renderers)
                 slide_dir = 1 if forward_steps <= backward_steps else -1
 
-            self.sliding_transition = SlideTransitionRenderer(
-                renderer_A=self.title_renderers[last_scene_index],
-                renderer_B=self.title_renderers[mode_index],
+            provider = SlideTransitionProvider(
+                renderer_a=self.title_renderers[last_scene_index],
+                renderer_b=self.title_renderers[mode_index],
                 direction=slide_dir,
             )
+            self.sliding_transition = SlideTransitionRenderer(provider)
 
             self.previous_mode_index = mode_index
             return self.sliding_transition
