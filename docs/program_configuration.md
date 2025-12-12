@@ -50,6 +50,7 @@ Use `heart.navigation` helpers to manage scheduling:
 Example fragment from `lib_2025.py`:
 
 ```python
+from heart.display.renderers.text import TextRendering
 from heart.display.renderers.water_cube import WaterCube
 from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.navigation import ComposedRenderer
@@ -57,9 +58,14 @@ from heart.navigation import ComposedRenderer
 
 def configure(loop: GameLoop) -> None:
     water_mode = loop.add_mode(
-        ComposedRenderer([WaterTitleScreen(), TextRendering.default("water")])
+        ComposedRenderer(
+            [
+                loop.context_container.resolve(WaterTitleScreen),
+                TextRendering.default("water"),
+            ]
+        )
     )
-    water_mode.add_renderer(WaterCube())
+    water_mode.resolve_renderer(loop.context_container, WaterCube)
 ```
 
 ## Integrating Peripheral Data
