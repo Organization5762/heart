@@ -68,7 +68,7 @@ status so incremental updates stay coordinated.
   - `Slinky` (`src/heart/display/renderers/pacman.py`) – keeps the falling
     anchor in atomic state so the animation restarts cleanly when composed in
     arcade sequences.
-  - `CombinedBpmScreen` (`src/heart/display/renderers/combined_bpm_screen.py`)
+  - `CombinedBpmScreen` (`src/heart/display/renderers/combined_bpm_screen/renderer.py`)
     – maintains the swap timer atomically while delegating to metadata and max
     BPM sub-renderers so playlists see deterministic rotation cadence.
   - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
@@ -90,7 +90,7 @@ status so incremental updates stay coordinated.
   - `MultiScene` (`src/heart/display/renderers/multi_scene.py`) – tracks the
     active child index and keyboard edge detection atomically so scene cycling
     via switches and keys remains deterministic for composed playlists.
-  - `MetadataScreen` (`src/heart/display/renderers/metadata_screen.py`) –
+  - `MetadataScreen` (`src/heart/display/renderers/metadata_screen/renderer.py`) –
     snapshots per-monitor animation state and battery indicators to deliver
     consistent beat visualisations even as heart rate sensors join or leave.
   - `WaterCube` (`src/heart/display/renderers/water_cube.py`) – records the
