@@ -1,3 +1,5 @@
+from typing import Callable
+
 import numpy as np
 from lagom import Singleton
 
@@ -16,7 +18,7 @@ from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.text import TextRendering
 from heart.display.renderers.three_fractal import FractalScene
-from heart.display.renderers.tixyland import Tixyland
+from heart.display.renderers.tixyland import Tixyland, TixylandStateProvider
 from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.environment import GameLoop
 from heart.modules.devices.acceleration.provider import \
@@ -108,7 +110,7 @@ def configure(loop: GameLoop) -> None:
     heart_rate_mode = loop.add_mode(
         ComposedRenderer(
             [
-                HeartTitleScreen(),
+                loop.context_container.resolve(HeartTitleScreen),
                 TextRendering(
                     text=["heart rate"],
                     font="Roboto",
@@ -185,22 +187,31 @@ def configure(loop: GameLoop) -> None:
 
     # Some random ones
     tixyland = loop.add_mode("tixyland")
+
+    def build_tixyland(
+        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+    ) -> Tixyland:
+        return Tixyland(
+            builder=loop.context_container.resolve(TixylandStateProvider),
+            fn=fn,
+        )
+
     tixyland.add_renderer(
         MultiScene(
             [
-                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
-                Tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
-                Tixyland(fn=lambda t, i, x, y: y - t * t),
-                Tixyland(
+                build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                build_tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
+                build_tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
+                build_tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
+                build_tixyland(fn=lambda t, i, x, y: y - t * t),
+                build_tixyland(
                     fn=lambda t, i, x, y: np.sin(
                         t
                         - np.sqrt((x - x.shape[0] / 2) ** 2 + (y - y.shape[1] / 2) ** 2)
                     )
                 ),
-                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
-                Tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
+                build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                build_tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
             ]
         )
     )

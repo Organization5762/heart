@@ -1,6 +1,8 @@
+from typing import Callable
+
 import numpy as np
 
-from heart.display.renderers.tixyland import Tixyland
+from heart.display.renderers.tixyland import Tixyland, TixylandStateProvider
 from heart.environment import GameLoop
 from heart.navigation import MultiScene
 
@@ -12,23 +14,31 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 def configure(loop: GameLoop) -> None:
+    def build_tixyland(
+        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+    ) -> Tixyland:
+        return Tixyland(
+            builder=loop.context_container.resolve(TixylandStateProvider),
+            fn=fn,
+        )
+
     mode = loop.add_mode()
     mode.add_renderer(
         MultiScene(
             [
-                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
-                Tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
-                Tixyland(fn=lambda t, i, x, y: y - t * t),
-                Tixyland(
+                build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                build_tixyland(fn=lambda t, i, x, y: np.sin(np.ones(x.shape) * t)),
+                build_tixyland(fn=lambda t, i, x, y: y - t * t),
+                build_tixyland(
                     fn=lambda t, i, x, y: np.sin(
                         t
                         - np.sqrt((x - x.shape[0] / 2) ** 2 + (y - y.shape[1] / 2) ** 2)
                     )
                 ),
-                Tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
-                Tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
-                Tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
+                build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
+                build_tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
+                build_tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape) < 0.1),
+                build_tixyland(fn=lambda t, i, x, y: np.random.rand(*x.shape)),
             ]
         )
     )

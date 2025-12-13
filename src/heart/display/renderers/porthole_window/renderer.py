@@ -1,36 +1,21 @@
-from __future__ import annotations
-
 import math
-from dataclasses import dataclass
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import AtomicBaseRenderer
-from heart.peripheral.core.manager import PeripheralManager
+from heart.display.renderers import StatefulBaseRenderer
+from heart.display.renderers.porthole_window.provider import \
+    PortholeWindowStateProvider
+from heart.display.renderers.porthole_window.state import PortholeWindowState
 
 
-@dataclass(frozen=True)
-class PortholeWindowState:
-    elapsed: float
-
-
-class PortholeWindowRenderer(AtomicBaseRenderer[PortholeWindowState]):
+class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
     """Render a brass porthole with a softly animated outdoor scene."""
 
-    def __init__(self) -> None:
-        AtomicBaseRenderer.__init__(self)
+    def __init__(self, builder: PortholeWindowStateProvider) -> None:
+        super().__init__(builder=builder)
         self.device_display_mode = DeviceDisplayMode.FULL
-
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation
-    ):
-        return PortholeWindowState(elapsed=0.0)
 
     def real_process(
         self,
@@ -38,8 +23,7 @@ class PortholeWindowRenderer(AtomicBaseRenderer[PortholeWindowState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        elapsed = self.state.elapsed + clock.get_time() / 1000.0
-        self.update_state(elapsed=elapsed)
+        elapsed = self.state.elapsed_seconds
         width, height = window.get_size()
         center = (width // 2, height // 2)
         radius = max(48, int(min(width, height) * 0.42))
