@@ -1,6 +1,7 @@
 from heart.display.color import Color
 from heart.display.renderers.pacman import PacmanGhostRenderer
-from heart.display.renderers.pixels import Border, RandomPixel
+from heart.display.renderers.pixels import Border
+from heart.display.renderers.random_pixel import RandomPixel
 from heart.environment import GameLoop
 
 

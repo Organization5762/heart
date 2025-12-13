@@ -11,11 +11,6 @@ from heart.peripheral.core.manager import PeripheralManager
 
 
 @dataclass
-class RandomPixelState:
-    color: Color | None
-
-
-@dataclass
 class BorderState:
     color: Color
 
@@ -30,49 +25,6 @@ class RainState:
 class SlinkyState:
     starting_point: int = 0
     current_y: int = 0
-
-
-class RandomPixel(AtomicBaseRenderer[RandomPixelState]):
-    def __init__(
-        self, num_pixels=1, color: Color | None = None, brightness: float = 1.0
-    ) -> None:
-        self._initial_color = color
-        AtomicBaseRenderer.__init__(self)
-        self.device_display_mode = DeviceDisplayMode.FULL
-        self.num_pixels = num_pixels
-        self.brightness = brightness
-
-    def real_process(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        orientation: Orientation,
-    ) -> None:
-        width, height = window.get_size()
-
-        # TODO: We need a mask here because the most expensive thing is the random function.
-        # A mask of noise would allow for cheaper sampling of randomness
-        pixels = [
-            (random.randint(0, width - 1), random.randint(0, height - 1))
-            for _ in range(self.num_pixels)
-        ]
-        state = self.state
-        random_color = state.color or Color.random()
-        color_value = [int(x * self.brightness) for x in random_color._as_tuple()]
-        for x, y in pixels:
-            window.set_at((x, y), color_value)
-
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation
-    ):
-        return RandomPixelState(color=self._initial_color)
-
-    def set_color(self, color: Color | None) -> None:
-        self.update_state(color=color)
 
 
 class Border(AtomicBaseRenderer[BorderState]):

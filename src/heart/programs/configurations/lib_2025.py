@@ -11,7 +11,7 @@ from heart.display.renderers.kirby import KirbyScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.display.renderers.mandelbrot.title import MandelbrotTitle
 from heart.display.renderers.multicolor import MulticolorRenderer
-from heart.display.renderers.pixels import RandomPixel
+from heart.display.renderers.random_pixel import RandomPixel
 from heart.display.renderers.spritesheet import SpritesheetLoop
 from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.display.renderers.text import TextRendering
