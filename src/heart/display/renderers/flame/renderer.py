@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import numpy as np
 import pygame
 import pygame.surfarray as sarr
 import pygame.transform as pgt
 from pygame import Surface
+from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import AtomicBaseRenderer
+from heart.display.renderers.flame.provider import FlameStateProvider
+from heart.display.renderers.flame.state import FlameState
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -223,36 +228,46 @@ class FlameGenerator:
         raise ValueError("side must be 'bottom', 'top', 'left' or 'right'")
 
 
-class FlameRenderer(BaseRenderer):
-    """A renderer that displays flames on all four sides of the screen.
-
-    Similar to the flame borders used in MaxBpmScreen.
-
-    """
+class FlameRenderer(AtomicBaseRenderer[FlameState]):
+    """Display animated flames on all four sides of the screen."""
 
     def __init__(self) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-
-        # Create a single flame generator instead of four
         self._flame_generator = FlameGenerator(64, 16)
+        self._provider: FlameStateProvider | None = None
+        self._subscription: Disposable | None = None
 
-        self.time_since_last_update = 0
+    def reset(self) -> None:
+        if self._subscription is not None:
+            self._subscription.dispose()
+            self._subscription = None
+        super().reset()
 
-    def process(
+    def _create_initial_state(
         self,
         window: Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> None:
-        # Calculate time and render the flame once
-        t = pygame.time.get_ticks() * 2 / 1000.0  # floating-point seconds
+    ) -> FlameState:
+        self._provider = FlameStateProvider(peripheral_manager)
+        initial_state = self._provider.latest_state
+        self.set_state(initial_state)
+        self._subscription = self._provider.observable().subscribe(on_next=self.set_state)
+        return initial_state
 
-        # Generate the base flame surface once
+    def real_process(
+        self,
+        window: Surface,
+        clock: pygame.time.Clock,
+        orientation: Orientation,
+    ) -> None:
+        state = self.state
+        t = state.time_seconds
+
         base_flame = self._flame_generator.surface(t, "bottom")
 
-        # Transform the base flame for other orientations
         flame_surfaces = {
             "bottom": base_flame,
             "top": pgt.flip(base_flame.copy(), False, True),
@@ -260,18 +275,9 @@ class FlameRenderer(BaseRenderer):
             "right": pgt.rotate(base_flame.copy(), 90),
         }
 
-        # Get window dimensions
         window_width, window_height = window.get_size()
 
-        # Draw flames on all four sides
-        # Bottom flame
         window.blit(flame_surfaces["bottom"], (0, window_height - 16))
-
-        # Top flame
         window.blit(flame_surfaces["top"], (0, 0))
-
-        # Left flame
         window.blit(flame_surfaces["left"], (0, 0))
-
-        # Right flame
         window.blit(flame_surfaces["right"], (window_width - 16, 0))
