@@ -1,28 +1,18 @@
-from dataclasses import dataclass
-
-import pygame
 from pygame import Surface, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.display.renderers import AtomicBaseRenderer
-from heart.peripheral.core.manager import PeripheralManager
-from heart.utilities.logging import get_logger
-
-DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
-logger = get_logger("HeartRateTitleScreen")
-
-
-@dataclass
-class HeartTitleScreenState:
-    heart_up: bool = True
-    elapsed_ms: float = 0.0
+from heart.display.renderers import StatefulBaseRenderer
+from heart.display.renderers.heart_title_screen.provider import \
+    HeartTitleScreenStateProvider
+from heart.display.renderers.heart_title_screen.state import \
+    HeartTitleScreenState
 
 
-class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
-    def __init__(self) -> None:
-        AtomicBaseRenderer.__init__(self)
+class HeartTitleScreen(StatefulBaseRenderer[HeartTitleScreenState]):
+    def __init__(self, builder: HeartTitleScreenStateProvider) -> None:
+        super().__init__(builder=builder)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
         # Load blue heart images
@@ -32,7 +22,7 @@ class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
             "big": Loader.load("hearts/blue/big.png"),
         }
 
-    def display_number(self, window, number, x, y):
+    def display_number(self, window: Surface, number, x, y):
         my_font = Loader.load_font("Grand9K Pixel.ttf")
         text = my_font.render(str(number).zfill(3), True, (255, 255, 255))
         text_rect = text.get_rect(center=(x, y))
@@ -47,21 +37,10 @@ class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
         # Get window dimensions
         window_width, window_height = window.get_size()
 
-        # Update animation state
-        # TODO: Move clock into _create_initial_state callbacks
         state = self.state
-        elapsed_ms = state.elapsed_ms + clock.get_time()
-        heart_up = state.heart_up
-
-        if elapsed_ms > DEFAULT_TIME_BETWEEN_FRAMES_MS:
-            elapsed_ms = 0
-            heart_up = not heart_up
-
-        if heart_up != state.heart_up or elapsed_ms != state.elapsed_ms:
-            self.update_state(heart_up=heart_up, elapsed_ms=elapsed_ms)
 
         # Determine which image to use based on animation state
-        image_key = "small" if heart_up else "med"
+        image_key = "small" if state.heart_up else "med"
         image = self.heart_images[image_key]
 
         # Center the heart in the window
@@ -74,12 +53,3 @@ class HeartTitleScreen(AtomicBaseRenderer[HeartTitleScreenState]):
 
         # Draw the heart
         window.blit(image, (heart_x, heart_y))
-
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation
-    ) -> HeartTitleScreenState:
-        return HeartTitleScreenState()

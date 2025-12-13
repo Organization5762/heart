@@ -31,7 +31,7 @@ status so incremental updates stay coordinated.
   - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random.py`)
     – keeps the switch consumer while moving frame counters and screen
     selection into immutable state for per-frame randomisation safety.
-  - `Tixyland` (`src/heart/display/renderers/tixyland.py`) – carries the
+  - `Tixyland` (`src/heart/display/renderers/tixyland/renderer.py`) – carries the
     time-tracking accumulator atomically so shader functions invoked by loops
     receive a deterministic elapsed time value.
   - `Life` (`src/heart/display/renderers/life.py`) – records the seeded grid
@@ -74,10 +74,10 @@ status so incremental updates stay coordinated.
   - `MarioRenderer` (`src/heart/display/renderers/mario.py`) – stores the frame
     counter and shake-triggered loop flag in immutable state, keeping
     accelerometer-driven transitions predictable across resets.
-  - `PortholeWindowRenderer` (`src/heart/display/renderers/porthole_window.py`)
+  - `PortholeWindowRenderer` (`src/heart/display/renderers/porthole_window/renderer.py`)
     – tracks elapsed time in immutable state so cloud drift remains stable when
     the renderer is reset or reused.
-  - `HeartTitleScreen` (`src/heart/display/renderers/heart_title_screen.py`) –
+  - `HeartTitleScreen` (`src/heart/display/renderers/heart_title_screen/renderer.py`) –
     keeps the heartbeat toggle and elapsed timing in atomic state so mirrored
     title loops resume a consistent animation cadence after resets.
   - `AvatarBpmRenderer` (`src/heart/display/renderers/max_bpm_screen/renderer.py`) –
