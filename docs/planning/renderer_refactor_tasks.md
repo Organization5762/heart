@@ -39,7 +39,7 @@ We will iterate through the remaining renderers and restructure each into three 
 - [ ] `artist.py`: split into package with state capturing palette/position, provider handling input, and renderer drawing art frames.
 - [ ] `cloth_sail.py`: extract wind/oscillation parameters into state; provider streams physics deltas; renderer handles mesh drawing.
 - [ ] `color.py`: encapsulate colour transitions and timing in state; provider emits colour steps; renderer applies fills.
-- [ ] `combined_bpm_screen.py`: move playlist rotation and metadata/max-BPM coordination into provider/state split with a composed renderer wrapper.
+- [x] `combined_bpm_screen.py`: move playlist rotation and metadata/max-BPM coordination into provider/state split with a composed renderer wrapper.
 - [ ] `flame.py`: isolate flame simulation parameters in state; provider drives frame progression; renderer focuses on blitting frames.
 - [ ] `free_text.py`: capture text content, cursor, and colour in state; provider consumes switch/keyboard events; renderer renders glyphs only.
 - [x] `heart_title_screen.py`: separate heartbeat timing and toggles into state; provider handles clock-driven pulses; renderer draws title art.
@@ -47,7 +47,7 @@ We will iterate through the remaining renderers and restructure each into three 
 - [ ] `image.py`: manage image selection and fade state separately; provider cycles assets; renderer handles surface composition.
 - [ ] `kirby.py`: move animation frame index and physics to state; provider ticks movement and sprite selection; renderer blits sprites.
 - [ ] `l_system.py`: encapsulate grammar expansion progress in state; provider steps production rules on ticks; renderer plots lines.
-- [ ] `metadata_screen.py`: keep per-sensor values and layout toggles in state; provider ingests BPM/metadata streams; renderer draws HUD.
+- [x] `metadata_screen.py`: keep per-sensor values and layout toggles in state; provider ingests BPM/metadata streams; renderer draws HUD.
 - [ ] `multicolor.py`: track palette rotation and transition timing in state; provider sequences colours; renderer applies fills.
 - [ ] `pacman.py`: split ghost/player state into dataclasses; provider advances movement and collisions; renderer draws tiles and sprites.
 - [ ] `pixels.py`: capture pixel set and animation offset in state; provider selects pixels based on peripherals; renderer blits points.
@@ -80,7 +80,7 @@ Each task listed above follows this recipe but adapts to renderer-specific behav
 | artist | `src/heart/display/renderers/artist.py` | `artist/{provider.py,state.py,renderer.py}` |
 | cloth_sail | `src/heart/display/renderers/cloth_sail.py` | `cloth_sail/{provider.py,state.py,renderer.py}` |
 | color | `src/heart/display/renderers/color.py` | `color/{provider.py,state.py,renderer.py}` |
-| combined_bpm_screen | `src/heart/display/renderers/combined_bpm_screen.py` | `combined_bpm_screen/{provider.py,state.py,renderer.py}` |
+| combined_bpm_screen | `src/heart/display/renderers/combined_bpm_screen/renderer.py` | `combined_bpm_screen/{provider.py,state.py,renderer.py}` |
 | flame | `src/heart/display/renderers/flame.py` | `flame/{provider.py,state.py,renderer.py}` |
 | free_text | `src/heart/display/renderers/free_text.py` | `free_text/{provider.py,state.py,renderer.py}` |
 | heart_title_screen | `src/heart/display/renderers/heart_title_screen/renderer.py` | `heart_title_screen/{provider.py,state.py,renderer.py}` |
@@ -88,7 +88,7 @@ Each task listed above follows this recipe but adapts to renderer-specific behav
 | image | `src/heart/display/renderers/image.py` | `image/{provider.py,state.py,renderer.py}` |
 | kirby | `src/heart/display/renderers/kirby.py` | `kirby/{provider.py,state.py,renderer.py}` |
 | l_system | `src/heart/display/renderers/l_system.py` | `l_system/{provider.py,state.py,renderer.py}` |
-| metadata_screen | `src/heart/display/renderers/metadata_screen.py` | `metadata_screen/{provider.py,state.py,renderer.py}` |
+| metadata_screen | `src/heart/display/renderers/metadata_screen/renderer.py` | `metadata_screen/{provider.py,state.py,renderer.py}` |
 | multicolor | `src/heart/display/renderers/multicolor.py` | `multicolor/{provider.py,state.py,renderer.py}` |
 | pacman | `src/heart/display/renderers/pacman.py` | `pacman/{provider.py,state.py,renderer.py}` |
 | pixels | `src/heart/display/renderers/pixels.py` | `pixels/{provider.py,state.py,renderer.py}` |
