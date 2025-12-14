@@ -151,9 +151,10 @@ class SpritesheetProvider:
         loop_count = state.loop_count
         phase = state.phase
         reverse_direction = state.reverse_direction
-        time_since_last_update = (state.time_since_last_update or 0) + elapsed_ms
+        previous_elapsed = state.time_since_last_update
+        time_since_last_update = (previous_elapsed or 0) + elapsed_ms
 
-        if time_since_last_update > kf_duration:
+        if previous_elapsed is None or time_since_last_update > kf_duration:
             if self.boomerang and phase == LoopPhase.LOOP:
                 current_frame = current_frame - 1 if reverse_direction else current_frame + 1
             else:
