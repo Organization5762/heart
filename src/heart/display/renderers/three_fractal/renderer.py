@@ -1,16 +1,17 @@
 import math
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
 from OpenGL.GL import *
-from pygame import DOUBLEBUF, OPENGL
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Orientation, Rectangle
-from heart.display.renderers import BaseRenderer
+from heart.device import Cube, Orientation
+from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.display.renderers.three_fractal.state import FractalSceneState
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
@@ -18,8 +19,12 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
 from heart.utilities.env import Configuration
 
+if TYPE_CHECKING:
+    from heart.display.renderers.three_fractal.provider import \
+        FractalSceneProvider
 
-class FractalScene(BaseRenderer):
+
+class FractalRuntime(BaseRenderer):
     def __init__(self, device=None):
         super().__init__()
         self.device = device
@@ -805,46 +810,48 @@ class FractalScene(BaseRenderer):
         self.mode = "auto"
 
 
-def main():
-    import pygame
+class FractalScene(AtomicBaseRenderer[FractalSceneState]):
+    def __init__(
+        self, provider: "FractalSceneProvider" | None = None
+    ) -> None:
+        from heart.display.renderers.three_fractal.provider import \
+            FractalSceneProvider
 
-    # Initialize pygame
-    pygame.init()
+        self.provider = provider or FractalSceneProvider()
+        self.device_display_mode = DeviceDisplayMode.OPENGL
+        super().__init__()
+        self.warmup = False
+        self._peripheral_manager: PeripheralManager | None = None
 
-    # Set up the display
-    WIDTH, HEIGHT = 1280, 720
-    screen = pygame.display.set_mode((WIDTH, HEIGHT), OPENGL | DOUBLEBUF)
-    pygame.display.set_caption("Mandelbrot Explorer")
+    def _create_initial_state(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> FractalSceneState:
+        self._peripheral_manager = peripheral_manager
+        return self.provider.initial_state(
+            window=window,
+            clock=clock,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
 
-    scene = FractalScene(None)
-
-    # Main game loop
-    running = True
-    clock = pygame.time.Clock()
-
-    manager = PeripheralManager()
-    manager.detect()
-    manager.start()
-    try:
-        while running:
-            # Handle events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-
-            # Process and render
-            scene._internal_process(screen, clock, manager, Rectangle.with_layout(1, 1))
-
-            # Update the display
-            pygame.display.flip()
-
-            clock.tick(60)
-    except Exception as e:
-        print("exception", e)
-
-    raise Exception("stopping")
-    print("quitting")
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        orientation: Orientation,
+    ) -> None:
+        assert self._peripheral_manager is not None
+        state = self.provider.advance(
+            self.state,
+            window=window,
+            clock=clock,
+            peripheral_manager=self._peripheral_manager,
+            orientation=orientation,
+        )
+        self.set_state(state)
 
 
-if __name__ == "__main__":
-    main()
