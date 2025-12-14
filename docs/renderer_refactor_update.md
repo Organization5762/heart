@@ -4,6 +4,7 @@
 
 - Split the combined BPM playlist into `combined_bpm_screen/{provider.py,state.py,renderer.py}` so timer handling now lives in `CombinedBpmScreenStateProvider` while the renderer only delegates to metadata and max-BPM screens.
 - Migrated metadata HUD logic into `metadata_screen/{provider.py,state.py,renderer.py}` with `MetadataScreenStateProvider` streaming animation state for each monitor.
+- Broke out `cloth_sail`, `multicolor`, and `three_d_glasses` into provider/state/renderer triplets so timing, shader inputs, and frame sequencing are produced upstream and renderers only translate state into pixels.
 
 ## Notes for implementers
 

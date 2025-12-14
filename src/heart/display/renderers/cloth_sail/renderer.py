@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import math
-import time
 from typing import Any, Optional
 
 import numpy as np
@@ -27,7 +26,9 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import StatefulBaseRenderer
+from heart.display.renderers.cloth_sail.provider import ClothSailStateProvider
+from heart.display.renderers.cloth_sail.state import ClothSailState
 from heart.peripheral.core.manager import PeripheralManager
 
 _SDL2Window: Any | None
@@ -160,11 +161,12 @@ void main() {
 """
 
 
-class ClothSailRenderer(BaseRenderer):
+class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
     """Render a farmhouse-nautical cloth waving across the four panels."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, provider: ClothSailStateProvider | None = None) -> None:
+        self._provider = provider or ClothSailStateProvider()
+        super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self.warmup = False
 
@@ -174,11 +176,11 @@ class ClothSailRenderer(BaseRenderer):
             [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0], dtype=np.float32
         )
 
-        self._start_time = time.perf_counter()
         self._uniform_time: Optional[int] = None
         self._uniform_resolution: Optional[int] = None
         self._uniform_wind: Optional[int] = None
         self._pixel_buffer: Optional[np.ndarray] = None
+        self._state = self._provider.initial_state
 
     @staticmethod
     def _get_drawable_size(window: pygame.Surface) -> tuple[int, int]:
@@ -219,7 +221,6 @@ class ClothSailRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-
         vertex_shader = self._compile_shader(VERT_SHADER, GL_VERTEX_SHADER)
         fragment_shader = self._compile_shader(FRAG_SHADER, GL_FRAGMENT_SHADER)
 
@@ -273,17 +274,12 @@ class ClothSailRenderer(BaseRenderer):
         ):
             self._pixel_buffer = np.zeros((height, width, 3), dtype=np.uint8)
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-
-        if self._program is None:
-            self.initialize(window, clock, peripheral_manager, orientation)
-
         surface_width, surface_height = window.get_size()
         if surface_width == 0 or surface_height == 0:
             return
@@ -294,7 +290,7 @@ class ClothSailRenderer(BaseRenderer):
 
         self._ensure_pixel_buffer((frame_width, frame_height))
 
-        elapsed = time.perf_counter() - self._start_time
+        elapsed = self.state.elapsed
 
         wind_strength = 0.7 + 0.25 * math.sin(elapsed * 0.3)
         wind_vertical = 0.08 * math.sin(elapsed * 0.6 + 1.2)

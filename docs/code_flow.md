@@ -35,6 +35,8 @@ flowchart LR
         direction TB
         Loop["GameLoop Service\n(start + main loop)"]
         AppRouter["AppController / Mode Router"]
+        Providers["State Providers\n(timer + peripheral streams)"]
+        RendererState["Renderer State Streams"]
         ModeServices["Mode Services & Renderers"]
         FrameComposer["Frame Composer\n(surface merge + timing)"]
     end
@@ -64,7 +66,7 @@ flowchart LR
     Configurer --> AppRouter
     Loop --> AppRouter
     Loop --> FrameComposer
-    AppRouter --> ModeServices --> FrameComposer --> DisplaySvc
+    AppRouter --> Providers --> RendererState --> ModeServices --> FrameComposer --> DisplaySvc
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
@@ -75,12 +77,17 @@ flowchart LR
     PeripheralMgr --> Sensors --> AppRouter
     PeripheralMgr --> HeartRate --> AppRouter
     PeripheralMgr --> PhoneText --> AppRouter
+    PeripheralMgr --> Providers
 
     class CLI,Registry,Configurer,ModeServices,FrameComposer service;
     class Loop,AppRouter orchestrator;
     class PeripheralMgr,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
+
+State providers now sit between the peripheral feeds and mode renderers, translating device inputs and timers into immutable
+state snapshots before any pixels are drawn. Renderers operate purely on those state objects, which keeps peripheral handling
+and shader logic decoupled while still allowing the game loop to orchestrate timing.
 
 ## Rendering Procedure
 
