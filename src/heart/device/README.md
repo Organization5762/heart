@@ -1,0 +1,1 @@
+Device abstractions for rendering targets. Classes here describe the physical layout of displays (rectangular panels or cubes) and provide device-specific interfaces for sending frames to LEDs or simulated outputs.

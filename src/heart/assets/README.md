@@ -1,0 +1,1 @@
+This directory stores sprites, fonts, and animation data used by the Heart display pipeline. The assets are loaded through helpers like `loader.py` and kept in source form (PNG, JSON, Aseprite) so visual programs can reuse them across devices.

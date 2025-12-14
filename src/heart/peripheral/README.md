@@ -1,0 +1,1 @@
+Drivers and abstractions for external peripherals. This package contains sensor integrations (IMUs, microphones, infrared arrays), input devices (keyboards, gamepads), radios, and shared configuration helpers that feed data into the Heart runtime.

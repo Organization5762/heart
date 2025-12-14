@@ -1,0 +1,1 @@
+Rendering logic for the Heart visuals. This package defines color utilities, frame models, renderers, shaders, and recording helpers that turn program output into images for physical or simulated displays.
