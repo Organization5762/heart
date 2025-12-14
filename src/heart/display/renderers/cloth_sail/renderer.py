@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import math
-import time
 from typing import Any, Optional
 
 import numpy as np
 import pygame
+import reactivex
 from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
                        GL_CULL_FACE, GL_DEPTH_TEST, GL_FALSE, GL_FLOAT,
                        GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_PACK_ALIGNMENT,
@@ -27,7 +27,9 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import StatefulBaseRenderer
+from heart.display.renderers.cloth_sail.provider import ClothSailStateProvider
+from heart.display.renderers.cloth_sail.state import ClothSailState
 from heart.peripheral.core.manager import PeripheralManager
 
 _SDL2Window: Any | None
@@ -160,13 +162,15 @@ void main() {
 """
 
 
-class ClothSailRenderer(BaseRenderer):
+class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
     """Render a farmhouse-nautical cloth waving across the four panels."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, builder: ClothSailStateProvider | None = None) -> None:
+        self._builder: ClothSailStateProvider | None = builder
+        super().__init__(builder=builder)  # type: ignore[arg-type]
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self.warmup = False
+        self.set_state(ClothSailState())
 
         self._program: Optional[int] = None
         self._vertex_buffer: Optional[int] = None
@@ -174,7 +178,6 @@ class ClothSailRenderer(BaseRenderer):
             [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0], dtype=np.float32
         )
 
-        self._start_time = time.perf_counter()
         self._uniform_time: Optional[int] = None
         self._uniform_resolution: Optional[int] = None
         self._uniform_wind: Optional[int] = None
@@ -219,50 +222,61 @@ class ClothSailRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        if self._program is None:
+            vertex_shader = self._compile_shader(VERT_SHADER, GL_VERTEX_SHADER)
+            fragment_shader = self._compile_shader(FRAG_SHADER, GL_FRAGMENT_SHADER)
 
-        vertex_shader = self._compile_shader(VERT_SHADER, GL_VERTEX_SHADER)
-        fragment_shader = self._compile_shader(FRAG_SHADER, GL_FRAGMENT_SHADER)
+            program = glCreateProgram()
+            glAttachShader(program, vertex_shader)
+            glAttachShader(program, fragment_shader)
+            glBindAttribLocation(program, 0, "a_position")
+            glLinkProgram(program)
 
-        program = glCreateProgram()
-        glAttachShader(program, vertex_shader)
-        glAttachShader(program, fragment_shader)
-        glBindAttribLocation(program, 0, "a_position")
-        glLinkProgram(program)
+            link_status = glGetProgramiv(program, GL_LINK_STATUS)
+            if not link_status:
+                info = glGetProgramInfoLog(program).decode("utf-8")
+                glDeleteShader(vertex_shader)
+                glDeleteShader(fragment_shader)
+                raise RuntimeError(f"Shader link failed: {info}")
 
-        link_status = glGetProgramiv(program, GL_LINK_STATUS)
-        if not link_status:
-            info = glGetProgramInfoLog(program).decode("utf-8")
             glDeleteShader(vertex_shader)
             glDeleteShader(fragment_shader)
-            raise RuntimeError(f"Shader link failed: {info}")
 
-        glDeleteShader(vertex_shader)
-        glDeleteShader(fragment_shader)
+            self._program = program
+            glUseProgram(self._program)
 
-        self._program = program
-        glUseProgram(self._program)
+            self._uniform_time = glGetUniformLocation(self._program, "u_time")
+            self._uniform_resolution = glGetUniformLocation(
+                self._program, "u_resolution"
+            )
+            self._uniform_wind = glGetUniformLocation(self._program, "u_wind")
 
-        self._uniform_time = glGetUniformLocation(self._program, "u_time")
-        self._uniform_resolution = glGetUniformLocation(self._program, "u_resolution")
-        self._uniform_wind = glGetUniformLocation(self._program, "u_wind")
+            self._vertex_buffer = glGenBuffers(1)
+            glBindBuffer(GL_ARRAY_BUFFER, self._vertex_buffer)
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                self._quad_vertices.nbytes,
+                self._quad_vertices,
+                GL_STATIC_DRAW,
+            )
 
-        self._vertex_buffer = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, self._vertex_buffer)
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            self._quad_vertices.nbytes,
-            self._quad_vertices,
-            GL_STATIC_DRAW,
-        )
+            glEnableVertexAttribArray(0)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, None)
 
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, None)
-
-        glPixelStorei(GL_PACK_ALIGNMENT, 1)
-        glDisable(GL_DEPTH_TEST)
-        glDisable(GL_CULL_FACE)
+            glPixelStorei(GL_PACK_ALIGNMENT, 1)
+            glDisable(GL_DEPTH_TEST)
+            glDisable(GL_CULL_FACE)
 
         super().initialize(window, clock, peripheral_manager, orientation)
+
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[ClothSailState]:
+        if self._builder is None:
+            self._builder = ClothSailStateProvider(peripheral_manager)
+            self.builder = self._builder
+
+        return self._builder.observable()
 
     def _ensure_pixel_buffer(self, size: tuple[int, int]) -> None:
         width, height = size
@@ -273,17 +287,12 @@ class ClothSailRenderer(BaseRenderer):
         ):
             self._pixel_buffer = np.zeros((height, width, 3), dtype=np.uint8)
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-
-        if self._program is None:
-            self.initialize(window, clock, peripheral_manager, orientation)
-
         surface_width, surface_height = window.get_size()
         if surface_width == 0 or surface_height == 0:
             return
@@ -294,7 +303,7 @@ class ClothSailRenderer(BaseRenderer):
 
         self._ensure_pixel_buffer((frame_width, frame_height))
 
-        elapsed = time.perf_counter() - self._start_time
+        elapsed = self.state.elapsed_seconds
 
         wind_strength = 0.7 + 0.25 * math.sin(elapsed * 0.3)
         wind_vertical = 0.08 * math.sin(elapsed * 0.6 + 1.2)

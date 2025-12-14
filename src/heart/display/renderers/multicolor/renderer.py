@@ -1,13 +1,15 @@
 import math
-import time
 
 import numba as nb
 import numpy as np
 import pygame
+import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import BaseRenderer
+from heart.display.renderers import StatefulBaseRenderer
+from heart.display.renderers.multicolor.provider import MulticolorStateProvider
+from heart.display.renderers.multicolor.state import MulticolorState
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -24,9 +26,7 @@ def patterns(x: float, y: float, t: float) -> float:
 
 
 @nb.njit(fastmath=True)
-def map_value(
-    value: float, min1: float, max1: float, min2: float, max2: float
-) -> float:
+def map_value(value: float, min1: float, max1: float, min2: float, max2: float) -> float:
     """Map a value from one range to another."""
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1)
 
@@ -64,26 +64,19 @@ def cubehelix_rainbow(t: float) -> tuple:
 @nb.njit(fastmath=True, parallel=True)
 def generate_pattern(width: int, height: int, current_time: float) -> np.ndarray:
     """Generate the pattern as a numpy array."""
-    # Create output array (RGB)
     output = np.empty((height, width, 3), dtype=np.uint8)
 
-    # Generate pattern for each pixel
     for y in nb.prange(height):
         for x in range(width):
-            # Normalize coordinates to -1 to 1 range
             uv_x = (x - width / 2) / height
             uv_y = (y - height / 2) / height
 
-            # Calculate pattern value
             col = patterns(uv_x, uv_y, current_time * 1.5)
 
-            # Map pattern value to color range
             c1 = map_value(col, -1.0, 1.0, 0.0, 0.9)
 
-            # Get color from cubehelix rainbow
             r, g, b = cubehelix_rainbow(c1)
 
-            # Convert to 0-255 range and set color
             output[y, x, 0] = int(clamp(r * 255, 0, 255))
             output[y, x, 1] = int(clamp(g * 255, 0, 255))
             output[y, x, 2] = int(clamp(b * 255, 0, 255))
@@ -91,36 +84,29 @@ def generate_pattern(width: int, height: int, current_time: float) -> np.ndarray
     return output
 
 
-class MulticolorRenderer(BaseRenderer):
-    def __init__(self) -> None:
-        super().__init__()
+class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
+    def __init__(self, builder: MulticolorStateProvider | None = None) -> None:
+        self._builder: MulticolorStateProvider | None = builder
+        super().__init__(builder=builder)  # type: ignore[arg-type]
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.start_time = None
+        self.set_state(MulticolorState())
 
-    def process(
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[MulticolorState]:
+        if self._builder is None:
+            self._builder = MulticolorStateProvider(peripheral_manager)
+            self.builder = self._builder
+
+        return self._builder.observable()
+
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        """Process and render the multicolor scene.
-
-        Args:
-            window: The pygame surface to render to
-            clock: The pygame clock for timing
-            peripheral_manager: Manager for accessing peripheral devices
-            orientation: The current device orientation
-
-        """
-        # Get window dimensions
         width, height = window.get_size()
-
-        # Generate pattern using JIT-compiled function
-        pattern_array = generate_pattern(width, height, time.time())
-
-        # Convert numpy array to pygame surface
+        pattern_array = generate_pattern(width, height, self.state.elapsed_seconds)
         pattern_surface = pygame.surfarray.make_surface(pattern_array)
-
-        # Draw the pattern surface to the window
         window.blit(pattern_surface, (0, 0))
