@@ -4,7 +4,7 @@ import pytest
 from PIL import Image, ImageSequence
 
 from heart.display.recorder import ScreenRecorder
-from heart.display.renderers import BaseRenderer
+from heart.renderers import BaseRenderer
 
 
 class SolidColorRenderer(BaseRenderer):

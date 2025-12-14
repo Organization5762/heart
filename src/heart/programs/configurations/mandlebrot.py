@@ -1,5 +1,5 @@
-from heart.display.renderers.mandelbrot.scene import MandelbrotMode
 from heart.environment import GameLoop
+from heart.renderers.mandelbrot.scene import MandelbrotMode
 
 
 def configure(loop: GameLoop) -> None:

@@ -6,9 +6,9 @@ from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import StatefulBaseRenderer
 from heart.modules.life.provider import LifeStateProvider
 from heart.modules.life.state import LifeState
+from heart.renderers import StatefulBaseRenderer
 
 
 class Life(StatefulBaseRenderer[LifeState]):

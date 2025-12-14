@@ -3,10 +3,9 @@ import pytest
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
-from heart.display.renderers.spritesheet import (BoundingBox, FrameDescription,
-                                                 LoopPhase, Size,
-                                                 SpritesheetLoop)
 from heart.peripheral.switch import SwitchState
+from heart.renderers.spritesheet import (BoundingBox, FrameDescription,
+                                         LoopPhase, Size, SpritesheetLoop)
 
 
 class _StubSpritesheet:

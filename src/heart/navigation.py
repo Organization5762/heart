@@ -7,14 +7,14 @@ from lagom import Container
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.display.renderers import AtomicBaseRenderer, BaseRenderer
-from heart.display.renderers.color import RenderColor
-from heart.display.renderers.slide_transition import (SlideTransitionProvider,
-                                                      SlideTransitionRenderer)
-from heart.display.renderers.spritesheet import SpritesheetLoop
-from heart.display.renderers.text import TextRendering
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
+from heart.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.renderers.color import RenderColor
+from heart.renderers.slide_transition import (SlideTransitionProvider,
+                                              SlideTransitionRenderer)
+from heart.renderers.spritesheet import SpritesheetLoop
+from heart.renderers.text import TextRendering
 
 
 class AppController(BaseRenderer):

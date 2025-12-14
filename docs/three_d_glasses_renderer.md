@@ -27,7 +27,7 @@ filtering hardware.
 ## Usage
 
 ```python
-from heart.display.renderers.three_d_glasses import ThreeDGlassesRenderer
+from heart.renderers.three_d_glasses import ThreeDGlassesRenderer
 
 renderer = ThreeDGlassesRenderer([
     "gallery/left_panel.png",

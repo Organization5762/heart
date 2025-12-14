@@ -87,7 +87,7 @@ ignore = ["E501", "F403", "F405"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/heart/display/shaders/shader.py" = ["F403", "F405"]
-"src/heart/display/renderers/three_fractal.py" = ["F403", "F405"]
+"src/heart/renderers/three_fractal.py" = ["F403", "F405"]
 
 
 [tool.mypy]

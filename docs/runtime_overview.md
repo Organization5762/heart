@@ -28,7 +28,7 @@ Refer to [code_flow.md](code_flow.md) for the full call graph and service bounda
 
 ## Renderers and Modes
 
-Renderers extend `heart.display.renderers.BaseRenderer` (or a specialization) and draw into the surface supplied by the loop. Configuration modules typically:
+Renderers extend `heart.renderers.BaseRenderer` (or a specialization) and draw into the surface supplied by the loop. Configuration modules typically:
 
 - Call `loop.add_mode(<label or renderer>)` to register selectable modes.
 - Attach renderers with `mode.add_renderer(...)` to run them sequentially each frame.
@@ -58,7 +58,7 @@ Each frame flows through the same stages:
 
 To add a scene or peripheral:
 
-1. Implement a renderer under `heart/display/renderers/` (see `water_cube.py` for reference).
+1. Implement a renderer under `heart/renderers/` (see `water_cube.py` for reference).
 1. Register it in an existing configuration module or introduce a new module in `heart/programs/configurations/` with `configure(loop)`.
 1. Execute `totem run --configuration <module>` to validate behaviour.
 1. Place new peripheral integrations under `heart/peripheral/` and register them with the `PeripheralManager` so the runtime activates them automatically.

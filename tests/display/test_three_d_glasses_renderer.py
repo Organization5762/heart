@@ -4,8 +4,8 @@ import pytest
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
-from heart.display.renderers.three_d_glasses import ThreeDGlassesRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.renderers.three_d_glasses import ThreeDGlassesRenderer
 
 
 class TestDisplayThreeDGlassesRenderer:

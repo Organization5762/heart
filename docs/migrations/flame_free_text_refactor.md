@@ -11,8 +11,8 @@ The flame and free text renderers now mirror the provider/state/renderer pattern
 
 ## File layout
 
-- `src/heart/display/renderers/flame/{provider.py,state.py,renderer.py}`
-- `src/heart/display/renderers/free_text/{provider.py,state.py,renderer.py}`
+- `src/heart/renderers/flame/{provider.py,state.py,renderer.py}`
+- `src/heart/renderers/free_text/{provider.py,state.py,renderer.py}`
 
 ## Notes
 

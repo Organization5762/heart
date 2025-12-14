@@ -1,5 +1,5 @@
-from heart.display.renderers.three_d_glasses import ThreeDGlassesRenderer
 from heart.environment import GameLoop
+from heart.renderers.three_d_glasses import ThreeDGlassesRenderer
 
 IMAGE_SEQUENCE = [
     "heart.png",

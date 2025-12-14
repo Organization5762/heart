@@ -2,12 +2,12 @@
 
 ## Problem Statement
 
-The renderer stack in `src/heart/display/renderers/` and its orchestration in `src/heart/environment.py` spend excessive CPU cycles assembling intermediate `pygame.Surface` objects, replaying identical scene setup logic, and serialising animation frames individually. These patterns slow frame production on limited hardware and make it hard to capture deterministic playback traces. We need a coordinated plan to quantify the bottlenecks, redesign the rendering loop, and introduce tooling for reproducible performance analysis without regressing image quality or API ergonomics.
+The renderer stack in `src/heart/renderers/` and its orchestration in `src/heart/environment.py` spend excessive CPU cycles assembling intermediate `pygame.Surface` objects, replaying identical scene setup logic, and serialising animation frames individually. These patterns slow frame production on limited hardware and make it hard to capture deterministic playback traces. We need a coordinated plan to quantify the bottlenecks, redesign the rendering loop, and introduce tooling for reproducible performance analysis without regressing image quality or API ergonomics.
 
 ## Materials
 
 - Development host with Python 3.11, `pygame`, profiling dependencies already expressed in `pyproject.toml`, and GPU-less execution parity with production Raspberry Pi builds.
-- Representative animation assets: spritesheets under `src/heart/display/renderers/spritesheet*`, fractal workloads in `src/heart/display/renderers/mandelbrot/`, and text-heavy layouts from `src/heart/display/renderers/text.py`.
+- Representative animation assets: spritesheets under `src/heart/renderers/spritesheet*`, fractal workloads in `src/heart/renderers/mandelbrot/`, and text-heavy layouts from `src/heart/renderers/text.py`.
 - Access to profiling and tracing utilities: `cProfile`, `py-spy`, `line_profiler`, and the repository's logging configuration in `src/heart/logging.py`.
 - Existing automated test harness (`make test`) plus manual access to the physical LED matrix for end-to-end validation when possible.
 - Storage for trace artefacts (GIF sequences, frame timing CSVs) organised under `docs/research/renderer_performance/`.
@@ -37,7 +37,7 @@ We will iteratively improve the renderer pipeline by first capturing quantitativ
 
 ### Phase 2 — Rendering Pipeline Improvements
 
-- [ ] Design a `FrameAccumulator` helper under `src/heart/display/renderers/internal/` that lets renderers enqueue drawing commands without immediate surface allocation.
+- [ ] Design a `FrameAccumulator` helper under `src/heart/renderers/internal/` that lets renderers enqueue drawing commands without immediate surface allocation.
 - [ ] Refactor `Environment._render_fn` to support batching renderers sharing identical device display modes and pixel formats.
 - [ ] Introduce an optional pixel buffer reuse path for `SpritesheetLoop` and `RandomPixel` renderers, eliminating per-frame surface instantiation.
 - [ ] Add unit tests validating that the new batch path produces identical pixel arrays to the legacy path for representative scenes.
@@ -71,8 +71,8 @@ Finally, Phase 4 focuses on validation and rollout. Benchmarks rerun on the same
 | Pipeline Stage | Module(s) | Description |
 | --- | --- | --- |
 | Scene Selection | `src/heart/environment.py` (`Environment._render_fn`) | Chooses active renderers, now batching by display mode and reusing pixel buffers. |
-| Command Accumulation | `src/heart/display/renderers/internal/frame_accumulator.py` | Collects draw calls and metadata without allocating surfaces until flush time. |
-| Frame Synthesis | `src/heart/display/renderers/__init__.py` (`BaseRenderer._internal_process`) | Applies draw commands onto shared buffers, emitting final pixel arrays. |
+| Command Accumulation | `src/heart/renderers/internal/frame_accumulator.py` | Collects draw calls and metadata without allocating surfaces until flush time. |
+| Frame Synthesis | `src/heart/renderers/__init__.py` (`BaseRenderer._internal_process`) | Applies draw commands onto shared buffers, emitting final pixel arrays. |
 | Trace Export | `scripts/trace_renderers.py` | Streams accumulated frames to GIF + JSON artefacts for deterministic playback. |
 
 ## Risk Analysis

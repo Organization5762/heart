@@ -4,9 +4,9 @@ This update restructures the L-system renderer into the provider/state/renderer 
 
 ## Components
 
-- `src/heart/display/renderers/l_system/state.py` keeps the turtle-grammar string and tracks elapsed time between updates.
-- `src/heart/display/renderers/l_system/provider.py` advances the grammar whenever a second of simulated time elapses, driven by the shared peripheral clock stream.
-- `src/heart/display/renderers/l_system/renderer.py` consumes the current grammar and draws it on the full device surface using the existing turtle rules.
+- `src/heart/renderers/l_system/state.py` keeps the turtle-grammar string and tracks elapsed time between updates.
+- `src/heart/renderers/l_system/provider.py` advances the grammar whenever a second of simulated time elapses, driven by the shared peripheral clock stream.
+- `src/heart/renderers/l_system/renderer.py` consumes the current grammar and draws it on the full device surface using the existing turtle rules.
 - `src/heart/programs/configurations/l_system.py` now resolves the provider from the shared container and injects it into the renderer.
 
 ## Usage notes

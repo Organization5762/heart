@@ -1,8 +1,8 @@
 """Configuration for the brass porthole window renderer."""
 
-from heart.display.renderers.porthole_window import (
-    PortholeWindowRenderer, PortholeWindowStateProvider)
 from heart.environment import GameLoop
+from heart.renderers.porthole_window import (PortholeWindowRenderer,
+                                             PortholeWindowStateProvider)
 
 
 def configure(loop: GameLoop) -> None:

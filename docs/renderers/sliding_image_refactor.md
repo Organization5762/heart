@@ -7,12 +7,12 @@
 
 ## Details
 
-- `src/heart/display/renderers/sliding_image/` now contains:
+- `src/heart/renderers/sliding_image/` now contains:
   - `state.py` with immutable state objects for images and composed renderers.
   - `provider.py` that produces stream-driven state updates tied to the main game tick.
   - `renderer.py` that loads resources, wires providers, and renders frames.
 - Container registration entries were added in `__init__.py` so dependency-injected builders resolve consistently.
-- Removing the legacy files ensures imports like `heart.display.renderers.sliding_image` or `...artist` always resolve to the modular packages rather than the older monolithic implementations.
+- Removing the legacy files ensures imports like `heart.renderers.sliding_image` or `...artist` always resolve to the modular packages rather than the older monolithic implementations.
 
 ## Impact
 

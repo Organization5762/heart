@@ -40,7 +40,7 @@ Key `totem run` flags:
 
 ## Architecture Summary
 - `heart/environment.py` defines the `GameLoop` responsible for frame pacing and peripheral coordination.
-- `heart.display.renderers` hosts animations, overlays, and HUDs that can be composed into playlists.
+- `heart.renderers` hosts animations, overlays, and HUDs that can be composed into playlists.
 - `heart.device` contains output adapters such as `LocalScreen` and `LEDMatrix`.
 - `heart.peripheral.core.manager.PeripheralManager` supervises switches, gamepads, heart-rate monitors, and other inputs.
 

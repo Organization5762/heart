@@ -3,9 +3,9 @@
 import pygame
 
 from heart.device import Rectangle
-from heart.display.renderers import AtomicBaseRenderer
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
+from heart.renderers import AtomicBaseRenderer
 
 
 class _ColdAtomicRenderer(AtomicBaseRenderer[int]):

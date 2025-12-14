@@ -1,6 +1,6 @@
 # Farmhouse-Nautical Cloth Renderer
 
-The `ClothSailRenderer` (`src/heart/display/renderers/cloth_sail.py`) draws a
+The `ClothSailRenderer` (`src/heart/renderers/cloth_sail.py`) draws a
 256×64 OpenGL scene that spans the four panels of the cube layout without
 mirroring adjacent faces. The fragment shader implements a simple cloth model
 whose displacement is driven directly in GLSL so that the motion remains smooth
