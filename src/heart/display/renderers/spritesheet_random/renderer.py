@@ -1,38 +1,22 @@
+import logging
 import random
-from dataclasses import dataclass
-from enum import StrEnum
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
-from heart.assets.loader import spritesheet as SpritesheetAsset
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.display.renderers import AtomicBaseRenderer
+from heart.display.renderers.spritesheet_random.provider import \
+    SpritesheetLoopRandomProvider
+from heart.display.renderers.spritesheet_random.state import (
+    LoopPhase, SpritesheetLoopRandomState)
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import SwitchState
+
+logger = logging.getLogger(__name__)
 
 
-class LoopPhase(StrEnum):
-    START = "start"
-    LOOP = "loop"
-    END = "end"
-
-
-# Renderer state snapshot for `SpritesheetLoopRandom`.
-@dataclass
-class SpritesheetLoopRandomState:
-    switch_state: SwitchState | None
-    spritesheet: SpritesheetAsset | None = None
-    current_frame: int = 0
-    loop_count: int = 0
-    phase: LoopPhase = LoopPhase.LOOP
-    time_since_last_update: float | None = None
-    current_screen: int = 0
-
-
-# Renders a looping spritesheet on a random screen.
 class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
     def __init__(
         self,
@@ -41,20 +25,17 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
         sheet_file_path: str,
         metadata_file_path: str,
         screen_count: int,
+        provider: SpritesheetLoopRandomProvider | None = None,
     ) -> None:
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
         self.file = sheet_file_path
-        frame_data = Loader.load_json(metadata_file_path)
         self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
-        for key in frame_data["frames"]:
-            frame_obj = frame_data["frames"][key]
+        frame_data = Loader.load_json(metadata_file_path)
+        for key, frame_obj in frame_data["frames"].items():
             frame = frame_obj["frame"]
             parsed_tag, _ = key.split(" ", 1)
-            if parsed_tag not in self.frames:
-                tag = LoopPhase.LOOP
-            else:
-                tag = LoopPhase(parsed_tag)
+            tag = LoopPhase(parsed_tag) if parsed_tag in self.frames else LoopPhase.LOOP
             self.frames[tag].append(
                 KeyFrame(
                     (frame["x"], frame["y"], frame["w"], frame["h"]),
@@ -65,9 +46,9 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
             LoopPhase.START if len(self.frames[LoopPhase.START]) > 0 else LoopPhase.LOOP
         )
 
-        # TODO: Why is this 30 30 / should we be pulling this from somewhere
         self.x = 30
         self.y = 30
+        self.provider = provider or SpritesheetLoopRandomProvider(sheet_file_path)
 
         AtomicBaseRenderer.__init__(self)
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -120,15 +101,13 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
-    ):
-        def new_switch_state(v):
-            self.state.switch_state = v
-        
-        source = peripheral_manager.get_main_switch_subscription()
-        source.subscribe(
-            on_next = new_switch_state,
-            on_error = lambda e: print("Error Occurred: {0}".format(e)),
+        orientation: Orientation,
+    ) -> SpritesheetLoopRandomState:
+        return self.provider.create_initial_state(
+            window=window,
+            clock=clock,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+            initial_phase=self._initial_phase,
+            update_switch_state=lambda state: self.update_state(switch_state=state),
         )
-        return SpritesheetLoopRandomState(phase=self._initial_phase, spritesheet = Loader.load_spirtesheet(self.file), switch_state=None)
-
