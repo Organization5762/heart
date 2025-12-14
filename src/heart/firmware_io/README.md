@@ -1,1 +1,1 @@
-This is ported into the devices. Please update carefully as the devices only have a limited subset of Python available (e.g. no `import json`)
+I/O helpers that run on constrained firmware builds. These modules bridge sensors and actuators (accelerometer, rotary encoder, Bluetooth) while avoiding heavy dependencies because target devices have a limited Python subset (for example, no `import json`).
