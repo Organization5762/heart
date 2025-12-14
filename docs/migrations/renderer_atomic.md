@@ -8,7 +8,7 @@ status so incremental updates stay coordinated.
 ## Current progress
 
 - Converted renderers:
-  - `SpritesheetLoop` (`src/heart/display/renderers/spritesheet.py`) – reference
+  - `SpritesheetLoop` (`src/heart/display/renderers/spritesheet/renderer.py`) – reference
     implementation with switch and gamepad consumers.
   - `RenderColor` (`src/heart/display/renderers/color.py`) – now maintains
     immutable colour state and exposes `set_color` for callers that need to
@@ -28,7 +28,7 @@ status so incremental updates stay coordinated.
   - `WaterTitleScreen` (`src/heart/display/renderers/water_title_screen/renderer.py`) –
     tracks wave animation timing via a provider-driven state stream so consumer
     loops receive consistent offsets across frames.
-  - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random.py`)
+  - `SpritesheetLoopRandom` (`src/heart/display/renderers/spritesheet_random/renderer.py`)
     – keeps the switch consumer while moving frame counters and screen
     selection into immutable state for per-frame randomisation safety.
   - `Tixyland` (`src/heart/display/renderers/tixyland/renderer.py`) – carries the
@@ -45,16 +45,16 @@ status so incremental updates stay coordinated.
   - `SlidingRenderer` (`src/heart/display/renderers/sliding_image.py`) – wraps
     a composed renderer while keeping the sliding offset immutable for
     downstream loops that expect predictable frame hand-offs.
-  - `Rain` (`src/heart/display/renderers/pixels.py`) – stores the drop origin
+  - `Rain` (`src/heart/display/renderers/pixels/renderer.py`) – stores the drop origin
     and vertical sweep position atomically so successive frames don't rely on
     mutable instance attributes between resets.
-  - `Slinky` (`src/heart/display/renderers/pixels.py`) – tracks the falling
+  - `Slinky` (`src/heart/display/renderers/pixels/renderer.py`) – tracks the falling
     anchor and bounce position in immutable state so loop consumers can safely
     reuse instances without carrying prior frame state.
-  - `RandomPixel` (`src/heart/display/renderers/pixels.py`) – keeps the optional
+  - `RandomPixel` (`src/heart/display/renderers/pixels/renderer.py`) – keeps the optional
     override colour in atomic state so brightness adjustments sample a stable
     palette even when instances are re-used.
-  - `Border` (`src/heart/display/renderers/pixels.py`) – stores the configured
+  - `Border` (`src/heart/display/renderers/pixels/renderer.py`) – stores the configured
     colour atomically so composed scenes can flip border hues without mutating
     shared renderer attributes.
   - `RandomPixel` (`src/heart/display/renderers/pacman.py`) – aligns the arcade

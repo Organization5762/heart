@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pygame
 import reactivex
 from reactivex import operators as ops
 
@@ -20,12 +21,18 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         self._peripheral_manager = peripheral_manager
         self._speed = max(1, speed)
         self._width = width
+        self._image: pygame.Surface | None = None
 
     def set_width(self, width: int) -> None:
         self._width = max(0, width)
 
+    def set_image(self, image: pygame.Surface) -> None:
+        self._image = image
+
     def _initial_state(self) -> SlidingImageState:
-        return SlidingImageState(speed=self._speed, width=self._width)
+        return SlidingImageState(
+            speed=self._speed, width=self._width, image=self._image
+        )
 
     def observable(self) -> reactivex.Observable[SlidingImageState]:
         initial_state = self._initial_state()
@@ -33,10 +40,17 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         def advance(state: SlidingImageState) -> SlidingImageState:
             width = state.width or self._width
             if width <= 0:
-                return SlidingImageState(speed=state.speed, width=width)
+                return SlidingImageState(
+                    speed=state.speed, width=width, image=state.image or self._image
+                )
 
             offset = (state.offset + state.speed) % width
-            return SlidingImageState(offset=offset, speed=state.speed, width=width)
+            return SlidingImageState(
+                offset=offset,
+                speed=state.speed,
+                width=width,
+                image=state.image or self._image,
+            )
 
         return (
             self._peripheral_manager.game_tick.pipe(

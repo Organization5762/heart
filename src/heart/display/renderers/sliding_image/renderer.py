@@ -60,11 +60,13 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
 
         self._image = image
         self._provider.set_width(width)
+        self._provider.set_image(image)
         self.set_state(
             SlidingImageState(
                 offset=0,
                 speed=self._configured_speed,
                 width=width,
+                image=image,
             )
         )
 
@@ -78,15 +80,19 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        if self._image is None or self.state.width <= 0:
+        image = self.state.image or self._image
+        if image is None or self.state.width <= 0:
             return
 
         offset = self.state.offset
         width = self.state.width
 
-        window.blit(self._image, (-offset, 0))
+        window.blit(image, (-offset, 0))
         if offset:
-            window.blit(self._image, (width - offset, 0))
+            window.blit(image, (width - offset, 0))
+
+        next_offset = (offset + self.state.speed) % width
+        self.update_state(offset=next_offset)
 
     def reset(self) -> None:
         if self.state.width > 0:

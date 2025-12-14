@@ -50,11 +50,11 @@ We will iterate through the remaining renderers and restructure each into three 
 - [x] `metadata_screen.py`: keep per-sensor values and layout toggles in state; provider ingests BPM/metadata streams; renderer draws HUD.
 - [ ] `multicolor.py`: track palette rotation and transition timing in state; provider sequences colours; renderer applies fills.
 - [ ] `pacman.py`: split ghost/player state into dataclasses; provider advances movement and collisions; renderer draws tiles and sprites.
-- [ ] `pixels.py`: capture pixel set and animation offset in state; provider selects pixels based on peripherals; renderer blits points.
+- [x] `pixels.py`: capture pixel set and animation offset in state; provider selects pixels based on peripherals; renderer blits points.
 - [x] `porthole_window.py`: move cloud drift timers and offsets into state; provider steps movement with clock ticks; renderer draws viewport.
 - [ ] `sliding_image.py`: separate slide position and timing into state; provider handles sequencing; renderer performs transitions.
-- [ ] `spritesheet.py`: wrap frame index and looping configuration in state; provider advances frames; renderer composes spritesheet frames.
-- [ ] `spritesheet_random.py`: store random sequence seeds and current frame in state; provider produces deterministic frame order; renderer blits frames.
+- [x] `spritesheet.py`: wrap frame index and looping configuration in state; provider advances frames; renderer composes spritesheet frames.
+- [x] `spritesheet_random.py`: store random sequence seeds and current frame in state; provider produces deterministic frame order; renderer blits frames.
 - [ ] `three_d_glasses.py`: keep frame timer and slide index in state; provider controls timing; renderer handles stereo composition.
 - [ ] `three_fractal.py`: manage fractal parameters and zoom state; provider updates iterations; renderer draws fractal tiles.
 - [x] `tixyland.py`: store expression selections and phase in state; provider evaluates formulas per tick; renderer paints grid outputs.
@@ -91,11 +91,11 @@ Each task listed above follows this recipe but adapts to renderer-specific behav
 | metadata_screen | `src/heart/display/renderers/metadata_screen/renderer.py` | `metadata_screen/{provider.py,state.py,renderer.py}` |
 | multicolor | `src/heart/display/renderers/multicolor.py` | `multicolor/{provider.py,state.py,renderer.py}` |
 | pacman | `src/heart/display/renderers/pacman.py` | `pacman/{provider.py,state.py,renderer.py}` |
-| pixels | `src/heart/display/renderers/pixels.py` | `pixels/{provider.py,state.py,renderer.py}` |
+| pixels | `src/heart/display/renderers/pixels/renderer.py` | `pixels/{provider.py,state.py,renderer.py}` |
 | porthole_window | `src/heart/display/renderers/porthole_window/renderer.py` | `porthole_window/{provider.py,state.py,renderer.py}` |
 | sliding_image | `src/heart/display/renderers/sliding_image.py` | `sliding_image/{provider.py,state.py,renderer.py}` |
-| spritesheet | `src/heart/display/renderers/spritesheet.py` | `spritesheet/{provider.py,state.py,renderer.py}` |
-| spritesheet_random | `src/heart/display/renderers/spritesheet_random.py` | `spritesheet_random/{provider.py,state.py,renderer.py}` |
+| spritesheet | `src/heart/display/renderers/spritesheet/renderer.py` | `spritesheet/{provider.py,state.py,renderer.py}` |
+| spritesheet_random | `src/heart/display/renderers/spritesheet_random/renderer.py` | `spritesheet_random/{provider.py,state.py,renderer.py}` |
 | three_d_glasses | `src/heart/display/renderers/three_d_glasses.py` | `three_d_glasses/{provider.py,state.py,renderer.py}` |
 | three_fractal | `src/heart/display/renderers/three_fractal.py` | `three_fractal/{provider.py,state.py,renderer.py}` |
 | tixyland | `src/heart/display/renderers/tixyland/renderer.py` | `tixyland/{provider.py,state.py,renderer.py}` |
