@@ -3,9 +3,9 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.display.renderers import StatefulBaseRenderer
 from heart.modules.mario.provider import MarioRendererProvider
 from heart.modules.mario.state import MarioRendererState
+from heart.renderers import StatefulBaseRenderer
 from heart.utilities.logging import get_logger
 
 _LOGGER = get_logger(__name__)

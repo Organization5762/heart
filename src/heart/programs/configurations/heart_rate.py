@@ -1,5 +1,5 @@
-from heart.display.renderers.max_bpm_screen import MaxBpmScreen
 from heart.environment import GameLoop
+from heart.renderers.max_bpm_screen import MaxBpmScreen
 
 
 def configure(loop: GameLoop) -> None:

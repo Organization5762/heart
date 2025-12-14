@@ -6,7 +6,7 @@ We need a shader that demonstrates how 3D lighting data can be quantized into a 
 
 ## Approach
 
-- Added `PixelSunriseRenderer` under `src/heart/display/renderers/pixel_sunrise.py` to house the OpenGL program that drives the effect.
+- Added `PixelSunriseRenderer` under `src/heart/renderers/pixel_sunrise.py` to house the OpenGL program that drives the effect.
 - The vertex shader draws a fullscreen quad, while the fragment shader performs analytic ray intersections for a moving sun sphere, a cylindrical obelisk, and the ground plane.
 - Lighting uses lambertian and specular terms sourced from the computed sun direction, along with a binary shadow test against the obelisk to generate long ground shadows as the sun lowers.
 - After shading, color channels are quantized and dithered, and screen coordinates are snapped to a coarse grid to emulate low-resolution pixel art output.

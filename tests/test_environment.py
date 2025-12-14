@@ -2,8 +2,8 @@
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from heart.display.renderers.random_pixel import RandomPixel
 from heart.environment import GameLoop, RendererVariant
+from heart.renderers.random_pixel import RandomPixel
 
 
 class TestEnvironment:

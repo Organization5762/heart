@@ -8,7 +8,7 @@ Describe how to construct repeatable playlists of modes and renderers so the Hea
 
 - Local checkout of the repository with an activated development environment.
 - Familiarity with `heart.programs.registry.ConfigurationRegistry` and the `GameLoop` APIs.
-- Access to renderer implementations under `heart.display.renderers` and navigation helpers under `heart.navigation`.
+- Access to renderer implementations under `heart.renderers` and navigation helpers under `heart.navigation`.
 
 ## Technical Approach
 
@@ -23,7 +23,7 @@ Describe how to construct repeatable playlists of modes and renderers so the Hea
 ## Minimal Module Example
 
 ```python
-from heart.display.renderers.text import TextRendering
+from heart.renderers.text import TextRendering
 from heart.environment import GameLoop
 
 
@@ -50,9 +50,9 @@ Use `heart.navigation` helpers to manage scheduling:
 Example fragment from `lib_2025.py`:
 
 ```python
-from heart.display.renderers.text import TextRendering
-from heart.display.renderers.water_cube import WaterCube
-from heart.display.renderers.water_title_screen import WaterTitleScreen
+from heart.renderers.text import TextRendering
+from heart.renderers.water_cube import WaterCube
+from heart.renderers.water_title_screen import WaterTitleScreen
 from heart.navigation import ComposedRenderer
 
 

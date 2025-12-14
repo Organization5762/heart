@@ -1,8 +1,8 @@
 from heart.display.color import Color
-from heart.display.renderers.pacman import PacmanGhostRenderer
-from heart.display.renderers.pixels import Border
-from heart.display.renderers.random_pixel import RandomPixel
 from heart.environment import GameLoop
+from heart.renderers.pacman import PacmanGhostRenderer
+from heart.renderers.pixels import Border
+from heart.renderers.random_pixel import RandomPixel
 
 
 def configure(loop: GameLoop) -> None:

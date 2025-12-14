@@ -23,7 +23,7 @@ contacting the manager on every frame.
   subscription that populates an internal cache while delegating update
   hooks to `on_switch_state`.
 - Display renderers such as
-  `src/heart/display/renderers/text.py`, `life.py`,
+  `src/heart/renderers/text.py`, `life.py`,
   `spritesheet.py`, `spritesheet_random.py`, `multi_scene.py`, and
   `yolisten.py` enable the cache and consume `get_switch_state()` during
   their render loops.

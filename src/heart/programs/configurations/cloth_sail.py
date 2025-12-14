@@ -1,8 +1,8 @@
 """Configuration for the farmhouse-nautical cloth renderer."""
 
-from heart.display.renderers.cloth_sail import (ClothSailRenderer,
-                                                ClothSailStateProvider)
 from heart.environment import GameLoop
+from heart.renderers.cloth_sail import (ClothSailRenderer,
+                                        ClothSailStateProvider)
 
 
 def configure(loop: GameLoop) -> None:

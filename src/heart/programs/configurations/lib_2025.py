@@ -4,23 +4,6 @@ import numpy as np
 from lagom import Singleton
 
 from heart.display.color import Color
-from heart.display.renderers.artist import ArtistScene
-from heart.display.renderers.combined_bpm_screen import CombinedBpmScreen
-from heart.display.renderers.heart_title_screen import HeartTitleScreen
-from heart.display.renderers.hilbert_curve import HilbertScene
-from heart.display.renderers.image import RenderImage
-from heart.display.renderers.kirby import KirbyScene
-from heart.display.renderers.mandelbrot.scene import MandelbrotMode
-from heart.display.renderers.mandelbrot.title import MandelbrotTitle
-from heart.display.renderers.multicolor import (MulticolorRenderer,
-                                                MulticolorStateProvider)
-from heart.display.renderers.random_pixel import RandomPixel
-from heart.display.renderers.spritesheet import SpritesheetLoop
-from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
-from heart.display.renderers.text import TextRendering
-from heart.display.renderers.three_fractal import FractalScene
-from heart.display.renderers.tixyland import Tixyland, TixylandStateProvider
-from heart.display.renderers.water_title_screen import WaterTitleScreen
 from heart.environment import GameLoop
 from heart.modules.devices.acceleration.provider import \
     AllAccelerometersProvider
@@ -29,6 +12,23 @@ from heart.modules.mario.provider import MarioRendererProvider
 from heart.modules.mario.renderer import MarioRenderer
 from heart.modules.water_cube.renderer import WaterCube
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.renderers.artist import ArtistScene
+from heart.renderers.combined_bpm_screen import CombinedBpmScreen
+from heart.renderers.heart_title_screen import HeartTitleScreen
+from heart.renderers.hilbert_curve import HilbertScene
+from heart.renderers.image import RenderImage
+from heart.renderers.kirby import KirbyScene
+from heart.renderers.mandelbrot.scene import MandelbrotMode
+from heart.renderers.mandelbrot.title import MandelbrotTitle
+from heart.renderers.multicolor import (MulticolorRenderer,
+                                        MulticolorStateProvider)
+from heart.renderers.random_pixel import RandomPixel
+from heart.renderers.spritesheet import SpritesheetLoop
+from heart.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.renderers.text import TextRendering
+from heart.renderers.three_fractal import FractalScene
+from heart.renderers.tixyland import Tixyland, TixylandStateProvider
+from heart.renderers.water_title_screen import WaterTitleScreen
 
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:

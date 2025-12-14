@@ -3,7 +3,7 @@
 import pygame
 
 from heart.assets.loader import Loader
-from heart.display.renderers.sliding_image import SlidingImage
+from heart.renderers.sliding_image import SlidingImage
 
 
 def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_clock_factory) -> None:

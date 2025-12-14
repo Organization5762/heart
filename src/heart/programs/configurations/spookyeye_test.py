@@ -1,5 +1,5 @@
-from heart.display.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.environment import GameLoop
+from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 
 
 def configure(loop: GameLoop) -> None:

@@ -15,10 +15,10 @@ hold live references to peripherals during rendering.
 - Added `BaseRenderer.register_event_listener()` so renderers declare their
   dependencies up front and receive callbacks once `ensure_input_bindings()`
   executes.
-- Updated `MarioRenderer` (`src/heart/display/renderers/mario.py`) to use
+- Updated `MarioRenderer` (`src/heart/renderers/mario.py`) to use
   the new helper, cache accelerometer vectors, and drive loop transitions
   from cached data instead of polling the manager each frame.
-- Taught `FreeTextRenderer` (`src/heart/display/renderers/free_text.py`) to
+- Taught `FreeTextRenderer` (`src/heart/renderers/free_text.py`) to
   register a listener for `PhoneTextMessage` events, cache the latest text,
   and drop its stored `PhoneText` peripheral reference.
 

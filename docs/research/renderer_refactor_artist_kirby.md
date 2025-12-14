@@ -2,7 +2,7 @@
 
 ## Context
 
-The `ArtistScene` and `KirbyScene` renderers previously lived in single monolithic modules under `src/heart/display/renderers`. That layout made it difficult to share initialization logic or track scene construction inputs.
+The `ArtistScene` and `KirbyScene` renderers previously lived in single monolithic modules under `src/heart/renderers`. That layout made it difficult to share initialization logic or track scene construction inputs.
 
 ## Changes
 

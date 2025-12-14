@@ -1,6 +1,6 @@
-from heart.display.renderers.pixels import Border
-from heart.display.renderers.random_pixel import RandomPixel
 from heart.environment import GameLoop
+from heart.renderers.pixels import Border
+from heart.renderers.random_pixel import RandomPixel
 
 
 def configure(loop: GameLoop) -> None:

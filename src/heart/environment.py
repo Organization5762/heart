@@ -16,8 +16,8 @@ from PIL import Image
 
 from heart import DeviceDisplayMode
 from heart.device import Device
-# from heart.display.renderers.flame import FlameRenderer
-# from heart.display.renderers.free_text import FreeTextRenderer
+# from heart.renderers.flame import FlameRenderer
+# from heart.renderers.free_text import FreeTextRenderer
 from heart.device.beats import WebSocket
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
@@ -247,7 +247,7 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
 
 
 if TYPE_CHECKING:
-    from heart.display.renderers import BaseRenderer
+    from heart.renderers import BaseRenderer
 
 logger = get_logger(__name__)
 log_controller = get_logging_controller()

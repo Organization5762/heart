@@ -1,5 +1,5 @@
-from heart.display.renderers.l_system import LSystem, LSystemStateProvider
 from heart.environment import GameLoop
+from heart.renderers.l_system import LSystem, LSystemStateProvider
 
 
 def configure(loop: GameLoop) -> None:

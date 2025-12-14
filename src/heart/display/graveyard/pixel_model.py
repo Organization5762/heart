@@ -29,7 +29,7 @@
 
 # from heart import DeviceDisplayMode
 # from heart.device import Orientation
-# from heart.display.renderers import AtomicBaseRenderer
+# from heart.renderers import AtomicBaseRenderer
 # from heart.peripheral.core.manager import PeripheralManager
 
 # VERT_SHADER = """

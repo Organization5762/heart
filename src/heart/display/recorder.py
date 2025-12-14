@@ -10,8 +10,8 @@ import pygame
 from PIL import Image
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
-    from heart.display.renderers import BaseRenderer
     from heart.environment import GameLoop
+    from heart.renderers import BaseRenderer
 
 
 class ScreenRecorder:

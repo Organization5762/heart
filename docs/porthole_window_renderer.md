@@ -2,7 +2,7 @@
 
 ## Overview
 
-`PortholeWindowRenderer` (`src/heart/display/renderers/porthole_window/renderer.py`)
+`PortholeWindowRenderer` (`src/heart/renderers/porthole_window/renderer.py`)
 draws a brass-framed porthole around the current device viewport. The renderer
 builds the window frame directly in Pygame, masking an animated city-and-roof
 scene so that the active output resembles looking outside through a ship's

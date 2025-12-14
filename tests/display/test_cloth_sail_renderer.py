@@ -89,10 +89,10 @@ class TestClothSailRenderer:
 
         _install_fake_opengl(monkeypatch)
         monkeypatch.delitem(
-            sys.modules, "heart.display.renderers.cloth_sail", raising=False
+            sys.modules, "heart.renderers.cloth_sail", raising=False
         )
         cloth_module = importlib.import_module(
-            "heart.display.renderers.cloth_sail"
+            "heart.renderers.cloth_sail"
         )
         ClothSailRenderer = cloth_module.ClothSailRenderer
 

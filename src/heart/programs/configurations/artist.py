@@ -1,5 +1,5 @@
-from heart.display.renderers.image import RenderImage
 from heart.environment import GameLoop
+from heart.renderers.image import RenderImage
 
 
 def configure(loop: GameLoop) -> None:

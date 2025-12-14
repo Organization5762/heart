@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `heart.display.renderers.doppler.renderer.DopplerRenderer` simulates a 3D particle
+The `heart.renderers.doppler.renderer.DopplerRenderer` simulates a 3D particle
 field and maps the direction of motion to a red/blue hue gradient. The effect is
 inspired by the Doppler shift, so particles moving toward the viewer shift
 blue, while particles moving away trend red.

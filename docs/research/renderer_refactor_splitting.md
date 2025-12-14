@@ -14,8 +14,8 @@ Each renderer previously mixed peripheral subscriptions, state storage, and draw
 
 ## Impacted code paths
 
-- `src/heart/display/renderers/spritesheet_random/`
-- `src/heart/display/renderers/yolisten/`
-- `src/heart/display/renderers/pixels/`
+- `src/heart/renderers/spritesheet_random/`
+- `src/heart/renderers/yolisten/`
+- `src/heart/renderers/pixels/`
 
 These packages continue exporting the same renderer classes, so existing program configurations importing `SpritesheetLoopRandom`, `YoListenRenderer`, `Border`, `Rain`, or `Slinky` keep working.

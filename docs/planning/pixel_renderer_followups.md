@@ -1,12 +1,12 @@
 # Problem Statement
 
-The `src/heart/display/renderers/pixels.py` module still contains multiple renderers that share state and rendering logic inside a single file. Only the `RandomPixel` renderer has been split into a provider, state, and renderer trio. `Border`, `Rain`, and `Slinky` keep their state classes and rendering code interleaved, which makes it harder to adopt the observable-driven patterns used by `water_title_screen` and to test state changes independently. The goal is to carve those remaining renderers into isolated packages with clear ownership for state evolution and drawing.
+The `src/heart/renderers/pixels.py` module still contains multiple renderers that share state and rendering logic inside a single file. Only the `RandomPixel` renderer has been split into a provider, state, and renderer trio. `Border`, `Rain`, and `Slinky` keep their state classes and rendering code interleaved, which makes it harder to adopt the observable-driven patterns used by `water_title_screen` and to test state changes independently. The goal is to carve those remaining renderers into isolated packages with clear ownership for state evolution and drawing.
 
 # Materials
 
 - Python 3.12 with the repository's `uv`-managed environment.
 - Access to `pygame` for surface operations during renderer warm-up.
-- Familiarity with `StatefulBaseRenderer` and `ObservableProvider` in `src/heart/display/renderers/__init__.py`.
+- Familiarity with `StatefulBaseRenderer` and `ObservableProvider` in `src/heart/renderers/__init__.py`.
 - Editor capable of handling nested package refactors.
 - Optional: `scripts/render_code_flow.py` if any flow diagrams need regeneration after structural changes.
 
@@ -18,7 +18,7 @@ The pixel renderer family is moving toward the provider/state/renderer split alr
 
 | Target behaviour | Validation signal | Owner |
 | --- | --- | --- |
-| Each remaining pixel renderer lives in its own package with `provider.py`, `state.py`, and `renderer.py`. | Directory structure under `src/heart/display/renderers/` shows `border/`, `rain/`, and `slinky/` folders with the three files. | Display team |
+| Each remaining pixel renderer lives in its own package with `provider.py`, `state.py`, and `renderer.py`. | Directory structure under `src/heart/renderers/` shows `border/`, `rain/`, and `slinky/` folders with the three files. | Display team |
 | Renderer state updates are driven by observables rather than ad-hoc `update_state` calls. | Unit or smoke tests can subscribe to providers and receive deterministic state transitions. | Display team |
 | API consumers import renderers from their dedicated packages without breaking existing configurations. | `make test` passes and configuration modules import the new paths. | Display team |
 | Documentation reflects the new structure and rationale. | Updated planning and follow-up notes exist in `docs/planning/` with diagrams or tables. | Documentation lead |
@@ -34,9 +34,9 @@ The pixel renderer family is moving toward the provider/state/renderer split alr
 ## Implementation
 
 - [ ] **Border renderer package**
-  - [ ] Create `src/heart/display/renderers/border/state.py` with an immutable `BorderState` dataclass.
+  - [ ] Create `src/heart/renderers/border/state.py` with an immutable `BorderState` dataclass.
   - [ ] Implement `BorderStateProvider` that exposes an observable stream seeded with the initial color and supports color updates.
-  - [ ] Move draw logic into `src/heart/display/renderers/border/renderer.py`, subclassing `StatefulBaseRenderer`.
+  - [ ] Move draw logic into `src/heart/renderers/border/renderer.py`, subclassing `StatefulBaseRenderer`.
   - [ ] Update configuration files to import `Border` from the new package and remove legacy definitions from `pixels.py`.
 - [ ] **Rain renderer package**
   - [ ] Define `RainState` in `state.py` with explicit fields for drop origin and position.

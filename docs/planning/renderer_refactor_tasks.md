@@ -6,9 +6,9 @@ The renderer catalogue mixes several structural patterns, leaving many entries a
 
 ## Materials
 
-- Source renderers in `src/heart/display/renderers/`
+- Source renderers in `src/heart/renderers/`
 - Peripheral observables from `heart.peripheral.core.manager.PeripheralManager`
-- Base classes in `heart.display.renderers.__init__` (AtomicBaseRenderer, StatefulBaseRenderer, ComposedRenderer)
+- Base classes in `heart.renderers.__init__` (AtomicBaseRenderer, StatefulBaseRenderer, ComposedRenderer)
 - Reactivex operators for streaming state updates
 - Asset loader utilities in `heart.assets.loader.Loader`
 - Existing refactored examples: `water_title_screen`, `random_pixel`, `led_wave_boat`, `slide_transition`, `text`, `max_bpm_screen`
@@ -77,29 +77,29 @@ Each task listed above follows this recipe but adapts to renderer-specific behav
 
 | Renderer | Current location | Target package layout |
 | --- | --- | --- |
-| artist | `src/heart/display/renderers/artist.py` | `artist/{provider.py,state.py,renderer.py}` |
-| cloth_sail | `src/heart/display/renderers/cloth_sail.py` | `cloth_sail/{provider.py,state.py,renderer.py}` |
-| color | `src/heart/display/renderers/color.py` | `color/{provider.py,state.py,renderer.py}` |
-| combined_bpm_screen | `src/heart/display/renderers/combined_bpm_screen/renderer.py` | `combined_bpm_screen/{provider.py,state.py,renderer.py}` |
-| flame | `src/heart/display/renderers/flame.py` | `flame/{provider.py,state.py,renderer.py}` |
-| free_text | `src/heart/display/renderers/free_text.py` | `free_text/{provider.py,state.py,renderer.py}` |
-| heart_title_screen | `src/heart/display/renderers/heart_title_screen/renderer.py` | `heart_title_screen/{provider.py,state.py,renderer.py}` |
-| hilbert_curve | `src/heart/display/renderers/hilbert_curve.py` | `hilbert_curve/{provider.py,state.py,renderer.py}` |
-| image | `src/heart/display/renderers/image.py` | `image/{provider.py,state.py,renderer.py}` |
-| kirby | `src/heart/display/renderers/kirby.py` | `kirby/{provider.py,state.py,renderer.py}` |
-| l_system | `src/heart/display/renderers/l_system.py` | `l_system/{provider.py,state.py,renderer.py}` |
-| metadata_screen | `src/heart/display/renderers/metadata_screen/renderer.py` | `metadata_screen/{provider.py,state.py,renderer.py}` |
-| multicolor | `src/heart/display/renderers/multicolor.py` | `multicolor/{provider.py,state.py,renderer.py}` |
-| pacman | `src/heart/display/renderers/pacman.py` | `pacman/{provider.py,state.py,renderer.py}` |
-| pixels | `src/heart/display/renderers/pixels.py` | `pixels/{provider.py,state.py,renderer.py}` |
-| porthole_window | `src/heart/display/renderers/porthole_window/renderer.py` | `porthole_window/{provider.py,state.py,renderer.py}` |
-| sliding_image | `src/heart/display/renderers/sliding_image.py` | `sliding_image/{provider.py,state.py,renderer.py}` |
-| spritesheet | `src/heart/display/renderers/spritesheet.py` | `spritesheet/{provider.py,state.py,renderer.py}` |
-| spritesheet_random | `src/heart/display/renderers/spritesheet_random.py` | `spritesheet_random/{provider.py,state.py,renderer.py}` |
-| three_d_glasses | `src/heart/display/renderers/three_d_glasses.py` | `three_d_glasses/{provider.py,state.py,renderer.py}` |
-| three_fractal | `src/heart/display/renderers/three_fractal.py` | `three_fractal/{provider.py,state.py,renderer.py}` |
-| tixyland | `src/heart/display/renderers/tixyland/renderer.py` | `tixyland/{provider.py,state.py,renderer.py}` |
-| yolisten | `src/heart/display/renderers/yolisten.py` | `yolisten/{provider.py,state.py,renderer.py}` |
+| artist | `src/heart/renderers/artist.py` | `artist/{provider.py,state.py,renderer.py}` |
+| cloth_sail | `src/heart/renderers/cloth_sail.py` | `cloth_sail/{provider.py,state.py,renderer.py}` |
+| color | `src/heart/renderers/color.py` | `color/{provider.py,state.py,renderer.py}` |
+| combined_bpm_screen | `src/heart/renderers/combined_bpm_screen/renderer.py` | `combined_bpm_screen/{provider.py,state.py,renderer.py}` |
+| flame | `src/heart/renderers/flame.py` | `flame/{provider.py,state.py,renderer.py}` |
+| free_text | `src/heart/renderers/free_text.py` | `free_text/{provider.py,state.py,renderer.py}` |
+| heart_title_screen | `src/heart/renderers/heart_title_screen/renderer.py` | `heart_title_screen/{provider.py,state.py,renderer.py}` |
+| hilbert_curve | `src/heart/renderers/hilbert_curve.py` | `hilbert_curve/{provider.py,state.py,renderer.py}` |
+| image | `src/heart/renderers/image.py` | `image/{provider.py,state.py,renderer.py}` |
+| kirby | `src/heart/renderers/kirby.py` | `kirby/{provider.py,state.py,renderer.py}` |
+| l_system | `src/heart/renderers/l_system.py` | `l_system/{provider.py,state.py,renderer.py}` |
+| metadata_screen | `src/heart/renderers/metadata_screen/renderer.py` | `metadata_screen/{provider.py,state.py,renderer.py}` |
+| multicolor | `src/heart/renderers/multicolor.py` | `multicolor/{provider.py,state.py,renderer.py}` |
+| pacman | `src/heart/renderers/pacman.py` | `pacman/{provider.py,state.py,renderer.py}` |
+| pixels | `src/heart/renderers/pixels.py` | `pixels/{provider.py,state.py,renderer.py}` |
+| porthole_window | `src/heart/renderers/porthole_window/renderer.py` | `porthole_window/{provider.py,state.py,renderer.py}` |
+| sliding_image | `src/heart/renderers/sliding_image.py` | `sliding_image/{provider.py,state.py,renderer.py}` |
+| spritesheet | `src/heart/renderers/spritesheet.py` | `spritesheet/{provider.py,state.py,renderer.py}` |
+| spritesheet_random | `src/heart/renderers/spritesheet_random.py` | `spritesheet_random/{provider.py,state.py,renderer.py}` |
+| three_d_glasses | `src/heart/renderers/three_d_glasses.py` | `three_d_glasses/{provider.py,state.py,renderer.py}` |
+| three_fractal | `src/heart/renderers/three_fractal.py` | `three_fractal/{provider.py,state.py,renderer.py}` |
+| tixyland | `src/heart/renderers/tixyland/renderer.py` | `tixyland/{provider.py,state.py,renderer.py}` |
+| yolisten | `src/heart/renderers/yolisten.py` | `yolisten/{provider.py,state.py,renderer.py}` |
 
 ## Risk analysis
 
@@ -119,4 +119,4 @@ Each task listed above follows this recipe but adapts to renderer-specific behav
 
 ## Outcome snapshot
 
-Once completed, every renderer in `src/heart/display/renderers` will expose a coherent provider/state/renderer package mirroring Water and Max BPM. Providers will own peripheral subscriptions, states will remain immutable snapshots, and renderers will focus purely on drawing, making composed playlists and resets reliable across the fleet.
+Once completed, every renderer in `src/heart/renderers` will expose a coherent provider/state/renderer package mirroring Water and Max BPM. Providers will own peripheral subscriptions, states will remain immutable snapshots, and renderers will focus purely on drawing, making composed playlists and resets reliable across the fleet.

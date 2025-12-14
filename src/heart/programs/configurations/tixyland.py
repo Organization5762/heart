@@ -2,9 +2,9 @@ from typing import Callable
 
 import numpy as np
 
-from heart.display.renderers.tixyland import Tixyland, TixylandStateProvider
 from heart.environment import GameLoop
 from heart.navigation import MultiScene
+from heart.renderers.tixyland import Tixyland, TixylandStateProvider
 
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:

@@ -2,7 +2,7 @@
 
 `PixelModelRenderer` converts standard Wavefront OBJ meshes into a pixel-art
 rendering by rasterising them with OpenGL and quantising the lighting output.
-It lives at `src/heart/display/renderers/pixel_model.py` and exposes the same
+It lives at `src/heart/renderers/pixel_model.py` and exposes the same
 `BaseRenderer` lifecycle hooks as the existing shader-based renderers.
 
 ## Rendering pipeline
@@ -23,7 +23,7 @@ It lives at `src/heart/display/renderers/pixel_model.py` and exposes the same
 ## Usage
 
 ```
-from heart.display.renderers.pixel_model import PixelModelRenderer
+from heart.renderers.pixel_model import PixelModelRenderer
 from heart.utilities.paths import docs_asset_path
 
 renderer = PixelModelRenderer(
