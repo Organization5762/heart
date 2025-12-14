@@ -246,8 +246,7 @@ class ComposedRenderer(BaseRenderer):
         orientation: Orientation,
     ) -> None:
         for renderer in self.renderers:
-            if renderer.warmup:
-                renderer.initialize(window, clock, peripheral_manager, orientation)
+            renderer.initialize(window, clock, peripheral_manager, orientation)
 
     def add_renderer(self, *renderer: BaseRenderer):
         self.renderers.extend(renderer)
