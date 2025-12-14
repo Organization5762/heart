@@ -59,12 +59,14 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
         width, _ = image.get_size()
 
         self._image = image
+        self._provider.set_image(image)
         self._provider.set_width(width)
         self.set_state(
             SlidingImageState(
                 offset=0,
                 speed=self._configured_speed,
                 width=width,
+                image=image,
             )
         )
 
@@ -80,6 +82,8 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
     ) -> None:
         if self._image is None or self.state.width <= 0:
             return
+
+        self.mutate_state(lambda state: state.advance())
 
         offset = self.state.offset
         width = self.state.width
