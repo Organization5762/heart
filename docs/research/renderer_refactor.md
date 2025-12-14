@@ -1,10 +1,13 @@
 # Renderer refactor notes
 
-Refactored the `RenderColor` and `RenderImage` implementations under `src/heart/display/renderers/` to match the provider/state/renderer structure used by the Life and Water modules.
+## Overview
 
-## Changes
+- Split the Pacman ghost renderer into dedicated provider, state, and renderer modules under `src/heart/display/renderers/pacman/`.
+- Moved the ThreeDGlasses renderer into the same three-file structure at `src/heart/display/renderers/three_d_glasses/`.
+- Both refactors keep rendering responsibilities in the renderer classes while providers advance immutable state snapshots.
 
-- `RenderColor` now uses `RenderColorStateProvider` (`color/provider.py`) to emit a static `RenderColorState` snapshot, keeping the color data isolated from rendering logic.
-- `RenderImage` now relies on `RenderImageStateProvider` (`image/provider.py`) to load image assets and publish scaled frames whenever the window size updates, ensuring the renderer only blits ready-to-display frames.
+## Implications
 
-These updates align simple renderers with the same separation of concerns as more complex modules, simplifying future maintenance and testing.
+- Configuration modules can continue importing `PacmanGhostRenderer` and `ThreeDGlassesRenderer` from `heart.display.renderers.*` because `__init__.py` shims were added.
+- Providers now encapsulate spawn/animation timing logic, which simplifies renderer initialization and keeps update code reusable.
+- Asset loading for Pacman sprites is gated by an asset version counter to avoid unnecessary reloads between frames.

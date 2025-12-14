@@ -1,5 +1,4 @@
-"""Renderer for LED anaglyph imagery.
-
+"""
 This module implements a 3D glasses effect that remaps an image into
 per-channel (red / cyan) components suitable for LED lenses. The
 technique was developed in collaboration with Sri and Michael.
@@ -16,6 +15,9 @@ import pygame
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.renderers import AtomicBaseRenderer
+from heart.display.renderers.three_d_glasses.provider import \
+    ThreeDGlassesStateProvider
+from heart.display.renderers.three_d_glasses.state import ThreeDGlassesState
 from heart.peripheral.core.manager import PeripheralManager
 
 
@@ -29,12 +31,6 @@ class _ChannelProfile:
     cyan_gain: float
 
 
-@dataclass(frozen=True)
-class ThreeDGlassesState:
-    current_index: int = 0
-    elapsed_ms: float = 0.0
-
-
 class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
     """Render a sequence of images with a red/blue anaglyph effect."""
 
@@ -43,14 +39,14 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
         image_files: Sequence[str],
         *,
         frame_duration_ms: int = 650,
+        builder: ThreeDGlassesStateProvider | None = None,
     ) -> None:
-        AtomicBaseRenderer.__init__(self)
         if not image_files:
             raise ValueError("ThreeDGlassesRenderer requires at least one image file")
 
+        super().__init__()
+        self._builder = builder or ThreeDGlassesStateProvider(frame_duration_ms)
         self._image_files = list(image_files)
-        self._frame_duration_ms = frame_duration_ms
-
         self._images: list[pygame.Surface] = []
         self._image_arrays: list[np.ndarray] = []
         self._profiles: list[_ChannelProfile] = []
@@ -150,17 +146,15 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
         if not self._image_arrays:
             return
 
-        elapsed = self.state.elapsed_ms + float(clock.get_time())
-        index = self.state.current_index
+        next_state = self._builder.next_state(
+            self.state,
+            frame_count=len(self._image_arrays),
+            elapsed_ms=float(clock.get_time()),
+        )
+        self.set_state(next_state)
 
-        if elapsed >= self._frame_duration_ms:
-            elapsed %= self._frame_duration_ms
-            index = (index + 1) % len(self._image_arrays)
-
-        self.update_state(current_index=index, elapsed_ms=elapsed)
-
-        profile = self._profiles[index]
-        base_array = self._image_arrays[index]
+        profile = self._profiles[next_state.current_index]
+        base_array = self._image_arrays[next_state.current_index]
 
         frame_array = self._apply_profile(base_array, profile)
 
@@ -173,9 +167,8 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation
-    ):
-        # TODO: Push more of this into state
+        orientation: Orientation,
+    ) -> ThreeDGlassesState:
         window_size = window.get_size()
 
         self._images.clear()
@@ -191,4 +184,4 @@ class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
 
         self._profiles = self._generate_profiles(len(self._image_arrays))
         self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
-        return ThreeDGlassesState()
+        return self._builder.initial_state()
