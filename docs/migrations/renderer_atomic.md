@@ -112,9 +112,15 @@ status so incremental updates stay coordinated.
     (`src/heart/display/renderers/internal/event_stream.py`) – promote sequence
     counters and latest frames into atomic state so event bus producers and
     consumers resume cleanly across scene transitions.
+  - `HilbertScene` (`src/heart/display/renderers/hilbert_curve/renderer.py`) –
+    keeps curve interpolation progress and zoom state in immutable snapshots
+    driven by a dedicated provider so morph/zoom cycles stay deterministic.
   - `PacmanGhostRenderer` (`src/heart/display/renderers/pacman.py`) – keeps the
     chase direction, animation toggle, and sprite position immutable so the
     Pac-Man vignette restarts consistently between playlist entries.
+  - `SpritesheetLoop` (`src/heart/display/renderers/spritesheet/renderer.py`) –
+    splits frame sequencing into a provider-managed state stream so input-driven
+    pacing and loop progression are stored atomically before rendering.
 - Remaining renderers will be migrated iteratively. Track additional updates by
   appending to this list with accompanying test references.
 
