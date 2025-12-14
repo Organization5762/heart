@@ -69,7 +69,6 @@ class Configuration:
 
     @classmethod
     def forward_to_beats_app(cls) -> bool:
-        return True
         return _env_flag("FORWARD_TO_BEATS_MAP")
 
     @classmethod
