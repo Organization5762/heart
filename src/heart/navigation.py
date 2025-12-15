@@ -9,7 +9,7 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
-from heart.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.renderers import BaseRenderer, StatefulBaseRenderer
 from heart.renderers.color import RenderColor
 from heart.renderers.slide_transition import (SlideTransitionProvider,
                                               SlideTransitionRenderer)
@@ -148,7 +148,7 @@ class GameModeState:
         self.previous_mode_index = mode_index
         return self.renderers[mode_index]
 
-class GameModes(AtomicBaseRenderer[GameModeState]):
+class GameModes(StatefulBaseRenderer[GameModeState]):
     """GameModes represents a collection of modes in the game loop where different
     renderers can be added.
 
@@ -275,14 +275,14 @@ class MultiSceneState:
     current_button_value: int = 0
     offset_of_button_value: int | None = None
 
-class MultiScene(AtomicBaseRenderer[MultiSceneState]):
-    def __init__(self, scenes: list[AtomicBaseRenderer]) -> None:
+class MultiScene(StatefulBaseRenderer[MultiSceneState]):
+    def __init__(self, scenes: list[StatefulBaseRenderer]) -> None:
         super().__init__()
         self.scenes = scenes
 
     def get_renderers(
         self
-    ) -> list[AtomicBaseRenderer]:
+    ) -> list[StatefulBaseRenderer]:
         index = (self.state.current_button_value - (self.state.offset_of_button_value or 0)) % len(self.scenes)
         return [
             *self.scenes[index].get_renderers()

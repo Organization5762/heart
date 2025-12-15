@@ -6,13 +6,13 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet.provider import SpritesheetProvider
 from heart.renderers.spritesheet.state import (FrameDescription,
                                                SpritesheetLoopState)
 
 
-class SpritesheetLoop(AtomicBaseRenderer[SpritesheetLoopState]):
+class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
     def __init__(
         self,
         provider: SpritesheetProvider | str | None = None,

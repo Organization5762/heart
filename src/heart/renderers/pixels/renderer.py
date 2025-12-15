@@ -6,17 +6,17 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.pixels.provider import (BorderStateProvider,
                                              RainStateProvider,
                                              SlinkyStateProvider)
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 
 
-class Border(AtomicBaseRenderer[BorderState]):
+class Border(StatefulBaseRenderer[BorderState]):
     def __init__(self, width: int, color: Color | None = None, provider: BorderStateProvider | None = None) -> None:
         self.provider = provider or BorderStateProvider(color)
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.width = width
 
@@ -56,10 +56,10 @@ class Border(AtomicBaseRenderer[BorderState]):
         self.update_state(color=color)
 
 
-class Rain(AtomicBaseRenderer[RainState]):
+class Rain(StatefulBaseRenderer[RainState]):
     def __init__(self, provider: RainStateProvider | None = None) -> None:
         self.provider = provider or RainStateProvider()
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
@@ -104,10 +104,10 @@ class Rain(AtomicBaseRenderer[RainState]):
             self.update_state(current_y=new_y)
 
 
-class Slinky(AtomicBaseRenderer[SlinkyState]):
+class Slinky(StatefulBaseRenderer[SlinkyState]):
     def __init__(self, provider: SlinkyStateProvider | None = None) -> None:
         self.provider = provider or SlinkyStateProvider()
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)

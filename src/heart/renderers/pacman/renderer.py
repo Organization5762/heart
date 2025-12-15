@@ -6,12 +6,12 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.pacman.provider import PacmanGhostStateProvider
 from heart.renderers.pacman.state import PacmanGhostState
 
 
-class PacmanGhostRenderer(AtomicBaseRenderer[PacmanGhostState]):
+class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
     def __init__(self, builder: PacmanGhostStateProvider | None = None) -> None:
         self._builder = builder or PacmanGhostStateProvider()
         super().__init__()

@@ -6,12 +6,12 @@ from reactivex.disposable import Disposable
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.free_text.provider import FreeTextStateProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 
 
-class FreeTextRenderer(AtomicBaseRenderer[FreeTextRendererState]):
+class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
     """Render the most recent text message that arrived via *PhoneText*."""
 
     def __init__(self) -> None:

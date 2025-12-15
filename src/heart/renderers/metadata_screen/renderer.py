@@ -11,7 +11,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import battery_status, current_bpms
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.metadata_screen.provider import \
     MetadataScreenStateProvider
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
@@ -21,7 +21,7 @@ from heart.utilities.logging import get_logger
 logger = get_logger("HeartRateManager")
 
 
-class MetadataScreen(AtomicBaseRenderer[MetadataScreenState]):
+class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
     def __init__(self, colors: Iterable[str] | None = None) -> None:
         self.colors = list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
 
@@ -35,7 +35,7 @@ class MetadataScreen(AtomicBaseRenderer[MetadataScreenState]):
 
         self.avatar_images: Dict[str, Surface] = {}
 
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         self._provider: MetadataScreenStateProvider | None = None

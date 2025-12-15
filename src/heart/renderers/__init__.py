@@ -4,6 +4,7 @@ from typing import Any, Callable, Generic, TypeVar, final
 
 import pygame
 from reactivex import Observable
+from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
@@ -325,14 +326,18 @@ class AtomicBaseRenderer(Generic[StateT]):
         return tiled_surface
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
-    def __init__(self, builder: ObservableProvider[StateT], *args, **kwargs) -> None:
+    def __init__(
+        self, builder: ObservableProvider[StateT] | None = None, *args, **kwargs
+    ) -> None:
         self.builder = builder
+        self._subscription: Disposable | None = None
         super().__init__(*args, **kwargs)
 
     def state_observable(
         self,
         peripheral_manager: PeripheralManager,
     ) -> Observable[StateT]:
+        assert self.builder is not None
         return self.builder.observable()
 
     def initialize(
@@ -342,11 +347,38 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        observable = self.state_observable(
+        if self.builder is not None:
+            observable = self.state_observable(
+                peripheral_manager=peripheral_manager,
+            )
+            self._subscription = observable.subscribe(on_next=self.set_state)
+            if self.warmup:
+                screen = self._get_input_screen(window, orientation)
+                self.process(screen, clock, peripheral_manager, orientation)
+            self.initialized = True
+            return
+
+        if not hasattr(self, "_create_initial_state"):
+            msg = "StatefulBaseRenderer requires a builder or _create_initial_state"
+            raise ValueError(msg)
+
+        state = self._create_initial_state(
+            window=window,
+            clock=clock,
             peripheral_manager=peripheral_manager,
+            orientation=orientation,
         )
-        observable.subscribe(on_next=self.set_state)
+        self.set_state(state)
+        if self.warmup:
+            screen = self._get_input_screen(window, orientation)
+            self.process(screen, clock, peripheral_manager, orientation)
         self.initialized = True
+
+    def reset(self):
+        if self._subscription is not None:
+            self._subscription.dispose()
+            self._subscription = None
+        super().reset()
 
 @dataclass
 class KeyFrame:

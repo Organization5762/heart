@@ -8,7 +8,7 @@ from reactivex.disposable import Disposable
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.combined_bpm_screen.provider import (
     DEFAULT_MAX_BPM_DURATION_MS, DEFAULT_METADATA_DURATION_MS,
     CombinedBpmScreenStateProvider)
@@ -17,7 +17,7 @@ from heart.renderers.max_bpm_screen import MaxBpmScreen
 from heart.renderers.metadata_screen import MetadataScreen
 
 
-class CombinedBpmScreen(AtomicBaseRenderer[CombinedBpmScreenState]):
+class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
     def __init__(
         self,
         metadata_duration_ms: int = DEFAULT_METADATA_DURATION_MS,
@@ -31,7 +31,7 @@ class CombinedBpmScreen(AtomicBaseRenderer[CombinedBpmScreenState]):
 
         self.is_flame_renderer = True
 
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
         self._provider: CombinedBpmScreenStateProvider | None = None

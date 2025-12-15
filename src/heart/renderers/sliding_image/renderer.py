@@ -8,14 +8,14 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.renderers import BaseRenderer, StatefulBaseRenderer
 from heart.renderers.sliding_image.provider import (
     SlidingImageStateProvider, SlidingRendererStateProvider)
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
 
 
-class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
+class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
     """Render a 256×64 image that continuously slides horizontally."""
 
     def __init__(
@@ -98,7 +98,7 @@ class SlidingImage(AtomicBaseRenderer[SlidingImageState]):
         super().reset()
 
 
-class SlidingRenderer(AtomicBaseRenderer[SlidingRendererState]):
+class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
     """Wrap another renderer and slide its output horizontally."""
 
     def __init__(

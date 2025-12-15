@@ -3,12 +3,12 @@ import pygame
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.text.provider import TextRenderingProvider
 from heart.renderers.text.state import TextRenderingState
 
 
-class TextRendering(AtomicBaseRenderer[TextRenderingState]):
+class TextRendering(StatefulBaseRenderer[TextRenderingState]):
     def __init__(
         self,
         text: list[str],

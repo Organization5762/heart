@@ -5,10 +5,10 @@ import pygame
 from heart.device import Rectangle
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 
 
-class _ColdAtomicRenderer(AtomicBaseRenderer[int]):
+class _ColdAtomicRenderer(StatefulBaseRenderer[int]):
     """Atomic renderer without warmup that still requires initialization."""
 
     def __init__(self) -> None:
