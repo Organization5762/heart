@@ -467,6 +467,9 @@ class GameLoop:
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
         try:
             start_ns = time.perf_counter_ns()
+            if self.clock is None:
+                raise RuntimeError("GameLoop clock is not initialized")
+            clock = self.clock
             if renderer.device_display_mode == DeviceDisplayMode.OPENGL:
                 if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
                     logger.info("Switching to OPENGL mode")
@@ -503,13 +506,13 @@ class GameLoop:
             if not renderer.initialized:
                 renderer.initialize(
                     window=screen,
-                    clock=self.clock,
+                    clock=clock,
                     peripheral_manager=self.peripheral_manager,
                     orientation=self.device.orientation,
                 )
             renderer._internal_process(
                 window=screen,
-                clock=self.clock,
+                clock=clock,
                 peripheral_manager=self.peripheral_manager,
                 orientation=self.device.orientation,
             )

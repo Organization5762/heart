@@ -10,7 +10,7 @@ from reactivex.disposable import Disposable
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.flame.provider import FlameStateProvider
 from heart.renderers.flame.state import FlameState
 
@@ -228,7 +228,7 @@ class FlameGenerator:
         raise ValueError("side must be 'bottom', 'top', 'left' or 'right'")
 
 
-class FlameRenderer(AtomicBaseRenderer[FlameState]):
+class FlameRenderer(StatefulBaseRenderer[FlameState]):
     """Display animated flames on all four sides of the screen."""
 
     def __init__(self) -> None:

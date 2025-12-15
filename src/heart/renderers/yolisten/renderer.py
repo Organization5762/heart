@@ -10,7 +10,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.yolisten.provider import YoListenStateProvider
 from heart.renderers.yolisten.state import YoListenState
 
@@ -18,7 +18,7 @@ PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 logger = logging.getLogger(__name__)
 
 
-class YoListenRenderer(AtomicBaseRenderer[YoListenState]):
+class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
     def __init__(self, color: Color = Color(255, 0, 0), provider: YoListenStateProvider | None = None) -> None:
         self.base_color = color
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
@@ -59,7 +59,7 @@ class YoListenRenderer(AtomicBaseRenderer[YoListenState]):
         self.test_mode = False
         self.phyphox_db = 50.0
         self.provider = provider or YoListenStateProvider(color)
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
 
         self.device_display_mode = DeviceDisplayMode.FULL
 

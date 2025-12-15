@@ -15,7 +15,7 @@ from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
-from heart.renderers import AtomicBaseRenderer, BaseRenderer
+from heart.renderers import BaseRenderer, StatefulBaseRenderer
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
 
@@ -809,7 +809,7 @@ class FractalRuntime(BaseRenderer):
         self.mode = "auto"
 
 
-class FractalScene(AtomicBaseRenderer[FractalSceneState]):
+class FractalScene(StatefulBaseRenderer[FractalSceneState]):
     def __init__(
         self, provider: "FractalSceneProvider" | None = None
     ) -> None:

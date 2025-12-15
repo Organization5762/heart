@@ -7,12 +7,12 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.hilbert_curve.provider import HilbertCurveProvider
 from heart.renderers.hilbert_curve.state import HilbertCurveState
 
 
-class HilbertScene(AtomicBaseRenderer[HilbertCurveState]):
+class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
     def __init__(self, provider: HilbertCurveProvider | None = None) -> None:
         self.provider = provider or HilbertCurveProvider()
         self.device_display_mode = DeviceDisplayMode.MIRRORED

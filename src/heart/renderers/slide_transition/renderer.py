@@ -6,7 +6,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import SlideTransitionState
 from heart.utilities.logging import get_logger
@@ -16,13 +16,13 @@ logger = get_logger(__name__)
 log_controller = get_logging_controller()
 
 
-class SlideTransitionRenderer(AtomicBaseRenderer[SlideTransitionState]):
+class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     """Slides renderer_B into view while renderer_A moves out."""
 
     def __init__(self, provider: SlideTransitionProvider) -> None:
         self.provider = provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
 
     def _create_initial_state(
         self,

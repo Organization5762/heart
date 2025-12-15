@@ -9,7 +9,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.flame import FlameRenderer
 from heart.renderers.max_bpm_screen.provider import (AVATAR_MAPPINGS,
                                                      AvatarBpmStateProvider)
@@ -26,7 +26,7 @@ class MaxBpmScreen(ComposedRenderer):
         self.is_flame_renderer = True
 
 
-class AvatarBpmRenderer(AtomicBaseRenderer[AvatarBpmRendererState]):
+class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
     def __init__(self) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.MIRRORED

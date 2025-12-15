@@ -8,7 +8,7 @@ from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet_random.provider import \
     SpritesheetLoopRandomProvider
 from heart.renderers.spritesheet_random.state import (
@@ -17,7 +17,7 @@ from heart.renderers.spritesheet_random.state import (
 logger = logging.getLogger(__name__)
 
 
-class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
+class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
     def __init__(
         self,
         screen_width: int,
@@ -50,7 +50,7 @@ class SpritesheetLoopRandom(AtomicBaseRenderer[SpritesheetLoopRandomState]):
         self.y = 30
         self.provider = provider or SpritesheetLoopRandomProvider(sheet_file_path)
 
-        AtomicBaseRenderer.__init__(self)
+        super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
     def __duration_scale_factor(self) -> float:

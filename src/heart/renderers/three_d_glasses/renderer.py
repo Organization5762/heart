@@ -15,7 +15,7 @@ import pygame
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import AtomicBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_d_glasses.provider import ThreeDGlassesStateProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 
@@ -30,7 +30,7 @@ class _ChannelProfile:
     cyan_gain: float
 
 
-class ThreeDGlassesRenderer(AtomicBaseRenderer[ThreeDGlassesState]):
+class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
     """Render a sequence of images with a red/blue anaglyph effect."""
 
     def __init__(
