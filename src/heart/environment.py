@@ -465,6 +465,10 @@ class GameLoop:
     #     # return isinstance(renderer, FlameRenderer)
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
+        clock = self.clock
+        if clock is None:
+            raise RuntimeError("GameLoop clock is not initialized")
+
         try:
             start_ns = time.perf_counter_ns()
             if renderer.device_display_mode == DeviceDisplayMode.OPENGL:
@@ -503,13 +507,13 @@ class GameLoop:
             if not renderer.initialized:
                 renderer.initialize(
                     window=screen,
-                    clock=self.clock,
+                    clock=clock,
                     peripheral_manager=self.peripheral_manager,
                     orientation=self.device.orientation,
                 )
             renderer._internal_process(
                 window=screen,
-                clock=self.clock,
+                clock=clock,
                 peripheral_manager=self.peripheral_manager,
                 orientation=self.device.orientation,
             )
