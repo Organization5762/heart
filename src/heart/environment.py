@@ -465,6 +465,10 @@ class GameLoop:
     #     # return isinstance(renderer, FlameRenderer)
 
     def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
+        clock = self.clock
+        if clock is None:
+            raise RuntimeError("GameLoop clock is not initialized")
+
         try:
             start_ns = time.perf_counter_ns()
             if self.clock is None:
