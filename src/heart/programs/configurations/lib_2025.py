@@ -39,7 +39,7 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
-    kirby_mode.add_renderer(KirbyScene())
+    kirby_mode.resolve_renderer(loop.context_container, KirbyScene)
 
     modelbrot = loop.add_mode(
         ComposedRenderer(
@@ -55,13 +55,13 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    modelbrot.add_renderer(MandelbrotMode())
+    modelbrot.resolve_renderer(loop.context_container, MandelbrotMode)
 
     sphere_mode = loop.add_mode("3d fractal")
     sphere_mode.add_renderer(FractalScene(loop.device))
 
     hilbert_mode = loop.add_mode("hilbert")
-    hilbert_mode.add_renderer(HilbertScene())
+    hilbert_mode.resolve_renderer(loop.context_container, HilbertScene)
 
     mario_mode = loop.add_mode(
         ComposedRenderer(
@@ -127,7 +127,7 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    heart_rate_mode.add_renderer(CombinedBpmScreen())
+    heart_rate_mode.resolve_renderer(loop.context_container, CombinedBpmScreen)
 
     water_mode = loop.add_mode(
         ComposedRenderer(
@@ -147,7 +147,7 @@ def configure(loop: GameLoop) -> None:
     water_mode.resolve_renderer(loop.context_container, WaterCube)
 
     artist_mode = loop.add_mode(ArtistScene.title_scene())
-    artist_mode.add_renderer(ArtistScene())
+    artist_mode.resolve_renderer(loop.context_container, ArtistScene)
 
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(

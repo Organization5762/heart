@@ -10,7 +10,7 @@ from heart.renderers.text import TextRendering
 
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
-    kirby_mode.add_renderer(KirbyScene())
+    kirby_mode.resolve_renderer(loop.context_container, KirbyScene)
 
     modelbrot = loop.add_mode(
         ComposedRenderer(
@@ -26,10 +26,10 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    modelbrot.add_renderer(MandelbrotMode())
+    modelbrot.resolve_renderer(loop.context_container, MandelbrotMode)
 
     hilbert_mode = loop.add_mode("hilbert")
-    hilbert_mode.add_renderer(HilbertScene())
+    hilbert_mode.resolve_renderer(loop.context_container, HilbertScene)
 
     mode = loop.add_mode("friend\nbeacon")
     text = ["Lost my\nfriends\nagain"]
