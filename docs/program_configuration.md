@@ -23,12 +23,14 @@ Describe how to construct repeatable playlists of modes and renderers so the Hea
 ## Minimal Module Example
 
 ```python
+from heart.renderers.max_bpm_screen import MaxBpmScreen
 from heart.renderers.text import TextRendering
 from heart.environment import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
     hello_mode = loop.add_mode("hello")
+    hello_mode.resolve_renderer(loop.context_container, MaxBpmScreen)
     hello_mode.add_renderer(
         TextRendering.default(text="Hello, world!", y_location=16)
     )
@@ -37,7 +39,8 @@ def configure(loop: GameLoop) -> None:
 Important behaviours:
 
 - `loop.add_mode(<label or renderer>)` registers a selectable mode. Pass a string for a simple label or a renderer that supplies its own title screen.
-- `mode.add_renderer(...)` appends renderers that execute sequentially each frame, enabling overlays or layered effects.
+- `mode.resolve_renderer(container, RendererClass)` instantiates renderers via the dependency-injection container so shared providers and runtime wiring stay centralized.
+- `mode.add_renderer(...)` remains available for renderers that must be constructed with explicit parameters at configuration time.
 - `loop.app_controller.add_sleep_mode()` inserts a low-power fallback. The CLI toggles this path with `--add-low-power-mode/--no-add-low-power-mode`.
 
 ## Building Playlists

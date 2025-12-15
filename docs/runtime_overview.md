@@ -31,7 +31,7 @@ Refer to [code_flow.md](code_flow.md) for the full call graph and service bounda
 Renderers extend `heart.renderers.BaseRenderer` (or a specialization) and draw into the surface supplied by the loop. Configuration modules typically:
 
 - Call `loop.add_mode(<label or renderer>)` to register selectable modes.
-- Attach renderers with `mode.add_renderer(...)` to run them sequentially each frame.
+- Attach renderers with `mode.resolve_renderer(loop.context_container, RendererClass)` to run them sequentially each frame while leveraging dependency injection.
 - Wrap renderers in `heart.navigation.MultiScene` or `heart.navigation.ComposedRenderer` to control scheduling and overlays.
 
 `lib_2025.py` demonstrates how to mix ambient animations (`WaterCube`), interactive scenes, and a low-power sleep mode managed through `loop.app_controller.add_sleep_mode()`.
