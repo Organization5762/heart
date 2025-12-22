@@ -1,5 +1,5 @@
 import time
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Any, Callable, Generic, TypeVar, final
 
 import pygame
@@ -10,7 +10,6 @@ from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.switch import SwitchState
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -25,14 +24,6 @@ class BaseRenderer:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
         self.warmup = True
-        self._subscription_factories: list[
-            Callable[[PeripheralManager], Callable[[], None] | None]
-        ] = []
-        self._active_unsubscribers: list[Callable[[], None]] = []
-        self._subscriptions_active = False
-        self._subscription_context: PeripheralManager | None = None
-        self._switch_state_cache: SwitchState | None = None
-        self._switch_state_cache_enabled = False
 
     def is_initialized(self) -> bool:
         return self.initialized
@@ -52,7 +43,7 @@ class BaseRenderer:
         self.initialized = True
 
     def reset(self):
-        self._switch_state_cache = None
+        pass
 
     def get_renderers(
         self
@@ -380,10 +371,3 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             self._subscription = None
         super().reset()
 
-@dataclass
-class KeyFrame:
-    frame: tuple[int, int, int, int]
-    up: int = 0
-    down: int = 0
-    left: int = 0
-    right: int = 0
