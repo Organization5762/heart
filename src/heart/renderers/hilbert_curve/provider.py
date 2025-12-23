@@ -5,8 +5,12 @@ import time
 from dataclasses import replace
 
 import numpy as np
+import reactivex
 from numba import njit
+from reactivex import operators as ops
 
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
 
 
@@ -126,7 +130,7 @@ def transform_points(
     return new_points
 
 
-class HilbertCurveProvider:
+class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
     def __init__(
         self,
         *,
@@ -253,3 +257,33 @@ class HilbertCurveProvider:
         if state.transition_state == "zoom":
             return self._advance_zoom(state, now)
         return self._advance_morph(state, now)
+
+    def observable(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> reactivex.Observable[HilbertCurveState]:
+        window_sizes = peripheral_manager.window.pipe(
+            ops.filter(lambda window: window is not None),
+            ops.map(lambda window: window.get_size()),
+            ops.distinct_until_changed(),
+        )
+
+        def build_stream(
+            size: tuple[int, int],
+        ) -> reactivex.Observable[HilbertCurveState]:
+            initial_state = self.initial_state(width=size[0], height=size[1])
+            return peripheral_manager.game_tick.pipe(
+                ops.filter(lambda tick: tick is not None),
+                ops.map(lambda _: time.time()),
+                ops.scan(
+                    lambda state, now: self.advance(state, now=now),
+                    seed=initial_state,
+                ),
+                ops.start_with(initial_state),
+            )
+
+        return window_sizes.pipe(
+            ops.map(build_stream),
+            ops.switch_latest(),
+            ops.share(),
+        )

@@ -57,7 +57,12 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         self.sim_accel_step = 0.1
         self.test_mode = False
         self.phyphox_db = 50.0
-        self.provider = provider or YoListenStateProvider(color)
+        self.provider = provider or YoListenStateProvider(
+            color,
+            base_scroll_speed=self._base_scroll_speed,
+            flicker_speed=self.flicker_speed,
+            flicker_intensity=self.flicker_intensity,
+        )
         super().__init__()
 
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -130,31 +135,10 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         orientation: Orientation,
     ) -> None:
         state = self.state
-        if state.should_calibrate:
-            state = self.provider.calibrate_scroll_speed(state)
-
-        current_time = time.time()
-        state = self.provider.update_flicker(
-            state,
-            current_time,
-            flicker_speed=self.flicker_speed,
-            flicker_intensity=self.flicker_intensity,
-        )
 
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
         window.fill((0, 0, 0))
-
-        scroll_speed = self._base_scroll_speed * self.provider.scroll_speed_scale_factor(
-            state
-        )
-        state = self.provider.advance_word_position(
-            state,
-            scroll_speed=scroll_speed,
-            window_width=window_width,
-        )
-        if state != self.state:
-            self.set_state(state)
 
         color = state.color
         word_position = state.word_position
@@ -257,15 +241,12 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 text_width, _ = font.size(self.ascii_art[word][0])
                 self.word_widths[word] = text_width
 
-        return self.provider.create_initial_state(
-            window=window,
-            clock=clock,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-            on_switch_state=lambda value: self.set_state(
-                self.provider.handle_switch_state(self.state, value)
-            ),
+        initial_state = self.provider.initial_state()
+        self.set_state(initial_state)
+        self._subscription = self.provider.observable(peripheral_manager).subscribe(
+            on_next=self.set_state
         )
+        return initial_state
 
 
 def poll_phyphox():

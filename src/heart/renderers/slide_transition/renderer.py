@@ -31,12 +31,18 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> SlideTransitionState:
-        return self.provider.initial_state(
+        initial_state = self.provider.initial_state(
             window=window,
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
+        self.set_state(initial_state)
+        self._subscription = self.provider.observable(
+            peripheral_manager,
+            initial_state=initial_state,
+        ).subscribe(on_next=self.set_state)
+        return initial_state
 
     def is_done(self) -> bool:
         return not self.state.sliding
@@ -47,8 +53,6 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        state = self.provider.update_state(state=self.state, screen_width=window.get_width())
-        self.set_state(state)
         state = self.state
 
         size = window.get_size()

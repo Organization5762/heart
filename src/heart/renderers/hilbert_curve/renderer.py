@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import time
-
 import pygame
+import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -17,17 +16,12 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
         self.provider = provider or HilbertCurveProvider()
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.line_color = (215, 72, 148)
-        super().__init__()
+        super().__init__(builder=self.provider)
 
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> HilbertCurveState:
-        width, height = window.get_size()
-        return self.provider.initial_state(width=width, height=height)
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[HilbertCurveState]:
+        return self.provider.observable(peripheral_manager)
 
     def real_process(
         self,
@@ -35,10 +29,7 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        state = self.provider.advance(self.state, now=time.time())
-        self.set_state(state)
-
+        state = self.state
         window.fill((0, 0, 0))
         if len(state.frame_curve) > 1:
             pygame.draw.lines(window, self.line_color, False, state.frame_curve, 1)
-

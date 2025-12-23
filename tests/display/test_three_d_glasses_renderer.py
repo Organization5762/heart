@@ -53,14 +53,17 @@ class TestDisplayThreeDGlassesRenderer:
         load_calls = iter(_LoaderResult(surface) for surface in source_surfaces)
         monkeypatch.setattr(assets_loader.Loader, "load", lambda path: next(load_calls))
 
-        clock = stub_clock_factory(0, 0, 150, repeat_last=False)
+        clock = stub_clock_factory(0, 150, repeat_last=False)
         renderer = ThreeDGlassesRenderer(["one.png", "two.png"], frame_duration_ms=120)
 
         renderer.initialize(window, clock, manager, orientation)
+        manager.clock.on_next(clock)
 
+        manager.game_tick.on_next(True)
         renderer.process(window, clock, manager, orientation)
         frame_one = pygame.surfarray.array3d(window).copy()
 
+        manager.game_tick.on_next(True)
         renderer.process(window, clock, manager, orientation)
         frame_two = pygame.surfarray.array3d(window).copy()
 
