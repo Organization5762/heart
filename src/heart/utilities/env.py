@@ -38,6 +38,21 @@ def _env_int(
     return parsed
 
 
+def _env_optional_int(env_var: str, *, minimum: int | None = None) -> int | None:
+    """Return the integer value of ``env_var`` or ``None`` when unset."""
+
+    value = os.environ.get(env_var)
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{env_var} must be an integer") from exc
+    if minimum is not None and parsed < minimum:
+        raise ValueError(f"{env_var} must be at least {minimum}")
+    return parsed
+
+
 @dataclass
 class Pi:
     version: int
@@ -135,6 +150,18 @@ class Configuration:
     @classmethod
     def hsv_calibration_enabled(cls) -> bool:
         return _env_flag("HEART_HSV_CALIBRATION", default=True)
+
+    @classmethod
+    def render_variant(cls) -> str:
+        return os.environ.get("HEART_RENDER_VARIANT", "iterative")
+
+    @classmethod
+    def render_parallel_threshold(cls) -> int:
+        return _env_int("HEART_RENDER_PARALLEL_THRESHOLD", default=4, minimum=1)
+
+    @classmethod
+    def render_executor_max_workers(cls) -> int | None:
+        return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:

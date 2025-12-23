@@ -313,6 +313,7 @@ RGBA_IMAGE_FORMAT: Literal["RGBA"] = "RGBA"
 class RendererVariant(enum.Enum):
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
+    AUTO = "AUTO"
     # TODO: Add more
 
 
@@ -373,7 +374,9 @@ class GameLoop:
 
     def _get_render_executor(self) -> ThreadPoolExecutor:
         if self._render_executor is None:
-            self._render_executor = ThreadPoolExecutor()
+            self._render_executor = ThreadPoolExecutor(
+                max_workers=Configuration.render_executor_max_workers()
+            )
         return self._render_executor
 
     def add_mode(
@@ -630,6 +633,10 @@ class GameLoop:
     def _render_surfaces_binary(
         self, renderers: list["BaseRenderer"]
     ) -> pygame.Surface | None:
+        if not renderers:
+            return None
+        if len(renderers) == 1:
+            return self.process_renderer(renderers[0])
         self._render_queue_depth = len(renderers)
         executor = self._get_render_executor()
         surfaces: list[pygame.Surface] = [
@@ -640,10 +647,7 @@ class GameLoop:
 
         # Iteratively merge surfaces until only one remains
         while len(surfaces) > 1:
-            pairs = []
-            # Create pairs of adjacent surfaces
-            for i in range(0, len(surfaces) - 1, 2):
-                pairs.append((surfaces[i], surfaces[i + 1]))
+            pairs = list(zip(surfaces[0::2], surfaces[1::2]))
 
             # Merge pairs in parallel
             merged_surfaces = list(
@@ -661,10 +665,25 @@ class GameLoop:
             return surfaces[0]
         return None
 
-    def _render_fn(
-        self, override_renderer_variant: RendererVariant | None
-    ) -> RenderMethod:
+    def _resolve_render_variant(
+        self,
+        renderer_count: int,
+        override_renderer_variant: RendererVariant | None,
+    ) -> RendererVariant:
         variant = override_renderer_variant or self.renderer_variant
+        if variant == RendererVariant.AUTO:
+            threshold = Configuration.render_parallel_threshold()
+            if threshold > 1 and renderer_count >= threshold:
+                return RendererVariant.BINARY
+            return RendererVariant.ITERATIVE
+        return variant
+
+    def _render_fn(
+        self,
+        renderers: list["BaseRenderer"],
+        override_renderer_variant: RendererVariant | None,
+    ) -> RenderMethod:
+        variant = self._resolve_render_variant(len(renderers), override_renderer_variant)
         return self._render_dispatch.get(
             variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )
@@ -677,9 +696,8 @@ class GameLoop:
         if self.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
         # Add border in select mode
-        result: pygame.Surface | None = self._render_fn(override_renderer_variant)(
-            renderers
-        )
+        render_fn = self._render_fn(renderers, override_renderer_variant)
+        result: pygame.Surface | None = render_fn(renderers)
         render_image = self.__finalize_rendering(result) if result else None
         if result is not None:
             self.screen.blit(result, (0, 0))

@@ -9,7 +9,7 @@ from PIL import Image
 
 from heart.device import Cube, Device
 from heart.device.local import LocalScreen
-from heart.environment import GameLoop
+from heart.environment import GameLoop, RendererVariant
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.providers import container
 from heart.programs.registry import ConfigurationRegistry
@@ -62,6 +62,19 @@ def _get_device(x11_forward: bool) -> Device:
     return device
 
 
+def _parse_render_variant(value: str) -> RendererVariant:
+    normalized = value.strip().upper()
+    if not normalized:
+        raise ValueError("HEART_RENDER_VARIANT must not be empty")
+    try:
+        return RendererVariant[normalized]
+    except KeyError as exc:
+        options = ", ".join(variant.name.lower() for variant in RendererVariant)
+        raise ValueError(
+            f"Unknown render variant '{value}'. Expected one of: {options}"
+        ) from exc
+
+
 @app.command()
 def run(
     configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
@@ -76,7 +89,12 @@ def run(
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         raise Exception(f"Configuration '{configuration}' not found in registry")
-    loop = GameLoop(device=_get_device(x11_forward), resolver=container)
+    render_variant = _parse_render_variant(Configuration.render_variant())
+    loop = GameLoop(
+        device=_get_device(x11_forward),
+        resolver=container,
+        render_variant=render_variant,
+    )
     configuration_fn(loop)
 
     ## ============================= ##
