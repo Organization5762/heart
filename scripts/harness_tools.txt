@@ -1,0 +1,5 @@
+ruff
+isort
+docformatter
+mdformat
+mypy

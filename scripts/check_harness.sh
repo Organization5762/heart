@@ -6,6 +6,7 @@ REQUIRED_CMDS=(uv uvx rsync)
 OPTIONAL_CMDS=(spellcheck sshpass fswatch inotifywait flock)
 PYTHON_CANDIDATES=(python3 python)
 PYTHON_MIN_VERSION="3.11"
+UV_TOOL_LIST_FILE="${REPO_ROOT}/scripts/harness_tools.txt"
 missing_required=()
 
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
@@ -71,6 +72,30 @@ echo "Python available: ${PYTHON_CMD} ${python_version}"
 echo "Required tools available: ${REQUIRED_CMDS[*]}"
 echo "uv version: $(uv --version)"
 echo "uvx version: $(uvx --version)"
+
+if [[ -f "${UV_TOOL_LIST_FILE}" ]]; then
+  mapfile -t required_uv_tools < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
+else
+  required_uv_tools=()
+  echo "Warning: ${UV_TOOL_LIST_FILE} not found; skipping uv tool checks." >&2
+fi
+
+if [[ ${#required_uv_tools[@]} -gt 0 ]]; then
+  if uv tool list >/dev/null 2>&1; then
+    mapfile -t installed_uv_tools < <(uv tool list | awk '/^[a-zA-Z0-9_-]+ v/ {print $1}')
+    missing_uv_tools=()
+    for tool in "${required_uv_tools[@]}"; do
+      if ! printf '%s\n' "${installed_uv_tools[@]}" | grep -qx "${tool}"; then
+        missing_uv_tools+=("${tool}")
+      fi
+    done
+    if [[ ${#missing_uv_tools[@]} -gt 0 ]]; then
+      echo "Warning: missing uv tools: ${missing_uv_tools[*]}. Run 'make install' to install them." >&2
+    fi
+  else
+    echo "Warning: unable to list uv tools; run 'uv tool list' to verify installs." >&2
+  fi
+fi
 
 for cmd in "${OPTIONAL_CMDS[@]}"; do
   if command -v "${cmd}" >/dev/null 2>&1; then

@@ -1,6 +1,6 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
-TOOLS = ruff isort docformatter mdformat mypy
+TOOLS := $(shell cat scripts/harness_tools.txt)
 BUILD_ARGS ?=
 .PHONY: install pi_install format check test build check-harness
 
