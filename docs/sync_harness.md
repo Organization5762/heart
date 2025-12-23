@@ -60,10 +60,14 @@ under `build/.package_stamp`.
 Build helpers:
 
 - `BUILD_ARGS` passes extra arguments to `uv build`.
+- `BUILD_HASH_MODE` selects how build inputs are hashed (`content` or `metadata`).
 - `BUILD_FORCE=true` forces a build even if the inputs are unchanged.
 - `BUILD_STAMP_PATH` overrides the build stamp location.
+- `BUILD_MANIFEST_PATH` writes a JSON summary of the build decision.
 - `BUILD_INPUTS` overrides the default inputs (`src`, `pyproject.toml`,
   `README.md`, `uv.lock`) as a space-delimited list.
+- `BUILD_INPUTS_FILE` points at a newline-delimited list of build inputs.
+- `PYTHON_BIN` chooses the Python interpreter used for hashing and manifests.
 
 ## Harness check helper
 
