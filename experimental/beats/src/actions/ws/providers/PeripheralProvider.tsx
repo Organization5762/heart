@@ -30,6 +30,7 @@ export function PeripheralProvider({ children }: { children: React.ReactNode }) 
         [info.id]: {
           ts: Date.now(),
           info,
+          last_data: data,
         },
       }));
     });
