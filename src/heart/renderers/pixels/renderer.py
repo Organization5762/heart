@@ -31,15 +31,22 @@ class Border(StatefulBaseRenderer[BorderState]):
     ) -> None:
         width, height = window.get_size()
         color_value = self.state.color._as_tuple()
-        for x in range(width):
-            for y in range(self.width):
-                window.set_at((x, y), color_value)
-                window.set_at((x, height - 1 - y), color_value)
-
-        for y in range(height):
-            for x in range(self.width):
-                window.set_at((x, y), color_value)
-                window.set_at((width - 1 - x, y), color_value)
+        border_width = max(0, self.width)
+        if border_width == 0:
+            return
+        clamped_width = min(border_width, min(width, height))
+        if clamped_width == 0:
+            return
+        window.fill(color_value, pygame.Rect(0, 0, width, clamped_width))
+        window.fill(
+            color_value,
+            pygame.Rect(0, height - clamped_width, width, clamped_width),
+        )
+        window.fill(color_value, pygame.Rect(0, 0, clamped_width, height))
+        window.fill(
+            color_value,
+            pygame.Rect(width - clamped_width, 0, clamped_width, height),
+        )
 
     def set_color(self, color: Color) -> None:
         self._provider.set_color(color)
