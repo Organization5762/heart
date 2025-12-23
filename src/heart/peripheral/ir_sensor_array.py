@@ -233,7 +233,8 @@ class MultilaterationSolver:
             candidate_emission = vector[3]
             deltas = candidate_point - self.sensor_positions
             distances = np.linalg.norm(deltas, axis=1)
-            return distances - self.propagation_speed * (times - candidate_emission)
+            residuals = distances - self.propagation_speed * (times - candidate_emission)
+            return np.asarray(residuals, dtype=float)
 
         def jacobian(vector: np.ndarray) -> np.ndarray:
             candidate_point = vector[:3]
