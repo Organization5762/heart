@@ -34,19 +34,7 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
         def advance_state(
             state: CombinedBpmScreenState, clock: Clock
         ) -> CombinedBpmScreenState:
-            elapsed_time = state.elapsed_time_ms + clock.get_time()
-            showing_metadata = state.showing_metadata
-
-            if showing_metadata and elapsed_time >= self._metadata_duration_ms:
-                showing_metadata = False
-                elapsed_time = 0
-            elif (not showing_metadata) and elapsed_time >= self._max_bpm_duration_ms:
-                showing_metadata = True
-                elapsed_time = 0
-
-            return CombinedBpmScreenState(
-                elapsed_time_ms=elapsed_time, showing_metadata=showing_metadata
-            )
+            return self._advance_state(state=state, elapsed_ms=clock.get_time())
 
         return (
             self._peripheral_manager.game_tick.pipe(
@@ -56,4 +44,21 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
                 ops.start_with(initial_state),
                 ops.share(),
             )
+        )
+
+    def _advance_state(
+        self, *, state: CombinedBpmScreenState, elapsed_ms: int
+    ) -> CombinedBpmScreenState:
+        elapsed_time = state.elapsed_time_ms + elapsed_ms
+        showing_metadata = state.showing_metadata
+
+        if showing_metadata and elapsed_time >= self._metadata_duration_ms:
+            showing_metadata = False
+            elapsed_time = 0
+        elif (not showing_metadata) and elapsed_time >= self._max_bpm_duration_ms:
+            showing_metadata = True
+            elapsed_time = 0
+
+        return CombinedBpmScreenState(
+            elapsed_time_ms=elapsed_time, showing_metadata=showing_metadata
         )
