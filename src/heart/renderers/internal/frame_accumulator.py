@@ -96,16 +96,35 @@ class FrameAccumulator:
         if clear:
             destination.fill((0, 0, 0, 0))
 
+        pending_blits: list[
+            tuple[
+                pygame.Surface,
+                tuple[int, int],
+                pygame.Rect | tuple[int, int, int, int] | None,
+                int,
+            ]
+        ] = []
+
+        def flush_blits() -> None:
+            if pending_blits:
+                destination.blits(pending_blits)
+                pending_blits.clear()
+
         for command in self._commands:
             if isinstance(command, _BlitCommand):
-                destination.blit(
-                    command.surface,
-                    command.dest,
-                    command.area,
-                    command.special_flags,
+                pending_blits.append(
+                    (
+                        command.surface,
+                        command.dest,
+                        command.area,
+                        command.special_flags,
+                    )
                 )
             else:
+                flush_blits()
                 destination.fill(command.color, command.rect, command.special_flags)
+
+        flush_blits()
 
         self._commands.clear()
         self._array_cache = None
