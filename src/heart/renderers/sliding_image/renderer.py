@@ -30,7 +30,6 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         self._image_file = image_file
         self._provider_factory = provider_factory
         self._provider: SlidingImageStateProvider | None = None
-        self._image: pygame.Surface | None = None
 
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -58,18 +57,11 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         image = pygame.transform.scale(image, window.get_size())
         width, _ = image.get_size()
 
-        self._image = image
         self._provider.set_image(image)
         self._provider.set_width(width)
-        self.set_state(
-            SlidingImageState(
-                offset=0,
-                speed=self._configured_speed,
-                width=width,
-                image=image,
-            )
-        )
-        self.initialized = True
+        if self.builder is None:
+            self.builder = self._provider
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def real_process(
         self,
@@ -77,25 +69,20 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        if self._image is None or self.state.width <= 0:
+        image = self.state.image
+        if image is None or self.state.width <= 0:
             return
-
-        if self._provider is not None:
-            next_state = self._provider.advance_state(self.state)
-            if next_state != self.state:
-                self.set_state(next_state)
 
         offset = self.state.offset
         width = self.state.width
 
-        window.blit(self._image, (-offset, 0))
+        window.blit(image, (-offset, 0))
         if offset:
-            window.blit(self._image, (width - offset, 0))
+            window.blit(image, (width - offset, 0))
 
     def reset(self) -> None:
-        if self._provider is not None and self.state.width > 0:
-            self.set_state(self._provider.reset_state(self.state))
-        super().reset()
+        if self._provider is not None:
+            self._provider.request_reset()
 
 
 class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
@@ -142,14 +129,9 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
 
         width, _ = window.get_size()
         self._provider.set_width(width)
-        self.set_state(
-            SlidingRendererState(
-                offset=0,
-                speed=self._configured_speed,
-                width=width,
-            )
-        )
-        self.initialized = True
+        if self.builder is None:
+            self.builder = self._provider
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def real_process(
         self,
@@ -167,11 +149,6 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
         if self.state.width <= 0:
             return
 
-        if self._provider is not None:
-            next_state = self._provider.advance_state(self.state)
-            if next_state != self.state:
-                self.set_state(next_state)
-
         offset = self.state.offset
         width = self.state.width
         surface = window.copy()
@@ -182,6 +159,5 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
             window.blit(surface, (width - offset, 0))
 
     def reset(self) -> None:
-        if self._provider is not None and self.state.width > 0:
-            self.set_state(self._provider.reset_state(self.state))
-        super().reset()
+        if self._provider is not None:
+            self._provider.request_reset()

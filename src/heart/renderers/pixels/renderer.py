@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Callable
+
 import pygame
 
 from heart import DeviceDisplayMode
@@ -55,26 +59,33 @@ class Border(StatefulBaseRenderer[BorderState]):
 
 
 class Rain(StatefulBaseRenderer[RainState]):
-    def __init__(self, provider: RainStateProvider | None = None) -> None:
-        self.provider = provider or RainStateProvider()
+    def __init__(
+        self,
+        provider_factory: Callable[..., RainStateProvider] | None = None,
+    ) -> None:
+        self._provider_factory = provider_factory or RainStateProvider
+        self._provider: RainStateProvider | None = None
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 8
         self.starting_color = Color(r=173, g=216, b=230)
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> RainState:
-        return self.provider.create_initial_state(
-            window=window,
-            clock=clock,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-        )
+    ) -> None:
+        if self.builder is None:
+            width, height = window.get_size()
+            self._provider = self._provider_factory(
+                width=width,
+                height=height,
+                peripheral_manager=peripheral_manager,
+            )
+            self.builder = self._provider
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def real_process(
         self,
@@ -82,7 +93,6 @@ class Rain(StatefulBaseRenderer[RainState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        width, height = window.get_size()
         new_y = self.state.current_y + 1
         starting_point = self.state.starting_point
 
@@ -90,34 +100,35 @@ class Rain(StatefulBaseRenderer[RainState]):
             color = self.starting_color.dim(fraction=i / self.l)
             window.set_at((starting_point, new_y - i), color)
 
-        next_state = self.provider.next_state(
-            state=self.state, width=width, height=height
-        )
-        if next_state != self.state:
-            self.set_state(next_state)
-
 
 class Slinky(StatefulBaseRenderer[SlinkyState]):
-    def __init__(self, provider: SlinkyStateProvider | None = None) -> None:
-        self.provider = provider or SlinkyStateProvider()
+    def __init__(
+        self,
+        provider_factory: Callable[..., SlinkyStateProvider] | None = None,
+    ) -> None:
+        self._provider_factory = provider_factory or SlinkyStateProvider
+        self._provider: SlinkyStateProvider | None = None
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.l = 10
         self.starting_color = Color(r=255, g=165, b=0)
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> SlinkyState:
-        return self.provider.create_initial_state(
-            window=window,
-            clock=clock,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-        )
+    ) -> None:
+        if self.builder is None:
+            width, height = window.get_size()
+            self._provider = self._provider_factory(
+                width=width,
+                height=height,
+                peripheral_manager=peripheral_manager,
+            )
+            self.builder = self._provider
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def real_process(
         self,
@@ -125,7 +136,6 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        width, height = window.get_size()
         new_y = self.state.current_y + 1
         starting_point = self.state.starting_point
 
@@ -141,9 +151,3 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
                 more_dim = self.starting_color.dim(fraction=(i + 1) / self.l)
                 window.set_at((starting_point + 1, new_y + i), more_dim)
                 window.set_at((starting_point - 1, new_y - i), more_dim)
-
-        next_state = self.provider.next_state(
-            state=self.state, width=width, height=height
-        )
-        if next_state != self.state:
-            self.set_state(next_state)

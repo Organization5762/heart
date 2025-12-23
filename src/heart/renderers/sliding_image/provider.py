@@ -5,6 +5,7 @@ from dataclasses import replace
 import pygame
 import reactivex
 from reactivex import operators as ops
+from reactivex.subject import Subject
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -24,6 +25,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         self._speed = max(1, speed)
         self._width = width
         self._image: pygame.Surface | None = None
+        self._reset = Subject[None]()
 
     def set_width(self, width: int) -> None:
         self._width = max(0, width)
@@ -47,30 +49,26 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
+    def request_reset(self) -> None:
+        self._reset.on_next(None)
+
     def observable(self) -> reactivex.Observable[SlidingImageState]:
         initial_state = self._initial_state()
 
-        def advance(state: SlidingImageState) -> SlidingImageState:
-            width = state.width or self._width
-            if width <= 0:
-                return SlidingImageState(
-                    speed=state.speed, width=width, image=state.image
-                )
+        tick_events = self._peripheral_manager.game_tick.pipe(
+            ops.map(lambda _: "tick")
+        )
+        reset_events = self._reset.pipe(ops.map(lambda _: "reset"))
 
-            offset = (state.offset + state.speed) % width
-            return SlidingImageState(
-                offset=offset,
-                speed=state.speed,
-                width=width,
-                image=state.image,
-            )
+        def advance(state: SlidingImageState, event: str) -> SlidingImageState:
+            if event == "reset":
+                return self.reset_state(state)
+            return self.advance_state(state)
 
-        return (
-            self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: advance(state), seed=initial_state),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return reactivex.merge(tick_events, reset_events).pipe(
+            ops.scan(advance, seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
 
@@ -85,6 +83,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         self._peripheral_manager = peripheral_manager
         self._speed = max(1, speed)
         self._width = width
+        self._reset = Subject[None]()
 
     def set_width(self, width: int) -> None:
         self._width = max(0, width)
@@ -103,21 +102,24 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
+    def request_reset(self) -> None:
+        self._reset.on_next(None)
+
     def observable(self) -> reactivex.Observable[SlidingRendererState]:
         initial_state = self._initial_state()
 
-        def advance(state: SlidingRendererState) -> SlidingRendererState:
-            width = state.width or self._width
-            if width <= 0:
-                return SlidingRendererState(speed=state.speed, width=width)
+        tick_events = self._peripheral_manager.game_tick.pipe(
+            ops.map(lambda _: "tick")
+        )
+        reset_events = self._reset.pipe(ops.map(lambda _: "reset"))
 
-            offset = (state.offset + state.speed) % width
-            return SlidingRendererState(offset=offset, speed=state.speed, width=width)
+        def advance(state: SlidingRendererState, event: str) -> SlidingRendererState:
+            if event == "reset":
+                return self.reset_state(state)
+            return self.advance_state(state)
 
-        return (
-            self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: advance(state), seed=initial_state),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return reactivex.merge(tick_events, reset_events).pipe(
+            ops.scan(advance, seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
         )
