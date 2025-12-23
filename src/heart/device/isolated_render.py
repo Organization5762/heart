@@ -59,15 +59,3 @@ class MatrixClient:
             finally:
                 sock.settimeout(None)
 
-
-def send_image(
-    image: Image.Image,
-    *,
-    socket_path: Optional[str] = None,
-    tcp_address: Optional[Tuple[str, int]] = None,
-) -> None:
-    client = MatrixClient(socket_path=socket_path, tcp_address=tcp_address)
-    try:
-        client.send_image(image)
-    finally:
-        client.close()
