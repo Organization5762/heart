@@ -644,11 +644,19 @@ class GameLoop:
 
         if len(renderers) > 0:
             pygame.display.flip()
-            # Convert screen to PIL Image
-            screen_array = pygame.surfarray.array3d(self.screen)
-            transposed_array = np.transpose(screen_array, (1, 0, 2))
-            pil_image = Image.fromarray(transposed_array)
-            self.device.set_image(pil_image)
+            if render_image is not None:
+                device_image = (
+                    render_image.convert("RGB")
+                    if render_image.mode != "RGB"
+                    else render_image
+                )
+                self.device.set_image(device_image)
+            else:
+                # Fallback to a screen capture if we did not render an image.
+                screen_array = pygame.surfarray.array3d(self.screen)
+                transposed_array = np.transpose(screen_array, (1, 0, 2))
+                pil_image = Image.fromarray(transposed_array)
+                self.device.set_image(pil_image)
 
     def _handle_events(self) -> None:
         try:
