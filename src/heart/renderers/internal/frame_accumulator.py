@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import numpy as np
 import pygame
 
+from heart.utilities.env import Configuration
+
 _ColorInput = pygame.Color | str | tuple[int, int, int] | tuple[int, int, int, int]
 _RectInput = pygame.Rect | tuple[int, int, int, int] | None
 
@@ -134,7 +136,10 @@ class FrameAccumulator:
         """Return an RGB array view of the accumulated frame."""
 
         if self._array_cache is None:
-            array = pygame.surfarray.array3d(self._surface)
+            if Configuration.frame_array_strategy() == "view":
+                array = pygame.surfarray.pixels3d(self._surface)
+            else:
+                array = pygame.surfarray.array3d(self._surface)
             self._array_cache = array.swapaxes(0, 1)
         return self._array_cache
 
