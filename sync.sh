@@ -21,8 +21,8 @@ Options:
       --once               Perform a single sync and exit (no file watching)
       --watcher MODE       Watch implementation to use: auto, fswatch, inotifywait, poll (default: auto)
       --poll-interval SEC  Interval in seconds for polling when watcher=poll (default: 5)
-      --pre-sync CMD       Command to run before each sync (runs in the source directory)
-      --post-sync CMD      Command to run after each sync (runs in the source directory)
+      --pre-sync CMD       Command to run before each sync (runs in the source directory, may be supplied multiple times)
+      --post-sync CMD      Command to run after each sync (runs in the source directory, may be supplied multiple times)
       --dry-run            Show what would be transferred without making changes
       --skip-spellcheck    Skip running spellcheck before synchronising
   -h, --help               Show this help message and exit
@@ -51,12 +51,20 @@ IGNORE_FILE=${SYNC_IGNORE_FILE:-}
 POLL_INTERVAL=${SYNC_POLL_INTERVAL:-5}
 WATCH_MODE=${SYNC_WATCHER:-auto}
 DRY_RUN=${SYNC_DRY_RUN:-false}
-PRE_SYNC_CMD=${SYNC_PRE_SYNC_CMD:-}
-POST_SYNC_CMD=${SYNC_POST_SYNC_CMD:-}
+declare -a PRE_SYNC_CMDS=()
+declare -a POST_SYNC_CMDS=()
 SPELLCHECK_ENABLED=true
 RUN_ONCE=false
 
 declare -a IGNORE_PATTERNS
+
+if [[ -n "${SYNC_PRE_SYNC_CMD:-}" ]]; then
+  PRE_SYNC_CMDS+=("$SYNC_PRE_SYNC_CMD")
+fi
+
+if [[ -n "${SYNC_POST_SYNC_CMD:-}" ]]; then
+  POST_SYNC_CMDS+=("$SYNC_POST_SYNC_CMD")
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -89,11 +97,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --pre-sync)
-      PRE_SYNC_CMD="$2"
+      PRE_SYNC_CMDS+=("$2")
       shift 2
       ;;
     --post-sync)
-      POST_SYNC_CMD="$2"
+      POST_SYNC_CMDS+=("$2")
       shift 2
       ;;
     --dry-run)
@@ -197,10 +205,10 @@ _sync_once() {
   local timestamp
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[$timestamp] Syncing $SOURCE_DIR -> $DESTINATION"
-  run_hook "pre-sync" "$PRE_SYNC_CMD"
+  run_hooks "pre-sync" "${PRE_SYNC_CMDS[@]}"
   run_spellcheck
   run_rsync
-  run_hook "post-sync" "$POST_SYNC_CMD"
+  run_hooks "post-sync" "${POST_SYNC_CMDS[@]}"
   echo "[$timestamp] Sync complete"
 }
 
@@ -260,16 +268,18 @@ run_rsync() {
   fi
 }
 
-run_hook() {
+run_hooks() {
   local hook_label=$1
-  local hook_cmd=$2
+  shift
+  local hook_cmd
 
-  if [[ -z "$hook_cmd" ]]; then
-    return
-  fi
-
-  echo "Running ${hook_label} hook: ${hook_cmd}"
-  (cd "$SOURCE_DIR" && bash -lc "$hook_cmd")
+  for hook_cmd in "$@"; do
+    if [[ -z "$hook_cmd" ]]; then
+      continue
+    fi
+    echo "Running ${hook_label} hook: ${hook_cmd}"
+    (cd "$SOURCE_DIR" && bash -lc "$hook_cmd")
+  done
 }
 
 perform_watch() {
@@ -299,11 +309,15 @@ echo "Watcher: $WATCH_MODE"
 if [[ -n "$IGNORE_FILE" ]]; then
   echo "Using ignore file: $IGNORE_FILE"
 fi
-if [[ -n "$PRE_SYNC_CMD" ]]; then
-  echo "Pre-sync hook: $PRE_SYNC_CMD"
+if [[ ${#PRE_SYNC_CMDS[@]} -gt 0 ]]; then
+  for hook_cmd in "${PRE_SYNC_CMDS[@]}"; do
+    echo "Pre-sync hook: $hook_cmd"
+  done
 fi
-if [[ -n "$POST_SYNC_CMD" ]]; then
-  echo "Post-sync hook: $POST_SYNC_CMD"
+if [[ ${#POST_SYNC_CMDS[@]} -gt 0 ]]; then
+  for hook_cmd in "${POST_SYNC_CMDS[@]}"; do
+    echo "Post-sync hook: $hook_cmd"
+  done
 fi
 
 sync_changes
