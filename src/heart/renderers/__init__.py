@@ -57,12 +57,8 @@ class BaseRenderer:
             case DeviceDisplayMode.MIRRORED:
                 layout: Layout = orientation.layout
                 screen_size = (window_x // layout.columns, window_y // layout.rows)
-            case DeviceDisplayMode.FULL:
+            case DeviceDisplayMode.FULL | DeviceDisplayMode.OPENGL:
                 # The screen is the full size of the device
-                screen_size = (window_x, window_y)
-            case DeviceDisplayMode.OPENGL:
-                # todo: this is actually completely unused for this dispaly mode
-                #  so there's some smell here but providing this dummy val for now
                 screen_size = (window_x, window_y)
         screen = pygame.Surface(screen_size, pygame.SRCALPHA)
         return screen
@@ -291,12 +287,8 @@ class AtomicBaseRenderer(Generic[StateT]):
             case DeviceDisplayMode.MIRRORED:
                 layout: Layout = orientation.layout
                 screen_size = (window_x // layout.columns, window_y // layout.rows)
-            case DeviceDisplayMode.FULL:
+            case DeviceDisplayMode.FULL | DeviceDisplayMode.OPENGL:
                 # The screen is the full size of the device
-                screen_size = (window_x, window_y)
-            case DeviceDisplayMode.OPENGL:
-                # todo: this is actually completely unused for this dispaly mode
-                #  so there's some smell here but providing this dummy val for now
                 screen_size = (window_x, window_y)
         screen = pygame.Surface(screen_size, pygame.SRCALPHA)
         return screen
@@ -370,4 +362,3 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             self._subscription.dispose()
             self._subscription = None
         super().reset()
-
