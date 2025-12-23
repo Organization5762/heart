@@ -1,18 +1,15 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
+TOOLS = ruff isort docformatter mdformat mypy
 .PHONY: install pi_install format check test
 
 install:
 	@uv sync --all-extras --group dev
-	@uv tool install ruff
-	@uv tool install isort
-	@uv tool install docformatter
-	@uv tool install mdformat
-	@uv tool install mypy
+	@for tool in $(TOOLS); do uv tool install $$tool; done
 
 format:
 	@uvx isort $(PYTHON_SOURCES)
-	@uvx ruff check --fix
+	@uvx ruff check --fix $(PYTHON_SOURCES)
 	@uvx docformatter -i -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat $(DOCS_SOURCES)
 	@uv run mypy --config-file pyproject.toml
