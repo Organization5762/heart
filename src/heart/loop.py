@@ -112,8 +112,8 @@ def bench_device() -> None:
                     d.set_image(image)
 
 
-def main():
-    return app()
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":

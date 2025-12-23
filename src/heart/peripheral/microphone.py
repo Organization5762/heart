@@ -6,6 +6,7 @@ import contextlib
 import threading
 import time
 from collections.abc import Iterator
+from types import TracebackType
 from typing import Any, Self, cast
 
 import numpy as np
@@ -24,7 +25,7 @@ except Exception:  # pragma: no cover - module may be missing on CI
 sd = cast(Any | None, _sounddevice)
 
 
-class Microphone(Peripheral):
+class Microphone(Peripheral[MicrophoneLevel]):
     """Capture audio input and emit loudness metrics"""
 
     EVENT_LEVEL = "peripheral.microphone.level"
@@ -117,7 +118,7 @@ class Microphone(Peripheral):
         while not self._stop_event.wait(self.block_duration):
             pass
 
-    def _open_stream(self, blocksize: int):  # pragma: no cover - thin wrapper
+    def _open_stream(self, blocksize: int) -> Any:  # pragma: no cover - thin wrapper
         assert sd is not None
         return sd.InputStream(
             samplerate=self.samplerate,
@@ -129,7 +130,9 @@ class Microphone(Peripheral):
     # ------------------------------------------------------------------
     # Audio processing
     # ------------------------------------------------------------------
-    def _on_audio_block(self, indata, frames, _time, status) -> None:
+    def _on_audio_block(
+        self, indata: Any, frames: int, _time: Any, status: Any
+    ) -> None:
         if status:  # pragma: no cover - requires real hardware conditions
             logger.warning("Microphone stream status: %s", status)
         try:
@@ -167,7 +170,12 @@ class Microphone(Peripheral):
     def __enter__(self) -> "Microphone":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.stop()
         # Drain any context managers to avoid suppressing exceptions
         with contextlib.suppress(Exception):

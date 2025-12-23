@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Iterator, Self
+from typing import Any, Iterator, Self
 
 import pygame.joystick
 import reactivex
@@ -29,7 +29,7 @@ class GamepadIdentifier(Enum):
 class GamepadState:
     pass
 
-class Gamepad(Peripheral):
+class Gamepad(Peripheral[Any]):
     EVENT_BUTTON = "gamepad.button"
     EVENT_AXIS = "gamepad.axis"
     EVENT_DPAD = "gamepad.dpad"
@@ -91,7 +91,7 @@ class Gamepad(Peripheral):
     def get_dpad_value(self) -> tuple[float, float]:
         return self._dpad_curr_frame
 
-    def reset(self):
+    def reset(self) -> None:
         if self.joystick is not None:
             self.joystick.quit()
         self.joystick = None
@@ -198,7 +198,7 @@ class Gamepad(Peripheral):
     def gamepad_detected() -> bool:
         return pygame.joystick.get_count() > 0
 
-    def _read_from_gamepad(self, interval):
+    def _read_from_gamepad(self, interval: int) -> None:
         try:
             while Gamepad.gamepad_detected() and not self.is_connected():
                 try:

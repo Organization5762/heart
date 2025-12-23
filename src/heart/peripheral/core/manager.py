@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import Any, Iterable, TypeVar
 
 import reactivex
+from reactivex import operators as ops
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -9,7 +10,6 @@ from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
-from heart.peripheral.uwb import ops
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -27,7 +27,7 @@ class PeripheralManager:
         configuration: str | None = None,
         configuration_registry: PeripheralConfigurationRegistry | None = None,
     ) -> None:
-        self._peripherals: list[Peripheral] = []
+        self._peripherals: list[Peripheral[Any]] = []
         self._started = False
         self._configuration_registry = (
             configuration_registry or PeripheralConfigurationRegistry()
@@ -38,7 +38,7 @@ class PeripheralManager:
         self._configuration: PeripheralConfiguration | None = None
 
     @property
-    def peripherals(self) -> tuple[Peripheral, ...]:
+    def peripherals(self) -> tuple[Peripheral[Any], ...]:
         return tuple(self._peripherals)
 
 
@@ -56,12 +56,12 @@ class PeripheralManager:
 
         self._ensure_configuration()
 
-    def register(self, peripheral: Peripheral) -> None:
+    def register(self, peripheral: Peripheral[Any]) -> None:
         """Manually register ``peripheral`` with the manager."""
 
         self._register_peripheral(peripheral)
 
-    def _iter_detected_peripherals(self) -> Iterable[Peripheral]:
+    def _iter_detected_peripherals(self) -> Iterable[Peripheral[Any]]:
         configuration = self._ensure_configuration()
         for detector in configuration.detectors:
             yield from detector()
@@ -87,7 +87,7 @@ class PeripheralManager:
             logger.info(f"Attempting to start peripheral '{peripheral}'")
             peripheral.run()
 
-    def _register_peripheral(self, peripheral: Peripheral) -> None:
+    def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
 
     ###
@@ -99,20 +99,24 @@ class PeripheralManager:
         )
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
-        main_switches = [peripheral.observe for peripheral in self.peripherals if isinstance(peripheral, FakeSwitch)]
+        main_switches = [
+            peripheral.observe
+            for peripheral in self.peripherals
+            if isinstance(peripheral, FakeSwitch)
+        ]
 
         return reactivex.merge(*main_switches).pipe(
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
 
     @cached_property
-    def game_tick(self) -> reactivex.Subject:
-        return BehaviorSubject(None)
+    def game_tick(self) -> reactivex.Subject[Any]:
+        return BehaviorSubject[Any](None)
 
     @cached_property
-    def window(self) -> reactivex.Subject:
-        return BehaviorSubject(None)
+    def window(self) -> reactivex.Subject[Any]:
+        return BehaviorSubject[Any](None)
 
     @cached_property
-    def clock(self) -> reactivex.Subject:
-        return BehaviorSubject(None)
+    def clock(self) -> reactivex.Subject[Any]:
+        return BehaviorSubject[Any](None)

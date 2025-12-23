@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Optional
 
 
 class DpadType(Enum):
@@ -8,7 +9,7 @@ class DpadType(Enum):
 
 
 class SwitchLikeMapping(ABC):
-    def get_dpad_type(self):
+    def get_dpad_type(self) -> DpadType:
         return self.DPAD_TYPE
 
     @property
@@ -17,120 +18,120 @@ class SwitchLikeMapping(ABC):
         pass
 
     @property
-    def DPAD_HAT(self):
-        pass
+    def DPAD_HAT(self) -> Optional[int]:
+        return None
 
     # d-pad buttons
     @property
-    def DPAD_UP(self):
-        pass
+    def DPAD_UP(self) -> Optional[int]:
+        return None
 
     @property
-    def DPAD_DOWN(self):
-        pass
+    def DPAD_DOWN(self) -> Optional[int]:
+        return None
 
     @property
-    def DPAD_LEFT(self):
-        pass
+    def DPAD_LEFT(self) -> Optional[int]:
+        return None
 
     @property
-    def DPAD_RIGHT(self):
-        pass
+    def DPAD_RIGHT(self) -> Optional[int]:
+        return None
 
     # face buttons
     @property
     @abstractmethod
-    def BUTTON_A(self):
+    def BUTTON_A(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_B(self):
+    def BUTTON_B(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_X(self):
+    def BUTTON_X(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_Y(self):
+    def BUTTON_Y(self) -> int:
         pass
 
     # option buttons
     @property
     @abstractmethod
-    def BUTTON_PLUS(self):
+    def BUTTON_PLUS(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_MINUS(self):
+    def BUTTON_MINUS(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_HOME(self):
+    def BUTTON_HOME(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_CAPTURE(self):
+    def BUTTON_CAPTURE(self) -> int:
         pass
 
     # trigger buttons
     @property
     @abstractmethod
-    def BUTTON_ZL(self):
+    def BUTTON_ZL(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_ZR(self):
+    def BUTTON_ZR(self) -> int:
         pass
 
     # "analogue" triggers
     @property
     @abstractmethod
-    def AXIS_L(self):
+    def AXIS_L(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def AXIS_R(self):
+    def AXIS_R(self) -> int:
         pass
 
     # analogue joystick axes
     @property
     @abstractmethod
-    def AXIS_LEFT_X(self):
+    def AXIS_LEFT_X(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def AXIS_LEFT_Y(self):
+    def AXIS_LEFT_Y(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def AXIS_RIGHT_X(self):
+    def AXIS_RIGHT_X(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def AXIS_RIGHT_Y(self):
+    def AXIS_RIGHT_Y(self) -> int:
         pass
 
     # joystick buttons
     @property
     @abstractmethod
-    def BUTTON_L3(self):
+    def BUTTON_L3(self) -> int:
         pass
 
     @property
     @abstractmethod
-    def BUTTON_R3(self):
+    def BUTTON_R3(self) -> int:
         pass
 
 

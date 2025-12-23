@@ -2,7 +2,7 @@ import argparse
 import queue
 import sys
 import threading
-from typing import Optional
+from typing import Any, Optional
 
 from PIL import Image
 
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class SampleBase(object):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.parser = argparse.ArgumentParser()
 
         self.parser.add_argument(
@@ -164,10 +164,10 @@ class SampleBase(object):
         )
         self.parser.set_defaults(drop_privileges=True)
 
-    def run(self):
+    def run(self) -> None:
         print("Running")
 
-    def process(self):
+    def process(self) -> bool:
         self.args = self.parser.parse_args()
 
         from rgbmatrix import RGBMatrix, RGBMatrixOptions
@@ -215,7 +215,7 @@ class MatrixDisplayWorker:
     """Worker thread that handles sending images to the RGB matrix (This was taking up
     ~20-30% of main thread)"""
 
-    def __init__(self, matrix):
+    def __init__(self, matrix: Any) -> None:
         self.matrix = matrix
         self.offscreen = self.matrix.CreateFrameCanvas()
         self.q: queue.Queue[Optional[Image.Image]] = queue.Queue(maxsize=2)
@@ -231,11 +231,11 @@ class MatrixDisplayWorker:
             _ = self.q.get_nowait()
             self.q.put_nowait(img)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self.q.put(None)
         self._worker.join()
 
-    def _run(self):
+    def _run(self) -> None:
         while True:
             img = self.q.get()
             if img is None:
@@ -248,7 +248,7 @@ class MatrixDisplayWorker:
 
 
 class LEDMatrix(Device, SampleBase):
-    def __init__(self, orientation: Orientation, *args, **kwargs) -> None:
+    def __init__(self, orientation: Orientation, *args: Any, **kwargs: Any) -> None:
         Device.__init__(self, orientation=orientation)
         SampleBase.__init__(self, *args, **kwargs)
         assert orientation.layout.rows == 1, "Maximum 1 row supported at the moment"

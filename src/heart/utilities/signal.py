@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Callable, Sequence
+from typing import Callable, Sequence, cast
 
 import numpy as np
 
@@ -55,7 +55,7 @@ def hilbert_envelope(samples: Sequence[float]) -> np.ndarray:
     hilbert_fn = _load_scipy_hilbert()
     if hilbert_fn is not None:
         analytic = hilbert_fn(array)
-        return np.abs(analytic)
+        return cast(np.ndarray, np.abs(analytic))
     spectrum = np.fft.fft(array)
     h = np.zeros(array.size)
     if array.size > 0:

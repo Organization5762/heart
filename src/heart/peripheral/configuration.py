@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from heart.peripheral.core import Peripheral
 
-DetectorFactory = Callable[[], Iterable[Peripheral]]
+DetectorFactory = Callable[[], Iterable[Peripheral[Any]]]
 
 
 @dataclass(frozen=True)

@@ -93,7 +93,7 @@ class UartListener:
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:
-        def on_disconnect(client: BleakClient):
+        def on_disconnect(client: BleakClient) -> None:
             self.disconnected = True
 
         client = BleakClient(
@@ -106,7 +106,7 @@ class UartListener:
             backend._mtu_size = 512
         return client
 
-    def __callback(self, sender: BleakGATTCharacteristic, data: bytearray):
+    def __callback(self, sender: BleakGATTCharacteristic, data: bytearray) -> None:
         """Callback function to handle incoming data from the UART service.
 
         Args:

@@ -2,7 +2,8 @@
 import logging
 import threading
 import time
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import (Any, Callable, Dict, Iterator, List, Optional,
+                    SupportsIndex, Tuple, overload)
 
 from openant.base.driver import DriverNotFound
 from openant.devices import ANTPLUS_NETWORK_KEY
@@ -42,22 +43,38 @@ logger = get_logger("HeartRateManager")
 
 
 class _DummyChannel:
-    def on_broadcast_data(self, *_): ...
-    def on_burst_data(self, *_): ...
-    def on_acknowledge(self, *_): ...
+    def on_broadcast_data(self, *_: object) -> None:
+        pass
+
+    def on_burst_data(self, *_: object) -> None:
+        pass
+
+    def on_acknowledge(self, *_: object) -> None:
+        pass
 
 
 _DUMMY = _DummyChannel()
 
 
-class _SafeList(list):
-    def __getitem__(self, i):
-        if i >= len(self) or i < -len(self):
+class _SafeList(list[Any]):
+    @overload
+    def __getitem__(self, i: SupportsIndex) -> Any:
+        ...
+
+    @overload
+    def __getitem__(self, i: slice) -> list[Any]:
+        ...
+
+    def __getitem__(self, i: SupportsIndex | slice) -> Any:
+        if isinstance(i, slice):
+            return super().__getitem__(i)
+        index = int(i)
+        if index >= len(self) or index < -len(self):
             return _DUMMY
-        return super().__getitem__(i)
+        return super().__getitem__(index)
 
 
-class HeartRateManager(Peripheral):
+class HeartRateManager(Peripheral[Any]):
     """Continuously scans for ANT+ HR straps and publishes measurements."""
 
     def __init__(self) -> None:
@@ -83,7 +100,7 @@ class HeartRateManager(Peripheral):
 
     # ---------- Callbacks -----------------------------------------------------
 
-    def _on_found(self, d: Tuple[int, int, int]):
+    def _on_found(self, d: Tuple[int, int, int]) -> None:
         dev_id, dev_type, tx_type = d
         logger.info("Found device #%05X (%s)", dev_id, DeviceType(dev_type).name)
         try:
@@ -93,8 +110,8 @@ class HeartRateManager(Peripheral):
         except Exception as e:
             logger.error("Could not create HR device: %s", e)
 
-    def _cb(self, hrm: HeartRate):
-        def _inner(_pg, _name, data):
+    def _cb(self, hrm: HeartRate) -> Callable[[object, object, object], None]:
+        def _inner(_pg: object, _name: object, data: object) -> None:
             if isinstance(data, HeartRateData):
                 device_id = f"{hrm.device_id:05X}"
                 with _mutex:
@@ -129,7 +146,7 @@ class HeartRateManager(Peripheral):
 
     # ---------- ANT+ life-cycle ---------------------------------------------
 
-    def _ant_cycle(self):
+    def _ant_cycle(self) -> None:
         self._node = Node()
         self._node.channels = _SafeList(self._node.channels)
 
