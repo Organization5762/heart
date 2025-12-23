@@ -7,8 +7,11 @@ from typing import Callable, Sequence, cast
 
 import numpy as np
 
+from heart.utilities.env import Configuration
+
 _scipy_hilbert: Callable[[np.ndarray], np.ndarray] | None = None
 _FFT_CORRELATION_THRESHOLD = 50_000
+_FFT_PAD_MODES = {"exact", "next_pow2"}
 
 
 def _load_scipy_hilbert() -> Callable[[np.ndarray], np.ndarray] | None:
@@ -36,11 +39,31 @@ def _as_array(samples: Sequence[float] | np.ndarray) -> np.ndarray:
 
 
 def _fft_cross_correlation(ref: np.ndarray, comp: np.ndarray) -> np.ndarray:
-    n = ref.size + comp.size - 1
-    ref_spectrum = np.fft.rfft(ref, n)
-    comp_spectrum = np.fft.rfft(comp[::-1], n)
-    correlation = np.fft.irfft(ref_spectrum * comp_spectrum, n)
+    correlation_length = ref.size + comp.size - 1
+    fft_length = _fft_length(correlation_length)
+    ref_spectrum = np.fft.rfft(ref, fft_length)
+    comp_spectrum = np.fft.rfft(comp[::-1], fft_length)
+    correlation = np.fft.irfft(ref_spectrum * comp_spectrum, fft_length)
+    if fft_length != correlation_length:
+        correlation = correlation[:correlation_length]
     return correlation
+
+
+def _fft_length(correlation_length: int) -> int:
+    pad_mode = Configuration.signal_fft_pad_mode()
+    if pad_mode == "exact":
+        return correlation_length
+    if pad_mode == "next_pow2":
+        return _next_power_of_two(correlation_length)
+    raise ValueError(
+        f"Unsupported FFT pad mode '{pad_mode}'. Expected one of: {sorted(_FFT_PAD_MODES)}"
+    )
+
+
+def _next_power_of_two(value: int) -> int:
+    if value <= 1:
+        return 1
+    return 1 << (value - 1).bit_length()
 
 
 def fft_magnitude(samples: Sequence[float], *, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray]:
@@ -92,7 +115,8 @@ def cross_correlation(
         return np.array([], dtype=float), np.array([], dtype=float)
     ref_centered = ref - ref.mean()
     comp_centered = comp - comp.mean()
-    use_fft = ref_centered.size * comp_centered.size >= _FFT_CORRELATION_THRESHOLD
+    threshold = Configuration.signal_fft_correlation_threshold()
+    use_fft = ref_centered.size * comp_centered.size >= threshold
     if use_fft:
         correlation = _fft_cross_correlation(ref_centered, comp_centered)
     else:

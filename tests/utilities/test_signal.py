@@ -22,8 +22,6 @@ class TestUtilitiesSignal:
         peak_frequency = freqs[int(np.argmax(magnitudes))]
         assert peak_frequency == 5.0
 
-
-
     def test_dominant_frequency_matches_fft(self) -> None:
         """Verify that dominant frequency matches fft. This supports analytics accuracy for monitoring."""
         sample_rate = 200.0
@@ -33,8 +31,6 @@ class TestUtilitiesSignal:
         assert frequency == 20.0
         assert magnitude > 0.0
 
-
-
     def test_cross_correlation_detects_zero_lag(self) -> None:
         """Verify that cross correlation detects zero lag. This supports analytics accuracy for monitoring."""
         a = np.array([1.0, 2.0, 3.0, 4.0])
@@ -43,7 +39,64 @@ class TestUtilitiesSignal:
         zero_index = int(np.where(lags == 0)[0][0])
         assert correlation[zero_index] == pytest.approx(1.0)
 
+    def test_cross_correlation_uses_exact_fft_length(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that exact FFT padding is honored. This keeps correlation results predictable when tuning performance."""
+        monkeypatch.setenv("HEART_SIGNAL_FFT_THRESHOLD", "1")
+        monkeypatch.setenv("HEART_SIGNAL_FFT_PAD_MODE", "exact")
+        captured = {}
+        original_rfft = np.fft.rfft
 
+        def wrapped_rfft(data, n=None, *args, **kwargs):
+            captured["n"] = n
+            return original_rfft(data, n=n, *args, **kwargs)
+
+        monkeypatch.setattr(np.fft, "rfft", wrapped_rfft)
+        ref = np.array([1.0, 2.0, 3.0])
+        comp = np.array([0.0, 1.0, -1.0, 2.0])
+        lags, correlation = cross_correlation(ref, comp)
+        expected_length = ref.size + comp.size - 1
+        assert captured["n"] == expected_length
+        assert correlation.size == expected_length
+        assert lags.size == expected_length
+
+    def test_cross_correlation_pads_fft_to_power_of_two(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify that FFT padding uses the next power of two. This reduces runtime for large correlations."""
+        monkeypatch.setenv("HEART_SIGNAL_FFT_THRESHOLD", "1")
+        monkeypatch.setenv("HEART_SIGNAL_FFT_PAD_MODE", "next_pow2")
+        captured = {}
+        original_rfft = np.fft.rfft
+
+        def wrapped_rfft(data, n=None, *args, **kwargs):
+            captured["n"] = n
+            return original_rfft(data, n=n, *args, **kwargs)
+
+        monkeypatch.setattr(np.fft, "rfft", wrapped_rfft)
+        ref = np.array([1.0, 2.0, 3.0])
+        comp = np.array([0.0, 1.0, -1.0, 2.0])
+        lags, correlation = cross_correlation(ref, comp)
+        expected_length = ref.size + comp.size - 1
+        assert captured["n"] == 8
+        assert correlation.size == expected_length
+        assert lags.size == expected_length
+
+    def test_cross_correlation_skips_fft_below_threshold(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify that thresholding skips FFT usage. This avoids unnecessary overhead on small inputs."""
+        monkeypatch.setenv("HEART_SIGNAL_FFT_THRESHOLD", "1000000")
+
+        def fail_rfft(*args, **kwargs):
+            raise AssertionError("FFT should not be used below threshold")
+
+        monkeypatch.setattr(np.fft, "rfft", fail_rfft)
+        ref = np.array([1.0, 2.0, 3.0])
+        comp = np.array([0.0, 1.0, -1.0, 2.0])
+        lags, correlation = cross_correlation(ref, comp)
+        expected_length = ref.size + comp.size - 1
+        assert correlation.size == expected_length
+        assert lags.size == expected_length
 
     def test_hilbert_envelope_matches_absolute_for_constant(self) -> None:
         """Verify that hilbert envelope matches absolute for constant. This keeps the system behaviour reliable for operators."""

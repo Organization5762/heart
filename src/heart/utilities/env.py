@@ -128,6 +128,19 @@ class Configuration:
             )
         return None
 
+    @classmethod
+    def signal_fft_correlation_threshold(cls) -> int:
+        return _env_int("HEART_SIGNAL_FFT_THRESHOLD", default=50_000, minimum=1)
+
+    @classmethod
+    def signal_fft_pad_mode(cls) -> str:
+        mode = os.environ.get("HEART_SIGNAL_FFT_PAD_MODE", "next_pow2").strip().lower()
+        if mode not in {"exact", "next_pow2"}:
+            raise ValueError(
+                "HEART_SIGNAL_FFT_PAD_MODE must be 'exact' or 'next_pow2'"
+            )
+        return mode
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
