@@ -8,6 +8,7 @@ from typing import Callable, Sequence, cast
 import numpy as np
 
 _scipy_hilbert: Callable[[np.ndarray], np.ndarray] | None = None
+_FFT_CORRELATION_THRESHOLD = 50_000
 
 
 def _load_scipy_hilbert() -> Callable[[np.ndarray], np.ndarray] | None:
@@ -32,6 +33,14 @@ def _as_array(samples: Sequence[float] | np.ndarray) -> np.ndarray:
         msg = "samples must be a one-dimensional sequence"
         raise ValueError(msg)
     return array
+
+
+def _fft_cross_correlation(ref: np.ndarray, comp: np.ndarray) -> np.ndarray:
+    n = ref.size + comp.size - 1
+    ref_spectrum = np.fft.rfft(ref, n)
+    comp_spectrum = np.fft.rfft(comp[::-1], n)
+    correlation = np.fft.irfft(ref_spectrum * comp_spectrum, n)
+    return correlation
 
 
 def fft_magnitude(samples: Sequence[float], *, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray]:
@@ -83,7 +92,11 @@ def cross_correlation(
         return np.array([], dtype=float), np.array([], dtype=float)
     ref_centered = ref - ref.mean()
     comp_centered = comp - comp.mean()
-    correlation = np.correlate(ref_centered, comp_centered, mode="full")
+    use_fft = ref_centered.size * comp_centered.size >= _FFT_CORRELATION_THRESHOLD
+    if use_fft:
+        correlation = _fft_cross_correlation(ref_centered, comp_centered)
+    else:
+        correlation = np.correlate(ref_centered, comp_centered, mode="full")
     lags = np.arange(-comp.size + 1, ref.size)
     if max_lag is not None:
         mask = np.abs(lags) <= max_lag
