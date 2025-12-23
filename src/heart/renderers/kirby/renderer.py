@@ -1,6 +1,9 @@
+from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.renderers import BaseRenderer
 from heart.renderers.kirby.provider import KirbyStateProvider
+from heart.renderers.spritesheet import SpritesheetLoop
+from heart.renderers.text import TextRendering
 
 
 class KirbyScene(MultiScene):
@@ -11,4 +14,19 @@ class KirbyScene(MultiScene):
 
     @staticmethod
     def title_scene() -> list[BaseRenderer]:
-        return KirbyStateProvider.title_renderers()
+        return [
+            TextRendering(
+                text=["kirby mode"],
+                font="Roboto",
+                font_size=14,
+                color=Color.kirby(),
+                y_location=35,
+            ),
+            SpritesheetLoop(
+                sheet_file_path="kirby_flying_32.png",
+                metadata_file_path="kirby_flying_32.json",
+                image_scale=1 / 3,
+                offset_y=-5,
+                disable_input=True,
+            ),
+        ]
