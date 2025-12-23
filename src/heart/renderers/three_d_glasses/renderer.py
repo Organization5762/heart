@@ -43,8 +43,8 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         if not image_files:
             raise ValueError("ThreeDGlassesRenderer requires at least one image file")
 
-        super().__init__()
         self._builder = builder or ThreeDGlassesStateProvider(frame_duration_ms)
+        super().__init__()
         self._image_files = list(image_files)
         self._images: list[pygame.Surface] = []
         self._image_arrays: list[np.ndarray] = []
@@ -145,15 +145,9 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         if not self._image_arrays:
             return
 
-        next_state = self._builder.next_state(
-            self.state,
-            frame_count=len(self._image_arrays),
-            elapsed_ms=float(clock.get_time()),
-        )
-        self.set_state(next_state)
-
-        profile = self._profiles[next_state.current_index]
-        base_array = self._image_arrays[next_state.current_index]
+        state = self.state
+        profile = self._profiles[state.current_index]
+        base_array = self._image_arrays[state.current_index]
 
         frame_array = self._apply_profile(base_array, profile)
 
@@ -183,4 +177,11 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
         self._profiles = self._generate_profiles(len(self._image_arrays))
         self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
-        return self._builder.initial_state()
+        initial_state = self._builder.initial_state()
+        self.set_state(initial_state)
+        self._subscription = self._builder.observable(
+            peripheral_manager,
+            frame_count=len(self._image_arrays),
+            initial_state=initial_state,
+        ).subscribe(on_next=self.set_state)
+        return initial_state

@@ -1,39 +1,35 @@
 import logging
 import random
-from collections.abc import Callable
+import time
 from dataclasses import replace
 
-import pygame
+import reactivex
+from reactivex import operators as ops
 
-from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 
 logger = logging.getLogger(__name__)
 
 
-class YoListenStateProvider:
-    def __init__(self, base_color: Color) -> None:
-        self.base_color = base_color
-
-    def create_initial_state(
+class YoListenStateProvider(ObservableProvider[YoListenState]):
+    def __init__(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-        on_switch_state: Callable[[SwitchState | None], None],
-    ) -> YoListenState:
-        def new_switch_state(value: SwitchState | None) -> None:
-            on_switch_state(value)
+        base_color: Color,
+        *,
+        base_scroll_speed: float,
+        flicker_speed: float,
+        flicker_intensity: float,
+    ) -> None:
+        self.base_color = base_color
+        self.base_scroll_speed = base_scroll_speed
+        self.flicker_speed = flicker_speed
+        self.flicker_intensity = flicker_intensity
 
-        source = peripheral_manager.get_main_switch_subscription()
-        source.subscribe(
-            on_next=new_switch_state,
-            on_error=lambda exc: logger.error("Error Occurred: %s", exc),
-        )
+    def initial_state(self) -> YoListenState:
         return YoListenState(color=self.base_color, switch_state=None)
 
     def handle_switch_state(
@@ -82,9 +78,58 @@ class YoListenStateProvider:
     def advance_word_position(
         self, state: YoListenState, *, scroll_speed: float, window_width: int
     ) -> YoListenState:
+        if window_width <= 0:
+            return state
         word_position = state.word_position - scroll_speed
         if word_position < -window_width:
             word_position = 0
         if word_position != state.word_position:
             return replace(state, word_position=word_position)
         return state
+
+    def observable(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> reactivex.Observable[YoListenState]:
+        initial_state = self.initial_state()
+
+        switch_updates = peripheral_manager.get_main_switch_subscription().pipe(
+            ops.map(lambda switch_state: lambda state: self.handle_switch_state(state, switch_state)),
+        )
+
+        window_widths = peripheral_manager.window.pipe(
+            ops.filter(lambda window: window is not None),
+            ops.map(lambda window: window.get_width()),
+            ops.distinct_until_changed(),
+            ops.start_with(0),
+        )
+
+        def advance(state: YoListenState, window_width: int) -> YoListenState:
+            if state.should_calibrate:
+                state = self.calibrate_scroll_speed(state)
+
+            state = self.update_flicker(
+                state,
+                time.time(),
+                flicker_speed=self.flicker_speed,
+                flicker_intensity=self.flicker_intensity,
+            )
+
+            scroll_speed = self.base_scroll_speed * self.scroll_speed_scale_factor(state)
+            return self.advance_word_position(
+                state,
+                scroll_speed=scroll_speed,
+                window_width=window_width,
+            )
+
+        tick_updates = peripheral_manager.game_tick.pipe(
+            ops.filter(lambda tick: tick is not None),
+            ops.with_latest_from(window_widths),
+            ops.map(lambda latest: lambda state: advance(state, latest[1])),
+        )
+
+        return reactivex.merge(switch_updates, tick_updates).pipe(
+            ops.scan(lambda state, update: update(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
+        )

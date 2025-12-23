@@ -23,14 +23,3 @@ class FractalSceneProvider:
         runtime = FractalRuntime(device=self.device)
         runtime.initialize(window, clock, peripheral_manager, orientation)
         return FractalSceneState(runtime=runtime)
-
-    def advance(
-        self,
-        state: FractalSceneState,
-        window: pygame.Surface,
-        clock: Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> FractalSceneState:
-        state.runtime.process(window, clock, peripheral_manager, orientation)
-        return state

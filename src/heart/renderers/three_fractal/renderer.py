@@ -843,13 +843,10 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         orientation: Orientation,
     ) -> None:
         assert self._peripheral_manager is not None
-        state = self.provider.advance(
-            self.state,
-            window=window,
-            clock=clock,
-            peripheral_manager=self._peripheral_manager,
-            orientation=orientation,
+        self.state.runtime.process(
+            window,
+            clock,
+            self._peripheral_manager,
+            orientation,
         )
-        self.set_state(state)
-
 

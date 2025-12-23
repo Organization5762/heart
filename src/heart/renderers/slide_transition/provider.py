@@ -3,14 +3,17 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pygame
+import reactivex
+from reactivex import operators as ops
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import BaseRenderer
 from heart.renderers.slide_transition.state import SlideTransitionState
 
 
-class SlideTransitionProvider:
+class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
     def __init__(
         self,
         renderer_a: BaseRenderer,
@@ -74,6 +77,36 @@ class SlideTransitionProvider:
             state=refreshed_state,
             direction=self.direction,
             slide_speed=self.slide_speed,
+        )
+
+    def observable(
+        self,
+        peripheral_manager: PeripheralManager,
+        *,
+        initial_state: SlideTransitionState,
+    ) -> reactivex.Observable[SlideTransitionState]:
+        window_widths = peripheral_manager.window.pipe(
+            ops.filter(lambda window: window is not None),
+            ops.map(lambda window: window.get_width()),
+            ops.distinct_until_changed(),
+            ops.start_with(initial_state.screen_w),
+        )
+
+        tick_updates = peripheral_manager.game_tick.pipe(
+            ops.filter(lambda tick: tick is not None),
+            ops.with_latest_from(window_widths),
+            ops.map(
+                lambda latest: lambda state: self.update_state(
+                    state=state,
+                    screen_width=latest[1],
+                )
+            ),
+        )
+
+        return tick_updates.pipe(
+            ops.scan(lambda state, update: update(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
     @staticmethod
