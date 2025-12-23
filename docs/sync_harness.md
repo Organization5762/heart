@@ -62,6 +62,8 @@ Build helpers:
 - `BUILD_ARGS` passes extra arguments to `uv build`.
 - `BUILD_HASH_MODE` selects how build inputs are hashed (`content` or `metadata`).
 - `BUILD_FORCE=true` forces a build even if the inputs are unchanged.
+- `BUILD_PROFILE` selects a named build profile from `scripts/build_profiles.json`.
+- `BUILD_PROFILE_FILE` points at a JSON file containing build profile definitions.
 - `BUILD_STAMP_PATH` overrides the build stamp location.
 - `BUILD_MANIFEST_PATH` writes a JSON summary of the build decision.
 - `BUILD_INPUTS` overrides the default inputs (`src`, `pyproject.toml`,
