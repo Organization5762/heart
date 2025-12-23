@@ -42,6 +42,7 @@ flowchart LR
     subgraph Inputs["Peripheral & Signal Services"]
         direction TB
         PeripheralMgr["PeripheralManager\n(background threads)"]
+        RxScheduler["Reactivex Thread Pool\n(shared scheduler)"]
         Switch["Switch / BluetoothSwitch"]
         Gamepad["Gamepad"]
         Sensors["Accelerometer / Phyphox"]
@@ -69,16 +70,16 @@ flowchart LR
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
 
-    Loop --> PeripheralMgr
-    PeripheralMgr --> Switch --> AppRouter
-    PeripheralMgr --> Gamepad --> AppRouter
-    PeripheralMgr --> Sensors --> AppRouter
-    PeripheralMgr --> HeartRate --> AppRouter
-    PeripheralMgr --> PhoneText --> AppRouter
+    Loop --> PeripheralMgr --> RxScheduler
+    RxScheduler --> Switch --> AppRouter
+    RxScheduler --> Gamepad --> AppRouter
+    RxScheduler --> Sensors --> AppRouter
+    RxScheduler --> HeartRate --> AppRouter
+    RxScheduler --> PhoneText --> AppRouter
 
     class CLI,Registry,Configurer,ModeServices,FrameComposer service;
     class Loop,AppRouter orchestrator;
-    class PeripheralMgr,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
+    class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
 
