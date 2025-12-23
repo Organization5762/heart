@@ -128,6 +128,14 @@ class Configuration:
             )
         return None
 
+    @classmethod
+    def hsv_cache_max_size(cls) -> int:
+        return _env_int("HEART_HSV_CACHE_MAX_SIZE", default=4096, minimum=0)
+
+    @classmethod
+    def hsv_calibration_enabled(cls) -> bool:
+        return _env_flag("HEART_HSV_CALIBRATION", default=True)
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"

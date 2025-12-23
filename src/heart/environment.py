@@ -45,7 +45,9 @@ def _load_cv2_module() -> ModuleType | None:
 CV2_MODULE = _load_cv2_module()
 
 HUE_SCALE = (6.0 / 179.0) - 6e-05
-CACHE_MAX_SIZE = 4096
+CACHE_MAX_SIZE = Configuration.hsv_cache_max_size()
+HSV_CACHE_ENABLED = CACHE_MAX_SIZE > 0
+HSV_CALIBRATION_ENABLED = Configuration.hsv_calibration_enabled()
 HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
 
 RenderMethod = Callable[[list["BaseRenderer"]], pygame.Surface | None]
@@ -148,55 +150,59 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
     # Adjust the hue so that the round-trip through the numpy converter matches
     # the input BGR values.  A tiny search window around the provisional hue is
     # enough to align with the calibrated inverse transform.
-    reconstructed = _numpy_bgr_from_hsv(hsv)
-    mismatched = np.any(reconstructed != image, axis=-1)
-    if np.any(mismatched):
-        offsets = (0, -1, 1, -2, 2, -3, 3)
-        mismatch_indices = np.argwhere(mismatched)
-        hsv_values = hsv[mismatch_indices[:, 0], mismatch_indices[:, 1]]
-        originals = image[mismatch_indices[:, 0], mismatch_indices[:, 1]]
-        base_h = hsv_values[:, 0].astype(np.int16)
-        best_h = base_h.copy()
-        remaining = np.ones(best_h.shape[0], dtype=bool)
-        for delta in offsets:
-            if not np.any(remaining):
-                break
-            remaining_indices = np.nonzero(remaining)[0]
-            candidate_h = (base_h[remaining_indices] + delta) % 180
-            candidates = np.stack(
-                (
-                    candidate_h.astype(np.uint8),
-                    hsv_values[remaining_indices, 1],
-                    hsv_values[remaining_indices, 2],
-                ),
-                axis=-1,
+    if HSV_CALIBRATION_ENABLED:
+        reconstructed = _numpy_bgr_from_hsv(hsv)
+        mismatched = np.any(reconstructed != image, axis=-1)
+        if np.any(mismatched):
+            offsets = (0, -1, 1, -2, 2, -3, 3)
+            mismatch_indices = np.argwhere(mismatched)
+            hsv_values = hsv[mismatch_indices[:, 0], mismatch_indices[:, 1]]
+            originals = image[mismatch_indices[:, 0], mismatch_indices[:, 1]]
+            base_h = hsv_values[:, 0].astype(np.int16)
+            best_h = base_h.copy()
+            remaining = np.ones(best_h.shape[0], dtype=bool)
+            for delta in offsets:
+                if not np.any(remaining):
+                    break
+                remaining_indices = np.nonzero(remaining)[0]
+                candidate_h = (base_h[remaining_indices] + delta) % 180
+                candidates = np.stack(
+                    (
+                        candidate_h.astype(np.uint8),
+                        hsv_values[remaining_indices, 1],
+                        hsv_values[remaining_indices, 2],
+                    ),
+                    axis=-1,
+                )
+                candidate_bgr = _numpy_bgr_from_hsv(candidates)
+                matches = np.all(candidate_bgr == originals[remaining_indices], axis=-1)
+                if np.any(matches):
+                    matched_indices = remaining_indices[matches]
+                    best_h[matched_indices] = candidate_h[matches]
+                    remaining[matched_indices] = False
+            hsv[mismatch_indices[:, 0], mismatch_indices[:, 1], 0] = best_h.astype(
+                np.uint8
             )
-            candidate_bgr = _numpy_bgr_from_hsv(candidates)
-            matches = np.all(candidate_bgr == originals[remaining_indices], axis=-1)
-            if np.any(matches):
-                matched_indices = remaining_indices[matches]
-                best_h[matched_indices] = candidate_h[matches]
-                remaining[matched_indices] = False
-        hsv[mismatch_indices[:, 0], mismatch_indices[:, 1], 0] = best_h.astype(np.uint8)
 
-    flat_hsv = hsv.reshape(-1, 3)
-    flat_bgr = image.reshape(-1, 3)
-    unique_hsv, inverse = np.unique(flat_hsv, axis=0, return_inverse=True)
-    positions = np.arange(flat_hsv.shape[0])
-    last_positions = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
-    np.maximum.at(last_positions, inverse, positions)
-    for idx in np.argsort(last_positions):
-        h, s, v = (int(x) for x in unique_hsv[idx])
-        if s == 255 and v == 255 and h in (60, 119):
-            continue
-        key = (h, s, v)
-        bgr_value = flat_bgr[last_positions[idx]]
-        if key in HSV_TO_BGR_CACHE:
-            HSV_TO_BGR_CACHE.move_to_end(key)
-        else:
-            HSV_TO_BGR_CACHE[key] = bgr_value.copy()
-            if len(HSV_TO_BGR_CACHE) > CACHE_MAX_SIZE:
-                HSV_TO_BGR_CACHE.popitem(last=False)
+    if HSV_CACHE_ENABLED:
+        flat_hsv = hsv.reshape(-1, 3)
+        flat_bgr = image.reshape(-1, 3)
+        unique_hsv, inverse = np.unique(flat_hsv, axis=0, return_inverse=True)
+        positions = np.arange(flat_hsv.shape[0])
+        last_positions = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
+        np.maximum.at(last_positions, inverse, positions)
+        for idx in np.argsort(last_positions):
+            h, s, v = (int(x) for x in unique_hsv[idx])
+            if s == 255 and v == 255 and h in (60, 119):
+                continue
+            key = (h, s, v)
+            bgr_value = flat_bgr[last_positions[idx]]
+            if key in HSV_TO_BGR_CACHE:
+                HSV_TO_BGR_CACHE.move_to_end(key)
+            else:
+                HSV_TO_BGR_CACHE[key] = bgr_value.copy()
+                if len(HSV_TO_BGR_CACHE) > CACHE_MAX_SIZE:
+                    HSV_TO_BGR_CACHE.popitem(last=False)
 
     return hsv
 
@@ -209,7 +215,11 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
 
     # Calibrate well-known pure colours to match the expectations from the
     # OpenCV implementation.
-    if np.any(image[..., 1] == 255) and np.any(image[..., 2] == 255):
+    if (
+        HSV_CALIBRATION_ENABLED
+        and np.any(image[..., 1] == 255)
+        and np.any(image[..., 2] == 255)
+    ):
         full_mask = (image[..., 1] == 255) & (image[..., 2] == 255)
         mask_60 = full_mask & (image[..., 0] == 60)
         if np.any(mask_60):
@@ -222,39 +232,42 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
 
     # The float approximation can be off by one.  Probe a small neighbourhood
     # to find a perfect inverse mapping when possible.
-    reconverted = _numpy_hsv_from_bgr(result)
-    mismatched = np.any(reconverted != image, axis=-1)
-    if np.any(mismatched):
-        for idx in np.argwhere(mismatched):
-            i, j = idx
-            target = image[i, j]
-            base = result[i, j].astype(np.int16)
-            best = result[i, j]
-            found = False
-            for dr in (-1, 0, 1):
-                for dg in (-1, 0, 1):
-                    for db in (-1, 0, 1):
-                        candidate = np.array(
-                            [base[0] + db, base[1] + dg, base[2] + dr],
-                            dtype=np.int16,
-                        )
-                        if np.any(candidate < 0) or np.any(candidate > 255):
-                            continue
-                        candidate_u8 = candidate.astype(np.uint8)
-                        if np.array_equal(
-                            _numpy_hsv_from_bgr(candidate_u8.reshape(1, 1, 3))[0, 0],
-                            target,
-                        ):
-                            best = candidate_u8
-                            found = True
+    if HSV_CALIBRATION_ENABLED:
+        reconverted = _numpy_hsv_from_bgr(result)
+        mismatched = np.any(reconverted != image, axis=-1)
+        if np.any(mismatched):
+            for idx in np.argwhere(mismatched):
+                i, j = idx
+                target = image[i, j]
+                base = result[i, j].astype(np.int16)
+                best = result[i, j]
+                found = False
+                for dr in (-1, 0, 1):
+                    for dg in (-1, 0, 1):
+                        for db in (-1, 0, 1):
+                            candidate = np.array(
+                                [base[0] + db, base[1] + dg, base[2] + dr],
+                                dtype=np.int16,
+                            )
+                            if np.any(candidate < 0) or np.any(candidate > 255):
+                                continue
+                            candidate_u8 = candidate.astype(np.uint8)
+                            if np.array_equal(
+                                _numpy_hsv_from_bgr(candidate_u8.reshape(1, 1, 3))[0, 0],
+                                target,
+                            ):
+                                best = candidate_u8
+                                found = True
+                                break
+                        if found:
                             break
                     if found:
                         break
-            if found:
-                break
-            result[i, j] = best
+                if found:
+                    break
+                result[i, j] = best
 
-    if HSV_TO_BGR_CACHE:
+    if HSV_CACHE_ENABLED and HSV_TO_BGR_CACHE:
         flat_hsv = image.reshape(-1, 3)
         flat_result = result.reshape(-1, 3)
         unique_hsv, inverse = np.unique(flat_hsv, axis=0, return_inverse=True)
