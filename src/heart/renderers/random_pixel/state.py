@@ -7,4 +7,5 @@ from heart.display.color import Color
 
 @dataclass(frozen=True)
 class RandomPixelState:
-    color: Color | None
+    color: Color
+    pixels: tuple[tuple[int, int], ...]
