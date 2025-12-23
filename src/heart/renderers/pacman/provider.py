@@ -2,25 +2,49 @@ from __future__ import annotations
 
 import random
 
-import pygame
+import reactivex
+from reactivex import operators as ops
 
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.pacman.state import PacmanGhostState
 
 
-class PacmanGhostStateProvider:
-    def __init__(self, rng: random.Random | None = None) -> None:
+class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
+    def __init__(
+        self,
+        *,
+        width: int,
+        height: int,
+        peripheral_manager: PeripheralManager,
+        rng: random.Random | None = None,
+    ) -> None:
+        self._width = width
+        self._height = height
+        self._peripheral_manager = peripheral_manager
         self._rng = rng or random.Random()
         self._asset_version = 0
 
-    def initial_state(self, window: pygame.Surface) -> PacmanGhostState:
-        width, height = window.get_size()
-        return self._spawn_state(width=width, height=height, blood=True)
+    def observable(self) -> reactivex.Observable[PacmanGhostState]:
+        initial_state = self._spawn_state(
+            width=self._width,
+            height=self._height,
+            blood=True,
+        )
 
-    def next_state(self, state: PacmanGhostState) -> PacmanGhostState:
+        return self._peripheral_manager.game_tick.pipe(
+            ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
+        )
+
+    def _next_state(self, state: PacmanGhostState) -> PacmanGhostState:
         delta = -5 if state.reverse else 5
         new_x = state.x + delta
         next_switch = not state.switch_pacman
-        next_pacman_idx = (state.pacman_idx + 1) % 3 if state.switch_pacman else state.pacman_idx
+        next_pacman_idx = (
+            (state.pacman_idx + 1) % 3 if state.switch_pacman else state.pacman_idx
+        )
 
         if new_x > state.screen_width + 50 or new_x < -150:
             return self._spawn_state(
@@ -53,7 +77,9 @@ class PacmanGhostStateProvider:
         pacman_idx: int = 0,
         switch_pacman: bool = True,
     ) -> PacmanGhostState:
-        corner = self._rng.choice(["top_left", "top_right", "bottom_left", "bottom_right"])
+        corner = self._rng.choice(
+            ["top_left", "top_right", "bottom_left", "bottom_right"]
+        )
         if corner == "top_left":
             x = -50
             y = 16

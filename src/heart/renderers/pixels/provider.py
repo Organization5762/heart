@@ -1,73 +1,101 @@
+from __future__ import annotations
+
 import random
 from dataclasses import replace
 
-import pygame
+import reactivex
+from reactivex import operators as ops
+from reactivex.subject import BehaviorSubject
 
-from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 
 
-class BorderStateProvider:
+class BorderStateProvider(ObservableProvider[BorderState]):
     def __init__(self, initial_color: Color | None = None) -> None:
-        self._initial_color = initial_color or Color.random()
+        self._color = BehaviorSubject(initial_color or Color.random())
 
-    def create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> BorderState:
-        return BorderState(color=self._initial_color)
-
-    def update_color(self, state: BorderState, color: Color) -> BorderState:
-        return replace(state, color=color)
-
-
-class RainStateProvider:
-    def create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> RainState:
-        initial_y = random.randint(0, 20)
-        return RainState(
-            random.randint(0, window.get_width()),
-            current_y=initial_y,
+    def observable(self) -> reactivex.Observable[BorderState]:
+        return self._color.pipe(
+            ops.map(lambda color: BorderState(color=color)),
+            ops.share(),
         )
 
-    def next_state(self, state: RainState, width: int, height: int) -> RainState:
+    def set_color(self, color: Color) -> None:
+        self._color.on_next(color)
+
+
+class RainStateProvider(ObservableProvider[RainState]):
+    def __init__(
+        self,
+        *,
+        width: int,
+        height: int,
+        peripheral_manager: PeripheralManager,
+        rng: random.Random | None = None,
+    ) -> None:
+        self._width = width
+        self._height = height
+        self._peripheral_manager = peripheral_manager
+        self._rng = rng or random.Random()
+
+    def observable(self) -> reactivex.Observable[RainState]:
+        initial_state = RainState(
+            starting_point=self._rng.randint(0, self._width),
+            current_y=self._rng.randint(0, 20),
+        )
+
+        return self._peripheral_manager.game_tick.pipe(
+            ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
+        )
+
+    def _next_state(self, state: RainState) -> RainState:
         new_y = state.current_y + 1
-        if new_y > height:
+        if new_y > self._height:
             return replace(
                 state,
-                starting_point=random.randint(0, width),
+                starting_point=self._rng.randint(0, self._width),
+                current_y=0,
             )
         return replace(state, current_y=new_y)
 
 
-class SlinkyStateProvider:
-    def create_initial_state(
+class SlinkyStateProvider(ObservableProvider[SlinkyState]):
+    def __init__(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        *,
+        width: int,
+        height: int,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> SlinkyState:
-        return SlinkyState(
-            starting_point=random.randint(0, window.get_size()[0]),
-            current_y=random.randint(0, 20),
+        rng: random.Random | None = None,
+    ) -> None:
+        self._width = width
+        self._height = height
+        self._peripheral_manager = peripheral_manager
+        self._rng = rng or random.Random()
+
+    def observable(self) -> reactivex.Observable[SlinkyState]:
+        initial_state = SlinkyState(
+            starting_point=self._rng.randint(0, self._width),
+            current_y=self._rng.randint(0, 20),
         )
 
-    def next_state(self, state: SlinkyState, width: int, height: int) -> SlinkyState:
+        return self._peripheral_manager.game_tick.pipe(
+            ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
+        )
+
+    def _next_state(self, state: SlinkyState) -> SlinkyState:
         new_y = state.current_y + 1
-        if new_y > height:
+        if new_y > self._height:
             return replace(
                 state,
-                starting_point=random.randint(0, width),
+                starting_point=self._rng.randint(0, self._width),
+                current_y=0,
             )
         return replace(state, current_y=new_y)
