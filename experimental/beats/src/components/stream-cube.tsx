@@ -5,6 +5,10 @@ import { Skeleton } from "./ui/skeleton";
 
 const CAMERA_DISTANCE = 4;
 const ROTATION_DELTA = { x: 0.01, y: 0.015 } as const;
+const GRID_SIZE = 6;
+const GRID_DIVISIONS = 10;
+const GRID_COLOR = 0xffffff;
+const GRID_OPACITY = 0.18;
 
 export type StreamCubeProps = {
   imgURL: string | null;
@@ -21,6 +25,7 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
   const cubeRef = useRef<THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial[]> | null>(
     null,
   );
+  const gridRef = useRef<THREE.GridHelper | null>(null);
   const fallbackTextureRef = useRef<THREE.Texture | null>(null);
   const lastTextureRef = useRef<THREE.Texture | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -53,6 +58,20 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       directional.position.set(2, 3, 4);
       scene.add(ambient, directional);
 
+      const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR, GRID_COLOR);
+      grid.position.y = -1.2;
+      const gridMaterial = grid.material;
+      if (Array.isArray(gridMaterial)) {
+        gridMaterial.forEach((material) => {
+          material.transparent = true;
+          material.opacity = GRID_OPACITY;
+        });
+      } else {
+        gridMaterial.transparent = true;
+        gridMaterial.opacity = GRID_OPACITY;
+      }
+      scene.add(grid);
+
       const geometry = new THREE.BoxGeometry(2, 2, 2);
       const fallbackTexture = createFallbackTexture();
       const materials = Array.from({ length: 6 }, () =>
@@ -67,6 +86,7 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       sceneRef.current = scene;
       cameraRef.current = camera;
       cubeRef.current = cube;
+      gridRef.current = grid;
       fallbackTextureRef.current = fallbackTexture;
 
       const renderFrame = () => {
@@ -107,6 +127,16 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
         material.dispose();
       });
 
+      if (gridRef.current) {
+        gridRef.current.geometry.dispose();
+        const gridMaterial = gridRef.current.material;
+        if (Array.isArray(gridMaterial)) {
+          gridMaterial.forEach((material) => material.dispose());
+        } else {
+          gridMaterial.dispose();
+        }
+      }
+
       if (fallbackTextureRef.current) {
         fallbackTextureRef.current.dispose();
       }
@@ -120,6 +150,7 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       sceneRef.current = null;
       cameraRef.current = null;
       cubeRef.current = null;
+      gridRef.current = null;
       fallbackTextureRef.current = null;
       lastTextureRef.current = null;
       resizeObserverRef.current = null;
