@@ -1,27 +1,34 @@
 [project]
 name = "heart"
 version = "0.2.0"
-classifiers = [
-  "Development Status :: 3 - Alpha",
-
-  # Indicate who your project is intended for
-  "Intended Audience :: Developers",
-  "Intended Audience :: Education",
-  "Intended Audience :: Science/Research",
-  "Intended Audience :: Music Lovers",
-  "Intended Audience :: Artists",
-  "Intended Audience :: Dancers",
-  "Intended Audience :: Other Audience",
-  "Environment :: MacOS X",
-  "Environment :: Linux",
-  "Environment :: Raspberry Pi",
-  "Topic :: Software Development :: Libraries :: pygame",
-  "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
+description = "TODO: Add a concise project description."
+readme = "README.md"
+license = { text = "TODO: Choose a license text or SPDX identifier." }
+authors = [
+    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
 ]
-keywords = []
-authors = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    # Indicate who your project is intended for
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Music Lovers",
+    "Intended Audience :: Artists",
+    "Intended Audience :: Dancers",
+    "Intended Audience :: Other Audience",
+    "Environment :: MacOS X",
+    "Environment :: Linux",
+    "Environment :: Raspberry Pi",
+    "Topic :: Software Development :: Libraries :: pygame",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+keywords = ["TODO: add keywords"]
+maintainers = [
+    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
+]
 requires-python = ">= 3.11"
 
 dependencies = [
@@ -47,6 +54,12 @@ dependencies = [
     "websockets>=15.0.1",
 ]
 
+[project.urls]
+Documentation = "TODO: add documentation URL"
+Homepage = "TODO: add homepage URL"
+Repository = "TODO: add repository URL"
+Issues = "TODO: add issue tracker URL"
+
 [project.optional-dependencies]
 dev = [
     "Pillow",
@@ -64,7 +77,6 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 heart = { path = "./src/heart" }
-
 
 [tool.setuptools.package-data]
 heart = ["*.png"]
@@ -126,15 +138,15 @@ module = [
     "pygame.*",
     "requests",
     "rgbmatrix",
-    "serial", 
-    "serial.*", 
-    "bluezero", 
-    "bluezero.*", 
-    "typer", 
-    "toml", 
-    "sounddevice", 
-    "usb", 
-    "usb.*", 
+    "serial",
+    "serial.*",
+    "bluezero",
+    "bluezero.*",
+    "typer",
+    "toml",
+    "sounddevice",
+    "usb",
+    "usb.*",
 ]
 ignore_missing_imports = true
 
