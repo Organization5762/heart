@@ -302,7 +302,6 @@ class GameLoop:
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
-        self.tmp_float: np.ndarray | None = None
         self.edge_thresh = 1
 
         pygame.display.set_mode(
@@ -491,53 +490,6 @@ class GameLoop:
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
         image_array = pygame.surfarray.pixels3d(screen)
 
-        # HACKKK
-        # TODO: Move this entire thing into a renderer
-        # bluetooth_switch = self.peripheral_manager.bluetooth_switch()
-        # if bluetooth_switch is not None:
-        #     ###
-        #     # Button One
-        #     ###
-        #     if (switch_one := bluetooth_switch.switch_one()) is not None:
-        #         rotation_delta = switch_one.get_rotation_since_last_long_button_press()
-        #         if rotation_delta != 0:
-        #             # 0.05 per detent, same feel as before
-        #             factor = 1.0 + 0.05 * rotation_delta
-        #             factor = max(
-        #                 0.0, min(5.0, factor)
-        #             )  # allow full desat → heavy oversat
-
-        #             # ---------- saturation tweak (RGB → lerp with luminance) -------------
-        #             img = image_array.astype(np.float32)
-
-        #             # perceptual luma used by Rec. 601
-        #             lum = (
-        #                 0.299 * img[..., 0]
-        #                 + 0.587 * img[..., 1]
-        #                 + 0.114 * img[..., 2]
-        #             )[..., None]  # shape (H, W, 1)
-
-        #             # interpolate: lum + factor × (color – lum)
-        #             img_sat = lum + factor * (img - lum)
-
-        #             image_array[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
-
-        #     ###
-        #     # Button Two
-        #     ###
-        #     if self.tmp_float is None:
-        #         self.tmp_float = np.empty_like(image_array, dtype=np.float32)
-        #     if (hue_switch := bluetooth_switch.switch_two()) is not None:
-        #         delta = hue_switch.get_rotation_since_last_long_button_press()
-        #         if delta:
-        #             # 0.03 ~= ~11° per detent; tune to taste
-        #             hue_delta = (delta * 0.03) % 1.0
-        #             # Convert to HSV, roll H channel, convert back
-        #             hsv = _convert_bgr_to_hsv(image_array).astype(np.float32)
-        #             hsv[..., 0] = (hsv[..., 0] / 179.0 + hue_delta) % 1.0 * 179.0
-        #             image_array[:] = _convert_hsv_to_bgr(hsv.astype(np.uint8))
-
-        #     ###
         #     # Button Three
         #     ###
         #     if (edge_sw := bluetooth_switch.switch_three()) is not None:
