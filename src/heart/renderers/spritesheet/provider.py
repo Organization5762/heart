@@ -3,9 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+import reactivex
+from reactivex import operators as ops
+
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
 from heart.peripheral.switch import SwitchState
@@ -15,7 +19,7 @@ from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
 from heart.utilities.env import Configuration
 
 
-class SpritesheetProvider:
+class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     def __init__(
         self,
         sheet_file_path: str,
@@ -93,14 +97,46 @@ class SpritesheetProvider:
     def initial_state(
         self,
         *,
-        window: Any,
-        clock: Any,
         peripheral_manager: PeripheralManager,
     ) -> SpritesheetLoopState:
         return SpritesheetLoopState(
             phase=self.initial_phase,
             spritesheet=Loader.load_spirtesheet(self.file),
             gamepad=self._configure_gamepad(peripheral_manager),
+        )
+
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[SpritesheetLoopState]:
+        initial_state = self.initial_state(peripheral_manager=peripheral_manager)
+        ticks = peripheral_manager.game_tick
+        clocks = peripheral_manager.clock.pipe(
+            ops.filter(lambda clock: clock is not None),
+            ops.share(),
+        )
+
+        if self.disable_input:
+            switch_updates = reactivex.empty()
+        else:
+            switches = peripheral_manager.get_main_switch_subscription()
+            switch_updates = switches.pipe(
+                ops.map(lambda switch_state: lambda state: self.handle_switch(state, switch_state))
+            )
+
+        tick_updates = ticks.pipe(
+            ops.with_latest_from(clocks),
+            ops.map(
+                lambda latest: lambda state: self.advance(
+                    state,
+                    elapsed_ms=latest[1].get_time(),
+                )
+            ),
+        )
+
+        return reactivex.merge(switch_updates, tick_updates).pipe(
+            ops.scan(lambda state, update: update(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
     def handle_switch(self, state: SpritesheetLoopState, switch_state: SwitchState) -> SpritesheetLoopState:
@@ -204,7 +240,9 @@ class SpritesheetProvider:
             time_since_last_update=time_since_last_update,
         )
 
-    def advance(self, state: SpritesheetLoopState, *, clock: Any) -> SpritesheetLoopState:
+    def advance(
+        self, state: SpritesheetLoopState, *, elapsed_ms: float
+    ) -> SpritesheetLoopState:
         state = self._apply_gamepad_input(state)
 
         current_kf = self.frames[state.phase][state.current_frame]
@@ -213,7 +251,7 @@ class SpritesheetProvider:
         else:
             kf_duration = current_kf.duration - (current_kf.duration * state.duration_scale)
 
-        return self._next_frame(state, kf_duration=kf_duration, elapsed_ms=clock.get_time())
+        return self._next_frame(state, kf_duration=kf_duration, elapsed_ms=elapsed_ms)
 
     def reset_state(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
         return replace(

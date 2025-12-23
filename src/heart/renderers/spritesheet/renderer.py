@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pygame
+import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet.provider import SpritesheetProvider
 from heart.renderers.spritesheet.state import (FrameDescription,
@@ -57,7 +57,7 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
 
         self.provider = resolved_provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        super().__init__()
+        super().__init__(builder=self.provider)
 
     @classmethod
     def from_frame_data(
@@ -83,23 +83,11 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         )
         return cls(provider)
 
-    def _create_initial_state(
+    def state_observable(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> SpritesheetLoopState:
-        return self.provider.initial_state(
-            window=window, clock=clock, peripheral_manager=peripheral_manager
-        )
-
-    def on_switch_state(self, state: SwitchState) -> None:
-        self.set_state(self.provider.handle_switch(self.state, state))
-
-    def reset(self) -> None:
-        super().reset()
-        self.set_state(self.provider.reset_state(self.state))
+    ) -> reactivex.Observable[SpritesheetLoopState]:
+        return self.provider.observable(peripheral_manager=peripheral_manager)
 
     def real_process(
         self,
@@ -107,8 +95,7 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        state = self.provider.advance(self.state, clock=clock)
-        self.set_state(state)
+        state = self.state
 
         spritesheet = state.spritesheet
         if spritesheet is None:

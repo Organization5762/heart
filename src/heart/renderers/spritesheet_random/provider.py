@@ -1,45 +1,80 @@
-import logging
 import random
-from collections.abc import Callable, Sequence
 from dataclasses import replace
 
-import pygame
+import reactivex
+from reactivex import operators as ops
 
 from heart.assets.loader import Loader
-from heart.device import Orientation
+from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
 
-logger = logging.getLogger(__name__)
 
-
-class SpritesheetLoopRandomProvider:
-    def __init__(self, sheet_file_path: str) -> None:
-        self.file = sheet_file_path
-
-    def create_initial_state(
+class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
+    def __init__(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-        initial_phase: LoopPhase,
-        update_switch_state: Callable[[SwitchState | None], None],
-    ) -> SpritesheetLoopRandomState:
-        def new_switch_state(value: SwitchState | None) -> None:
-            update_switch_state(value)
+        sheet_file_path: str,
+        metadata_file_path: str,
+        screen_count: int,
+    ) -> None:
+        self.file = sheet_file_path
+        self.screen_count = screen_count
+        self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
+        frame_data = Loader.load_json(metadata_file_path)
+        for key, frame_obj in frame_data["frames"].items():
+            frame = frame_obj["frame"]
+            parsed_tag, _ = key.split(" ", 1)
+            tag = LoopPhase(parsed_tag) if parsed_tag in self.frames else LoopPhase.LOOP
+            self.frames[tag].append(
+                KeyFrame(
+                    (frame["x"], frame["y"], frame["w"], frame["h"]),
+                    frame_obj["duration"],
+                )
+            )
 
-        source = peripheral_manager.get_main_switch_subscription()
-        source.subscribe(
-            on_next=new_switch_state,
-            on_error=lambda exc: logger.error("Error Occurred: %s", exc),
+        self.initial_phase = (
+            LoopPhase.START if len(self.frames[LoopPhase.START]) > 0 else LoopPhase.LOOP
         )
+
+    def initial_state(self) -> SpritesheetLoopRandomState:
         return SpritesheetLoopRandomState(
-            phase=initial_phase,
+            phase=self.initial_phase,
             spritesheet=Loader.load_spirtesheet(self.file),
             switch_state=None,
+        )
+
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[SpritesheetLoopRandomState]:
+        clocks = peripheral_manager.clock.pipe(
+            ops.filter(lambda clock: clock is not None),
+            ops.share(),
+        )
+        switches = peripheral_manager.get_main_switch_subscription()
+        switch_updates = switches.pipe(
+            ops.map(
+                lambda switch_state: lambda state: self.handle_switch_state(
+                    state, switch_state
+                )
+            )
+        )
+        tick_updates = peripheral_manager.game_tick.pipe(
+            ops.with_latest_from(clocks),
+            ops.map(
+                lambda latest: lambda state: self.next_state(
+                    state=state,
+                    elapsed_ms=latest[1].get_time(),
+                )
+            ),
+        )
+        initial_state = self.initial_state()
+        return reactivex.merge(switch_updates, tick_updates).pipe(
+            ops.scan(lambda state, update: update(state), seed=initial_state),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
     def handle_switch_state(
@@ -58,10 +93,9 @@ class SpritesheetLoopRandomProvider:
     def next_state(
         self,
         state: SpritesheetLoopRandomState,
-        current_phase_frames: Sequence,
-        screen_count: int,
         elapsed_ms: float,
     ) -> SpritesheetLoopRandomState:
+        current_phase_frames = self.frames[state.phase]
         current_kf = current_phase_frames[state.current_frame]
         kf_duration = current_kf.duration - (
             current_kf.duration * self.duration_scale_factor(state)
@@ -73,7 +107,7 @@ class SpritesheetLoopRandomProvider:
             next_frame = state.current_frame + 1
             if next_frame >= len(current_phase_frames):
                 next_frame = 0
-                next_screen = random.randint(0, screen_count - 1)
+                next_screen = random.randint(0, self.screen_count - 1)
             time_since_last = 0
 
         time_since_last = (time_since_last or 0) + elapsed_ms
