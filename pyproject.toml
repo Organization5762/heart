@@ -103,6 +103,7 @@ packages = [
 warn_unused_configs = true
 warn_unused_ignores = true
 check_untyped_defs = true
+strict = true
 color_output = false
 error_summary = false
 show_error_context = false
