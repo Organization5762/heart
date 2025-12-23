@@ -1,5 +1,8 @@
+"""Validate spritesheet loop state updates from provider streams."""
+
 import pygame
 import pytest
+from reactivex.subject import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
@@ -43,12 +46,12 @@ class _StubPeripheralManager:
     ) -> None:
         self._switch_state = switch_state or SwitchState(0, 0, 0, 0, 0)
         self._gamepad = gamepad
-        self.subscribers: list = []
+        self._switch_stream = BehaviorSubject(self._switch_state)
+        self.game_tick = BehaviorSubject(None)
+        self.clock = BehaviorSubject(None)
 
-    def subscribe_main_switch(self, handler):
-        self.subscribers.append(handler)
-        handler(self._switch_state)
-        return lambda: None
+    def get_main_switch_subscription(self):
+        return self._switch_stream
 
     def get_gamepad(self):
         if self._gamepad is None:
@@ -81,106 +84,152 @@ def orientation() -> Rectangle:
     return Rectangle.with_layout(1, 1)
 
 
-def test_boomerang_loop_stays_bounded(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
-    manager = _StubPeripheralManager()
-    spritesheet = _StubSpritesheet()
-    monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
+class TestSpritesheetLoopProvider:
+    """Validate spritesheet loop state updates sourced from provider streams."""
 
-    clock = stub_clock_factory(0, *([150] * 20))
-    renderer = SpritesheetLoop(
-        "irrelevant.png",
-        disable_input=True,
-        boomerang=True,
-        frame_data=frame_data,
-    )
-    renderer.initialize(window, clock, manager, orientation)
-    renderer.update_state(time_since_last_update=frame_data[0].duration + 1)
+    def test_boomerang_loop_stays_bounded(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: pygame.Surface,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Ensure boomerang loops stay within frame bounds so animations remain stable."""
 
-    history = []
-    for _ in range(15):
-        renderer.process(window, clock, manager, orientation)
-        history.append(renderer.state)
+        manager = _StubPeripheralManager()
+        spritesheet = _StubSpritesheet()
+        monkeypatch.setattr(
+            assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
+        )
 
-    assert all(0 <= state.current_frame < len(frame_data) for state in history)
-    assert any(state.reverse_direction for state in history)
-    assert history[-1].loop_count == 0
-    assert history[-1].phase == LoopPhase.LOOP
+        clock = stub_clock_factory(0, *([150] * 20))
+        manager.clock.on_next(clock)
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=True,
+            boomerang=True,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, clock, manager, orientation)
 
+        history = []
+        for _ in range(15):
+            manager.game_tick.on_next(True)
+            history.append(renderer.state)
 
-def test_reset_preserves_loaded_resources(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
-    gamepad = _StubGamepad()
-    manager = _StubPeripheralManager(gamepad=gamepad)
-    spritesheet = _StubSpritesheet()
-    monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
+        assert all(0 <= state.current_frame < len(frame_data) for state in history)
+        assert any(state.reverse_direction for state in history)
+        assert history[-1].loop_count == 0
+        assert history[-1].phase == LoopPhase.LOOP
 
-    renderer = SpritesheetLoop(
-        "irrelevant.png",
-        disable_input=False,
-        boomerang=False,
-        frame_data=frame_data,
-    )
-    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
+    def test_reset_preserves_loaded_resources(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: pygame.Surface,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Confirm reset/reinitialize cycles keep spritesheet assets attached for continuity."""
 
-    renderer.update_state(
-        current_frame=2,
-        loop_count=3,
-        phase=LoopPhase.END,
-        duration_scale=0.5,
-        time_since_last_update=123,
-    )
-    renderer.reset()
+        gamepad = _StubGamepad()
+        manager = _StubPeripheralManager(gamepad=gamepad)
+        spritesheet = _StubSpritesheet()
+        monkeypatch.setattr(
+            assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
+        )
 
-    state = renderer.state
+        clock = stub_clock_factory(0)
+        manager.clock.on_next(clock)
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=False,
+            boomerang=False,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, clock, manager, orientation)
+        manager.game_tick.on_next(True)
 
-    assert state.spritesheet is not None
-    assert state.gamepad is gamepad
-    assert state.current_frame == 0
-    assert state.loop_count == 0
-    assert state.phase == LoopPhase.LOOP
-    assert state.duration_scale == pytest.approx(0.0)
-    assert state.time_since_last_update is None
+        renderer.reset()
+        manager.clock.on_next(None)
+        renderer.initialize(window, clock, manager, orientation)
 
+        state = renderer.state
 
-def test_on_switch_state_updates_duration(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
-    gamepad = _StubGamepad()
-    manager = _StubPeripheralManager(gamepad=gamepad)
-    spritesheet = _StubSpritesheet()
-    monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
+        assert state.spritesheet is spritesheet
+        assert state.gamepad is gamepad
+        assert state.current_frame == 0
+        assert state.loop_count == 0
+        assert state.phase == LoopPhase.LOOP
+        assert state.duration_scale == pytest.approx(0.0)
+        assert state.time_since_last_update is None
 
-    renderer = SpritesheetLoop(
-        "irrelevant.png",
-        disable_input=False,
-        boomerang=False,
-        frame_data=frame_data,
-    )
-    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
+    def test_on_switch_state_updates_duration(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: pygame.Surface,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Verify switch rotation updates duration scaling to keep input-driven pacing responsive."""
 
-    renderer.on_switch_state(SwitchState(0, 0, 0, 10, 0))
-    renderer.on_switch_state(SwitchState(0, 0, 0, 25, 0))
+        gamepad = _StubGamepad()
+        manager = _StubPeripheralManager(gamepad=gamepad)
+        spritesheet = _StubSpritesheet()
+        monkeypatch.setattr(
+            assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
+        )
 
-    state_after_increase = renderer.state
-    assert state_after_increase.duration_scale == pytest.approx(0.10)
-    assert state_after_increase.last_switch_rotation == 25
+        clock = stub_clock_factory(0)
+        manager.clock.on_next(clock)
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=False,
+            boomerang=False,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, clock, manager, orientation)
 
-    renderer.on_switch_state(SwitchState(0, 0, 0, 5, 0))
-    state_after_decrease = renderer.state
-    assert state_after_decrease.duration_scale == pytest.approx(0.05)
-    assert state_after_decrease.last_switch_rotation == 5
+        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))
+        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 25, 0))
 
+        state_after_increase = renderer.state
+        assert state_after_increase.duration_scale == pytest.approx(0.10)
+        assert state_after_increase.last_switch_rotation == 25
 
-def test_switch_state_ignored_when_input_disabled(monkeypatch: pytest.MonkeyPatch, frame_data: list[FrameDescription], window: pygame.Surface, orientation: Rectangle, stub_clock_factory) -> None:
-    manager = _StubPeripheralManager()
-    spritesheet = _StubSpritesheet()
-    monkeypatch.setattr(assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet)
+        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 5, 0))
+        state_after_decrease = renderer.state
+        assert state_after_decrease.duration_scale == pytest.approx(0.05)
+        assert state_after_decrease.last_switch_rotation == 5
 
-    renderer = SpritesheetLoop(
-        "irrelevant.png",
-        disable_input=True,
-        boomerang=False,
-        frame_data=frame_data,
-    )
-    renderer.initialize(window, stub_clock_factory(0), manager, orientation)
+    def test_switch_state_ignored_when_input_disabled(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: pygame.Surface,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Ensure switch events do not mutate state when input handling is disabled."""
 
-    initial_state = renderer.state
-    renderer.on_switch_state(SwitchState(0, 0, 0, 10, 0))
-    assert renderer.state == initial_state
+        manager = _StubPeripheralManager()
+        spritesheet = _StubSpritesheet()
+        monkeypatch.setattr(
+            assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
+        )
+
+        clock = stub_clock_factory(0)
+        manager.clock.on_next(clock)
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=True,
+            boomerang=False,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, clock, manager, orientation)
+
+        initial_state = renderer.state
+        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))
+        assert renderer.state == initial_state
