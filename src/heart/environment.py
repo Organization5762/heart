@@ -152,19 +152,32 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
     mismatched = np.any(reconstructed != image, axis=-1)
     if np.any(mismatched):
         offsets = (0, -1, 1, -2, 2, -3, 3)
-        for idx in np.argwhere(mismatched):
-            i, j = idx
-            original = image[i, j]
-            h, s, v = hsv[i, j]
-            best_h = int(h)
-            for delta in offsets:
-                candidate_h = (int(h) + delta) % 180
-                candidate = np.array([[[candidate_h, s, v]]], dtype=np.uint8)
-                candidate_bgr = _numpy_bgr_from_hsv(candidate)[0, 0]
-                if np.array_equal(candidate_bgr, original):
-                    best_h = candidate_h
-                    break
-            hsv[i, j, 0] = best_h
+        mismatch_indices = np.argwhere(mismatched)
+        hsv_values = hsv[mismatch_indices[:, 0], mismatch_indices[:, 1]]
+        originals = image[mismatch_indices[:, 0], mismatch_indices[:, 1]]
+        base_h = hsv_values[:, 0].astype(np.int16)
+        best_h = base_h.copy()
+        remaining = np.ones(best_h.shape[0], dtype=bool)
+        for delta in offsets:
+            if not np.any(remaining):
+                break
+            remaining_indices = np.nonzero(remaining)[0]
+            candidate_h = (base_h[remaining_indices] + delta) % 180
+            candidates = np.stack(
+                (
+                    candidate_h.astype(np.uint8),
+                    hsv_values[remaining_indices, 1],
+                    hsv_values[remaining_indices, 2],
+                ),
+                axis=-1,
+            )
+            candidate_bgr = _numpy_bgr_from_hsv(candidates)
+            matches = np.all(candidate_bgr == originals[remaining_indices], axis=-1)
+            if np.any(matches):
+                matched_indices = remaining_indices[matches]
+                best_h[matched_indices] = candidate_h[matches]
+                remaining[matched_indices] = False
+        hsv[mismatch_indices[:, 0], mismatch_indices[:, 1], 0] = best_h.astype(np.uint8)
 
     flat_hsv = hsv.reshape(-1, 3)
     flat_bgr = image.reshape(-1, 3)
