@@ -17,8 +17,14 @@ needed.
   - Sets the maximum number of HSV-to-BGR entries stored in the in-memory LRU
     cache.
   - Set to `0` to disable cache population and lookup entirely.
+- `HEART_HSV_BACKEND` (default: `auto`)
+  - Chooses the implementation for HSV/BGR conversions.
+  - `auto` uses OpenCV when available and falls back to numpy otherwise.
+  - `numpy` forces the numpy implementation even when OpenCV is available.
+  - `cv2` requires OpenCV and fails fast if the module is unavailable.
 
 ## Materials
 
-- Environment variables: `HEART_HSV_CALIBRATION`, `HEART_HSV_CACHE_MAX_SIZE`.
+- Environment variables: `HEART_HSV_CALIBRATION`, `HEART_HSV_CACHE_MAX_SIZE`,
+  `HEART_HSV_BACKEND`.
 - Source: `src/heart/environment.py`.

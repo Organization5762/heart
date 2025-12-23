@@ -152,6 +152,13 @@ class Configuration:
         return _env_flag("HEART_HSV_CALIBRATION", default=True)
 
     @classmethod
+    def hsv_conversion_backend(cls) -> str:
+        backend = os.environ.get("HEART_HSV_BACKEND", "auto").strip().lower()
+        if backend in {"auto", "numpy", "cv2"}:
+            return backend
+        raise ValueError("HEART_HSV_BACKEND must be 'auto', 'numpy', or 'cv2'")
+
+    @classmethod
     def render_variant(cls) -> str:
         return os.environ.get("HEART_RENDER_VARIANT", "iterative")
 

@@ -48,9 +48,20 @@ HUE_SCALE = (6.0 / 179.0) - 6e-05
 CACHE_MAX_SIZE = Configuration.hsv_cache_max_size()
 HSV_CACHE_ENABLED = CACHE_MAX_SIZE > 0
 HSV_CALIBRATION_ENABLED = Configuration.hsv_calibration_enabled()
+HSV_BACKEND = Configuration.hsv_conversion_backend()
 HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
 
 RenderMethod = Callable[[list["BaseRenderer"]], pygame.Surface | None]
+
+
+def _use_cv2_backend() -> bool:
+    if HSV_BACKEND == "numpy":
+        return False
+    if HSV_BACKEND == "cv2":
+        if CV2_MODULE is None:
+            raise RuntimeError("HEART_HSV_BACKEND=cv2 requires OpenCV (cv2) to be installed.")
+        return True
+    return CV2_MODULE is not None
 
 
 def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
@@ -142,7 +153,7 @@ def _numpy_bgr_from_hsv(image: np.ndarray) -> np.ndarray:
 
 
 def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
+    if _use_cv2_backend():
         return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV))
 
     hsv = _numpy_hsv_from_bgr(image)
@@ -208,7 +219,7 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
 
 
 def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
+    if _use_cv2_backend():
         return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR))
 
     result = _numpy_bgr_from_hsv(image)
@@ -236,36 +247,33 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
         reconverted = _numpy_hsv_from_bgr(result)
         mismatched = np.any(reconverted != image, axis=-1)
         if np.any(mismatched):
-            for idx in np.argwhere(mismatched):
-                i, j = idx
-                target = image[i, j]
-                base = result[i, j].astype(np.int16)
-                best = result[i, j]
-                found = False
-                for dr in (-1, 0, 1):
-                    for dg in (-1, 0, 1):
-                        for db in (-1, 0, 1):
-                            candidate = np.array(
-                                [base[0] + db, base[1] + dg, base[2] + dr],
-                                dtype=np.int16,
-                            )
-                            if np.any(candidate < 0) or np.any(candidate > 255):
-                                continue
-                            candidate_u8 = candidate.astype(np.uint8)
-                            if np.array_equal(
-                                _numpy_hsv_from_bgr(candidate_u8.reshape(1, 1, 3))[0, 0],
-                                target,
-                            ):
-                                best = candidate_u8
-                                found = True
-                                break
-                        if found:
-                            break
-                    if found:
-                        break
-                if found:
-                    break
-                result[i, j] = best
+            mismatch_positions = np.nonzero(mismatched)
+            base = result[mismatch_positions].astype(np.int16)
+            targets = image[mismatch_positions]
+            offsets = np.array(
+                [
+                    (db, dg, dr)
+                    for dr in (-1, 0, 1)
+                    for dg in (-1, 0, 1)
+                    for db in (-1, 0, 1)
+                ],
+                dtype=np.int16,
+            )
+            candidates = base[:, None, :] + offsets[None, :, :]
+            valid_mask = np.all((candidates >= 0) & (candidates <= 255), axis=-1)
+            candidates_u8 = np.clip(candidates, 0, 255).astype(np.uint8)
+            hsv_candidates = _numpy_hsv_from_bgr(
+                candidates_u8.reshape(-1, 3)
+            ).reshape(base.shape[0], -1, 3)
+            matches = valid_mask & np.all(hsv_candidates == targets[:, None, :], axis=-1)
+            has_match = np.any(matches, axis=1)
+            if np.any(has_match):
+                match_indices = matches.argmax(axis=1)
+                best_candidates = candidates_u8[np.arange(base.shape[0]), match_indices]
+                result[
+                    mismatch_positions[0][has_match],
+                    mismatch_positions[1][has_match],
+                ] = best_candidates[has_match]
 
     if HSV_CACHE_ENABLED and HSV_TO_BGR_CACHE:
         flat_hsv = image.reshape(-1, 3)

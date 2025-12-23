@@ -161,6 +161,28 @@ class TestUtilitiesEnv:
 
         assert Configuration.render_executor_max_workers() == 3
 
+    @pytest.mark.parametrize(
+        "backend,expected",
+        [("auto", "auto"), ("numpy", "numpy"), ("cv2", "cv2")],
+        ids=("auto", "numpy", "cv2"),
+    )
+    def test_hsv_backend_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch, backend: str, expected: str
+    ) -> None:
+        """Verify that hsv backend reads the environment value so conversion strategies stay configurable."""
+        monkeypatch.setenv("HEART_HSV_BACKEND", backend)
+
+        assert Configuration.hsv_conversion_backend() == expected
+
+    def test_hsv_backend_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify that hsv backend rejects invalid values so configuration errors surface quickly."""
+        monkeypatch.setenv("HEART_HSV_BACKEND", "invalid")
+
+        with pytest.raises(ValueError):
+            Configuration.hsv_conversion_backend()
+
 
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
