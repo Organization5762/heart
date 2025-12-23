@@ -8,7 +8,7 @@ null terminator (`\0`).  The most-recent message is available via
 
 from collections.abc import Iterator
 from types import ModuleType
-from typing import Self
+from typing import Any, Self
 
 from heart.peripheral.core import Peripheral
 
@@ -35,7 +35,7 @@ _SERVICE_UUID = "1235"
 _CHARACTERISTIC_UUID = "5679"
 
 
-class PhoneText(Peripheral):
+class PhoneText(Peripheral[str]):
     """Peripheral that stores the most recent text or image sent to it over BLE."""
 
     def __init__(self) -> None:
@@ -107,7 +107,9 @@ class PhoneText(Peripheral):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _on_write(self, value: bytes, _options: dict | None) -> None:  # noqa: D401
+    def _on_write(
+        self, value: bytes, _options: dict[str, Any] | None
+    ) -> None:  # noqa: D401
         """Bluezero callback executed whenever a central writes new data."""
 
         print(f"Received value: {value!r}")

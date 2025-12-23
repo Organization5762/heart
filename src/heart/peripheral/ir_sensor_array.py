@@ -260,7 +260,7 @@ class MultilaterationSolver:
         return point, confidence, rmse
 
 
-class IRSensorArray(Peripheral):
+class IRSensorArray(Peripheral[Input]):
     """Process DMA packets from an IR sensor array and emit pose estimates."""
 
     EVENT_FRAME = "peripheral.ir_array.frame"
@@ -336,4 +336,3 @@ def radial_layout(radius: float = 0.12) -> list[list[float]]:
         [half, 0.0, vertical],
         [0.0, -half, -vertical],
     ]
-

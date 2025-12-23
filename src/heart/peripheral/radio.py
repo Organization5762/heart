@@ -23,14 +23,6 @@ except Exception:  # pragma: no cover - defensive catch for partial installs
 
 logger = get_logger(__name__)
 
-__all__ = [
-    "RawRadioPacket",
-    "RadioDriver",
-    "SerialRadioDriver",
-    "RadioPeripheral",
-]
-
-
 @dataclass(slots=True)
 class RawRadioPacket:
     """Low-level representation produced by firmware drivers."""
@@ -128,14 +120,14 @@ class SerialRadioDriver(RadioDriver):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _open_serial(self):  # pragma: no cover - thin wrapper around pyserial
+    def _open_serial(self) -> Any:  # pragma: no cover - thin wrapper around pyserial
         return self._serial_module.Serial(
             self._port,
             self._baudrate,
             timeout=self._timeout,
         )
 
-    def _drain_serial(self, handle) -> Iterator[RawRadioPacket]:
+    def _drain_serial(self, handle: Any) -> Iterator[RawRadioPacket]:
         while not self._stop_event.is_set():
             raw = handle.readline()
             if not raw:
@@ -216,7 +208,7 @@ class SerialRadioDriver(RadioDriver):
         return None
 
 
-class RadioPeripheral(Peripheral):
+class RadioPeripheral(Peripheral[RawRadioPacket]):
     """Bridge raw radio packets produced by firmware"""
 
     EVENT_TYPE = RadioPacket.EVENT_TYPE

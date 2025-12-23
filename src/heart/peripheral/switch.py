@@ -10,6 +10,8 @@ import serial
 from bleak.backends.device import BLEDevice
 from reactivex import create
 from reactivex import operators as ops
+from reactivex.abc import ObserverBase, SchedulerBase
+from reactivex.disposable import Disposable
 from reactivex.scheduler import NewThreadScheduler
 
 from heart.peripheral.bluetooth import UartListener
@@ -31,7 +33,7 @@ class SwitchState:
     rotation_since_last_button_press: int
     rotation_since_last_long_button_press: int
 
-class BaseSwitch(Peripheral):
+class BaseSwitch(Peripheral[SwitchState]):
     def __init__(
         self,
     ) -> None:
@@ -62,7 +64,7 @@ class BaseSwitch(Peripheral):
         )
 
 class FakeSwitch(BaseSwitch):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -88,22 +90,22 @@ class FakeSwitch(BaseSwitch):
 
     def run(self) -> None:
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
-            def handle_key_up(x):
+            def handle_key_up(_: Any) -> None:
                 self.button_long_press_value += 1
                 self.rotation_value_at_last_long_button_press = self.rotational_value
             
-            def handle_key_down(x):
+            def handle_key_down(_: Any) -> None:
                 self.button_value += 1
                 self.rotation_value_at_last_button_press = self.rotational_value
 
-            def handle_key_left(x):
+            def handle_key_left(_: Any) -> None:
                 self.rotational_value -= 1
 
-            def handle_key_right(x):
+            def handle_key_right(_: Any) -> None:
                 self.rotational_value += 1
 
-            def is_first_press(x):
-                return x.data.first_press()
+            def is_first_press(x: Any) -> bool:
+                return bool(x.data.first_press())
 
             KeyboardKey.get(pygame.K_UP).observe.pipe(
                 ops.filter(is_first_press)
@@ -132,7 +134,7 @@ class FakeSwitch(BaseSwitch):
             )
 
 class Switch(BaseSwitch):
-    def __init__(self, port: str, baudrate: int, *args, **kwargs) -> None:
+    def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:
         self.port = port
         self.baudrate = baudrate
         super().__init__(*args, **kwargs)
@@ -142,10 +144,14 @@ class Switch(BaseSwitch):
         for port in get_device_ports("usb-Adafruit_Industries_LLC_Rotary_Trinkey_M0"):
             yield cls(port=port, baudrate=115200)
 
-    def _connect_to_ser(self):
+    def _connect_to_ser(self) -> Any:
         return serial.Serial(self.port, self.baudrate)
 
-    def _read_from_switch(self, observer, scheduler):
+    def _read_from_switch(
+        self,
+        observer: ObserverBase[Any],
+        scheduler: SchedulerBase | None,
+    ) -> Disposable:
         while True:
             try:
                 ser = self._connect_to_ser()
@@ -165,6 +171,7 @@ class Switch(BaseSwitch):
                 pass
 
             time.sleep(0.1)
+        return Disposable()
 
     def run(self) -> None:
         source = create(self._read_from_switch)
@@ -174,7 +181,7 @@ class Switch(BaseSwitch):
         )
 
 class BluetoothSwitch(BaseSwitch):
-    def __init__(self, device: BLEDevice, *args, **kwargs) -> None:
+    def __init__(self, device: BLEDevice, *args: Any, **kwargs: Any) -> None:
         self.listener = UartListener(device=device)
         self.switches = [
             BaseSwitch() for index in range(4)
@@ -239,7 +246,7 @@ class BluetoothSwitch(BaseSwitch):
             yield cls(device=device)
 
     def _connect_to_ser(self) -> None:
-        return self.listener.start()
+        self.listener.start()
 
     def run(self) -> NoReturn:
         slow_poll = False

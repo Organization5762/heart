@@ -1,7 +1,7 @@
 """Peripheral detection configuration modules."""
 
 import itertools
-from typing import Iterator
+from typing import Any, Iterator
 
 from heart.environment import logger
 from heart.peripheral.compass import Compass
@@ -18,10 +18,10 @@ from heart.peripheral.uwb import FakeUWBPositioning
 from heart.utilities.env import Configuration
 
 
-def _detect_switches() -> Iterator[Peripheral]:
+def _detect_switches() -> Iterator[Peripheral[Any]]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
         logger.info("Detecting switches")
-        switches: list[Peripheral] = [
+        switches: list[Peripheral[Any]] = [
             *Switch.detect(),
             *BluetoothSwitch.detect(),
         ]
@@ -37,29 +37,29 @@ def _detect_switches() -> Iterator[Peripheral]:
         logger.info("Adding switch - %s", switch)
         yield switch
 
-def _detect_phone_text() -> Iterator[Peripheral]:
+def _detect_phone_text() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(PhoneText.detect())
 
-def _detect_sensors() -> Iterator[Peripheral]:
+def _detect_sensors() -> Iterator[Peripheral[Any]]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
         yield from itertools.chain(Accelerometer.detect(), Compass.detect())
     else:
         yield from FakeAccelerometer.detect()
 
-def _detect_gamepads() -> Iterator[Peripheral]:
+def _detect_gamepads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(Gamepad.detect())
 
-def _detect_heart_rate_sensor() -> Iterator[Peripheral]:
+def _detect_heart_rate_sensor() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(HeartRateManager.detect())
 
-def _detect_microphones() -> Iterator[Peripheral]:
+def _detect_microphones() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(Microphone.detect())
 
-def _detect_drawing_pads() -> Iterator[Peripheral]:
+def _detect_drawing_pads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(DrawingPad.detect())
 
-def _detect_radios() -> Iterator[Peripheral]:
+def _detect_radios() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(RadioPeripheral.detect())
 
-def _detect_uwb_position() -> Iterator[Peripheral]:
+def _detect_uwb_position() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(FakeUWBPositioning.detect())

@@ -34,7 +34,7 @@ class StylusSample:
     is_erase: bool = False
 
 
-class DrawingPad(Peripheral):
+class DrawingPad(Peripheral[Any]):
     """Virtual 6"×6" drawing surface with stylus and erase support.
 
     Parameters

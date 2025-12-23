@@ -7,7 +7,7 @@ from heart.peripheral.core import Peripheral
 from heart.peripheral.sensor import Acceleration
 
 
-class Phyphox(Peripheral):
+class Phyphox(Peripheral[Acceleration]):
     def __init__(self, url: str) -> None:
         super().__init__()
         self.url = url

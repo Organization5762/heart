@@ -143,7 +143,7 @@ def _numpy_bgr_from_hsv(image: np.ndarray) -> np.ndarray:
 
 def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
     if CV2_MODULE is not None:
-        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV)
+        return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV))
 
     hsv = _numpy_hsv_from_bgr(image)
 
@@ -186,7 +186,7 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
 
 def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
     if CV2_MODULE is not None:
-        return CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR)
+        return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR))
 
     result = _numpy_bgr_from_hsv(image)
 
@@ -764,7 +764,7 @@ class GameLoop:
             #   try pygame-ce instead
             print("SystemError: Encountered segfaulted event")
 
-    def _preprocess_setup(self):
+    def _preprocess_setup(self) -> None:
         self.__dim_display()
 
     def __set_singleton(self) -> None:

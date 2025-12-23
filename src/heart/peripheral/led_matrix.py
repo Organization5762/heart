@@ -15,7 +15,7 @@ from heart.utilities.logging import get_logger
 _LOGGER = get_logger(__name__)
 
 
-class LEDMatrixDisplay(Peripheral):
+class LEDMatrixDisplay(Peripheral[DisplayFrame]):
     """Virtual peripheral representing the rendered LED matrix image."""
 
     EVENT_FRAME = DisplayFrame.EVENT_TYPE

@@ -182,7 +182,7 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
     def _event_stream(
         self
     ) -> reactivex.Observable[Acceleration | None]:
-        def random_accel(x) -> Acceleration:
+        def random_accel(_: int) -> Acceleration:
             return Acceleration(
                 x=random.random(),
                 y=random.random(),

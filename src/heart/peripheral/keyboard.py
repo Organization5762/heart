@@ -2,14 +2,14 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cache
-from typing import Iterator, Self, cast
+from typing import Any, Iterator, Self, cast
 
 import pygame
 import reactivex
+from reactivex import operators as ops
 from reactivex.scheduler import NewThreadScheduler
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.switch import ops
 from heart.utilities.env import Configuration
 
 
@@ -24,8 +24,8 @@ class KeyTimeline:
 
 
 
-class KeyboardKey(Peripheral):
-    def __init__(self, key, *args, **kwargs) -> None:
+class KeyboardKey(Peripheral[KeyTimeline]):
+    def __init__(self, key: int, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.key = key
         self.state = KeyTimeline()
@@ -49,10 +49,10 @@ class KeyboardKey(Peripheral):
 
     @classmethod
     @cache
-    def get(cls, key) -> Self:
+    def get(cls, key: int) -> Self:
         return cls(key)
 
-    def _snapshot(self):
+    def _snapshot(self) -> KeyTimeline:
         return self.state
 
     def _event_stream(self) -> reactivex.Observable[KeyTimeline]:
@@ -84,11 +84,11 @@ class KeyboardKey(Peripheral):
             )
         )
 
-    def _check_if_pressed(self):
+    def _check_if_pressed(self) -> None:
         keys = pygame.key.get_pressed()
         now = time.time() * 1000
 
-        def check_with_cache(key, s: KeyTimeline) -> KeyTimeline:
+        def check_with_cache(key: int, s: KeyTimeline) -> KeyTimeline:
             # Is pressed
             if keys[key]:
                 if s.pressed:

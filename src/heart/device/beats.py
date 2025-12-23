@@ -8,6 +8,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
+from typing import Any
 from uuid import UUID
 
 import websockets
@@ -22,9 +23,9 @@ logger = logging.getLogger(__name__)
 class UniversalJSONEncoder(json.JSONEncoder):
     """JSON encoder that supports dataclasses, pydantic models, enums, UUID, datetime, etc."""
 
-    def default(self, obj):
+    def default(self, obj: object) -> object:
         if dataclasses.is_dataclass(obj):
-            return dataclasses.asdict(obj) # type: ignore
+            return dataclasses.asdict(obj)  # type: ignore[arg-type]
 
         if isinstance(obj, Enum):
             return obj.value
@@ -42,17 +43,17 @@ class UniversalJSONEncoder(json.JSONEncoder):
 
 @dataclass
 class WebSocket:
-    clients: set = field(default_factory=set, init=False)
+    clients: set[Any] = field(default_factory=set, init=False)
 
     _instance = None
     _lock = threading.Lock()
 
-    _server = None
-    _thread: threading.Thread = field(default=None, init=False) # type: ignore
-    _loop: asyncio.AbstractEventLoop = field(default=None, init=False) # type: ignore
-    _broadcast_queue: "asyncio.Queue[bytes]" = field(default=None, init=False)  # type: ignore
+    _server: Any = None
+    _thread: threading.Thread | None = field(default=None, init=False)
+    _loop: asyncio.AbstractEventLoop | None = field(default=None, init=False)
+    _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "WebSocket":
         # Thread-safe singleton creation
         if cls._instance is None:
             with cls._lock:
@@ -60,7 +61,7 @@ class WebSocket:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Only run once for the singleton instance
         if getattr(self, "_initialized", False):
             return
@@ -73,21 +74,25 @@ class WebSocket:
         self._thread.start()
 
     # --- THREAD EVENT LOOP STARTUP ---
-    def _ws_thread_main(self):
+    def _ws_thread_main(self) -> None:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         self._broadcast_queue = asyncio.Queue()
+        loop = self._loop
+        broadcast_queue = self._broadcast_queue
+        assert loop is not None
+        assert broadcast_queue is not None
 
-        async def handler(ws):
+        async def handler(ws: Any) -> None:
             self.clients.add(ws)
             try:
                 await ws.wait_closed()
             finally:
                 self.clients.discard(ws)
 
-        async def broadcast_worker():
+        async def broadcast_worker() -> None:
             while True:
-                frame = await self._broadcast_queue.get()
+                frame = await broadcast_queue.get()
                 for ws in list(self.clients):
                     try:
                         await ws.send(frame)
@@ -97,20 +102,20 @@ class WebSocket:
                         logger.warning(f"Error sending frame to client: {e}")
                         self.clients.discard(ws)
 
-        async def main():
+        async def main() -> None:
             self._server = await websockets.serve(
                 handler,
                 "localhost",
                 8765,
                 ping_interval=20,
             )
-            self._loop.create_task(broadcast_worker())
+            loop.create_task(broadcast_worker())
             await self._server.wait_closed()
 
-        self._loop.run_until_complete(main())
+        loop.run_until_complete(main())
 
     # --- PUBLIC API ---
-    def send(self, kind: str, payload):
+    def send(self, kind: str, payload: object) -> None:
         if self._broadcast_queue and self._loop:
             data = {"type": kind, "payload": payload}
             json_bytes = json.dumps(data, cls=UniversalJSONEncoder, sort_keys=True, indent=0).encode()
