@@ -1,5 +1,7 @@
 import logging
-from collections.abc import Callable
+import random
+from collections.abc import Callable, Sequence
+from dataclasses import replace
 
 import pygame
 
@@ -38,4 +40,46 @@ class SpritesheetLoopRandomProvider:
             phase=initial_phase,
             spritesheet=Loader.load_spirtesheet(self.file),
             switch_state=None,
+        )
+
+    def handle_switch_state(
+        self,
+        state: SpritesheetLoopRandomState,
+        switch_state: SwitchState | None,
+    ) -> SpritesheetLoopRandomState:
+        return replace(state, switch_state=switch_state)
+
+    def duration_scale_factor(self, state: SpritesheetLoopRandomState) -> float:
+        current_value = 0
+        if state.switch_state:
+            current_value = state.switch_state.rotation_since_last_button_press
+        return current_value / 20.00
+
+    def next_state(
+        self,
+        state: SpritesheetLoopRandomState,
+        current_phase_frames: Sequence,
+        screen_count: int,
+        elapsed_ms: float,
+    ) -> SpritesheetLoopRandomState:
+        current_kf = current_phase_frames[state.current_frame]
+        kf_duration = current_kf.duration - (
+            current_kf.duration * self.duration_scale_factor(state)
+        )
+        time_since_last = state.time_since_last_update
+        next_frame = state.current_frame
+        next_screen = state.current_screen
+        if time_since_last is None or time_since_last > kf_duration:
+            next_frame = state.current_frame + 1
+            if next_frame >= len(current_phase_frames):
+                next_frame = 0
+                next_screen = random.randint(0, screen_count - 1)
+            time_since_last = 0
+
+        time_since_last = (time_since_last or 0) + elapsed_ms
+        return replace(
+            state,
+            current_frame=next_frame,
+            time_since_last_update=time_since_last,
+            current_screen=next_screen,
         )

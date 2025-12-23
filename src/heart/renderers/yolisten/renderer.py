@@ -1,5 +1,4 @@
 import logging
-import random
 import threading
 import time
 
@@ -124,37 +123,6 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 logger.exception("Failed to poll phyphox data")
             time.sleep(0.05)
 
-    def _update_flicker(self, current_time: float, state: YoListenState) -> YoListenState:
-        if current_time - state.last_flicker_update >= self.flicker_speed:
-            brightness_factor = 1 + random.uniform(
-                -self.flicker_intensity, self.flicker_intensity
-            )
-            r = min(255, max(0, int(self.base_color.r * brightness_factor)))
-            g = min(255, max(0, int(self.base_color.g * brightness_factor)))
-            b = min(255, max(0, int(self.base_color.b * brightness_factor)))
-            self.update_state(
-                color=Color(r, g, b),
-                last_flicker_update=current_time,
-            )
-            return self.state
-        return state
-
-    def _calibrate_scroll_speed(self, state: YoListenState) -> YoListenState:
-        rotation = 0
-        if self.state.switch_state:
-            rotation = self.state.switch_state.rotation_since_last_button_press
-        self.update_state(
-            scroll_speed_offset=rotation,
-            should_calibrate=False,
-        )
-        return self.state
-
-    def _scroll_speed_scale_factor(self, state: YoListenState) -> float:
-        current_value = 0
-        if self.state.switch_state:
-            current_value = self.state.switch_state.rotation_since_last_button_press
-        return 1.0 + (current_value - state.scroll_speed_offset) / 20.0
-
     def real_process(
         self,
         window: pygame.Surface,
@@ -163,23 +131,30 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
     ) -> None:
         state = self.state
         if state.should_calibrate:
-            state = self._calibrate_scroll_speed(state)
-        scroll_speed = self._base_scroll_speed * self._scroll_speed_scale_factor(state)
+            state = self.provider.calibrate_scroll_speed(state)
 
         current_time = time.time()
-        state = self._update_flicker(current_time, state)
+        state = self.provider.update_flicker(
+            state,
+            current_time,
+            flicker_speed=self.flicker_speed,
+            flicker_intensity=self.flicker_intensity,
+        )
 
         window_width, window_height = window.get_size()
         screen_width = window_width // self.screen_count
         window.fill((0, 0, 0))
 
-        word_position = state.word_position - scroll_speed
-        if word_position < -window_width:
-            word_position = 0
-
-        if word_position != state.word_position:
-            self.update_state(word_position=word_position)
-            state = self.state
+        scroll_speed = self._base_scroll_speed * self.provider.scroll_speed_scale_factor(
+            state
+        )
+        state = self.provider.advance_word_position(
+            state,
+            scroll_speed=scroll_speed,
+            window_width=window_width,
+        )
+        if state != self.state:
+            self.set_state(state)
 
         color = state.color
         word_position = state.word_position
@@ -287,7 +262,9 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
-            on_switch_state=lambda value: self.update_state(switch_state=value),
+            on_switch_state=lambda value: self.set_state(
+                self.provider.handle_switch_state(self.state, value)
+            ),
         )
 
 
