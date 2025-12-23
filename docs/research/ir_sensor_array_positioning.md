@@ -40,6 +40,16 @@ score derived from the residual root mean square error (RMSE). Unit tests in
 exercise the solver with synthetic geometry and confirm convergence to a known
 point within a millimetre.【F:src/heart/peripheral/ir_sensor_array.py†L118-L207】【F:tests/peripheral/test_ir_sensor_array.py†L28-L52】
 
+## Solver performance and configuration
+
+The solver now evaluates residuals using vectorized NumPy operations and
+supplies an analytical Jacobian for the least-squares optimizer. This reduces
+per-iteration Python overhead and provides direct control over the gradient
+estimate. The solver method (`trf` by default) and Jacobian usage are
+configuration parameters on both `MultilaterationSolver` and `IRSensorArray`,
+so deployments can tune convergence behaviour alongside frame processing
+without modifying the algorithm itself.【F:src/heart/peripheral/ir_sensor_array.py†L118-L268】
+
 ## Frame assembly and decoding
 
 `FrameAssembler` groups samples by `frame_id` until every sensor contributes.
