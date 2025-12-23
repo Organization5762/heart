@@ -195,16 +195,24 @@ class TestEnvironmentCoreLogic:
 
     def test_render_fn_selects_renderer(self, loop) -> None:
         """Verify that _render_fn returns the expected merge strategy for each variant. This keeps render mode selection predictable."""
-        assert loop._render_fn(RendererVariant.BINARY) is loop._render_surfaces_binary
-        assert loop._render_fn(RendererVariant.ITERATIVE) is loop._render_surface_iterative
+        renderers = ["r1", "r2"]
+        assert (
+            loop._render_fn(renderers, RendererVariant.BINARY)
+            is loop._render_surfaces_binary
+        )
+        assert (
+            loop._render_fn(renderers, RendererVariant.ITERATIVE)
+            is loop._render_surface_iterative
+        )
 
 
     def test_render_fn_default_uses_loop_variant(self, loop) -> None:
         """Verify that _render_fn respects the loop's configured renderer variant by default. This keeps runtime switches effective without reconfiguring callers."""
+        renderers = ["r1"]
         loop.renderer_variant = RendererVariant.BINARY
-        assert loop._render_fn(None) is loop._render_surfaces_binary
+        assert loop._render_fn(renderers, None) is loop._render_surfaces_binary
         loop.renderer_variant = RendererVariant.ITERATIVE
-        assert loop._render_fn(None) is loop._render_surface_iterative
+        assert loop._render_fn(renderers, None) is loop._render_surface_iterative
 
 
 
@@ -214,7 +222,25 @@ class TestEnvironmentCoreLogic:
     )
     def test_render_fn_handles_unknown_variant(self, loop, variant: RendererVariant) -> None:
         """Verify that _render_fn returns a callable even for enumerated variants. This avoids runtime errors when iterating through supported strategies."""
-        assert callable(loop._render_fn(variant))
+        renderers = ["r1", "r2", "r3", "r4"]
+        assert callable(loop._render_fn(renderers, variant))
+
+
+    def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
+        """Verify that auto rendering switches at the threshold. This keeps performance tuning predictable on constrained devices."""
+        monkeypatch.setattr(
+            "heart.environment.Configuration.render_parallel_threshold",
+            lambda: 2,
+        )
+
+        assert (
+            loop._render_fn(["r1"], RendererVariant.AUTO)
+            is loop._render_surface_iterative
+        )
+        assert (
+            loop._render_fn(["r1", "r2"], RendererVariant.AUTO)
+            is loop._render_surfaces_binary
+        )
 
     @pytest.mark.skip(reason="Flame renderer is not implemented")
     def test_ensure_flame_renderer_returns_singleton_with_marker(self, loop) -> None:
