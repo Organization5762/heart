@@ -21,6 +21,23 @@ def _env_flag(env_var: str, *, default: bool = False) -> bool:
     return value.strip().lower() in TRUE_FLAG_VALUES
 
 
+def _env_int(
+    env_var: str, *, default: int, minimum: int | None = None
+) -> int:
+    """Return the integer value of ``env_var`` with optional bounds checking."""
+
+    value = os.environ.get(env_var)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{env_var} must be an integer") from exc
+    if minimum is not None and parsed < minimum:
+        raise ValueError(f"{env_var} must be at least {minimum}")
+    return parsed
+
+
 @dataclass
 class Pi:
     version: int
@@ -74,6 +91,14 @@ class Configuration:
     @classmethod
     def peripheral_configuration(cls) -> str:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
+
+    @classmethod
+    def reactivex_background_max_workers(cls) -> int:
+        return _env_int("HEART_RX_BACKGROUND_MAX_WORKERS", default=4, minimum=1)
+
+    @classmethod
+    def reactivex_input_max_workers(cls) -> int:
+        return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
     def isolated_renderer_socket(cls) -> str | None:

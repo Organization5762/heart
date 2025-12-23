@@ -10,7 +10,7 @@ from reactivex import operators as ops
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import background_scheduler
+from heart.utilities.reactivex_threads import input_scheduler
 
 
 @dataclass
@@ -32,7 +32,7 @@ class KeyboardKey(Peripheral[KeyTimeline]):
 
         # Start running the key checker
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
-            scheduler = background_scheduler()
+            scheduler = input_scheduler()
             check_for_input = reactivex.interval(
                 timedelta(milliseconds=10), scheduler=scheduler
             )
@@ -79,7 +79,10 @@ class KeyboardKey(Peripheral[KeyTimeline]):
             return cast(reactivex.Observable[KeyTimeline], reactivex.empty())
 
         return (
-            reactivex.interval(timedelta(milliseconds=5))
+            reactivex.interval(
+                timedelta(milliseconds=5),
+                scheduler=input_scheduler(),
+            )
             .pipe(
                 ops.map(_generate),  # Observable[KeyTimeline]
                 ops.distinct_until_changed(only_keypress),
