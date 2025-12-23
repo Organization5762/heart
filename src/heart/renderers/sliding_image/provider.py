@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import cast
 
 import pygame
 import reactivex
@@ -15,44 +16,46 @@ from heart.renderers.sliding_image.state import (SlidingImageState,
 class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
     def __init__(
         self,
-        peripheral_manager: PeripheralManager,
         *,
         speed: int = 1,
-        width: int = 0,
     ) -> None:
-        self._peripheral_manager = peripheral_manager
         self._speed = max(1, speed)
-        self._width = width
-        self._image: pygame.Surface | None = None
-
-    def set_width(self, width: int) -> None:
-        self._width = max(0, width)
-
-    def set_image(self, image: pygame.Surface) -> None:
-        self._image = image
 
     def _initial_state(self) -> SlidingImageState:
-        return SlidingImageState(
-            speed=self._speed, width=self._width, image=self._image
-        )
+        return SlidingImageState(speed=self._speed)
 
     def reset_state(self, state: SlidingImageState) -> SlidingImageState:
         return replace(state, offset=0)
 
-    def advance_state(self, state: SlidingImageState) -> SlidingImageState:
-        width = state.width or self._width
+    def advance_state(self, state: SlidingImageState, width: int) -> SlidingImageState:
         if width <= 0:
             return replace(state, width=width)
 
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
-    def observable(self) -> reactivex.Observable[SlidingImageState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[SlidingImageState]:
+        if peripheral_manager is None:
+            raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
+
+        window_stream = peripheral_manager.window.pipe(
+            ops.filter(lambda window: window is not None),
+            ops.map(lambda window: cast(pygame.Surface, window)),
+            ops.map(lambda window: window.get_size()[0]),
+            ops.distinct_until_changed(),
+        )
         initial_state = self._initial_state()
 
         return (
-            self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: self.advance_state(state), seed=initial_state),
+            peripheral_manager.game_tick.pipe(
+                ops.with_latest_from(window_stream),
+                ops.map(lambda pair: pair[1]),
+                ops.scan(
+                    lambda state, width: self.advance_state(state, width),
+                    seed=initial_state,
+                ),
                 ops.start_with(initial_state),
                 ops.share(),
             )
@@ -62,38 +65,48 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
 class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
     def __init__(
         self,
-        peripheral_manager: PeripheralManager,
         *,
         speed: int = 1,
-        width: int = 0,
     ) -> None:
-        self._peripheral_manager = peripheral_manager
         self._speed = max(1, speed)
-        self._width = width
-
-    def set_width(self, width: int) -> None:
-        self._width = max(0, width)
 
     def _initial_state(self) -> SlidingRendererState:
-        return SlidingRendererState(speed=self._speed, width=self._width)
+        return SlidingRendererState(speed=self._speed)
 
     def reset_state(self, state: SlidingRendererState) -> SlidingRendererState:
         return replace(state, offset=0)
 
-    def advance_state(self, state: SlidingRendererState) -> SlidingRendererState:
-        width = state.width or self._width
+    def advance_state(
+        self, state: SlidingRendererState, width: int
+    ) -> SlidingRendererState:
         if width <= 0:
             return replace(state, width=width)
 
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
-    def observable(self) -> reactivex.Observable[SlidingRendererState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[SlidingRendererState]:
+        if peripheral_manager is None:
+            raise ValueError("SlidingRendererStateProvider requires a PeripheralManager")
+
+        window_stream = peripheral_manager.window.pipe(
+            ops.filter(lambda window: window is not None),
+            ops.map(lambda window: cast(pygame.Surface, window)),
+            ops.map(lambda window: window.get_size()[0]),
+            ops.distinct_until_changed(),
+        )
         initial_state = self._initial_state()
 
         return (
-            self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: self.advance_state(state), seed=initial_state),
+            peripheral_manager.game_tick.pipe(
+                ops.with_latest_from(window_stream),
+                ops.map(lambda pair: pair[1]),
+                ops.scan(
+                    lambda state, width: self.advance_state(state, width),
+                    seed=initial_state,
+                ),
                 ops.start_with(initial_state),
                 ops.share(),
             )

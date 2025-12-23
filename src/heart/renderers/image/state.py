@@ -5,4 +5,5 @@ import pygame
 
 @dataclass(frozen=True)
 class RenderImageState:
-    image: pygame.Surface
+    base_image: pygame.Surface
+    window_size: tuple[int, int]

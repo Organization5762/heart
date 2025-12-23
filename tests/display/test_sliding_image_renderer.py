@@ -17,15 +17,18 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     clock = stub_clock_factory(0)
 
     renderer = SlidingImage("banner.png", speed=4)
+    manager.window.on_next(window)
     renderer.initialize(window, clock, manager, orientation)
+    manager.game_tick.on_next(True)
 
     initial_state = renderer.state
-    assert initial_state.image is not None
     assert initial_state.width == window.get_width()
-    image_ref = initial_state.image
+    image_ref = renderer._image
+    assert image_ref is not None
 
     window.fill((0, 0, 0, 0))
     offset_before = renderer.state.offset
+    manager.game_tick.on_next(True)
     renderer.process(window, clock, manager, orientation)
     processed_state = renderer.state
     assert processed_state.offset == (
@@ -36,18 +39,20 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
 
     renderer.reset()
 
+    renderer.initialize(window, clock, manager, orientation)
+    assert renderer._image is image_ref
     after_reset_state = renderer.state
-    assert after_reset_state.image is image_ref
-    assert after_reset_state.width == processed_state.width
-    assert after_reset_state.offset == 0
+    assert after_reset_state.offset == after_reset_state.speed
     assert after_reset_state.speed == 4
+    manager.game_tick.on_next(True)
+    assert renderer.state.width == processed_state.width
 
     window.fill((0, 0, 0, 0))
     offset_before_second = renderer.state.offset
+    manager.game_tick.on_next(True)
     renderer.process(window, clock, manager, orientation)
     after_second_process_state = renderer.state
     assert after_second_process_state.offset == (
         offset_before_second + after_second_process_state.speed
     ) % after_second_process_state.width
     assert window.get_at((0, 0))[:3] == (10, 20, 30)
-    assert after_second_process_state.image is image_ref
