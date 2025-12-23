@@ -13,7 +13,7 @@ from heart.renderers.pacman.state import PacmanGhostState
 
 class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
     def __init__(self, builder: PacmanGhostStateProvider | None = None) -> None:
-        self._builder = builder or PacmanGhostStateProvider()
+        self._builder = builder
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.ghost1: pygame.Surface | None = None
@@ -22,17 +22,22 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
         self.pacman: pygame.Surface | None = None
         self._asset_version: int = 0
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> PacmanGhostState:
-        initial_state = self._builder.initial_state(window)
-        self._asset_version = initial_state.asset_version
-        self._load_sprites(initial_state)
-        return initial_state
+    ) -> None:
+        if self.builder is None:
+            width, height = window.get_size()
+            self._builder = self._builder or PacmanGhostStateProvider(
+                width=width,
+                height=height,
+                peripheral_manager=peripheral_manager,
+            )
+            self.builder = self._builder
+        super().initialize(window, clock, peripheral_manager, orientation)
 
     def _load_sprites(self, state: PacmanGhostState) -> None:
         load = Loader.load
@@ -55,12 +60,10 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        next_state = self._builder.next_state(self.state)
-        if next_state.asset_version != self._asset_version:
-            self._asset_version = next_state.asset_version
-            self._load_sprites(next_state)
-        self.set_state(next_state)
         state = self.state
+        if state.asset_version != self._asset_version:
+            self._asset_version = state.asset_version
+            self._load_sprites(state)
 
         pacman = Loader.load(
             f"bloodpac{state.pacman_idx + 1}.png" if state.blood else f"pac{state.pacman_idx + 1}.png"
