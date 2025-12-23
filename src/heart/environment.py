@@ -304,6 +304,7 @@ class GameLoop:
             RendererVariant.BINARY: binary_method,
             RendererVariant.ITERATIVE: iterative_method,
         }
+        self._render_executor: ThreadPoolExecutor | None = None
 
         self._render_queue_depth = 0
 
@@ -331,6 +332,11 @@ class GameLoop:
             pygame.event.set_grab(True)
 
         self._last_render_mode = pygame.SHOWN
+
+    def _get_render_executor(self) -> ThreadPoolExecutor:
+        if self._render_executor is None:
+            self._render_executor = ThreadPoolExecutor()
+        return self._render_executor
 
     def add_mode(
         self,
@@ -393,6 +399,9 @@ class GameLoop:
                 self._one_loop(renderers)
                 clock.tick(self.max_fps)
         finally:
+            if self._render_executor is not None:
+                self._render_executor.shutdown(wait=True)
+                self._render_executor = None
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:
@@ -584,36 +593,35 @@ class GameLoop:
         self, renderers: list["BaseRenderer"]
     ) -> pygame.Surface | None:
         self._render_queue_depth = len(renderers)
-        with ThreadPoolExecutor() as executor:
-            surfaces: list[pygame.Surface] = [
-                i
-                for i in list(executor.map(self.process_renderer, renderers))
-                if i is not None
-            ]
+        executor = self._get_render_executor()
+        surfaces: list[pygame.Surface] = [
+            surface
+            for surface in executor.map(self.process_renderer, renderers)
+            if surface is not None
+        ]
 
-            # Iteratively merge surfaces until only one remains
-            while len(surfaces) > 1:
-                pairs = []
-                # Create pairs of adjacent surfaces
-                for i in range(0, len(surfaces) - 1, 2):
-                    pairs.append((surfaces[i], surfaces[i + 1]))
+        # Iteratively merge surfaces until only one remains
+        while len(surfaces) > 1:
+            pairs = []
+            # Create pairs of adjacent surfaces
+            for i in range(0, len(surfaces) - 1, 2):
+                pairs.append((surfaces[i], surfaces[i + 1]))
 
-                # Merge pairs in parallel
-                merged_surfaces = list(
-                    executor.map(lambda p: self.merge_surfaces(*p), pairs)
-                )
+            # Merge pairs in parallel
+            merged_surfaces = list(
+                executor.map(lambda p: self.merge_surfaces(*p), pairs)
+            )
 
-                # If there's an odd surface out, append it to the merged list
-                if len(surfaces) % 2 == 1:
-                    merged_surfaces.append(surfaces[-1])
+            # If there's an odd surface out, append it to the merged list
+            if len(surfaces) % 2 == 1:
+                merged_surfaces.append(surfaces[-1])
 
-                # Update the surfaces list for the next iteration
-                surfaces = merged_surfaces
+            # Update the surfaces list for the next iteration
+            surfaces = merged_surfaces
 
         if surfaces:
             return surfaces[0]
-        else:
-            return None
+        return None
 
     def _render_fn(
         self, override_renderer_variant: RendererVariant | None
