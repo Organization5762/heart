@@ -58,7 +58,6 @@ class SensorReader:
 
         self._last_accel: tuple | None = None
         self._last_gyro: tuple | None = None
-        self._last_mag: tuple | None = None
 
     def read(self):
         for sensor in self.sensors:
@@ -74,13 +73,6 @@ class SensorReader:
                 if self._changed_enough(gyro, self._last_gyro, self.min_change):
                     self._last_gyro = gyro
                     yield form_tuple_payload(constants.GYROSCOPE, gyro)
-
-            # TODO: Can be turned on when we have a use for it
-            # if hasattr(sensor, "magnetic"):
-            #     mag = sensor.magnetic
-            #     if self._changed_enough(mag, self._last_mag, self.min_change):
-            #         self._last_mag = mag
-            # yield form_tuple_payload(constants.MAGNETIC, mag)
 
     def _changed_enough(self, new: tuple, old: tuple | None, min_change: float) -> bool:
         """Return *True* if any axis differs by more than *min_change*."""
