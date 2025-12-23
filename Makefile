@@ -1,7 +1,8 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
 TOOLS = ruff isort docformatter mdformat mypy
-.PHONY: install pi_install format check test
+BUILD_ARGS ?=
+.PHONY: install pi_install format check test build
 
 install:
 	@uv sync --all-extras --group dev
@@ -23,6 +24,9 @@ check:
 
 test:
 	@uv run pytest
+
+build:
+	@uv build $(BUILD_ARGS)
 
 pi_install:
 	@sudo bash src/heart/manage/install_rgb_matrix.sh
