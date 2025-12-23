@@ -75,6 +75,9 @@ echo "uvx version: $(uvx --version)"
 
 if [[ -f "${UV_TOOL_LIST_FILE}" ]]; then
   mapfile -t required_uv_tools < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
+  if [[ ${#required_uv_tools[@]} -eq 0 ]]; then
+    echo "Warning: ${UV_TOOL_LIST_FILE} has no tool entries; skipping uv tool checks." >&2
+  fi
 else
   required_uv_tools=()
   echo "Warning: ${UV_TOOL_LIST_FILE} not found; skipping uv tool checks." >&2

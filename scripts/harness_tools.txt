@@ -1,3 +1,4 @@
+# uv tool installs for formatter/lint helpers used by Makefile targets.
 ruff
 isort
 docformatter

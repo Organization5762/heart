@@ -1,12 +1,17 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
-TOOLS := $(shell cat scripts/harness_tools.txt)
+TOOL_LIST_FILE = scripts/harness_tools.txt
+TOOLS := $(shell awk '/^[a-zA-Z0-9_-]+/ {print $$1}' $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
 .PHONY: install pi_install format check test build check-harness
 
 install:
 	@uv sync --all-extras --group dev
-	@for tool in $(TOOLS); do uv tool install $$tool; done
+	@if [ -s "$(TOOL_LIST_FILE)" ]; then \
+		for tool in $(TOOLS); do uv tool install $$tool; done; \
+	else \
+		echo "Warning: $(TOOL_LIST_FILE) is missing or empty; skipping uv tool installs." >&2; \
+	fi
 
 format:
 	@uvx isort $(PYTHON_SOURCES)
