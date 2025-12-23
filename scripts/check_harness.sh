@@ -7,6 +7,7 @@ OPTIONAL_CMDS=(spellcheck sshpass fswatch inotifywait flock)
 PYTHON_CANDIDATES=(python3 python)
 PYTHON_MIN_VERSION="3.11"
 UV_TOOL_LIST_FILE="${REPO_ROOT}/scripts/harness_tools.txt"
+LIST_TOOLS_SCRIPT="${REPO_ROOT}/scripts/list_harness_tools.sh"
 missing_required=()
 
 if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
@@ -74,13 +75,25 @@ echo "uv version: $(uv --version)"
 echo "uvx version: $(uvx --version)"
 
 if [[ -f "${UV_TOOL_LIST_FILE}" ]]; then
-  mapfile -t required_uv_tools < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
+  if [[ -x "${LIST_TOOLS_SCRIPT}" ]]; then
+    mapfile -t required_uv_tools < <("${LIST_TOOLS_SCRIPT}" "${UV_TOOL_LIST_FILE}")
+  else
+    mapfile -t required_uv_tools < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
+    echo "Warning: ${LIST_TOOLS_SCRIPT} is missing; falling back to basic parsing." >&2
+  fi
   if [[ ${#required_uv_tools[@]} -eq 0 ]]; then
     echo "Warning: ${UV_TOOL_LIST_FILE} has no tool entries; skipping uv tool checks." >&2
   fi
 else
   required_uv_tools=()
   echo "Warning: ${UV_TOOL_LIST_FILE} not found; skipping uv tool checks." >&2
+fi
+
+if [[ ${#required_uv_tools[@]} -gt 0 ]]; then
+  mapfile -t duplicate_uv_tools < <(printf '%s\n' "${required_uv_tools[@]}" | sort | uniq -d)
+  if [[ ${#duplicate_uv_tools[@]} -gt 0 ]]; then
+    echo "Warning: duplicate entries in ${UV_TOOL_LIST_FILE}: ${duplicate_uv_tools[*]}" >&2
+  fi
 fi
 
 if [[ ${#required_uv_tools[@]} -gt 0 ]]; then

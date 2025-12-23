@@ -1,7 +1,7 @@
 PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
-TOOLS := $(shell awk '/^[a-zA-Z0-9_-]+/ {print $$1}' $(TOOL_LIST_FILE))
+TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
 .PHONY: install pi_install format check test build check-harness
 
