@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from heart.peripheral.ir_sensor_array import (SPEED_OF_LIGHT, IRArrayDMAQueue,
                                               IRDMAPacket, IRSample,
@@ -51,6 +52,37 @@ class TestPeripheralIrSensorArray:
         """Verify that multilateration solver converges on known point. This keeps the system behaviour reliable for operators."""
         sensors = radial_layout(radius=0.2)
         solver = MultilaterationSolver(sensors)
+        emitter = np.array([0.05, 0.03, 0.02])
+
+        arrival_times = []
+        for sensor in sensors:
+            sensor_vec = np.array(sensor)
+            distance = np.linalg.norm(emitter - sensor_vec)
+            arrival_times.append(distance / SPEED_OF_LIGHT)
+
+        position, confidence, rmse = solver.solve(arrival_times)
+
+        assert np.allclose(position, emitter, atol=1e-3)
+        assert confidence > 0.99
+        assert rmse < 1e-10
+
+    @pytest.mark.parametrize(
+        ("solver_method", "use_jacobian"),
+        [("trf", True), ("lm", True), ("trf", False)],
+        ids=("trf-jacobian", "lm-jacobian", "trf-no-jacobian"),
+    )
+    def test_multilateration_solver_accepts_algorithm_configuration(
+        self,
+        solver_method: str,
+        use_jacobian: bool,
+    ) -> None:
+        """Verify solver configuration toggles algorithm options. This matters for tuning convergence speed across deployments."""
+        sensors = radial_layout(radius=0.2)
+        solver = MultilaterationSolver(
+            sensors,
+            solver_method=solver_method,
+            use_jacobian=use_jacobian,
+        )
         emitter = np.array([0.05, 0.03, 0.02])
 
         arrival_times = []

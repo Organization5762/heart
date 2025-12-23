@@ -198,6 +198,8 @@ class MultilaterationSolver:
         propagation_speed: float = SPEED_OF_LIGHT,
         max_iterations: int = 12,
         convergence_threshold: float = 1e-6,
+        solver_method: str = "trf",
+        use_jacobian: bool = True,
     ) -> None:
         self.sensor_positions = np.asarray(sensor_positions, dtype=float)
         if self.sensor_positions.ndim != 2 or self.sensor_positions.shape[1] != 3:
@@ -209,6 +211,8 @@ class MultilaterationSolver:
         self.propagation_speed = float(propagation_speed)
         self.max_iterations = max_iterations
         self.convergence_threshold = convergence_threshold
+        self.solver_method = solver_method
+        self.use_jacobian = use_jacobian
 
     # ------------------------------------------------------------------
     def solve(self, arrival_times: Sequence[float]) -> tuple[np.ndarray, float, float]:
@@ -227,27 +231,36 @@ class MultilaterationSolver:
         def objective(vector: np.ndarray) -> np.ndarray:
             candidate_point = vector[:3]
             candidate_emission = vector[3]
-            residuals = []
-            for sensor_pos, arrival in zip(
-                self.sensor_positions, times, strict=True
-            ):
-                distance = np.linalg.norm(candidate_point - sensor_pos)
-                residuals.append(
-                    distance
-                    - self.propagation_speed * (arrival - candidate_emission)
+            deltas = candidate_point - self.sensor_positions
+            distances = np.linalg.norm(deltas, axis=1)
+            return distances - self.propagation_speed * (times - candidate_emission)
+
+        def jacobian(vector: np.ndarray) -> np.ndarray:
+            candidate_point = vector[:3]
+            deltas = candidate_point - self.sensor_positions
+            distances = np.linalg.norm(deltas, axis=1)
+            jac = np.zeros((distances.shape[0], 4), dtype=float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                jac[:, :3] = np.divide(
+                    deltas,
+                    distances[:, None],
+                    out=np.zeros_like(deltas),
+                    where=distances[:, None] != 0.0,
                 )
-            return np.asarray(residuals)
+            jac[:, 3] = self.propagation_speed
+            return jac
 
         start = np.concatenate([point, [emission_time]])
-        result = least_squares(
-            objective,
-            start,
-            method="trf",
-            max_nfev=self.max_iterations * 100,
-            xtol=self.convergence_threshold,
-            ftol=self.convergence_threshold**2,
-            gtol=self.convergence_threshold,
-        )
+        least_squares_kwargs = {
+            "method": self.solver_method,
+            "max_nfev": self.max_iterations * 100,
+            "xtol": self.convergence_threshold,
+            "ftol": self.convergence_threshold**2,
+            "gtol": self.convergence_threshold,
+        }
+        if self.use_jacobian:
+            least_squares_kwargs["jac"] = jacobian
+        result = least_squares(objective, start, **least_squares_kwargs)
         if not result.success:
             raise ValueError(f"Solver failed to converge: {result.message}")
 
@@ -270,18 +283,25 @@ class IRSensorArray(Peripheral[Input]):
         *,
         sensor_positions: Sequence[Sequence[float]],
         propagation_speed: float = SPEED_OF_LIGHT,
+        solver_method: str = "trf",
+        use_jacobian: bool = True,
+        max_iterations: int = 12,
+        convergence_threshold: float = 1e-6,
     ) -> None:
         super().__init__()
         self._assembler = FrameAssembler(sensor_count=len(sensor_positions))
         self._solver = MultilaterationSolver(
-            sensor_positions, propagation_speed=propagation_speed
+            sensor_positions,
+            propagation_speed=propagation_speed,
+            solver_method=solver_method,
+            use_jacobian=use_jacobian,
+            max_iterations=max_iterations,
+            convergence_threshold=convergence_threshold,
         )
         self._calibration_offsets: dict[int, float] = {}
 
-
     def apply_calibration(self, offsets: Mapping[int, float]) -> None:
         self._calibration_offsets = dict(offsets)
-
 
     # ------------------------------------------------------------------
     def ingest_packet(self, packet: IRDMAPacket) -> None:
