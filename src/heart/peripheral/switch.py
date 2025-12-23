@@ -12,13 +12,13 @@ from reactivex import create
 from reactivex import operators as ops
 from reactivex.abc import ObserverBase, SchedulerBase
 from reactivex.disposable import Disposable
-from reactivex.scheduler import NewThreadScheduler
 
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.keyboard import KeyboardKey
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import background_scheduler
 
 logger = get_logger(__name__)
 
@@ -177,7 +177,7 @@ class Switch(BaseSwitch):
         source = create(self._read_from_switch)
         source.subscribe(
             on_next=self.update_due_to_data,
-            scheduler=NewThreadScheduler()
+            scheduler=background_scheduler(),
         )
 
 class BluetoothSwitch(BaseSwitch):

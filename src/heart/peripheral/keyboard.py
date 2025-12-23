@@ -7,10 +7,10 @@ from typing import Any, Iterator, Self, cast
 import pygame
 import reactivex
 from reactivex import operators as ops
-from reactivex.scheduler import NewThreadScheduler
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
+from heart.utilities.reactivex_threads import background_scheduler
 
 
 @dataclass
@@ -32,10 +32,13 @@ class KeyboardKey(Peripheral[KeyTimeline]):
 
         # Start running the key checker
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
-            check_for_input = reactivex.interval(timedelta(milliseconds=10))
+            scheduler = background_scheduler()
+            check_for_input = reactivex.interval(
+                timedelta(milliseconds=10), scheduler=scheduler
+            )
             check_for_input.subscribe(
                 on_next=lambda _: self._check_if_pressed(),
-                scheduler=NewThreadScheduler()
+                scheduler=scheduler,
             )
 
     @classmethod
