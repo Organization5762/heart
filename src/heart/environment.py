@@ -635,12 +635,8 @@ class GameLoop:
             renderers
         )
         render_image = self.__finalize_rendering(result) if result else None
-        if render_image is not None:
-            pixel_bytes = render_image.tobytes()
-            surface = pygame.image.frombytes(
-                pixel_bytes, render_image.size, RGBA_IMAGE_FORMAT
-            )
-            self.screen.blit(surface, (0, 0))
+        if result is not None:
+            self.screen.blit(result, (0, 0))
 
         if len(renderers) > 0:
             pygame.display.flip()
