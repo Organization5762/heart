@@ -10,6 +10,7 @@ from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -24,6 +25,9 @@ class BaseRenderer:
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
         self.warmup = True
+        self._surface_cache: dict[tuple[int, int], pygame.Surface] = {}
+        self._tiled_surface_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
+        self._tile_positions_cache: dict[tuple[int, int, int, int], list[tuple[int, int]]] = {}
 
     def is_initialized(self) -> bool:
         return self.initialized
@@ -60,8 +64,15 @@ class BaseRenderer:
             case DeviceDisplayMode.FULL | DeviceDisplayMode.OPENGL:
                 # The screen is the full size of the device
                 screen_size = (window_x, window_y)
-        screen = pygame.Surface(screen_size, pygame.SRCALPHA)
-        return screen
+        if Configuration.render_surface_cache_enabled():
+            cached = self._surface_cache.get(screen_size)
+            if cached is None:
+                cached = pygame.Surface(screen_size, pygame.SRCALPHA)
+                self._surface_cache[screen_size] = cached
+            else:
+                cached.fill((0, 0, 0, 0))
+            return cached
+        return pygame.Surface(screen_size, pygame.SRCALPHA)
 
     def _postprocess_input_screen(
         self, screen: pygame.Surface, orientation: Orientation
@@ -114,9 +125,30 @@ class BaseRenderer:
         self, screen: pygame.Surface, rows: int, cols: int
     ) -> pygame.Surface:
         tile_width, tile_height = screen.get_size()
-        tiled_surface = pygame.Surface(
-            (tile_width * cols, tile_height * rows), pygame.SRCALPHA
-        )
+        target_size = (tile_width * cols, tile_height * rows)
+        if Configuration.render_surface_cache_enabled():
+            cache_key = (tile_width, tile_height, rows, cols)
+            tiled_surface = self._tiled_surface_cache.get(cache_key)
+            if tiled_surface is None:
+                tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
+                self._tiled_surface_cache[cache_key] = tiled_surface
+            else:
+                tiled_surface.fill((0, 0, 0, 0))
+        else:
+            tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
+
+        if Configuration.render_tile_strategy() == "blits":
+            positions_key = (tile_width, tile_height, rows, cols)
+            positions = self._tile_positions_cache.get(positions_key)
+            if positions is None:
+                positions = [
+                    (col * tile_width, row * tile_height)
+                    for row in range(rows)
+                    for col in range(cols)
+                ]
+                self._tile_positions_cache[positions_key] = positions
+            tiled_surface.blits([(screen, pos) for pos in positions])
+            return tiled_surface
 
         for row in range(rows):
             for col in range(cols):
@@ -135,6 +167,9 @@ class AtomicBaseRenderer(Generic[StateT]):
         self.initialized = False
         self.warmup = True
         self._state: StateT | None = None
+        self._surface_cache: dict[tuple[int, int], pygame.Surface] = {}
+        self._tiled_surface_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
+        self._tile_positions_cache: dict[tuple[int, int, int, int], list[tuple[int, int]]] = {}
 
     def _create_initial_state(
         self,
@@ -290,16 +325,44 @@ class AtomicBaseRenderer(Generic[StateT]):
             case DeviceDisplayMode.FULL | DeviceDisplayMode.OPENGL:
                 # The screen is the full size of the device
                 screen_size = (window_x, window_y)
-        screen = pygame.Surface(screen_size, pygame.SRCALPHA)
-        return screen
+        if Configuration.render_surface_cache_enabled():
+            cached = self._surface_cache.get(screen_size)
+            if cached is None:
+                cached = pygame.Surface(screen_size, pygame.SRCALPHA)
+                self._surface_cache[screen_size] = cached
+            else:
+                cached.fill((0, 0, 0, 0))
+            return cached
+        return pygame.Surface(screen_size, pygame.SRCALPHA)
 
     def _tile_surface(
         self, screen: pygame.Surface, rows: int, cols: int
     ) -> pygame.Surface:
         tile_width, tile_height = screen.get_size()
-        tiled_surface = pygame.Surface(
-            (tile_width * cols, tile_height * rows), pygame.SRCALPHA
-        )
+        target_size = (tile_width * cols, tile_height * rows)
+        if Configuration.render_surface_cache_enabled():
+            cache_key = (tile_width, tile_height, rows, cols)
+            tiled_surface = self._tiled_surface_cache.get(cache_key)
+            if tiled_surface is None:
+                tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
+                self._tiled_surface_cache[cache_key] = tiled_surface
+            else:
+                tiled_surface.fill((0, 0, 0, 0))
+        else:
+            tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
+
+        if Configuration.render_tile_strategy() == "blits":
+            positions_key = (tile_width, tile_height, rows, cols)
+            positions = self._tile_positions_cache.get(positions_key)
+            if positions is None:
+                positions = [
+                    (col * tile_width, row * tile_height)
+                    for row in range(rows)
+                    for col in range(cols)
+                ]
+                self._tile_positions_cache[positions_key] = positions
+            tiled_surface.blits([(screen, pos) for pos in positions])
+            return tiled_surface
 
         for row in range(rows):
             for col in range(cols):
