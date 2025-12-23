@@ -56,6 +56,13 @@ Example with multiple hooks:
 `make build` runs `uv build`. Use `BUILD_ARGS` to pass extra arguments to the
 build command.
 
+## Harness check helper
+
+`scripts/check_harness.sh` verifies the core tooling expected by the sync and
+build harness. It confirms required commands like `uv` and `rsync` exist, reports
+optional helpers (for example `spellcheck`), and flags missing files such as
+`.syncignore`.
+
 ## Notes
 
 - Use `--skip-spellcheck` if the `spellcheck` tool is not installed.

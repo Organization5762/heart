@@ -2,7 +2,7 @@ PYTHON_SOURCES = src tests
 DOCS_SOURCES = docs
 TOOLS = ruff isort docformatter mdformat mypy
 BUILD_ARGS ?=
-.PHONY: install pi_install format check test build
+.PHONY: install pi_install format check test build check-harness
 
 install:
 	@uv sync --all-extras --group dev
@@ -27,6 +27,9 @@ test:
 
 build:
 	@uv build $(BUILD_ARGS)
+
+check-harness:
+	@bash scripts/check_harness.sh
 
 pi_install:
 	@sudo bash src/heart/manage/install_rgb_matrix.sh
