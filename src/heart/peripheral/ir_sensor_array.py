@@ -13,6 +13,7 @@ from types import ModuleType
 from typing import Any, Callable, Iterator, Mapping, Sequence, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger
@@ -215,10 +216,10 @@ class MultilaterationSolver:
         self.use_jacobian = use_jacobian
 
     # ------------------------------------------------------------------
-    def solve(self, arrival_times: Sequence[float]) -> tuple[np.ndarray, float, float]:
+    def solve(self, arrival_times: Sequence[float]) -> tuple[NDArray[np.float64], float, float]:
         """Return ``(position, confidence, rmse)`` for ``arrival_times``."""
 
-        times = np.asarray(arrival_times, dtype=float)
+        times: NDArray[np.float64] = np.asarray(arrival_times, dtype=float)
         if times.shape[0] != self.sensor_positions.shape[0]:
             msg = "arrival_times length must match number of sensors"
             raise ValueError(msg)
@@ -228,18 +229,21 @@ class MultilaterationSolver:
             point - self.sensor_positions[0]
         ) / self.propagation_speed
 
-        def objective(vector: np.ndarray) -> np.ndarray:
+        def objective(vector: NDArray[np.float64]) -> NDArray[np.float64]:
             candidate_point = vector[:3]
             candidate_emission = vector[3]
             deltas = candidate_point - self.sensor_positions
-            distances = np.linalg.norm(deltas, axis=1)
-            return distances - self.propagation_speed * (times - candidate_emission)
+            distances: NDArray[np.float64] = np.linalg.norm(deltas, axis=1)
+            return np.asarray(
+                distances - self.propagation_speed * (times - candidate_emission),
+                dtype=float,
+            )
 
-        def jacobian(vector: np.ndarray) -> np.ndarray:
+        def jacobian(vector: NDArray[np.float64]) -> NDArray[np.float64]:
             candidate_point = vector[:3]
             deltas = candidate_point - self.sensor_positions
-            distances = np.linalg.norm(deltas, axis=1)
-            jac = np.zeros((distances.shape[0], 4), dtype=float)
+            distances: NDArray[np.float64] = np.linalg.norm(deltas, axis=1)
+            jac: NDArray[np.float64] = np.zeros((distances.shape[0], 4), dtype=float)
             with np.errstate(divide="ignore", invalid="ignore"):
                 jac[:, :3] = np.divide(
                     deltas,
@@ -264,9 +268,9 @@ class MultilaterationSolver:
         if not result.success:
             raise ValueError(f"Solver failed to converge: {result.message}")
 
-        point = result.x[:3]
+        point: NDArray[np.float64] = np.asarray(result.x[:3], dtype=float)
         emission_time = result.x[3]
-        final_residuals = objective(result.x)
+        final_residuals = objective(np.asarray(result.x, dtype=float))
 
         rmse = float(math.sqrt(np.mean(np.square(final_residuals))))
         confidence = float(1.0 / (1.0 + rmse * self.propagation_speed))
