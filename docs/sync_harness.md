@@ -53,8 +53,17 @@ Example with multiple hooks:
   --post-sync "make test" --post-sync "scripts/check_harness.sh" --once
 ```
 
-`make build` runs `uv build`. Use `BUILD_ARGS` to pass extra arguments to the
-build command.
+`make build` runs `uv build` through `scripts/build_package.sh`. The wrapper
+skips repeated builds when the packaging inputs are unchanged, writing a stamp
+under `build/.package_stamp`.
+
+Build helpers:
+
+- `BUILD_ARGS` passes extra arguments to `uv build`.
+- `BUILD_FORCE=true` forces a build even if the inputs are unchanged.
+- `BUILD_STAMP_PATH` overrides the build stamp location.
+- `BUILD_INPUTS` overrides the default inputs (`src`, `pyproject.toml`,
+  `README.md`, `uv.lock`) as a space-delimited list.
 
 ## Harness check helper
 
