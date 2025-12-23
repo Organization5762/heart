@@ -175,6 +175,7 @@ dev = [
   {include-group = "test"}
 ]
 test = [
+    "hypothesis>=6.120.0",
     "pytest>=8.4.2",
     "pytest-benchmark>=5.2.0",
     "pytest-xdist>=3.8.0",
