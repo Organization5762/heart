@@ -6,6 +6,9 @@ DEFAULT_REMOTE_DIR="~/Desktop/"
 DEFAULT_REMOTE_PASS="totemlib2024"
 
 SCRIPT_NAME=$(basename "$0")
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+source "${SCRIPT_DIR}/scripts/harness_utils.sh"
 
 print_usage() {
   cat <<USAGE
@@ -27,6 +30,7 @@ Options:
       --skip-noop          Skip hooks and rsync when a dry-run finds no changes
       --dry-run            Show what would be transferred without making changes
       --skip-spellcheck    Skip running spellcheck before synchronising
+      --print-config       Print the resolved configuration and exit
   -h, --help               Show this help message and exit
 
 Environment variables:
@@ -38,10 +42,6 @@ Environment variables:
 A .syncignore file inside the source directory will be used automatically
 if present and no --ignore-from option is supplied.
 USAGE
-}
-
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
 }
 
 SOURCE_DIR=${SYNC_SOURCE_DIR:-$(pwd)}
@@ -59,6 +59,7 @@ declare -a POST_SYNC_CMDS=()
 declare -a EXTRA_RSYNC_ARGS=()
 SPELLCHECK_ENABLED=true
 RUN_ONCE=false
+PRINT_CONFIG=false
 
 declare -a IGNORE_PATTERNS
 
@@ -128,6 +129,10 @@ while [[ $# -gt 0 ]]; do
       SPELLCHECK_ENABLED=false
       shift
       ;;
+    --print-config)
+      PRINT_CONFIG=true
+      shift
+      ;;
     -h|--help)
       print_usage
       exit 0
@@ -156,16 +161,16 @@ if [[ -z "$IGNORE_FILE" && -f "$SOURCE_DIR/.syncignore" ]]; then
   IGNORE_FILE="$SOURCE_DIR/.syncignore"
 fi
 
-if ! command_exists rsync; then
+if ! harness_command_exists rsync; then
   echo "Error: rsync is required but was not found in PATH" >&2
   exit 1
 fi
 
 case "$WATCH_MODE" in
   auto)
-    if command_exists fswatch; then
+    if harness_command_exists fswatch; then
       WATCH_MODE=fswatch
-    elif command_exists inotifywait; then
+    elif harness_command_exists inotifywait; then
       WATCH_MODE=inotifywait
     else
       WATCH_MODE=poll
@@ -179,12 +184,12 @@ case "$WATCH_MODE" in
     ;;
   esac
 
-if [[ "$WATCH_MODE" == "inotifywait" ]] && ! command_exists inotifywait; then
+if [[ "$WATCH_MODE" == "inotifywait" ]] && ! harness_command_exists inotifywait; then
   echo "Error: inotifywait is not available" >&2
   exit 1
 fi
 
-if [[ "$WATCH_MODE" == "fswatch" ]] && ! command_exists fswatch; then
+if [[ "$WATCH_MODE" == "fswatch" ]] && ! harness_command_exists fswatch; then
   echo "Error: fswatch is not available" >&2
   exit 1
 fi
@@ -197,7 +202,7 @@ fi
 RSYNC_FLAGS=(-az --delete)
 declare -a RSYNC_PREFIX=()
 if [[ -n "$REMOTE_PASS" ]]; then
-  if command_exists sshpass; then
+  if harness_command_exists sshpass; then
     RSYNC_PREFIX=(sshpass -p "$REMOTE_PASS")
   else
     echo "Warning: REMOTE_PASS is set but sshpass is not available; continuing without password helper." >&2
@@ -271,7 +276,7 @@ sync_has_changes() {
 }
 
 with_lock() {
-  if command_exists flock; then
+  if harness_command_exists flock; then
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
       echo "Another sync is already running; skipping this run." >&2
@@ -300,7 +305,7 @@ run_spellcheck() {
     return
   fi
 
-  if ! command_exists spellcheck; then
+  if ! harness_command_exists spellcheck; then
     echo "spellcheck command not found; skipping spellcheck" >&2
     SPELLCHECK_ENABLED=false
     return
@@ -342,6 +347,35 @@ run_hooks() {
   done
 }
 
+print_config() {
+  echo "Source directory: $SOURCE_DIR"
+  echo "Destination: $DESTINATION"
+  echo "Watcher: $WATCH_MODE"
+  echo "Dry run: $DRY_RUN"
+  echo "Skip noop: $SKIP_NOOP"
+  echo "Spellcheck enabled: $SPELLCHECK_ENABLED"
+  echo "Poll interval: $POLL_INTERVAL"
+  if [[ -n "$IGNORE_FILE" ]]; then
+    echo "Using ignore file: $IGNORE_FILE"
+  fi
+  if [[ ${#IGNORE_PATTERNS[@]} -gt 0 ]]; then
+    printf 'Ignore patterns: %s\n' "${IGNORE_PATTERNS[*]}"
+  fi
+  if [[ ${#EXTRA_RSYNC_ARGS[@]} -gt 0 ]]; then
+    printf 'Extra rsync args: %s\n' "${EXTRA_RSYNC_ARGS[*]}"
+  fi
+  if [[ ${#PRE_SYNC_CMDS[@]} -gt 0 ]]; then
+    for hook_cmd in "${PRE_SYNC_CMDS[@]}"; do
+      echo "Pre-sync hook: $hook_cmd"
+    done
+  fi
+  if [[ ${#POST_SYNC_CMDS[@]} -gt 0 ]]; then
+    for hook_cmd in "${POST_SYNC_CMDS[@]}"; do
+      echo "Post-sync hook: $hook_cmd"
+    done
+  fi
+}
+
 perform_watch() {
   case "$WATCH_MODE" in
     fswatch)
@@ -363,21 +397,10 @@ perform_watch() {
   esac
 }
 
-echo "Source directory: $SOURCE_DIR"
-echo "Destination: $DESTINATION"
-echo "Watcher: $WATCH_MODE"
-if [[ -n "$IGNORE_FILE" ]]; then
-  echo "Using ignore file: $IGNORE_FILE"
-fi
-if [[ ${#PRE_SYNC_CMDS[@]} -gt 0 ]]; then
-  for hook_cmd in "${PRE_SYNC_CMDS[@]}"; do
-    echo "Pre-sync hook: $hook_cmd"
-  done
-fi
-if [[ ${#POST_SYNC_CMDS[@]} -gt 0 ]]; then
-  for hook_cmd in "${POST_SYNC_CMDS[@]}"; do
-    echo "Post-sync hook: $hook_cmd"
-  done
+print_config
+
+if [[ "$PRINT_CONFIG" == true ]]; then
+  exit 0
 fi
 
 sync_changes

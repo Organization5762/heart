@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
 REQUIRED_CMDS=(uv rsync)
-OPTIONAL_CMDS=(spellcheck sshpass fswatch inotifywait)
+OPTIONAL_CMDS=(spellcheck sshpass fswatch inotifywait make)
 missing_required=()
 
-if [[ ! -f "${REPO_ROOT}/pyproject.toml" ]]; then
-  echo "Error: expected to find pyproject.toml in ${REPO_ROOT}" >&2
-  exit 1
-fi
+source "${SCRIPT_DIR}/harness_utils.sh"
 
-if [[ ! -f "${REPO_ROOT}/sync.sh" ]]; then
-  echo "Error: expected to find sync.sh in ${REPO_ROOT}" >&2
-  exit 1
-fi
+harness_require_file "${REPO_ROOT}/pyproject.toml"
+harness_require_file "${REPO_ROOT}/sync.sh"
+harness_require_file "${REPO_ROOT}/Makefile"
 
 echo "Checking harness prerequisites in ${REPO_ROOT}"
 
-for cmd in "${REQUIRED_CMDS[@]}"; do
-  if ! command -v "${cmd}" >/dev/null 2>&1; then
-    missing_required+=("${cmd}")
-  fi
-done
+harness_collect_missing_commands missing_required "${REQUIRED_CMDS[@]}"
 
 if [[ ${#missing_required[@]} -gt 0 ]]; then
   echo "Missing required tools: ${missing_required[*]}" >&2
@@ -30,18 +23,11 @@ if [[ ${#missing_required[@]} -gt 0 ]]; then
 fi
 
 echo "Required tools available: ${REQUIRED_CMDS[*]}"
-
-for cmd in "${OPTIONAL_CMDS[@]}"; do
-  if command -v "${cmd}" >/dev/null 2>&1; then
-    echo "Optional tool available: ${cmd}"
-  else
-    echo "Optional tool missing: ${cmd}"
-  fi
-done
+harness_report_tool_versions "${REQUIRED_CMDS[@]}"
+harness_report_optional_commands "${OPTIONAL_CMDS[@]}"
 
 if [[ -f "${REPO_ROOT}/.syncignore" ]]; then
   echo "Found .syncignore at ${REPO_ROOT}/.syncignore"
 else
   echo "No .syncignore file found in ${REPO_ROOT}"
 fi
-
