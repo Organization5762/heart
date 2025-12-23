@@ -35,8 +35,7 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
 
         base_image = self._load_base_image()
 
-        def scale_to_window(size: tuple[int, int]) -> RenderImageState:
-            scaled = pygame.transform.scale(base_image, size)
-            return RenderImageState(image=scaled)
+        def build_state(size: tuple[int, int]) -> RenderImageState:
+            return RenderImageState(base_image=base_image, window_size=size)
 
-        return window_stream.pipe(ops.map(scale_to_window), ops.share())
+        return window_stream.pipe(ops.map(build_state), ops.share())

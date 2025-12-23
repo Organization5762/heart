@@ -13,6 +13,8 @@ class RenderImage(StatefulBaseRenderer[RenderImageState]):
 
     def __init__(self, image_file: str) -> None:
         super().__init__(builder=RenderImageStateProvider(image_file=image_file))
+        self._scaled_image: pygame.Surface | None = None
+        self._scaled_size: tuple[int, int] | None = None
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -25,4 +27,9 @@ class RenderImage(StatefulBaseRenderer[RenderImageState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        window.blit(self.state.image, (0, 0))
+        if self._scaled_image is None or self._scaled_size != self.state.window_size:
+            self._scaled_image = pygame.transform.scale(
+                self.state.base_image, self.state.window_size
+            )
+            self._scaled_size = self.state.window_size
+        window.blit(self._scaled_image, (0, 0))
