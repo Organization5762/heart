@@ -163,6 +163,19 @@ class Configuration:
     def render_executor_max_workers(cls) -> int | None:
         return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
 
+    @classmethod
+    def render_surface_cache_enabled(cls) -> bool:
+        return _env_flag("HEART_RENDER_SURFACE_CACHE", default=True)
+
+    @classmethod
+    def render_tile_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_RENDER_TILE_STRATEGY", "blits").strip().lower()
+        if strategy in {"blits", "loop"}:
+            return strategy
+        raise ValueError(
+            "HEART_RENDER_TILE_STRATEGY must be 'blits' or 'loop'"
+        )
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
