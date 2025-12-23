@@ -8,6 +8,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.heart_title_screen.state import HeartTitleScreenState
 
+DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
+
 
 class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
@@ -25,7 +27,14 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
             state: HeartTitleScreenState, clock: Clock
         ) -> HeartTitleScreenState:
             frame_ms = max(clock.get_time(), 0)
-            return state.advance(frame_ms)
+            elapsed_ms = state.elapsed_ms + frame_ms
+            heart_up = state.heart_up
+
+            if elapsed_ms > DEFAULT_TIME_BETWEEN_FRAMES_MS:
+                elapsed_ms = 0.0
+                heart_up = not heart_up
+
+            return HeartTitleScreenState(heart_up=heart_up, elapsed_ms=elapsed_ms)
 
         return (
             self._peripheral_manager.game_tick.pipe(

@@ -29,7 +29,7 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
             ops.share(),
         )
 
-        initial_state = CombinedBpmScreenState.initial()
+        initial_state = CombinedBpmScreenState()
 
         def advance_state(
             state: CombinedBpmScreenState, clock: Clock

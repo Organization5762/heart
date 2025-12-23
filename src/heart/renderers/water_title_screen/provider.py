@@ -20,11 +20,13 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
             ops.share(),
         )
 
-        initial_state = WaterTitleScreenState.initial()
+        initial_state = WaterTitleScreenState()
 
         def advance_state(state: WaterTitleScreenState, clock: Clock) -> WaterTitleScreenState:
             dt_seconds = max(clock.get_time() / 1000.0, 1.0 / 120.0)
-            return state.advance(self._wave_speed, dt_seconds)
+            return WaterTitleScreenState(
+                wave_offset=state.wave_offset + self._wave_speed * dt_seconds * 60.0
+            )
 
         return (
             self._peripheral_manager.game_tick.pipe(
