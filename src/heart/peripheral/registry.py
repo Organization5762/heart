@@ -9,9 +9,6 @@ from typing import Callable
 
 from heart.peripheral.configuration import PeripheralConfiguration
 
-if False:  # pragma: no cover - for type checkers only
-    pass
-
 ConfigurationFactory = Callable[[], PeripheralConfiguration]
 
 
