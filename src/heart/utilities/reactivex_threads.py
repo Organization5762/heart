@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+from typing import Any, cast
 
 from reactivex.scheduler import ThreadPoolScheduler
 
@@ -26,11 +27,13 @@ def background_scheduler(max_workers: int | None = None) -> ThreadPoolScheduler:
                     if max_workers is not None
                     else Configuration.reactivex_background_max_workers()
                 )
-                _EXECUTOR = ThreadPoolExecutor(
+                executor = ThreadPoolExecutor(
                     max_workers=resolved_workers,
                     thread_name_prefix="heart-rx",
                 )
-                _SCHEDULER = ThreadPoolScheduler(_EXECUTOR)
+                _EXECUTOR = executor
+                _SCHEDULER = ThreadPoolScheduler(cast(Any, executor))
+    assert _SCHEDULER is not None
     return _SCHEDULER
 
 
@@ -45,9 +48,11 @@ def input_scheduler(max_workers: int | None = None) -> ThreadPoolScheduler:
                     if max_workers is not None
                     else Configuration.reactivex_input_max_workers()
                 )
-                _INPUT_EXECUTOR = ThreadPoolExecutor(
+                executor = ThreadPoolExecutor(
                     max_workers=resolved_workers,
                     thread_name_prefix="heart-rx-input",
                 )
-                _INPUT_SCHEDULER = ThreadPoolScheduler(_INPUT_EXECUTOR)
+                _INPUT_EXECUTOR = executor
+                _INPUT_SCHEDULER = ThreadPoolScheduler(cast(Any, executor))
+    assert _INPUT_SCHEDULER is not None
     return _INPUT_SCHEDULER
