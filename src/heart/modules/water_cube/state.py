@@ -1,4 +1,3 @@
-import math
 from dataclasses import dataclass
 from typing import Self, Tuple
 
@@ -25,13 +24,6 @@ _centre = (GRID - 1) / 2.0
 X_COORDS, Y_COORDS = np.meshgrid(np.arange(GRID), np.arange(GRID), indexing="ij")
 DX = X_COORDS - _centre
 DY = Y_COORDS - _centre
-
-
-def _norm(v: tuple[float, float, float]) -> tuple[float, float, float]:
-    length = math.hypot(v[0], v[1]) + abs(v[2])
-    if length == 0:
-        return (0.0, 0.0, 0.0)
-    return (v[0] / length, v[1] / length, v[2] / length)
 
 
 def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
