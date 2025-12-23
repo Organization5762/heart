@@ -12,9 +12,6 @@ from typing import Any, Self
 
 from heart.peripheral.core import Peripheral
 
-# Target iPhone information
-TARGET_DEVICE_NAME = "SEBASTIEN's iPhone"
-
 adapter: ModuleType | None
 bz_peripheral: ModuleType | None
 
@@ -44,7 +41,6 @@ class PhoneText(Peripheral[str]):
         self._last_text: str | None = None  # full text as received
         self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
-        self._producer_id = id(self)
 
     # ---------------------------------------------------------------------
     # Peripheral API
