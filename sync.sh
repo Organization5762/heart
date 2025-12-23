@@ -123,6 +123,9 @@ fi
 
 SOURCE_DIR=$(cd "$SOURCE_DIR" && pwd)
 
+LOCK_ID=$(printf '%s' "${SOURCE_DIR}|${DESTINATION}" | cksum | awk '{print $1}')
+LOCK_FILE="${TMPDIR:-/tmp}/heart-sync-${LOCK_ID}.lock"
+
 if [[ -z "$IGNORE_FILE" && -f "$SOURCE_DIR/.syncignore" ]]; then
   IGNORE_FILE="$SOURCE_DIR/.syncignore"
 fi
@@ -187,6 +190,10 @@ if [[ -n "$IGNORE_FILE" ]]; then
 fi
 
 sync_changes() {
+  with_lock _sync_once
+}
+
+_sync_once() {
   local timestamp
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[$timestamp] Syncing $SOURCE_DIR -> $DESTINATION"
@@ -195,6 +202,29 @@ sync_changes() {
   run_rsync
   run_hook "post-sync" "$POST_SYNC_CMD"
   echo "[$timestamp] Sync complete"
+}
+
+with_lock() {
+  if command_exists flock; then
+    exec 9>"$LOCK_FILE"
+    if ! flock -n 9; then
+      echo "Another sync is already running; skipping this run." >&2
+      return 0
+    fi
+    "$@"
+    return 0
+  fi
+
+  local lock_dir="${LOCK_FILE}.d"
+  if ! mkdir "$lock_dir" 2>/dev/null; then
+    echo "Another sync is already running; skipping this run." >&2
+    return 0
+  fi
+
+  trap 'rmdir "$lock_dir"' EXIT
+  "$@"
+  rmdir "$lock_dir"
+  trap - EXIT
 }
 
 run_spellcheck() {

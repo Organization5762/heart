@@ -11,6 +11,7 @@ host while optionally running build or harness steps before and after each sync.
   - `inotifywait` (Linux via `inotify-tools`).
 - Optional `spellcheck` command available on `PATH`.
 - Optional `sshpass` when using `REMOTE_PASS` for password-based SSH.
+- Optional `flock` (or a filesystem that supports directory locks) to prevent overlapping sync runs.
 
 ## Quick start
 
@@ -49,3 +50,5 @@ export SYNC_POST_SYNC_CMD="make test"
 - Use `--skip-spellcheck` if the `spellcheck` tool is not installed.
 - Use `--dry-run` to preview changes before syncing.
 - If a hook fails, the script exits with the hook's non-zero status.
+- Overlapping sync triggers are de-duplicated; a running sync holds a lock so the next
+  event logs a skip instead of running concurrently.
