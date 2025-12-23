@@ -34,8 +34,8 @@ script. Hooks run from the source directory.
 
 | Option | Environment variable | Purpose |
 | --- | --- | --- |
-| `--pre-sync CMD` | `SYNC_PRE_SYNC_CMD` | Run a command before each sync. |
-| `--post-sync CMD` | `SYNC_POST_SYNC_CMD` | Run a command after each sync. |
+| `--pre-sync CMD` | `SYNC_PRE_SYNC_CMD` | Run a command before each sync. Repeat the option to run multiple commands. |
+| `--post-sync CMD` | `SYNC_POST_SYNC_CMD` | Run a command after each sync. Repeat the option to run multiple commands. |
 
 Example with environment variables:
 
@@ -43,6 +43,13 @@ Example with environment variables:
 export SYNC_PRE_SYNC_CMD="make format"
 export SYNC_POST_SYNC_CMD="make test"
 ./sync.sh --once
+```
+
+Example with multiple hooks:
+
+```bash
+./sync.sh --pre-sync "make format" --pre-sync "make build" \
+  --post-sync "make test" --post-sync "scripts/check_harness.sh" --once
 ```
 
 ## Notes
