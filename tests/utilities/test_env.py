@@ -132,6 +132,36 @@ class TestUtilitiesEnv:
         assert Configuration.is_debug_mode() is False
 
 
+    def test_render_variant_defaults_iterative(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that render variant defaults to iterative. This keeps render behaviour stable without explicit configuration."""
+        _clear_env(monkeypatch, "HEART_RENDER_VARIANT")
+
+        assert Configuration.render_variant() == "iterative"
+
+
+    def test_render_parallel_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that render parallel threshold reads the environment value. This keeps tuning deterministic across deployments."""
+        monkeypatch.setenv("HEART_RENDER_PARALLEL_THRESHOLD", "6")
+
+        assert Configuration.render_parallel_threshold() == 6
+
+
+    def test_render_executor_max_workers_returns_none_when_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify that render executor max workers returns None when unset. This preserves default executor sizing."""
+        _clear_env(monkeypatch, "HEART_RENDER_MAX_WORKERS")
+
+        assert Configuration.render_executor_max_workers() is None
+
+
+    def test_render_executor_max_workers_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that render executor max workers reads the environment value. This keeps parallelism caps configurable."""
+        monkeypatch.setenv("HEART_RENDER_MAX_WORKERS", "3")
+
+        assert Configuration.render_executor_max_workers() == 3
+
+
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
         fake_entries = ["ttyHeart-123", "other"]
