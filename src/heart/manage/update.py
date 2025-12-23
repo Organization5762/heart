@@ -132,8 +132,25 @@ def copy_file(source: str, destination: str) -> None:
         print(f"Error: Failed to copy {source} to {destination}: {error}")
 
 
-def _parse_csv(value: str) -> list[str]:
-    return [entry.strip() for entry in value.split(",") if entry.strip()]
+def _parse_csv(value: str | list[str], *, field_name: str) -> list[str]:
+    if isinstance(value, list):
+        entries = [str(entry).strip() for entry in value]
+    elif isinstance(value, str):
+        entries = [entry.strip() for entry in value.split(",")]
+    else:
+        raise ValueError(
+            f"Expected {field_name} to be a list or comma-delimited string, got {type(value)!r}"
+        )
+
+    return [entry for entry in entries if entry]
+
+
+def _require_string(value: object, *, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            f"Expected {field_name} to be a non-empty string, got {value!r}"
+        )
+    return value
 
 
 def _load_driver_config(settings_path: str) -> DriverConfig:
@@ -158,12 +175,34 @@ def _load_driver_config(settings_path: str) -> DriverConfig:
         print(f"Error: Missing keys in {settings_path}: {', '.join(missing)}")
         sys.exit(1)
 
+    try:
+        driver_libs = _parse_csv(
+            config["CIRCUIT_PY_DRIVER_LIBS"],
+            field_name="CIRCUIT_PY_DRIVER_LIBS",
+        )
+        valid_board_ids = _parse_csv(
+            config["VALID_BOARD_IDS"],
+            field_name="VALID_BOARD_IDS",
+        )
+        uf2_url = _require_string(
+            config["CIRCUIT_PY_UF2_URL"], field_name="CIRCUIT_PY_UF2_URL"
+        )
+        uf2_checksum = _require_string(
+            config["CIRCUIT_PY_UF2_CHECKSUM"], field_name="CIRCUIT_PY_UF2_CHECKSUM"
+        )
+        device_boot_name = _require_string(
+            config["CIRCUIT_PY_BOOT_NAME"], field_name="CIRCUIT_PY_BOOT_NAME"
+        )
+    except ValueError as error:
+        print(f"Error: Invalid driver settings in {settings_path}: {error}")
+        sys.exit(1)
+
     return DriverConfig(
-        uf2_url=config["CIRCUIT_PY_UF2_URL"],
-        uf2_checksum=config["CIRCUIT_PY_UF2_CHECKSUM"],
-        driver_libs=_parse_csv(config["CIRCUIT_PY_DRIVER_LIBS"]),
-        device_boot_name=config["CIRCUIT_PY_BOOT_NAME"],
-        valid_board_ids=_parse_csv(config["VALID_BOARD_IDS"]),
+        uf2_url=uf2_url,
+        uf2_checksum=uf2_checksum,
+        driver_libs=driver_libs,
+        device_boot_name=device_boot_name,
+        valid_board_ids=valid_board_ids,
     )
 
 
@@ -186,6 +225,20 @@ def _ensure_driver_files(driver_path: str) -> None:
         sys.exit(1)
 
 
+def _mount_points(media_directory: str) -> list[str]:
+    if not os.path.isdir(media_directory):
+        print(
+            f"Error: Expected media directory {media_directory} to exist before updates."
+        )
+        sys.exit(1)
+
+    return [
+        os.path.join(media_directory, entry)
+        for entry in os.listdir(media_directory)
+        if os.path.isdir(os.path.join(media_directory, entry))
+    ]
+
+
 def main(device_driver_name: str) -> None:
     base_path = str(Path(heart.__file__).resolve().parents[2] / "drivers")
     code_path = os.path.join(base_path, device_driver_name)
@@ -200,6 +253,7 @@ def main(device_driver_name: str) -> None:
     ###
     config = _load_driver_config(os.path.join(code_path, DRIVER_SETTINGS_FILENAME))
     _ensure_driver_files(code_path)
+    mount_points = _mount_points(MEDIA_DIRECTORY)
 
     ###
     # If the device is not a CIRCUIT_PY device yet, load the UF2 so that it is converted
@@ -217,38 +271,44 @@ def main(device_driver_name: str) -> None:
     ###
     # For all the CIRCUITPY devices, try to find whether this specific driver should be loaded onto them
     ###
-    for mount_point in os.listdir(MEDIA_DIRECTORY):
-        if "CIRCUITPY" in mount_point:
-            media_location = os.path.join(MEDIA_DIRECTORY, mount_point)
-            boot_out_path = os.path.join(media_location, "boot_out.txt")
+    circuitpy_mounts = [
+        mount_point
+        for mount_point in mount_points
+        if "CIRCUITPY" in os.path.basename(mount_point)
+    ]
+    if not circuitpy_mounts:
+        print(f"No CIRCUITPY volumes found under {MEDIA_DIRECTORY}.")
 
-            if os.path.exists(boot_out_path):
-                try:
-                    board_id = _parse_board_id(boot_out_path)
-                except ValueError as error:
-                    print(f"Error: {error}")
-                    continue
+    for media_location in circuitpy_mounts:
+        boot_out_path = os.path.join(media_location, "boot_out.txt")
 
-                if board_id not in config.valid_board_ids:
-                    print(
-                        "Skipping: The board ID "
-                        f"{board_id} is not in the list of valid board IDs: "
-                        f"{config.valid_board_ids}"
-                    )
-                    continue
+        if os.path.exists(boot_out_path):
+            try:
+                board_id = _parse_board_id(boot_out_path)
+            except ValueError as error:
+                print(f"Error: {error}")
+                continue
 
-                for file_name in DRIVER_FILES:
-                    copy_file(
-                        os.path.join(code_path, file_name),
-                        os.path.join(media_location, file_name),
-                    )
-
-                load_driver_libs(
-                    libs=config.driver_libs,
-                    destination=os.path.join(os.path.join(media_location, "lib")),
+            if board_id not in config.valid_board_ids:
+                print(
+                    "Skipping: The board ID "
+                    f"{board_id} is not in the list of valid board IDs: "
+                    f"{config.valid_board_ids}"
                 )
-            else:
-                print(f"{boot_out_path} is missing, skipping...")
+                continue
+
+            for file_name in DRIVER_FILES:
+                copy_file(
+                    os.path.join(code_path, file_name),
+                    os.path.join(media_location, file_name),
+                )
+
+            load_driver_libs(
+                libs=config.driver_libs,
+                destination=os.path.join(os.path.join(media_location, "lib")),
+            )
+        else:
+            print(f"{boot_out_path} is missing, skipping...")
 
 
 if __name__ == "__main__":
