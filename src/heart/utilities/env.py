@@ -136,6 +136,18 @@ class Configuration:
     def hsv_calibration_enabled(cls) -> bool:
         return _env_flag("HEART_HSV_CALIBRATION", default=True)
 
+    @classmethod
+    def hsv_calibration_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_HSV_CALIBRATION_STRATEGY", "vectorized")
+        normalized = strategy.strip().lower()
+        valid_strategies = {"legacy", "vectorized"}
+        if normalized not in valid_strategies:
+            valid_values = ", ".join(sorted(valid_strategies))
+            raise ValueError(
+                f"HEART_HSV_CALIBRATION_STRATEGY must be one of {valid_values}"
+            )
+        return normalized
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
