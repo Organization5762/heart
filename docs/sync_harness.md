@@ -53,6 +53,9 @@ Example with multiple hooks:
   --post-sync "make test" --post-sync "scripts/check_harness.sh" --once
 ```
 
+`make build` runs `uv build`. Use `BUILD_ARGS` to pass extra arguments to the
+build command.
+
 ## Notes
 
 - Use `--skip-spellcheck` if the `spellcheck` tool is not installed.
