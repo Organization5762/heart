@@ -18,7 +18,7 @@ from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.keyboard import KeyboardKey
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import background_scheduler
+from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 
@@ -49,7 +49,10 @@ class BaseSwitch(Peripheral[SwitchState]):
     def _event_stream(
         self
     ) -> reactivex.Observable[SwitchState]:
-        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+        return reactivex.interval(
+            timedelta(milliseconds=10),
+            scheduler=input_scheduler(),
+        ).pipe(
             ops.map(lambda _: self._snapshot()),
             ops.distinct_until_changed(lambda x: x)
         )
@@ -128,7 +131,10 @@ class FakeSwitch(BaseSwitch):
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             return reactivex.empty()
         else:
-            return reactivex.interval(timedelta(milliseconds=10)).pipe(
+            return reactivex.interval(
+                timedelta(milliseconds=10),
+                scheduler=input_scheduler(),
+            ).pipe(
                 ops.map(lambda _: self._snapshot()),
                 ops.distinct_until_changed(lambda x: x)
             )
@@ -177,7 +183,7 @@ class Switch(BaseSwitch):
         source = create(self._read_from_switch)
         source.subscribe(
             on_next=self.update_due_to_data,
-            scheduler=background_scheduler(),
+            scheduler=input_scheduler(),
         )
 
 class BluetoothSwitch(BaseSwitch):

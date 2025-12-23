@@ -14,7 +14,7 @@ from reactivex import operators as ops
 from heart.peripheral.core import Peripheral, events
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import background_scheduler
+from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 
@@ -246,7 +246,7 @@ class Gamepad(Peripheral[Any]):
         time.sleep(1.5)
 
         # check every 1 second for controller state, so that we can attempt to connect
-        scheduler = background_scheduler()
+        scheduler = input_scheduler()
         reactivex.interval(timedelta(seconds=1), scheduler=scheduler).subscribe(
             on_next=self._read_from_gamepad,
             scheduler=scheduler,
