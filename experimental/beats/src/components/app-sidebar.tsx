@@ -1,4 +1,4 @@
-import { ChevronRight, Home, Monitor, Mouse, Tv } from "lucide-react";
+import { ChevronRight, Home, Monitor, Mouse, Rocket, Tv } from "lucide-react";
 
 import {
   Sidebar,
@@ -22,6 +22,11 @@ const items = {
             title: "Home",
             url: "/",
             icon: Home,
+        },
+        {
+            title: "Mission Control",
+            url: "/mission-control",
+            icon: Rocket,
         },
         {
             title: "Current Stream",
