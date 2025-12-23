@@ -25,8 +25,9 @@ before touching the ordered dictionary.
   values for a frame and provide a stable mapping back to the flattened array.
 - Last-occurrence positions are tracked with `np.maximum.at` so that the cache
   can still be ordered by most recent use, matching the previous behaviour.
-- Cache application now fills the flattened result array for each cached HSV
-  tuple instead of writing per pixel.
+- Cache application now builds an index map from the unique HSV values to cached
+  entries, letting NumPy assign all cached pixels in a single masked write
+  instead of repeating `inverse == idx` comparisons for every cached tuple.
 
 ## Materials
 

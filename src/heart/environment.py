@@ -249,13 +249,25 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
         last_positions = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
         np.maximum.at(last_positions, inverse, positions)
         used_keys: list[tuple[tuple[int, int, int], int]] = []
+        cached_indices: list[int] = []
+        cached_values: list[np.ndarray] = []
         for idx, unique_value in enumerate(unique_hsv):
             key = (int(unique_value[0]), int(unique_value[1]), int(unique_value[2]))
             cached = HSV_TO_BGR_CACHE.get(key)
             if cached is None:
                 continue
-            flat_result[inverse == idx] = cached
+            cached_indices.append(idx)
+            cached_values.append(cached)
             used_keys.append((key, int(last_positions[idx])))
+        if cached_indices:
+            index_map = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
+            cached_indices_array = np.array(cached_indices, dtype=np.int64)
+            index_map[cached_indices_array] = np.arange(len(cached_indices))
+            cached_values_array = np.stack(cached_values, axis=0)
+            cached_map = index_map[inverse]
+            mask = cached_map != -1
+            if np.any(mask):
+                flat_result[mask] = cached_values_array[cached_map[mask]]
         for key, _ in sorted(used_keys, key=lambda item: item[1]):
             HSV_TO_BGR_CACHE.move_to_end(key)
 
