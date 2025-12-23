@@ -2,11 +2,12 @@
 
 ## Summary
 
-The firmware update harness in `src/heart/manage/update.py` now validates driver
-settings early, ensures required driver files exist before mounting devices, and
-uses portable filesystem operations in place of shell `cp`/`rm` calls. These
-changes reduce partial updates when settings are malformed or driver assets are
-missing, and they improve error messages for maintenance workflows.
+The firmware update harness in `src/heart/manage/update.py` validates driver
+settings early, accepts both list and comma-delimited formats for driver
+libraries and board IDs, and confirms the media mount root exists before
+searching for CircuitPython volumes. These checks reduce partial updates when
+settings are malformed or removable storage is missing, while improving error
+messages for maintenance workflows.
 
 ## Materials
 
@@ -16,7 +17,9 @@ missing, and they improve error messages for maintenance workflows.
 
 - `DriverConfig` centralizes parsing of `settings.toml` keys so missing values
   fail fast with a clear list of required keys.
-- `_ensure_driver_files` verifies `boot.py`, `code.py`, and `settings.toml`
-  before any device copy steps, reducing partially configured devices.
-- `copy_file` and `load_driver_libs` now rely on `shutil` to keep filesystem
-  operations portable and reduce reliance on shell subprocesses.
+- `_parse_csv` now supports TOML list values alongside comma-separated strings,
+  keeping `CIRCUIT_PY_DRIVER_LIBS` and `VALID_BOARD_IDS` flexible for future
+  driver settings.
+- `_mount_points` validates the media root early and narrows the search to
+  directories, so missing volumes produce actionable errors before any file
+  copies begin.
