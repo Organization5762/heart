@@ -26,15 +26,7 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
         def advance_state(
             state: HeartTitleScreenState, clock: Clock
         ) -> HeartTitleScreenState:
-            frame_ms = max(clock.get_time(), 0)
-            elapsed_ms = state.elapsed_ms + frame_ms
-            heart_up = state.heart_up
-
-            if elapsed_ms > DEFAULT_TIME_BETWEEN_FRAMES_MS:
-                elapsed_ms = 0.0
-                heart_up = not heart_up
-
-            return HeartTitleScreenState(heart_up=heart_up, elapsed_ms=elapsed_ms)
+            return self._advance_state(state=state, frame_ms=clock.get_time())
 
         return (
             self._peripheral_manager.game_tick.pipe(
@@ -45,3 +37,16 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
                 ops.share(),
             )
         )
+
+    def _advance_state(
+        self, *, state: HeartTitleScreenState, frame_ms: float
+    ) -> HeartTitleScreenState:
+        safe_frame_ms = max(frame_ms, 0.0)
+        elapsed_ms = state.elapsed_ms + safe_frame_ms
+        heart_up = state.heart_up
+
+        if elapsed_ms > DEFAULT_TIME_BETWEEN_FRAMES_MS:
+            elapsed_ms = 0.0
+            heart_up = not heart_up
+
+        return HeartTitleScreenState(heart_up=heart_up, elapsed_ms=elapsed_ms)
