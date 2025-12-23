@@ -21,6 +21,8 @@ Options:
       --once               Perform a single sync and exit (no file watching)
       --watcher MODE       Watch implementation to use: auto, fswatch, inotifywait, poll (default: auto)
       --poll-interval SEC  Interval in seconds for polling when watcher=poll (default: 5)
+      --pre-sync CMD       Command to run before each sync (runs in the source directory)
+      --post-sync CMD      Command to run after each sync (runs in the source directory)
       --dry-run            Show what would be transferred without making changes
       --skip-spellcheck    Skip running spellcheck before synchronising
   -h, --help               Show this help message and exit
@@ -28,6 +30,7 @@ Options:
 Environment variables:
   SYNC_SOURCE_DIR, SYNC_DESTINATION, SYNC_IGNORE_FILE,
   SYNC_POLL_INTERVAL, SYNC_WATCHER, SYNC_DRY_RUN,
+  SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD,
   REMOTE_HOST, REMOTE_DIR, REMOTE_PASS
 
 A .syncignore file inside the source directory will be used automatically
@@ -48,6 +51,8 @@ IGNORE_FILE=${SYNC_IGNORE_FILE:-}
 POLL_INTERVAL=${SYNC_POLL_INTERVAL:-5}
 WATCH_MODE=${SYNC_WATCHER:-auto}
 DRY_RUN=${SYNC_DRY_RUN:-false}
+PRE_SYNC_CMD=${SYNC_PRE_SYNC_CMD:-}
+POST_SYNC_CMD=${SYNC_POST_SYNC_CMD:-}
 SPELLCHECK_ENABLED=true
 RUN_ONCE=false
 
@@ -81,6 +86,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --poll-interval)
       POLL_INTERVAL="$2"
+      shift 2
+      ;;
+    --pre-sync)
+      PRE_SYNC_CMD="$2"
+      shift 2
+      ;;
+    --post-sync)
+      POST_SYNC_CMD="$2"
       shift 2
       ;;
     --dry-run)
@@ -177,8 +190,10 @@ sync_changes() {
   local timestamp
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[$timestamp] Syncing $SOURCE_DIR -> $DESTINATION"
+  run_hook "pre-sync" "$PRE_SYNC_CMD"
   run_spellcheck
   run_rsync
+  run_hook "post-sync" "$POST_SYNC_CMD"
   echo "[$timestamp] Sync complete"
 }
 
@@ -215,6 +230,18 @@ run_rsync() {
   fi
 }
 
+run_hook() {
+  local hook_label=$1
+  local hook_cmd=$2
+
+  if [[ -z "$hook_cmd" ]]; then
+    return
+  fi
+
+  echo "Running ${hook_label} hook: ${hook_cmd}"
+  (cd "$SOURCE_DIR" && bash -lc "$hook_cmd")
+}
+
 perform_watch() {
   case "$WATCH_MODE" in
     fswatch)
@@ -241,6 +268,12 @@ echo "Destination: $DESTINATION"
 echo "Watcher: $WATCH_MODE"
 if [[ -n "$IGNORE_FILE" ]]; then
   echo "Using ignore file: $IGNORE_FILE"
+fi
+if [[ -n "$PRE_SYNC_CMD" ]]; then
+  echo "Pre-sync hook: $PRE_SYNC_CMD"
+fi
+if [[ -n "$POST_SYNC_CMD" ]]; then
+  echo "Post-sync hook: $POST_SYNC_CMD"
 fi
 
 sync_changes
