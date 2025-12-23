@@ -60,7 +60,8 @@ build command.
 
 `scripts/check_harness.sh` verifies the core tooling expected by the sync and
 build harness. It confirms required commands like `uv` and `rsync` exist, reports
-optional helpers (for example `spellcheck`), and flags missing files such as
+optional helpers (for example `spellcheck`), checks that uv tools listed in
+`scripts/harness_tools.txt` are installed, and flags missing files such as
 `.syncignore`.
 
 ## Notes
