@@ -27,31 +27,6 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         self.direction = 1 if direction >= 0 else -1
         self.slide_speed = slide_speed
 
-    def _initialize_children(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        if not self.renderer_a.initialized:
-            self.renderer_a.initialize(
-                window=window,
-                clock=clock,
-                peripheral_manager=peripheral_manager,
-                orientation=orientation,
-            )
-            self.renderer_a.initialized = True
-
-        if not self.renderer_b.initialized:
-            self.renderer_b.initialize(
-                window=window,
-                clock=clock,
-                peripheral_manager=peripheral_manager,
-                orientation=orientation,
-            )
-            self.renderer_b.initialized = True
-
     def initial_state(
         self,
         window: pygame.Surface,
@@ -59,7 +34,6 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> SlideTransitionState:
-        self._initialize_children(window, clock, peripheral_manager, orientation)
         screen_w = window.get_width()
         return self._with_screen_width(
             SlideTransitionState(peripheral_manager=peripheral_manager),

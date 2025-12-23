@@ -1,15 +1,14 @@
 from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.renderers import BaseRenderer
-from heart.renderers.kirby.provider import KirbyStateProvider
+from heart.renderers.kirby.state import KirbyState
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 
 
 class KirbyScene(MultiScene):
-    def __init__(self, provider: KirbyStateProvider | None = None) -> None:
-        self._provider = provider or KirbyStateProvider()
-        kirby_state = self._provider.build()
+    def __init__(self) -> None:
+        kirby_state = KirbyState.build()
         super().__init__(kirby_state.scenes)
 
     @staticmethod
