@@ -70,6 +70,8 @@ Build helpers:
   `README.md`, `uv.lock`) as a space-delimited list.
 - `BUILD_INPUTS_FILE` points at a newline-delimited list of build inputs.
 - `PYTHON_BIN` chooses the Python interpreter used for hashing and manifests.
+- `scripts/show_build_profile.sh` prints the effective profile, inputs, hash
+  mode, and build arguments (available via `make build-info`).
 
 ## Harness check helper
 

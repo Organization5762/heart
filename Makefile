@@ -3,7 +3,7 @@ DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
-.PHONY: install pi_install format check test build check-harness
+.PHONY: install pi_install format check test build check-harness build-info
 
 install:
 	@uv sync --all-extras --group dev
@@ -32,6 +32,9 @@ test:
 
 build: check-harness
 	@bash scripts/build_package.sh
+
+build-info:
+	@bash scripts/show_build_profile.sh
 
 check-harness:
 	@bash scripts/check_harness.sh
