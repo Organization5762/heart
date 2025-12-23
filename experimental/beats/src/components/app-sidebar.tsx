@@ -53,6 +53,10 @@ const items = {
                   title: "Events",
                   url: "/peripherals/events",
               },
+              {
+                  title: "Snapshots",
+                  url: "/peripherals/snapshots",
+              },
             ],
         },
     ]
