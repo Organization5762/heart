@@ -52,7 +52,7 @@ if [[ -z "${PYTHON_CMD}" ]]; then
   exit 1
 fi
 
-python_version=$(
+if ! python_version=$(
   "${PYTHON_CMD}" - <<PYTHON
 import sys
 required = (3, 11)
@@ -61,9 +61,8 @@ print(version)
 if sys.version_info < required:
     raise SystemExit(1)
 PYTHON
-)
-if [[ $? -ne 0 ]]; then
-  echo "Error: ${PYTHON_CMD} ${python_version} is below required ${PYTHON_MIN_VERSION}" >&2
+); then
+  echo "Error: ${PYTHON_CMD} ${python_version:-unknown} is below required ${PYTHON_MIN_VERSION}" >&2
   exit 1
 fi
 

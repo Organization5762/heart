@@ -59,9 +59,10 @@ build command.
 ## Harness check helper
 
 `scripts/check_harness.sh` verifies the core tooling expected by the sync and
-build harness. It confirms required commands like `uv` and `rsync` exist, reports
-optional helpers (for example `spellcheck`), and flags missing files such as
-`.syncignore`.
+build harness. It confirms required commands like `uv`, `uvx`, and `rsync` exist,
+checks the active Python interpreter meets the minimum version, reports optional
+helpers (for example `spellcheck`), and flags missing files such as `.syncignore`
+and `uv.lock`.
 
 ## Notes
 
