@@ -168,10 +168,16 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
 
     flat_hsv = hsv.reshape(-1, 3)
     flat_bgr = image.reshape(-1, 3)
-    for hsv_value, bgr_value in zip(flat_hsv, flat_bgr):
-        key = cast(tuple[int, int, int], tuple(int(x) for x in hsv_value))
-        if hsv_value[1] == 255 and hsv_value[2] == 255 and hsv_value[0] in (60, 119):
+    unique_hsv, inverse = np.unique(flat_hsv, axis=0, return_inverse=True)
+    positions = np.arange(flat_hsv.shape[0])
+    last_positions = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
+    np.maximum.at(last_positions, inverse, positions)
+    for idx in np.argsort(last_positions):
+        h, s, v = (int(x) for x in unique_hsv[idx])
+        if s == 255 and v == 255 and h in (60, 119):
             continue
+        key = (h, s, v)
+        bgr_value = flat_bgr[last_positions[idx]]
         if key in HSV_TO_BGR_CACHE:
             HSV_TO_BGR_CACHE.move_to_end(key)
         else:
@@ -190,15 +196,16 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
 
     # Calibrate well-known pure colours to match the expectations from the
     # OpenCV implementation.
-    for idx in np.ndindex(image.shape[:-1]):
-        h, s, v = (int(x) for x in image[idx])
-        if s == 255 and v == 255:
-            if h == 60:
-                HSV_TO_BGR_CACHE.pop((h, s, v), None)
-                result[idx] = np.array([2, 255, 0], dtype=np.uint8)
-            elif h == 119:
-                HSV_TO_BGR_CACHE.pop((h, s, v), None)
-                result[idx] = np.array([255, 0, 5], dtype=np.uint8)
+    if np.any(image[..., 1] == 255) and np.any(image[..., 2] == 255):
+        full_mask = (image[..., 1] == 255) & (image[..., 2] == 255)
+        mask_60 = full_mask & (image[..., 0] == 60)
+        if np.any(mask_60):
+            HSV_TO_BGR_CACHE.pop((60, 255, 255), None)
+            result[mask_60] = np.array([2, 255, 0], dtype=np.uint8)
+        mask_119 = full_mask & (image[..., 0] == 119)
+        if np.any(mask_119):
+            HSV_TO_BGR_CACHE.pop((119, 255, 255), None)
+            result[mask_119] = np.array([255, 0, 5], dtype=np.uint8)
 
     # The float approximation can be off by one.  Probe a small neighbourhood
     # to find a perfect inverse mapping when possible.
@@ -234,11 +241,22 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
                 break
             result[i, j] = best
 
-    for idx in np.ndindex(image.shape[:-1]):
-        key = cast(tuple[int, int, int], tuple(int(x) for x in image[idx]))
-        cached = HSV_TO_BGR_CACHE.get(key)
-        if cached is not None:
-            result[idx] = cached
+    if HSV_TO_BGR_CACHE:
+        flat_hsv = image.reshape(-1, 3)
+        flat_result = result.reshape(-1, 3)
+        unique_hsv, inverse = np.unique(flat_hsv, axis=0, return_inverse=True)
+        positions = np.arange(flat_hsv.shape[0])
+        last_positions = np.full(unique_hsv.shape[0], -1, dtype=np.int64)
+        np.maximum.at(last_positions, inverse, positions)
+        used_keys: list[tuple[tuple[int, int, int], int]] = []
+        for idx, unique_value in enumerate(unique_hsv):
+            key = (int(unique_value[0]), int(unique_value[1]), int(unique_value[2]))
+            cached = HSV_TO_BGR_CACHE.get(key)
+            if cached is None:
+                continue
+            flat_result[inverse == idx] = cached
+            used_keys.append((key, int(last_positions[idx])))
+        for key, _ in sorted(used_keys, key=lambda item: item[1]):
             HSV_TO_BGR_CACHE.move_to_end(key)
 
     return result
