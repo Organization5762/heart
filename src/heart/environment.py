@@ -296,8 +296,6 @@ class GameLoop:
         self._current_offset_on_change = 0
         self.renderers_cache: list["BaseRenderer"] | None = None
 
-        self.time_last_debugging_press: float | None = None
-
         self._active_mode_index = 0
 
         # Lampe controller
