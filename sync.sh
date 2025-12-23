@@ -139,6 +139,8 @@ SOURCE_DIR=$(cd "$SOURCE_DIR" && pwd)
 
 LOCK_ID=$(printf '%s' "${SOURCE_DIR}|${DESTINATION}" | cksum | awk '{print $1}')
 LOCK_FILE="${TMPDIR:-/tmp}/heart-sync-${LOCK_ID}.lock"
+PENDING_FILE="${LOCK_FILE}.pending"
+rm -f "$PENDING_FILE"
 
 if [[ -z "$IGNORE_FILE" && -f "$SOURCE_DIR/.syncignore" ]]; then
   IGNORE_FILE="$SOURCE_DIR/.syncignore"
@@ -204,11 +206,22 @@ if [[ -n "$IGNORE_FILE" ]]; then
 fi
 
 sync_changes() {
-  if [[ "$SKIP_NOOP" == true ]] && ! sync_has_changes; then
-    echo "No changes detected; skipping sync and hooks."
-    return 0
-  fi
-  with_lock _sync_once
+  with_lock _sync_loop
+}
+
+_sync_loop() {
+  while true; do
+    if [[ "$SKIP_NOOP" == true ]] && ! sync_has_changes; then
+      echo "No changes detected; skipping sync and hooks."
+    else
+      _sync_once
+    fi
+    if [[ -f "$PENDING_FILE" ]]; then
+      rm -f "$PENDING_FILE"
+      continue
+    fi
+    break
+  done
 }
 
 _sync_once() {
@@ -248,6 +261,7 @@ with_lock() {
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
       echo "Another sync is already running; skipping this run." >&2
+      touch "$PENDING_FILE"
       return 0
     fi
     "$@"
@@ -257,6 +271,7 @@ with_lock() {
   local lock_dir="${LOCK_FILE}.d"
   if ! mkdir "$lock_dir" 2>/dev/null; then
     echo "Another sync is already running; skipping this run." >&2
+    touch "$PENDING_FILE"
     return 0
   fi
 

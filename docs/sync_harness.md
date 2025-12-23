@@ -59,5 +59,5 @@ Example with multiple hooks:
 - Use `--dry-run` to preview changes before syncing.
 - Use `--skip-noop` to avoid running hooks when no files would transfer.
 - If a hook fails, the script exits with the hook's non-zero status.
-- Overlapping sync triggers are de-duplicated; a running sync holds a lock so the next
-  event logs a skip instead of running concurrently.
+- Overlapping sync triggers are coalesced; a running sync holds a lock and records a
+  pending run so changes that land mid-sync are picked up once the current pass finishes.
