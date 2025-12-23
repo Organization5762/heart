@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 
@@ -7,7 +5,3 @@ from dataclasses import dataclass
 class CombinedBpmScreenState:
     elapsed_time_ms: float = 0.0
     showing_metadata: bool = True
-
-    @classmethod
-    def initial(cls) -> "CombinedBpmScreenState":
-        return cls()

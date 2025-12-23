@@ -23,7 +23,7 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
 
         def advance_state(state: TixylandState, clock: Clock) -> TixylandState:
             delta_seconds = max(clock.get_time(), 0) / 1000
-            return state.advance(delta_seconds)
+            return TixylandState(time_seconds=state.time_seconds + delta_seconds)
 
         return (
             self._peripheral_manager.game_tick.pipe(

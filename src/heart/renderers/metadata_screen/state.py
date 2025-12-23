@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Dict
 
@@ -26,7 +24,3 @@ class HeartAnimationState:
 class MetadataScreenState:
     heart_states: Dict[str, HeartAnimationState] = field(default_factory=dict)
     time_since_last_update_ms: float = 0.0
-
-    @classmethod
-    def initial(cls) -> "MetadataScreenState":
-        return cls()

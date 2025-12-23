@@ -28,7 +28,9 @@ class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
         return (
             self._peripheral_manager.game_tick.pipe(
                 ops.map(lambda _: self._select_top_bpm()),
-                ops.start_with(AvatarBpmRendererState.initial()),
+                ops.start_with(
+                    AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
+                ),
                 ops.distinct_until_changed(),
                 ops.share(),
             )
@@ -36,17 +38,17 @@ class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
 
     def _select_top_bpm(self) -> AvatarBpmRendererState:
         if not current_bpms:
-            return AvatarBpmRendererState.initial()
+            return AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
 
         try:
             active_bpms = [
                 (addr, bpm) for addr, bpm in current_bpms.items() if bpm > 0
             ]
         except ValueError:
-            return AvatarBpmRendererState.initial()
+            return AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
 
         if not active_bpms:
-            return AvatarBpmRendererState.initial()
+            return AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
 
         sorted_bpms = sorted(active_bpms, key=lambda x: x[1], reverse=True)
         sensor_id, bpm = sorted_bpms[0]

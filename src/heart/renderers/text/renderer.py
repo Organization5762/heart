@@ -18,6 +18,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         x_location: int | None = None,
         y_location: int | None = None,
     ) -> None:
+        self._font: pygame.font.Font | None = None
         self._provider = TextRenderingProvider(
             text=text,
             font_name=font,
@@ -35,12 +36,17 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> TextRenderingState:
-        return self._provider.build(
+        state = self._provider.build(
             peripheral_manager=peripheral_manager,
             orientation=orientation,
             window=window,
             clock=clock,
         )
+        self._font = pygame.font.SysFont(
+            state.font_name,
+            state.font_size,
+        )
+        return state
 
     @classmethod
     def default(cls, text: str) -> "TextRendering":
@@ -73,7 +79,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         current_text = self._current_text()
 
         lines = current_text.split("\n")
-        font = self.state.font
+        font = self._font
         if font is None:
             return
 

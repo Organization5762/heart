@@ -25,7 +25,7 @@ class ClothSailStateProvider(ObservableProvider[ClothSailState]):
             state: ClothSailState, clock: Clock
         ) -> ClothSailState:
             dt_seconds = max(clock.get_time() / 1000.0, 1.0 / 120.0)
-            return state.advance(dt_seconds)
+            return ClothSailState(elapsed_seconds=state.elapsed_seconds + dt_seconds)
 
         return (
             self._peripheral_manager.game_tick.pipe(

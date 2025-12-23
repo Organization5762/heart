@@ -50,24 +50,9 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
     def observable(self) -> reactivex.Observable[SlidingImageState]:
         initial_state = self._initial_state()
 
-        def advance(state: SlidingImageState) -> SlidingImageState:
-            width = state.width or self._width
-            if width <= 0:
-                return SlidingImageState(
-                    speed=state.speed, width=width, image=state.image
-                )
-
-            offset = (state.offset + state.speed) % width
-            return SlidingImageState(
-                offset=offset,
-                speed=state.speed,
-                width=width,
-                image=state.image,
-            )
-
         return (
             self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: advance(state), seed=initial_state),
+                ops.scan(lambda state, _: self.advance_state(state), seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),
             )
@@ -106,17 +91,9 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
     def observable(self) -> reactivex.Observable[SlidingRendererState]:
         initial_state = self._initial_state()
 
-        def advance(state: SlidingRendererState) -> SlidingRendererState:
-            width = state.width or self._width
-            if width <= 0:
-                return SlidingRendererState(speed=state.speed, width=width)
-
-            offset = (state.offset + state.speed) % width
-            return SlidingRendererState(offset=offset, speed=state.speed, width=width)
-
         return (
             self._peripheral_manager.game_tick.pipe(
-                ops.scan(lambda state, _: advance(state), seed=initial_state),
+                ops.scan(lambda state, _: self.advance_state(state), seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),
             )

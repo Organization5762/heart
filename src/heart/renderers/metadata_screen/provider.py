@@ -31,7 +31,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
             ops.share(),
         )
 
-        initial_state = MetadataScreenState.initial()
+        initial_state = MetadataScreenState()
 
         def advance_state(
             state: MetadataScreenState, clock: Clock
