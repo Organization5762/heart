@@ -25,7 +25,7 @@ check:
 test:
 	@uv run pytest
 
-build:
+build: check-harness
 	@uv build $(BUILD_ARGS)
 
 check-harness:
