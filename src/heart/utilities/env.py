@@ -53,6 +53,29 @@ def _env_optional_int(env_var: str, *, minimum: int | None = None) -> int | None
     return parsed
 
 
+def _env_float(
+    env_var: str,
+    *,
+    default: float,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    """Return the float value of ``env_var`` with optional bounds checking."""
+
+    value = os.environ.get(env_var)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{env_var} must be a float") from exc
+    if minimum is not None and parsed < minimum:
+        raise ValueError(f"{env_var} must be at least {minimum}")
+    if maximum is not None and parsed > maximum:
+        raise ValueError(f"{env_var} must be at most {maximum}")
+    return parsed
+
+
 @dataclass
 class Pi:
     version: int
@@ -162,6 +185,20 @@ class Configuration:
     @classmethod
     def render_executor_max_workers(cls) -> int | None:
         return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
+
+    @classmethod
+    def compass_window_size(cls) -> int:
+        return _env_int("HEART_COMPASS_WINDOW_SIZE", default=5, minimum=1)
+
+    @classmethod
+    def compass_smoothing_mode(cls) -> str:
+        return os.environ.get("HEART_COMPASS_SMOOTHING", "window")
+
+    @classmethod
+    def compass_ema_alpha(cls) -> float:
+        return _env_float(
+            "HEART_COMPASS_EMA_ALPHA", default=0.2, minimum=0.0, maximum=1.0
+        )
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
