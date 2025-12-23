@@ -105,7 +105,6 @@ class GameModeState:
     last_long_button_value = 0
     mode_offset = 0
     _active_mode_index = 0
-    time_last_debugging_press = None
 
     previous_mode_index = 0
     sliding_transition = None
