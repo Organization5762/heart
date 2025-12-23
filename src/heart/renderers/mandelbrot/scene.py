@@ -11,7 +11,7 @@ import numpy as np
 import pygame
 from numba import jit, prange
 
-from heart.device import Cube, Layout, Orientation, Rectangle
+from heart.device import Cube, Orientation, Rectangle
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
@@ -38,9 +38,6 @@ class MandelbrotMode(BaseRenderer):
         self.individual_screen_width: int | None = None
         self.individual_screen_height: int | None = None
         self.screens: dict[tuple[int, int], pygame.Surface] = {}
-        self.layout: Layout | None = None
-        self.orientation: Orientation | None = None
-
         # sharable app state
         self.state: AppState | None = None
         self.palettes = self._generate_palettes()
@@ -56,8 +53,6 @@ class MandelbrotMode(BaseRenderer):
             -0.7446419526560056,
             0.11883810795259032,
         )
-        self.last_switch_value = None
-
         # input properties
         self.time_initialized = None
         self.gamepad = None
@@ -81,7 +76,6 @@ class MandelbrotMode(BaseRenderer):
         self.clock = clock
         self.height = window.get_height()
         self.width = window.get_width()
-        self.layout = orientation.layout
         screen_cols = orientation.layout.columns
         screen_rows = orientation.layout.rows
         self.screens = {
