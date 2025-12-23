@@ -1,0 +1,14 @@
+{
+  "default": {
+    "description": "Default packaging profile mirroring the standard build inputs.",
+    "inputs": ["src", "pyproject.toml", "README.md", "uv.lock"],
+    "hash_mode": "content",
+    "args": []
+  },
+  "fast": {
+    "description": "Use metadata hashing for faster local iteration when content hashing is too slow.",
+    "inputs": ["src", "pyproject.toml", "README.md", "uv.lock"],
+    "hash_mode": "metadata",
+    "args": []
+  }
+}

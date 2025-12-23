@@ -6,8 +6,10 @@ BUILD_STAMP_PATH=${BUILD_STAMP_PATH:-"${REPO_ROOT}/build/.package_stamp"}
 BUILD_MANIFEST_PATH=${BUILD_MANIFEST_PATH:-"${REPO_ROOT}/build/.package_manifest.json"}
 BUILD_FORCE=${BUILD_FORCE:-false}
 BUILD_ARGS=${BUILD_ARGS:-}
-BUILD_HASH_MODE=${BUILD_HASH_MODE:-content}
+BUILD_HASH_MODE=${BUILD_HASH_MODE:-}
 BUILD_INPUTS_FILE=${BUILD_INPUTS_FILE:-}
+BUILD_PROFILE=${BUILD_PROFILE:-}
+BUILD_PROFILE_FILE=${BUILD_PROFILE_FILE:-"${REPO_ROOT}/scripts/build_profiles.json"}
 PYTHON_BIN=${PYTHON_BIN:-}
 
 DEFAULT_BUILD_INPUTS=(src pyproject.toml README.md uv.lock)
@@ -22,6 +24,83 @@ if [[ -z "${PYTHON_BIN}" ]]; then
   fi
 fi
 
+profile_inputs=()
+profile_args=()
+profile_hash_mode=""
+profile_description=""
+
+if [[ -f "${BUILD_PROFILE_FILE}" ]] && [[ -z "${BUILD_PROFILE}" ]]; then
+  BUILD_PROFILE="default"
+fi
+
+if [[ -n "${BUILD_PROFILE}" ]]; then
+  if [[ ! -f "${BUILD_PROFILE_FILE}" ]]; then
+    echo "Error: BUILD_PROFILE_FILE does not exist at ${BUILD_PROFILE_FILE}" >&2
+    exit 1
+  fi
+
+  eval "$(
+    BUILD_PROFILE_FILE="${BUILD_PROFILE_FILE}" \
+    BUILD_PROFILE="${BUILD_PROFILE}" \
+    "${PYTHON_BIN}" - <<'PYTHON'
+import json
+import os
+import shlex
+import sys
+
+profile_file = os.environ["BUILD_PROFILE_FILE"]
+profile_name = os.environ["BUILD_PROFILE"]
+
+with open(profile_file, "r", encoding="utf-8") as handle:
+  profiles = json.load(handle)
+
+if profile_name not in profiles:
+  available = ", ".join(sorted(profiles)) or "none"
+  print(f"Error: build profile '{profile_name}' not found. Available: {available}.", file=sys.stderr)
+  raise SystemExit(1)
+
+profile = profiles[profile_name]
+
+def _list(value, key):
+  if value is None:
+    return []
+  if not isinstance(value, list):
+    raise SystemExit(f"Build profile '{profile_name}' field '{key}' must be a list.")
+  return [str(item) for item in value]
+
+inputs = _list(profile.get("inputs", []), "inputs")
+args = _list(profile.get("args", []), "args")
+hash_mode = profile.get("hash_mode", "") or ""
+description = profile.get("description", "") or ""
+
+if hash_mode and hash_mode not in {"content", "metadata"}:
+  raise SystemExit(f"Build profile '{profile_name}' has unsupported hash_mode '{hash_mode}'.")
+
+def _emit_array(name, values):
+  joined = " ".join(shlex.quote(item) for item in values)
+  print(f"{name}=({joined})")
+
+_emit_array("PROFILE_INPUTS", inputs)
+_emit_array("PROFILE_ARGS", args)
+print(f"PROFILE_HASH_MODE={shlex.quote(hash_mode)}")
+print(f"PROFILE_DESCRIPTION={shlex.quote(description)}")
+PYTHON
+  )"
+
+  profile_inputs=("${PROFILE_INPUTS[@]}")
+  profile_args=("${PROFILE_ARGS[@]}")
+  profile_hash_mode="${PROFILE_HASH_MODE}"
+  profile_description="${PROFILE_DESCRIPTION}"
+fi
+
+if [[ -z "${BUILD_HASH_MODE}" ]]; then
+  if [[ -n "${profile_hash_mode}" ]]; then
+    BUILD_HASH_MODE="${profile_hash_mode}"
+  else
+    BUILD_HASH_MODE="content"
+  fi
+fi
+
 if [[ -n "${BUILD_INPUTS_FILE}" ]]; then
   if [[ ! -f "${BUILD_INPUTS_FILE}" ]]; then
     echo "Error: BUILD_INPUTS_FILE does not exist at ${BUILD_INPUTS_FILE}" >&2
@@ -30,6 +109,8 @@ if [[ -n "${BUILD_INPUTS_FILE}" ]]; then
   mapfile -t build_inputs < <(grep -Ev '^\s*(#|$)' "${BUILD_INPUTS_FILE}")
 elif [[ -n "${BUILD_INPUTS:-}" ]]; then
   read -r -a build_inputs <<<"${BUILD_INPUTS}"
+elif [[ ${#profile_inputs[@]} -gt 0 ]]; then
+  build_inputs=("${profile_inputs[@]}")
 else
   build_inputs=("${DEFAULT_BUILD_INPUTS[@]}")
 fi
@@ -96,6 +177,9 @@ write_manifest() {
   BUILD_MANIFEST_PATH="${BUILD_MANIFEST_PATH}" \
   BUILD_ARGS="${BUILD_ARGS}" \
   BUILD_FORCE="${BUILD_FORCE}" \
+  BUILD_PROFILE="${BUILD_PROFILE}" \
+  BUILD_PROFILE_FILE="${BUILD_PROFILE_FILE}" \
+  BUILD_PROFILE_DESCRIPTION="${profile_description}" \
   PYTHON_BIN="${PYTHON_BIN}" \
   "${PYTHON_BIN}" - <<'PYTHON'
 import json
@@ -122,6 +206,9 @@ manifest = {
   "build_inputs": build_inputs,
   "build_args": os.environ.get("BUILD_ARGS", ""),
   "build_force": os.environ.get("BUILD_FORCE", "false"),
+  "build_profile": os.environ.get("BUILD_PROFILE", ""),
+  "build_profile_file": os.environ.get("BUILD_PROFILE_FILE", ""),
+  "build_profile_description": os.environ.get("BUILD_PROFILE_DESCRIPTION", ""),
   "build_skipped": os.environ.get("BUILD_SKIPPED", "false") == "true",
   "build_reason": os.environ.get("BUILD_REASON", ""),
   "build_stamp_path": os.environ.get("BUILD_STAMP_PATH", ""),
@@ -144,6 +231,11 @@ if [[ "${BUILD_FORCE}" != "true" ]] && [[ -f "${BUILD_STAMP_PATH}" ]]; then
 fi
 
 mkdir -p "$(dirname "${BUILD_STAMP_PATH}")"
+
+if [[ -z "${BUILD_ARGS}" ]] && [[ ${#profile_args[@]} -gt 0 ]]; then
+  BUILD_ARGS=$(printf '%s ' "${profile_args[@]}")
+  BUILD_ARGS="${BUILD_ARGS%% }"
+fi
 
 build_args=()
 if [[ -n "${BUILD_ARGS}" ]]; then
