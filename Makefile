@@ -31,7 +31,7 @@ test:
 	@uv run pytest
 
 build: check-harness
-	@uv build $(BUILD_ARGS)
+	@bash scripts/build_package.sh
 
 check-harness:
 	@bash scripts/check_harness.sh
