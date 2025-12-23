@@ -504,7 +504,7 @@ class GameLoop:
             return None
 
     def __finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
-        image_array = pygame.surfarray.pixels3d(screen)
+        image_bytes = pygame.image.tostring(screen, "RGBA")
 
         #     # Button Three
         #     ###
@@ -545,11 +545,15 @@ class GameLoop:
 
         #             image_array[:] = out.astype(np.uint8)
 
-        # TODO: This operation will be slow.
-        alpha = pygame.surfarray.pixels_alpha(screen)
-        rgba = np.dstack((image_array, alpha))
-        rgba = np.transpose(rgba, (1, 0, 2))
-        return Image.fromarray(rgba, RGBA_IMAGE_FORMAT)
+        return Image.frombuffer(
+            RGBA_IMAGE_FORMAT,
+            screen.get_size(),
+            image_bytes,
+            "raw",
+            RGBA_IMAGE_FORMAT,
+            0,
+            1,
+        )
 
     def merge_surfaces(
         self, surface1: pygame.Surface, surface2: pygame.Surface
