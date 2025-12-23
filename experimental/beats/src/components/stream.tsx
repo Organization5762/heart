@@ -1,7 +1,7 @@
 import { useStreamedImage } from "@/actions/ws/providers/ImageProvider";
 import { useWS } from "@/actions/ws/websocket";
 import { Antenna } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { StreamCube } from "./stream-cube";
 import { Separator } from "./ui/separator";
@@ -48,6 +48,9 @@ export function Stream() {
   const ws = useWS();
   const { imgURL, isActive, fps } = useStreamedImage();
   const [useImageFallback, setUseImageFallback] = useState(false);
+  const handleContextError = useCallback(() => {
+    setUseImageFallback(true);
+  }, []);
 
   return (
     <div className="flex h-full flex-col select-none">
@@ -57,7 +60,7 @@ export function Stream() {
         ) : (
           <StreamCube
             imgURL={imgURL}
-            onContextError={() => setUseImageFallback(true)}
+            onContextError={handleContextError}
           />
         )}
       </div>
