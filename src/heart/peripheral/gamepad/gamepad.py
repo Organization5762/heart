@@ -1,7 +1,6 @@
 import subprocess
 import time
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from typing import Any, Iterator, Self
@@ -24,10 +23,6 @@ class GamepadIdentifier(Enum):
     # so check that first when adding a controller type
     BIT_DO_LITE_2 = "8BitDo Lite 2"
     SWITCH_PRO = "Nintendo Switch Pro Controller"
-
-@dataclass
-class GamepadState:
-    pass
 
 class Gamepad(Peripheral[Any]):
     EVENT_BUTTON = "gamepad.button"
