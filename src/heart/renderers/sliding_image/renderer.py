@@ -69,9 +69,6 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
                 image=image,
             )
         )
-
-        observable = self._provider.observable()
-        observable.subscribe(on_next=self.set_state)
         self.initialized = True
 
     def real_process(
@@ -83,7 +80,10 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         if self._image is None or self.state.width <= 0:
             return
 
-        self.mutate_state(lambda state: state.advance())
+        if self._provider is not None:
+            next_state = self._provider.advance_state(self.state)
+            if next_state != self.state:
+                self.set_state(next_state)
 
         offset = self.state.offset
         width = self.state.width
@@ -93,8 +93,8 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
             window.blit(self._image, (width - offset, 0))
 
     def reset(self) -> None:
-        if self.state.width > 0:
-            self.update_state(offset=0)
+        if self._provider is not None and self.state.width > 0:
+            self.set_state(self._provider.reset_state(self.state))
         super().reset()
 
 
@@ -149,9 +149,6 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
                 width=width,
             )
         )
-
-        observable = self._provider.observable()
-        observable.subscribe(on_next=self.set_state)
         self.initialized = True
 
     def real_process(
@@ -170,6 +167,11 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
         if self.state.width <= 0:
             return
 
+        if self._provider is not None:
+            next_state = self._provider.advance_state(self.state)
+            if next_state != self.state:
+                self.set_state(next_state)
+
         offset = self.state.offset
         width = self.state.width
         surface = window.copy()
@@ -180,6 +182,6 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
             window.blit(surface, (width - offset, 0))
 
     def reset(self) -> None:
-        if self.state.width > 0:
-            self.update_state(offset=0)
+        if self._provider is not None and self.state.width > 0:
+            self.set_state(self._provider.reset_state(self.state))
         super().reset()

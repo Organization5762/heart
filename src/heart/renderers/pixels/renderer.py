@@ -1,5 +1,3 @@
-import random
-
 import pygame
 
 from heart import DeviceDisplayMode
@@ -53,7 +51,7 @@ class Border(StatefulBaseRenderer[BorderState]):
         )
 
     def set_color(self, color: Color) -> None:
-        self.update_state(color=color)
+        self.set_state(self.provider.update_color(self.state, color))
 
 
 class Rain(StatefulBaseRenderer[RainState]):
@@ -78,12 +76,6 @@ class Rain(StatefulBaseRenderer[RainState]):
             orientation=orientation,
         )
 
-    def _change_starting_point(self, width: int) -> None:
-        self.update_state(
-            starting_point=random.randint(0, width),
-            current_y=self.state.current_y,
-        )
-
     def real_process(
         self,
         window: pygame.Surface,
@@ -98,10 +90,11 @@ class Rain(StatefulBaseRenderer[RainState]):
             color = self.starting_color.dim(fraction=i / self.l)
             window.set_at((starting_point, new_y - i), color)
 
-        if new_y > height:
-            self._change_starting_point(width=width)
-        else:
-            self.update_state(current_y=new_y)
+        next_state = self.provider.next_state(
+            state=self.state, width=width, height=height
+        )
+        if next_state != self.state:
+            self.set_state(next_state)
 
 
 class Slinky(StatefulBaseRenderer[SlinkyState]):
@@ -124,12 +117,6 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
-        )
-
-    def _change_starting_point(self, width: int) -> None:
-        self.update_state(
-            starting_point=random.randint(0, width),
-            current_y=self.state.current_y,
         )
 
     def real_process(
@@ -155,7 +142,8 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
                 window.set_at((starting_point + 1, new_y + i), more_dim)
                 window.set_at((starting_point - 1, new_y - i), more_dim)
 
-        if new_y > height:
-            self._change_starting_point(width=width)
-        else:
-            self.update_state(current_y=new_y)
+        next_state = self.provider.next_state(
+            state=self.state, width=width, height=height
+        )
+        if next_state != self.state:
+            self.set_state(next_state)

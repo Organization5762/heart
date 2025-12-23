@@ -1,5 +1,4 @@
 import logging
-import random
 
 import pygame
 
@@ -53,12 +52,6 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def __duration_scale_factor(self) -> float:
-        current_value = 0
-        if self.state.switch_state:
-            current_value = self.state.switch_state.rotation_since_last_button_press
-        return current_value / 20.00
-
     def real_process(
         self,
         window: pygame.Surface,
@@ -68,22 +61,15 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         state = self.state
         current_phase_frames = self.frames[state.phase]
         current_kf = current_phase_frames[state.current_frame]
-        kf_duration = current_kf.duration - (
-            current_kf.duration
-            * self.__duration_scale_factor()
+        next_state = self.provider.next_state(
+            state=state,
+            current_phase_frames=current_phase_frames,
+            screen_count=self.screen_count,
+            elapsed_ms=clock.get_time(),
         )
-        if state.time_since_last_update is None or state.time_since_last_update > kf_duration:
-            next_frame = state.current_frame + 1
-            next_screen = state.current_screen
-            if next_frame >= len(current_phase_frames):
-                next_frame = 0
-                next_screen = random.randint(0, self.screen_count - 1)
-            self.update_state(
-                current_frame=next_frame,
-                time_since_last_update=0,
-                current_screen=next_screen,
-            )
-            state = self.state
+        if next_state != state:
+            self.set_state(next_state)
+            state = next_state
 
         spritesheet = state.spritesheet
         if spritesheet is None:
@@ -92,9 +78,6 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         image = spritesheet.image_at(current_kf.frame)
         scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
         window.blit(scaled, (state.current_screen * self.screen_width, 0))
-
-        elapsed = (state.time_since_last_update or 0) + clock.get_time()
-        self.update_state(time_since_last_update=elapsed)
 
     def _create_initial_state(
         self,
@@ -109,5 +92,7 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
             peripheral_manager=peripheral_manager,
             orientation=orientation,
             initial_phase=self._initial_phase,
-            update_switch_state=lambda state: self.update_state(switch_state=state),
+            update_switch_state=lambda switch_state: self.set_state(
+                self.provider.handle_switch_state(self.state, switch_state)
+            ),
         )

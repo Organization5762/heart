@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pygame
 import reactivex
 from reactivex import operators as ops
@@ -33,6 +35,17 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         return SlidingImageState(
             speed=self._speed, width=self._width, image=self._image
         )
+
+    def reset_state(self, state: SlidingImageState) -> SlidingImageState:
+        return replace(state, offset=0)
+
+    def advance_state(self, state: SlidingImageState) -> SlidingImageState:
+        width = state.width or self._width
+        if width <= 0:
+            return replace(state, width=width)
+
+        offset = (state.offset + state.speed) % width
+        return replace(state, offset=offset, width=width)
 
     def observable(self) -> reactivex.Observable[SlidingImageState]:
         initial_state = self._initial_state()
@@ -78,6 +91,17 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
 
     def _initial_state(self) -> SlidingRendererState:
         return SlidingRendererState(speed=self._speed, width=self._width)
+
+    def reset_state(self, state: SlidingRendererState) -> SlidingRendererState:
+        return replace(state, offset=0)
+
+    def advance_state(self, state: SlidingRendererState) -> SlidingRendererState:
+        width = state.width or self._width
+        if width <= 0:
+            return replace(state, width=width)
+
+        offset = (state.offset + state.speed) % width
+        return replace(state, offset=offset, width=width)
 
     def observable(self) -> reactivex.Observable[SlidingRendererState]:
         initial_state = self._initial_state()
