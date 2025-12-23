@@ -1,7 +1,5 @@
-import collections
 import json
 import random
-import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
@@ -25,20 +23,6 @@ class Acceleration:
     z: float
 
 
-# TODO (lampe): This is fundamentally useless right now
-class Distribution:
-    def __init__(self) -> None:
-        self.historic_values: collections.deque[tuple[float, float]] = (
-            collections.deque([], maxlen=100)
-        )
-
-    def _get_time(self) -> float:
-        return time.monotonic()
-
-    def add_value(self, value: float) -> None:
-        self.historic_values.append((self._get_time(), value))
-
-
 class Accelerometer(Peripheral[Acceleration | None]):
     def __init__(
         self,
@@ -49,10 +33,6 @@ class Accelerometer(Peripheral[Acceleration | None]):
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
-
-        self.x_distribution = Distribution()
-        self.y_distribution = Distribution()
-        self.z_distribution = Distribution()
 
     def _event_stream(
         self
@@ -144,10 +124,6 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
         input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
-
-        self.x_distribution.add_value(vector.x)
-        self.y_distribution.add_value(vector.y)
-        self.z_distribution.add_value(vector.z)
 
         raise NotImplementedError("")
 

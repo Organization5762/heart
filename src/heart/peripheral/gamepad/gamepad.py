@@ -62,12 +62,6 @@ class Gamepad(Peripheral[Any]):
         self._tap_flag[button_id] = False
         return tapped
 
-    def was_released(self, button_id: int) -> bool:
-        return (
-            not self._pressed_curr_frame[button_id]
-            and self._pressed_prev_frame[button_id]
-        )
-
     def axis_value(self, axis_id: int, dead_zone: float = 0) -> float:
         axis_value = self._axis_curr_frame[self.axis_key(axis_id)]
         if abs(axis_value) < dead_zone:
@@ -82,9 +76,6 @@ class Gamepad(Peripheral[Any]):
         tapped_last_frame = self._axis_tapped_prev_frame[self.axis_key(axis_id)]
         self._axis_tapped_prev_frame[self.axis_key(axis_id)] = tapped
         return tapped and not tapped_last_frame
-
-    def get_dpad_value(self) -> tuple[float, float]:
-        return self._dpad_curr_frame
 
     def reset(self) -> None:
         if self.joystick is not None:
