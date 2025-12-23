@@ -1,8 +1,10 @@
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import toml
@@ -18,15 +20,29 @@ else:
     MEDIA_DIRECTORY = "/Volumes"
 
 CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = "adafruit-circuitpython-bundle-9.x-mpy-20250412"
-CIRCUIT_PY_COMMON_LIBS = f"https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
+CIRCUIT_PY_COMMON_LIBS = (
+    "https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/"
+    f"20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
+)
 CIRCUIT_PY_COMMON_LIBS_CHECKSUM = (
     "6d49c73c352da31d5292508ff9b3eca2803372c1d2acca7175b64be2ff2bc450"
 )
+DRIVER_SETTINGS_FILENAME = "settings.toml"
+DRIVER_FILES = ("boot.py", "code.py", DRIVER_SETTINGS_FILENAME)
+
+
+@dataclass(frozen=True)
+class DriverConfig:
+    uf2_url: str
+    uf2_checksum: str
+    driver_libs: list[str]
+    device_boot_name: str
+    valid_board_ids: list[str]
 
 
 def load_driver_libs(libs: list[str], destination: str) -> None:
+    shutil.rmtree(destination, ignore_errors=True)
     os.makedirs(destination, exist_ok=True)
-    subprocess.run(["rm", "-rf", destination], check=True)
     # Our local lib
     copy_file(
         os.path.dirname(firmware_io.__file__),
@@ -104,16 +120,70 @@ def download_file(url: str, checksum: str) -> str:
 
 
 def copy_file(source: str, destination: str) -> None:
-    os.makedirs(os.path.dirname(destination), exist_ok=True)
     try:
         print(f"Before copying: {source} to {destination}")
         if os.path.isdir(source):
-            subprocess.run(["cp", "-rf", source, destination], check=True)
+            shutil.copytree(source, destination, dirs_exist_ok=True)
         else:
-            subprocess.run(["cp", "-f", source, destination], check=True)
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            shutil.copy2(source, destination)
         print(f"After copying: {source} to {destination}")
-    except subprocess.CalledProcessError:
-        print(f"Error: Failed to copy {source} to {destination}")
+    except (OSError, shutil.Error) as error:
+        print(f"Error: Failed to copy {source} to {destination}: {error}")
+
+
+def _parse_csv(value: str) -> list[str]:
+    return [entry.strip() for entry in value.split(",") if entry.strip()]
+
+
+def _load_driver_config(settings_path: str) -> DriverConfig:
+    try:
+        config = toml.load(settings_path)
+    except (FileNotFoundError, toml.TomlDecodeError) as error:
+        print(f"Error: Unable to read driver settings at {settings_path}: {error}")
+        sys.exit(1)
+
+    missing = [
+        key
+        for key in (
+            "CIRCUIT_PY_UF2_URL",
+            "CIRCUIT_PY_UF2_CHECKSUM",
+            "CIRCUIT_PY_DRIVER_LIBS",
+            "CIRCUIT_PY_BOOT_NAME",
+            "VALID_BOARD_IDS",
+        )
+        if key not in config
+    ]
+    if missing:
+        print(f"Error: Missing keys in {settings_path}: {', '.join(missing)}")
+        sys.exit(1)
+
+    return DriverConfig(
+        uf2_url=config["CIRCUIT_PY_UF2_URL"],
+        uf2_checksum=config["CIRCUIT_PY_UF2_CHECKSUM"],
+        driver_libs=_parse_csv(config["CIRCUIT_PY_DRIVER_LIBS"]),
+        device_boot_name=config["CIRCUIT_PY_BOOT_NAME"],
+        valid_board_ids=_parse_csv(config["VALID_BOARD_IDS"]),
+    )
+
+
+def _parse_board_id(boot_out_path: str) -> str:
+    with open(boot_out_path, "r") as file_handle:
+        for line in file_handle:
+            if "Board ID:" in line:
+                return line.split("Board ID:")[1].strip()
+    raise ValueError(f"Unable to find Board ID identifier in {boot_out_path}")
+
+
+def _ensure_driver_files(driver_path: str) -> None:
+    missing = [
+        name
+        for name in DRIVER_FILES
+        if not os.path.exists(os.path.join(driver_path, name))
+    ]
+    if missing:
+        print(f"Error: Missing driver files in {driver_path}: {', '.join(missing)}")
+        sys.exit(1)
 
 
 def main(device_driver_name: str) -> None:
@@ -128,26 +198,15 @@ def main(device_driver_name: str) -> None:
     ###
     # Load a bunch of env vars the driver declares
     ###
-    d = toml.load(os.path.join(code_path, "settings.toml"))
-
-    URL: str = d["CIRCUIT_PY_UF2_URL"]
-    CHECKSUM: str = d["CIRCUIT_PY_UF2_CHECKSUM"]
-    DRIVER_LIBS: list[str] = [
-        lib for lib in d["CIRCUIT_PY_DRIVER_LIBS"].split(",") if lib
-    ]
-    # TODO: This doesn't support if you have multiple of the
-    # same type of device you're trying to flash at the same time
-    DEVICE_BOOT_NAME: str = d["CIRCUIT_PY_BOOT_NAME"]
-    VALID_BOARD_IDS: list[str] = [
-        board_id for board_id in d["VALID_BOARD_IDS"].split(",") if board_id
-    ]
+    config = _load_driver_config(os.path.join(code_path, DRIVER_SETTINGS_FILENAME))
+    _ensure_driver_files(code_path)
 
     ###
     # If the device is not a CIRCUIT_PY device yet, load the UF2 so that it is converted
     ###
-    UF2_DESTINATION = os.path.join(MEDIA_DIRECTORY, DEVICE_BOOT_NAME)
+    UF2_DESTINATION = os.path.join(MEDIA_DIRECTORY, config.device_boot_name)
     if os.path.isdir(UF2_DESTINATION):
-        downloaded_file_path = download_file(URL, CHECKSUM)
+        downloaded_file_path = download_file(config.uf2_url, config.uf2_checksum)
         copy_file(downloaded_file_path, UF2_DESTINATION)
         time.sleep(10)
     else:
@@ -164,34 +223,28 @@ def main(device_driver_name: str) -> None:
             boot_out_path = os.path.join(media_location, "boot_out.txt")
 
             if os.path.exists(boot_out_path):
-                with open(boot_out_path, "r") as file:
-                    content = file.read()
-                    board_id_line = next(
-                        (line for line in content.splitlines() if "Board ID:" in line),
-                        None,
-                    )
+                try:
+                    board_id = _parse_board_id(boot_out_path)
+                except ValueError as error:
+                    print(f"Error: {error}")
+                    continue
 
-                if board_id_line:
-                    board_id = board_id_line.split("Board ID:")[1].strip()
-                else:
-                    raise ValueError(
-                        f"Unable to find Board ID identifier in {boot_out_path}"
-                    )
-
-                if board_id not in VALID_BOARD_IDS:
+                if board_id not in config.valid_board_ids:
                     print(
-                        f"Skipping: The board ID {board_id} is not in the list of valid board IDs: {VALID_BOARD_IDS}"
+                        "Skipping: The board ID "
+                        f"{board_id} is not in the list of valid board IDs: "
+                        f"{config.valid_board_ids}"
                     )
                     continue
 
-                for file_name in ["boot.py", "code.py", "settings.toml"]:
+                for file_name in DRIVER_FILES:
                     copy_file(
                         os.path.join(code_path, file_name),
                         os.path.join(media_location, file_name),
                     )
 
                 load_driver_libs(
-                    libs=DRIVER_LIBS,
+                    libs=config.driver_libs,
                     destination=os.path.join(os.path.join(media_location, "lib")),
                 )
             else:
