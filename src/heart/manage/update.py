@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 import sys
@@ -54,15 +55,32 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
     for lib in libs:
         copy_file(os.path.join(lib_path, lib), os.path.join(destination, lib))
         # There are also .mpy files..
-        copy_file(
-            os.path.join(lib_path, f"{lib}.mpy"),
-            os.path.join(destination, f"{lib}.mpy"),
-        )
+        mpy_source = os.path.join(lib_path, f"{lib}.mpy")
+        if os.path.exists(mpy_source):
+            copy_file(mpy_source, os.path.join(destination, f"{lib}.mpy"))
+        else:
+            print(f"Skipping missing {mpy_source}")
+
+
+def _sha256sum(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as file_handle:
+        for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def download_file(url: str, checksum: str) -> str:
     try:
         destination = os.path.join("/tmp", url.split("/")[-1])
+        if os.path.exists(destination):
+            existing_checksum = _sha256sum(destination)
+            if existing_checksum != checksum:
+                print(
+                    f"Removing {destination}; checksum {existing_checksum} did not match {checksum}."
+                )
+                os.remove(destination)
+
         if not os.path.exists(destination):
             print(f"Starting download: {url}")
             if Configuration.is_pi():
@@ -71,19 +89,14 @@ def download_file(url: str, checksum: str) -> str:
                 subprocess.run(["curl", "-fL", url, "-o", destination], check=True)
             print(f"Finished download: {destination}")
 
-        # Check the checksum
-        # checksum_result = subprocess.run(
-        #     ["sha256sum", destination], capture_output=True, text=True, check=True
-        # )
-        # file_checksum = checksum_result.stdout.split()[0]
-        # print(f"Checksum for {destination}: {file_checksum}")
-
-        # if file_checksum != checksum:
-        #     print(
-        #         f"Error: Checksum mismatch for {destination}. Expected {checksum}, but got {file_checksum}. The downloaded file may be corrupted or tampered with."
-        #     )
-        #     sys.exit(1)
-        # print("Checksum matches expectations.")
+        downloaded_checksum = _sha256sum(destination)
+        print(f"Checksum for {destination}: {downloaded_checksum}")
+        if downloaded_checksum != checksum:
+            print(
+                f"Error: Checksum mismatch for {destination}. Expected {checksum}, but got {downloaded_checksum}."
+            )
+            sys.exit(1)
+        print("Checksum matches expectations.")
         return destination
     except subprocess.CalledProcessError:
         print(f"Error: Failed to download {url}")

@@ -23,6 +23,14 @@ Iterate on CircuitPython-based drivers that back Heart peripherals while working
 1. Copy the `lib/` dependencies and the driver under test to the board storage volume.
 1. Open a serial REPL at the documented baud rate (usually `115200`).
 
+## Driver Update Helper
+
+When you use `heart`'s driver update helper (`src/heart/manage/update.py`), it will:
+
+- Download the configured UF2 or CircuitPython bundle and verify its SHA-256 checksum.
+- Skip optional `.mpy` bundle files that are not present in the bundle.
+- Copy driver `code.py`, `boot.py`, and `settings.toml` into matching `CIRCUITPY` volumes.
+
 ## Iteration Practices
 
 - Use `code.py` as an entry point so saving a file triggers an automatic reload.
