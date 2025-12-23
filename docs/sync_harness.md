@@ -36,6 +36,7 @@ script. Hooks run from the source directory.
 | --- | --- | --- |
 | `--pre-sync CMD` | `SYNC_PRE_SYNC_CMD` | Run a command before each sync. Repeat the option to run multiple commands. |
 | `--post-sync CMD` | `SYNC_POST_SYNC_CMD` | Run a command after each sync. Repeat the option to run multiple commands. |
+| `--skip-noop` | `SYNC_SKIP_NOOP` | Skip hooks and rsync when a dry-run reports no changes. |
 
 Example with environment variables:
 
@@ -56,6 +57,7 @@ Example with multiple hooks:
 
 - Use `--skip-spellcheck` if the `spellcheck` tool is not installed.
 - Use `--dry-run` to preview changes before syncing.
+- Use `--skip-noop` to avoid running hooks when no files would transfer.
 - If a hook fails, the script exits with the hook's non-zero status.
 - Overlapping sync triggers are de-duplicated; a running sync holds a lock so the next
   event logs a skip instead of running concurrently.

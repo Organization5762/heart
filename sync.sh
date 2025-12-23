@@ -23,6 +23,7 @@ Options:
       --poll-interval SEC  Interval in seconds for polling when watcher=poll (default: 5)
       --pre-sync CMD       Command to run before each sync (runs in the source directory, may be supplied multiple times)
       --post-sync CMD      Command to run after each sync (runs in the source directory, may be supplied multiple times)
+      --skip-noop          Skip hooks and rsync when a dry-run finds no changes
       --dry-run            Show what would be transferred without making changes
       --skip-spellcheck    Skip running spellcheck before synchronising
   -h, --help               Show this help message and exit
@@ -30,7 +31,7 @@ Options:
 Environment variables:
   SYNC_SOURCE_DIR, SYNC_DESTINATION, SYNC_IGNORE_FILE,
   SYNC_POLL_INTERVAL, SYNC_WATCHER, SYNC_DRY_RUN,
-  SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD,
+  SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD, SYNC_SKIP_NOOP,
   REMOTE_HOST, REMOTE_DIR, REMOTE_PASS
 
 A .syncignore file inside the source directory will be used automatically
@@ -51,6 +52,7 @@ IGNORE_FILE=${SYNC_IGNORE_FILE:-}
 POLL_INTERVAL=${SYNC_POLL_INTERVAL:-5}
 WATCH_MODE=${SYNC_WATCHER:-auto}
 DRY_RUN=${SYNC_DRY_RUN:-false}
+SKIP_NOOP=${SYNC_SKIP_NOOP:-false}
 declare -a PRE_SYNC_CMDS=()
 declare -a POST_SYNC_CMDS=()
 SPELLCHECK_ENABLED=true
@@ -106,6 +108,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       DRY_RUN=true
+      shift
+      ;;
+    --skip-noop)
+      SKIP_NOOP=true
       shift
       ;;
     --skip-spellcheck)
@@ -198,6 +204,10 @@ if [[ -n "$IGNORE_FILE" ]]; then
 fi
 
 sync_changes() {
+  if [[ "$SKIP_NOOP" == true ]] && ! sync_has_changes; then
+    echo "No changes detected; skipping sync and hooks."
+    return 0
+  fi
   with_lock _sync_once
 }
 
@@ -210,6 +220,27 @@ _sync_once() {
   run_rsync
   run_hooks "post-sync" "${POST_SYNC_CMDS[@]}"
   echo "[$timestamp] Sync complete"
+}
+
+sync_has_changes() {
+  local rsync_check_flags=("${RSYNC_FLAGS[@]}" --dry-run --itemize-changes --out-format="%i")
+  local rsync_cmd=(rsync "${rsync_check_flags[@]}" "$SOURCE_DIR"/ "$DESTINATION")
+  local output
+
+  if [[ ${#RSYNC_PREFIX[@]} -gt 0 ]]; then
+    if ! output=$("${RSYNC_PREFIX[@]}" "${rsync_cmd[@]}"); then
+      echo "Error: rsync dry-run failed" >&2
+      exit 1
+    fi
+  else
+    if ! output=$("${rsync_cmd[@]}"); then
+      echo "Error: rsync dry-run failed" >&2
+      exit 1
+    fi
+  fi
+
+  output=${output//$'\n'/}
+  [[ -n "$output" ]]
 }
 
 with_lock() {
