@@ -176,6 +176,15 @@ class Configuration:
             "HEART_RENDER_TILE_STRATEGY must be 'blits' or 'loop'"
         )
 
+    @classmethod
+    def frame_array_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_FRAME_ARRAY_STRATEGY", "copy").strip().lower()
+        if strategy in {"copy", "view"}:
+            return strategy
+        raise ValueError(
+            "HEART_FRAME_ARRAY_STRATEGY must be 'copy' or 'view'"
+        )
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
