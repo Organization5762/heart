@@ -18,6 +18,7 @@ Options:
   -d, --destination DEST   Override rsync destination (default: ${DEFAULT_REMOTE_HOST}:${DEFAULT_REMOTE_DIR})
   -i, --ignore PATTERN     Additional rsync exclude pattern (may be supplied multiple times)
       --ignore-from FILE   Read rsync exclude patterns from FILE
+      --rsync-arg ARG      Additional rsync argument (may be supplied multiple times)
       --once               Perform a single sync and exit (no file watching)
       --watcher MODE       Watch implementation to use: auto, fswatch, inotifywait, poll (default: auto)
       --poll-interval SEC  Interval in seconds for polling when watcher=poll (default: 5)
@@ -30,7 +31,7 @@ Options:
 
 Environment variables:
   SYNC_SOURCE_DIR, SYNC_DESTINATION, SYNC_IGNORE_FILE,
-  SYNC_POLL_INTERVAL, SYNC_WATCHER, SYNC_DRY_RUN,
+  SYNC_POLL_INTERVAL, SYNC_WATCHER, SYNC_DRY_RUN, SYNC_RSYNC_ARGS,
   SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD, SYNC_SKIP_NOOP,
   REMOTE_HOST, REMOTE_DIR, REMOTE_PASS
 
@@ -55,6 +56,7 @@ DRY_RUN=${SYNC_DRY_RUN:-false}
 SKIP_NOOP=${SYNC_SKIP_NOOP:-false}
 declare -a PRE_SYNC_CMDS=()
 declare -a POST_SYNC_CMDS=()
+declare -a EXTRA_RSYNC_ARGS=()
 SPELLCHECK_ENABLED=true
 RUN_ONCE=false
 
@@ -66,6 +68,10 @@ fi
 
 if [[ -n "${SYNC_POST_SYNC_CMD:-}" ]]; then
   POST_SYNC_CMDS+=("$SYNC_POST_SYNC_CMD")
+fi
+
+if [[ -n "${SYNC_RSYNC_ARGS:-}" ]]; then
+  read -r -a EXTRA_RSYNC_ARGS <<< "$SYNC_RSYNC_ARGS"
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -84,6 +90,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --ignore-from)
       IGNORE_FILE="$2"
+      shift 2
+      ;;
+    --rsync-arg)
+      EXTRA_RSYNC_ARGS+=("$2")
       shift 2
       ;;
     --once)
@@ -203,6 +213,10 @@ done
 
 if [[ -n "$IGNORE_FILE" ]]; then
   RSYNC_FLAGS+=("--exclude-from=$IGNORE_FILE")
+fi
+
+if [[ ${#EXTRA_RSYNC_ARGS[@]} -gt 0 ]]; then
+  RSYNC_FLAGS+=("${EXTRA_RSYNC_ARGS[@]}")
 fi
 
 sync_changes() {
