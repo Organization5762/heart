@@ -12,7 +12,7 @@ from PIL import Image
 from reactivex.subject import Subject
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.input_payloads import DisplayFrame
+from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
