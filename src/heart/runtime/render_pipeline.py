@@ -32,7 +32,6 @@ class RendererVariant(enum.StrEnum):
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
     AUTO = "AUTO"
-    # TODO: Add more
 
     @classmethod
     def parse(cls, value: str) -> "RendererVariant":

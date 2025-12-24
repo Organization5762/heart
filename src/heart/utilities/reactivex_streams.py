@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from threading import RLock
 from typing import Any, Protocol, TypeVar, cast
 
@@ -137,28 +138,48 @@ def _coalesce_latest(
         lock = RLock()
         pending: Any = _NO_PENDING
         timer: Any | None = None
+        window_start: float | None = None
 
         def _flush() -> None:
-            nonlocal pending, timer
+            nonlocal pending, timer, window_start
             with lock:
                 value = pending
                 pending = _NO_PENDING
                 timer = None
+                window_start = None
             if value is _NO_PENDING:
                 return
             observer.on_next(value)
 
         def _schedule_flush() -> None:
-            nonlocal timer
+            nonlocal timer, window_start
             if timer is not None:
                 return
+            window_start = time.monotonic()
             timer = _COALESCE_SCHEDULER.schedule_relative(
                 window_ms / 1000,
                 lambda *_: _flush(),
             )
 
         def _on_next(value: Any) -> None:
-            nonlocal pending
+            nonlocal pending, timer, window_start
+            should_flush = False
+            value_to_flush: Any = _NO_PENDING
+            now = time.monotonic()
+            with lock:
+                if (
+                    timer is not None
+                    and window_start is not None
+                    and now - window_start >= window_ms / 1000
+                ):
+                    should_flush = True
+                    value_to_flush = pending
+                    pending = _NO_PENDING
+                    timer.dispose()
+                    timer = None
+                    window_start = None
+            if should_flush and value_to_flush is not _NO_PENDING:
+                observer.on_next(value_to_flush)
             with lock:
                 pending = value
                 _schedule_flush()

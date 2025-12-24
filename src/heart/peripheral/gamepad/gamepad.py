@@ -204,22 +204,18 @@ class Gamepad(Peripheral[Any]):
                 if cached_name is not None:
                     logger.info(f"{cached_name} disconnected")
 
-            # Todo: We're reaching unfathomable levels of hard-coding.
-            #  This will only work specifically with our pi4, and our 8bitdo
-            #  controller. We only know the mac address bc we've explicitly
-            #  paired the 8bitdo controller with the raspberry pi.
-            #  God help us if it ever unpairs.
             if Configuration.is_pi():
                 if not Gamepad.gamepad_detected():
+                    mac_address = Configuration.gamepad_mac_address()
                     result = subprocess.run(
-                        ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
+                        ["bluetoothctl", "connect", mac_address],
                         capture_output=True,
                         text=True,
                     )
                     if result.returncode == 0:
-                        logger.info("Successfully connected to 8bitdo controller")
+                        logger.info("Successfully connected to gamepad %s", mac_address)
                     else:
-                        logger.warning("Failed to connect to 8bitdo controller")
+                        logger.warning("Failed to connect to gamepad %s", mac_address)
 
         except KeyboardInterrupt:
             logger.info("Program terminated")
@@ -227,8 +223,7 @@ class Gamepad(Peripheral[Any]):
             pass
 
     def run(self) -> None:
-        # Give pygame and USB subsystems time to fully initialize
-        # TODO: Is this needed?
+        # Give pygame and USB subsystems time to fully initialize.
         time.sleep(1.5)
 
         # check every 1 second for controller state, so that we can attempt to connect

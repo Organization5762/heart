@@ -1,6 +1,6 @@
 import os
 
-from heart.device import Cube, Device, Rectangle
+from heart.device import Cube, Device, Orientation, Rectangle
 from heart.device.local import LocalScreen
 from heart.utilities.env import Configuration, DeviceLayoutMode
 from heart.utilities.logging import get_logger
@@ -10,6 +10,7 @@ logger = get_logger(__name__)
 
 def select_device(*, x11_forward: bool) -> Device:
     layout_mode = Configuration.device_layout_mode()
+    orientation: Orientation
     if layout_mode == DeviceLayoutMode.CUBE:
         orientation = Cube.sides()
     else:

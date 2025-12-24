@@ -87,8 +87,8 @@ class Seesaw:
         self.handlers = handlers
 
     def handle(self):
+        pooled: list[str] = []
         for handler in self.handlers:
-            events = handler.handle()
-            # TODO: Possibly pool the events
-            for event in events:
-                yield event
+            pooled.extend(handler.handle())
+        for event in pooled:
+            yield event

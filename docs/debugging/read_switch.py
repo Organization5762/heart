@@ -1,3 +1,5 @@
+import json
+
 import serial
 
 from heart.utilities.logging import get_logger
@@ -9,10 +11,26 @@ ser = serial.Serial("/dev/ttyACM0", 115200)
 try:
     while True:
         if ser.in_waiting > 0:
-            # TODO (lampe): Handle button state too
-            # Will likely switch this over to a JSON format + update the driver on the encoder
             data = ser.readline().decode("utf-8").rstrip()
-            logger.info("%s", data)
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                logger.info("%s", data)
+                continue
+
+            event_type = payload.get("event_type")
+            event_data = payload.get("data")
+            producer_id = payload.get("producer_id")
+            if event_type is None:
+                logger.info("%s", payload)
+                continue
+
+            logger.info(
+                "event=%s data=%s producer=%s",
+                event_type,
+                event_data,
+                producer_id,
+            )
 except KeyboardInterrupt:
     logger.info("Program terminated")
 finally:

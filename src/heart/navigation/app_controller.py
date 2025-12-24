@@ -73,7 +73,6 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         self,
         title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer | None = None,
     ) -> ComposedRenderer:
-        # TODO: Add a navigation page back in
         result = ComposedRenderer([])
         if title is None:
             title = "Untitled"

@@ -80,7 +80,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
             renderer._internal_process(
                 window,

@@ -74,9 +74,12 @@ class FakeSwitch(BaseSwitch):
         super().__init__(*args, **kwargs)
 
     def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+        def is_pressed(event: KeyboardEvent) -> bool:
+            return event.action is KeyboardAction.PRESSED
+
         return KeyboardKey.get(key).observe.pipe(
             ops.map(PeripheralMessageEnvelope[KeyboardEvent].unwrap_peripheral),
-            ops.filter(lambda event: event.action is KeyboardAction.PRESSED),
+            ops.filter(is_pressed),
         )
 
     @classmethod
@@ -92,10 +95,9 @@ class FakeSwitch(BaseSwitch):
                     variant="button",
                     metadata={"version": "v1"}
                 ),
-                # TODO: Allow the button to change its own tags in some cases
                 PeripheralTag(
                     name="mode",
-                    variant="main_rotary_button",
+                    variant=Configuration.switch_mode_tag(),
                 ),
             ]
         )
@@ -269,7 +271,8 @@ class BluetoothSwitch(BaseSwitch):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        for device in UartListener._discover_devices():
+        device_name = Configuration.bluetooth_device_name()
+        for device in UartListener._discover_devices(device_name):
             yield cls(device=device)
 
     def _connect_to_ser(self) -> None:

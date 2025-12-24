@@ -110,6 +110,18 @@ class Configuration:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 
     @classmethod
+    def bluetooth_device_name(cls) -> str:
+        return os.environ.get("HEART_BLE_DEVICE_NAME", "totem-controller").strip()
+
+    @classmethod
+    def gamepad_mac_address(cls) -> str:
+        return os.environ.get("HEART_GAMEPAD_MAC", "E4:17:D8:37:C3:40").strip()
+
+    @classmethod
+    def switch_mode_tag(cls) -> str:
+        return os.environ.get("HEART_SWITCH_MODE_TAG", "main_rotary_button").strip()
+
+    @classmethod
     def device_layout_mode(cls) -> DeviceLayoutMode:
         raw = os.environ.get("HEART_DEVICE_LAYOUT", "cube").strip().lower()
         try:

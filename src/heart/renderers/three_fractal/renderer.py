@@ -614,6 +614,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     def _process_keyboard_input(self, peripheral_manager):
         keys = pygame.key.get_pressed()
+        if self.delta_real_time is None:
+            return
 
         # Calculate acceleration based on key input
         acc = np.zeros((3,), dtype=np.float32)
@@ -660,25 +662,20 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         # self.key_pressed_last_frame[pygame.K_o] = keys[pygame.K_o]
 
         # "inflate/deflate" sphere on hold/release
-        try:
-            if keys[pygame.K_SPACE]:
-                target = self.BASE_RADIUS + 0.2
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
-            else:
-                target = self.BASE_RADIUS
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
-        except Exception as e:
-            # TODO: Very occasionally this raises an exception for some reason, no idea why
-            self.active_radius = self.BASE_RADIUS
-            logger.exception("Failed to update active radius: %s", e)
+        if keys[pygame.K_SPACE]:
+            target = self.BASE_RADIUS + 0.2
+            self.active_radius = lerp(
+                self.active_radius,
+                target,
+                self.delta_real_time * self.INFLATE_SPEED,
+            )
+        else:
+            target = self.BASE_RADIUS
+            self.active_radius = lerp(
+                self.active_radius,
+                target,
+                self.delta_real_time * self.INFLATE_SPEED,
+            )
 
         if not self.tiled_mode:
             # eagerly apply the uniforms
