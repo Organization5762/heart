@@ -262,9 +262,9 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("ISOLATED_RENDER_HOST", "")  # ensure unrelated env noise is absent
         monkeypatch.setenv("ISOLATED_RENDER_PORT", "")
 
-        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: True)
+        monkeypatch.setattr("heart.utilities.env.ports.Path.exists", lambda self: True)
         monkeypatch.setattr(
-            "heart.utilities.env.Path.iterdir",
+            "heart.utilities.env.ports.Path.iterdir",
             lambda self: iter(fake_entries),
         )
 
@@ -285,14 +285,14 @@ class TestUtilitiesEnv:
                 ]
             )
 
-        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: True)
+        monkeypatch.setattr("heart.utilities.env.ports.Path.exists", lambda self: True)
         monkeypatch.setattr(
-            "heart.utilities.env.Path.iterdir",
+            "heart.utilities.env.ports.Path.iterdir",
             lambda self: iter([Path("/dev/serial/by-id/other-device")]),
         )
-        monkeypatch.setattr("heart.utilities.env.platform.system", lambda: "Darwin")
+        monkeypatch.setattr("heart.utilities.env.ports.platform.system", lambda: "Darwin")
         monkeypatch.setattr(
-            "heart.utilities.env.serial.tools.list_ports.comports",
+            "heart.utilities.env.ports.serial.tools.list_ports.comports",
             fake_comports,
         )
 
@@ -311,11 +311,11 @@ class TestUtilitiesEnv:
                 ]
             )
 
-        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: False)
+        monkeypatch.setattr("heart.utilities.env.ports.Path.exists", lambda self: False)
 
-        monkeypatch.setattr("heart.utilities.env.platform.system", lambda: "Darwin")
+        monkeypatch.setattr("heart.utilities.env.ports.platform.system", lambda: "Darwin")
         monkeypatch.setattr(
-            "heart.utilities.env.serial.tools.list_ports.comports",
+            "heart.utilities.env.ports.serial.tools.list_ports.comports",
             fake_comports,
         )
 
