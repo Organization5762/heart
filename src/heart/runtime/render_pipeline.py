@@ -204,68 +204,75 @@ class RenderPipeline:
             return base
         return self._surface_composer.compose_batched(surfaces)
 
-    def _render_surface_iterative(
-        self, renderers: list["StatefulBaseRenderer[Any]"]
-    ) -> pygame.Surface | None:
-        self._render_queue_depth = len(renderers)
-        if Configuration.render_merge_strategy() == RenderMergeStrategy.IN_PLACE:
-            base = None
-            for renderer in renderers:
-                surface = self.process_renderer(renderer)
-                if base is None:
-                    base = surface
-                elif surface is None:
-                    continue
-                else:
-                    base = self.merge_surfaces(base, surface)
-            return base
-
+    def _collect_surfaces_serial(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+    ) -> list[pygame.Surface]:
+        if not renderers:
+            return []
         surfaces: list[pygame.Surface] = []
         for renderer in renderers:
             surface = self.process_renderer(renderer)
             if surface is not None:
                 surfaces.append(surface)
-        return (
-            self._surface_composer.compose_batched(surfaces) if surfaces else None
-        )
+        return surfaces
 
-    def _render_surfaces_binary(
-        self, renderers: list["StatefulBaseRenderer[Any]"]
-    ) -> pygame.Surface | None:
+    def _collect_surfaces_parallel(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+    ) -> list[pygame.Surface]:
         if not renderers:
-            return None
-        if len(renderers) == 1:
-            return self.process_renderer(renderers[0])
-        self._render_queue_depth = len(renderers)
+            return []
         executor = self._get_render_executor()
-        surfaces: list[pygame.Surface] = [
+        return [
             surface
             for surface in executor.map(self.process_renderer, renderers)
             if surface is not None
         ]
 
+    def _merge_surface_pair(
+        self, surfaces: tuple[pygame.Surface, pygame.Surface]
+    ) -> pygame.Surface:
+        return self.merge_surfaces(*surfaces)
+
+    def _merge_surfaces_parallel(
+        self,
+        surfaces: list[pygame.Surface],
+        executor: ThreadPoolExecutor,
+    ) -> pygame.Surface | None:
+        if not surfaces:
+            return None
+        while len(surfaces) > 1:
+            pairs = list(zip(surfaces[0::2], surfaces[1::2]))
+
+            merged_surfaces = list(executor.map(self._merge_surface_pair, pairs))
+
+            if len(surfaces) % 2 == 1:
+                merged_surfaces.append(surfaces[-1])
+
+            surfaces = merged_surfaces
+        return surfaces[0]
+
+    def _render_surface_iterative(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> pygame.Surface | None:
+        self._render_queue_depth = len(renderers)
+        surfaces = self._collect_surfaces_serial(renderers)
+        return self._compose_surfaces(surfaces)
+
+    def _render_surfaces_binary(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> pygame.Surface | None:
+        self._render_queue_depth = len(renderers)
+        if len(renderers) == 1:
+            return self.process_renderer(renderers[0])
+        surfaces = self._collect_surfaces_parallel(renderers)
         if not surfaces:
             return None
         if Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED:
             return self._surface_composer.compose_batched(surfaces)
-
-        # Iteratively merge surfaces until only one remains
-        while len(surfaces) > 1:
-            pairs = list(zip(surfaces[0::2], surfaces[1::2]))
-
-            # Merge pairs in parallel
-            merged_surfaces = list(
-                executor.map(lambda p: self.merge_surfaces(*p), pairs)
-            )
-
-            # If there's an odd surface out, append it to the merged list
-            if len(surfaces) % 2 == 1:
-                merged_surfaces.append(surfaces[-1])
-
-            # Update the surfaces list for the next iteration
-            surfaces = merged_surfaces
-
-        return surfaces[0]
+        executor = self._get_render_executor()
+        return self._merge_surfaces_parallel(surfaces, executor)
 
     def _resolve_render_variant(
         self,
