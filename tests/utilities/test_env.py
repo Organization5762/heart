@@ -198,6 +198,22 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.reactivex_event_bus_scheduler()
 
+    def test_reactivex_stream_refcount_grace_defaults_to_zero(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify refcount grace defaults to zero so streams disconnect promptly unless tuned for churn."""
+        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_GRACE_MS")
+
+        assert Configuration.reactivex_stream_refcount_grace_ms() == 0
+
+    def test_reactivex_stream_refcount_grace_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify refcount grace reads the environment value so churn protection remains configurable."""
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "25")
+
+        assert Configuration.reactivex_stream_refcount_grace_ms() == 25
+
 
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""

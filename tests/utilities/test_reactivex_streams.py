@@ -177,3 +177,35 @@ class TestShareStreamStrategy:
         assert subscribe_count == 1
         assert received_a == [1]
         assert received_b == [1]
+
+    def test_share_stream_refcount_grace_delays_disconnect(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure ref-count grace keeps upstream subscriptions alive to reduce churn during subscriber flapping."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_latest")
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "30")
+        subscribe_count = 0
+
+        def _subscribe(observer, scheduler=None):
+            nonlocal subscribe_count
+            subscribe_count += 1
+            observer.on_next(subscribe_count)
+            return Disposable()
+
+        source = reactivex.create(_subscribe)
+        shared = share_stream(source, stream_name="grace")
+
+        subscription_a = shared.subscribe()
+        subscription_a.dispose()
+
+        shared.subscribe().dispose()
+
+        assert subscribe_count == 1
+
+        time.sleep(0.05)
+
+        shared.subscribe().dispose()
+
+        assert subscribe_count == 2

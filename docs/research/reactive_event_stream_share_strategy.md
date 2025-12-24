@@ -18,6 +18,8 @@ buffered replay when tuning for performance and correctness.
   late subscribers.
 - Allow time-based eviction and delayed auto-connect to keep shared streams
   performant under variable subscriber churn.
+- Add a configurable ref-count grace window so replayed streams avoid rapid
+  disconnect/reconnect cycles when subscribers churn quickly.
 
 ## Configuration
 
@@ -40,6 +42,9 @@ buffered replay when tuning for performance and correctness.
 - `HEART_RX_STREAM_AUTO_CONNECT_MIN_SUBSCRIBERS`
   - Integer subscriber count required before auto-connect strategies attach to
     the upstream source.
+- `HEART_RX_STREAM_REFCOUNT_GRACE_MS`
+  - Integer grace window in milliseconds to delay ref-count disconnection for
+    share/replay strategies that would otherwise detach immediately.
 
 ## Implementation notes
 
@@ -51,6 +56,8 @@ buffered replay when tuning for performance and correctness.
   now use the shared helper so configuration applies consistently across core
   event streams.
 - Tests validate that late subscribers receive the configured replay buffer.
+- Ref-count grace uses a scheduled disconnect to keep the upstream subscription
+  warm during short-lived subscriber churn.
 
 ## Materials
 
@@ -59,3 +66,4 @@ buffered replay when tuning for performance and correctness.
 - `src/heart/peripheral/core/__init__.py`
 - `src/heart/peripheral/core/manager.py`
 - `tests/utilities/test_reactivex_streams.py`
+- `tests/utilities/test_env.py`

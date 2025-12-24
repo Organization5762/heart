@@ -185,6 +185,10 @@ class Configuration:
         )
 
     @classmethod
+    def reactivex_stream_refcount_grace_ms(cls) -> int:
+        return _env_int("HEART_RX_STREAM_REFCOUNT_GRACE_MS", default=0, minimum=0)
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":
