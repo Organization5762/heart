@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 from scipy.ndimage import convolve
 
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, LifeUpdateStrategy
 
 DEFAULT_LIFE_KERNEL = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=int)
 
@@ -20,12 +20,15 @@ class LifeState:
         kernel = self.kernel
         strategy = Configuration.life_update_strategy()
 
-        if kernel is None and strategy in {"auto", "pad"}:
+        if kernel is None and strategy in {
+            LifeUpdateStrategy.AUTO,
+            LifeUpdateStrategy.PAD,
+        }:
             neighbors = _count_neighbors_with_padding(self.grid)
         else:
             if kernel is None:
                 kernel = DEFAULT_LIFE_KERNEL
-            if kernel is not None and strategy == "pad":
+            if kernel is not None and strategy == LifeUpdateStrategy.PAD:
                 raise ValueError(
                     "HEART_LIFE_UPDATE_STRATEGY='pad' only supports the default kernel."
                 )

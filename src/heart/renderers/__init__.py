@@ -10,7 +10,7 @@ from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, RenderTileStrategy
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -137,7 +137,7 @@ class BaseRenderer:
         else:
             tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
 
-        if Configuration.render_tile_strategy() == "blits":
+        if Configuration.render_tile_strategy() == RenderTileStrategy.BLITS:
             positions_key = (tile_width, tile_height, rows, cols)
             positions = self._tile_positions_cache.get(positions_key)
             if positions is None:
@@ -351,7 +351,7 @@ class AtomicBaseRenderer(Generic[StateT]):
         else:
             tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
 
-        if Configuration.render_tile_strategy() == "blits":
+        if Configuration.render_tile_strategy() == RenderTileStrategy.BLITS:
             positions_key = (tile_width, tile_height, rows, cols)
             positions = self._tile_positions_cache.get(positions_key)
             if positions is None:
