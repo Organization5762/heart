@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes.util
+import importlib
+import importlib.util
 import threading
 import time
 from collections.abc import Iterator
@@ -18,11 +21,11 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 sd: Any | None = None
-try:  # pragma: no cover - import guarded for optional dependency
-    import sounddevice as _sounddevice
-except Exception:  # pragma: no cover - module may be missing on CI
-    _sounddevice = None
-sd = cast(Any | None, _sounddevice)
+if (
+    importlib.util.find_spec("sounddevice") is not None
+    and ctypes.util.find_library("portaudio") is not None
+):  # pragma: no cover - optional dependency
+    sd = cast(Any | None, importlib.import_module("sounddevice"))
 
 
 class Microphone(Peripheral[MicrophoneLevel]):
