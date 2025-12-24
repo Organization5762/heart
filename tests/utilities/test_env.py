@@ -215,6 +215,22 @@ class TestUtilitiesEnv:
 
         assert Configuration.reactivex_stream_refcount_grace_ms() == 25
 
+    def test_reactivex_stream_refcount_min_subscribers_defaults_to_one(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify refcount min subscribers defaults to one so share behaviour remains unchanged by default."""
+        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS")
+
+        assert Configuration.reactivex_stream_refcount_min_subscribers() == 1
+
+    def test_reactivex_stream_refcount_min_subscribers_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify refcount min subscribers reads the environment value so connection thresholds are configurable."""
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS", "2")
+
+        assert Configuration.reactivex_stream_refcount_min_subscribers() == 2
+
     def test_reactivex_stream_connect_mode_defaults_lazy(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
