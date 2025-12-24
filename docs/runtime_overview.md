@@ -46,6 +46,8 @@ Renderers extend `heart.renderers.BaseRenderer` (or a specialization) and draw i
 
 Workers push events into the `AppController`, which propagates state to renderers. Scene code can subscribe to helper modules such as `heart.peripheral.heart_rates` to retrieve the latest readings.
 
+The game loop also registers a virtual `LEDMatrixDisplay` peripheral so each rendered frame is emitted as a `peripheral.display.frame` payload. Consumers that need access to the live output (for example, analytics or secondary displays) can subscribe to this event stream without coupling to the renderer stack.
+
 ## Display Pipeline
 
 Each frame flows through the same stages:
@@ -53,6 +55,7 @@ Each frame flows through the same stages:
 1. The active mode asks its renderers for frames. Composite modes may layer results through `ComposedRenderer` or rotate them with `MultiScene`.
 1. `heart.display.service.DisplayService` manages timing and double buffering to prevent tearing.
 1. The chosen `Device` implementation emits the output. `LocalScreen` writes to a pygame window, whereas the LED matrix driver streams pixel rows over SPI. Optional capture paths such as `heart.device.bridge.DeviceBridge` share frames with auxiliary processes.
+1. The `LEDMatrixDisplay` peripheral publishes the rendered frame and metadata so downstream subscribers can observe the runtime output.
 
 ## Extending the Runtime
 
@@ -61,6 +64,7 @@ To add a scene or peripheral:
 1. Implement a renderer under `heart/renderers/` (see `water_cube.py` for reference).
 1. Register it in an existing configuration module or introduce a new module in `heart/programs/configurations/` with `configure(loop)`.
 1. Execute `totem run --configuration <module>` to validate behaviour.
+1. For non-cube layouts, pass `--orientation rectangle --orientation-columns <cols> --orientation-rows <rows>` to override the default cube geometry.
 1. Place new peripheral integrations under `heart/peripheral/` and register them with the `PeripheralManager` so the runtime activates them automatically.
 
 ## Related References

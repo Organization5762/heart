@@ -21,6 +21,7 @@ from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
+from heart.peripheral.led_matrix import LEDMatrixDisplay
 from heart.renderers.internal import FrameAccumulator
 from heart.utilities.env import Configuration, RenderMergeStrategy
 from heart.utilities.logging import get_logger
@@ -355,6 +356,7 @@ class GameLoop:
         self.clock: pygame.time.Clock | None = None
         self.screen: pygame.Surface | None = None
         self.renderer_variant = render_variant
+        self._display_peripheral: LEDMatrixDisplay | None = None
         binary_method = cast(RenderMethod, self._render_surfaces_binary)
         iterative_method = cast(RenderMethod, self._render_surface_iterative)
         object.__setattr__(self, "_render_surfaces_binary", binary_method)
@@ -813,12 +815,22 @@ class GameLoop:
                     else render_image
                 )
                 self.device.set_image(device_image)
+                self._publish_display_frame(
+                    device_image,
+                    renderers=renderers,
+                    render_variant=override_renderer_variant,
+                )
             else:
                 # Fallback to a screen capture if we did not render an image.
                 screen_array = pygame.surfarray.array3d(self.screen)
                 transposed_array = np.transpose(screen_array, (1, 0, 2))
                 pil_image = Image.fromarray(transposed_array)
                 self.device.set_image(pil_image)
+                self._publish_display_frame(
+                    pil_image,
+                    renderers=renderers,
+                    render_variant=override_renderer_variant,
+                )
 
     def _handle_events(self) -> None:
         try:
@@ -833,7 +845,7 @@ class GameLoop:
             # (clem): gamepad shit is weird and can randomly put caught segfault
             #   events on queue, I see allusions to this online, people say
             #   try pygame-ce instead
-            print("SystemError: Encountered segfaulted event")
+            logger.exception("SystemError: Encountered segfaulted event")
 
     def _preprocess_setup(self) -> None:
         self.__dim_display()
@@ -854,6 +866,7 @@ class GameLoop:
 
     def _initialize_peripherals(self) -> None:
         logger.info("Attempting to detect attached peripherals")
+        self._initialize_display_peripheral()
         self.peripheral_manager.detect()
         peripherals = self.peripheral_manager.peripherals
         logger.info(
@@ -863,6 +876,36 @@ class GameLoop:
         )
         logger.info("Starting all peripherals")
         self.peripheral_manager.start()
+
+    def _initialize_display_peripheral(self) -> None:
+        if self._display_peripheral is not None:
+            return
+        width, height = self.device.full_display_size()
+        self._display_peripheral = LEDMatrixDisplay(width=width, height=height)
+        self.peripheral_manager.register(self._display_peripheral)
+        logger.info(
+            "Registered LEDMatrixDisplay peripheral for %dx%d output",
+            width,
+            height,
+        )
+
+    def _publish_display_frame(
+        self,
+        image: Image.Image,
+        *,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        render_variant: RendererVariant | None,
+    ) -> None:
+        if self._display_peripheral is None:
+            return
+        metadata = {
+            "renderers": [renderer.name for renderer in renderers],
+            "variant": (render_variant or self.renderer_variant).value,
+        }
+        try:
+            self._display_peripheral.publish_image(image, metadata=metadata)
+        except Exception:
+            logger.exception("Failed to publish display frame metadata")
 
     def _initialize(self) -> None:
         self.__set_singleton()

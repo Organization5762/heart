@@ -61,24 +61,24 @@ class Accelerometer(Peripheral[Acceleration | None]):
                         for datum in data:
                             self._process_data(datum)
                 except KeyboardInterrupt:
-                    print("Program terminated")
+                    logger.info("Sensor peripheral terminated by keyboard interrupt")
                 except Exception:
-                    pass
+                    logger.exception("Sensor peripheral failed while reading serial data")
                 finally:
                     ser.close()
             except Exception:
-                pass
+                logger.exception("Sensor peripheral failed to connect to serial port")
 
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()
         if not bus_data or not bus_data.startswith("{"):
-            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
+            logger.debug("Ignoring non-JSON sensor payload: %s", bus_data)
             return
 
         try:
             parsed: dict[str, Any] = json.loads(bus_data)
         except json.JSONDecodeError:
-            print(f"Failed to decode JSON: {bus_data}")
+            logger.warning("Failed to decode sensor JSON payload: %s", bus_data)
             return
         self._update_due_to_data(parsed)
 

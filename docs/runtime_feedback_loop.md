@@ -16,6 +16,8 @@ Higher-level gestures are implemented as `VirtualPeripheralDefinition` instances
 
 The primary `GameLoop` attaches the `PeripheralManager` to the same event bus, initialises an `LEDMatrixDisplay` peripheral, and registers it so rendered frames are published just like any other input. Every frame, the loop blits renderer output to the pygame surface, forwards it to the active device, and asks the LED matrix peripheral to emit a `peripheral.display.frame` payload. External consumers can then read those frames via the event bus or the peripheral’s `latest_frame` property. 【F:src/heart/environment.py†L263-L734】【F:src/heart/peripheral/led_matrix.py†L19-L111】
 
+Renderer-specific state can also be observed directly. For example, the Mario renderer shares a `MarioRendererState` stream from `heart/renderers/mario/provider.py`, allowing diagnostics or companion effects to subscribe to sprite timing and acceleration thresholds without inspecting the renderer internals. 【F:src/heart/renderers/mario/provider.py†L1-L150】
+
 ## Recursive Flow Diagram
 
 ```mermaid

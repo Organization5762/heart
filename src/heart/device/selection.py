@@ -1,6 +1,7 @@
 import os
+from enum import StrEnum
 
-from heart.device import Cube, Device
+from heart.device import Cube, Device, Orientation, Rectangle
 from heart.device.local import LocalScreen
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
@@ -8,10 +9,31 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 
-def select_device(*, x11_forward: bool) -> Device:
-    # TODO: Add a way of adding orientation either from Config or `run`
-    orientation = Cube.sides()
+class OrientationLayout(StrEnum):
+    CUBE = "cube"
+    RECTANGLE = "rectangle"
 
+
+def resolve_orientation(
+    *,
+    layout: OrientationLayout,
+    columns: int,
+    rows: int,
+) -> Orientation:
+    if columns <= 0 or rows <= 0:
+        raise ValueError("Orientation layout columns and rows must be positive")
+
+    if layout is OrientationLayout.CUBE:
+        if columns != 4 or rows != 1:
+            logger.warning(
+                "Ignoring custom layout %dx%d for cube orientation", columns, rows
+            )
+        return Cube.sides()
+
+    return Rectangle.with_layout(columns=columns, rows=rows)
+
+
+def select_device(*, x11_forward: bool, orientation: Orientation) -> Device:
     if Configuration.forward_to_beats_app():
         from heart.device.beats import StreamedScreen
 
