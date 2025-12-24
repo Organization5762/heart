@@ -185,6 +185,15 @@ class Configuration:
             "HEART_FRAME_ARRAY_STRATEGY must be 'copy' or 'view'"
         )
 
+    @classmethod
+    def life_update_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_LIFE_UPDATE_STRATEGY", "auto").strip().lower()
+        if strategy in {"auto", "convolve", "pad"}:
+            return strategy
+        raise ValueError(
+            "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', or 'pad'"
+        )
+
 
 def get_device_ports(prefix: str) -> Iterator[str]:
     base_port = "/dev/serial/by-id"
