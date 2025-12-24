@@ -1,5 +1,4 @@
 import json
-import logging
 import time
 
 import board
@@ -10,9 +9,13 @@ from adafruit_lsm303_accel import LSM303_Accel
 
 from heart.firmware_io import constants, identity
 
-logger = logging.getLogger(__name__)
-
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
+DEBUG = False
+
+
+def _debug(message: str) -> None:
+    if DEBUG:
+        print(message)
 
 IDENTITY = identity.Identity(
     device_name="sensor-bus",
@@ -104,7 +107,7 @@ def connect_to_sensors(i2c):
         try:
             sensors.append(sensor_fn(i2c))
         except Exception as exc:  # noqa: BLE001
-            logger.debug("Failed to initialize sensor %s: %s", sensor_fn.__name__, exc)
+            _debug(f"Failed to initialize sensor {sensor_fn.__name__}: {exc}")
     return sensors
 
 
