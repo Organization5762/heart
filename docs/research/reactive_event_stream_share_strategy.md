@@ -16,6 +16,8 @@ buffered replay when tuning for performance and correctness.
   a straightforward `share` option when back-compatibility is desired.
 - Support a bounded replay buffer size for scenarios that need a short history for
   late subscribers.
+- Allow time-based eviction and delayed auto-connect to keep shared streams
+  performant under variable subscriber churn.
 
 ## Configuration
 
@@ -30,6 +32,11 @@ buffered replay when tuning for performance and correctness.
   - `share`: preserve the pre-existing no-replay share behaviour.
 - `HEART_RX_STREAM_REPLAY_BUFFER`
   - Integer buffer size used when the strategy is `replay_buffer`.
+- `HEART_RX_STREAM_REPLAY_WINDOW_MS`
+  - Optional millisecond window used to evict old replayed events.
+- `HEART_RX_STREAM_AUTO_CONNECT_MIN_SUBSCRIBERS`
+  - Integer subscriber count required before auto-connect strategies attach to
+    the upstream source.
 
 ## Implementation notes
 

@@ -1,3 +1,5 @@
+import time
+
 import pytest
 import reactivex
 from reactivex.disposable import Disposable
@@ -105,3 +107,63 @@ class TestShareStreamStrategy:
         assert received_b == [2, 3]
         source.on_next(4)
         assert received_b == [2, 3, 4]
+
+    def test_share_stream_honors_replay_window(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure replay windows drop stale events so late subscribers see only fresh context."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_latest")
+        monkeypatch.setenv("HEART_RX_STREAM_REPLAY_WINDOW_MS", "5")
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="windowed")
+
+        received_a: list[int] = []
+        shared.subscribe(received_a.append)
+
+        source.on_next(1)
+        time.sleep(0.02)
+
+        received_b: list[int] = []
+        shared.subscribe(received_b.append)
+
+        assert received_b == []
+
+        source.on_next(2)
+
+        assert received_a == [1, 2]
+        assert received_b == [2]
+
+    def test_share_stream_auto_connect_respects_min_subscribers(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify auto-connect waits for the configured subscriber count to avoid premature subscriptions."""
+
+        monkeypatch.setenv(
+            "HEART_RX_STREAM_SHARE_STRATEGY", "replay_latest_auto_connect"
+        )
+        monkeypatch.setenv("HEART_RX_STREAM_AUTO_CONNECT_MIN_SUBSCRIBERS", "2")
+        subscribe_count = 0
+
+        def _subscribe(observer, scheduler=None):
+            nonlocal subscribe_count
+            subscribe_count += 1
+            observer.on_next(subscribe_count)
+            return Disposable()
+
+        source = reactivex.create(_subscribe)
+        shared = share_stream(source, stream_name="min_subscribers")
+
+        received_a: list[int] = []
+        shared.subscribe(received_a.append)
+
+        assert subscribe_count == 0
+
+        received_b: list[int] = []
+        shared.subscribe(received_b.append)
+
+        assert subscribe_count == 1
+        assert received_a == [1]
+        assert received_b == [1]

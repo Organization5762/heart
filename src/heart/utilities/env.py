@@ -146,6 +146,18 @@ class Configuration:
         return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
 
     @classmethod
+    def reactivex_stream_replay_window_ms(cls) -> int | None:
+        return _env_optional_int("HEART_RX_STREAM_REPLAY_WINDOW_MS", minimum=1)
+
+    @classmethod
+    def reactivex_stream_auto_connect_min_subscribers(cls) -> int:
+        return _env_int(
+            "HEART_RX_STREAM_AUTO_CONNECT_MIN_SUBSCRIBERS",
+            default=1,
+            minimum=1,
+        )
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":
