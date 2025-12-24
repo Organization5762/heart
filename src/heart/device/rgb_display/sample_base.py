@@ -2,6 +2,10 @@ import argparse
 import sys
 from typing import Any
 
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class SampleBase:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -154,7 +158,7 @@ class SampleBase:
         self.parser.set_defaults(drop_privileges=True)
 
     def run(self) -> None:
-        print("Running")
+        logger.info("Running")
 
     def process(self) -> bool:
         self.args = self.parser.parse_args()
@@ -191,10 +195,10 @@ class SampleBase:
         self.matrix = RGBMatrix(options=options)
 
         try:
-            print("Press CTRL-C to stop sample")
+            logger.info("Press CTRL-C to stop sample")
             self.run()
         except KeyboardInterrupt:
-            print("Exiting\n")
+            logger.info("Exiting")
             sys.exit(0)
 
         return True
