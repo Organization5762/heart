@@ -9,8 +9,8 @@ from heart.cli.loop_commands import (bench_device_command, run_command,
 
 app = typer.Typer()
 
-app.command()(run_command)
-app.command()(update_driver_command)
+app.command(name="run")(run_command)
+app.command(name="update-driver")(update_driver_command)
 app.command(name="bench-device")(bench_device_command)
 
 
