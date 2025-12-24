@@ -4,7 +4,7 @@ from typing import Iterator
 
 import pytest
 
-from heart.events.types import RadioPacket
+from heart.peripheral.input_payloads import RadioPacket
 from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver)
 

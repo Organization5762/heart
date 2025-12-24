@@ -9,8 +9,8 @@ from typing import (TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping,
                     Protocol, Sequence, runtime_checkable)
 
 if TYPE_CHECKING:  # pragma: no cover - import for type checking only
-    from PIL import Image
     import pygame
+    from PIL import Image
 
 from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          RADIO_PACKET, SWITCH_ROTATION)
@@ -26,17 +26,18 @@ def _normalize_timestamp(timestamp: datetime | None) -> datetime:
 
 
 if TYPE_CHECKING:
+
     @runtime_checkable
     class InputEventPayload(Protocol):
         """Protocol for payload helpers that can materialise :class:`Input`."""
 
         event_type: str
 
-        def to_input(
-            self, *, timestamp: datetime | None = None
-        ) -> Input:
+        def to_input(self, *, timestamp: datetime | None = None) -> Input:
             """Render the payload as an :class:`Input` instance."""
+
 else:
+
     class InputEventPayload:
         """Runtime shim so dataclass payloads remain instantiable."""
 
@@ -128,9 +129,7 @@ class RadioPacket(InputEventPayload):
     EVENT_TYPE: ClassVar[str] = RADIO_PACKET
     event_type: str = EVENT_TYPE
 
-    def to_input(
-        self, *, timestamp: datetime | None = None
-    ) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload: MutableMapping[str, Any] = {}
 
         if self.frequency_hz is not None:
@@ -283,9 +282,7 @@ class ForceMeasurement(InputEventPayload):
             raise ValueError("unit must be a non-empty string")
         object.__setattr__(self, "force_type", normalized)
 
-    def to_input(
-        self, *, timestamp: datetime | None = None
-    ) -> Input:
+    def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload = {
             "type": self.force_type,
             "magnitude": float(self.magnitude),

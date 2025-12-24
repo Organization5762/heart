@@ -43,7 +43,7 @@ Upcoming multi-device installations require deterministic arbitration between in
 
 - [x] Implement `InputEventBus` with `subscribe`, `unsubscribe`, decorator support, and synchronous dispatch.
 - [x] Introduce `StateStore` with aggregation strategies (`overwrite`, `sum`, `sequence`).
-- [x] Land shared `InputEvent` protocol and typed payload helpers in `src/heart/events/types.py` with exhaustive docstrings.
+- [x] Land shared `InputEvent` protocol and typed payload helpers in `src/heart/peripheral/input_payloads.py` with exhaustive docstrings.
 - [x] Publish developer guide under `docs/api/input_bus.md` covering producer registration, lifecycle events, and snapshot reads.
 - [x] Expose bus-driven snapshots to the game loop (`src/heart/environment.py`) so renderers retire module-level globals in favour of `StateStore` queries.
 - [x] Add structured logging hooks inside `InputEventBus.emit()` to trace dispatch latency and dropped handlers.
