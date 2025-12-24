@@ -201,6 +201,13 @@ class Configuration:
         return _env_flag("HEART_RENDER_SCREEN_CACHE", default=True)
 
     @classmethod
+    def render_merge_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_RENDER_MERGE_STRATEGY", "batch").strip().lower()
+        if strategy in {"batch", "inplace"}:
+            return strategy
+        raise ValueError("HEART_RENDER_MERGE_STRATEGY must be 'batch' or 'inplace'")
+
+    @classmethod
     def render_tile_strategy(cls) -> str:
         strategy = os.environ.get("HEART_RENDER_TILE_STRATEGY", "blits").strip().lower()
         if strategy in {"blits", "loop"}:

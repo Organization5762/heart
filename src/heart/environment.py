@@ -355,6 +355,8 @@ class GameLoop:
         self._renderer_surface_cache: dict[
             tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
         ] = {}
+        self._composite_surface: pygame.Surface | None = None
+        self._composite_surface_size: tuple[int, int] | None = None
 
         # jank slide animation state machine
         self.mode_change: tuple[int, int] = (0, 0)
@@ -403,6 +405,36 @@ class GameLoop:
                 max_workers=Configuration.render_executor_max_workers()
             )
         return self._render_executor
+
+    def _get_composite_surface(self, size: tuple[int, int]) -> pygame.Surface:
+        if (
+            self._composite_surface is None
+            or self._composite_surface_size != size
+        ):
+            self._composite_surface = pygame.Surface(size, pygame.SRCALPHA)
+            self._composite_surface_size = size
+        else:
+            self._composite_surface.fill((0, 0, 0, 0))
+        return self._composite_surface
+
+    def _compose_surfaces(
+        self, surfaces: list[pygame.Surface]
+    ) -> pygame.Surface | None:
+        if not surfaces:
+            return None
+        if Configuration.render_merge_strategy() == "batch":
+            if not isinstance(surfaces[0], pygame.Surface):
+                base = surfaces[0]
+                for surface in surfaces[1:]:
+                    base = self.merge_surfaces(base, surface)
+                return base
+            composite = self._get_composite_surface(surfaces[0].get_size())
+            composite.blits([(surface, (0, 0)) for surface in surfaces])
+            return composite
+        base = surfaces[0]
+        for surface in surfaces[1:]:
+            base.blit(surface, (0, 0))
+        return base
 
     def add_mode(
         self,
@@ -642,6 +674,14 @@ class GameLoop:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._render_queue_depth = len(renderers)
+        if Configuration.render_merge_strategy() == "batch":
+            surfaces: list[pygame.Surface] = []
+            for renderer in renderers:
+                surface = self.process_renderer(renderer)
+                if surface is not None:
+                    surfaces.append(surface)
+            return self._compose_surfaces(surfaces)
+
         base = None
         for renderer in renderers:
             surface = self.process_renderer(renderer)
