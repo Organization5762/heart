@@ -45,12 +45,14 @@ class UartListener:
         self._messages_received = 0
 
     @classmethod
-    def _discover_devices(cls) -> Iterator[BLEDevice]:
-        devices: list[BLEDevice] = asyncio.run(BleakScanner.discover())
-        for device in devices:
+    async def _discover_devices(cls) -> list[BLEDevice]:
+        devices: list[BLEDevice] = await BleakScanner.discover()
+        return [
+            device
+            for device in devices
             # TODO: This should come from somewhere more principled
-            if device.name == "totem-controller":
-                yield device
+            if device.name == "totem-controller"
+        ]
 
     def start(self) -> None:
         self._logger.debug("Starting UART listener thread for %s", self.device.address)

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 from dataclasses import dataclass
@@ -275,7 +276,8 @@ class BluetoothSwitch(BaseSwitch):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        for device in UartListener._discover_devices():
+        devices = asyncio.run(UartListener._discover_devices())
+        for device in devices:
             yield cls(device=device)
 
     def _connect_to_ser(self) -> None:
