@@ -48,60 +48,42 @@ class RendererVariant(enum.StrEnum):
             ) from exc
 
 
-class RenderPipeline:
-    def __init__(
-        self,
-        device: Device,
-        peripheral_manager: PeripheralManager,
-        render_variant: RendererVariant = RendererVariant.ITERATIVE,
-    ) -> None:
-        self.device = device
-        self.peripheral_manager = peripheral_manager
-        self.renderer_variant = render_variant
-        self.clock: pygame.time.Clock | None = None
+class DisplayModeManager:
+    def __init__(self, device: Device) -> None:
+        self._device = device
+        self._last_render_mode = pygame.SHOWN
 
-        binary_method = cast(RenderMethod, self._render_surfaces_binary)
-        iterative_method = cast(RenderMethod, self._render_surface_iterative)
-        object.__setattr__(self, "_render_surfaces_binary", binary_method)
-        object.__setattr__(self, "_render_surface_iterative", iterative_method)
-        self._render_dispatch: dict[RendererVariant, RenderMethod] = {
-            RendererVariant.BINARY: binary_method,
-            RendererVariant.ITERATIVE: iterative_method,
-        }
-        self._render_executor: ThreadPoolExecutor | None = None
+    def ensure_mode(self, display_mode: DeviceDisplayMode) -> None:
+        target_mode = self._to_pygame_mode(display_mode)
+        if self._last_render_mode == target_mode:
+            return
+        logger.info("Switching to %s mode", display_mode.name)
+        pygame.display.set_mode(self._display_size(), target_mode)
+        self._last_render_mode = target_mode
 
-        self._render_queue_depth = 0
-        self._renderer_surface_cache: dict[
-            tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
-        ] = {}
+    def _display_size(self) -> tuple[int, int]:
+        width, height = self._device.full_display_size()
+        return (width * self._device.scale_factor, height * self._device.scale_factor)
+
+    @staticmethod
+    def _to_pygame_mode(display_mode: DeviceDisplayMode) -> int:
+        if display_mode == DeviceDisplayMode.OPENGL:
+            return pygame.OPENGL | pygame.DOUBLEBUF
+        return pygame.SHOWN
+
+
+class SurfaceComposer:
+    def __init__(self) -> None:
         self._composite_surface_cache: dict[tuple[int, int], pygame.Surface] = {}
         self._composite_accumulator: FrameAccumulator | None = None
 
-        self._last_render_mode = pygame.SHOWN
-
-    def set_clock(self, clock: pygame.time.Clock | None) -> None:
-        self.clock = clock
-
-    def shutdown(self) -> None:
-        if self._render_executor is not None:
-            self._render_executor.shutdown(wait=True)
-            self._render_executor = None
-
-    def _get_renderer_surface(
-        self, renderer: "BaseRenderer | StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface:
-        size = self.device.full_display_size()
-        if not Configuration.render_screen_cache_enabled():
-            return pygame.Surface(size, pygame.SRCALPHA)
-
-        cache_key = (id(renderer), renderer.device_display_mode, size)
-        cached = self._renderer_surface_cache.get(cache_key)
-        if cached is None:
-            cached = pygame.Surface(size, pygame.SRCALPHA)
-            self._renderer_surface_cache[cache_key] = cached
-        else:
-            cached.fill((0, 0, 0, 0))
-        return cached
+    def compose_batched(self, surfaces: list[pygame.Surface]) -> pygame.Surface:
+        size = surfaces[0].get_size()
+        composite = self._get_composite_surface(size)
+        accumulator = self._get_composite_accumulator(composite)
+        for surface in surfaces:
+            accumulator.queue_blit(surface)
+        return accumulator.flush(clear=False)
 
     def _get_composite_surface(self, size: tuple[int, int]) -> pygame.Surface:
         if not Configuration.render_screen_cache_enabled():
@@ -128,6 +110,60 @@ class RenderPipeline:
             self._composite_accumulator.reset()
         return self._composite_accumulator
 
+
+class RenderPipeline:
+    def __init__(
+        self,
+        device: Device,
+        peripheral_manager: PeripheralManager,
+        render_variant: RendererVariant = RendererVariant.ITERATIVE,
+    ) -> None:
+        self.device = device
+        self.peripheral_manager = peripheral_manager
+        self.renderer_variant = render_variant
+        self.clock: pygame.time.Clock | None = None
+        self._display_manager = DisplayModeManager(device)
+        self._surface_composer = SurfaceComposer()
+
+        binary_method = cast(RenderMethod, self._render_surfaces_binary)
+        iterative_method = cast(RenderMethod, self._render_surface_iterative)
+        object.__setattr__(self, "_render_surfaces_binary", binary_method)
+        object.__setattr__(self, "_render_surface_iterative", iterative_method)
+        self._render_dispatch: dict[RendererVariant, RenderMethod] = {
+            RendererVariant.BINARY: binary_method,
+            RendererVariant.ITERATIVE: iterative_method,
+        }
+        self._render_executor: ThreadPoolExecutor | None = None
+
+        self._render_queue_depth = 0
+        self._renderer_surface_cache: dict[
+            tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
+        ] = {}
+
+    def set_clock(self, clock: pygame.time.Clock | None) -> None:
+        self.clock = clock
+
+    def shutdown(self) -> None:
+        if self._render_executor is not None:
+            self._render_executor.shutdown(wait=True)
+            self._render_executor = None
+
+    def _get_renderer_surface(
+        self, renderer: "BaseRenderer | StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface:
+        size = self.device.full_display_size()
+        if not Configuration.render_screen_cache_enabled():
+            return pygame.Surface(size, pygame.SRCALPHA)
+
+        cache_key = (id(renderer), renderer.device_display_mode, size)
+        cached = self._renderer_surface_cache.get(cache_key)
+        if cached is None:
+            cached = pygame.Surface(size, pygame.SRCALPHA)
+            self._renderer_surface_cache[cache_key] = cached
+        else:
+            cached.fill((0, 0, 0, 0))
+        return cached
+
     def _get_render_executor(self) -> ThreadPoolExecutor:
         if self._render_executor is None:
             self._render_executor = ThreadPoolExecutor(
@@ -135,46 +171,25 @@ class RenderPipeline:
             )
         return self._render_executor
 
-    def process_renderer(
-        self, renderer: "StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface | None:
+    def _require_clock(self) -> pygame.time.Clock:
         clock = self.clock
         if clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
+        return clock
 
+    def _prepare_renderer_surface(
+        self, renderer: "StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface:
+        self._display_manager.ensure_mode(renderer.device_display_mode)
+        return self._get_renderer_surface(renderer)
+
+    def process_renderer(
+        self, renderer: "StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface | None:
         try:
             start_ns = time.perf_counter_ns()
-            if self.clock is None:
-                raise RuntimeError("GameLoop clock is not initialized")
-            clock = self.clock
-            if renderer.device_display_mode == DeviceDisplayMode.OPENGL:
-                if self._last_render_mode != pygame.OPENGL | pygame.DOUBLEBUF:
-                    logger.info("Switching to OPENGL mode")
-                    pygame.display.set_mode(
-                        (
-                            self.device.full_display_size()[0]
-                            * self.device.scale_factor,
-                            self.device.full_display_size()[1]
-                            * self.device.scale_factor,
-                        ),
-                        pygame.OPENGL | pygame.DOUBLEBUF,
-                    )
-                self._last_render_mode = pygame.OPENGL | pygame.DOUBLEBUF
-                screen = self._get_renderer_surface(renderer)
-            else:
-                if self._last_render_mode != pygame.SHOWN:
-                    logger.info("Switching to SHOWN mode")
-                    pygame.display.set_mode(
-                        (
-                            self.device.full_display_size()[0]
-                            * self.device.scale_factor,
-                            self.device.full_display_size()[1]
-                            * self.device.scale_factor,
-                        ),
-                        pygame.SHOWN,
-                    )
-                self._last_render_mode = pygame.SHOWN
-                screen = self._get_renderer_surface(renderer)
+            clock = self._require_clock()
+            screen = self._prepare_renderer_surface(renderer)
 
             if not renderer.initialized:
                 renderer.initialize(
@@ -255,16 +270,6 @@ class RenderPipeline:
     ) -> pygame.Surface:
         return self._merge_surfaces_in_place(surface1, surface2)
 
-    def _compose_surfaces_batched(
-        self, surfaces: list[pygame.Surface]
-    ) -> pygame.Surface:
-        size = surfaces[0].get_size()
-        composite = self._get_composite_surface(size)
-        accumulator = self._get_composite_accumulator(composite)
-        for surface in surfaces:
-            accumulator.queue_blit(surface)
-        return accumulator.flush(clear=False)
-
     def _compose_surfaces(
         self, surfaces: list[pygame.Surface]
     ) -> pygame.Surface | None:
@@ -275,7 +280,7 @@ class RenderPipeline:
             for surface in surfaces[1:]:
                 base = self.merge_surfaces(base, surface)
             return base
-        return self._compose_surfaces_batched(surfaces)
+        return self._surface_composer.compose_batched(surfaces)
 
     def _render_surface_iterative(
         self, renderers: list["StatefulBaseRenderer[Any]"]
@@ -298,7 +303,9 @@ class RenderPipeline:
             surface = self.process_renderer(renderer)
             if surface is not None:
                 surfaces.append(surface)
-        return self._compose_surfaces_batched(surfaces) if surfaces else None
+        return (
+            self._surface_composer.compose_batched(surfaces) if surfaces else None
+        )
 
     def _render_surfaces_binary(
         self, renderers: list["StatefulBaseRenderer[Any]"]
@@ -318,7 +325,7 @@ class RenderPipeline:
         if not surfaces:
             return None
         if Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED:
-            return self._compose_surfaces_batched(surfaces)
+            return self._surface_composer.compose_batched(surfaces)
 
         # Iteratively merge surfaces until only one remains
         while len(surfaces) > 1:
