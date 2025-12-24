@@ -211,10 +211,9 @@ def _extract_command(raw: str) -> str | None:
 
 
 def _commit_from_generated_module() -> str | None:
-    try:
-        module = importlib.import_module("heart_firmware_build")
-    except ImportError:
+    if importlib.util.find_spec("heart_firmware_build") is None:
         return None
+    module = importlib.import_module("heart_firmware_build")
 
     commit = getattr(module, "FIRMWARE_COMMIT", None)
     if isinstance(commit, str) and commit:
@@ -244,10 +243,9 @@ def _commit_from_git(default: str) -> str | None:
 def _hardware_device_uid(microcontroller_module: ModuleType | None = None) -> str | None:
     module = microcontroller_module
     if module is None:
-        try:  # pragma: no cover - available on CircuitPython only
-            module = importlib.import_module("microcontroller")
-        except ImportError:
+        if importlib.util.find_spec("microcontroller") is None:  # pragma: no cover - hardware only
             return None
+        module = importlib.import_module("microcontroller")
 
     cpu = getattr(module, "cpu", None)
     uid = getattr(cpu, "uid", None) if cpu is not None else None
