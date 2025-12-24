@@ -4,11 +4,10 @@ import reactivex
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
+from heart.modules.mario.state import MarioRendererState
+from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.peripheral.uwb import ops
-from heart.renderers.modules.devices.acceleration.provider import \
-    AllAccelerometersProvider
-from heart.renderers.modules.mario.state import MarioRendererState
 
 
 class MarioRendererProvider:

@@ -4,10 +4,10 @@ from typing import Callable
 import numpy as np
 import reactivex
 
+from heart.modules.life.state import LifeState
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
-from heart.renderers.modules.devices.switch.provider import MainSwitchProvider
-from heart.renderers.modules.life.state import LifeState
 
 
 class LifeStateProvider:

@@ -10,12 +10,11 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
                                                  LedWaveBoatState,
                                                  SprayParticle)
-from heart.renderers.modules.devices.acceleration.provider import \
-    AllAccelerometersProvider
 
 HULL_DEPTH = 1.0
 
