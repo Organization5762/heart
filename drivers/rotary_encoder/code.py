@@ -28,6 +28,16 @@ def _debug(message: str) -> None:
         print(message)
 
 
+def _write_serial_bus(message: str) -> None:
+    """Emit the event payload over the serial bus.
+
+    Do not route event payloads through ``_debug``; the host depends on these
+    lines arriving over the serial connection.
+    """
+
+    print(message)
+
+
 def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
     """Process any pending Identify query."""
 
@@ -67,7 +77,7 @@ def main() -> None:  # pragma: no cover - exercised on hardware
     while True:
         respond_to_identify_query()
         for event in read_events(handler):
-            print(event)
+            _write_serial_bus(event)
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised on hardware
