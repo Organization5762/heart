@@ -8,7 +8,8 @@ from reactivex import operators as ops
 from reactivex.disposable import Disposable
 from reactivex.scheduler import TimeoutScheduler
 
-from heart.utilities.env import (Configuration, ReactivexStreamConnectMode,
+from heart.utilities.env import (Configuration, ReactivexStreamCoalesceMode,
+                                 ReactivexStreamConnectMode,
                                  ReactivexStreamShareStrategy)
 from heart.utilities.logging import get_logger
 
@@ -121,10 +122,11 @@ def _share_with_refcount_grace(
     return reactivex.create(_subscribe)
 
 
-def _coalesce_latest(
+def _coalesce_stream(
     source: reactivex.Observable[T],
     *,
     window_ms: int,
+    mode: ReactivexStreamCoalesceMode,
     stream_name: str,
 ) -> reactivex.Observable[T]:
     if window_ms <= 0:
@@ -156,9 +158,16 @@ def _coalesce_latest(
 
         def _on_next(value: Any) -> None:
             nonlocal pending
+            emit_now = False
             with lock:
-                pending = value
-                _schedule_flush()
+                if mode is ReactivexStreamCoalesceMode.LEADING and timer is None:
+                    emit_now = True
+                    _schedule_flush()
+                else:
+                    pending = value
+                    _schedule_flush()
+            if emit_now:
+                observer.on_next(value)
 
         def _on_error(err: Exception) -> None:
             nonlocal pending, timer
@@ -195,9 +204,10 @@ def _coalesce_latest(
                     timer = None
 
         logger.debug(
-            "Coalescing %s with window_ms=%d",
+            "Coalescing %s with window_ms=%d mode=%s",
             stream_name,
             window_ms,
+            mode,
         )
         return Disposable(_dispose)
 
@@ -294,6 +304,7 @@ def share_stream(
 
     strategy = Configuration.reactivex_stream_share_strategy()
     coalesce_window_ms = Configuration.reactivex_stream_coalesce_window_ms()
+    coalesce_mode = Configuration.reactivex_stream_coalesce_mode()
     stats_log_ms = Configuration.reactivex_stream_stats_log_ms()
     replay_window_ms = Configuration.reactivex_stream_replay_window_ms()
     auto_connect_min_subscribers = (
@@ -307,9 +318,10 @@ def share_stream(
     replay_window_seconds = (
         None if replay_window_ms is None else replay_window_ms / 1000
     )
-    source = _coalesce_latest(
+    source = _coalesce_stream(
         source,
         window_ms=coalesce_window_ms,
+        mode=coalesce_mode,
         stream_name=stream_name,
     )
 

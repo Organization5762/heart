@@ -174,6 +174,16 @@ class Configuration:
         return _env_int("HEART_RX_STREAM_COALESCE_WINDOW_MS", default=0, minimum=0)
 
     @classmethod
+    def reactivex_stream_coalesce_mode(cls) -> "ReactivexStreamCoalesceMode":
+        mode = os.environ.get("HEART_RX_STREAM_COALESCE_MODE", "latest").strip().lower()
+        try:
+            return ReactivexStreamCoalesceMode(mode)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RX_STREAM_COALESCE_MODE must be 'latest' or 'leading'"
+            ) from exc
+
+    @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
         return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
 
@@ -391,6 +401,11 @@ class ReactivexStreamShareStrategy(StrEnum):
     REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
     REPLAY_BUFFER = "replay_buffer"
     REPLAY_BUFFER_AUTO_CONNECT = "replay_buffer_auto_connect"
+
+
+class ReactivexStreamCoalesceMode(StrEnum):
+    LATEST = "latest"
+    LEADING = "leading"
 
 
 class ReactivexStreamConnectMode(StrEnum):

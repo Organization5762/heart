@@ -284,6 +284,7 @@ class TestShareStreamFlowControl:
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "20")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_MODE", "latest")
         source: Subject[int] = Subject()
         shared = share_stream(source, stream_name="coalesce")
 
@@ -299,6 +300,29 @@ class TestShareStreamFlowControl:
         time.sleep(0.03)
 
         assert received == [2, 3]
+
+    def test_share_stream_coalesces_leading_with_trailing_update(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify leading coalescing emits immediately and still delivers the latest burst update."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "30")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_MODE", "leading")
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="coalesce_leading")
+
+        received: list[int] = []
+        shared.subscribe(received.append)
+
+        source.on_next(1)
+        source.on_next(2)
+        source.on_next(3)
+
+        time.sleep(0.05)
+
+        assert received == [1, 3]
 
     def test_share_stream_flushes_pending_values_on_completion(
         self,

@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import (Configuration, ReactivexStreamConnectMode,
+from heart.utilities.env import (Configuration, ReactivexStreamCoalesceMode,
+                                 ReactivexStreamConnectMode,
                                  RenderMergeStrategy, get_device_ports)
 
 
@@ -198,6 +199,26 @@ class TestUtilitiesEnv:
 
         with pytest.raises(ValueError):
             Configuration.reactivex_event_bus_scheduler()
+
+    def test_reactivex_stream_coalesce_mode_defaults_latest(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify coalesce mode defaults to latest so trailing emission behaviour is consistent."""
+        _clear_env(monkeypatch, "HEART_RX_STREAM_COALESCE_MODE")
+
+        assert (
+            Configuration.reactivex_stream_coalesce_mode()
+            == ReactivexStreamCoalesceMode.LATEST
+        )
+
+    def test_reactivex_stream_coalesce_mode_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify coalesce mode rejects invalid values so flow control errors are visible early."""
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_MODE", "burst")
+
+        with pytest.raises(ValueError):
+            Configuration.reactivex_stream_coalesce_mode()
 
     def test_reactivex_stream_refcount_grace_defaults_to_zero(
         self, monkeypatch: pytest.MonkeyPatch
