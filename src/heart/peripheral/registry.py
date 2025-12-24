@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import importlib
-import os
 from functools import cached_property
+from pathlib import Path
 from typing import Callable
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -18,14 +18,16 @@ class PeripheralConfigurationRegistry:
     @cached_property
     def registry(self) -> dict[str, ConfigurationFactory]:
         registry: dict[str, ConfigurationFactory] = {}
-        configurations_dir = os.path.join(os.path.dirname(__file__), "configurations")
-        for filename in os.listdir(configurations_dir):
-            if not filename.endswith(".py") or filename == "__init__.py":
+        configurations_dir = Path(__file__).resolve().parent / "configurations"
+        for entry in configurations_dir.iterdir():
+            if not entry.is_file():
                 continue
-            module_name = f"heart.peripheral.configurations.{filename[:-3]}"
+            if entry.suffix != ".py" or entry.name == "__init__.py":
+                continue
+            module_name = f"heart.peripheral.configurations.{entry.stem}"
             module = importlib.import_module(module_name)
             if hasattr(module, "configure"):
-                registry[filename[:-3]] = getattr(module, "configure")
+                registry[entry.stem] = getattr(module, "configure")
         return registry
 
     def get(self, name: str) -> ConfigurationFactory | None:

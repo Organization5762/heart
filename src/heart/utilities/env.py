@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cache
+from pathlib import Path
 from typing import Iterator
 
 import serial.tools.list_ports
@@ -363,7 +364,7 @@ class ReactivexStreamShareStrategy(StrEnum):
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
-    base_port = "/dev/serial/by-id"
+    base_port = Path("/dev/serial/by-id")
 
     directory_matches = tuple(_iter_directory_ports(base_port, prefix))
     if directory_matches:
@@ -375,15 +376,15 @@ def get_device_ports(prefix: str) -> Iterator[str]:
         yield from _iter_serial_ports(prefix)
 
 
-def _iter_directory_ports(base_port: str, prefix: str) -> Iterator[str]:
+def _iter_directory_ports(base_port: Path, prefix: str) -> Iterator[str]:
     """Yield ports in ``base_port`` whose names begin with ``prefix``."""
 
     try:
-        if not os.path.exists(base_port):
+        if not base_port.exists():
             return
-        for entry in os.listdir(base_port):
-            if entry.startswith(prefix):
-                yield os.path.join(base_port, entry)
+        for entry in base_port.iterdir():
+            if entry.name.startswith(prefix):
+                yield str(entry)
     except (FileNotFoundError, PermissionError):
         return
 
@@ -393,7 +394,7 @@ def _iter_serial_ports(prefix: str) -> Iterator[str]:
 
     lower_prefix = prefix.lower()
     for port in serial.tools.list_ports.comports():
-        port_name = os.path.basename(port.device)
+        port_name = Path(port.device).name
         description = getattr(port, "description", "")
         if lower_prefix in description.lower() or lower_prefix in port_name.lower():
             yield port.device

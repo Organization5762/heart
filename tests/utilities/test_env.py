@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -201,14 +202,19 @@ class TestUtilitiesEnv:
 
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
-        fake_entries = ["ttyHeart-123", "other"]
+        fake_entries = [
+            Path("/dev/serial/by-id/ttyHeart-123"),
+            Path("/dev/serial/by-id/other"),
+        ]
 
         monkeypatch.setenv("ISOLATED_RENDER_HOST", "")  # ensure unrelated env noise is absent
         monkeypatch.setenv("ISOLATED_RENDER_PORT", "")
 
-        monkeypatch.setattr("heart.utilities.env.os.path.exists", lambda path: True)
-        monkeypatch.setattr("heart.utilities.env.os.listdir", lambda path: fake_entries)
-        monkeypatch.setattr("heart.utilities.env.os.path.join", lambda a, b: f"{a}/{b}")
+        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: True)
+        monkeypatch.setattr(
+            "heart.utilities.env.Path.iterdir",
+            lambda self: iter(fake_entries),
+        )
 
         ports = list(get_device_ports("ttyHeart"))
 
@@ -227,8 +233,11 @@ class TestUtilitiesEnv:
                 ]
             )
 
-        monkeypatch.setattr("heart.utilities.env.os.path.exists", lambda path: True)
-        monkeypatch.setattr("heart.utilities.env.os.listdir", lambda path: ["other-device"])
+        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: True)
+        monkeypatch.setattr(
+            "heart.utilities.env.Path.iterdir",
+            lambda self: iter([Path("/dev/serial/by-id/other-device")]),
+        )
         monkeypatch.setattr("heart.utilities.env.platform.system", lambda: "Darwin")
         monkeypatch.setattr(
             "heart.utilities.env.serial.tools.list_ports.comports",
@@ -250,7 +259,7 @@ class TestUtilitiesEnv:
                 ]
             )
 
-        monkeypatch.setattr("heart.utilities.env.os.path.exists", lambda path: False)
+        monkeypatch.setattr("heart.utilities.env.Path.exists", lambda self: False)
 
         monkeypatch.setattr("heart.utilities.env.platform.system", lambda: "Darwin")
         monkeypatch.setattr(
