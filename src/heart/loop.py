@@ -119,7 +119,7 @@ def bench_device() -> None:
     d = _get_device(x11_forward=False)
 
     size = d.full_display_size()
-    print(size)
+    logger.info("Device full display size: %s", size)
 
     image = Image.new("RGB", size)
     while True:
