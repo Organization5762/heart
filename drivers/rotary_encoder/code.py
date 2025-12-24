@@ -60,7 +60,7 @@ def main() -> None:  # pragma: no cover - exercised on hardware
     while True:
         respond_to_identify_query()
         for event in read_events(handler):
-            _debug(event)
+            print(event)
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised on hardware
