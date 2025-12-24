@@ -56,3 +56,17 @@ make focus-watch
 ```
 
 See `docs/dev_focus_loop.md` for detailed usage notes and test selection controls.
+
+## Developer Session Runner
+
+The developer session runner keeps a local `totem run` loop active and restarts the process when
+runtime files change. It is designed for quick iteration on renderers, peripherals, and runtime
+configuration without repeated manual restarts.
+
+Run the restartable session:
+
+```bash
+make dev-session
+```
+
+See [docs/dev_session.md](docs/dev_session.md) for usage details, watch settings, and overrides.
