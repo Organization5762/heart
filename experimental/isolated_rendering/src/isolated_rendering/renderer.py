@@ -1,3 +1,4 @@
+import importlib
 import threading
 import time
 from dataclasses import dataclass
@@ -10,9 +11,9 @@ from heart.utilities.logging import get_logger
 
 from .buffer import FrameBuffer
 
-try:
+if importlib.util.find_spec("heart.device.rgb_display") is not None:  # pragma: no cover - available on Pi
     from heart.device.rgb_display import LEDMatrix as _LEDMatrix
-except ImportError:  # pragma: no cover - not available outside Pi
+else:  # pragma: no cover - not available outside Pi
     _LEDMatrix = None
 
 LEDMatrix: Optional[type[Device]] = cast(Optional[type[Device]], _LEDMatrix)
