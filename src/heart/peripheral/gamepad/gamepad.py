@@ -120,8 +120,8 @@ class Gamepad(Peripheral[Any]):
     def update(self) -> None:
         try:
             self._update()
-        except Exception as e:
-            print(f"Error updating gamepad state: {e}")
+        except Exception:
+            logger.exception("Error updating gamepad state")
 
     def _update(self) -> None:
         if not self.joystick:
@@ -174,7 +174,7 @@ class Gamepad(Peripheral[Any]):
             pygame.joystick.init()
             yield cls()
         except pygame.error as e:
-            print(f"Error initializing joystick module: {e}")
+            logger.error("Error initializing joystick module: %s", e)
             return
 
     def is_connected(self) -> bool:
@@ -217,12 +217,12 @@ class Gamepad(Peripheral[Any]):
                         text=True,
                     )
                     if result.returncode == 0:
-                        print("Successfully connected to 8bitdo controller")
+                        logger.info("Successfully connected to 8bitdo controller")
                     else:
-                        print("Failed to connect to 8bitdo controller")
+                        logger.warning("Failed to connect to 8bitdo controller")
 
         except KeyboardInterrupt:
-            print("Program terminated")
+            logger.info("Program terminated")
         except Exception:
             pass
 
