@@ -12,10 +12,7 @@ class Loader:
     def resolve_path(cls, path: str | os.PathLike[str]) -> Path:
         """Return the absolute path to a file in ``src/heart/assets``."""
 
-        return os.path.join(
-            os.path.dirname(__file__),
-            path
-        )
+        return Path(__file__).resolve().parent / Path(path)
 
     @classmethod
     def _resolve_path(cls, path):
