@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from heart.modules.life.state import LifeState
+from heart.renderers.modules.life.state import LifeState
 
 
 class TestLifeUpdateStrategies:

@@ -19,9 +19,9 @@ from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.modules.water_cube.provider import WaterCubeStateProvider
-from heart.modules.water_cube.state import WaterCubeState
 from heart.renderers import StatefulBaseRenderer
+from heart.renderers.modules.water_cube.provider import WaterCubeStateProvider
+from heart.renderers.modules.water_cube.state import WaterCubeState
 
 # ───────────────────────── constants & tunables ───────────────────────────────
 FACE_PX = 64  # physical LED face resolution (square)
