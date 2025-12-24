@@ -3,7 +3,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-from heart.environment import GameLoop
+from heart.runtime.game_loop import GameLoop
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)

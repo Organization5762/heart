@@ -2,12 +2,12 @@
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from heart.environment import GameLoop, RendererVariant
 from heart.renderers.random_pixel import RandomPixel
+from heart.runtime.game_loop import GameLoop, RendererVariant
 
 
 class TestEnvironment:
-    """Group Environment tests so environment behaviour stays reliable. This preserves confidence in environment for end-to-end scenarios."""
+    """Group runtime loop tests so render behaviour stays reliable. This preserves confidence in runtime orchestration for end-to-end scenarios."""
 
     @pytest.mark.parametrize("num_renderers", [1, 5, 10, 25, 50, 100, 1000])
     @pytest.mark.parametrize(

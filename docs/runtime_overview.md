@@ -21,7 +21,7 @@ Explain how the Heart runtime composes configuration modules, orchestrates rende
 At startup the `totem` CLI builds three core subsystems:
 
 1. **Configuration loader** – `heart.programs.registry.ConfigurationRegistry` inspects `heart/programs/configurations` for modules exposing `configure(loop: GameLoop)`. Each callable mutates the loop with modes, renderers, and playlists.
-1. **Game loop orchestration** – `heart.environment.GameLoop` owns the pygame window, timing, and peripheral integration. Its `AppController` routes scene transitions and composes surfaces.
+1. **Game loop orchestration** – `heart.runtime.game_loop.GameLoop` owns the pygame window, timing, and peripheral integration. Its `AppController` routes scene transitions and composes surfaces.
 1. **Device abstraction** – Implementations of `heart.device.Device` translate pygame surfaces into concrete outputs. `LocalScreen` targets desktop iteration, while `LEDMatrix` in `heart.device.rgb_display` streams frames through the `rgbmatrix` bindings.
 
 Refer to [code_flow.md](code_flow.md) for the full call graph and service boundaries.

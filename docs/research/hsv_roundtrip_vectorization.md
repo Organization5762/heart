@@ -2,7 +2,7 @@
 
 ## Problem
 
-The numpy fallback for HSV conversion in `heart.environment` corrects hue values by
+The numpy fallback for HSV conversion in `heart.renderers.color_conversion` corrects hue values by
 checking nearby hues until the converted BGR values match the original image. The
 previous implementation processed each mismatched pixel in a nested Python loop,
 which scaled poorly when many pixels required adjustment.
@@ -29,6 +29,6 @@ rely on the numpy conversion path.
 
 ## Materials
 
-- `src/heart/environment.py` (HSV calibration loops, mode selection)
+- `src/heart/renderers/color_conversion.py` (HSV calibration loops, mode selection)
 - `src/heart/utilities/env.py` (calibration mode configuration)
 - `tests/test_environment_core_logic.py` (HSV conversion round-trip coverage)

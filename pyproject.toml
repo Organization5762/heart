@@ -104,6 +104,7 @@ packages = [
     "heart.environment",
     "heart.loop",
     "heart.peripheral",
+    "heart.runtime",
     "heart.utilities",
 ]
 warn_unused_configs = true

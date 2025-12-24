@@ -1,6 +1,6 @@
 # HSV conversion tuning
 
-The HSV/BGR conversion helpers in `heart.environment` prioritize accuracy by
+The HSV/BGR conversion helpers in `heart.renderers.color_conversion` prioritize accuracy by
 calibrating numpy conversions to match OpenCV output and by maintaining a small
 LRU cache for recent colors. On constrained devices or when rendering large
 frames, that calibration and cache management can become a noticeable portion of
@@ -27,4 +27,4 @@ needed.
 
 - Environment variables: `HEART_HSV_CALIBRATION`,
   `HEART_HSV_CALIBRATION_MODE`, `HEART_HSV_CACHE_MAX_SIZE`.
-- Source: `src/heart/environment.py`.
+- Source: `src/heart/renderers/color_conversion.py`.

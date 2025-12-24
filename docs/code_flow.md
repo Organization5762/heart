@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. The frame composition stage includes merge-strategy selection and cached surface reuse.
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, the runtime loop in `heart.runtime.game_loop`, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. The frame composition stage includes merge-strategy selection and cached surface reuse.
 
 ## Flow Diagram
 
@@ -33,7 +33,7 @@ flowchart LR
 
     subgraph Runtime["GameLoop Orchestration"]
         direction TB
-        Loop["GameLoop Service\n(start + main loop)"]
+        Loop["GameLoop Service\n(heart.runtime.game_loop)"]
         AppRouter["AppController / Mode Router"]
         ModeServices["Mode Services & Renderers"]
         FrameComposer["Frame Composer\n(surface merge + strategy selection)"]

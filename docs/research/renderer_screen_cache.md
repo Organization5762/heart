@@ -2,7 +2,7 @@
 
 ## Context
 
-`heart.environment.GameLoop.process_renderer` previously allocated a full-sized
+`heart.runtime.game_loop.GameLoop.process_renderer` previously allocated a full-sized
 `pygame.Surface` for every renderer on every frame. The allocation cost scales
 with the number of renderers, and it happens even when the display size stays
 constant between frames. The cache adds a reusable surface per renderer so the
@@ -17,7 +17,7 @@ frame loop can clear and reuse buffers instead of allocating each time.
 
 ## Source references
 
-- `src/heart/environment.py` (`GameLoop._get_renderer_surface`,
+- `src/heart/runtime/game_loop.py` (`GameLoop._get_renderer_surface`,
   `GameLoop.process_renderer`)
 - `src/heart/utilities/env.py` (`Configuration.render_screen_cache_enabled`)
 

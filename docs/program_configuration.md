@@ -25,7 +25,7 @@ Describe how to construct repeatable playlists of modes and renderers so the Hea
 ```python
 from heart.renderers.max_bpm_screen import MaxBpmScreen
 from heart.renderers.text import TextRendering
-from heart.environment import GameLoop
+from heart.runtime.game_loop import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
