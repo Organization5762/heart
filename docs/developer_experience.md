@@ -38,3 +38,21 @@ uv run python scripts/devex_snapshot.py --format json --output devex_snapshot.js
 ## Outputs
 
 The default output highlights the platform, tool versions, and repository state. Use JSON output when you need to diff snapshots over time or feed them into other tooling.
+
+## Developer Focus Loop
+
+The developer focus loop provides change-aware formatting and test feedback to shorten iteration time when working on a subset of files. It targets modified Python and documentation files, runs focused tests, and can watch for changes.
+
+Run the loop once:
+
+```bash
+make focus
+```
+
+Watch for updates:
+
+```bash
+make focus-watch
+```
+
+See `docs/dev_focus_loop.md` for detailed usage notes and test selection controls.
