@@ -10,6 +10,8 @@ from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 import reactivex
 from reactivex import operators as ops
 
+from heart.utilities.reactivex_streams import share_stream
+
 
 @dataclass(slots=True)
 class Input:
@@ -74,7 +76,10 @@ class Peripheral(Generic[A]):
                 peripheral_info=self.peripheral_info()
             )
 
-        return self._event_stream().pipe(ops.map(wrap), ops.share())
+        return share_stream(
+            self._event_stream().pipe(ops.map(wrap)),
+            stream_name=f"{type(self).__name__}.observe",
+        )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
