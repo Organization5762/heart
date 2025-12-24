@@ -10,7 +10,7 @@ from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 import reactivex
 from reactivex import operators as ops
 
-from heart.utilities.reactivex_streams import share_stream
+from heart.utilities.reactivex import share_stream
 
 
 @dataclass(slots=True)

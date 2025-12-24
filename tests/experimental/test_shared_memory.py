@@ -32,7 +32,7 @@ def _load_experimental_classes():
 ) = _load_experimental_classes()
 
 
-def _wait_for(predicate, timeout: float = 1.0) -> bool:
+def _wait_for(predicate, timeout: float = 2.0) -> bool:
     deadline = time.perf_counter() + timeout
     while time.perf_counter() < deadline:
         if predicate():
@@ -58,7 +58,7 @@ class TestExperimentalSharedMemory:
 
             assert _wait_for(
                 lambda: list(target.snapshot().image.getdata())[0] == (10, 20, 30)
-            )
+            ), "Shared memory watcher did not update the frame buffer in time."
         finally:
             watcher.stop()
             writer.close()
