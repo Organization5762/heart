@@ -291,7 +291,7 @@ class BluetoothSwitch(BaseSwitch):
                             self.update_due_to_data(event)
                         time.sleep(0.1)
                 except KeyboardInterrupt:
-                    print("Program terminated")
+                    logger.info("Program terminated")
                 except Exception:
                     self.connected = False
                     pass
