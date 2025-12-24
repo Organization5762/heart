@@ -1,6 +1,6 @@
 import json
-import os
 from functools import cache
+from os import PathLike
 from pathlib import Path
 from typing import Any
 
@@ -11,37 +11,37 @@ from heart.utilities.env import Configuration, SpritesheetFrameCacheStrategy
 
 class Loader:
     @classmethod
-    def resolve_path(cls, path: str | os.PathLike[str]) -> Path:
+    def resolve_path(cls, path: str | PathLike[str]) -> Path:
         """Return the absolute path to a file in ``src/heart/assets``."""
 
         return Path(__file__).resolve().parent / Path(path)
 
     @classmethod
-    def _resolve_path(cls, path):
-        return os.fspath(cls.resolve_path(path))
+    def _resolve_path(cls, path: str | PathLike[str]) -> Path:
+        return cls.resolve_path(path)
 
     @classmethod
     @cache
-    def load(cls, path: str | os.PathLike[str]):
+    def load(cls, path: str | PathLike[str]):
         return pygame.image.load(cls._resolve_path(path))
 
     @classmethod
-    def load_spirtesheet(cls, path: str | os.PathLike[str]):
+    def load_spirtesheet(cls, path: str | PathLike[str]):
         resolved_path = cls._resolve_path(path)
         return spritesheet(resolved_path)
 
     @classmethod
-    def load_animation(cls, path: str | os.PathLike[str]):
+    def load_animation(cls, path: str | PathLike[str]):
         return Animation(cls._resolve_path(path), 100)
 
     @classmethod
-    def load_font(cls, path: str | os.PathLike[str], font_size: int = 10):
+    def load_font(cls, path: str | PathLike[str], font_size: int = 10):
         return pygame.font.Font(cls._resolve_path(path), size=font_size)
 
     @classmethod
-    def load_json(cls, path: str | os.PathLike[str]) -> dict[str, Any]:
+    def load_json(cls, path: str | PathLike[str]) -> dict[str, Any]:
         resolved_path = cls._resolve_path(path)
-        with open(resolved_path, "r") as fp:
+        with resolved_path.open("r") as fp:
             return json.load(fp)
 
 
@@ -49,13 +49,14 @@ class Loader:
 # I copied this from here it is kinda meh lol
 class spritesheet(object):
     def __init__(self, filename: str):
-        if not os.path.exists(filename):
-            raise ValueError(f"'{filename}' does not exist.")
+        path = Path(filename)
+        if not path.exists():
+            raise ValueError(f"'{path}' does not exist.")
 
-        if not os.path.isfile(filename):
-            raise ValueError(f"'{filename}' is not a file.")
+        if not path.is_file():
+            raise ValueError(f"'{path}' is not a file.")
 
-        with open(filename, "rb") as f:
+        with path.open("rb") as f:
             self.sheet = pygame.image.load(f).convert_alpha()
         self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
         self._scaled_cache: dict[tuple[int, int, int, int, int, int], pygame.Surface] = {}
