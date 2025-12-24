@@ -136,7 +136,9 @@ class Configuration:
             return ReactivexStreamShareStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', or 'replay_buffer'"
+                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', "
+                "'replay_latest_auto_connect', 'replay_buffer', or "
+                "'replay_buffer_auto_connect'"
             ) from exc
 
     @classmethod
@@ -292,7 +294,9 @@ class ReactivexEventBusScheduler(StrEnum):
 class ReactivexStreamShareStrategy(StrEnum):
     SHARE = "share"
     REPLAY_LATEST = "replay_latest"
+    REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
     REPLAY_BUFFER = "replay_buffer"
+    REPLAY_BUFFER_AUTO_CONNECT = "replay_buffer_auto_connect"
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
