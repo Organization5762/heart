@@ -1,5 +1,6 @@
 import json
 import random
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
@@ -61,24 +62,26 @@ class Accelerometer(Peripheral[Acceleration | None]):
                         for datum in data:
                             self._process_data(datum)
                 except KeyboardInterrupt:
-                    print("Program terminated")
+                    logger.info("Accelerometer serial loop interrupted")
+                    break
                 except Exception:
-                    pass
+                    logger.exception("Accelerometer serial loop crashed")
                 finally:
                     ser.close()
             except Exception:
-                pass
+                logger.exception("Failed to connect to accelerometer serial device")
+                time.sleep(1.0)
 
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()
         if not bus_data or not bus_data.startswith("{"):
-            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
+            logger.debug("Ignoring non-JSON sensor payload: %s", bus_data)
             return
 
         try:
             parsed: dict[str, Any] = json.loads(bus_data)
         except json.JSONDecodeError:
-            print(f"Failed to decode JSON: {bus_data}")
+            logger.warning("Failed to decode sensor JSON: %s", bus_data)
             return
         self._update_due_to_data(parsed)
 
@@ -124,12 +127,11 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
         input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
+        return
 
-        raise NotImplementedError("")
-
-    # TODO Separate
     def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
-        raise NotImplementedError("")
+        logger.debug("Ignoring magnetometer payload: %s", payload)
+        return
         # try:
         #     vector = MagnetometerVector(
         #         x=float(payload["x"]),

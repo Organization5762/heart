@@ -77,6 +77,7 @@ COLUMNS: tuple[ColumnDef, ...] = (
             NodeDef("sensors", "Accelerometer / Phyphox", "input"),
             NodeDef("heart_rate", "HeartRateManager", "input"),
             NodeDef("phone_text", "PhoneText", "input"),
+            NodeDef("display_frame", "LED Matrix Frame Peripheral", "input"),
         ),
     ),
     ColumnDef(
@@ -113,11 +114,13 @@ EDGES: tuple[EdgeDef, ...] = (
     EdgeDef("peripheral_manager", "sensors"),
     EdgeDef("peripheral_manager", "heart_rate"),
     EdgeDef("peripheral_manager", "phone_text"),
+    EdgeDef("peripheral_manager", "display_frame"),
     EdgeDef("switch", "app_router"),
     EdgeDef("gamepad", "app_router"),
     EdgeDef("sensors", "app_router"),
     EdgeDef("heart_rate", "app_router"),
     EdgeDef("phone_text", "app_router"),
+    EdgeDef("display_service", "display_frame"),
 )
 
 

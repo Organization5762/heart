@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1408" height="660" viewBox="0 0 1408 660">
+<svg xmlns="http://www.w3.org/2000/svg" width="1408" height="742" viewBox="0 0 1408 742">
   <defs>
     <style>text { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
 .column-title { font-size: 16px; font-weight: 600; }
@@ -18,7 +18,7 @@
     <text x="534.00" y="74.00" text-anchor="middle" class="column-title">GameLoop Orchestration</text>
   </g>
   <g>
-    <rect x="744.00" y="48.00" width="260.00" height="564.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <rect x="744.00" y="48.00" width="260.00" height="646.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
     <text x="874.00" y="74.00" text-anchor="middle" class="column-title">Peripheral &amp; Signal Services</text>
   </g>
   <g>
@@ -45,11 +45,13 @@
     <path d="M 874.00 174.00 C 874.00 265.00 874.00 265.00 874.00 356.00" marker-end="url(#arrowhead)" />
     <path d="M 874.00 174.00 C 874.00 306.00 874.00 306.00 874.00 438.00" marker-end="url(#arrowhead)" />
     <path d="M 874.00 174.00 C 874.00 347.00 874.00 347.00 874.00 520.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 388.00 874.00 388.00 874.00 602.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 224.00 C 722.00 224.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 306.00 C 722.00 306.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 388.00 C 722.00 388.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 470.00 C 722.00 470.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 552.00 C 722.00 552.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 1102.00 142.00 C 1062.00 142.00 1026.00 634.00 986.00 634.00" marker-end="url(#arrowhead)" />
   </g>
   <rect x="289.50" y="241.00" width="149.00" height="20.00" rx="4" fill="#ffffff" stroke="#d1d5db" opacity="0.95" />
   <text x="364.00" y="251.00" text-anchor="middle" dominant-baseline="middle" class="edge-label">adds modes &amp; scenes</text>
@@ -109,6 +111,10 @@
     <rect x="762.00" y="520.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="552.00" fill="#f8fafc" text-anchor="middle">
       <tspan x="874.00">PhoneText</tspan>
+    </text>
+    <rect x="762.00" y="602.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="634.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">LED Matrix Frame Peripheral</tspan>
     </text>
     <rect x="1102.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
     <text x="1214.00" y="133.00" fill="#f8fafc" text-anchor="middle">

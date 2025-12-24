@@ -6,6 +6,7 @@ from lagom import Singleton
 from heart.display.color import Color
 from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.renderers.artist import ArtistScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
@@ -77,7 +78,12 @@ def configure(loop: GameLoop) -> None:
         )
     )
     loop.context_container[MarioRendererProvider] = Singleton(
-        lambda builder: MarioRendererProvider(accel_stream=builder[AllAccelerometersProvider], sheet_file_path="mario_64.png", metadata_file_path="mario_64.json")
+        lambda builder: MarioRendererProvider(
+            accel_stream=builder[AllAccelerometersProvider],
+            peripheral_manager=builder[PeripheralManager],
+            sheet_file_path="mario_64.png",
+            metadata_file_path="mario_64.json",
+        )
     )
     mario_mode.resolve_renderer(
         container=loop.context_container,

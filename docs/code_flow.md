@@ -48,6 +48,7 @@ flowchart LR
         Sensors["Accelerometer / Phyphox"]
         HeartRate["HeartRateManager"]
         PhoneText["PhoneText"]
+        DisplayFrame["LED Matrix Frame Peripheral"]
     end
 
     subgraph Outputs["Display & Device Services"]
@@ -76,10 +77,12 @@ flowchart LR
     RxScheduler --> Sensors --> AppRouter
     RxScheduler --> HeartRate --> AppRouter
     RxScheduler --> PhoneText --> AppRouter
+    PeripheralMgr --> DisplayFrame
+    DisplaySvc --> DisplayFrame
 
     class CLI,Registry,Configurer,ModeServices,FrameComposer service;
     class Loop,AppRouter orchestrator;
-    class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
+    class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText,DisplayFrame input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
 

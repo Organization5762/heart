@@ -27,6 +27,8 @@ class MarioRenderer(StatefulBaseRenderer[MarioRendererState]):
         orientation: Orientation,
     ) -> None:
         screen_width, screen_height = window.get_size()
+        if self.state.current_frame is None:
+            return
         image = self.state.spritesheet.image_at(self.state.current_frame.frame)
         scaled = pygame.transform.scale(image, (screen_width, screen_height))
         center_x = (screen_width - scaled.get_width()) // 2

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from PIL import Image
+from reactivex.subject import Subject
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads import DisplayFrame
@@ -35,6 +36,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         self._latest_frame: DisplayFrame | None = None
         self._sequence = 0
         self._stop = threading.Event()
+        self._frame_subject: Subject[DisplayFrame] = Subject()
 
         super().__init__()
 
@@ -53,6 +55,8 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         with self._frame_lock:
             return self._latest_frame
 
+    def _event_stream(self) -> Subject[DisplayFrame]:
+        return self._frame_subject
 
     def publish_image(
         self,
@@ -68,14 +72,23 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
                 "Image dimensions do not match configured display size"
             )
 
-        # TODO: Make this observable
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        frame_metadata = dict(metadata or {})
+        frame_metadata.setdefault("timestamp", timestamp.isoformat())
+
         with self._frame_lock:
             frame = DisplayFrame.from_image(
                 image,
                 frame_id=self._sequence,
-                metadata=metadata,
+                metadata=frame_metadata,
             )
             self._sequence += 1
             self._latest_frame = frame
+
+        try:
+            self._frame_subject.on_next(frame)
+        except Exception:
+            _LOGGER.exception("Failed to publish LED matrix frame")
 
         return frame
