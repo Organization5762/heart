@@ -40,9 +40,11 @@ END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
 
 
-# TODO: AAddDd a bulk write command
-def send(messages: list[str]):
+def send_bulk(messages: list[str]) -> None:
     _require_ble_dependencies()
+
+    if not messages:
+        return
 
     if not ble.advertising:
         if advertisement is None:
@@ -53,7 +55,9 @@ def send(messages: list[str]):
         ble.start_advertising(advertisement)
 
     if ble.connected:
-        # We're connected, make sure the buffer is drained as the first priority
-        for message in messages:
-            uart.write(message.encode(ENCODING))
-            uart.write(END_OF_MESSAGE_DELIMETER.encode(ENCODING))
+        payload = END_OF_MESSAGE_DELIMETER.join(messages) + END_OF_MESSAGE_DELIMETER
+        uart.write(payload.encode(ENCODING))
+
+
+def send(messages: list[str]) -> None:
+    send_bulk(messages)

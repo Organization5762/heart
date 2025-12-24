@@ -1,3 +1,5 @@
+import json
+
 import serial
 
 ser = serial.Serial("/dev/ttyACM0", 115200)
@@ -5,10 +7,16 @@ ser = serial.Serial("/dev/ttyACM0", 115200)
 try:
     while True:
         if ser.in_waiting > 0:
-            # TODO (lampe): Handle button state too
-            # Will likely switch this over to a JSON format + update the driver on the encoder
             data = ser.readline().decode("utf-8").rstrip()
-            print(data)
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                print(data)
+                continue
+
+            event_type = payload.get("event_type", "unknown")
+            event_data = payload.get("data", {})
+            print(f"{event_type}: {event_data}")
 except KeyboardInterrupt:
     print("Program terminated")
 finally:

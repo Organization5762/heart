@@ -11,6 +11,8 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
+from heart.utilities.env import Configuration
+
 # https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#service_uuid
 NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
@@ -31,12 +33,18 @@ class UartListener:
         self._logger = logging.getLogger(f"{__name__}.{type(self).__name__}")
 
     @classmethod
-    def _discover_devices(cls) -> Iterator[BLEDevice]:
+    def _discover_devices(cls, device_name: str) -> Iterator[BLEDevice]:
         devices: list[BLEDevice] = asyncio.run(BleakScanner.discover())
         for device in devices:
-            # TODO: This should come from somewhere more principled
-            if device.name == "totem-controller":
+            if device.name == device_name:
                 yield device
+
+    def _resolve_device(self) -> BLEDevice | None:
+        device_name = Configuration.bluetooth_device_name()
+        for device in self._discover_devices(device_name):
+            return device
+        self._logger.warning("No BLE devices found with name '%s'", device_name)
+        return None
 
     def start(self) -> None:
         self._logger.debug("Starting UART listener thread for %s", self.device.address)
@@ -62,6 +70,7 @@ class UartListener:
         await self.__start_listener_loop(self.device)
 
     async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
+        target_name = Configuration.bluetooth_device_name()
         while True:
             # We still tend to loe a decent amount of data (~5 seconds worth)
             # as part of the reconnection process, but if the timeout is infrequent enough it would be hard to notice
@@ -73,10 +82,17 @@ class UartListener:
             # is likely going to be discarded as misaligned anyway
             self.__clear_buffer()
 
-            # TODO: There is an issue where when you have the device in dev mode, the _device_
-            # changes when new code gets flashed onto it.  I don't think this will happen in practice, but it:
-            # 1. Makes developing kinda annoying
-            # 2. Is a weird failure case where the Totem / main controller would need to be restarted
+            if device.name != target_name or self.disconnected:
+                refreshed = self._resolve_device()
+                if refreshed is not None:
+                    device = refreshed
+                    self.device = refreshed
+                    self.disconnected = False
+                    self._logger.info(
+                        "Refreshed BLE device to %s (%s).",
+                        device.address,
+                        device.name,
+                    )
             async with self.__get_client(device) as client:
                 # Try to connect if not connected
                 if not client.is_connected:

@@ -65,7 +65,7 @@ class FractalRuntime(BaseRenderer):
         self.shader: Shader | None = None
 
         self.last_frame_time = None
-        self.delta_real_time = None
+        self.delta_real_time = 0.0
         self.virtual_time = 0
         self.INFLATE_SPEED = 10
         self.look_speed = 0.003
@@ -639,25 +639,20 @@ class FractalRuntime(BaseRenderer):
         # self.key_pressed_last_frame[pygame.K_o] = keys[pygame.K_o]
 
         # "inflate/deflate" sphere on hold/release
-        try:
-            if keys[pygame.K_SPACE]:
-                target = self.BASE_RADIUS + 0.2
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
-            else:
-                target = self.BASE_RADIUS
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
-        except Exception as e:
-            # TODO: Very occasionally this raises an exception for some reason, no idea why
-            self.active_radius = self.BASE_RADIUS
-            print(f"error but why: {e}")
+        if keys[pygame.K_SPACE]:
+            target = self.BASE_RADIUS + 0.2
+            self.active_radius = lerp(
+                self.active_radius,
+                target,
+                self.delta_real_time * self.INFLATE_SPEED,
+            )
+        else:
+            target = self.BASE_RADIUS
+            self.active_radius = lerp(
+                self.active_radius,
+                target,
+                self.delta_real_time * self.INFLATE_SPEED,
+            )
 
         if not self.tiled_mode:
             # eagerly apply the uniforms

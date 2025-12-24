@@ -24,6 +24,32 @@ class AppController(BaseRenderer):
         self.warmup = True
         super().__init__()
 
+    def _build_title_renderer(
+        self, title: str | list[BaseRenderer] | BaseRenderer
+    ) -> BaseRenderer:
+        if isinstance(title, str):
+            title_renderer: BaseRenderer = TextRendering(
+                text=[title],
+                font="Roboto",
+                font_size=14,
+                color=Color(255, 105, 180),
+            )
+        elif isinstance(title, BaseRenderer):
+            title_renderer = title
+        elif isinstance(title, list):
+            title_renderer = ComposedRenderer(title)
+        else:
+            raise ValueError("Title must be a string or BaseRenderer, got: ", title)
+
+        navigation_hint = TextRendering(
+            text=["rotate to browse", "long-press to enter"],
+            font="Roboto",
+            font_size=10,
+            color=Color(160, 160, 160),
+            y_location=45,
+        )
+        return ComposedRenderer([title_renderer, navigation_hint])
+
     def initialize(
         self,
         window: pygame.Surface,
@@ -71,26 +97,11 @@ class AppController(BaseRenderer):
     def add_mode(
         self, title: str | list[BaseRenderer] | BaseRenderer | None = None
     ) -> "ComposedRenderer":
-        # TODO: Add a navigation page back in
         result = ComposedRenderer([])
         if title is None:
             title = "Untitled"
 
-        if isinstance(title, str):
-            title_renderer = TextRendering(
-                text=[title],
-                font="Roboto",
-                font_size=14,
-                color=Color(255, 105, 180),
-            )
-        elif isinstance(title, BaseRenderer):
-            title_renderer = title
-        elif isinstance(title, list):
-            title_renderer = ComposedRenderer(title)
-        else:
-            raise ValueError("Title must be a string or BaseRenderer, got: ", title)
-
-        # TODO: Clean-up
+        title_renderer = self._build_title_renderer(title)
         self.modes.add_new_pages(title_renderer, result)
         return result
 
@@ -154,6 +165,10 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     Navigation is built-in to this, assuming the user long-presses
 
     """
+    def __init__(self) -> None:
+        super().__init__()
+        self._pending_pages: list[tuple[BaseRenderer, BaseRenderer]] = []
+
     def _create_initial_state(
         self,
         window: pygame.Surface,
@@ -169,6 +184,12 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             state = self._state
         else:
             state = GameModeState()
+        for title_renderer, renderer in self._pending_pages:
+            renderer.initialize(window, clock, peripheral_manager, orientation)
+            title_renderer.initialize(window, clock, peripheral_manager, orientation)
+            state.renderers.append(renderer)
+            state.title_renderers.append(title_renderer)
+        self._pending_pages.clear()
         peripheral_manager.get_main_switch_subscription().subscribe(
             on_next=self.handle_state
         )
@@ -177,9 +198,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def add_new_pages(
         self, title_renderer: "BaseRenderer", renderers: "BaseRenderer"
     ) -> None:
-        # TODO: Hack because we are trying to build and have state at the same time
         if self._state is None:
-            self.set_state(GameModeState())
+            self._pending_pages.append((title_renderer, renderers))
+            return
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
 
@@ -260,7 +281,6 @@ class ComposedRenderer(BaseRenderer):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
             renderer._internal_process(window, clock, peripheral_manager, orientation)
 

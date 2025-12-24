@@ -72,7 +72,7 @@ Validation combines automated and manual checks. Unit tests exercise mapping mat
 | Transport disconnects overwhelm reconnection logic | Low | Medium | Add exponential backoff and watchdog timers for reconnect attempts | Repeated failure logs or queue growth metrics |
 | Mapping complexity confuses operators | Medium | Medium | Ship opinionated starter profiles and documentation with diagrams | Support tickets asking for configuration clarification |
 | Inbound MIDI floods saturate event bus consumers | Medium | Medium | Rate-limit inbound publishing, expose queue metrics, and allow per-route throttling | Observability dashboards show sustained inbound queue depth |
-| Hardware DIN output unavailable for initial release | High | Low | Publish stub adapter with clear TODO; plan follow-up hardware sprint | Planning review identifies missing hardware BOM |
+| Hardware DIN output unavailable for initial release | High | Low | Publish stub adapter with explicit limitation note; plan follow-up hardware sprint | Planning review identifies missing hardware BOM |
 
 ### Mitigation checklist
 

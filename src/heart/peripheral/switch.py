@@ -39,12 +39,20 @@ class BaseSwitch(Peripheral[SwitchState]):
     ) -> None:
         super().__init__()
         self.rotational_value = 0
+        self._mode_variant = "main_rotary_button"
 
         self.button_value = 0
         self.rotation_value_at_last_button_press = self.rotational_value
 
         self.button_long_press_value = 0
         self.rotation_value_at_last_long_button_press = self.rotational_value
+
+    def set_mode_variant(self, variant: str) -> None:
+        self._mode_variant = variant
+
+    @property
+    def mode_variant(self) -> str:
+        return self._mode_variant
 
     def _event_stream(
         self
@@ -83,10 +91,9 @@ class FakeSwitch(BaseSwitch):
                     variant="button",
                     metadata={"version": "v1"}
                 ),
-                # TODO: Allow the button to change its own tags in some cases
                 PeripheralTag(
                     name="mode",
-                    variant="main_rotary_button",
+                    variant=self.mode_variant,
                 ),
             ]
         )
@@ -248,7 +255,9 @@ class BluetoothSwitch(BaseSwitch):
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        for device in UartListener._discover_devices():
+        for device in UartListener._discover_devices(
+            Configuration.bluetooth_device_name()
+        ):
             yield cls(device=device)
 
     def _connect_to_ser(self) -> None:

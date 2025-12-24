@@ -176,6 +176,26 @@ class Configuration:
         return os.environ.get("HEART_RENDER_VARIANT", "iterative")
 
     @classmethod
+    def layout_columns(cls) -> int | None:
+        return _env_optional_int("HEART_LAYOUT_COLUMNS", minimum=1)
+
+    @classmethod
+    def layout_rows(cls) -> int | None:
+        return _env_optional_int("HEART_LAYOUT_ROWS", minimum=1)
+
+    @classmethod
+    def bluetooth_device_name(cls) -> str:
+        return os.environ.get("HEART_BLE_DEVICE_NAME", "totem-controller")
+
+    @classmethod
+    def gamepad_bluetooth_mac(cls) -> str | None:
+        value = os.environ.get("HEART_GAMEPAD_MAC")
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @classmethod
     def render_parallel_threshold(cls) -> int:
         return _env_int("HEART_RENDER_PARALLEL_THRESHOLD", default=4, minimum=1)
 

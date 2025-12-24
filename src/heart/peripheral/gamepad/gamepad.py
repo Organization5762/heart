@@ -204,22 +204,18 @@ class Gamepad(Peripheral[Any]):
                 if cached_name is not None:
                     logger.info(f"{cached_name} disconnected")
 
-            # Todo: We're reaching unfathomable levels of hard-coding.
-            #  This will only work specifically with our pi4, and our 8bitdo
-            #  controller. We only know the mac address bc we've explicitly
-            #  paired the 8bitdo controller with the raspberry pi.
-            #  God help us if it ever unpairs.
             if Configuration.is_pi():
-                if not Gamepad.gamepad_detected():
+                bluetooth_mac = Configuration.gamepad_bluetooth_mac()
+                if bluetooth_mac and not Gamepad.gamepad_detected():
                     result = subprocess.run(
-                        ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
+                        ["bluetoothctl", "connect", bluetooth_mac],
                         capture_output=True,
                         text=True,
                     )
                     if result.returncode == 0:
-                        print("Successfully connected to 8bitdo controller")
+                        print("Successfully connected to Bluetooth gamepad")
                     else:
-                        print("Failed to connect to 8bitdo controller")
+                        print("Failed to connect to Bluetooth gamepad")
 
         except KeyboardInterrupt:
             print("Program terminated")
@@ -227,9 +223,7 @@ class Gamepad(Peripheral[Any]):
             pass
 
     def run(self) -> None:
-        # Give pygame and USB subsystems time to fully initialize
-        # TODO: Is this needed?
-        time.sleep(1.5)
+        self._wait_for_joystick_ready()
 
         # check every 1 second for controller state, so that we can attempt to connect
         scheduler = input_scheduler()
@@ -242,3 +236,13 @@ class Gamepad(Peripheral[Any]):
         reactivex.interval(timedelta(milliseconds=20), scheduler=scheduler).pipe(
             ops.observe_on(scheduler),
         ).subscribe(on_next=lambda x: self._update())
+
+    def _wait_for_joystick_ready(
+        self, *, timeout_seconds: float = 1.5, poll_interval: float = 0.05
+    ) -> None:
+        start = time.monotonic()
+        while time.monotonic() - start < timeout_seconds:
+            if pygame.joystick.get_init():
+                return
+            pygame.joystick.init()
+            time.sleep(poll_interval)

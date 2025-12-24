@@ -85,10 +85,11 @@ class RotaryEncoderHandler:
 class Seesaw:
     def __init__(self, handlers):
         self.handlers = handlers
+        self._event_pool: list[str] = []
 
     def handle(self):
+        self._event_pool.clear()
         for handler in self.handlers:
-            events = handler.handle()
-            # TODO: Possibly pool the events
-            for event in events:
-                yield event
+            self._event_pool.extend(handler.handle())
+        for event in self._event_pool:
+            yield event

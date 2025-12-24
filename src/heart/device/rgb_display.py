@@ -251,9 +251,9 @@ class LEDMatrix(Device, SampleBase):
     def __init__(self, orientation: Orientation, *args: Any, **kwargs: Any) -> None:
         Device.__init__(self, orientation=orientation)
         SampleBase.__init__(self, *args, **kwargs)
-        assert orientation.layout.rows == 1, "Maximum 1 row supported at the moment"
 
         self.chain_length = orientation.layout.columns
+        self.parallel = orientation.layout.rows
         self.row_size = 64
         self.col_size = 64
 
@@ -278,11 +278,10 @@ class LEDMatrix(Device, SampleBase):
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
             options = RGBMatrixOptions()
-            # TODO: Might need to change these if we want N screens
             options.rows = self.row_size
             options.cols = self.col_size
             options.chain_length = self.chain_length
-            options.parallel = 1
+            options.parallel = self.parallel
             options.pwm_bits = 11
 
             options.show_refresh_rate = 1
@@ -306,7 +305,7 @@ class LEDMatrix(Device, SampleBase):
             self.worker = MatrixDisplayWorker(self.matrix)
 
     def layout(self) -> Layout:
-        return Layout(columns=self.chain_length, rows=1)
+        return Layout(columns=self.chain_length, rows=self.parallel)
 
     def individual_display_size(self) -> tuple[int, int]:
         return (self.col_size, self.row_size)

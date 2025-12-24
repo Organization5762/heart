@@ -1,11 +1,11 @@
 [project]
 name = "heart"
 version = "0.2.0"
-description = "TODO: Add a concise project description."
+description = "Runtime for driving LED totems with pygame renderers and peripheral integrations."
 readme = "README.md"
-license = { text = "TODO: Choose a license text or SPDX identifier." }
+license = { text = "Apache-2.0" }
 authors = [
-    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
+    { name = "Heart Runtime Maintainers", email = "maintainers@heart.runtime" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -25,9 +25,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
 ]
-keywords = ["TODO: add keywords"]
+keywords = ["led", "pygame", "raspberry-pi", "peripheral", "runtime"]
 maintainers = [
-    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
+    { name = "Heart Runtime Maintainers", email = "maintainers@heart.runtime" },
 ]
 requires-python = ">= 3.11"
 
@@ -55,10 +55,10 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "TODO: add documentation URL"
-Homepage = "TODO: add homepage URL"
-Repository = "TODO: add repository URL"
-Issues = "TODO: add issue tracker URL"
+Documentation = "https://github.com/your-org/heart/tree/main/docs"
+Homepage = "https://github.com/your-org/heart"
+Repository = "https://github.com/your-org/heart"
+Issues = "https://github.com/your-org/heart/issues"
 
 [project.optional-dependencies]
 dev = [

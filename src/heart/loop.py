@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from PIL import Image
 
-from heart.device import Cube, Device
+from heart.device import Cube, Device, Rectangle
 from heart.device.local import LocalScreen
 from heart.environment import GameLoop, RendererVariant
 from heart.manage.update import main as update_driver_main
@@ -21,9 +21,27 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 
-def _get_device(x11_forward: bool) -> Device:
-    # TODO: Add a way of adding orientation either from Config or `run`
-    orientation = Cube.sides()
+def _resolve_orientation(
+    layout_columns: int | None, layout_rows: int | None
+) -> Cube | Rectangle:
+    config_columns = Configuration.layout_columns()
+    config_rows = Configuration.layout_rows()
+    if layout_columns is None:
+        layout_columns = config_columns
+    if layout_rows is None:
+        layout_rows = config_rows
+
+    if (layout_columns is None) ^ (layout_rows is None):
+        raise ValueError("Both layout_columns and layout_rows must be set together")
+    if layout_columns is not None and layout_rows is not None:
+        return Rectangle.with_layout(layout_columns, layout_rows)
+    return Cube.sides()
+
+
+def _get_device(
+    x11_forward: bool, *, layout_columns: int | None, layout_rows: int | None
+) -> Device:
+    orientation = _resolve_orientation(layout_columns, layout_rows)
     device: Device
 
     if Configuration.forward_to_beats_app():
@@ -84,6 +102,12 @@ def run(
     x11_forward: bool = typer.Option(
         False, "--x11-forward", help="Use X11 forwarding for RGB display"
     ),
+    layout_columns: int | None = typer.Option(
+        None, "--layout-columns", help="Number of horizontal panels in the layout"
+    ),
+    layout_rows: int | None = typer.Option(
+        None, "--layout-rows", help="Number of vertical panels in the layout"
+    ),
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
@@ -91,7 +115,9 @@ def run(
         raise Exception(f"Configuration '{configuration}' not found in registry")
     render_variant = _parse_render_variant(Configuration.render_variant())
     loop = GameLoop(
-        device=_get_device(x11_forward),
+        device=_get_device(
+            x11_forward, layout_columns=layout_columns, layout_rows=layout_rows
+        ),
         resolver=container,
         render_variant=render_variant,
     )
@@ -116,7 +142,7 @@ def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     name="bench-device",
 )
 def bench_device() -> None:
-    d = _get_device(x11_forward=False)
+    d = _get_device(x11_forward=False, layout_columns=None, layout_rows=None)
 
     size = d.full_display_size()
     print(size)

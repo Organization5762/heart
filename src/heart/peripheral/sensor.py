@@ -8,7 +8,7 @@ import reactivex
 import serial
 from reactivex import operators as ops
 
-from heart.events.types import AccelerometerVector
+from heart.events.types import AccelerometerVector, MagnetometerVector
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
@@ -31,6 +31,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
     ) -> None:
         super().__init__()
         self.acceleration_value: dict[str, float] | None = None
+        self.magnetic_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
 
@@ -72,7 +73,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()
         if not bus_data or not bus_data.startswith("{"):
-            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
+            logger.debug("Ignoring non-JSON sensor payload: %r", bus_data)
             return
 
         try:
@@ -96,7 +97,6 @@ class Accelerometer(Peripheral[Acceleration | None]):
                 "Failed to get acceleration, data: %s", self.acceleration_value
             )
             return None
-
 
     def _update_due_to_data(self, data: dict[str, Any]) -> None:
         event_type = data.get("event_type")
@@ -124,23 +124,23 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
         input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
+        logger.debug("Updated accelerometer values: %s", self.acceleration_value)
 
-        raise NotImplementedError("")
-
-    # TODO Separate
     def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
-        raise NotImplementedError("")
-        # try:
-        #     vector = MagnetometerVector(
-        #         x=float(payload["x"]),
-        #         y=float(payload["y"]),
-        #         z=float(payload["z"]),
-        #     )
-        # except (KeyError, TypeError, ValueError):
-        #     logger.debug("Magnetometer payload missing axis components: %s", payload)
-        #     return
+        try:
+            vector = MagnetometerVector(
+                x=float(payload["x"]),
+                y=float(payload["y"]),
+                z=float(payload["z"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.debug("Magnetometer payload missing axis components: %s", payload)
+            return
 
-        # raise NotImplementedError("")
+        input_event = vector.to_input()
+        self.magnetic_value = cast(dict[str, float], input_event.data)
+        logger.debug("Updated magnetometer values: %s", self.magnetic_value)
+
 
 class FakeAccelerometer(Peripheral[Acceleration | None]):
     @classmethod

@@ -52,6 +52,7 @@ Important flags:
 - `--configuration <name>`: load a module from `heart.programs.configurations`.
 - `--x11-forward`: force a pygame window, even on systems with the LED matrix attached.
 - `--add-low-power-mode/--no-add-low-power-mode`: control the idle power management loop.
+- `--layout-columns` and `--layout-rows`: override the display layout when running non-cube panel configurations.
 
 Ensure SDL dependencies are installed (`libsdl2-dev` and `libsdl2-image-dev` on Debian-based systems) if the window fails to open.
 
@@ -94,6 +95,12 @@ Set `--x11-forward` if you require a remote preview window while connected over 
 - Serial accelerometers and mixed sensor boards validated with `totem_debug accelerometer`.
 
 Inactive devices emit warnings but do not halt the runtime.
+
+Use environment variables to target specific hardware when multiple devices are paired:
+
+- `HEART_BLE_DEVICE_NAME` selects the BLE peripheral name used for UART listeners.
+- `HEART_GAMEPAD_MAC` sets a Bluetooth MAC address to auto-connect via `bluetoothctl`.
+- `HEART_LAYOUT_COLUMNS` and `HEART_LAYOUT_ROWS` set the default layout when CLI flags are not provided.
 
 ## Debugging Interfaces
 
