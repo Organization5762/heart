@@ -355,6 +355,9 @@ class GameLoop:
         self._render_executor: ThreadPoolExecutor | None = None
 
         self._render_queue_depth = 0
+        self._renderer_surface_cache: dict[
+            tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
+        ] = {}
 
         # jank slide animation state machine
         self.mode_change: tuple[int, int] = (0, 0)
@@ -380,6 +383,20 @@ class GameLoop:
             pygame.event.set_grab(True)
 
         self._last_render_mode = pygame.SHOWN
+
+    def _get_renderer_surface(self, renderer: "BaseRenderer") -> pygame.Surface:
+        size = self.device.full_display_size()
+        if not Configuration.render_screen_cache_enabled():
+            return pygame.Surface(size, pygame.SRCALPHA)
+
+        cache_key = (id(renderer), renderer.device_display_mode, size)
+        cached = self._renderer_surface_cache.get(cache_key)
+        if cached is None:
+            cached = pygame.Surface(size, pygame.SRCALPHA)
+            self._renderer_surface_cache[cache_key] = cached
+        else:
+            cached.fill((0, 0, 0, 0))
+        return cached
 
     def _get_render_executor(self) -> ThreadPoolExecutor:
         if self._render_executor is None:
@@ -490,9 +507,7 @@ class GameLoop:
                         pygame.OPENGL | pygame.DOUBLEBUF,
                     )
                 self._last_render_mode = pygame.OPENGL | pygame.DOUBLEBUF
-                screen = pygame.Surface(
-                    self.device.full_display_size(), pygame.SRCALPHA
-                )
+                screen = self._get_renderer_surface(renderer)
             else:
                 if self._last_render_mode != pygame.SHOWN:
                     logger.info("Switching to SHOWN mode")
@@ -506,9 +521,7 @@ class GameLoop:
                         pygame.SHOWN,
                     )
                 self._last_render_mode = pygame.SHOWN
-                screen = pygame.Surface(
-                    self.device.full_display_size(), pygame.SRCALPHA
-                )
+                screen = self._get_renderer_surface(renderer)
 
             if not renderer.initialized:
                 renderer.initialize(
