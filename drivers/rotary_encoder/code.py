@@ -1,4 +1,11 @@
-"""Expose a testable entry point for the rotary encoder driver."""
+"""Expose a testable entry point for the rotary encoder driver.
+
+REPL reproduction:
+    1. Connect to the board REPL and import this module.
+    2. Call ``create_handler()`` to construct the hardware adapter.
+    3. Iterate ``read_events(handler)`` while turning the encoder or pressing the
+       switch to verify event output without running the full game runtime.
+"""
 
 from __future__ import annotations
 
