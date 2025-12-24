@@ -25,9 +25,6 @@ from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
-if TYPE_CHECKING:
-    pass
-
 
 def _load_cv2_module() -> ModuleType | None:
     module: ModuleType | None = None
