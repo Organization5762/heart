@@ -38,8 +38,6 @@ def _get_device(x11_forward: bool) -> Device:
 
         return LEDMatrix(orientation=orientation)
     if Configuration.is_pi():
-        import os
-
         os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
         pi_info = Configuration.pi()
