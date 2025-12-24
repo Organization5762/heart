@@ -11,6 +11,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Iterable
 
 
@@ -150,6 +151,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--output",
+        type=Path,
         help="Optional file path to write the snapshot output.",
     )
     args = parser.parse_args()
@@ -161,9 +163,9 @@ def main() -> int:
         output = _format_text(payload)
 
     if args.output:
-        with open(args.output, "w", encoding="utf-8") as handle:
-            handle.write(output)
-            handle.write("\n")
+        output_path: Path = args.output
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(f"{output}\n", encoding="utf-8")
     else:
         print(output)
     return 0
