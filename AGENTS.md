@@ -36,3 +36,7 @@ Update `docs/code_flow.md` and re-render the diagram with `scripts/render_code_f
 ## File Focus
 
 Keep files narrowly scoped. If a module starts handling multiple concerns (e.g., orchestration plus parsing plus rendering), split the responsibilities into smaller, purpose-built modules so each file does slightly fewer things and has a clear single focus.
+
+## Environment Cleanup
+
+If a single file or module starts accumulating setup, orchestration, configuration, and cleanup logic, move those responsibilities into smaller, focused modules or helpers so each file handles fewer concerns and is easier to reason about.
