@@ -87,7 +87,7 @@ class SharedMemoryFile:
             self._mapping = _SharedMemoryMapping(fd=fd, mm=mm, size=total_size)
             self._maybe_initialize_header(mm)
             return self._mapping
-        except BaseException:
+        except Exception:
             os.close(fd)
             raise
 

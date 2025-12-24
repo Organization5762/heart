@@ -15,6 +15,10 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Avoid using `print` for runtime diagnostics in peripheral modules; use the shared logger.
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
 
+## Error Handling
+
+- Avoid catching `BaseException`; catch `Exception` or more specific error types so system-exiting signals propagate.
+
 ## Testing
 
 Run `make test` to execute the Pytest suite located in the `tests/` directory. Ensure all tests pass before submitting changes.
