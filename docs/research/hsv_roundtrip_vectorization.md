@@ -12,7 +12,14 @@ which scaled poorly when many pixels required adjustment.
 Vectorize the hue search by batching the candidate hue checks across all mismatched
 pixels for each offset. The updated loop keeps the same offsets and matching logic
 but uses array operations to compare candidate BGR values in bulk, reducing Python
-iteration overhead while preserving the calibrated round-trip behaviour.
+iteration overhead while preserving the calibrated round-trip behaviour. The same
+approach is applied to HSV→BGR correction so mismatched pixels are handled in
+groups rather than one-at-a-time.
+
+Add a configuration switch to opt into a lighter-weight calibration mode (`fast`)
+that skips the neighbourhood search while still applying targeted pure-colour
+adjustments. This allows deployments to pick the precision/performance trade-off
+without patching the conversion helper.
 
 ## Impact
 
@@ -22,5 +29,6 @@ rely on the numpy conversion path.
 
 ## Materials
 
-- `src/heart/environment.py` (`_convert_bgr_to_hsv` hue calibration loop)
+- `src/heart/environment.py` (HSV calibration loops, mode selection)
+- `src/heart/utilities/env.py` (calibration mode configuration)
 - `tests/test_environment_core_logic.py` (HSV conversion round-trip coverage)

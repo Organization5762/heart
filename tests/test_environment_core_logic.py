@@ -7,6 +7,7 @@ import pytest
 
 from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
                                _convert_bgr_to_hsv, _convert_hsv_to_bgr)
+from heart.utilities.env import Configuration
 
 
 @pytest.fixture(autouse=True)
@@ -213,6 +214,23 @@ class TestEnvironmentCoreLogic:
         assert loop._render_fn(renderers, None) is loop._render_surfaces_binary
         loop.renderer_variant = RendererVariant.ITERATIVE
         assert loop._render_fn(renderers, None) is loop._render_surface_iterative
+
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("strict", "strict"),
+            ("fast", "fast"),
+            ("off", "off"),
+        ],
+        ids=["strict-mode", "fast-mode", "off-mode"],
+    )
+    def test_hsv_calibration_mode_env_override(
+        self, monkeypatch, value: str, expected: str
+    ) -> None:
+        """Verify that hsv_calibration_mode reads explicit overrides. This keeps performance tuning consistent across deployments."""
+        monkeypatch.setenv("HEART_HSV_CALIBRATION_MODE", value)
+        assert Configuration.hsv_calibration_mode() == expected
 
 
 

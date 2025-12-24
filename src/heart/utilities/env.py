@@ -149,7 +149,27 @@ class Configuration:
 
     @classmethod
     def hsv_calibration_enabled(cls) -> bool:
+        mode = os.environ.get("HEART_HSV_CALIBRATION_MODE")
+        if mode is not None:
+            normalized = mode.strip().lower()
+            if normalized in {"off", "fast", "strict"}:
+                return normalized != "off"
+            raise ValueError(
+                "HEART_HSV_CALIBRATION_MODE must be 'off', 'fast', or 'strict'"
+            )
         return _env_flag("HEART_HSV_CALIBRATION", default=True)
+
+    @classmethod
+    def hsv_calibration_mode(cls) -> str:
+        mode = os.environ.get("HEART_HSV_CALIBRATION_MODE")
+        if mode is None:
+            return "strict" if cls.hsv_calibration_enabled() else "off"
+        normalized = mode.strip().lower()
+        if normalized in {"off", "fast", "strict"}:
+            return normalized
+        raise ValueError(
+            "HEART_HSV_CALIBRATION_MODE must be 'off', 'fast', or 'strict'"
+        )
 
     @classmethod
     def render_variant(cls) -> str:
