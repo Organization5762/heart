@@ -146,7 +146,7 @@ class TestEnvironmentCoreLogic:
     @pytest.mark.parametrize("values", [list("abcd"), list("abcde")])
     def test_render_surfaces_binary_merges_all(
         self,
-        loop, monkeypatch, values: list[str]
+        loop, monkeypatch, render_merge_strategy_in_place, values: list[str]
     ) -> None:
         """Verify that _render_surfaces_binary merges all renderers pairwise. This validates the binary merge optimisation powering high-FPS scenes."""
         sequence = {value: f"surface-{value}" for value in values}
@@ -172,7 +172,9 @@ class TestEnvironmentCoreLogic:
 
 
 
-    def test_render_surface_iterative_skips_missing(self, loop, monkeypatch) -> None:
+    def test_render_surface_iterative_skips_missing(
+        self, loop, monkeypatch, render_merge_strategy_in_place
+    ) -> None:
         """Verify that _render_surface_iterative skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
         renderers = ["r1", "r2", "r3"]
         responses = {"r1": "surface-1", "r2": None, "r3": "surface-3"}

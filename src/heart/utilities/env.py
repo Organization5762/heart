@@ -228,6 +228,18 @@ class Configuration:
             ) from exc
 
     @classmethod
+    def render_merge_strategy(cls) -> "RenderMergeStrategy":
+        strategy = os.environ.get(
+            "HEART_RENDER_MERGE_STRATEGY", "batched"
+        ).strip().lower()
+        try:
+            return RenderMergeStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_MERGE_STRATEGY must be 'batched' or 'in_place'"
+            ) from exc
+
+    @classmethod
     def frame_array_strategy(cls) -> "FrameArrayStrategy":
         strategy = os.environ.get("HEART_FRAME_ARRAY_STRATEGY", "copy").strip().lower()
         try:
@@ -251,6 +263,11 @@ class Configuration:
 class RenderTileStrategy(StrEnum):
     BLITS = "blits"
     LOOP = "loop"
+
+
+class RenderMergeStrategy(StrEnum):
+    IN_PLACE = "in_place"
+    BATCHED = "batched"
 
 
 class FrameArrayStrategy(StrEnum):

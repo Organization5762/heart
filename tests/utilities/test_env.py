@@ -8,7 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import Configuration, get_device_ports
+from heart.utilities.env import (Configuration, RenderMergeStrategy,
+                                 get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +161,23 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RENDER_MAX_WORKERS", "3")
 
         assert Configuration.render_executor_max_workers() == 3
+
+
+    def test_render_merge_strategy_defaults_batched(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render merge strategy defaults to batched. This keeps multi-renderer composition optimized without configuration."""
+        _clear_env(monkeypatch, "HEART_RENDER_MERGE_STRATEGY")
+
+        assert Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED
+
+
+    def test_render_merge_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify render merge strategy rejects invalid values. This keeps configuration errors visible early."""
+        monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.render_merge_strategy()
 
 
     def test_reactivex_event_bus_scheduler_defaults_inline(
