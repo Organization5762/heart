@@ -1,6 +1,7 @@
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 from functools import cache
 from typing import Any, Iterator, Self, cast
 
@@ -13,33 +14,33 @@ from heart.utilities.env import Configuration
 from heart.utilities.reactivex_threads import input_scheduler
 
 
-@dataclass
-class KeyTimeline:
+class KeyboardAction(StrEnum):
+    PRESSED = "pressed"
+    HELD = "held"
+    RELEASED = "released"
+
+
+@dataclass(frozen=True, slots=True)
+class KeyState:
     pressed: bool = False
     held: bool = False
-    last_change_ts: float = 0
-
-    def first_press(self) -> bool:
-        return self.pressed and not self.held
+    last_change_ts: float = 0.0
 
 
+@dataclass(frozen=True, slots=True)
+class KeyboardEvent:
+    key: int
+    action: KeyboardAction
+    pressed: bool
+    held: bool
+    timestamp_ms: float
 
-class KeyboardKey(Peripheral[KeyTimeline]):
+
+class KeyboardKey(Peripheral[KeyboardEvent]):
     def __init__(self, key: int, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.key = key
-        self.state = KeyTimeline()
-
-        # Start running the key checker
-        if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
-            scheduler = input_scheduler()
-            check_for_input = reactivex.interval(
-                timedelta(milliseconds=10), scheduler=scheduler
-            )
-            check_for_input.subscribe(
-                on_next=lambda _: self._check_if_pressed(),
-                scheduler=scheduler,
-            )
+        self.state = KeyState()
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -55,58 +56,76 @@ class KeyboardKey(Peripheral[KeyTimeline]):
     def get(cls, key: int) -> Self:
         return cls(key)
 
-    def _snapshot(self) -> KeyTimeline:
-        return self.state
-
-    def _event_stream(self) -> reactivex.Observable[KeyTimeline]:
+    def _event_stream(self) -> reactivex.Observable[KeyboardEvent]:
         """
-        Periodically sample keyboard state as a KeyTimeline.
+        Periodically sample keyboard state as KeyboardEvent edges.
 
         On Pi without X11 we emit an empty observable (no events).
         """
 
-        def _generate(_: int) -> KeyTimeline:
-            # interval emits an int tick count; we ignore it and just snapshot.
-            snapshot: KeyTimeline = self._snapshot()
-            return snapshot
-
-        def only_keypress(x: KeyTimeline) -> bool:
-            return x.first_press()
+        def _poll(_: int) -> KeyboardEvent | None:
+            return self._check_if_pressed()
 
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             # empty() is typed as Observable[NoReturn | Never] so we cast it
             # to keep type checkers happy about the return type.
-            return cast(reactivex.Observable[KeyTimeline], reactivex.empty())
+            return cast(reactivex.Observable[KeyboardEvent], reactivex.empty())
 
-        return (
-            reactivex.interval(
-                timedelta(milliseconds=5),
-                scheduler=input_scheduler(),
-            )
-            .pipe(
-                ops.map(_generate),  # Observable[KeyTimeline]
-                ops.distinct_until_changed(only_keypress),
-                ops.share(),
-            )
+        return reactivex.interval(
+            timedelta(milliseconds=5),
+            scheduler=input_scheduler(),
+        ).pipe(
+            ops.map(_poll),
+            ops.filter(lambda event: event is not None),
+            ops.map(lambda event: cast(KeyboardEvent, event)),
+            ops.share(),
         )
 
-    def _check_if_pressed(self) -> None:
+    def _check_if_pressed(self) -> KeyboardEvent | None:
         keys = pygame.key.get_pressed()
         now = time.time() * 1000
+        current = self.state
+        event: KeyboardEvent | None = None
 
-        def check_with_cache(key: int, s: KeyTimeline) -> KeyTimeline:
-            # Is pressed
-            if keys[key]:
-                if s.pressed:
-                    s.held = True
-                s.last_change_ts = now
-                s.pressed = True
-                return s
-            elif s.pressed and (now - s.last_change_ts < 60):
-                return s
+        if keys[self.key]:
+            if not current.pressed:
+                updated = KeyState(pressed=True, held=False, last_change_ts=now)
+                event = KeyboardEvent(
+                    key=self.key,
+                    action=KeyboardAction.PRESSED,
+                    pressed=updated.pressed,
+                    held=updated.held,
+                    timestamp_ms=now,
+                )
+            elif not current.held:
+                updated = KeyState(pressed=True, held=True, last_change_ts=now)
+                event = KeyboardEvent(
+                    key=self.key,
+                    action=KeyboardAction.HELD,
+                    pressed=updated.pressed,
+                    held=updated.held,
+                    timestamp_ms=now,
+                )
             else:
-                s.pressed = False
-                s.held = False
-                return s
+                updated = KeyState(pressed=True, held=True, last_change_ts=now)
+        else:
+            if current.pressed and (now - current.last_change_ts < 60):
+                return None
+            if current.pressed or current.held:
+                updated = KeyState(pressed=False, held=False, last_change_ts=now)
+                event = KeyboardEvent(
+                    key=self.key,
+                    action=KeyboardAction.RELEASED,
+                    pressed=updated.pressed,
+                    held=updated.held,
+                    timestamp_ms=now,
+                )
+            else:
+                updated = KeyState(
+                    pressed=False,
+                    held=False,
+                    last_change_ts=current.last_change_ts,
+                )
 
-        self.state = check_with_cache(self.key, self.state)
+        self.state = updated
+        return event

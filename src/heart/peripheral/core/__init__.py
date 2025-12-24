@@ -21,6 +21,16 @@ class Input:
     data: Any
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+
+@dataclass(frozen=True, slots=True)
+class InputDescriptor:
+    """Describe an input a peripheral or provider expects to consume."""
+
+    name: str
+    stream: reactivex.Observable[Any]
+    payload_type: type[Any] | None = None
+    description: str | None = None
+
 A = TypeVar("A")
 
 class PeripheralGroup(StrEnum):
@@ -65,6 +75,15 @@ class Peripheral(Generic[A]):
         # with no identifier or tags. Subclasses should override this method
         # to supply meaningful identification and metadata relevant to their hardware.
         return PeripheralInfo()
+
+    def inputs(
+        self,
+        *,
+        event_bus: reactivex.Observable[Input] | None = None,
+    ) -> tuple[InputDescriptor, ...]:
+        """Declare the input events this peripheral consumes."""
+
+        return ()
 
     @cached_property
     def observe(

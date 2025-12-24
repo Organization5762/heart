@@ -4,7 +4,7 @@ from typing import TypeGuard, cast
 import reactivex
 from reactivex import operators as ops
 
-from heart.peripheral.core import PeripheralMessageEnvelope
+from heart.peripheral.core import InputDescriptor, PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration, Accelerometer
@@ -15,6 +15,22 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
 
     def __init__(self, peripheral_manager: PeripheralManager):
         self._pm = peripheral_manager
+
+    def inputs(self) -> tuple[InputDescriptor, ...]:
+        accels = [
+            peripheral.observe
+            for peripheral in self._pm.peripherals
+            if isinstance(peripheral, Accelerometer)
+        ]
+        accel_stream = reactivex.merge(*accels) if accels else reactivex.empty()
+        return (
+            InputDescriptor(
+                name="accelerometer.observe",
+                stream=accel_stream,
+                payload_type=Acceleration,
+                description="Observable streams emitted by Accelerometer peripherals.",
+            ),
+        )
 
     def observable(self) -> reactivex.Observable[Acceleration]:
         accels = [
