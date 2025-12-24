@@ -14,8 +14,11 @@ from reactivex.abc import ObserverBase, SchedulerBase
 from reactivex.disposable import Disposable
 
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.keyboard import KeyboardKey
+from heart.peripheral.core import (Input, InputDescriptor, Peripheral,
+                                   PeripheralInfo, PeripheralMessageEnvelope,
+                                   PeripheralTag)
+from heart.peripheral.keyboard import (KeyboardAction, KeyboardEvent,
+                                       KeyboardKey)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import input_scheduler
@@ -91,6 +94,29 @@ class FakeSwitch(BaseSwitch):
             ]
         )
 
+    def inputs(
+        self,
+        *,
+        event_bus: reactivex.Observable[Input] | None = None,
+    ) -> tuple[InputDescriptor, ...]:
+        keyboard_stream = reactivex.merge(
+            KeyboardKey.get(pygame.K_UP).observe,
+            KeyboardKey.get(pygame.K_DOWN).observe,
+            KeyboardKey.get(pygame.K_LEFT).observe,
+            KeyboardKey.get(pygame.K_RIGHT).observe,
+        )
+        return (
+            InputDescriptor(
+                name="keyboard.arrow_keys",
+                stream=keyboard_stream,
+                payload_type=KeyboardEvent,
+                description=(
+                    "Arrow key press events mapped to fake switch rotation and "
+                    "button increments."
+                ),
+            ),
+        )
+
     def run(self) -> None:
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
             def handle_key_up(_: Any) -> None:
@@ -107,8 +133,10 @@ class FakeSwitch(BaseSwitch):
             def handle_key_right(_: Any) -> None:
                 self.rotational_value += 1
 
-            def is_first_press(x: Any) -> bool:
-                return bool(x.data.first_press())
+            def is_first_press(
+                x: PeripheralMessageEnvelope[KeyboardEvent],
+            ) -> bool:
+                return x.data.action == KeyboardAction.PRESSED
 
             KeyboardKey.get(pygame.K_UP).observe.pipe(
                 ops.filter(is_first_press)
