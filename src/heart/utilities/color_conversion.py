@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 from collections import OrderedDict
 from types import ModuleType
 from typing import cast
