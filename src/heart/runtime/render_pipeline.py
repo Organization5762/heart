@@ -188,60 +188,67 @@ class RenderPipeline:
     ) -> pygame.Surface | None:
         try:
             start_ns = time.perf_counter_ns()
-            clock = self._require_clock()
-            screen = self._prepare_renderer_surface(renderer)
+            screen = self._render_renderer_frame(renderer)
+            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+            self._log_renderer_metrics(renderer, duration_ms)
+            return screen
+        except Exception:
+            logger.exception("Error processing renderer")
+            return None
 
-            if not renderer.initialized:
-                renderer.initialize(
-                    window=screen,
-                    clock=clock,
-                    peripheral_manager=self.peripheral_manager,
-                    orientation=self.device.orientation,
-                )
-            renderer._internal_process(
+    def _render_renderer_frame(
+        self, renderer: "StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface:
+        clock = self._require_clock()
+        screen = self._prepare_renderer_surface(renderer)
+        if not renderer.initialized:
+            renderer.initialize(
                 window=screen,
                 clock=clock,
                 peripheral_manager=self.peripheral_manager,
                 orientation=self.device.orientation,
             )
+        renderer._internal_process(
+            window=screen,
+            clock=clock,
+            peripheral_manager=self.peripheral_manager,
+            orientation=self.device.orientation,
+        )
+        return screen
 
-            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-            log_message = (
-                "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
-                "display_mode=%s uses_opengl=%s initialized=%s"
-            )
-            log_args = (
-                renderer.name,
-                duration_ms,
-                self._render_queue_depth,
-                renderer.device_display_mode.name,
-                renderer.device_display_mode == DeviceDisplayMode.OPENGL,
-                renderer.is_initialized(),
-            )
-            log_extra = {
-                "renderer": renderer.name,
-                "duration_ms": duration_ms,
-                "queue_depth": self._render_queue_depth,
-                "display_mode": renderer.device_display_mode.name,
-                "uses_opengl": renderer.device_display_mode
-                == DeviceDisplayMode.OPENGL,
-                "initialized": renderer.is_initialized(),
-            }
+    def _log_renderer_metrics(
+        self, renderer: "StatefulBaseRenderer[Any]", duration_ms: float
+    ) -> None:
+        log_message = (
+            "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
+            "display_mode=%s uses_opengl=%s initialized=%s"
+        )
+        log_args = (
+            renderer.name,
+            duration_ms,
+            self._render_queue_depth,
+            renderer.device_display_mode.name,
+            renderer.device_display_mode == DeviceDisplayMode.OPENGL,
+            renderer.is_initialized(),
+        )
+        log_extra = {
+            "renderer": renderer.name,
+            "duration_ms": duration_ms,
+            "queue_depth": self._render_queue_depth,
+            "display_mode": renderer.device_display_mode.name,
+            "uses_opengl": renderer.device_display_mode == DeviceDisplayMode.OPENGL,
+            "initialized": renderer.is_initialized(),
+        }
 
-            log_controller.log(
-                key="render.loop",
-                logger=logger,
-                level=logging.INFO,
-                msg=log_message,
-                args=log_args,
-                extra=log_extra,
-                fallback_level=logging.DEBUG,
-            )
-
-            return screen
-        except Exception as e:
-            logger.error(f"Error processing renderer: {e}", exc_info=True)
-            return None
+        log_controller.log(
+            key="render.loop",
+            logger=logger,
+            level=logging.INFO,
+            msg=log_message,
+            args=log_args,
+            extra=log_extra,
+            fallback_level=logging.DEBUG,
+        )
 
     def finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
         image_bytes = pygame.image.tostring(screen, RGBA_IMAGE_FORMAT)

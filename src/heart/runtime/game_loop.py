@@ -34,7 +34,7 @@ class GameLoop:
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
         self.context_container = resolver
-        self.initalized = False
+        self.initialized = False
         self.device = device
         self.peripheral_manager = container.resolve(PeripheralManager)
 
@@ -94,9 +94,9 @@ class GameLoop:
 
     def start(self) -> None:
         logger.info("Starting GameLoop")
-        if not self.initalized:
+        if not self.initialized:
             logger.info("GameLoop not yet initialized, initializing...")
-            self._initialize()
+            self._ensure_initialized()
             logger.info("Finished initializing GameLoop.")
 
         if self.app_controller.is_empty():
@@ -107,33 +107,12 @@ class GameLoop:
         self.running = True
         logger.info("Entering main loop.")
 
-        self.app_controller.initialize(
-            window=self.screen,
-            clock=self.clock,
-            peripheral_manager=self.peripheral_manager,
-            orientation=self.device.orientation,
-        )
-        if self.clock is None or self.screen is None:
-            raise RuntimeError("GameLoop failed to initialize display surfaces")
-        clock = self.clock
-
-        # Load the screen
-        ws = WebSocket()
-        self.peripheral_manager.get_event_bus().subscribe(
-            on_next=lambda x: ws.send(kind="peripheral", payload=x)
-        )
+        self._initialize_app_controller()
+        self._ensure_display_initialized()
+        self._configure_peripheral_streaming()
 
         try:
-            while self.running:
-                # Push an event for state that requires game tick
-                self.peripheral_manager.game_tick.on_next(True)
-
-                self._handle_events()
-                self._preprocess_setup()
-
-                renderers = self._select_renderers()
-                self._one_loop(renderers)
-                clock.tick(self.max_fps)
+            self._run_main_loop()
         finally:
             self.render_pipeline.shutdown()
             pygame.quit()
@@ -159,27 +138,12 @@ class GameLoop:
     ) -> None:
         if self.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
-        # Add border in select mode
-        result = self.render_pipeline.render(renderers, override_renderer_variant)
-        render_image = self.render_pipeline.finalize_rendering(result) if result else None
-        if result is not None:
-            self.screen.blit(result, (0, 0))
-
-        if len(renderers) > 0:
-            pygame.display.flip()
-            if render_image is not None:
-                device_image = (
-                    render_image.convert("RGB")
-                    if render_image.mode != "RGB"
-                    else render_image
-                )
-                self.device.set_image(device_image)
-            else:
-                # Fallback to a screen capture if we did not render an image.
-                screen_array = pygame.surfarray.array3d(self.screen)
-                transposed_array = np.transpose(screen_array, (1, 0, 2))
-                pil_image = Image.fromarray(transposed_array)
-                self.device.set_image(pil_image)
+        render_surface = self.render_pipeline.render(
+            renderers, override_renderer_variant
+        )
+        if render_surface is not None:
+            self.screen.blit(render_surface, (0, 0))
+        self._present_rendered_frame(renderers, render_surface)
 
     def _handle_events(self) -> None:
         try:
@@ -197,9 +161,9 @@ class GameLoop:
             logger.exception("Encountered segfaulted event")
 
     def _preprocess_setup(self) -> None:
-        self.__dim_display()
+        self._dim_display()
 
-    def __set_singleton(self) -> None:
+    def _set_singleton(self) -> None:
         active_loop = self.get_game_loop()
         if active_loop is None:
             GameLoop.set_game_loop(self)
@@ -226,12 +190,77 @@ class GameLoop:
         self.peripheral_manager.start()
 
     def _initialize(self) -> None:
-        self.__set_singleton()
+        self._set_singleton()
         self._initialize_screen()
         self._initialize_peripherals()
-        self.initalized = True
+        self.initialized = True
 
-    def __dim_display(self) -> None:
+    def _dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
         if self.screen is not None:
             self.screen.fill("black")
+
+    def _ensure_initialized(self) -> None:
+        if self.initialized:
+            return
+        self._initialize()
+
+    def _initialize_app_controller(self) -> None:
+        if self.clock is None or self.screen is None:
+            raise RuntimeError("GameLoop failed to initialize display surfaces")
+        self.app_controller.initialize(
+            window=self.screen,
+            clock=self.clock,
+            peripheral_manager=self.peripheral_manager,
+            orientation=self.device.orientation,
+        )
+
+    def _ensure_display_initialized(self) -> None:
+        if self.clock is None or self.screen is None:
+            raise RuntimeError("GameLoop failed to initialize display surfaces")
+
+    def _configure_peripheral_streaming(self) -> None:
+        ws = WebSocket()
+        self.peripheral_manager.get_event_bus().subscribe(
+            on_next=lambda x: ws.send(kind="peripheral", payload=x)
+        )
+
+    def _tick_peripherals(self) -> None:
+        self.peripheral_manager.game_tick.on_next(True)
+
+    def _run_main_loop(self) -> None:
+        if self.clock is None:
+            raise RuntimeError("GameLoop failed to initialize display clock")
+        clock = self.clock
+        while self.running:
+            self._tick_peripherals()
+            self._handle_events()
+            self._preprocess_setup()
+            renderers = self._select_renderers()
+            self._one_loop(renderers)
+            clock.tick(self.max_fps)
+
+    def _present_rendered_frame(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        render_surface: pygame.Surface | None,
+    ) -> None:
+        if not renderers:
+            return
+        pygame.display.flip()
+        if render_surface is not None:
+            render_image = self.render_pipeline.finalize_rendering(render_surface)
+            device_image = (
+                render_image.convert("RGB")
+                if render_image.mode != "RGB"
+                else render_image
+            )
+            self.device.set_image(device_image)
+            return
+
+        if self.screen is None:
+            raise RuntimeError("GameLoop screen is not initialized")
+        screen_array = pygame.surfarray.array3d(self.screen)
+        transposed_array = np.transpose(screen_array, (1, 0, 2))
+        pil_image = Image.fromarray(transposed_array)
+        self.device.set_image(pil_image)
