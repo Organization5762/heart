@@ -11,6 +11,8 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
+from heart.utilities.logging_control import get_logging_controller
+
 # https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#service_uuid
 NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
@@ -21,7 +23,16 @@ OBJECT_SEPARATOR = "\n"
 class UartListener:
     """Listeners for data come in as raw bytes from a UART Service."""
 
-    __slots__ = ("device", "buffer", "events", "disconnected", "_logger")
+    __slots__ = (
+        "device",
+        "buffer",
+        "events",
+        "disconnected",
+        "_logger",
+        "_log_controller",
+        "_bytes_received",
+        "_messages_received",
+    )
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
@@ -29,6 +40,9 @@ class UartListener:
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
         self.disconnected = False
         self._logger = logging.getLogger(f"{__name__}.{type(self).__name__}")
+        self._log_controller = get_logging_controller()
+        self._bytes_received = 0
+        self._messages_received = 0
 
     @classmethod
     def _discover_devices(cls) -> Iterator[BLEDevice]:
@@ -115,15 +129,34 @@ class UartListener:
 
         """
         # Append the decoded data to the buffer
-        self.buffer += self.__decode_read_data(data)
+        decoded = self.__decode_read_data(data)
+        self._bytes_received += len(decoded)
+        self.buffer += decoded
 
-        if OBJECT_SEPARATOR in self.buffer:
-            line, self.buffer = self.buffer.split(OBJECT_SEPARATOR, 1)
-
+        while OBJECT_SEPARATOR in self.buffer:
+            line, _, remainder = self.buffer.partition(OBJECT_SEPARATOR)
+            self.buffer = remainder
+            if not line:
+                continue
             try:
                 self.events.append(json.loads(line))
+                self._messages_received += 1
             except json.decoder.JSONDecodeError:
-                self._logger.debug("Failed to decode payload: %s", line, exc_info=True)
+                self._logger.debug(
+                    "Failed to decode payload: %s", line, exc_info=True
+                )
+
+        self._log_controller.log(
+            key="ble.uart.poll",
+            logger=self._logger,
+            level=logging.INFO,
+            msg="BLE UART stream stats bytes=%s messages=%s buffer=%s",
+            args=(
+                self._bytes_received,
+                self._messages_received,
+                len(self.buffer),
+            ),
+        )
 
     def __decode_read_data(self, data: bytearray) -> str:
         return data.decode("utf-8", errors="ignore")

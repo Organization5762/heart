@@ -1,5 +1,7 @@
 import json
+import logging
 import random
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
@@ -12,6 +14,7 @@ from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads import AccelerometerVector
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
+from heart.utilities.logging_control import get_logging_controller
 
 logger = get_logger(__name__)
 
@@ -33,6 +36,9 @@ class Accelerometer(Peripheral[Acceleration | None]):
         self.acceleration_value: dict[str, float] | None = None
         self.port = port
         self.baudrate = baudrate
+        self._log_controller = get_logging_controller()
+        self._messages_received = 0
+        self._decode_failures = 0
 
     def _event_stream(
         self
@@ -48,38 +54,48 @@ class Accelerometer(Peripheral[Acceleration | None]):
             yield cls(port=port, baudrate=115200)
 
     def _connect_to_ser(self) -> serial.Serial:
-        return serial.Serial(self.port, self.baudrate)
+        return serial.Serial(self.port, self.baudrate, timeout=1.0)
 
     def run(self) -> NoReturn:
         # If it crashes, try to re-connect
         while True:
             try:
-                ser = self._connect_to_ser()
-                try:
+                with self._connect_to_ser() as ser:
                     while True:
-                        data = ser.readlines(ser.in_waiting or 1)
-                        for datum in data:
-                            self._process_data(datum)
-                except KeyboardInterrupt:
-                    print("Program terminated")
-                except Exception:
-                    pass
-                finally:
-                    ser.close()
+                        datum = ser.readline()
+                        if not datum:
+                            continue
+                        self._process_data(datum)
+            except KeyboardInterrupt:
+                logger.info("Accelerometer stream terminated by user")
+                raise
             except Exception:
-                pass
+                logger.exception("Accelerometer stream failed; reconnecting")
+                time.sleep(1.0)
 
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()
-        if not bus_data or not bus_data.startswith("{"):
-            # TODO: This happens on first connect due to some weird `b'\x1b]0;\xf0\x9f\x90\x8dcode.py | 9.2.7\x1b\\` bytes
+        if not bus_data:
             return
+        if "{" not in bus_data:
+            return
+        if not bus_data.startswith("{"):
+            bus_data = bus_data[bus_data.find("{") :]
 
         try:
             parsed: dict[str, Any] = json.loads(bus_data)
         except json.JSONDecodeError:
-            print(f"Failed to decode JSON: {bus_data}")
+            self._decode_failures += 1
+            logger.debug("Failed to decode JSON: %s", bus_data)
             return
+        self._messages_received += 1
+        self._log_controller.log(
+            key="sensor.serial.poll",
+            logger=logger,
+            level=logging.INFO,
+            msg="Sensor stream stats messages=%s decode_failures=%s",
+            args=(self._messages_received, self._decode_failures),
+        )
         self._update_due_to_data(parsed)
 
     def get_acceleration(self) -> Acceleration | None:
@@ -110,6 +126,8 @@ class Accelerometer(Peripheral[Acceleration | None]):
             return
         if event_type in {"magnetic", "sensor.magnetic"}:
             self._handle_magnetic(payload)
+            return
+        logger.debug("Ignoring unknown sensor payload type: %s", event_type)
 
     def _handle_acceleration(self, payload: Mapping[str, Any]) -> None:
         try:
@@ -125,11 +143,8 @@ class Accelerometer(Peripheral[Acceleration | None]):
         input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
 
-        raise NotImplementedError("")
-
-    # TODO Separate
     def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
-        raise NotImplementedError("")
+        logger.debug("Ignoring magnetic payload: %s", payload)
         # try:
         #     vector = MagnetometerVector(
         #         x=float(payload["x"]),
