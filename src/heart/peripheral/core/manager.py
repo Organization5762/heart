@@ -7,6 +7,7 @@ from reactivex.abc import SchedulerBase
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.configuration import PeripheralConfiguration
+from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -34,13 +35,10 @@ class PeripheralManager:
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
         self._started = False
-        self._configuration_registry = (
-            configuration_registry or PeripheralConfigurationRegistry()
+        self._configuration_loader = PeripheralConfigurationLoader(
+            configuration=configuration,
+            registry=configuration_registry,
         )
-        self._configuration_name = (
-            configuration or Configuration.peripheral_configuration()
-        )
-        self._configuration: PeripheralConfiguration | None = None
 
     @property
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
@@ -66,21 +64,11 @@ class PeripheralManager:
         self._register_peripheral(peripheral)
 
     def _iter_detected_peripherals(self) -> Iterable[Peripheral[Any]]:
-        configuration = self._ensure_configuration()
-        for detector in configuration.detectors:
+        for detector in self._ensure_configuration().detectors:
             yield from detector()
 
     def _ensure_configuration(self) -> PeripheralConfiguration:
-        if self._configuration is None:
-            self._configuration = self._load_configuration(self._configuration_name)
-        return self._configuration
-
-    def _load_configuration(self, name: str) -> PeripheralConfiguration:
-        factory = self._configuration_registry.get(name)
-        if factory is None:
-            raise ValueError(f"Peripheral configuration '{name}' not found")
-        logger.info("Loading peripheral configuration: %s", name)
-        return factory()
+        return self._configuration_loader.load()
 
     def start(self) -> None:
         if self._started:
