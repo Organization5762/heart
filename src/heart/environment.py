@@ -1,4 +1,5 @@
 """Compatibility shim for legacy environment imports."""
 
-from heart.runtime.game_loop import (  # type: ignore[attr-defined]  # noqa: F401
-    DeviceDisplayMode, GameLoop, RendererVariant)
+from heart import DeviceDisplayMode  # noqa: F401
+from heart.runtime.game_loop import GameLoop  # noqa: F401
+from heart.runtime.render_pipeline import RendererVariant  # noqa: F401
