@@ -10,6 +10,7 @@ logger = get_logger(__name__)
 
 def select_device(*, x11_forward: bool) -> Device:
     layout_mode = Configuration.device_layout_mode()
+    orientation: Orientation
     if layout_mode == DeviceLayoutMode.CUBE:
         orientation: Orientation = Cube.sides()
     else:
