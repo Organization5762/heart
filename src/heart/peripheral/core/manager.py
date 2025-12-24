@@ -11,7 +11,7 @@ from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, ReactivexEventBusScheduler
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_streams import share_stream
 from heart.utilities.reactivex_threads import (background_scheduler,
@@ -134,8 +134,8 @@ class PeripheralManager:
     @staticmethod
     def _event_bus_scheduler() -> SchedulerBase | None:
         strategy = Configuration.reactivex_event_bus_scheduler()
-        if strategy == "background":
+        if strategy is ReactivexEventBusScheduler.BACKGROUND:
             return background_scheduler()
-        if strategy == "input":
+        if strategy is ReactivexEventBusScheduler.INPUT:
             return input_scheduler()
         return None
