@@ -190,6 +190,16 @@ class Configuration:
         return _env_int("HEART_RX_STREAM_REFCOUNT_GRACE_MS", default=0, minimum=0)
 
     @classmethod
+    def reactivex_stream_connect_mode(cls) -> "ReactivexStreamConnectMode":
+        mode = os.environ.get("HEART_RX_STREAM_CONNECT_MODE", "lazy").strip().lower()
+        try:
+            return ReactivexStreamConnectMode(mode)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RX_STREAM_CONNECT_MODE must be 'lazy' or 'eager'"
+            ) from exc
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":
@@ -365,6 +375,11 @@ class ReactivexStreamShareStrategy(StrEnum):
     REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
     REPLAY_BUFFER = "replay_buffer"
     REPLAY_BUFFER_AUTO_CONNECT = "replay_buffer_auto_connect"
+
+
+class ReactivexStreamConnectMode(StrEnum):
+    LAZY = "lazy"
+    EAGER = "eager"
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:

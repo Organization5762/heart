@@ -209,3 +209,25 @@ class TestShareStreamStrategy:
         shared.subscribe().dispose()
 
         assert subscribe_count == 2
+
+    def test_share_stream_refcount_grace_connects_after_subscribe(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Confirm lazy ref-count connection preserves immediate emissions to protect hot-stream correctness."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "10")
+        monkeypatch.setenv("HEART_RX_STREAM_CONNECT_MODE", "lazy")
+
+        def _subscribe(observer, scheduler=None):
+            observer.on_next("ready")
+            return Disposable()
+
+        source = reactivex.create(_subscribe)
+        shared = share_stream(source, stream_name="connect_order")
+
+        received: list[str] = []
+        shared.subscribe(received.append)
+
+        assert received == ["ready"]
