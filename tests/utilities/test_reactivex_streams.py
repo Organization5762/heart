@@ -13,22 +13,24 @@ class TestShareStreamStrategy:
         ("strategy", "expected_initial"),
         [
             ("share", []),
+            ("share_auto_connect", []),
             ("replay_latest", [2]),
             ("replay_latest_auto_connect", [2]),
         ],
         ids=[
             "share_no_replay",
+            "share_auto_connect_no_replay",
             "replay_latest_replays_last",
             "replay_latest_auto_connect_replays_last",
         ],
     )
-    def test_share_stream_replays_latest_when_configured(
+    def test_share_stream_replay_behavior_matches_strategy(
         self,
         monkeypatch: pytest.MonkeyPatch,
         strategy: str,
         expected_initial: list[int],
     ) -> None:
-        """Ensure configured replay behaviour matches expectations to preserve late-subscriber correctness."""
+        """Ensure each strategy replay behaviour matches configuration to preserve late-subscriber correctness."""
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", strategy)
         source: Subject[int] = Subject()
@@ -80,6 +82,37 @@ class TestShareStreamStrategy:
         assert subscribe_count == 1
         assert received_a == [1]
         assert received_b == [1]
+
+    def test_share_stream_auto_connect_subscribers_gate_connection(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Confirm auto-connect waits for the configured subscribers to reduce churn while respecting intent."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share_auto_connect")
+        monkeypatch.setenv("HEART_RX_STREAM_AUTO_CONNECT_SUBSCRIBERS", "2")
+        subscribe_count = 0
+
+        def _subscribe(observer, scheduler=None):
+            nonlocal subscribe_count
+            subscribe_count += 1
+            observer.on_next("connected")
+            return Disposable()
+
+        source = reactivex.create(_subscribe)
+        shared = share_stream(source, stream_name="auto_connect_threshold")
+
+        received_a: list[str] = []
+        shared.subscribe(received_a.append)
+
+        assert subscribe_count == 0
+
+        received_b: list[str] = []
+        shared.subscribe(received_b.append)
+
+        assert subscribe_count == 1
+        assert received_a == ["connected"]
+        assert received_b == ["connected"]
 
     def test_share_stream_replays_buffer_when_configured(
         self,

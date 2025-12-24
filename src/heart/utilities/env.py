@@ -130,20 +130,26 @@ class Configuration:
     def reactivex_stream_share_strategy(cls) -> "ReactivexStreamShareStrategy":
         strategy = os.environ.get(
             "HEART_RX_STREAM_SHARE_STRATEGY",
-            "replay_latest",
+            "replay_latest_auto_connect",
         ).strip().lower()
         try:
             return ReactivexStreamShareStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', "
-                "'replay_latest_auto_connect', 'replay_buffer', or "
+                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'share_auto_connect', "
+                "'replay_latest', 'replay_latest_auto_connect', 'replay_buffer', or "
                 "'replay_buffer_auto_connect'"
             ) from exc
 
     @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
         return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
+
+    @classmethod
+    def reactivex_stream_auto_connect_subscribers(cls) -> int:
+        return _env_int(
+            "HEART_RX_STREAM_AUTO_CONNECT_SUBSCRIBERS", default=1, minimum=1
+        )
 
     @classmethod
     def isolated_renderer_socket(cls) -> str | None:
@@ -311,6 +317,7 @@ class ReactivexEventBusScheduler(StrEnum):
 
 class ReactivexStreamShareStrategy(StrEnum):
     SHARE = "share"
+    SHARE_AUTO_CONNECT = "share_auto_connect"
     REPLAY_LATEST = "replay_latest"
     REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
     REPLAY_BUFFER = "replay_buffer"
