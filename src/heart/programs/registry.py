@@ -10,7 +10,7 @@ class ConfigurationRegistry:
     @cached_property
     def registry(self) -> dict[str, Callable[[GameLoop], None]]:
         registry: dict[str, Callable[[GameLoop], None]] = {}
-        configurations_dir = os.path.dirname(__file__) + "/configurations"
+        configurations_dir = os.path.join(os.path.dirname(__file__), "configurations")
         for filename in os.listdir(configurations_dir):
             if filename.endswith(".py") and filename != "__init__.py":
                 module_name = f"heart.programs.configurations.{filename[:-3]}"
