@@ -9,8 +9,8 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
-from heart.events.types import RadioPacket
 from heart.peripheral.core import Peripheral
+from heart.peripheral.input_payloads import RadioPacket
 from heart.utilities.logging import get_logger
 
 serial: Any

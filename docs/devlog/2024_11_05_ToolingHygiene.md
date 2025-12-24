@@ -8,7 +8,7 @@
 ## Impacted modules
 
 - `pyproject.toml`
-- `src/heart/events/*`
+- `src/heart/peripheral/input_payloads.py`
 - `src/heart/peripheral/*`
 - `src/heart/display/recorder.py`
 - `tests/events/test_metrics.py`

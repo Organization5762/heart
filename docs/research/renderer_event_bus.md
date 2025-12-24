@@ -17,6 +17,6 @@ Composed renderers previously passed `pygame.Surface` objects through method par
 
 ## Observations and Follow-up
 
-- `RendererFrame` lives alongside other event payloads and serializes bytes without assuming the final display size. Consumers scale as needed, so upstream publishers can target their native resolution. (`src/heart/events/types.py`)
+- `RendererFrame` lives alongside other event payloads and serializes bytes without assuming the final display size. Consumers scale as needed, so upstream publishers can target their native resolution. (`src/heart/peripheral/input_payloads.py`)
 - Tests cover the integration path from publisher to subscriber to guarantee surfaces round-trip through the bus. (`tests/display/test_renderer_event_stream.py`)
 - Future work: expose richer metadata contracts (e.g., color space, depth) and add throttling controls so high-frequency publishers do not starve the event bus.
