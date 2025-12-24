@@ -1,5 +1,4 @@
 import hashlib
-import os
 import shutil
 import subprocess
 import sys
@@ -18,9 +17,9 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 if Configuration.is_pi():
-    MEDIA_DIRECTORY = "/media/michael"
+    MEDIA_DIRECTORY = Path("/media/michael")
 else:
-    MEDIA_DIRECTORY = "/Volumes"
+    MEDIA_DIRECTORY = Path("/Volumes")
 
 CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = "adafruit-circuitpython-bundle-9.x-mpy-20250412"
 CIRCUIT_PY_COMMON_LIBS = (
@@ -43,13 +42,13 @@ class DriverConfig:
     valid_board_ids: list[str]
 
 
-def load_driver_libs(libs: list[str], destination: str) -> None:
+def load_driver_libs(libs: list[str], destination: Path) -> None:
     shutil.rmtree(destination, ignore_errors=True)
-    os.makedirs(destination, exist_ok=True)
+    destination.mkdir(parents=True, exist_ok=True)
     # Our local lib
     copy_file(
-        os.path.dirname(firmware_io.__file__),
-        os.path.join(destination, *firmware_io.__package__.split(".")),
+        Path(firmware_io.__file__).parent,
+        destination.joinpath(*firmware_io.__package__.split(".")),
     )
 
     if not libs:
@@ -60,13 +59,15 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
     zip_location = download_file(
         CIRCUIT_PY_COMMON_LIBS, CIRCUIT_PY_COMMON_LIBS_CHECKSUM
     )
-    unzipped_location = zip_location.replace(".zip", "")
+    unzipped_location = zip_location.with_suffix("")
     # Lib in this case just comes from the downloaded file, which is separate from the `destination` which is also lib
-    lib_path = os.path.join(unzipped_location, "lib")
+    lib_path = unzipped_location / "lib"
 
-    if not os.path.exists(lib_path):
+    if not lib_path.exists():
         subprocess.run(
-            ["unzip", zip_location], check=True, cwd=os.path.dirname(unzipped_location)
+            ["unzip", str(zip_location)],
+            check=True,
+            cwd=str(unzipped_location.parent),
         )
     else:
         logger.info(
@@ -74,27 +75,27 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
         )
 
     for lib in libs:
-        copy_file(os.path.join(lib_path, lib), os.path.join(destination, lib))
+        copy_file(lib_path / lib, destination / lib)
         # There are also .mpy files..
-        mpy_source = os.path.join(lib_path, f"{lib}.mpy")
-        if os.path.exists(mpy_source):
-            copy_file(mpy_source, os.path.join(destination, f"{lib}.mpy"))
+        mpy_source = lib_path / f"{lib}.mpy"
+        if mpy_source.exists():
+            copy_file(mpy_source, destination / f"{lib}.mpy")
         else:
             logger.warning("Skipping missing %s", mpy_source)
 
 
-def _sha256sum(path: str) -> str:
+def _sha256sum(path: Path) -> str:
     digest = hashlib.sha256()
-    with open(path, "rb") as file_handle:
+    with path.open("rb") as file_handle:
         for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
 
-def download_file(url: str, checksum: str) -> str:
+def download_file(url: str, checksum: str) -> Path:
     try:
-        destination = os.path.join("/tmp", url.split("/")[-1])
-        if os.path.exists(destination):
+        destination = Path("/tmp") / url.split("/")[-1]
+        if destination.exists():
             existing_checksum = _sha256sum(destination)
             if existing_checksum != checksum:
                 logger.warning(
@@ -103,14 +104,16 @@ def download_file(url: str, checksum: str) -> str:
                     existing_checksum,
                     checksum,
                 )
-                os.remove(destination)
+                destination.unlink()
 
-        if not os.path.exists(destination):
+        if not destination.exists():
             logger.info("Starting download: %s", url)
             if Configuration.is_pi():
-                subprocess.run(["wget", url, "-O", destination], check=True)
+                subprocess.run(["wget", url, "-O", str(destination)], check=True)
             else:
-                subprocess.run(["curl", "-fL", url, "-o", destination], check=True)
+                subprocess.run(
+                    ["curl", "-fL", url, "-o", str(destination)], check=True
+                )
             logger.info("Finished download: %s", destination)
 
         downloaded_checksum = _sha256sum(destination)
@@ -130,13 +133,13 @@ def download_file(url: str, checksum: str) -> str:
         sys.exit(1)
 
 
-def copy_file(source: str, destination: str) -> None:
+def copy_file(source: Path, destination: Path) -> None:
     try:
         logger.info("Before copying: %s to %s", source, destination)
-        if os.path.isdir(source):
+        if source.is_dir():
             shutil.copytree(source, destination, dirs_exist_ok=True)
         else:
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         logger.info("After copying: %s to %s", source, destination)
     except (OSError, shutil.Error) as error:
@@ -164,7 +167,7 @@ def _require_string(value: object, *, field_name: str) -> str:
     return value
 
 
-def _load_driver_config(settings_path: str) -> DriverConfig:
+def _load_driver_config(settings_path: Path) -> DriverConfig:
     try:
         config = toml.load(settings_path)
     except (FileNotFoundError, toml.TomlDecodeError) as error:
@@ -219,19 +222,19 @@ def _load_driver_config(settings_path: str) -> DriverConfig:
     )
 
 
-def _parse_board_id(boot_out_path: str) -> str:
-    with open(boot_out_path, "r") as file_handle:
+def _parse_board_id(boot_out_path: Path) -> str:
+    with boot_out_path.open("r") as file_handle:
         for line in file_handle:
             if "Board ID:" in line:
                 return line.split("Board ID:")[1].strip()
     raise ValueError(f"Unable to find Board ID identifier in {boot_out_path}")
 
 
-def _ensure_driver_files(driver_path: str) -> None:
+def _ensure_driver_files(driver_path: Path) -> None:
     missing = [
         name
         for name in DRIVER_FILES
-        if not os.path.exists(os.path.join(driver_path, name))
+        if not (driver_path / name).exists()
     ]
     if missing:
         logger.error(
@@ -240,24 +243,22 @@ def _ensure_driver_files(driver_path: str) -> None:
         sys.exit(1)
 
 
-def _mount_points(media_directory: str) -> list[str]:
-    if not os.path.isdir(media_directory):
+def _mount_points(media_directory: Path) -> list[Path]:
+    if not media_directory.is_dir():
         logger.error(
             "Expected media directory %s to exist before updates.", media_directory
         )
         sys.exit(1)
 
     return [
-        os.path.join(media_directory, entry)
-        for entry in os.listdir(media_directory)
-        if os.path.isdir(os.path.join(media_directory, entry))
+        entry for entry in media_directory.iterdir() if entry.is_dir()
     ]
 
 
 def main(device_driver_name: str) -> None:
-    base_path = str(Path(heart.__file__).resolve().parents[2] / "drivers")
-    code_path = os.path.join(base_path, device_driver_name)
-    if not os.path.isdir(code_path):
+    base_path = Path(heart.__file__).resolve().parents[2] / "drivers"
+    code_path = base_path / device_driver_name
+    if not code_path.is_dir():
         logger.error(
             "The path %s does not exist. This is where we expect the driver code to exist.",
             code_path,
@@ -267,15 +268,15 @@ def main(device_driver_name: str) -> None:
     ###
     # Load a bunch of env vars the driver declares
     ###
-    config = _load_driver_config(os.path.join(code_path, DRIVER_SETTINGS_FILENAME))
+    config = _load_driver_config(code_path / DRIVER_SETTINGS_FILENAME)
     _ensure_driver_files(code_path)
     mount_points = _mount_points(MEDIA_DIRECTORY)
 
     ###
     # If the device is not a CIRCUIT_PY device yet, load the UF2 so that it is converted
     ###
-    UF2_DESTINATION = os.path.join(MEDIA_DIRECTORY, config.device_boot_name)
-    if os.path.isdir(UF2_DESTINATION):
+    UF2_DESTINATION = MEDIA_DIRECTORY / config.device_boot_name
+    if UF2_DESTINATION.is_dir():
         downloaded_file_path = download_file(config.uf2_url, config.uf2_checksum)
         copy_file(downloaded_file_path, UF2_DESTINATION)
         time.sleep(10)
@@ -290,15 +291,15 @@ def main(device_driver_name: str) -> None:
     circuitpy_mounts = [
         mount_point
         for mount_point in mount_points
-        if "CIRCUITPY" in os.path.basename(mount_point)
+        if "CIRCUITPY" in mount_point.name
     ]
     if not circuitpy_mounts:
         logger.warning("No CIRCUITPY volumes found under %s.", MEDIA_DIRECTORY)
 
     for media_location in circuitpy_mounts:
-        boot_out_path = os.path.join(media_location, "boot_out.txt")
+        boot_out_path = media_location / "boot_out.txt"
 
-        if os.path.exists(boot_out_path):
+        if boot_out_path.exists():
             try:
                 board_id = _parse_board_id(boot_out_path)
             except ValueError as error:
@@ -315,13 +316,13 @@ def main(device_driver_name: str) -> None:
 
             for file_name in DRIVER_FILES:
                 copy_file(
-                    os.path.join(code_path, file_name),
-                    os.path.join(media_location, file_name),
+                    code_path / file_name,
+                    media_location / file_name,
                 )
 
             load_driver_libs(
                 libs=config.driver_libs,
-                destination=os.path.join(os.path.join(media_location, "lib")),
+                destination=media_location / "lib",
             )
         else:
             logger.info("%s is missing, skipping...", boot_out_path)
