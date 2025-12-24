@@ -20,6 +20,9 @@ buffered replay when tuning for performance and correctness.
   performant under variable subscriber churn.
 - Add a configurable ref-count grace window so replayed streams avoid rapid
   disconnect/reconnect cycles when subscribers churn quickly.
+- Ensure ref-count sharing can connect after the first subscription to avoid
+  missing immediate emissions from hot upstream sources, while leaving an eager
+  connect mode available when legacy timing is desired.
 
 ## Configuration
 
@@ -45,11 +48,18 @@ buffered replay when tuning for performance and correctness.
 - `HEART_RX_STREAM_REFCOUNT_GRACE_MS`
   - Integer grace window in milliseconds to delay ref-count disconnection for
     share/replay strategies that would otherwise detach immediately.
+- `HEART_RX_STREAM_CONNECT_MODE`
+  - `lazy` (default): connect ref-count streams after the first subscriber
+    attaches to avoid missing immediate emissions from hot upstream sources.
+  - `eager`: connect ref-count streams before the first subscriber attaches,
+    matching the previous timing behaviour.
 
 ## Implementation notes
 
 - `heart.utilities.reactivex_streams.share_stream` wraps the sharing logic and
   provides logging hints for the configured strategy.
+- `heart.utilities.env.Configuration.reactivex_stream_connect_mode` controls
+  the ref-count connect timing for shared streams.
 - `heart.peripheral.core.Peripheral.observe` and
   `heart.peripheral.core.manager.PeripheralManager.get_event_bus` and
   `heart.peripheral.core.manager.PeripheralManager.get_main_switch_subscription`
@@ -67,3 +77,4 @@ buffered replay when tuning for performance and correctness.
 - `src/heart/peripheral/core/manager.py`
 - `tests/utilities/test_reactivex_streams.py`
 - `tests/utilities/test_env.py`
+- `docs/research/reactive_event_stream_share_strategy.md`

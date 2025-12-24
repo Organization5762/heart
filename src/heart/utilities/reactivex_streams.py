@@ -8,7 +8,8 @@ from reactivex import operators as ops
 from reactivex.disposable import Disposable
 from reactivex.scheduler import TimeoutScheduler
 
-from heart.utilities.env import Configuration, ReactivexStreamShareStrategy
+from heart.utilities.env import (Configuration, ReactivexStreamConnectMode,
+                                 ReactivexStreamShareStrategy)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +36,7 @@ def _share_with_refcount_grace(
     connectable: ConnectableStream[T],
     *,
     grace_ms: int,
+    connect_mode: ReactivexStreamConnectMode,
     stream_name: str,
 ) -> reactivex.Observable[T]:
     lock = RLock()
@@ -59,15 +61,29 @@ def _share_with_refcount_grace(
             if disconnect_timer is not None:
                 disconnect_timer.dispose()
                 disconnect_timer = None
-            if connection is None:
+            if (
+                connection is None
+                and connect_mode is ReactivexStreamConnectMode.EAGER
+            ):
                 logger.debug(
-                    "Connecting %s with refcount grace (grace_ms=%d)",
+                    "Connecting %s with refcount grace (grace_ms=%d, mode=%s)",
                     stream_name,
                     grace_ms,
+                    connect_mode,
                 )
                 connection = connectable.connect()
 
         subscription = connectable.subscribe(observer, scheduler=scheduler)
+        if connect_mode is ReactivexStreamConnectMode.LAZY:
+            with lock:
+                if connection is None and subscriber_count > 0:
+                    logger.debug(
+                        "Connecting %s with refcount grace (grace_ms=%d, mode=%s)",
+                        stream_name,
+                        grace_ms,
+                        connect_mode,
+                    )
+                    connection = connectable.connect()
 
         def _dispose() -> None:
             nonlocal subscriber_count, disconnect_timer
@@ -105,6 +121,7 @@ def share_stream(
         Configuration.reactivex_stream_auto_connect_min_subscribers()
     )
     refcount_grace_ms = Configuration.reactivex_stream_refcount_grace_ms()
+    connect_mode = Configuration.reactivex_stream_connect_mode()
     replay_window_seconds = (
         None if replay_window_ms is None else replay_window_ms / 1000
     )
@@ -136,6 +153,7 @@ def share_stream(
             return _share_with_refcount_grace(
                 cast(ConnectableStream[T], source.pipe(ops.publish())),
                 grace_ms=refcount_grace_ms,
+                connect_mode=connect_mode,
                 stream_name=stream_name,
             )
         return source.pipe(ops.share())
@@ -158,6 +176,7 @@ def share_stream(
             return _share_with_refcount_grace(
                 replayed,
                 grace_ms=refcount_grace_ms,
+                connect_mode=connect_mode,
                 stream_name=stream_name,
             )
         return replayed.pipe(ops.ref_count())
@@ -184,6 +203,7 @@ def share_stream(
             return _share_with_refcount_grace(
                 replayed,
                 grace_ms=refcount_grace_ms,
+                connect_mode=connect_mode,
                 stream_name=stream_name,
             )
         return replayed.pipe(ops.ref_count())
