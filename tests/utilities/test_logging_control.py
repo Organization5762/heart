@@ -20,6 +20,7 @@ class StubLogger:
 
 
 def test_logging_controller_applies_interval() -> None:
+    """Verify per-key intervals throttle logs to limit noisy repeats for stability."""
     monotonic_values = [0.0]
 
     def monotonic() -> float:
@@ -80,6 +81,7 @@ def reset_logging_controller_cache() -> None:
 
 
 def test_logging_controller_respects_rule_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Confirm rule overrides adjust fallback levels so operators can tune alerting."""
     monkeypatch.setenv("HEART_LOG_RULES", "render.loop=none:WARNING:none")
     controller = logging_control.get_logging_controller()
 
