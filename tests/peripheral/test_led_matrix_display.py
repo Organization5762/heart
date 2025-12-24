@@ -25,3 +25,17 @@ class TestPeripheralLedMatrixDisplay:
             assert "dimensions" in str(exc)
         else:  # pragma: no cover - defensive
             raise AssertionError("ValueError expected when dimensions do not match")
+
+    def test_publish_image_emits_latest_frame(self) -> None:
+        """Verify that publish image emits frames to observers so downstream monitors can track LED output health."""
+        peripheral = LEDMatrixDisplay(width=2, height=2)
+        image = _solid_image(2, 2, value=7)
+        received: list = []
+
+        subscription = peripheral.observe.subscribe(
+            on_next=lambda envelope: received.append(envelope.data)
+        )
+        frame = peripheral.publish_image(image)
+        subscription.dispose()
+
+        assert received == [frame]

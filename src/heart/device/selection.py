@@ -1,16 +1,24 @@
 import os
 
-from heart.device import Cube, Device
+from heart.device import Cube, Device, Rectangle
 from heart.device.local import LocalScreen
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, DeviceLayoutMode
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 def select_device(*, x11_forward: bool) -> Device:
-    # TODO: Add a way of adding orientation either from Config or `run`
-    orientation = Cube.sides()
+    layout_mode = Configuration.device_layout_mode()
+    if layout_mode == DeviceLayoutMode.CUBE:
+        orientation = Cube.sides()
+    else:
+        orientation = Rectangle.with_layout(
+            columns=Configuration.device_layout_columns(),
+            rows=Configuration.device_layout_rows(),
+        )
+    panel_width = Configuration.panel_columns()
+    panel_height = Configuration.panel_rows()
 
     if Configuration.forward_to_beats_app():
         from heart.device.beats import StreamedScreen
@@ -37,10 +45,14 @@ def select_device(*, x11_forward: bool) -> Device:
             # This makes it work on Pi when no screens are connected.
             # You need to setup X11 forwarding with XQuartz to do that.
             logger.warning("X11_FORWARD set, running with `LocalScreen`")
-            return LocalScreen(width=64, height=64, orientation=orientation)
+            return LocalScreen(
+                width=panel_width,
+                height=panel_height,
+                orientation=orientation,
+            )
 
         from heart.device.rgb_display import LEDMatrix
 
         return LEDMatrix(orientation=orientation)
 
-    return LocalScreen(width=64, height=64, orientation=orientation)
+    return LocalScreen(width=panel_width, height=panel_height, orientation=orientation)

@@ -170,6 +170,15 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     Navigation is built-in to this, assuming the user long-presses
 
     """
+    def __init__(self) -> None:
+        super().__init__()
+        self._init_context: tuple[
+            pygame.Surface,
+            pygame.time.Clock,
+            PeripheralManager,
+            Orientation,
+        ] | None = None
+
     def _create_initial_state(
         self,
         window: pygame.Surface,
@@ -177,6 +186,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation
     ) -> GameModeState:
+        self._init_context = (window, clock, peripheral_manager, orientation)
         if self._state is not None:
             for renderer in self.state.renderers:
                 renderer.initialize(window, clock, peripheral_manager, orientation)
@@ -193,11 +203,14 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def add_new_pages(
         self, title_renderer: "StatefulBaseRenderer", renderers: "StatefulBaseRenderer"
     ) -> None:
-        # TODO: Hack because we are trying to build and have state at the same time
         if self._state is None:
             self.set_state(GameModeState())
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
+        if self.is_initialized() and self._init_context is not None:
+            window, clock, peripheral_manager, orientation = self._init_context
+            title_renderer.initialize(window, clock, peripheral_manager, orientation)
+            renderers.initialize(window, clock, peripheral_manager, orientation)
 
     def get_renderers(
         self

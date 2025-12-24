@@ -109,6 +109,32 @@ class Configuration:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 
     @classmethod
+    def device_layout_mode(cls) -> "DeviceLayoutMode":
+        raw = os.environ.get("HEART_DEVICE_LAYOUT", "cube").strip().lower()
+        try:
+            return DeviceLayoutMode(raw)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_DEVICE_LAYOUT must be 'cube' or 'rectangle'"
+            ) from exc
+
+    @classmethod
+    def device_layout_columns(cls) -> int:
+        return _env_int("HEART_LAYOUT_COLUMNS", default=1, minimum=1)
+
+    @classmethod
+    def device_layout_rows(cls) -> int:
+        return _env_int("HEART_LAYOUT_ROWS", default=1, minimum=1)
+
+    @classmethod
+    def panel_rows(cls) -> int:
+        return _env_int("HEART_PANEL_ROWS", default=64, minimum=1)
+
+    @classmethod
+    def panel_columns(cls) -> int:
+        return _env_int("HEART_PANEL_COLUMNS", default=64, minimum=1)
+
+    @classmethod
     def reactivex_background_max_workers(cls) -> int:
         return _env_int("HEART_RX_BACKGROUND_MAX_WORKERS", default=4, minimum=1)
 
@@ -313,6 +339,11 @@ class LifeUpdateStrategy(StrEnum):
     AUTO = "auto"
     CONVOLVE = "convolve"
     PAD = "pad"
+
+
+class DeviceLayoutMode(StrEnum):
+    CUBE = "cube"
+    RECTANGLE = "rectangle"
 
 
 class ReactivexEventBusScheduler(StrEnum):

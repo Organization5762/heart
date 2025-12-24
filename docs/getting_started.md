@@ -55,6 +55,24 @@ Important flags:
 
 Ensure SDL dependencies are installed (`libsdl2-dev` and `libsdl2-image-dev` on Debian-based systems) if the window fails to open.
 
+## Display Layout Configuration
+
+Set the display layout through environment variables to match the physical LED panel geometry without editing code:
+
+- `HEART_DEVICE_LAYOUT`: `cube` (default) or `rectangle`.
+- `HEART_LAYOUT_COLUMNS` / `HEART_LAYOUT_ROWS`: panel grid dimensions for `rectangle` layouts.
+- `HEART_PANEL_COLUMNS` / `HEART_PANEL_ROWS`: per-panel pixel dimensions (default `64×64`).
+
+Example for a 2×2 wall of 64×64 panels:
+
+```bash
+export HEART_DEVICE_LAYOUT=rectangle
+export HEART_LAYOUT_COLUMNS=2
+export HEART_LAYOUT_ROWS=2
+export HEART_PANEL_COLUMNS=64
+export HEART_PANEL_ROWS=64
+```
+
 ## Raspberry Pi Deployment Procedure
 
 1. Install system dependencies:

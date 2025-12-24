@@ -833,7 +833,7 @@ class GameLoop:
             # (clem): gamepad shit is weird and can randomly put caught segfault
             #   events on queue, I see allusions to this online, people say
             #   try pygame-ce instead
-            print("SystemError: Encountered segfaulted event")
+            logger.exception("Encountered segfaulted event")
 
     def _preprocess_setup(self) -> None:
         self.__dim_display()
