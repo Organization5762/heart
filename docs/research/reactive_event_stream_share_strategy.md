@@ -21,7 +21,12 @@ buffered replay when tuning for performance and correctness.
 
 - `HEART_RX_STREAM_SHARE_STRATEGY`
   - `replay_latest` (default): replay the most recent event to late subscribers.
+  - `replay_latest_auto_connect`: replay the most recent event while keeping the
+    source connected after the first subscriber arrives, avoiding repeated
+    subscriptions when observers churn.
   - `replay_buffer`: replay the last `HEART_RX_STREAM_REPLAY_BUFFER` events.
+  - `replay_buffer_auto_connect`: replay the buffer while keeping the source
+    connected after the first subscriber arrives.
   - `share`: preserve the pre-existing no-replay share behaviour.
 - `HEART_RX_STREAM_REPLAY_BUFFER`
   - Integer buffer size used when the strategy is `replay_buffer`.

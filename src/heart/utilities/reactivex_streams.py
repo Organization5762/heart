@@ -22,12 +22,24 @@ def share_stream(
 
     strategy = Configuration.reactivex_stream_share_strategy()
     if strategy is ReactivexStreamShareStrategy.SHARE:
+        logger.debug("Sharing %s with share", stream_name)
         return source.pipe(ops.share())
     if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST:
         logger.debug("Sharing %s with replay_latest", stream_name)
         return source.pipe(ops.replay(buffer_size=1), ops.ref_count())
+    if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST_AUTO_CONNECT:
+        logger.debug("Sharing %s with replay_latest_auto_connect", stream_name)
+        return source.pipe(ops.replay(buffer_size=1)).auto_connect(1)
     if strategy is ReactivexStreamShareStrategy.REPLAY_BUFFER:
         buffer_size = Configuration.reactivex_stream_replay_buffer()
         logger.debug("Sharing %s with replay_buffer=%d", stream_name, buffer_size)
         return source.pipe(ops.replay(buffer_size=buffer_size), ops.ref_count())
+    if strategy is ReactivexStreamShareStrategy.REPLAY_BUFFER_AUTO_CONNECT:
+        buffer_size = Configuration.reactivex_stream_replay_buffer()
+        logger.debug(
+            "Sharing %s with replay_buffer_auto_connect=%d",
+            stream_name,
+            buffer_size,
+        )
+        return source.pipe(ops.replay(buffer_size=buffer_size)).auto_connect(1)
     raise ValueError(f"Unknown reactive stream share strategy: {strategy}")
