@@ -217,19 +217,19 @@ class Gamepad(Peripheral[Any]):
                         text=True,
                     )
                     if result.returncode == 0:
-                        print("Successfully connected to 8bitdo controller")
+                        logger.info("Successfully connected to 8bitdo controller")
                     else:
-                        print("Failed to connect to 8bitdo controller")
+                        logger.warning("Failed to connect to 8bitdo controller")
 
         except KeyboardInterrupt:
-            print("Program terminated")
+            logger.info("Gamepad program terminated")
         except Exception:
             pass
 
     def run(self) -> None:
-        # Give pygame and USB subsystems time to fully initialize
-        # TODO: Is this needed?
-        time.sleep(1.5)
+        delay = Configuration.gamepad_startup_delay_seconds()
+        if delay:
+            time.sleep(delay)
 
         # check every 1 second for controller state, so that we can attempt to connect
         scheduler = input_scheduler()

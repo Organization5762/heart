@@ -11,6 +11,8 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
+from heart.utilities.env import Configuration
+
 # https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#service_uuid
 NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
@@ -21,10 +23,11 @@ OBJECT_SEPARATOR = "\n"
 class UartListener:
     """Listeners for data come in as raw bytes from a UART Service."""
 
-    __slots__ = ("device", "buffer", "events", "disconnected", "_logger")
+    __slots__ = ("device", "device_name", "buffer", "events", "disconnected", "_logger")
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
+        self.device_name = device.name or Configuration.bluetooth_device_name()
         self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
         self.disconnected = False
@@ -33,9 +36,9 @@ class UartListener:
     @classmethod
     def _discover_devices(cls) -> Iterator[BLEDevice]:
         devices: list[BLEDevice] = asyncio.run(BleakScanner.discover())
+        target_name = Configuration.bluetooth_device_name()
         for device in devices:
-            # TODO: This should come from somewhere more principled
-            if device.name == "totem-controller":
+            if device.name == target_name:
                 yield device
 
     def start(self) -> None:
@@ -63,21 +66,23 @@ class UartListener:
 
     async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
         while True:
+            resolved_device = await self._resolve_device()
+            if resolved_device is None:
+                await asyncio.sleep(1.0)
+                continue
             # We still tend to loe a decent amount of data (~5 seconds worth)
             # as part of the reconnection process, but if the timeout is infrequent enough it would be hard to notice
             self._logger.info(
-                "Attempting to connect to %s (%s).", device.address, device.name
+                "Attempting to connect to %s (%s).",
+                resolved_device.address,
+                resolved_device.name,
             )
 
             # For now we just restart the listener, as whatever we lost in the reconnection
             # is likely going to be discarded as misaligned anyway
             self.__clear_buffer()
 
-            # TODO: There is an issue where when you have the device in dev mode, the _device_
-            # changes when new code gets flashed onto it.  I don't think this will happen in practice, but it:
-            # 1. Makes developing kinda annoying
-            # 2. Is a weird failure case where the Totem / main controller would need to be restarted
-            async with self.__get_client(device) as client:
+            async with self.__get_client(resolved_device) as client:
                 # Try to connect if not connected
                 if not client.is_connected:
                     await client.connect()
@@ -90,6 +95,14 @@ class UartListener:
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
             # On failure, wait a bit before retrying
             time.sleep(1.0)
+
+    async def _resolve_device(self) -> BLEDevice | None:
+        devices: list[BLEDevice] = await BleakScanner.discover()
+        for device in devices:
+            if device.name == self.device_name:
+                return device
+        self._logger.warning("No BLE device named '%s' found", self.device_name)
+        return None
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:

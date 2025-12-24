@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from PIL import Image
 
-from heart.device import Cube, Device
+from heart.device import Cube, Device, Orientation, Rectangle
 from heart.device.local import LocalScreen
 from heart.environment import GameLoop, RendererVariant
 from heart.manage.update import main as update_driver_main
@@ -21,9 +21,31 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 
-def _get_device(x11_forward: bool) -> Device:
-    # TODO: Add a way of adding orientation either from Config or `run`
-    orientation = Cube.sides()
+def _parse_layout(value: str) -> tuple[int, int]:
+    normalized = value.strip().lower()
+    if not normalized:
+        raise ValueError("Layout value must not be empty")
+    delimiter = "x" if "x" in normalized else ","
+    parts = [part.strip() for part in normalized.split(delimiter)]
+    if len(parts) != 2:
+        raise ValueError("Layout must be formatted as '<columns>x<rows>' or '<columns>,<rows>'")
+    try:
+        columns = int(parts[0])
+        rows = int(parts[1])
+    except ValueError as exc:
+        raise ValueError("Layout values must be integers") from exc
+    if columns < 1 or rows < 1:
+        raise ValueError("Layout values must be positive")
+    return columns, rows
+
+
+def _get_device(x11_forward: bool, layout_override: tuple[int, int] | None = None) -> Device:
+    layout = layout_override or Configuration.device_layout()
+    orientation: Orientation
+    if layout is None:
+        orientation = Cube.sides()
+    else:
+        orientation = Rectangle.with_layout(*layout)
     device: Device
 
     if Configuration.forward_to_beats_app():
@@ -82,14 +104,16 @@ def run(
     x11_forward: bool = typer.Option(
         False, "--x11-forward", help="Use X11 forwarding for RGB display"
     ),
+    layout: Annotated[str | None, typer.Option("--layout")] = None,
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         raise Exception(f"Configuration '{configuration}' not found in registry")
     render_variant = _parse_render_variant(Configuration.render_variant())
+    layout_override = _parse_layout(layout) if layout is not None else None
     loop = GameLoop(
-        device=_get_device(x11_forward),
+        device=_get_device(x11_forward, layout_override=layout_override),
         resolver=container,
         render_variant=render_variant,
     )

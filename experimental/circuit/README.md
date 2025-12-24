@@ -13,7 +13,7 @@ set KICAD_SYMBOL_DIR=C:\\Program Files\\KiCad\\share\\kicad\\kicad-symbols
 
 You need to do this so that the parts will be loaded in
 
-# TODO:
+## KiCad 8 macOS symbol path
 
 export KICAD8_SYMBOL_DIR="/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols/"
 

@@ -109,6 +109,48 @@ class Configuration:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 
     @classmethod
+    def bluetooth_device_name(cls) -> str:
+        return os.environ.get("HEART_BLE_DEVICE_NAME", "totem-controller")
+
+    @classmethod
+    def gamepad_startup_delay_seconds(cls) -> float:
+        value = os.environ.get("HEART_GAMEPAD_STARTUP_DELAY_SECONDS")
+        if value is None:
+            return 1.5
+        try:
+            delay = float(value)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_GAMEPAD_STARTUP_DELAY_SECONDS must be a number"
+            ) from exc
+        if delay < 0:
+            raise ValueError("HEART_GAMEPAD_STARTUP_DELAY_SECONDS must be non-negative")
+        return delay
+
+    @classmethod
+    def device_layout(cls) -> tuple[int, int] | None:
+        raw = os.environ.get("HEART_DEVICE_LAYOUT")
+        if raw is None:
+            return None
+        normalized = raw.strip().lower()
+        if not normalized:
+            return None
+        delimiter = "x" if "x" in normalized else ","
+        parts = [part.strip() for part in normalized.split(delimiter)]
+        if len(parts) != 2:
+            raise ValueError(
+                "HEART_DEVICE_LAYOUT must be in the form '<columns>x<rows>' or '<columns>,<rows>'"
+            )
+        try:
+            columns = int(parts[0])
+            rows = int(parts[1])
+        except ValueError as exc:
+            raise ValueError("HEART_DEVICE_LAYOUT values must be integers") from exc
+        if columns < 1 or rows < 1:
+            raise ValueError("HEART_DEVICE_LAYOUT must define positive dimensions")
+        return columns, rows
+
+    @classmethod
     def reactivex_background_max_workers(cls) -> int:
         return _env_int("HEART_RX_BACKGROUND_MAX_WORKERS", default=4, minimum=1)
 

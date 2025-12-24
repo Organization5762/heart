@@ -321,7 +321,6 @@ class RendererVariant(enum.Enum):
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
     AUTO = "AUTO"
-    # TODO: Add more
 
 
 class GameLoop:

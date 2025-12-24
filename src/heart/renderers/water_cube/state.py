@@ -86,9 +86,6 @@ class WaterCubeState:
         adjusted_velocities[np.logical_and(under, adjusted_velocities < 0)] = 0
 
 
-        # TODO:
-        # This is a good example of a state update that would benefit from itself being a virtual peripheral imo? Trying to think this one through
-        # Ok with this like this I think we have a path to just registering this as a callback that depends on gvec changing?
         return WaterCubeState(
             heights=adjusted_heights,
             velocities=adjusted_velocities,

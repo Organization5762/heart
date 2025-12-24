@@ -12,3 +12,4 @@ class MarioRendererState:
     in_loop: bool = False
     highest_z: float = 0.0
     latest_acceleration: Acceleration | None = None
+    last_update_timestamp: float | None = None

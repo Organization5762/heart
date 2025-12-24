@@ -69,6 +69,17 @@ class BaseSwitch(Peripheral[SwitchState]):
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._tags = [
+            PeripheralTag(
+                name="input_variant",
+                variant="button",
+                metadata={"version": "v1"},
+            ),
+            PeripheralTag(
+                name="mode",
+                variant="main_rotary_button",
+            ),
+        ]
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -77,19 +88,14 @@ class FakeSwitch(BaseSwitch):
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
             id="fake_switch",
-            tags=[
-                PeripheralTag(
-                    name="input_variant",
-                    variant="button",
-                    metadata={"version": "v1"}
-                ),
-                # TODO: Allow the button to change its own tags in some cases
-                PeripheralTag(
-                    name="mode",
-                    variant="main_rotary_button",
-                ),
-            ]
+            tags=tuple(self._tags),
         )
+
+    def set_tags(self, tags: list[PeripheralTag]) -> None:
+        self._tags = list(tags)
+
+    def add_tags(self, *tags: PeripheralTag) -> None:
+        self._tags.extend(tags)
 
     def run(self) -> None:
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
