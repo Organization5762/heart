@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
@@ -10,6 +9,7 @@ from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 import reactivex
 from reactivex import operators as ops
 
+from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_streams import share_stream
 
 
@@ -65,7 +65,7 @@ class PeripheralMessageEnvelope(Generic[A]):
 class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""
 
-    _logger = logging.getLogger(__name__)
+    _logger = get_logger(__name__)
 
     def _event_stream(self) -> reactivex.Observable[A]:
         return reactivex.empty()

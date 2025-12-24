@@ -11,6 +11,7 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
+from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 # https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/bluetooth/services/nus.html#service_uuid
@@ -39,7 +40,7 @@ class UartListener:
         self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
         self.disconnected = False
-        self._logger = logging.getLogger(f"{__name__}.{type(self).__name__}")
+        self._logger = get_logger(f"{__name__}.{type(self).__name__}")
         self._log_controller = get_logging_controller()
         self._bytes_received = 0
         self._messages_received = 0

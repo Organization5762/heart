@@ -1,7 +1,6 @@
 import asyncio
 import dataclasses
 import json
-import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -12,7 +11,9 @@ from uuid import UUID
 import websockets
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-logger = logging.getLogger(__name__)
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class UniversalJSONEncoder(json.JSONEncoder):

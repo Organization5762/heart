@@ -15,6 +15,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Avoid using `print` for runtime diagnostics in CLI commands; use the shared logger.
 - Avoid using `print` for runtime diagnostics in peripheral modules; use the shared logger.
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
+- Use `heart.utilities.logging.get_logger` for internal logging so handlers and log levels stay consistent across modules.
 
 ## Error Handling
 
