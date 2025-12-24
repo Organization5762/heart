@@ -1,7 +1,6 @@
 """Environment configuration helpers."""
 
 from heart.utilities.env.config import Configuration as Configuration
-from heart.utilities.env.config import Pi as Pi
 from heart.utilities.env.enums import DeviceLayoutMode as DeviceLayoutMode
 from heart.utilities.env.enums import FrameArrayStrategy as FrameArrayStrategy
 from heart.utilities.env.enums import LifeUpdateStrategy as LifeUpdateStrategy
@@ -17,3 +16,4 @@ from heart.utilities.env.enums import RenderTileStrategy as RenderTileStrategy
 from heart.utilities.env.enums import \
     SpritesheetFrameCacheStrategy as SpritesheetFrameCacheStrategy
 from heart.utilities.env.ports import get_device_ports as get_device_ports
+from heart.utilities.env.system import Pi as Pi
