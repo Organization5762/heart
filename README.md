@@ -58,6 +58,7 @@ See the following references for deeper analysis:
 
 ## Development Workflow
 - `make install` sets up the editable package and dev extras using `uv`.
+- `make develop` syncs dependencies and launches the change-aware watch loop.
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.

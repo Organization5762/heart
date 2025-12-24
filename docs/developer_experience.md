@@ -43,6 +43,32 @@ The default output highlights the platform, tool versions, and repository state.
 
 The developer focus loop provides change-aware formatting and test feedback to shorten iteration time when working on a subset of files. It targets modified Python and documentation files, runs focused tests, and can watch for changes.
 
+## Normal Development Flow
+
+Use the flow below to get a repeatable edit-format-test loop while keeping feedback focused on changed files.
+
+1. Sync dependencies and tooling.
+   ```bash
+   make install
+   ```
+2. Work on code or documentation, then run the focus loop when you want a single pass.
+   ```bash
+   make focus
+   ```
+3. Run full formatting and tests before pushing changes.
+   ```bash
+   make format
+   make test
+   ```
+
+## One-Stop Developer Mode
+
+Use the developer mode target to sync dependencies and start the watch loop in one command.
+
+```bash
+make develop
+```
+
 Run the loop once:
 
 ```bash
