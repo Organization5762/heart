@@ -11,6 +11,7 @@ from types import ModuleType
 from typing import Any, Self
 
 from heart.peripheral.core import Peripheral
+from heart.utilities.logging import get_logger
 
 adapter: ModuleType | None
 bz_peripheral: ModuleType | None
@@ -31,6 +32,8 @@ bz_peripheral = peripheral_module
 _SERVICE_UUID = "1235"
 _CHARACTERISTIC_UUID = "5679"
 
+logger = get_logger(__name__)
+
 
 class PhoneText(Peripheral[str]):
     """Peripheral that stores the most recent text or image sent to it over BLE."""
@@ -47,8 +50,8 @@ class PhoneText(Peripheral[str]):
     # ---------------------------------------------------------------------
     def run(self) -> None:  # noqa: D401 – keeping signature of base class
         if bz_peripheral is None or adapter is None:
-            print(
-                "!!! bluezero must be installed to run PhoneText as a BLE peripheral !!!"
+            logger.warning(
+                "bluezero must be installed to run PhoneText as a BLE peripheral."
             )
             return
 
@@ -63,10 +66,10 @@ class PhoneText(Peripheral[str]):
         pi_ble.add_service(1, _SERVICE_UUID, True)
 
         # Print clear information about what we're using
-        print("📲 Starting PhoneText peripheral with:")
-        print(f"   Service UUID: {_SERVICE_UUID}")
-        print(f"   Characteristic UUID: {_CHARACTERISTIC_UUID}")
-        print(f"   Adapter: {hci_addr}")
+        logger.info("Starting PhoneText peripheral.")
+        logger.info("Service UUID: %s", _SERVICE_UUID)
+        logger.info("Characteristic UUID: %s", _CHARACTERISTIC_UUID)
+        logger.info("Adapter: %s", hci_addr)
 
         # Characteristic that the iOS application writes its data chunks into.
         pi_ble.add_characteristic(
@@ -81,7 +84,7 @@ class PhoneText(Peripheral[str]):
 
         # Start advertising – this call blocks because Bluezero enters GLib's
         # main loop internally.
-        print("🔵  PhoneText peripheral advertising… (Ctrl-C to quit)")
+        logger.info("PhoneText peripheral advertising. (Ctrl-C to quit)")
         pi_ble.publish()
 
     # ------------------------------------------------------------------
@@ -108,7 +111,7 @@ class PhoneText(Peripheral[str]):
     ) -> None:  # noqa: D401
         """Bluezero callback executed whenever a central writes new data."""
 
-        print(f"Received value: {value!r}")
+        logger.debug("Received value: %r", value)
         # Accumulate the incoming chunk and process as text only
         self._buffer.extend(value)
 
@@ -122,10 +125,10 @@ class PhoneText(Peripheral[str]):
                 # Save the received text
                 self._last_text = text
                 self.new_text = True
-                print(f"Processed text: '{text}'")
+                logger.info("Processed text: %r", text)
             except UnicodeDecodeError as e:
-                print(f"Error decoding text: {e}")
-                print(f"Raw bytes: {text_bytes}")
+                logger.warning("Error decoding text: %s", e)
+                logger.debug("Raw bytes: %r", text_bytes)
 
             # Clear the buffer for the next message
             self._buffer.clear()
