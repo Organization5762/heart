@@ -115,9 +115,10 @@ class PeripheralManager:
         if not main_switches:
             return reactivex.empty()
 
-        return reactivex.merge(*main_switches).pipe(
+        merged = reactivex.merge(*main_switches).pipe(
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
+        return share_stream(merged, stream_name="PeripheralManager.main_switch")
 
     @cached_property
     def game_tick(self) -> reactivex.Subject[Any]:

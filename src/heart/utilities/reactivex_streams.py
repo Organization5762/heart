@@ -44,6 +44,13 @@ def share_stream(
     if strategy is ReactivexStreamShareStrategy.SHARE:
         logger.debug("Sharing %s with share", stream_name)
         return source.pipe(ops.share())
+    if strategy is ReactivexStreamShareStrategy.SHARE_AUTO_CONNECT:
+        logger.debug(
+            "Sharing %s with share_auto_connect (min_subscribers=%d)",
+            stream_name,
+            auto_connect_min_subscribers,
+        )
+        return source.pipe(ops.publish()).auto_connect(auto_connect_min_subscribers)
     if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST:
         logger.debug(
             "Sharing %s with replay_latest (window_ms=%s)",

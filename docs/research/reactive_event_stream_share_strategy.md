@@ -23,6 +23,9 @@ buffered replay when tuning for performance and correctness.
 
 - `HEART_RX_STREAM_SHARE_STRATEGY`
   - `replay_latest` (default): replay the most recent event to late subscribers.
+  - `share_auto_connect`: share without replay while keeping the source
+    connected after the first subscriber arrives, avoiding repeated
+    subscriptions when observers churn.
   - `replay_latest_auto_connect`: replay the most recent event while keeping the
     source connected after the first subscriber arrives, avoiding repeated
     subscriptions when observers churn.
@@ -43,8 +46,10 @@ buffered replay when tuning for performance and correctness.
 - `heart.utilities.reactivex_streams.share_stream` wraps the sharing logic and
   provides logging hints for the configured strategy.
 - `heart.peripheral.core.Peripheral.observe` and
-  `heart.peripheral.core.manager.PeripheralManager.get_event_bus` now use the
-  shared helper so configuration applies consistently across core event streams.
+  `heart.peripheral.core.manager.PeripheralManager.get_event_bus` and
+  `heart.peripheral.core.manager.PeripheralManager.get_main_switch_subscription`
+  now use the shared helper so configuration applies consistently across core
+  event streams.
 - Tests validate that late subscribers receive the configured replay buffer.
 
 ## Materials
