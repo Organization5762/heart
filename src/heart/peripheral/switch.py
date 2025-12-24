@@ -73,6 +73,12 @@ class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
+    def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+        return KeyboardKey.get(key).observe.pipe(
+            ops.map(PeripheralMessageEnvelope[KeyboardEvent].unwrap_peripheral),
+            ops.filter(lambda event: event.action is KeyboardAction.PRESSED),
+        )
+
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
@@ -100,19 +106,19 @@ class FakeSwitch(BaseSwitch):
         event_bus: reactivex.Observable[Input] | None = None,
     ) -> tuple[InputDescriptor, ...]:
         keyboard_stream = reactivex.merge(
-            KeyboardKey.get(pygame.K_UP).observe,
-            KeyboardKey.get(pygame.K_DOWN).observe,
-            KeyboardKey.get(pygame.K_LEFT).observe,
-            KeyboardKey.get(pygame.K_RIGHT).observe,
+            self._key_press_stream(pygame.K_UP),
+            self._key_press_stream(pygame.K_DOWN),
+            self._key_press_stream(pygame.K_LEFT),
+            self._key_press_stream(pygame.K_RIGHT),
         )
         return (
             InputDescriptor(
-                name="keyboard.arrow_keys",
+                name="keyboard.arrow_keys.pressed",
                 stream=keyboard_stream,
                 payload_type=KeyboardEvent,
                 description=(
-                    "Arrow key press events mapped to fake switch rotation and "
-                    "button increments."
+                    "Arrow key press events (KeyboardAction.PRESSED) mapped to "
+                    "fake switch rotation and button increments."
                 ),
             ),
         )
@@ -133,23 +139,10 @@ class FakeSwitch(BaseSwitch):
             def handle_key_right(_: Any) -> None:
                 self.rotational_value += 1
 
-            def is_first_press(
-                x: PeripheralMessageEnvelope[KeyboardEvent],
-            ) -> bool:
-                return x.data.action == KeyboardAction.PRESSED
-
-            KeyboardKey.get(pygame.K_UP).observe.pipe(
-                ops.filter(is_first_press)
-            ).subscribe(on_next=handle_key_up)
-            KeyboardKey.get(pygame.K_DOWN).observe.pipe(
-                ops.filter(is_first_press)
-            ).subscribe(on_next=handle_key_down)
-            KeyboardKey.get(pygame.K_LEFT).observe.pipe(
-                ops.filter(is_first_press)
-            ).subscribe(on_next=handle_key_left)
-            KeyboardKey.get(pygame.K_RIGHT).observe.pipe(
-                ops.filter(is_first_press)
-            ).subscribe(on_next=handle_key_right)
+            self._key_press_stream(pygame.K_UP).subscribe(on_next=handle_key_up)
+            self._key_press_stream(pygame.K_DOWN).subscribe(on_next=handle_key_down)
+            self._key_press_stream(pygame.K_LEFT).subscribe(on_next=handle_key_left)
+            self._key_press_stream(pygame.K_RIGHT).subscribe(on_next=handle_key_right)
         else:
             logger.warning("Not running FakeSwitch")
 
