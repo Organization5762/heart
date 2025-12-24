@@ -20,9 +20,12 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.renderers.three_fractal.provider import FractalSceneProvider
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -108,7 +111,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         self.shader = Shader()
         self.program = self.shader.create()
-        print("Compiled shader!")
+        logger.info("Compiled shader.")
 
         # Get uniform locations
         self.matID = glGetUniformLocation(self.program, "iMat")
@@ -155,11 +158,23 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         orientation: Orientation,
     ) -> FractalRuntimeState:
         """Initialize the fractal renderer with the given window size."""
-        print(f"OpenGL Version: {glGetString(GL_VERSION).decode('utf-8')}")
-        print(f"OpenGL Vendor: {glGetString(GL_VENDOR).decode('utf-8')}")
-        print(f"OpenGL Renderer: {glGetString(GL_RENDERER).decode('utf-8')}")
-        print(
-            f"OpenGL Shading Language Version: {glGetString(GL_SHADING_LANGUAGE_VERSION).decode('utf-8')}"
+        logger.info(
+            "OpenGL Version: %s",
+            glGetString(GL_VERSION).decode("utf-8", errors="replace"),
+        )
+        logger.info(
+            "OpenGL Vendor: %s",
+            glGetString(GL_VENDOR).decode("utf-8", errors="replace"),
+        )
+        logger.info(
+            "OpenGL Renderer: %s",
+            glGetString(GL_RENDERER).decode("utf-8", errors="replace"),
+        )
+        logger.info(
+            "OpenGL Shading Language Version: %s",
+            glGetString(GL_SHADING_LANGUAGE_VERSION).decode(
+                "utf-8", errors="replace"
+            ),
         )
 
         self.time_initialized = time.time()
@@ -246,7 +261,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                     else:
                         glUniform3fv(key_id, 1, val)
                 except Exception as e:
-                    print(f"Error setting uniform {key}: {e}")
+                    logger.exception("Error setting uniform %s: %s", key, e)
 
             # Clear pending uniforms after applying
             self.shader.pending_uniforms = {}
@@ -663,7 +678,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         except Exception as e:
             # TODO: Very occasionally this raises an exception for some reason, no idea why
             self.active_radius = self.BASE_RADIUS
-            print(f"error but why: {e}")
+            logger.exception("Failed to update active radius: %s", e)
 
         if not self.tiled_mode:
             # eagerly apply the uniforms

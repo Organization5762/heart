@@ -5,6 +5,9 @@ from OpenGL.GL import *
 
 from heart.display.shaders.template import __file__ as template_location
 from heart.display.shaders.util import _UNIFORMS, to_vec3
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Shader:
@@ -70,11 +73,11 @@ class Shader:
         program = glCreateProgram()
 
         if vertex_source:
-            print("Compiling Vertex Shader...")
+            logger.info("Compiling Vertex Shader...")
             vertex_shader = self.compile_shader(vertex_source, GL_VERTEX_SHADER)
             glAttachShader(program, vertex_shader)
         if fragment_source:
-            print("Compiling Fragment Shader...")
+            logger.info("Compiling Fragment Shader...")
             fragment_shader = self.compile_shader(fragment_source, GL_FRAGMENT_SHADER)
             glAttachShader(program, fragment_shader)
 
@@ -93,4 +96,7 @@ class Shader:
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, byref(length))
 
         if length.value > 0:
-            print(glGetShaderInfoLog(shader))
+            info_log = glGetShaderInfoLog(shader)
+            if isinstance(info_log, bytes):
+                info_log = info_log.decode("utf-8", errors="replace")
+            logger.error("Shader compile log: %s", info_log)

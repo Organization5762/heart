@@ -22,8 +22,10 @@ from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
 from heart.runtime.game_loop import DeviceDisplayMode
+from heart.utilities.logging import get_logger
 
 ColorPalette = list[tuple[int, int, int]]
+logger = get_logger(__name__)
 
 
 class MandelbrotMode(StatefulBaseRenderer[AppState]):
@@ -154,7 +156,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
                     self.state.set_mode_auto()
             self.input_error = not gamepad_connected
         except Exception as e:
-            print(f"Error processing input: {e}. Resetting.")
+            logger.exception("Error processing input; resetting. %s", e)
             if not self.input_error:
                 self.reset()
                 self.state.set_mode_auto()
@@ -655,28 +657,29 @@ def main():
         if profiling:
             # === Profiling Teardown and Analysis ===
             profiler.disable()  # Stop profiling
-            print(f"Profiling finished after {frame_count} frames.")
+            logger.info("Profiling finished after %s frames.", frame_count)
 
             # --- Option 1: Print stats to console ---
             s = io.StringIO()
             # Sort by cumulative time spent in function and its callees
             ps = pstats.Stats(profiler, stream=s).sort_stats("cumulative")
             ps.print_stats(30)  # Print top 30 lines
-            print("\n--- Profiling Stats (Sorted by Cumulative Time) ---")
-            print(s.getvalue())
+            logger.info("--- Profiling Stats (Sorted by Cumulative Time) ---")
+            logger.info("%s", s.getvalue())
 
             # You might also want to sort by 'tottime' (total time spent ONLY in the function itself)
             s = io.StringIO()
             ps = pstats.Stats(profiler, stream=s).sort_stats("tottime")
             ps.print_stats(30)  # Print top 30 lines
-            print("\n--- Profiling Stats (Sorted by Total Time) ---")
-            print(s.getvalue())
+            logger.info("--- Profiling Stats (Sorted by Total Time) ---")
+            logger.info("%s", s.getvalue())
 
             # --- Option 2: Save stats to a file for later analysis ---
             profiler.dump_stats(profile_filename)
-            print(f"\nProfiling data saved to {profile_filename}")
-            print(
-                "You can analyze this file later, e.g., using 'snakeviz {profile_filename}'"
+            logger.info("Profiling data saved to %s", profile_filename)
+            logger.info(
+                "You can analyze this file later, e.g., using 'snakeviz %s'",
+                profile_filename,
             )
 
     # Clean up
