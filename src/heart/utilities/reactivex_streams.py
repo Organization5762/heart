@@ -36,6 +36,7 @@ def _share_with_refcount_grace(
     connectable: ConnectableStream[T],
     *,
     grace_ms: int,
+    min_subscribers: int,
     connect_mode: ReactivexStreamConnectMode,
     stream_name: str,
 ) -> reactivex.Observable[T]:
@@ -48,7 +49,7 @@ def _share_with_refcount_grace(
         nonlocal connection, disconnect_timer, subscriber_count
         with lock:
             disconnect_timer = None
-            if connection is None or subscriber_count > 0:
+            if connection is None or subscriber_count >= min_subscribers:
                 return
             logger.debug("Disconnecting %s after refcount grace window", stream_name)
             connection.dispose()
@@ -64,24 +65,30 @@ def _share_with_refcount_grace(
             if (
                 connection is None
                 and connect_mode is ReactivexStreamConnectMode.EAGER
+                and subscriber_count >= min_subscribers
             ):
                 logger.debug(
-                    "Connecting %s with refcount grace (grace_ms=%d, mode=%s)",
+                    "Connecting %s with refcount grace (grace_ms=%d, mode=%s, min=%d)",
                     stream_name,
                     grace_ms,
                     connect_mode,
+                    min_subscribers,
                 )
                 connection = connectable.connect()
 
         subscription = connectable.subscribe(observer, scheduler=scheduler)
         if connect_mode is ReactivexStreamConnectMode.LAZY:
             with lock:
-                if connection is None and subscriber_count > 0:
+                if (
+                    connection is None
+                    and subscriber_count >= min_subscribers
+                ):
                     logger.debug(
-                        "Connecting %s with refcount grace (grace_ms=%d, mode=%s)",
+                        "Connecting %s with refcount grace (grace_ms=%d, mode=%s, min=%d)",
                         stream_name,
                         grace_ms,
                         connect_mode,
+                        min_subscribers,
                     )
                     connection = connectable.connect()
 
@@ -90,13 +97,16 @@ def _share_with_refcount_grace(
             subscription.dispose()
             with lock:
                 subscriber_count -= 1
-                if subscriber_count > 0 or connection is None:
+                if subscriber_count >= min_subscribers or connection is None:
                     return
                 if grace_ms <= 0:
                     _disconnect()
                     return
                 logger.debug(
-                    "Scheduling disconnect for %s in %dms", stream_name, grace_ms
+                    "Scheduling disconnect for %s in %dms (min=%d)",
+                    stream_name,
+                    grace_ms,
+                    min_subscribers,
                 )
                 disconnect_timer = _GRACE_SCHEDULER.schedule_relative(
                     grace_ms / 1000,
@@ -119,6 +129,9 @@ def share_stream(
     replay_window_ms = Configuration.reactivex_stream_replay_window_ms()
     auto_connect_min_subscribers = (
         Configuration.reactivex_stream_auto_connect_min_subscribers()
+    )
+    refcount_min_subscribers = (
+        Configuration.reactivex_stream_refcount_min_subscribers()
     )
     refcount_grace_ms = Configuration.reactivex_stream_refcount_grace_ms()
     connect_mode = Configuration.reactivex_stream_connect_mode()
@@ -145,14 +158,16 @@ def share_stream(
 
     if strategy is ReactivexStreamShareStrategy.SHARE:
         logger.debug(
-            "Sharing %s with share (refcount_grace_ms=%d)",
+            "Sharing %s with share (refcount_grace_ms=%d, min=%d)",
             stream_name,
             refcount_grace_ms,
+            refcount_min_subscribers,
         )
-        if refcount_grace_ms > 0:
+        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
             return _share_with_refcount_grace(
                 cast(ConnectableStream[T], source.pipe(ops.publish())),
                 grace_ms=refcount_grace_ms,
+                min_subscribers=refcount_min_subscribers,
                 connect_mode=connect_mode,
                 stream_name=stream_name,
             )
@@ -166,16 +181,18 @@ def share_stream(
         return source.pipe(ops.publish()).auto_connect(auto_connect_min_subscribers)
     if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST:
         logger.debug(
-            "Sharing %s with replay_latest (window_ms=%s, refcount_grace_ms=%d)",
+            "Sharing %s with replay_latest (window_ms=%s, refcount_grace_ms=%d, min=%d)",
             stream_name,
             replay_window_ms,
             refcount_grace_ms,
+            refcount_min_subscribers,
         )
         replayed = _replay(1)
-        if refcount_grace_ms > 0:
+        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
             return _share_with_refcount_grace(
                 replayed,
                 grace_ms=refcount_grace_ms,
+                min_subscribers=refcount_min_subscribers,
                 connect_mode=connect_mode,
                 stream_name=stream_name,
             )
@@ -192,17 +209,19 @@ def share_stream(
     if strategy is ReactivexStreamShareStrategy.REPLAY_BUFFER:
         buffer_size = Configuration.reactivex_stream_replay_buffer()
         logger.debug(
-            "Sharing %s with replay_buffer=%d (window_ms=%s, refcount_grace_ms=%d)",
+            "Sharing %s with replay_buffer=%d (window_ms=%s, refcount_grace_ms=%d, min=%d)",
             stream_name,
             buffer_size,
             replay_window_ms,
             refcount_grace_ms,
+            refcount_min_subscribers,
         )
         replayed = _replay(buffer_size)
-        if refcount_grace_ms > 0:
+        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
             return _share_with_refcount_grace(
                 replayed,
                 grace_ms=refcount_grace_ms,
+                min_subscribers=refcount_min_subscribers,
                 connect_mode=connect_mode,
                 stream_name=stream_name,
             )

@@ -206,9 +206,13 @@ class TestShareStreamStrategy:
 
         time.sleep(0.05)
 
-        shared.subscribe().dispose()
+        subscription_c = shared.subscribe()
+        subscription_d = shared.subscribe()
 
         assert subscribe_count == 2
+
+        subscription_c.dispose()
+        subscription_d.dispose()
 
     def test_share_stream_refcount_grace_connects_after_subscribe(
         self,
@@ -231,3 +235,39 @@ class TestShareStreamStrategy:
         shared.subscribe(received.append)
 
         assert received == ["ready"]
+
+    def test_share_stream_refcount_min_subscribers_gates_connections(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure ref-count min subscribers gates connections to reduce upstream load until demand is sufficient."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS", "2")
+        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "0")
+        subscribe_count = 0
+
+        def _subscribe(observer, scheduler=None):
+            nonlocal subscribe_count
+            subscribe_count += 1
+            return Disposable()
+
+        source = reactivex.create(_subscribe)
+        shared = share_stream(source, stream_name="min_refcount")
+
+        subscription_a = shared.subscribe()
+        assert subscribe_count == 0
+
+        subscription_b = shared.subscribe()
+        assert subscribe_count == 1
+
+        subscription_a.dispose()
+        subscription_b.dispose()
+
+        subscription_c = shared.subscribe()
+        subscription_d = shared.subscribe()
+
+        assert subscribe_count == 2
+
+        subscription_c.dispose()
+        subscription_d.dispose()

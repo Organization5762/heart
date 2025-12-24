@@ -190,6 +190,14 @@ class Configuration:
         return _env_int("HEART_RX_STREAM_REFCOUNT_GRACE_MS", default=0, minimum=0)
 
     @classmethod
+    def reactivex_stream_refcount_min_subscribers(cls) -> int:
+        return _env_int(
+            "HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS",
+            default=1,
+            minimum=1,
+        )
+
+    @classmethod
     def reactivex_stream_connect_mode(cls) -> "ReactivexStreamConnectMode":
         mode = os.environ.get("HEART_RX_STREAM_CONNECT_MODE", "lazy").strip().lower()
         try:
