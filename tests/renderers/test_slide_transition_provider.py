@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import SlideTransitionState
 
@@ -43,14 +43,21 @@ def _screen_refresh_inputs(draw: st.DrawFn) -> tuple[int, int, int]:
 class TestSlideTransitionProviderStateTransitions:
     """Property checks for slide transitions to keep renderer sequencing stable."""
 
+    class _StubRenderer(StatefulBaseRenderer[int]):
+        def _create_initial_state(self, window, clock, peripheral_manager, orientation) -> int:
+            return 0
+
+        def real_process(self, window, clock, orientation) -> None:
+            pass
+
     @given(data=_advance_inputs())
     def test_update_state_moves_toward_target(self, data: tuple[int, int, int, int]) -> None:
         """Verify slide steps advance toward the target offset so scenes converge deterministically."""
         direction, slide_speed, screen_width, x_offset = data
         target_offset = -direction * screen_width
         provider = SlideTransitionProvider(
-            BaseRenderer(),
-            BaseRenderer(),
+            self._StubRenderer(),
+            self._StubRenderer(),
             direction=direction,
             slide_speed=slide_speed,
         )
@@ -78,8 +85,8 @@ class TestSlideTransitionProviderStateTransitions:
         """Verify idle transitions stay unchanged so halted slides do not jitter."""
         direction, slide_speed, screen_width, x_offset = data
         provider = SlideTransitionProvider(
-            BaseRenderer(),
-            BaseRenderer(),
+            self._StubRenderer(),
+            self._StubRenderer(),
             direction=direction,
             slide_speed=slide_speed,
         )
@@ -100,8 +107,8 @@ class TestSlideTransitionProviderStateTransitions:
         """Verify missing targets refresh to screen width so transitions restart coherently."""
         direction, slide_speed, screen_width = data
         provider = SlideTransitionProvider(
-            BaseRenderer(),
-            BaseRenderer(),
+            self._StubRenderer(),
+            self._StubRenderer(),
             direction=direction,
             slide_speed=slide_speed,
         )

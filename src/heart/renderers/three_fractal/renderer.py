@@ -1,6 +1,7 @@
 import math
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -16,7 +17,7 @@ from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
-from heart.renderers import BaseRenderer, StatefulBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
 
@@ -24,7 +25,12 @@ if TYPE_CHECKING:
     from heart.renderers.three_fractal.provider import FractalSceneProvider
 
 
-class FractalRuntime(BaseRenderer):
+@dataclass
+class FractalRuntimeState:
+    peripheral_manager: PeripheralManager
+
+
+class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def __init__(self, device=None):
         super().__init__()
         self.device = device
@@ -141,13 +147,13 @@ class FractalRuntime(BaseRenderer):
         )
 
     # Modified initialize to use the provided window
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ):
+    ) -> FractalRuntimeState:
         """Initialize the fractal renderer with the given window size."""
         print(f"OpenGL Version: {glGetString(GL_VERSION).decode('utf-8')}")
         print(f"OpenGL Vendor: {glGetString(GL_VENDOR).decode('utf-8')}")
@@ -161,7 +167,6 @@ class FractalRuntime(BaseRenderer):
         window_size = window.get_size()
         tiled_mode = isinstance(orientation, Cube)
 
-        self.initialized = True
         self.tiled_mode = tiled_mode
         self.clock = clock
         self.mode = "auto"
@@ -197,6 +202,7 @@ class FractalRuntime(BaseRenderer):
 
         self.shader.set(self.sphere_radius_var, self.BASE_RADIUS)
         self.last_frame_time = time.time()
+        return FractalRuntimeState(peripheral_manager=peripheral_manager)
 
         self.mode = "auto"
 
@@ -692,7 +698,13 @@ class FractalRuntime(BaseRenderer):
         self.mat[3, :3] = np.array(start_pos)
         self.vel = np.array([0, 0, -self.max_velocity], dtype=np.float32)
 
-    def process(self, window, clock, peripheral_manager, orientation):
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        orientation: Orientation,
+    ) -> None:
+        peripheral_manager = self.state.peripheral_manager
         # Update the target surface if it changed
         if window is not self.target_surface:
             self.target_surface = window
@@ -853,9 +865,8 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         orientation: Orientation,
     ) -> None:
         assert self._peripheral_manager is not None
-        self.state.runtime.process(
+        self.state.runtime.real_process(
             window,
             clock,
-            self._peripheral_manager,
             orientation,
         )

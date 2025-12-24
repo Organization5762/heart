@@ -1,6 +1,6 @@
 from heart.display.color import Color
 from heart.navigation import MultiScene
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.artist.state import ArtistState
 from heart.renderers.image import RenderImage
 from heart.renderers.text import TextRendering
@@ -12,7 +12,7 @@ class ArtistScene(MultiScene):
         super().__init__(artist_state.scenes)
 
     @staticmethod
-    def title_scene() -> list[BaseRenderer]:
+    def title_scene() -> list[StatefulBaseRenderer]:
         return [
             RenderImage(image_file="artist/imaginal_disk.png"),
             TextRendering(

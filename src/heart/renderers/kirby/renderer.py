@@ -1,6 +1,6 @@
 from heart.display.color import Color
 from heart.navigation import MultiScene
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.kirby.state import KirbyState
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
@@ -12,7 +12,7 @@ class KirbyScene(MultiScene):
         super().__init__(kirby_state.scenes)
 
     @staticmethod
-    def title_scene() -> list[BaseRenderer]:
+    def title_scene() -> list[StatefulBaseRenderer]:
         return [
             TextRendering(
                 text=["kirby mode"],

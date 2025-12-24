@@ -225,12 +225,12 @@ class AtomicBaseRenderer(Generic[StateT]):
 
     def get_renderers(
         self
-    ) -> list["BaseRenderer"]:
+    ) -> list["StatefulBaseRenderer"]:
         return self._real_get_renderers()
 
     def _real_get_renderers(
         self
-    ) -> list["BaseRenderer"]:
+    ) -> list["StatefulBaseRenderer"]:
         return [self]
 
     @final

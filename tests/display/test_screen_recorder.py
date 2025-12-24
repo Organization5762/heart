@@ -1,19 +1,28 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from PIL import Image, ImageSequence
 
 from heart.display.recorder import ScreenRecorder
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 
 
-class SolidColorRenderer(BaseRenderer):
+@dataclass
+class SolidColorState:
+    color: tuple[int, int, int]
+
+
+class SolidColorRenderer(StatefulBaseRenderer[SolidColorState]):
     def __init__(self, color: tuple[int, int, int]) -> None:
         super().__init__()
         self._color = color
 
-    def process(self, window, clock, peripheral_manager, orientation) -> None:
-        window.fill(self._color)
+    def _create_initial_state(self, window, clock, peripheral_manager, orientation) -> SolidColorState:
+        return SolidColorState(color=self._color)
+
+    def real_process(self, window, clock, orientation) -> None:
+        window.fill(self.state.color)
 
 
 @pytest.fixture()

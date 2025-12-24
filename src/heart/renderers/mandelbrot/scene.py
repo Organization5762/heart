@@ -15,7 +15,7 @@ from heart.device import Cube, Orientation, Rectangle
 from heart.environment import DeviceDisplayMode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
                                                          KeyboardControls,
                                                          SceneControlsMapping,
@@ -26,7 +26,7 @@ from heart.renderers.mandelbrot.state import AppState, ViewMode
 ColorPalette = list[tuple[int, int, int]]
 
 
-class MandelbrotMode(BaseRenderer):
+class MandelbrotMode(StatefulBaseRenderer[AppState]):
     def __init__(self):
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -38,8 +38,6 @@ class MandelbrotMode(BaseRenderer):
         self.individual_screen_width: int | None = None
         self.individual_screen_height: int | None = None
         self.screens: dict[tuple[int, int], pygame.Surface] = {}
-        # sharable app state
-        self.state: AppState | None = None
         self.palettes = self._generate_palettes()
 
         # cache properties for computed converge times for current view port
@@ -63,13 +61,13 @@ class MandelbrotMode(BaseRenderer):
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
 
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> None:
+    ) -> AppState:
         pygame.font.init()
         self.time_initialized = time.time()
         self.font = pygame.font.SysFont("monospace", 8)
@@ -88,7 +86,7 @@ class MandelbrotMode(BaseRenderer):
         self.individual_screen_width = self.screens[(0, 0)].get_width()
         self.individual_screen_height = self.screens[(0, 0)].get_height()
 
-        self.state = AppState(
+        state = AppState(
             movement=pygame.Vector2(self.init_offset_x, self.init_offset_y),
             jmovement=pygame.Vector2(0, 0),
             cursor_pos=pygame.Vector2(0, 0),
@@ -101,8 +99,9 @@ class MandelbrotMode(BaseRenderer):
             init_orientation=orientation,
             mode="auto",
         )
+        self.set_state(state)
         self.gamepad = peripheral_manager.get_gamepad()
-        self.scene_controls = SceneControls(self.state)
+        self.scene_controls = SceneControls(state)
         self.keyboard_controls = KeyboardControls(self.scene_controls)
         self.control_mappings = {
             GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(
@@ -118,8 +117,7 @@ class MandelbrotMode(BaseRenderer):
             mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
             julia_surface = pygame.Surface((self.width // 2, self.height))
             self._draw_split_view(mandelbrot_surface, julia_surface, clock)
-
-        super().initialize(window, clock, peripheral_manager, orientation)
+        return state
 
     @property
     def active_palette(self):
@@ -142,11 +140,10 @@ class MandelbrotMode(BaseRenderer):
             mapping.update()
         return connected
 
-    def process(
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         try:

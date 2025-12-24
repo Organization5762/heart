@@ -9,7 +9,7 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
-from heart.renderers import BaseRenderer, StatefulBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.color import RenderColor
 from heart.renderers.slide_transition import (SlideTransitionProvider,
                                               SlideTransitionRenderer)
@@ -17,24 +17,29 @@ from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 
 
-class AppController(BaseRenderer):
+@dataclass
+class AppControllerState:
+    pass
+
+
+class AppController(StatefulBaseRenderer[AppControllerState]):
     def __init__(self) -> None:
+        super().__init__()
         self.modes = GameModes()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.warmup = True
-        super().__init__()
 
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ):
+    ) -> AppControllerState:
         self.modes.initialize(window, clock, peripheral_manager, orientation)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        return AppControllerState()
 
-    def get_renderers(self) -> list[BaseRenderer]:
+    def get_renderers(self) -> list[StatefulBaseRenderer]:
         return self.modes.get_renderers()
 
     def add_sleep_mode(self) -> None:
@@ -69,7 +74,8 @@ class AppController(BaseRenderer):
         return new_scene
 
     def add_mode(
-        self, title: str | list[BaseRenderer] | BaseRenderer | None = None
+        self,
+        title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer | None = None,
     ) -> "ComposedRenderer":
         # TODO: Add a navigation page back in
         result = ComposedRenderer([])
@@ -83,12 +89,14 @@ class AppController(BaseRenderer):
                 font_size=14,
                 color=Color(255, 105, 180),
             )
-        elif isinstance(title, BaseRenderer):
+        elif isinstance(title, StatefulBaseRenderer):
             title_renderer = title
         elif isinstance(title, list):
             title_renderer = ComposedRenderer(title)
         else:
-            raise ValueError("Title must be a string or BaseRenderer, got: ", title)
+            raise ValueError(
+                "Title must be a string or StatefulBaseRenderer, got: ", title
+            )
 
         # TODO: Clean-up
         self.modes.add_new_pages(title_renderer, result)
@@ -97,10 +105,18 @@ class AppController(BaseRenderer):
     def is_empty(self) -> bool:
         return len(self.modes.state.renderers) == 0
 
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        orientation: Orientation,
+    ) -> None:
+        self.modes.real_process(window=window, clock=clock, orientation=orientation)
+
 @dataclass
 class GameModeState:
-    title_renderers: list[BaseRenderer] = dataclasses.field(default_factory=list)
-    renderers: list[BaseRenderer] = dataclasses.field(default_factory=list)
+    title_renderers: list[StatefulBaseRenderer] = dataclasses.field(default_factory=list)
+    renderers: list[StatefulBaseRenderer] = dataclasses.field(default_factory=list)
     in_select_mode = True
     last_long_button_value = 0
     mode_offset = 0
@@ -109,7 +125,7 @@ class GameModeState:
     previous_mode_index = 0
     sliding_transition = None
 
-    def active_renderer(self) -> BaseRenderer:
+    def active_renderer(self) -> StatefulBaseRenderer:
         assert len(self.renderers) > 0, "Must have at least one renderer to select from"
         offset = (self._active_mode_index + self.mode_offset)
         mode_index = offset % len(self.renderers)
@@ -175,7 +191,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         return state
 
     def add_new_pages(
-        self, title_renderer: "BaseRenderer", renderers: "BaseRenderer"
+        self, title_renderer: "StatefulBaseRenderer", renderers: "StatefulBaseRenderer"
     ) -> None:
         # TODO: Hack because we are trying to build and have state at the same time
         if self._state is None:
@@ -185,7 +201,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def get_renderers(
         self
-    ) -> list[BaseRenderer]:
+    ) -> list[StatefulBaseRenderer]:
         active_renderer = self.state.active_renderer()
         renderers = active_renderer.get_renderers()
         return renderers
@@ -217,14 +233,22 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             )
 
 
-class ComposedRenderer(BaseRenderer):
-    def __init__(self, renderers: list[BaseRenderer]) -> None:
-        super().__init__()
-        self.renderers: list[BaseRenderer] = renderers
+@dataclass
+class ComposedRendererState:
+    peripheral_manager: PeripheralManager
+    window: pygame.Surface
+    clock: pygame.time.Clock
+    orientation: Orientation
 
-    def get_renderers(
+
+class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
+    def __init__(self, renderers: list[StatefulBaseRenderer]) -> None:
+        super().__init__()
+        self.renderers: list[StatefulBaseRenderer] = renderers
+
+    def _real_get_renderers(
         self
-    ) -> list[BaseRenderer]:
+    ) -> list[StatefulBaseRenderer]:
         result = []
         for renderer in self.renderers:
             result.extend(renderer.get_renderers())
@@ -237,36 +261,65 @@ class ComposedRenderer(BaseRenderer):
             name += f"{renderer.name}+"
         return name
 
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> None:
+    ) -> ComposedRendererState:
         for renderer in self.renderers:
             renderer.initialize(window, clock, peripheral_manager, orientation)
+        return ComposedRendererState(
+            peripheral_manager=peripheral_manager,
+            window=window,
+            clock=clock,
+            orientation=orientation,
+        )
 
-    def add_renderer(self, *renderer: BaseRenderer):
+    def add_renderer(self, *renderer: StatefulBaseRenderer):
         self.renderers.extend(renderer)
+        if self.is_initialized():
+            for item in renderer:
+                item.initialize(
+                    self.state.window,
+                    self.state.clock,
+                    self.state.peripheral_manager,
+                    self.state.orientation,
+                )
 
-    def resolve_renderer(self, container: Container, renderer: type[BaseRenderer]):
-        self.renderers.append(container.resolve(renderer))
-    
-    def process(
+    def resolve_renderer(
+        self, container: Container, renderer: type[StatefulBaseRenderer]
+    ):
+        resolved = container.resolve(renderer)
+        self.renderers.append(resolved)
+        if self.is_initialized():
+            resolved.initialize(
+                self.state.window,
+                self.state.clock,
+                self.state.peripheral_manager,
+                self.state.orientation,
+            )
+
+    def real_process(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
-            renderer._internal_process(window, clock, peripheral_manager, orientation)
+            renderer._internal_process(
+                window,
+                clock,
+                self.state.peripheral_manager,
+                orientation,
+            )
 
     def reset(self) -> None:
         for renderer in self.renderers:
             renderer.reset()
+        super().reset()
 
 
 @dataclass

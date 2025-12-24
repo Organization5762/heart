@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.sliding_image import SlidingImage
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.yolisten import YoListenRenderer
@@ -8,11 +8,11 @@ from heart.renderers.yolisten import YoListenRenderer
 
 @dataclass
 class ArtistState:
-    scenes: list[BaseRenderer]
+    scenes: list[StatefulBaseRenderer]
 
     @staticmethod
     def build() -> "ArtistState":
-        scenes: list[BaseRenderer] = []
+        scenes: list[StatefulBaseRenderer] = []
 
         for artist in [
             "imaginal_disk_animated",

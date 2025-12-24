@@ -1,37 +1,53 @@
+from dataclasses import dataclass
+
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 
 
-class MandelbrotTitle(BaseRenderer):
+@dataclass
+class MandelbrotTitleState:
+    image: pygame.Surface
+
+
+class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
     def __init__(self):
         super().__init__()
         self.mandelbrot = MandelbrotMode()
         # Avoid double mirroring by setting this display
         # to just take in the full screen
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.first_image = None
 
-    def initialize(
+    def _create_initial_state(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ):
+    ) -> MandelbrotTitleState:
         custom_orientation = Rectangle.with_layout(1, 1)
-        if self.first_image is None:
-            self.mandelbrot._internal_process(
-                window, clock, peripheral_manager, custom_orientation
-            )
-            self.first_image = window.copy()
-            del self.mandelbrot
-            self.mandelbrot = None
-        super().initialize(window, clock, peripheral_manager, custom_orientation)
+        self.mandelbrot.initialize(
+            window,
+            clock,
+            peripheral_manager,
+            custom_orientation,
+        )
+        self.mandelbrot._internal_process(
+            window, clock, peripheral_manager, custom_orientation
+        )
+        first_image = window.copy()
+        del self.mandelbrot
+        self.mandelbrot = None
+        return MandelbrotTitleState(image=first_image)
 
-    def process(self, window, clock, peripheral_manager, orientation):
-        window.blit(self.first_image, (0, 0))
+    def real_process(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        orientation: Orientation,
+    ) -> None:
+        window.blit(self.state.image, (0, 0))

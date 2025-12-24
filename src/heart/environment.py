@@ -52,7 +52,7 @@ HSV_CALIBRATION_ENABLED = HSV_CALIBRATION_MODE != "off"
 HSV_CALIBRATION_STRICT = HSV_CALIBRATION_MODE == "strict"
 HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
 
-RenderMethod = Callable[[list["BaseRenderer"]], pygame.Surface | None]
+RenderMethod = Callable[[list["StatefulBaseRenderer"]], pygame.Surface | None]
 
 
 def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
@@ -310,7 +310,7 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
 
 
 if TYPE_CHECKING:
-    from heart.renderers import BaseRenderer
+    from heart.renderers import StatefulBaseRenderer
 
 logger = get_logger(__name__)
 log_controller = get_logging_controller()
@@ -361,7 +361,7 @@ class GameLoop:
         self._last_mode_offset = 0
         self._last_offset_on_change = 0
         self._current_offset_on_change = 0
-        self.renderers_cache: list["BaseRenderer"] | None = None
+        self.renderers_cache: list["StatefulBaseRenderer"] | None = None
 
         self._active_mode_index = 0
 
@@ -390,7 +390,7 @@ class GameLoop:
 
     def add_mode(
         self,
-        title: str | list["BaseRenderer"] | "BaseRenderer" | None = None,
+        title: str | list["StatefulBaseRenderer"] | "StatefulBaseRenderer" | None = None,
     ) -> ComposedRenderer:
         return self.app_controller.add_mode(title=title)
 
@@ -462,12 +462,14 @@ class GameLoop:
         self.clock = clock
         self.peripheral_manager.clock.on_next(self.clock)
 
-    def _select_renderers(self) -> list["BaseRenderer"]:
+    def _select_renderers(self) -> list["StatefulBaseRenderer"]:
         base_renderers = self.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
 
-    def process_renderer(self, renderer: "BaseRenderer") -> pygame.Surface | None:
+    def process_renderer(
+        self, renderer: "StatefulBaseRenderer"
+    ) -> pygame.Surface | None:
         clock = self.clock
         if clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
@@ -625,7 +627,7 @@ class GameLoop:
         return surface1
 
     def _render_surface_iterative(
-        self, renderers: list["BaseRenderer"]
+        self, renderers: list["StatefulBaseRenderer"]
     ) -> pygame.Surface | None:
         self._render_queue_depth = len(renderers)
         base = None
@@ -640,7 +642,7 @@ class GameLoop:
         return base
 
     def _render_surfaces_binary(
-        self, renderers: list["BaseRenderer"]
+        self, renderers: list["StatefulBaseRenderer"]
     ) -> pygame.Surface | None:
         if not renderers:
             return None
@@ -689,7 +691,7 @@ class GameLoop:
 
     def _render_fn(
         self,
-        renderers: list["BaseRenderer"],
+        renderers: list["StatefulBaseRenderer"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
         variant = self._resolve_render_variant(len(renderers), override_renderer_variant)
@@ -699,7 +701,7 @@ class GameLoop:
 
     def _one_loop(
         self,
-        renderers: list["BaseRenderer"],
+        renderers: list["StatefulBaseRenderer"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> None:
         if self.screen is None:

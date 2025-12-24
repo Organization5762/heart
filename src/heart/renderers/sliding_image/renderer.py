@@ -9,7 +9,7 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers import BaseRenderer, StatefulBaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.sliding_image.provider import (
     SlidingImageStateProvider, SlidingRendererStateProvider)
 from heart.renderers.sliding_image.state import (SlidingImageState,
@@ -77,7 +77,7 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
 
     def __init__(
         self,
-        renderer: BaseRenderer,
+        renderer: StatefulBaseRenderer,
         *,
         speed: int = 1,
         provider_factory: Callable[[], SlidingRendererStateProvider]
