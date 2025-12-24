@@ -4,6 +4,9 @@ from openant.devices.scanner import Scanner
 from openant.devices.utilities import auto_create_device
 from openant.easy.node import Node
 
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 # also see `auto_scanner` in ant/subparsers/scan.py
 def example_scan(file_path=None, device_id=0, device_type=0, auto_create=False):
@@ -20,17 +23,21 @@ def example_scan(file_path=None, device_id=0, device_type=0, auto_create=False):
     # local function to call when device updates common data
     def on_update(device_tuple, common):
         device_id = device_tuple[0]
-        print(f"Device #{device_id} commond data update: {common}")
+        logger.info("Device #%s commond data update: %s", device_id, common)
 
     # local function to call when device update device speific page data
     def on_device_data(device, page_name, data):
-        print(f"Device {device} broadcast {page_name} data: {data}")
+        logger.info("Device %s broadcast %s data: %s", device, page_name, data)
 
     # local function to call when a device is found - also does the auto-create if enabled
     def on_found(device_tuple):
         device_id, device_type, device_trans = device_tuple
-        print(
-            f"Found new device #{device_id} {DeviceType(device_type)}; device_type: {device_type}, transmission_type: {device_trans}"
+        logger.info(
+            "Found new device #%s %s; device_type: %s, transmission_type: %s",
+            device_id,
+            DeviceType(device_type),
+            device_type,
+            device_trans,
         )
 
         if auto_create and len(devices) < 16:
@@ -41,24 +48,26 @@ def example_scan(file_path=None, device_id=0, device_type=0, auto_create=False):
                     dev, page_name, data
                 )
                 devices.append(dev)
-            except Exception as e:
-                print(f"Could not auto create device: {e}")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not auto create device: %s", exc)
 
     # add callback functions to scanner
     scanner.on_found = on_found
     scanner.on_update = on_update
 
     try:
-        print(
-            f"Starting scanner for #{device_id}, type {device_type}, press Ctrl-C to finish"
+        logger.info(
+            "Starting scanner for #%s, type %s, press Ctrl-C to finish",
+            device_id,
+            device_type,
         )
         node.start()
     except KeyboardInterrupt:
-        print("Closing ANT+ node...")
+        logger.info("Closing ANT+ node...")
     finally:
         scanner.close_channel()
         if file_path:
-            print(f"Saving/updating found devices to {file_path}")
+            logger.info("Saving/updating found devices to %s", file_path)
             scanner.save(file_path)
 
         for dev in devices:
