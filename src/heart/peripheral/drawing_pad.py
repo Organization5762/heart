@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Self
 
 import reactivex
+from reactivex import operators as ops
 
 from heart.peripheral.core import Input, InputDescriptor, Peripheral
 
@@ -100,10 +101,18 @@ class DrawingPad(Peripheral[Any]):
     ) -> tuple[InputDescriptor, ...]:
         if event_bus is None:
             raise ValueError("event_bus is required to describe DrawingPad inputs")
+        stroke_stream = event_bus.pipe(
+            ops.filter(lambda event: event.event_type == "drawing_pad.stroke"),
+            ops.map(lambda event: event.data),
+        )
+        erase_stream = event_bus.pipe(
+            ops.filter(lambda event: event.event_type == "drawing_pad.erase"),
+            ops.map(lambda event: event.data),
+        )
         return (
             InputDescriptor(
                 name="drawing_pad.stroke",
-                stream=event_bus,
+                stream=stroke_stream,
                 payload_type=dict,
                 description=(
                     "Stylus payload with x, y, pressure, radius, and units fields."
@@ -111,7 +120,7 @@ class DrawingPad(Peripheral[Any]):
             ),
             InputDescriptor(
                 name="drawing_pad.erase",
-                stream=event_bus,
+                stream=erase_stream,
                 payload_type=dict,
                 description=(
                     "Erase payload with x, y, radius, and units fields."

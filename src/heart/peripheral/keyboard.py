@@ -24,15 +24,15 @@ class KeyboardAction(StrEnum):
 class KeyState:
     pressed: bool = False
     held: bool = False
-    last_change_ts: float = 0.0
+    last_change_ms: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
 class KeyboardEvent:
     key: int
+    key_name: str
     action: KeyboardAction
-    pressed: bool
-    held: bool
+    state: KeyState
     timestamp_ms: float
 
 
@@ -86,46 +86,43 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
         now = time.time() * 1000
         current = self.state
         event: KeyboardEvent | None = None
+        key_name = pygame.key.name(self.key)
 
         if keys[self.key]:
             if not current.pressed:
-                updated = KeyState(pressed=True, held=False, last_change_ts=now)
+                updated = KeyState(pressed=True, held=False, last_change_ms=now)
                 event = KeyboardEvent(
                     key=self.key,
+                    key_name=key_name,
                     action=KeyboardAction.PRESSED,
-                    pressed=updated.pressed,
-                    held=updated.held,
+                    state=updated,
                     timestamp_ms=now,
                 )
             elif not current.held:
-                updated = KeyState(pressed=True, held=True, last_change_ts=now)
+                updated = KeyState(pressed=True, held=True, last_change_ms=now)
                 event = KeyboardEvent(
                     key=self.key,
+                    key_name=key_name,
                     action=KeyboardAction.HELD,
-                    pressed=updated.pressed,
-                    held=updated.held,
+                    state=updated,
                     timestamp_ms=now,
                 )
             else:
-                updated = KeyState(pressed=True, held=True, last_change_ts=now)
+                updated = current
         else:
-            if current.pressed and (now - current.last_change_ts < 60):
+            if current.pressed and (now - current.last_change_ms < 60):
                 return None
             if current.pressed or current.held:
-                updated = KeyState(pressed=False, held=False, last_change_ts=now)
+                updated = KeyState(pressed=False, held=False, last_change_ms=now)
                 event = KeyboardEvent(
                     key=self.key,
+                    key_name=key_name,
                     action=KeyboardAction.RELEASED,
-                    pressed=updated.pressed,
-                    held=updated.held,
+                    state=updated,
                     timestamp_ms=now,
                 )
             else:
-                updated = KeyState(
-                    pressed=False,
-                    held=False,
-                    last_change_ts=current.last_change_ts,
-                )
+                updated = current
 
         self.state = updated
         return event

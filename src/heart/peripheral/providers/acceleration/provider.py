@@ -16,23 +16,7 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
     def __init__(self, peripheral_manager: PeripheralManager):
         self._pm = peripheral_manager
 
-    def inputs(self) -> tuple[InputDescriptor, ...]:
-        accels = [
-            peripheral.observe
-            for peripheral in self._pm.peripherals
-            if isinstance(peripheral, Accelerometer)
-        ]
-        accel_stream = reactivex.merge(*accels) if accels else reactivex.empty()
-        return (
-            InputDescriptor(
-                name="accelerometer.observe",
-                stream=accel_stream,
-                payload_type=Acceleration,
-                description="Observable streams emitted by Accelerometer peripherals.",
-            ),
-        )
-
-    def observable(self) -> reactivex.Observable[Acceleration]:
+    def _acceleration_stream(self) -> reactivex.Observable[Acceleration]:
         accels = [
             peripheral.observe
             for peripheral in self._pm.peripherals
@@ -55,6 +39,9 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
                 ops.map(lambda accel: cast(Acceleration, accel)),
             )
 
+        if not accels:
+            return reactivex.empty()
+
         merged = cast(
             reactivex.Observable[PeripheralMessageEnvelope[Acceleration | None]],
             reactivex.merge(*accels),
@@ -67,3 +54,19 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
             map_op,
             filter_acceleration,
         )
+
+    def inputs(self) -> tuple[InputDescriptor, ...]:
+        return (
+            InputDescriptor(
+                name="accelerometer.observe.acceleration",
+                stream=self._acceleration_stream(),
+                payload_type=Acceleration,
+                description=(
+                    "Observable stream of Acceleration readings emitted by "
+                    "Accelerometer peripherals."
+                ),
+            ),
+        )
+
+    def observable(self) -> reactivex.Observable[Acceleration]:
+        return self._acceleration_stream()
