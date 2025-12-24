@@ -3,7 +3,6 @@
 import itertools
 from typing import Any, Iterator
 
-from heart.environment import logger
 from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.drawing_pad import DrawingPad
@@ -16,6 +15,9 @@ from heart.peripheral.sensor import Accelerometer, FakeAccelerometer
 from heart.peripheral.switch import BluetoothSwitch, FakeSwitch, Switch
 from heart.peripheral.uwb import FakeUWBPositioning
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _detect_switches() -> Iterator[Peripheral[Any]]:

@@ -11,8 +11,8 @@ import numpy as np
 import pygame
 from numba import jit, prange
 
+from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
-from heart.environment import DeviceDisplayMode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
 from heart.renderers import StatefulBaseRenderer

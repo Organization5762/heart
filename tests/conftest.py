@@ -7,9 +7,9 @@ import pygame
 import pytest
 
 from heart.device import Cube, Device
-from heart.environment import GameLoop
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
+from heart.runtime.game_loop import GameLoop
 
 
 class _StubClock:

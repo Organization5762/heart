@@ -1,11 +1,11 @@
 from heart.display.color import Color
-from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.kirby import KirbyScene
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.text import TextRendering
+from heart.runtime.game_loop import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
