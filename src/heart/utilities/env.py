@@ -2,6 +2,7 @@ import os
 import platform
 import re
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cache
 from typing import Iterator
 
@@ -201,31 +202,50 @@ class Configuration:
         return _env_flag("HEART_RENDER_SCREEN_CACHE", default=True)
 
     @classmethod
-    def render_tile_strategy(cls) -> str:
+    def render_tile_strategy(cls) -> "RenderTileStrategy":
         strategy = os.environ.get("HEART_RENDER_TILE_STRATEGY", "blits").strip().lower()
-        if strategy in {"blits", "loop"}:
-            return strategy
-        raise ValueError(
-            "HEART_RENDER_TILE_STRATEGY must be 'blits' or 'loop'"
-        )
+        try:
+            return RenderTileStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_TILE_STRATEGY must be 'blits' or 'loop'"
+            ) from exc
 
     @classmethod
-    def frame_array_strategy(cls) -> str:
+    def frame_array_strategy(cls) -> "FrameArrayStrategy":
         strategy = os.environ.get("HEART_FRAME_ARRAY_STRATEGY", "copy").strip().lower()
-        if strategy in {"copy", "view"}:
-            return strategy
-        raise ValueError(
-            "HEART_FRAME_ARRAY_STRATEGY must be 'copy' or 'view'"
-        )
+        try:
+            return FrameArrayStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_FRAME_ARRAY_STRATEGY must be 'copy' or 'view'"
+            ) from exc
 
     @classmethod
-    def life_update_strategy(cls) -> str:
+    def life_update_strategy(cls) -> "LifeUpdateStrategy":
         strategy = os.environ.get("HEART_LIFE_UPDATE_STRATEGY", "auto").strip().lower()
-        if strategy in {"auto", "convolve", "pad"}:
-            return strategy
-        raise ValueError(
-            "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', or 'pad'"
-        )
+        try:
+            return LifeUpdateStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', or 'pad'"
+            ) from exc
+
+
+class RenderTileStrategy(StrEnum):
+    BLITS = "blits"
+    LOOP = "loop"
+
+
+class FrameArrayStrategy(StrEnum):
+    COPY = "copy"
+    VIEW = "view"
+
+
+class LifeUpdateStrategy(StrEnum):
+    AUTO = "auto"
+    CONVOLVE = "convolve"
+    PAD = "pad"
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
