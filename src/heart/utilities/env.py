@@ -7,7 +7,7 @@ from typing import Iterator
 
 import serial.tools.list_ports
 
-from heart.device.isolated_render import DEFAULT_SOCKET_PATH
+from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
 
 TRUE_FLAG_VALUES = {"true", "1", "yes", "on"}
 

@@ -1,7 +1,5 @@
 import asyncio
-import base64
 import dataclasses
-import io
 import json
 import logging
 import threading
@@ -12,16 +10,13 @@ from typing import Any
 from uuid import UUID
 
 import websockets
-from PIL import Image
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
-
-from heart.device import Device
 
 logger = logging.getLogger(__name__)
 
 
 class UniversalJSONEncoder(json.JSONEncoder):
-    """JSON encoder that supports dataclasses, pydantic models, enums, UUID, datetime, etc."""
+    """JSON encoder that supports dataclasses, enums, UUID, datetime, and bytes."""
 
     def default(self, obj: object) -> object:
         if dataclasses.is_dataclass(obj):
@@ -41,6 +36,7 @@ class UniversalJSONEncoder(json.JSONEncoder):
 
         return super().default(obj)
 
+
 @dataclass
 class WebSocket:
     clients: set[Any] = field(default_factory=set, init=False)
@@ -54,7 +50,6 @@ class WebSocket:
     _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "WebSocket":
-        # Thread-safe singleton creation
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -62,18 +57,16 @@ class WebSocket:
         return cls._instance
 
     def __post_init__(self) -> None:
-        # Only run once for the singleton instance
         if getattr(self, "_initialized", False):
             return
         self._initialized = True
 
         self._thread = threading.Thread(
             target=self._ws_thread_main,
-            daemon=True
+            daemon=True,
         )
         self._thread.start()
 
-    # --- THREAD EVENT LOOP STARTUP ---
     def _ws_thread_main(self) -> None:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
@@ -98,8 +91,8 @@ class WebSocket:
                         await ws.send(frame)
                     except (ConnectionClosedOK, ConnectionClosedError):
                         self.clients.discard(ws)
-                    except Exception as e:
-                        logger.warning(f"Error sending frame to client: {e}")
+                    except Exception as error:
+                        logger.warning("Error sending frame to client: %s", error)
                         self.clients.discard(ws)
 
         async def main() -> None:
@@ -114,34 +107,18 @@ class WebSocket:
 
         loop.run_until_complete(main())
 
-    # --- PUBLIC API ---
     def send(self, kind: str, payload: object) -> None:
         if self._broadcast_queue and self._loop:
             data = {"type": kind, "payload": payload}
-            json_bytes = json.dumps(data, cls=UniversalJSONEncoder, sort_keys=True, indent=0).encode()
+            json_bytes = json.dumps(
+                data,
+                cls=UniversalJSONEncoder,
+                sort_keys=True,
+                indent=0,
+            ).encode()
 
             fut = asyncio.run_coroutine_threadsafe(
                 self._broadcast_queue.put(json_bytes),
-                self._loop
+                self._loop,
             )
             fut.result()
-
-
-@dataclass
-class StreamedScreen(Device):
-    def individual_display_size(self) -> tuple[int, int]:
-        return (64, 64)
-
-    def __post_init__(self) -> None:
-        self.websocket = WebSocket()
-
-    def set_image(self, image: Image.Image) -> None:
-        assert image.size == self.full_display_size()
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        frame_bytes = buf.getvalue()
-
-        self.websocket.send(
-            kind="frame",
-            payload=base64.b64encode(frame_bytes).decode("utf-8")
-        )
