@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import reactivex
 from pygame import Surface, font, time
 
@@ -36,8 +38,9 @@ class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
 
         self.avatar_images = {}
         for name in AVATAR_MAPPINGS.keys():
+            avatar_path = Path("avatars") / f"{name}_32.png"
             try:
-                self.avatar_images[name] = Loader.load(f"avatars/{name}_32.png")
+                self.avatar_images[name] = Loader.load(avatar_path)
             except Exception:
                 logger.warning("Could not load avatar for %s", name)
 

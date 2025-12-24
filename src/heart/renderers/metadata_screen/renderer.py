@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, Iterable
 
 import reactivex
@@ -30,10 +31,11 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
 
         self.heart_images: Dict[str, dict[str, Surface]] = {}
         for color in self.colors:
+            heart_base = Path("hearts") / color
             self.heart_images[color] = {
-                "small": Loader.load(f"hearts/{color}/small.png"),
-                "med": Loader.load(f"hearts/{color}/med.png"),
-                "big": Loader.load(f"hearts/{color}/big.png"),
+                "small": Loader.load(heart_base / "small.png"),
+                "med": Loader.load(heart_base / "med.png"),
+                "big": Loader.load(heart_base / "big.png"),
             }
 
         self.avatar_images: Dict[str, Surface] = {}
@@ -41,7 +43,9 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
 
         for name, sensor_id in AVATAR_MAPPINGS.items():
             try:
-                self.avatar_images[sensor_id] = Loader.load(f"avatars/{name}_16.png")
+                self.avatar_images[sensor_id] = Loader.load(
+                    Path("avatars") / f"{name}_16.png"
+                )
             except Exception:
                 logger.warning(f"Could not load avatar for {name}")
 

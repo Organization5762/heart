@@ -22,24 +22,24 @@ class Loader:
 
     @classmethod
     @cache
-    def load(cls, path: str):
+    def load(cls, path: str | os.PathLike[str]):
         return pygame.image.load(cls._resolve_path(path))
 
     @classmethod
-    def load_spirtesheet(cls, path):
+    def load_spirtesheet(cls, path: str | os.PathLike[str]):
         resolved_path = cls._resolve_path(path)
         return spritesheet(resolved_path)
 
     @classmethod
-    def load_animation(cls, path):
+    def load_animation(cls, path: str | os.PathLike[str]):
         return Animation(cls._resolve_path(path), 100)
 
     @classmethod
-    def load_font(cls, path, font_size: int = 10):
+    def load_font(cls, path: str | os.PathLike[str], font_size: int = 10):
         return pygame.font.Font(cls._resolve_path(path), size=font_size)
 
     @classmethod
-    def load_json(cls, path) -> dict[str, Any]:
+    def load_json(cls, path: str | os.PathLike[str]) -> dict[str, Any]:
         resolved_path = cls._resolve_path(path)
         with open(resolved_path, "r") as fp:
             return json.load(fp)
