@@ -111,6 +111,9 @@ def _share_with_refcount_grace(
                     grace_ms,
                     min_subscribers,
                 )
+                if disconnect_timer is not None:
+                    disconnect_timer.dispose()
+                    disconnect_timer = None
                 disconnect_timer = _GRACE_SCHEDULER.schedule_relative(
                     grace_ms / 1000,
                     lambda *_: _disconnect(),
