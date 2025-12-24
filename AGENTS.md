@@ -10,6 +10,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 
 - Avoid declaring module-level `__all__` exports. Prefer explicit imports at call sites instead of curating export lists.
 - Avoid building filesystem paths via string concatenation. Use `os.path.join` or `pathlib.Path` instead.
+- Prefer `pathlib.Path` over `os.path.join` when constructing paths, and ensure functions annotated to return a `Path` return a `Path` object.
 - Avoid using `print` for runtime diagnostics in CLI commands; use the shared logger.
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
 
