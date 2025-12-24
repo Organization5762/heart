@@ -9,15 +9,15 @@ class TestLifeUpdateStrategies:
 
     @pytest.mark.parametrize(
         "strategy",
-        ["auto", "pad"],
-        ids=["auto-uses-padding", "pad-uses-padding"],
+        ["auto", "pad", "shifted"],
+        ids=["auto-uses-shifted", "pad-uses-padding", "shifted-uses-slices"],
     )
-    def test_padding_strategy_matches_convolution(
+    def test_fast_strategies_match_convolution(
         self,
         monkeypatch: pytest.MonkeyPatch,
         strategy: str,
     ) -> None:
-        """Confirm padding-based updates match convolution so performance gains do not alter rules."""
+        """Confirm fast updates match convolution so performance gains do not alter rules."""
 
         grid = np.array(
             [
@@ -34,23 +34,30 @@ class TestLifeUpdateStrategies:
         expected = LifeState(grid=grid)._update_grid().grid
 
         monkeypatch.setenv("HEART_LIFE_UPDATE_STRATEGY", strategy)
+        monkeypatch.setenv("HEART_LIFE_CONVOLVE_THRESHOLD", "0")
         result = LifeState(grid=grid)._update_grid().grid
 
         assert np.array_equal(
             expected,
             result,
-        ), "Padding strategy should preserve the Life update rules."
+        ), "Fast strategies should preserve the Life update rules."
 
-    def test_padding_strategy_rejects_custom_kernel(
+    @pytest.mark.parametrize(
+        "strategy",
+        ["pad", "shifted"],
+        ids=["pad-rejects-kernel", "shifted-rejects-kernel"],
+    )
+    def test_fast_strategy_rejects_custom_kernel(
         self,
         monkeypatch: pytest.MonkeyPatch,
+        strategy: str,
     ) -> None:
-        """Ensure unsupported custom kernels are blocked to avoid incorrect fast paths."""
+        """Ensure unsupported custom kernels are blocked to prevent invalid fast paths."""
 
         grid = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], dtype=int)
         kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]], dtype=int)
 
-        monkeypatch.setenv("HEART_LIFE_UPDATE_STRATEGY", "pad")
+        monkeypatch.setenv("HEART_LIFE_UPDATE_STRATEGY", strategy)
 
         with pytest.raises(ValueError, match="default kernel"):
             LifeState(grid=grid, kernel=kernel)._update_grid()

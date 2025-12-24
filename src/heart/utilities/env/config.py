@@ -342,6 +342,9 @@ class Configuration:
             return LifeUpdateStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', or 'pad'"
+                "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', 'pad', or 'shifted'"
             ) from exc
 
+    @classmethod
+    def life_convolve_threshold(cls) -> int:
+        return _env_int("HEART_LIFE_CONVOLVE_THRESHOLD", default=0, minimum=0)
