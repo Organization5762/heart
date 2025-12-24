@@ -32,3 +32,7 @@ Running `make check` is recommended to verify formatting and linting without app
 ## Documentation Guidelines
 
 Update `docs/code_flow.md` and re-render the diagram with `scripts/render_code_flow.py` whenever runtime architecture changes. Pair thoughtful implementations with a research note under `docs/research/` that cites the relevant source files. Plans under `docs/planning/` must follow the structure defined in their `AGENTS.md` file, and contributors should review the master project list in `docs/planning/README.md` before scoping new work. Before implementing a proposal, check `docs/planning/` for related higher-level plans and review any relevant documents.
+
+## File Focus
+
+Keep files narrowly scoped. If a module starts handling multiple concerns (e.g., orchestration plus parsing plus rendering), split the responsibilities into smaller, purpose-built modules so each file does slightly fewer things and has a clear single focus.
