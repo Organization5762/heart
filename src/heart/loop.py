@@ -11,7 +11,8 @@ from heart.device.selection import select_device
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.providers import container
 from heart.programs.registry import ConfigurationRegistry
-from heart.runtime.game_loop import GameLoop, RendererVariant
+from heart.runtime.game_loop import GameLoop
+from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

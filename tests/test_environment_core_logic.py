@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from heart.runtime.game_loop import RendererVariant
+from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.color_conversion import (HSV_TO_BGR_CACHE,
                                               _convert_bgr_to_hsv,
                                               _convert_hsv_to_bgr)
@@ -150,8 +150,9 @@ class TestEnvironmentCoreLogic:
         self,
         loop, monkeypatch, render_merge_strategy_in_place, values: list[str]
     ) -> None:
-        """Verify that _render_surfaces_binary merges all renderers pairwise. This validates the binary merge optimisation powering high-FPS scenes."""
+        """Verify that the render pipeline binary merge combines all renderers. This validates the pairwise merge optimisation for high-FPS scenes."""
         sequence = {value: f"surface-{value}" for value in values}
+        pipeline = loop.render_pipeline
 
         def fake_process(renderer: str) -> str:
             return sequence[renderer]
@@ -159,28 +160,29 @@ class TestEnvironmentCoreLogic:
         def fake_merge(surface1: str, surface2: str) -> str:
             return f"merge({surface1},{surface2})"
 
-        monkeypatch.setattr(loop, "process_renderer", fake_process)
-        monkeypatch.setattr(loop, "merge_surfaces", fake_merge)
+        monkeypatch.setattr(pipeline, "process_renderer", fake_process)
+        monkeypatch.setattr(pipeline, "merge_surfaces", fake_merge)
 
-        result = loop._render_surfaces_binary(values)
+        result = pipeline._render_surfaces_binary(values)
         expected = _sequential_binary_merge(list(sequence.values()))
         assert result == expected
 
 
 
     def test_render_surfaces_binary_handles_empty(self, loop) -> None:
-        """Verify that _render_surfaces_binary returns None when no renderers are provided. This avoids edge-case crashes during startup."""
-        assert loop._render_surfaces_binary([]) is None
+        """Verify that the render pipeline returns None with no renderers. This avoids edge-case crashes during startup."""
+        assert loop.render_pipeline._render_surfaces_binary([]) is None
 
 
 
     def test_render_surface_iterative_skips_missing(
         self, loop, monkeypatch, render_merge_strategy_in_place
     ) -> None:
-        """Verify that _render_surface_iterative skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
+        """Verify that the render pipeline skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
         renderers = ["r1", "r2", "r3"]
         responses = {"r1": "surface-1", "r2": None, "r3": "surface-3"}
         merges: list[tuple[str, str]] = []
+        pipeline = loop.render_pipeline
 
         def fake_process(renderer: str) -> str | None:
             return responses[renderer]
@@ -189,35 +191,39 @@ class TestEnvironmentCoreLogic:
             merges.append((surface1, surface2))
             return f"merge({surface1},{surface2})"
 
-        monkeypatch.setattr(loop, "process_renderer", fake_process)
-        monkeypatch.setattr(loop, "merge_surfaces", fake_merge)
+        monkeypatch.setattr(pipeline, "process_renderer", fake_process)
+        monkeypatch.setattr(pipeline, "merge_surfaces", fake_merge)
 
-        result = loop._render_surface_iterative(renderers)
+        result = pipeline._render_surface_iterative(renderers)
 
         assert result == "merge(surface-1,surface-3)"
         assert merges == [("surface-1", "surface-3")]
 
 
     def test_render_fn_selects_renderer(self, loop) -> None:
-        """Verify that _render_fn returns the expected merge strategy for each variant. This keeps render mode selection predictable."""
+        """Verify that the render pipeline selects the expected merge strategy. This keeps render mode selection predictable."""
         renderers = ["r1", "r2"]
+        pipeline = loop.render_pipeline
         assert (
-            loop._render_fn(renderers, RendererVariant.BINARY)
-            is loop._render_surfaces_binary
+            pipeline._render_fn(renderers, RendererVariant.BINARY)
+            is pipeline._render_surfaces_binary
         )
         assert (
-            loop._render_fn(renderers, RendererVariant.ITERATIVE)
-            is loop._render_surface_iterative
+            pipeline._render_fn(renderers, RendererVariant.ITERATIVE)
+            is pipeline._render_surface_iterative
         )
 
 
     def test_render_fn_default_uses_loop_variant(self, loop) -> None:
-        """Verify that _render_fn respects the loop's configured renderer variant by default. This keeps runtime switches effective without reconfiguring callers."""
+        """Verify that the render pipeline respects its configured renderer variant. This keeps runtime switches effective without reconfiguring callers."""
         renderers = ["r1"]
-        loop.renderer_variant = RendererVariant.BINARY
-        assert loop._render_fn(renderers, None) is loop._render_surfaces_binary
-        loop.renderer_variant = RendererVariant.ITERATIVE
-        assert loop._render_fn(renderers, None) is loop._render_surface_iterative
+        pipeline = loop.render_pipeline
+        pipeline.renderer_variant = RendererVariant.BINARY
+        assert pipeline._render_fn(renderers, None) is pipeline._render_surfaces_binary
+        pipeline.renderer_variant = RendererVariant.ITERATIVE
+        assert (
+            pipeline._render_fn(renderers, None) is pipeline._render_surface_iterative
+        )
 
 
     @pytest.mark.parametrize(
@@ -243,25 +249,26 @@ class TestEnvironmentCoreLogic:
         list(RendererVariant),
     )
     def test_render_fn_handles_unknown_variant(self, loop, variant: RendererVariant) -> None:
-        """Verify that _render_fn returns a callable even for enumerated variants. This avoids runtime errors when iterating through supported strategies."""
+        """Verify that the render pipeline returns a callable for each variant. This avoids runtime errors when iterating through supported strategies."""
         renderers = ["r1", "r2", "r3", "r4"]
-        assert callable(loop._render_fn(renderers, variant))
+        assert callable(loop.render_pipeline._render_fn(renderers, variant))
 
 
     def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
-        """Verify that auto rendering switches at the threshold. This keeps performance tuning predictable on constrained devices."""
+        """Verify that auto rendering switches at the threshold in the pipeline. This keeps performance tuning predictable on constrained devices."""
         monkeypatch.setattr(
-            "heart.runtime.game_loop.Configuration.render_parallel_threshold",
+            "heart.runtime.render_pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
+        pipeline = loop.render_pipeline
 
         assert (
-            loop._render_fn(["r1"], RendererVariant.AUTO)
-            is loop._render_surface_iterative
+            pipeline._render_fn(["r1"], RendererVariant.AUTO)
+            is pipeline._render_surface_iterative
         )
         assert (
-            loop._render_fn(["r1", "r2"], RendererVariant.AUTO)
-            is loop._render_surfaces_binary
+            pipeline._render_fn(["r1", "r2"], RendererVariant.AUTO)
+            is pipeline._render_surfaces_binary
         )
 
     @pytest.mark.skip(reason="Flame renderer is not implemented")
