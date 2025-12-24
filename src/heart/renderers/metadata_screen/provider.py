@@ -17,16 +17,13 @@ DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
 
 class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
-    def __init__(
-        self,
-        peripheral_manager: PeripheralManager,
-        colors: Iterable[str] | None = None,
-    ) -> None:
-        self._peripheral_manager = peripheral_manager
+    def __init__(self, colors: Iterable[str] | None = None) -> None:
         self._colors = list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
 
-    def observable(self) -> reactivex.Observable[MetadataScreenState]:
-        clocks = self._peripheral_manager.clock.pipe(
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[MetadataScreenState]:
+        clocks = peripheral_manager.clock.pipe(
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -41,7 +38,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
             return self._update_state(state, active_monitors, elapsed_ms)
 
         return (
-            self._peripheral_manager.game_tick.pipe(
+            peripheral_manager.game_tick.pipe(
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

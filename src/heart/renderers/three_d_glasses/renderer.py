@@ -11,6 +11,7 @@ from typing import Sequence
 
 import numpy as np
 import pygame
+import reactivex
 
 from heart.assets.loader import Loader
 from heart.device import Orientation
@@ -38,13 +39,21 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         image_files: Sequence[str],
         *,
         frame_duration_ms: int = 650,
-        builder: ThreeDGlassesStateProvider | None = None,
+        provider: ThreeDGlassesStateProvider | None = None,
     ) -> None:
         if not image_files:
             raise ValueError("ThreeDGlassesRenderer requires at least one image file")
 
-        self._builder = builder or ThreeDGlassesStateProvider(frame_duration_ms)
-        super().__init__()
+        if provider is None:
+            self.provider = ThreeDGlassesStateProvider(
+                frame_duration_ms=frame_duration_ms,
+                frame_count=len(image_files),
+            )
+        else:
+            provider.set_frame_count(len(image_files))
+            self.provider = provider
+        self._initial_state: ThreeDGlassesState | None = None
+        super().__init__(builder=self.provider)
         self._image_files = list(image_files)
         self._images: list[pygame.Surface] = []
         self._image_arrays: list[np.ndarray] = []
@@ -155,13 +164,13 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         pygame.surfarray.blit_array(self._effect_surface, frame_array)
         window.blit(self._effect_surface, (0, 0))
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> ThreeDGlassesState:
+    ) -> None:
         window_size = window.get_size()
 
         self._images.clear()
@@ -177,11 +186,15 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
         self._profiles = self._generate_profiles(len(self._image_arrays))
         self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
-        initial_state = self._builder.initial_state()
-        self.set_state(initial_state)
-        self._subscription = self._builder.observable(
+        self._initial_state = self.provider.initial_state()
+        super().initialize(window, clock, peripheral_manager, orientation)
+
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[ThreeDGlassesState]:
+        if self._initial_state is None:
+            raise ValueError("ThreeDGlassesRenderer requires an initial state")
+        return self.provider.observable(
             peripheral_manager,
-            frame_count=len(self._image_arrays),
-            initial_state=initial_state,
-        ).subscribe(on_next=self.set_state)
-        return initial_state
+            initial_state=self._initial_state,
+        )

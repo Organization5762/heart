@@ -8,8 +8,17 @@ from heart.renderers.color.state import RenderColorState
 
 
 class RenderColor(StatefulBaseRenderer[RenderColorState]):
-    def __init__(self, color: Color) -> None:
-        super().__init__(builder=RenderColorStateProvider(color))
+    def __init__(
+        self,
+        color: Color | None = None,
+        provider: RenderColorStateProvider | None = None,
+    ) -> None:
+        if provider is None:
+            if color is None:
+                raise ValueError("RenderColor requires a color or provider")
+            provider = RenderColorStateProvider(color)
+        self._provider = provider
+        super().__init__(builder=self._provider)
 
     def real_process(
         self,

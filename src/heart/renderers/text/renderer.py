@@ -1,4 +1,5 @@
 import pygame
+import reactivex
 
 from heart.device import Orientation
 from heart.display.color import Color
@@ -17,9 +18,11 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         color: Color,
         x_location: int | None = None,
         y_location: int | None = None,
+        provider: TextRenderingProvider | None = None,
     ) -> None:
         self._font: pygame.font.Font | None = None
-        self._provider = TextRenderingProvider(
+        self._font_key: tuple[str, int] | None = None
+        self._provider = provider or TextRenderingProvider(
             text=text,
             font_name=font,
             font_size=font_size,
@@ -27,26 +30,12 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             x_location=x_location,
             y_location=y_location,
         )
-        super().__init__()
+        super().__init__(builder=self._provider)
 
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> TextRenderingState:
-        state = self._provider.build(
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-            window=window,
-            clock=clock,
-        )
-        self._font = pygame.font.SysFont(
-            state.font_name,
-            state.font_size,
-        )
-        return state
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[TextRenderingState]:
+        return self._provider.observable(peripheral_manager)
 
     @classmethod
     def default(cls, text: str) -> "TextRendering":
@@ -79,6 +68,14 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         current_text = self._current_text()
 
         lines = current_text.split("\n")
+        font_key = (self.state.font_name, self.state.font_size)
+        if self._font is None or self._font_key != font_key:
+            self._font = pygame.font.SysFont(
+                self.state.font_name,
+                self.state.font_size,
+            )
+            self._font_key = font_key
+
         font = self._font
         if font is None:
             return

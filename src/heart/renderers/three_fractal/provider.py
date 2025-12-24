@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import pygame
+import reactivex
 from pygame.time import Clock
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_fractal.renderer import FractalRuntime
 from heart.renderers.three_fractal.state import FractalSceneState
 
 
-class FractalSceneProvider:
+class FractalSceneProvider(ObservableProvider[FractalSceneState]):
     def __init__(self, device=None) -> None:
         self.device = device
 
@@ -23,3 +25,8 @@ class FractalSceneProvider:
         runtime = FractalRuntime(device=self.device)
         runtime.initialize(window, clock, peripheral_manager, orientation)
         return FractalSceneState(runtime=runtime)
+
+    def observable(
+        self, *, initial_state: FractalSceneState
+    ) -> reactivex.Observable[FractalSceneState]:
+        return reactivex.just(initial_state)

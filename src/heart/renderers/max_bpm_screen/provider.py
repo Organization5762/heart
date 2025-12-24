@@ -21,12 +21,11 @@ AVATAR_MAPPINGS = {
 
 
 class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
-    def __init__(self, peripheral_manager: PeripheralManager) -> None:
-        self._peripheral_manager = peripheral_manager
-
-    def observable(self) -> reactivex.Observable[AvatarBpmRendererState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[AvatarBpmRendererState]:
         return (
-            self._peripheral_manager.game_tick.pipe(
+            peripheral_manager.game_tick.pipe(
                 ops.map(lambda _: self._select_top_bpm()),
                 ops.start_with(
                     AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
