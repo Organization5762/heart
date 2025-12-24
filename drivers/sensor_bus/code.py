@@ -199,8 +199,6 @@ def main() -> None:
         except OSError:
             sensors = None
             time.sleep(WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS)
-        except BaseException as e:
-            raise e
 
 
 if __name__ == "__main__":
