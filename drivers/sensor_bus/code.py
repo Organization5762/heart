@@ -1,3 +1,12 @@
+"""Stream sensor bus readings over serial and document REPL debugging steps.
+
+REPL reproduction:
+    1. Connect to the board REPL and import this module.
+    2. Run ``main()`` to stream JSON payloads over serial.
+    3. Toggle ``DEBUG = True`` and call ``connect_to_sensors(board.STEMMA_I2C())``
+       to surface initialization failures without running the full game runtime.
+"""
+
 import json
 import time
 
