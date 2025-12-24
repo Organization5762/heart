@@ -24,19 +24,21 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         image_file: str,
         *,
         speed: int = 1,
-        provider_factory: Callable[[], SlidingImageStateProvider]
+        provider_factory: Callable[[SlidingImageState], SlidingImageStateProvider]
         | None = None,
     ) -> None:
-        self._configured_speed = max(1, speed)
         self._image_file = image_file
-        self._provider = (provider_factory or self._default_provider)()
+        initial_state = SlidingImageState(speed=max(1, speed))
+        self._provider = (provider_factory or self._default_provider)(initial_state)
         self._image: pygame.Surface | None = None
 
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _default_provider(self) -> SlidingImageStateProvider:
-        return SlidingImageStateProvider(speed=self._configured_speed)
+    def _default_provider(
+        self, initial_state: SlidingImageState
+    ) -> SlidingImageStateProvider:
+        return SlidingImageStateProvider(initial_state=initial_state)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -80,19 +82,21 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
         renderer: StatefulBaseRenderer,
         *,
         speed: int = 1,
-        provider_factory: Callable[[], SlidingRendererStateProvider]
+        provider_factory: Callable[[SlidingRendererState], SlidingRendererStateProvider]
         | None = None,
     ) -> None:
-        self._configured_speed = max(1, speed)
         self.composed = renderer
-        self._provider = (provider_factory or self._default_provider)()
+        initial_state = SlidingRendererState(speed=max(1, speed))
+        self._provider = (provider_factory or self._default_provider)(initial_state)
         self._peripheral_manager: PeripheralManager | None = None
 
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-    def _default_provider(self) -> SlidingRendererStateProvider:
-        return SlidingRendererStateProvider(speed=self._configured_speed)
+    def _default_provider(
+        self, initial_state: SlidingRendererState
+    ) -> SlidingRendererStateProvider:
+        return SlidingRendererStateProvider(initial_state=initial_state)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager

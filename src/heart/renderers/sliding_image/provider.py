@@ -16,13 +16,12 @@ from heart.renderers.sliding_image.state import (SlidingImageState,
 class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
     def __init__(
         self,
-        *,
-        speed: int = 1,
+        initial_state: SlidingImageState | None = None,
     ) -> None:
-        self._speed = max(1, speed)
+        self._initial_state = initial_state or SlidingImageState()
 
-    def _initial_state(self) -> SlidingImageState:
-        return SlidingImageState(speed=self._speed)
+    def _initial_state_snapshot(self) -> SlidingImageState:
+        return self._initial_state
 
     def reset_state(self, state: SlidingImageState) -> SlidingImageState:
         return replace(state, offset=0)
@@ -46,7 +45,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             ops.map(lambda window: window.get_size()[0]),
             ops.distinct_until_changed(),
         )
-        initial_state = self._initial_state()
+        initial_state = self._initial_state_snapshot()
 
         return (
             peripheral_manager.game_tick.pipe(
@@ -65,13 +64,12 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
 class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
     def __init__(
         self,
-        *,
-        speed: int = 1,
+        initial_state: SlidingRendererState | None = None,
     ) -> None:
-        self._speed = max(1, speed)
+        self._initial_state = initial_state or SlidingRendererState()
 
-    def _initial_state(self) -> SlidingRendererState:
-        return SlidingRendererState(speed=self._speed)
+    def _initial_state_snapshot(self) -> SlidingRendererState:
+        return self._initial_state
 
     def reset_state(self, state: SlidingRendererState) -> SlidingRendererState:
         return replace(state, offset=0)
@@ -97,7 +95,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             ops.map(lambda window: window.get_size()[0]),
             ops.distinct_until_changed(),
         )
-        initial_state = self._initial_state()
+        initial_state = self._initial_state_snapshot()
 
         return (
             peripheral_manager.game_tick.pipe(
