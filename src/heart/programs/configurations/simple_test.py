@@ -1,6 +1,6 @@
 from heart.display.color import Color
-from heart.environment import GameLoop
 from heart.renderers.color import RenderColor
+from heart.runtime.game_loop import GameLoop
 
 
 def configure(loop: GameLoop) -> None:

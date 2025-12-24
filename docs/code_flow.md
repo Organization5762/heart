@@ -33,7 +33,7 @@ flowchart LR
 
     subgraph Runtime["GameLoop Orchestration"]
         direction TB
-        Loop["GameLoop Service\n(start + main loop)"]
+        Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
         AppRouter["AppController / Mode Router"]
         ModeServices["Mode Services & Renderers"]
         FrameComposer["Frame Composer\n(surface merge + strategy selection)"]

@@ -8,10 +8,10 @@ import typer
 from PIL import Image
 
 from heart.device.selection import select_device
-from heart.environment import GameLoop, RendererVariant
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.providers import container
 from heart.programs.registry import ConfigurationRegistry
+from heart.runtime.game_loop import GameLoop, RendererVariant
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

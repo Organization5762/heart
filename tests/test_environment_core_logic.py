@@ -1,20 +1,22 @@
-"""Additional tests for core logic in :mod:`heart.environment`."""
+"""Additional tests for runtime and color conversion helpers."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
-                               _convert_bgr_to_hsv, _convert_hsv_to_bgr)
+from heart.renderers.color_conversion import (HSV_TO_BGR_CACHE,
+                                              _convert_bgr_to_hsv,
+                                              _convert_hsv_to_bgr)
+from heart.runtime.game_loop import RendererVariant
 from heart.utilities.env import Configuration
 
 
 @pytest.fixture(autouse=True)
 def disable_cv2(monkeypatch):
-    """Force the environment color helpers to use the numpy fallbacks."""
+    """Force the color conversion helpers to use the numpy fallbacks."""
 
-    monkeypatch.setattr("heart.environment.CV2_MODULE", None)
+    monkeypatch.setattr("heart.renderers.color_conversion.CV2_MODULE", None)
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +29,7 @@ def clear_hsv_cache():
 
 
 class TestEnvironmentCoreLogic:
-    """Group Environment Core Logic tests so environment core logic behaviour stays reliable. This preserves confidence in environment core logic for end-to-end scenarios."""
+    """Group runtime and color conversion tests so core behaviours stay reliable. This preserves confidence in render loop orchestration and color conversion accuracy."""
 
     @pytest.mark.parametrize(
         "bgr,expected",
@@ -249,7 +251,7 @@ class TestEnvironmentCoreLogic:
     def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
         """Verify that auto rendering switches at the threshold. This keeps performance tuning predictable on constrained devices."""
         monkeypatch.setattr(
-            "heart.environment.Configuration.render_parallel_threshold",
+            "heart.runtime.game_loop.Configuration.render_parallel_threshold",
             lambda: 2,
         )
 
