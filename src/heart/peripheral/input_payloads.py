@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from types import MappingProxyType
-from typing import (TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping,
-                    Protocol, Sequence, runtime_checkable)
+from typing import (TYPE_CHECKING, Any, ClassVar, Literal, Mapping,
+                    MutableMapping, Protocol, Sequence, runtime_checkable)
 
 if TYPE_CHECKING:  # pragma: no cover - import for type checking only
     import pygame
@@ -377,7 +377,7 @@ class RendererFrame(InputEventPayload):
     frame_id: int
     width: int
     height: int
-    pixel_format: str
+    pixel_format: Literal["RGBA", "RGB", "ARGB", "BGRA"]
     data: bytes
     metadata: Mapping[str, Any] | None = None
 
@@ -408,7 +408,7 @@ class RendererFrame(InputEventPayload):
         *,
         renderer: str,
         frame_id: int,
-        pixel_format: str = "RGBA",
+        pixel_format: Literal["RGBA", "RGB", "ARGB", "BGRA"] = "RGBA",
         metadata: Mapping[str, Any] | None = None,
     ) -> "RendererFrame":
         """Capture ``surface`` pixels into a :class:`RendererFrame` payload."""
