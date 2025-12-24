@@ -54,6 +54,23 @@ def _env_optional_int(env_var: str, *, minimum: int | None = None) -> int | None
     return parsed
 
 
+def _env_optional_float(
+    env_var: str, *, minimum: float | None = None
+) -> float | None:
+    """Return the float value of ``env_var`` or ``None`` when unset."""
+
+    value = os.environ.get(env_var)
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{env_var} must be a float") from exc
+    if minimum is not None and parsed < minimum:
+        raise ValueError(f"{env_var} must be at least {minimum}")
+    return parsed
+
+
 @dataclass
 class Pi:
     version: int
@@ -142,6 +159,13 @@ class Configuration:
     @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
         return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
+
+    @classmethod
+    def reactivex_stream_replay_window_seconds(cls) -> float | None:
+        return _env_optional_float(
+            "HEART_RX_STREAM_REPLAY_WINDOW_SECONDS",
+            minimum=0.0,
+        )
 
     @classmethod
     def isolated_renderer_socket(cls) -> str | None:

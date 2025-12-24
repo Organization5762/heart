@@ -16,6 +16,8 @@ buffered replay when tuning for performance and correctness.
   a straightforward `share` option when back-compatibility is desired.
 - Support a bounded replay buffer size for scenarios that need a short history for
   late subscribers.
+- Allow a time-based replay window to trim stale events and reduce retained
+  memory during high-throughput streams.
 
 ## Configuration
 
@@ -25,6 +27,9 @@ buffered replay when tuning for performance and correctness.
   - `share`: preserve the pre-existing no-replay share behaviour.
 - `HEART_RX_STREAM_REPLAY_BUFFER`
   - Integer buffer size used when the strategy is `replay_buffer`.
+- `HEART_RX_STREAM_REPLAY_WINDOW_SECONDS`
+  - Optional float value. When set to a positive value, only events within the
+    most recent time window are replayed to late subscribers.
 
 ## Implementation notes
 

@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from reactivex.subject import Subject
 
@@ -67,3 +69,27 @@ class TestShareStreamStrategy:
         assert received_b == [2, 3]
         source.on_next(4)
         assert received_b == [2, 3, 4]
+
+    def test_share_stream_replay_window_expires_old_events(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure replay windows expire stale events so late subscribers avoid outdated state."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_buffer")
+        monkeypatch.setenv("HEART_RX_STREAM_REPLAY_BUFFER", "5")
+        monkeypatch.setenv("HEART_RX_STREAM_REPLAY_WINDOW_SECONDS", "0.05")
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="windowed")
+
+        received_a: list[int] = []
+        shared.subscribe(received_a.append)
+
+        source.on_next(1)
+        time.sleep(0.06)
+        source.on_next(2)
+
+        received_b: list[int] = []
+        shared.subscribe(received_b.append)
+
+        assert received_b == [2]

@@ -198,6 +198,31 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.reactivex_event_bus_scheduler()
 
+    def test_reactivex_stream_replay_window_defaults_to_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify replay window defaults to None so time-bound trimming stays opt-in."""
+        _clear_env(monkeypatch, "HEART_RX_STREAM_REPLAY_WINDOW_SECONDS")
+
+        assert Configuration.reactivex_stream_replay_window_seconds() is None
+
+    def test_reactivex_stream_replay_window_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify replay window reads the environment value so trimming can be tuned per deployment."""
+        monkeypatch.setenv("HEART_RX_STREAM_REPLAY_WINDOW_SECONDS", "0.25")
+
+        assert Configuration.reactivex_stream_replay_window_seconds() == 0.25
+
+    def test_reactivex_stream_replay_window_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify replay window rejects invalid values to surface misconfiguration early."""
+        monkeypatch.setenv("HEART_RX_STREAM_REPLAY_WINDOW_SECONDS", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.reactivex_stream_replay_window_seconds()
+
 
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
