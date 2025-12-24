@@ -13,6 +13,9 @@ import heart
 import heart.firmware_io
 from heart import firmware_io
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 if Configuration.is_pi():
     MEDIA_DIRECTORY = "/media/michael"
@@ -50,10 +53,10 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
     )
 
     if not libs:
-        print("Skipping loading driver libs as no libs were requested.")
+        logger.info("Skipping loading driver libs as no libs were requested.")
         return
 
-    print(f"Loading the following libs: {libs}")
+    logger.info("Loading the following libs: %s", libs)
     zip_location = download_file(
         CIRCUIT_PY_COMMON_LIBS, CIRCUIT_PY_COMMON_LIBS_CHECKSUM
     )
@@ -66,7 +69,9 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
             ["unzip", zip_location], check=True, cwd=os.path.dirname(unzipped_location)
         )
     else:
-        print(f"Skipping unzipping {zip_location} because {lib_path} exists")
+        logger.info(
+            "Skipping unzipping %s because %s exists", zip_location, lib_path
+        )
 
     for lib in libs:
         copy_file(os.path.join(lib_path, lib), os.path.join(destination, lib))
@@ -75,7 +80,7 @@ def load_driver_libs(libs: list[str], destination: str) -> None:
         if os.path.exists(mpy_source):
             copy_file(mpy_source, os.path.join(destination, f"{lib}.mpy"))
         else:
-            print(f"Skipping missing {mpy_source}")
+            logger.warning("Skipping missing %s", mpy_source)
 
 
 def _sha256sum(path: str) -> str:
@@ -92,44 +97,50 @@ def download_file(url: str, checksum: str) -> str:
         if os.path.exists(destination):
             existing_checksum = _sha256sum(destination)
             if existing_checksum != checksum:
-                print(
-                    f"Removing {destination}; checksum {existing_checksum} did not match {checksum}."
+                logger.warning(
+                    "Removing %s; checksum %s did not match %s.",
+                    destination,
+                    existing_checksum,
+                    checksum,
                 )
                 os.remove(destination)
 
         if not os.path.exists(destination):
-            print(f"Starting download: {url}")
+            logger.info("Starting download: %s", url)
             if Configuration.is_pi():
                 subprocess.run(["wget", url, "-O", destination], check=True)
             else:
                 subprocess.run(["curl", "-fL", url, "-o", destination], check=True)
-            print(f"Finished download: {destination}")
+            logger.info("Finished download: %s", destination)
 
         downloaded_checksum = _sha256sum(destination)
-        print(f"Checksum for {destination}: {downloaded_checksum}")
+        logger.info("Checksum for %s: %s", destination, downloaded_checksum)
         if downloaded_checksum != checksum:
-            print(
-                f"Error: Checksum mismatch for {destination}. Expected {checksum}, but got {downloaded_checksum}."
+            logger.error(
+                "Checksum mismatch for %s. Expected %s, but got %s.",
+                destination,
+                checksum,
+                downloaded_checksum,
             )
             sys.exit(1)
-        print("Checksum matches expectations.")
+        logger.info("Checksum matches expectations.")
         return destination
     except subprocess.CalledProcessError:
-        print(f"Error: Failed to download {url}")
+        logger.error("Failed to download %s", url)
         sys.exit(1)
 
 
 def copy_file(source: str, destination: str) -> None:
     try:
-        print(f"Before copying: {source} to {destination}")
+        logger.info("Before copying: %s to %s", source, destination)
         if os.path.isdir(source):
             shutil.copytree(source, destination, dirs_exist_ok=True)
         else:
             os.makedirs(os.path.dirname(destination), exist_ok=True)
             shutil.copy2(source, destination)
-        print(f"After copying: {source} to {destination}")
+        logger.info("After copying: %s to %s", source, destination)
     except (OSError, shutil.Error) as error:
-        print(f"Error: Failed to copy {source} to {destination}: {error}")
+        logger.error("Failed to copy %s to %s: %s", source, destination, error)
 
 
 def _parse_csv(value: str | list[str], *, field_name: str) -> list[str]:
@@ -157,7 +168,7 @@ def _load_driver_config(settings_path: str) -> DriverConfig:
     try:
         config = toml.load(settings_path)
     except (FileNotFoundError, toml.TomlDecodeError) as error:
-        print(f"Error: Unable to read driver settings at {settings_path}: {error}")
+        logger.error("Unable to read driver settings at %s: %s", settings_path, error)
         sys.exit(1)
 
     missing = [
@@ -172,7 +183,9 @@ def _load_driver_config(settings_path: str) -> DriverConfig:
         if key not in config
     ]
     if missing:
-        print(f"Error: Missing keys in {settings_path}: {', '.join(missing)}")
+        logger.error(
+            "Missing keys in %s: %s", settings_path, ", ".join(missing)
+        )
         sys.exit(1)
 
     try:
@@ -194,7 +207,7 @@ def _load_driver_config(settings_path: str) -> DriverConfig:
             config["CIRCUIT_PY_BOOT_NAME"], field_name="CIRCUIT_PY_BOOT_NAME"
         )
     except ValueError as error:
-        print(f"Error: Invalid driver settings in {settings_path}: {error}")
+        logger.error("Invalid driver settings in %s: %s", settings_path, error)
         sys.exit(1)
 
     return DriverConfig(
@@ -221,14 +234,16 @@ def _ensure_driver_files(driver_path: str) -> None:
         if not os.path.exists(os.path.join(driver_path, name))
     ]
     if missing:
-        print(f"Error: Missing driver files in {driver_path}: {', '.join(missing)}")
+        logger.error(
+            "Missing driver files in %s: %s", driver_path, ", ".join(missing)
+        )
         sys.exit(1)
 
 
 def _mount_points(media_directory: str) -> list[str]:
     if not os.path.isdir(media_directory):
-        print(
-            f"Error: Expected media directory {media_directory} to exist before updates."
+        logger.error(
+            "Expected media directory %s to exist before updates.", media_directory
         )
         sys.exit(1)
 
@@ -243,8 +258,9 @@ def main(device_driver_name: str) -> None:
     base_path = str(Path(heart.__file__).resolve().parents[2] / "drivers")
     code_path = os.path.join(base_path, device_driver_name)
     if not os.path.isdir(code_path):
-        print(
-            f"Error: The path {code_path} does not exist. This is where we expect the driver code to exist."
+        logger.error(
+            "The path %s does not exist. This is where we expect the driver code to exist.",
+            code_path,
         )
         sys.exit(1)
 
@@ -264,7 +280,7 @@ def main(device_driver_name: str) -> None:
         copy_file(downloaded_file_path, UF2_DESTINATION)
         time.sleep(10)
     else:
-        print(
+        logger.info(
             "Skipping CircuitPython UF2 installation as no device is in boot mode currently"
         )
 
@@ -277,7 +293,7 @@ def main(device_driver_name: str) -> None:
         if "CIRCUITPY" in os.path.basename(mount_point)
     ]
     if not circuitpy_mounts:
-        print(f"No CIRCUITPY volumes found under {MEDIA_DIRECTORY}.")
+        logger.warning("No CIRCUITPY volumes found under %s.", MEDIA_DIRECTORY)
 
     for media_location in circuitpy_mounts:
         boot_out_path = os.path.join(media_location, "boot_out.txt")
@@ -286,14 +302,14 @@ def main(device_driver_name: str) -> None:
             try:
                 board_id = _parse_board_id(boot_out_path)
             except ValueError as error:
-                print(f"Error: {error}")
+                logger.warning("Unable to parse board ID: %s", error)
                 continue
 
             if board_id not in config.valid_board_ids:
-                print(
-                    "Skipping: The board ID "
-                    f"{board_id} is not in the list of valid board IDs: "
-                    f"{config.valid_board_ids}"
+                logger.info(
+                    "Skipping: The board ID %s is not in the list of valid board IDs: %s",
+                    board_id,
+                    config.valid_board_ids,
                 )
                 continue
 
@@ -308,19 +324,19 @@ def main(device_driver_name: str) -> None:
                 destination=os.path.join(os.path.join(media_location, "lib")),
             )
         else:
-            print(f"{boot_out_path} is missing, skipping...")
+            logger.info("%s is missing, skipping...", boot_out_path)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(
-            "Error: DEVICE_DRIVER_NAME is not set. Please supply it as the first argument."
+        logger.error(
+            "DEVICE_DRIVER_NAME is not set. Please supply it as the first argument."
         )
         sys.exit(1)
 
     if not sys.argv[1]:
-        print(
-            "Error: DEVICE_DRIVER_NAME is not set. Please supply it as the first argument."
+        logger.error(
+            "DEVICE_DRIVER_NAME is not set. Please supply it as the first argument."
         )
         sys.exit(1)
     main(sys.argv[1])
