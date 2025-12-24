@@ -13,8 +13,8 @@ from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
+from heart.runtime.display_context import DisplayContext
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
-from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -40,8 +40,7 @@ class GameLoop:
 
         self.max_fps = max_fps
         self.app_controller = AppController()
-        self.clock: pygame.time.Clock | None = None
-        self.screen: pygame.Surface | None = None
+        self.display = DisplayContext(device=device)
         self.render_pipeline = RenderPipeline(
             device=device,
             peripheral_manager=self.peripheral_manager,
@@ -61,15 +60,7 @@ class GameLoop:
         self.feedback_buffer: np.ndarray | None = None
         self.edge_thresh = 1
 
-        pygame.display.set_mode(
-            (
-                device.full_display_size()[0] * device.scale_factor,
-                device.full_display_size()[1] * device.scale_factor,
-            ),
-            pygame.SHOWN,
-        )
-        if Configuration.is_pi() and not Configuration.is_x11_forward():
-            pygame.event.set_grab(True)
+        self.display.configure_window()
 
     def add_mode(
         self,
@@ -118,13 +109,21 @@ class GameLoop:
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:
-        self.screen = screen
-        self.peripheral_manager.window.on_next(self.screen)
+        self.display.set_screen(screen)
+        self.peripheral_manager.window.on_next(self.display.screen)
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
-        self.clock = clock
+        self.display.set_clock(clock)
         self.render_pipeline.set_clock(clock)
-        self.peripheral_manager.clock.on_next(self.clock)
+        self.peripheral_manager.clock.on_next(self.display.clock)
+
+    @property
+    def screen(self) -> pygame.Surface | None:
+        return self.display.screen
+
+    @property
+    def clock(self) -> pygame.time.Clock | None:
+        return self.display.clock
 
     def _select_renderers(self) -> list["StatefulBaseRenderer[Any]"]:
         base_renderers = self.app_controller.get_renderers()
@@ -136,13 +135,13 @@ class GameLoop:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> None:
-        if self.screen is None:
+        if self.display.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
         render_surface = self.render_pipeline.render(
             renderers, override_renderer_variant
         )
         if render_surface is not None:
-            self.screen.blit(render_surface, (0, 0))
+            self.display.screen.blit(render_surface, (0, 0))
         self._present_rendered_frame(renderers, render_surface)
 
     def _handle_events(self) -> None:
@@ -173,9 +172,11 @@ class GameLoop:
             )
 
     def _initialize_screen(self) -> None:
-        pygame.init()
-        self.set_screen(pygame.Surface(self.device.full_display_size(), pygame.SHOWN))
-        self.set_clock(pygame.time.Clock())
+        self.display.initialize()
+        if self.display.screen is None or self.display.clock is None:
+            raise RuntimeError("GameLoop failed to initialize display surfaces")
+        self.set_screen(self.display.screen)
+        self.set_clock(self.display.clock)
 
     def _initialize_peripherals(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -197,8 +198,8 @@ class GameLoop:
 
     def _dim_display(self) -> None:
         # Default to fully black, so the LEDs will be at lower power
-        if self.screen is not None:
-            self.screen.fill("black")
+        if self.display.screen is not None:
+            self.display.screen.fill("black")
 
     def _ensure_initialized(self) -> None:
         if self.initialized:
@@ -206,18 +207,16 @@ class GameLoop:
         self._initialize()
 
     def _initialize_app_controller(self) -> None:
-        if self.clock is None or self.screen is None:
-            raise RuntimeError("GameLoop failed to initialize display surfaces")
+        self.display.ensure_initialized()
         self.app_controller.initialize(
-            window=self.screen,
-            clock=self.clock,
+            window=self.display.screen,
+            clock=self.display.clock,
             peripheral_manager=self.peripheral_manager,
             orientation=self.device.orientation,
         )
 
     def _ensure_display_initialized(self) -> None:
-        if self.clock is None or self.screen is None:
-            raise RuntimeError("GameLoop failed to initialize display surfaces")
+        self.display.ensure_initialized()
 
     def _configure_peripheral_streaming(self) -> None:
         ws = WebSocket()
@@ -229,9 +228,9 @@ class GameLoop:
         self.peripheral_manager.game_tick.on_next(True)
 
     def _run_main_loop(self) -> None:
-        if self.clock is None:
+        if self.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
-        clock = self.clock
+        clock = self.display.clock
         while self.running:
             self._tick_peripherals()
             self._handle_events()
@@ -258,9 +257,9 @@ class GameLoop:
             self.device.set_image(device_image)
             return
 
-        if self.screen is None:
+        if self.display.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
-        screen_array = pygame.surfarray.array3d(self.screen)
+        screen_array = pygame.surfarray.array3d(self.display.screen)
         transposed_array = np.transpose(screen_array, (1, 0, 2))
         pil_image = Image.fromarray(transposed_array)
         self.device.set_image(pil_image)
