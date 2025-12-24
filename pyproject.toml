@@ -1,11 +1,11 @@
 [project]
 name = "heart"
 version = "0.2.0"
-description = "TODO: Add a concise project description."
+description = "Extensible runtime for driving LED totems with pygame renderers, configuration playlists, and peripherals."
 readme = "README.md"
-license = { text = "TODO: Choose a license text or SPDX identifier." }
+license = { text = "Apache-2.0" }
 authors = [
-    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
+    { name = "Heart Runtime Maintainers" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -25,9 +25,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
 ]
-keywords = ["TODO: add keywords"]
+keywords = ["led-matrix", "pygame", "runtime", "peripherals", "raspberry-pi"]
 maintainers = [
-    { name = "TODO: Add maintainer name", email = "TODO: add-email@example.com" },
+    { name = "Heart Runtime Maintainers" },
 ]
 requires-python = ">= 3.11"
 
@@ -53,12 +53,6 @@ dependencies = [
     "paho-mqtt",
     "websockets>=15.0.1",
 ]
-
-[project.urls]
-Documentation = "TODO: add documentation URL"
-Homepage = "TODO: add homepage URL"
-Repository = "TODO: add repository URL"
-Issues = "TODO: add issue tracker URL"
 
 [project.optional-dependencies]
 dev = [
