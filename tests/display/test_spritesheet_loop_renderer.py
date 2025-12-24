@@ -24,6 +24,12 @@ class _StubSpritesheet:
         surface.fill((255, 0, 0, 255))
         return surface
 
+    def image_at_scaled(
+        self, rect: tuple[int, int, int, int], size: tuple[int, int]
+    ) -> pygame.Surface:
+        image = self.image_at(rect)
+        return pygame.transform.scale(image, size)
+
 
 class _StubGamepad:
     def __init__(self, *, connected: bool = False) -> None:

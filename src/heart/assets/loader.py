@@ -6,6 +6,8 @@ from typing import Any
 
 import pygame
 
+from heart.utilities.env import Configuration, SpritesheetFrameCacheStrategy
+
 
 class Loader:
     @classmethod
@@ -55,15 +57,48 @@ class spritesheet(object):
 
         with open(filename, "rb") as f:
             self.sheet = pygame.image.load(f).convert_alpha()
+        self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
+        self._scaled_cache: dict[tuple[int, int, int, int, int, int], pygame.Surface] = {}
 
     def get_size(self):
         return self.sheet.get_size()
 
     def image_at(self, rectangle):
         rect = pygame.Rect(rectangle)
+        cache_key = (rect.x, rect.y, rect.width, rect.height)
+        strategy = Configuration.spritesheet_frame_cache_strategy()
+        if strategy in {
+            SpritesheetFrameCacheStrategy.FRAMES,
+            SpritesheetFrameCacheStrategy.SCALED,
+        }:
+            cached = self._frame_cache.get(cache_key)
+            if cached is not None:
+                return cached
+
         image = pygame.Surface(rect.size, pygame.SRCALPHA)
         image.blit(self.sheet, (0, 0), rect)
+        if strategy in {
+            SpritesheetFrameCacheStrategy.FRAMES,
+            SpritesheetFrameCacheStrategy.SCALED,
+        }:
+            self._frame_cache[cache_key] = image
         return image
+
+    def image_at_scaled(self, rectangle, size: tuple[int, int]) -> pygame.Surface:
+        rect = pygame.Rect(rectangle)
+        width, height = size
+        cache_key = (rect.x, rect.y, rect.width, rect.height, width, height)
+        strategy = Configuration.spritesheet_frame_cache_strategy()
+        if strategy == SpritesheetFrameCacheStrategy.SCALED:
+            cached = self._scaled_cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        image = self.image_at(rect)
+        scaled = pygame.transform.scale(image, (width, height))
+        if strategy == SpritesheetFrameCacheStrategy.SCALED:
+            self._scaled_cache[cache_key] = scaled
+        return scaled
 
     def images_at(self, rects):
         "Loads multiple images, supply a list of coordinates"

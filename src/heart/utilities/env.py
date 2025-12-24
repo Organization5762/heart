@@ -216,6 +216,18 @@ class Configuration:
         return _env_flag("HEART_RENDER_SURFACE_CACHE", default=True)
 
     @classmethod
+    def spritesheet_frame_cache_strategy(cls) -> "SpritesheetFrameCacheStrategy":
+        strategy = os.environ.get(
+            "HEART_SPRITESHEET_FRAME_CACHE_STRATEGY", "scaled"
+        ).strip().lower()
+        try:
+            return SpritesheetFrameCacheStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_SPRITESHEET_FRAME_CACHE_STRATEGY must be 'none', 'frames', or 'scaled'"
+            ) from exc
+
+    @classmethod
     def render_screen_cache_enabled(cls) -> bool:
         return _env_flag("HEART_RENDER_SCREEN_CACHE", default=True)
 
@@ -275,6 +287,12 @@ class RenderMergeStrategy(StrEnum):
 class FrameArrayStrategy(StrEnum):
     COPY = "copy"
     VIEW = "view"
+
+
+class SpritesheetFrameCacheStrategy(StrEnum):
+    NONE = "none"
+    FRAMES = "frames"
+    SCALED = "scaled"
 
 
 class LifeUpdateStrategy(StrEnum):
