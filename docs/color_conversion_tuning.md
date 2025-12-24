@@ -13,6 +13,11 @@ needed.
   - When set to `false`, disables the hue-roundtrip correction and the per-pixel
     neighbourhood search that aligns numpy conversion output with OpenCV.
   - This reduces per-frame CPU work at the cost of exact round-trip accuracy.
+- `HEART_HSV_CALIBRATION_MODE` (default: `strict`)
+  - Selects the calibration algorithm used by the numpy fallback converter.
+  - Use `strict` for full round-trip correction, `fast` to skip the neighbourhood
+    search while keeping pure-colour adjustments, or `off` to disable calibration.
+  - Overrides `HEART_HSV_CALIBRATION` when set.
 - `HEART_HSV_CACHE_MAX_SIZE` (default: `4096`)
   - Sets the maximum number of HSV-to-BGR entries stored in the in-memory LRU
     cache.
@@ -20,5 +25,6 @@ needed.
 
 ## Materials
 
-- Environment variables: `HEART_HSV_CALIBRATION`, `HEART_HSV_CACHE_MAX_SIZE`.
+- Environment variables: `HEART_HSV_CALIBRATION`,
+  `HEART_HSV_CALIBRATION_MODE`, `HEART_HSV_CACHE_MAX_SIZE`.
 - Source: `src/heart/environment.py`.
