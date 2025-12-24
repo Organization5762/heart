@@ -31,6 +31,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> SlideTransitionState:
+        self._initialize_children(window, clock, peripheral_manager, orientation)
         initial_state = self.provider.initial_state(
             window=window,
             clock=clock,
@@ -43,6 +44,23 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
             initial_state=initial_state,
         ).subscribe(on_next=self.set_state)
         return initial_state
+
+    def _initialize_children(
+        self,
+        window: pygame.Surface,
+        clock: pygame.time.Clock,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        for renderer in (self.provider.renderer_a, self.provider.renderer_b):
+            if not renderer.initialized:
+                renderer.initialize(
+                    window=window,
+                    clock=clock,
+                    peripheral_manager=peripheral_manager,
+                    orientation=orientation,
+                )
+                renderer.initialized = True
 
     def is_done(self) -> bool:
         return not self.state.sliding
