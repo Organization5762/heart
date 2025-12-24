@@ -1,5 +1,5 @@
 from heart.environment import GameLoop
-from heart.modules.life.renderer import Life
+from heart.renderers.life.renderer import Life
 
 
 def configure(loop: GameLoop) -> None:

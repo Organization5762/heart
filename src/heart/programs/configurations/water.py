@@ -1,5 +1,5 @@
 from heart.environment import GameLoop
-from heart.modules.water_cube.renderer import WaterCube
+from heart.renderers.water_cube.renderer import WaterCube
 
 
 def configure(loop: GameLoop) -> None:
