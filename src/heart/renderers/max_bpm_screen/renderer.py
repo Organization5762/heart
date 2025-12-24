@@ -13,6 +13,9 @@ from heart.renderers.flame import FlameRenderer
 from heart.renderers.max_bpm_screen.provider import (AVATAR_MAPPINGS,
                                                      AvatarBpmStateProvider)
 from heart.renderers.max_bpm_screen.state import AvatarBpmRendererState
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class MaxBpmScreen(ComposedRenderer):
@@ -36,7 +39,7 @@ class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
             try:
                 self.avatar_images[name] = Loader.load(f"avatars/{name}_32.png")
             except Exception:
-                print(f"Could not load avatar for {name}")
+                logger.warning("Could not load avatar for %s", name)
 
         self.image = self.avatar_images.get("seb")
 

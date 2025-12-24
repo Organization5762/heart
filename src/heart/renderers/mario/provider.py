@@ -1,5 +1,3 @@
-
-
 import reactivex
 
 from heart.assets.loader import Loader
@@ -8,12 +6,20 @@ from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.peripheral.uwb import ops
 from heart.renderers.mario.state import MarioRendererState
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class MarioRendererProvider:
-        #     self._spritesheet: pygame.Surface | None = None
+    # self._spritesheet: pygame.Surface | None = None
 
-    def __init__(self, metadata_file_path: str, sheet_file_path: str, accel_stream: AllAccelerometersProvider):
+    def __init__(
+        self,
+        metadata_file_path: str,
+        sheet_file_path: str,
+        accel_stream: AllAccelerometersProvider,
+    ):
         self.metadata_file_path = metadata_file_path
         self.file = sheet_file_path
         self._accel_stream = accel_stream
@@ -36,12 +42,11 @@ class MarioRendererProvider:
         image = Loader.load_spirtesheet(self.file)
         return MarioRendererState(spritesheet=image)
 
-
     def observable(
         self,
     ) -> reactivex.Observable[MarioRendererState]:
         observable = self._accel_stream.observable()
-        
+
         initial = self._create_initial_state()
 
         def update_state(prev: MarioRendererState, acceleration: Acceleration):
@@ -72,7 +77,11 @@ class MarioRendererProvider:
                 vector = self.state.latest_acceleration
                 if vector is not None and vector.z > 11.0:  # vibes based constants
                     highest_z = max(highest_z, vector.z)
-                    print(f"highest z: {highest_z}, accel z: {vector.z}")
+                    logger.info(
+                        "Highest accel Z updated: highest_z=%s, accel_z=%s",
+                        highest_z,
+                        vector.z,
+                    )
                     in_loop = True
                     time_since_last_update = 0
 
@@ -84,7 +93,7 @@ class MarioRendererProvider:
                 time_since_last_update=time_since_last_update,
                 in_loop=in_loop,
                 highest_z=highest_z,
-            )    
+            )
 
         return observable.pipe(
             ops.start_with(initial),

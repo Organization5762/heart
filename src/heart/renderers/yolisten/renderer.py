@@ -1,4 +1,3 @@
-import logging
 import threading
 import time
 
@@ -13,9 +12,10 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.yolisten.provider import YoListenStateProvider
 from heart.renderers.yolisten.state import YoListenState
+from heart.utilities.logging import get_logger
 
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
@@ -258,7 +258,7 @@ def poll_phyphox():
             x = data["buffer"]["acceleration"]["x"][-1]
             y = data["buffer"]["acceleration"]["y"][-1]
             z = data["buffer"]["acceleration"]["z"][-1]
-            print(f"x={x}, y={y}, z={z}")
+            logger.info("Phyphox acceleration x=%s, y=%s, z=%s", x, y, z)
         except Exception as exc:
             logger.error("Error: %s", exc)
         time.sleep(0.1)
