@@ -2,11 +2,9 @@ import math
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
-import reactivex
 from OpenGL.GL import *
 from pygame.math import lerp
 
@@ -18,11 +16,9 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
 from heart.renderers import StatefulBaseRenderer
+from heart.renderers.state_provider import ImmutableStateProvider
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
-
-if TYPE_CHECKING:
-    from heart.renderers.three_fractal.provider import FractalSceneProvider
 
 
 @dataclass
@@ -823,15 +819,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):
-    def __init__(
-        self, provider: "FractalSceneProvider" | None = None
-    ) -> None:
-        from heart.renderers.three_fractal.provider import FractalSceneProvider
-
-        self.provider = provider or FractalSceneProvider()
+    def __init__(self, device=None) -> None:
+        self._device = device
         self.device_display_mode = DeviceDisplayMode.OPENGL
-        self._initial_state: FractalSceneState | None = None
-        super().__init__(builder=self.provider)
+        super().__init__()
         self.warmup = False
         self._peripheral_manager: PeripheralManager | None = None
 
@@ -843,20 +834,10 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         orientation: Orientation,
     ) -> None:
         self._peripheral_manager = peripheral_manager
-        self._initial_state = self.provider.initial_state(
-            window=window,
-            clock=clock,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-        )
+        runtime = FractalRuntime(device=self._device)
+        runtime.initialize(window, clock, peripheral_manager, orientation)
+        self.builder = ImmutableStateProvider(FractalSceneState(runtime=runtime))
         super().initialize(window, clock, peripheral_manager, orientation)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FractalSceneState]:
-        if self._initial_state is None:
-            raise ValueError("FractalScene requires an initial state")
-        return self.provider.observable(initial_state=self._initial_state)
 
     def real_process(
         self,

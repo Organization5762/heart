@@ -10,6 +10,7 @@ from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.renderers.state_provider import ImmutableStateProvider
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -373,8 +374,16 @@ class AtomicBaseRenderer(Generic[StateT]):
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def __init__(
-        self, builder: ObservableProvider[StateT] | None = None, *args, **kwargs
+        self,
+        builder: ObservableProvider[StateT] | None = None,
+        *args,
+        state: StateT | None = None,
+        **kwargs,
     ) -> None:
+        if builder is not None and state is not None:
+            raise ValueError("StatefulBaseRenderer expects either builder or state")
+        if builder is None and state is not None:
+            builder = ImmutableStateProvider(state)
         self.builder = builder
         self._subscription: Disposable | None = None
         super().__init__(*args, **kwargs)

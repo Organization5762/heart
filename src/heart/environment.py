@@ -7,7 +7,7 @@ import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from types import ModuleType
-from typing import TYPE_CHECKING, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypeAlias, cast
 
 import numpy as np
 import pygame
@@ -26,8 +26,7 @@ from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
-    pass
-
+    from heart.renderers import StatefulBaseRenderer
 
 def _load_cv2_module() -> ModuleType | None:
     module: ModuleType | None = None
@@ -52,7 +51,9 @@ HSV_CALIBRATION_ENABLED = HSV_CALIBRATION_MODE != "off"
 HSV_CALIBRATION_STRICT = HSV_CALIBRATION_MODE == "strict"
 HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
 
-RenderMethod = Callable[[list["StatefulBaseRenderer"]], pygame.Surface | None]
+RenderMethod: TypeAlias = Callable[
+    [list["StatefulBaseRenderer[Any]"]], pygame.Surface | None
+]
 
 
 def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
@@ -309,9 +310,6 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
     return result
 
 
-if TYPE_CHECKING:
-    from heart.renderers import StatefulBaseRenderer
-
 logger = get_logger(__name__)
 log_controller = get_logging_controller()
 
@@ -364,7 +362,7 @@ class GameLoop:
         self._last_mode_offset = 0
         self._last_offset_on_change = 0
         self._current_offset_on_change = 0
-        self.renderers_cache: list["StatefulBaseRenderer"] | None = None
+        self.renderers_cache: list[StatefulBaseRenderer[Any]] | None = None
 
         self._active_mode_index = 0
 
@@ -384,7 +382,9 @@ class GameLoop:
 
         self._last_render_mode = pygame.SHOWN
 
-    def _get_renderer_surface(self, renderer: "BaseRenderer") -> pygame.Surface:
+    def _get_renderer_surface(
+        self, renderer: StatefulBaseRenderer[Any]
+    ) -> pygame.Surface:
         size = self.device.full_display_size()
         if not Configuration.render_screen_cache_enabled():
             return pygame.Surface(size, pygame.SRCALPHA)
@@ -407,7 +407,12 @@ class GameLoop:
 
     def add_mode(
         self,
-        title: str | list["StatefulBaseRenderer"] | "StatefulBaseRenderer" | None = None,
+        title: (
+            str
+            | list[StatefulBaseRenderer[Any]]
+            | StatefulBaseRenderer[Any]
+            | None
+        ) = None,
     ) -> ComposedRenderer:
         return self.app_controller.add_mode(title=title)
 
@@ -479,13 +484,13 @@ class GameLoop:
         self.clock = clock
         self.peripheral_manager.clock.on_next(self.clock)
 
-    def _select_renderers(self) -> list["StatefulBaseRenderer"]:
+    def _select_renderers(self) -> list[StatefulBaseRenderer[Any]]:
         base_renderers = self.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
 
     def process_renderer(
-        self, renderer: "StatefulBaseRenderer"
+        self, renderer: StatefulBaseRenderer[Any]
     ) -> pygame.Surface | None:
         clock = self.clock
         if clock is None:
@@ -640,7 +645,7 @@ class GameLoop:
         return surface1
 
     def _render_surface_iterative(
-        self, renderers: list["StatefulBaseRenderer"]
+        self, renderers: list[StatefulBaseRenderer[Any]]
     ) -> pygame.Surface | None:
         self._render_queue_depth = len(renderers)
         base = None
@@ -655,7 +660,7 @@ class GameLoop:
         return base
 
     def _render_surfaces_binary(
-        self, renderers: list["StatefulBaseRenderer"]
+        self, renderers: list[StatefulBaseRenderer[Any]]
     ) -> pygame.Surface | None:
         if not renderers:
             return None
@@ -704,7 +709,7 @@ class GameLoop:
 
     def _render_fn(
         self,
-        renderers: list["StatefulBaseRenderer"],
+        renderers: list[StatefulBaseRenderer[Any]],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
         variant = self._resolve_render_variant(len(renderers), override_renderer_variant)
@@ -714,7 +719,7 @@ class GameLoop:
 
     def _one_loop(
         self,
-        renderers: list["StatefulBaseRenderer"],
+        renderers: list[StatefulBaseRenderer[Any]],
         override_renderer_variant: RendererVariant | None = None,
     ) -> None:
         if self.screen is None:
