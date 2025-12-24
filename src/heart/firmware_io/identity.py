@@ -6,15 +6,16 @@ import importlib
 import json
 import os
 import sys
+from pathlib import Path
 from types import ModuleType
 from typing import Callable, Iterable, Mapping, TextIO
 
 from heart.firmware_io import constants
 
 supervisor: ModuleType | None
-try:  # pragma: no cover - supervisor is unavailable on CPython
+if importlib.util.find_spec("supervisor") is not None:  # pragma: no cover - exercised on hardware
     supervisor = importlib.import_module("supervisor")
-except ImportError:  # pragma: no cover - exercised on hardware
+else:  # pragma: no cover - supervisor is unavailable on CPython
     supervisor = None
 
 
@@ -23,7 +24,7 @@ _DEFAULT_COMMIT_CACHE: str | None = None
 DEVICE_ID_ENV_VAR = "HEART_DEVICE_ID"
 DEVICE_ID_PATH_ENV_VAR = "HEART_DEVICE_ID_PATH"
 DEFAULT_DEVICE_ID_FILENAME = "device_id.txt"
-DEFAULT_DEVICE_ID_PATH = f"/{DEFAULT_DEVICE_ID_FILENAME}"
+DEFAULT_DEVICE_ID_PATH = Path("/") / DEFAULT_DEVICE_ID_FILENAME
 
 
 class Identity:
@@ -95,18 +96,21 @@ def _format_identity_payload(identity: Identity) -> str:
     return json.dumps({"event_type": constants.DEVICE_IDENTIFY, "data": identity.as_payload()})
 
 
-def default_device_id_path(env: Mapping[str, str] | None = None) -> str:
+def default_device_id_path(env: Mapping[str, str] | None = None) -> Path:
     """Return the filesystem path used to persist device identifiers."""
 
     env_mapping = env or os.environ
-    return env_mapping.get(DEVICE_ID_PATH_ENV_VAR, DEFAULT_DEVICE_ID_PATH)
+    configured = env_mapping.get(DEVICE_ID_PATH_ENV_VAR)
+    if configured:
+        return Path(configured)
+    return DEFAULT_DEVICE_ID_PATH
 
 
 def persistent_device_id(
     *,
-    storage_path: str | None = None,
+    storage_path: Path | str | None = None,
     env: Mapping[str, str] | None = None,
-    opener: Callable[[str, str], TextIO] | None = None,
+    opener: Callable[[str | Path, str], TextIO] | None = None,
     microcontroller_module=None,
 ) -> str:
     """Return a device identifier that remains stable across boots.
@@ -124,7 +128,7 @@ def persistent_device_id(
     """
 
     env_mapping = env or os.environ
-    path = storage_path or default_device_id_path(env_mapping)
+    path = Path(storage_path) if storage_path else default_device_id_path(env_mapping)
     opener_fn = opener or open
 
     existing = _read_device_id(path, opener_fn)
@@ -219,10 +223,9 @@ def _commit_from_generated_module() -> str | None:
 
 
 def _commit_from_git(default: str) -> str | None:
-    try:
-        import subprocess
-    except (ImportError, NotImplementedError):  # pragma: no cover - hardware environments
+    if importlib.util.find_spec("subprocess") is None:  # pragma: no cover - hardware environments
         return None
+    subprocess = importlib.import_module("subprocess")
 
     try:
         result = subprocess.run(
@@ -271,7 +274,10 @@ def _random_device_id() -> str:
     return random_bytes.hex()
 
 
-def _read_device_id(path: str | None, opener: Callable[[str, str], TextIO]) -> str | None:
+def _read_device_id(
+    path: Path | None,
+    opener: Callable[[str | Path, str], TextIO],
+) -> str | None:
     if not path:
         return None
 
@@ -284,10 +290,8 @@ def _read_device_id(path: str | None, opener: Callable[[str, str], TextIO]) -> s
     return raw or None
 
 
-def _write_device_id(path: str, value: str, opener: Callable[[str, str], TextIO]) -> None:
-    parent = _parent_directory(path)
-    if parent:
-        _ensure_directory(parent)
+def _write_device_id(path: Path, value: str, opener: Callable[[str | Path, str], TextIO]) -> None:
+    _ensure_directory(path.parent)
 
     try:
         with opener(path, "w") as handle:
@@ -296,27 +300,11 @@ def _write_device_id(path: str, value: str, opener: Callable[[str, str], TextIO]
         return
 
 
-def _parent_directory(path: str) -> str:
-    if not path or "/" not in path:
-        return ""
-
-    directory, _ = path.rsplit("/", 1)
-    return directory or "/"
-
-
-def _ensure_directory(path: str) -> None:
-    if not path or path == "/":
+def _ensure_directory(path: Path) -> None:
+    if path in (Path("."), Path("/")):
         return
 
-    makedirs = getattr(os, "makedirs", None)
-    if callable(makedirs):
-        try:
-            makedirs(path)
-            return
-        except OSError:
-            return
-
     try:
-        os.mkdir(path)
+        path.mkdir(parents=True, exist_ok=True)
     except OSError:
         return
