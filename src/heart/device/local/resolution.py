@@ -1,10 +1,11 @@
-import logging
 import platform
 import subprocess
 from abc import ABC, abstractmethod
 from functools import lru_cache
 
-logger = logging.getLogger(__name__)
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ResolutionDetectionError(RuntimeError):

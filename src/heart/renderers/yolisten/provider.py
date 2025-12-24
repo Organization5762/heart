@@ -1,4 +1,3 @@
-import logging
 import random
 import time
 from dataclasses import replace
@@ -11,8 +10,9 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
+from heart.utilities.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class YoListenStateProvider(ObservableProvider[YoListenState]):
