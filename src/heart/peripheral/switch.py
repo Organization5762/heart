@@ -74,9 +74,15 @@ class FakeSwitch(BaseSwitch):
         super().__init__(*args, **kwargs)
 
     def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+        def _unwrap(envelope: PeripheralMessageEnvelope[KeyboardEvent]) -> KeyboardEvent:
+            return envelope.data
+
+        def _is_pressed(event: KeyboardEvent) -> bool:
+            return event.action is KeyboardAction.PRESSED
+
         return KeyboardKey.get(key).observe.pipe(
-            ops.map(PeripheralMessageEnvelope[KeyboardEvent].unwrap_peripheral),
-            ops.filter(lambda event: event.action is KeyboardAction.PRESSED),
+            ops.map(_unwrap),
+            ops.filter(_is_pressed),
         )
 
     @classmethod
