@@ -43,7 +43,6 @@ class LEDMatrix(Device, SampleBase):
             from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
             options = RGBMatrixOptions()
-            # TODO: Might need to change these if we want N screens
             options.rows = self.row_size
             options.cols = self.col_size
             options.chain_length = self.chain_length

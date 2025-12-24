@@ -55,8 +55,7 @@ def visualize():
 
         flatten_for_render()
         v = frame / dt
-        # TODO: Particles is currently rendering a non-dense visual variant of this, when I think I really want a dense visual input (each dot is a pixel)
-        # Then, I can choose how to add and remove them as part of the erosion
+        # Use smaller radii (e.g. 1.0 / norm) to emulate a denser, pixel-like view.
         scene.particles(
             X_flat,
             radius=spacing / norm,

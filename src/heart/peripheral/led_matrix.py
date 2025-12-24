@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
+import reactivex
 from PIL import Image
+from reactivex import operators as ops
+from reactivex.subject import BehaviorSubject
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads import DisplayFrame
@@ -33,6 +36,9 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         self._height = height
         self._frame_lock = threading.Lock()
         self._latest_frame: DisplayFrame | None = None
+        self._frame_subject: BehaviorSubject[DisplayFrame | None] = BehaviorSubject(
+            None
+        )
         self._sequence = 0
         self._stop = threading.Event()
 
@@ -53,6 +59,11 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         with self._frame_lock:
             return self._latest_frame
 
+    def _event_stream(self) -> reactivex.Observable[DisplayFrame]:
+        return self._frame_subject.pipe(
+            ops.filter(lambda frame: frame is not None),
+            ops.map(lambda frame: cast(DisplayFrame, frame)),
+        )
 
     def publish_image(
         self,
@@ -68,7 +79,6 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
                 "Image dimensions do not match configured display size"
             )
 
-        # TODO: Make this observable
         with self._frame_lock:
             frame = DisplayFrame.from_image(
                 image,
@@ -77,5 +87,6 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
             )
             self._sequence += 1
             self._latest_frame = frame
+            self._frame_subject.on_next(frame)
 
         return frame

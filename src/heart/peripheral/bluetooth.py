@@ -22,6 +22,7 @@ class UartListener:
     """Listeners for data come in as raw bytes from a UART Service."""
 
     __slots__ = ("device", "buffer", "events", "disconnected", "_logger")
+    TARGET_DEVICE_NAME = "totem-controller"
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
@@ -34,8 +35,7 @@ class UartListener:
     def _discover_devices(cls) -> Iterator[BLEDevice]:
         devices: list[BLEDevice] = asyncio.run(BleakScanner.discover())
         for device in devices:
-            # TODO: This should come from somewhere more principled
-            if device.name == "totem-controller":
+            if device.name == cls.TARGET_DEVICE_NAME:
                 yield device
 
     def start(self) -> None:
@@ -63,6 +63,7 @@ class UartListener:
 
     async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
         while True:
+            device = self.__refresh_device(device)
             # We still tend to loe a decent amount of data (~5 seconds worth)
             # as part of the reconnection process, but if the timeout is infrequent enough it would be hard to notice
             self._logger.info(
@@ -73,10 +74,6 @@ class UartListener:
             # is likely going to be discarded as misaligned anyway
             self.__clear_buffer()
 
-            # TODO: There is an issue where when you have the device in dev mode, the _device_
-            # changes when new code gets flashed onto it.  I don't think this will happen in practice, but it:
-            # 1. Makes developing kinda annoying
-            # 2. Is a weird failure case where the Totem / main controller would need to be restarted
             async with self.__get_client(device) as client:
                 # Try to connect if not connected
                 if not client.is_connected:
@@ -90,6 +87,24 @@ class UartListener:
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
             # On failure, wait a bit before retrying
             time.sleep(1.0)
+
+    def __refresh_device(self, current: BLEDevice) -> BLEDevice:
+        if not self.disconnected:
+            return current
+
+        self._logger.info(
+            "UART device disconnected; rescanning for %s",
+            self.TARGET_DEVICE_NAME,
+        )
+        self.disconnected = False
+        for device in self._discover_devices():
+            self._logger.info(
+                "Discovered updated UART device: %s (%s)",
+                device.address,
+                device.name,
+            )
+            return device
+        return current
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:

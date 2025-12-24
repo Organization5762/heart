@@ -77,7 +77,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         self,
         title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer | None = None,
     ) -> "ComposedRenderer":
-        # TODO: Add a navigation page back in
+        """Create a mode whose title renderer is shown in selection views."""
         result = ComposedRenderer([])
         if title is None:
             title = "Untitled"
@@ -98,7 +98,6 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
                 "Title must be a string or StatefulBaseRenderer, got: ", title
             )
 
-        # TODO: Clean-up
         self.modes.add_new_pages(title_renderer, result)
         return result
 
@@ -170,6 +169,10 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     Navigation is built-in to this, assuming the user long-presses
 
     """
+    def __init__(self) -> None:
+        super().__init__()
+        self.set_state(GameModeState())
+
     def _create_initial_state(
         self,
         window: pygame.Surface,
@@ -193,9 +196,6 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def add_new_pages(
         self, title_renderer: "StatefulBaseRenderer", renderers: "StatefulBaseRenderer"
     ) -> None:
-        # TODO: Hack because we are trying to build and have state at the same time
-        if self._state is None:
-            self.set_state(GameModeState())
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
 
@@ -307,7 +307,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
             renderer._internal_process(
                 window,

@@ -40,7 +40,6 @@ END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
 
 
-# TODO: AAddDd a bulk write command
 def send(messages: list[str]):
     _require_ble_dependencies()
 
@@ -57,3 +56,22 @@ def send(messages: list[str]):
         for message in messages:
             uart.write(message.encode(ENCODING))
             uart.write(END_OF_MESSAGE_DELIMETER.encode(ENCODING))
+
+
+def send_bulk(messages: list[str]) -> None:
+    """Write a batch of messages in a single UART write call."""
+    _require_ble_dependencies()
+
+    if not ble.advertising:
+        if advertisement is None:
+            raise ModuleNotFoundError(
+                "ProvideServicesAdvertisement is unavailable. "
+                "Install the adafruit_ble package to advertise over BLE."
+            )
+        ble.start_advertising(advertisement)
+
+    if ble.connected:
+        if not messages:
+            return
+        payload = END_OF_MESSAGE_DELIMETER.join(messages) + END_OF_MESSAGE_DELIMETER
+        uart.write(payload.encode(ENCODING))

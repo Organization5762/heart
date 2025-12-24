@@ -2,12 +2,13 @@ import os
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
+from enum import StrEnum
 from typing import Annotated
 
 import typer
 from PIL import Image
 
-from heart.device import Cube, Device
+from heart.device import Cube, Device, Orientation, Rectangle
 from heart.device.local import LocalScreen
 from heart.environment import GameLoop, RendererVariant
 from heart.manage.update import main as update_driver_main
@@ -21,9 +22,24 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 
-def _get_device(x11_forward: bool) -> Device:
-    # TODO: Add a way of adding orientation either from Config or `run`
-    orientation = Cube.sides()
+class OrientationVariant(StrEnum):
+    CUBE = "cube"
+    RECTANGLE = "rectangle"
+
+
+def _resolve_orientation(
+    variant: OrientationVariant,
+    columns: int,
+    rows: int,
+) -> Orientation:
+    if variant == OrientationVariant.CUBE:
+        return Cube.sides()
+    if columns <= 0 or rows <= 0:
+        raise ValueError("Orientation columns and rows must be positive")
+    return Rectangle.with_layout(columns, rows)
+
+
+def _get_device(x11_forward: bool, orientation: Orientation) -> Device:
     device: Device
 
     if Configuration.forward_to_beats_app():
@@ -82,14 +98,30 @@ def run(
     x11_forward: bool = typer.Option(
         False, "--x11-forward", help="Use X11 forwarding for RGB display"
     ),
+    orientation: OrientationVariant = typer.Option(
+        OrientationVariant.CUBE,
+        "--orientation",
+        help="Select cube or rectangle orientation",
+    ),
+    columns: int = typer.Option(
+        4,
+        "--columns",
+        help="Display columns when using rectangle orientation",
+    ),
+    rows: int = typer.Option(
+        1,
+        "--rows",
+        help="Display rows when using rectangle orientation",
+    ),
 ) -> None:
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         raise Exception(f"Configuration '{configuration}' not found in registry")
     render_variant = _parse_render_variant(Configuration.render_variant())
+    orientation_value = _resolve_orientation(orientation, columns, rows)
     loop = GameLoop(
-        device=_get_device(x11_forward),
+        device=_get_device(x11_forward, orientation_value),
         resolver=container,
         render_variant=render_variant,
     )
@@ -114,7 +146,8 @@ def update_driver(name: Annotated[str, typer.Option("--name")]) -> None:
     name="bench-device",
 )
 def bench_device() -> None:
-    d = _get_device(x11_forward=False)
+    orientation = _resolve_orientation(OrientationVariant.CUBE, 4, 1)
+    d = _get_device(x11_forward=False, orientation=orientation)
 
     size = d.full_display_size()
     logger.info("Device full display size: %s", size)

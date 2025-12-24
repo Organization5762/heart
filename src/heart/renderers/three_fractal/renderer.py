@@ -20,10 +20,12 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.renderers.three_fractal.provider import FractalSceneProvider
 
+_LOGGER = get_logger(__name__)
 
 @dataclass
 class FractalRuntimeState:
@@ -661,9 +663,11 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                     self.delta_real_time * self.INFLATE_SPEED,
                 )
         except Exception as e:
-            # TODO: Very occasionally this raises an exception for some reason, no idea why
+            _LOGGER.debug(
+                "Failed to update active radius; falling back to base radius",
+                exc_info=e,
+            )
             self.active_radius = self.BASE_RADIUS
-            print(f"error but why: {e}")
 
         if not self.tiled_mode:
             # eagerly apply the uniforms

@@ -2,7 +2,7 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Iterator, Mapping, NoReturn, Self
+from typing import Any, Iterator, Mapping, NoReturn, Self, Sequence
 
 import pygame
 import reactivex
@@ -67,28 +67,35 @@ class BaseSwitch(Peripheral[SwitchState]):
         )
 
 class FakeSwitch(BaseSwitch):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        extra_tags: Sequence[PeripheralTag] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self._extra_tags = list(extra_tags) if extra_tags else []
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
     
     def peripheral_info(self) -> PeripheralInfo:
+        tags = [
+            PeripheralTag(
+                name="input_variant",
+                variant="button",
+                metadata={"version": "v1"},
+            ),
+            PeripheralTag(
+                name="mode",
+                variant="main_rotary_button",
+            ),
+        ]
+        tags.extend(self._extra_tags)
         return PeripheralInfo(
             id="fake_switch",
-            tags=[
-                PeripheralTag(
-                    name="input_variant",
-                    variant="button",
-                    metadata={"version": "v1"}
-                ),
-                # TODO: Allow the button to change its own tags in some cases
-                PeripheralTag(
-                    name="mode",
-                    variant="main_rotary_button",
-                ),
-            ]
+            tags=tags,
         )
 
     def run(self) -> None:
