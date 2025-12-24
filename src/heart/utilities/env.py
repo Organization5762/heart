@@ -170,12 +170,20 @@ class Configuration:
             ) from exc
 
     @classmethod
+    def reactivex_stream_coalesce_window_ms(cls) -> int:
+        return _env_int("HEART_RX_STREAM_COALESCE_WINDOW_MS", default=0, minimum=0)
+
+    @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
         return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
 
     @classmethod
     def reactivex_stream_replay_window_ms(cls) -> int | None:
         return _env_optional_int("HEART_RX_STREAM_REPLAY_WINDOW_MS", minimum=1)
+
+    @classmethod
+    def reactivex_stream_stats_log_ms(cls) -> int:
+        return _env_int("HEART_RX_STREAM_STATS_LOG_MS", default=0, minimum=0)
 
     @classmethod
     def reactivex_stream_auto_connect_min_subscribers(cls) -> int:

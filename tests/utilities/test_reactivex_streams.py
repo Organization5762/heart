@@ -271,3 +271,50 @@ class TestShareStreamStrategy:
 
         subscription_c.dispose()
         subscription_d.dispose()
+
+
+class TestShareStreamFlowControl:
+    """Cover flow-control safeguards that protect reactive streams under high-frequency loads."""
+
+    def test_share_stream_coalesces_latest_when_configured(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure coalescing emits the latest payload per window to preserve responsiveness under load."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "20")
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="coalesce")
+
+        received: list[int] = []
+        shared.subscribe(received.append)
+
+        source.on_next(1)
+        source.on_next(2)
+
+        time.sleep(0.03)
+
+        source.on_next(3)
+        time.sleep(0.03)
+
+        assert received == [2, 3]
+
+    def test_share_stream_flushes_pending_values_on_completion(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify completion flushes pending values so final state updates are not lost."""
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "50")
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="coalesce_complete")
+
+        received: list[int] = []
+        shared.subscribe(received.append)
+
+        source.on_next(42)
+        source.on_completed()
+
+        assert received == [42]
