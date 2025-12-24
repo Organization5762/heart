@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pygame
+import reactivex
 from pygame import Surface
 from pygame import time as pygame_time
-from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -22,6 +22,7 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
         self,
         metadata_duration_ms: int = DEFAULT_METADATA_DURATION_MS,
         max_bpm_duration_ms: int = DEFAULT_MAX_BPM_DURATION_MS,
+        provider: CombinedBpmScreenStateProvider | None = None,
     ) -> None:
         self.metadata_screen = MetadataScreen()
         self.max_bpm_screen = MaxBpmScreen()
@@ -31,20 +32,22 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
 
         self.is_flame_renderer = True
 
-        super().__init__()
+        self._provider = provider or CombinedBpmScreenStateProvider(
+            metadata_duration_ms=metadata_duration_ms,
+            max_bpm_duration_ms=max_bpm_duration_ms,
+        )
+        super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
 
-        self._provider: CombinedBpmScreenStateProvider | None = None
-        self._subscription: Disposable | None = None
         self._peripheral_manager: PeripheralManager | None = None
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> CombinedBpmScreenState:
+    ) -> None:
         self._peripheral_manager = peripheral_manager
         self.metadata_screen.initialize(
             window=window,
@@ -58,19 +61,12 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
+        super().initialize(window, clock, peripheral_manager, orientation)
 
-        self._provider = CombinedBpmScreenStateProvider(
-            peripheral_manager=peripheral_manager,
-            metadata_duration_ms=self.metadata_duration_ms,
-            max_bpm_duration_ms=self.max_bpm_duration_ms,
-        )
-
-        initial_state = CombinedBpmScreenState.initial()
-        self.set_state(initial_state)
-
-        self._subscription = self._provider.observable().subscribe(on_next=self.set_state)
-
-        return initial_state
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[CombinedBpmScreenState]:
+        return self._provider.observable(peripheral_manager)
 
     def real_process(
         self,
@@ -95,13 +91,8 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
             )
 
     def reset(self) -> None:
-        if self._subscription is not None:
-            self._subscription.dispose()
-            self._subscription = None
-
         self.metadata_screen.reset()
         self.max_bpm_screen.reset()
 
-        self._provider = None
         self._peripheral_manager = None
         super().reset()

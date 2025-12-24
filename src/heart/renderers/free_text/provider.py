@@ -15,23 +15,24 @@ from heart.renderers.free_text.state import FreeTextRendererState
 
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
-    def __init__(self, peripheral_manager: PeripheralManager) -> None:
-        self._peripheral_manager = peripheral_manager
+    def __init__(self) -> None:
         self._text = BehaviorSubject("Waiting for text...")
         self._font_cache: dict[int, pygame.font.Font] = {}
         self._font_size_max: int = 12
         self._font_size_min: int = 6
         self._initial_font_size: int = 10
 
-    def observable(self) -> reactivex.Observable[FreeTextRendererState]:
-        windows = self._peripheral_manager.window.pipe(
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[FreeTextRendererState]:
+        windows = peripheral_manager.window.pipe(
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
             ops.share(),
         )
 
-        ticks = self._peripheral_manager.game_tick
+        ticks = peripheral_manager.game_tick
 
         def to_state(latest: tuple[object | None, tuple[int, int], str]) -> FreeTextRendererState:
             _, window_size, text = latest

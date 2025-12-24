@@ -2,6 +2,7 @@ import logging
 import time
 
 import pygame
+import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
@@ -22,28 +23,34 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     def __init__(self, provider: SlideTransitionProvider) -> None:
         self.provider = provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        super().__init__()
+        self._initial_state: SlideTransitionState | None = None
+        super().__init__(builder=self.provider)
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> SlideTransitionState:
+    ) -> None:
         self._initialize_children(window, clock, peripheral_manager, orientation)
-        initial_state = self.provider.initial_state(
+        self._initial_state = self.provider.initial_state(
             window=window,
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
-        self.set_state(initial_state)
-        self._subscription = self.provider.observable(
+        super().initialize(window, clock, peripheral_manager, orientation)
+
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[SlideTransitionState]:
+        if self._initial_state is None:
+            raise ValueError("SlideTransitionRenderer requires an initial state")
+        return self.provider.observable(
             peripheral_manager,
-            initial_state=initial_state,
-        ).subscribe(on_next=self.set_state)
-        return initial_state
+            initial_state=self._initial_state,
+        )
 
     def _initialize_children(
         self,

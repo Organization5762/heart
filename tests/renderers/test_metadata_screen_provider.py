@@ -8,7 +8,6 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.metadata_screen import provider as provider_module
 from heart.renderers.metadata_screen.provider import (
     DEFAULT_TIME_BETWEEN_FRAMES_MS, MetadataScreenStateProvider)
@@ -89,10 +88,7 @@ class TestMetadataScreenProviderTransitions:
         """Verify active monitors drive heart state membership so the UI reflects live devices."""
         active_monitors, _, existing_monitors = data
         colors = ["red", "green", "blue"]
-        provider = MetadataScreenStateProvider(
-            peripheral_manager=PeripheralManager(),
-            colors=colors,
-        )
+        provider = MetadataScreenStateProvider(colors=colors)
         heart_states = {
             monitor_id: HeartAnimationState(
                 up=False,
@@ -140,9 +136,7 @@ class TestMetadataScreenProviderTransitions:
     ) -> None:
         """Verify elapsed time toggles heart frames so the visual pulse matches BPM timing."""
         bpm, elapsed_ms, last_update_ms, up, color_index = data
-        provider = MetadataScreenStateProvider(
-            peripheral_manager=PeripheralManager(),
-        )
+        provider = MetadataScreenStateProvider()
         monitor_id = "pulse-1"
         state = MetadataScreenState(
             heart_states={

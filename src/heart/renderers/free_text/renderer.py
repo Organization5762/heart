@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pygame
-from reactivex.disposable import Disposable
+import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -14,37 +14,21 @@ from heart.renderers.free_text.state import FreeTextRendererState
 class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
     """Render the most recent text message that arrived via *PhoneText*."""
 
-    def __init__(self) -> None:
-        self._provider: FreeTextStateProvider | None = None
-        self._subscription: Disposable | None = None
-        super().__init__()
+    def __init__(self, provider: FreeTextStateProvider | None = None) -> None:
+        self._provider = provider or FreeTextStateProvider()
+        super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
-    def reset(self) -> None:
-        if self._subscription is not None:
-            self._subscription.dispose()
-            self._subscription = None
-        super().reset()
-
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> FreeTextRendererState:
-        self._provider = FreeTextStateProvider(peripheral_manager)
-        initial_state = self._provider.initial_state()
-        self.set_state(initial_state)
-        self._subscription = self._provider.observable().subscribe(on_next=self.set_state)
-        return initial_state
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[FreeTextRendererState]:
+        return self._provider.observable(peripheral_manager)
 
     def set_text(self, text: str) -> None:
         if self._provider is not None:
             self._provider.set_text(text)
 
     def _current_font(self, state: FreeTextRendererState) -> pygame.font.Font:
-        assert self._provider is not None
         return self._provider.get_font(state.font_size)
 
     def real_process(

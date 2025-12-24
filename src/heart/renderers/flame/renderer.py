@@ -4,8 +4,8 @@ import numpy as np
 import pygame
 import pygame.surfarray as sarr
 import pygame.transform as pgt
+import reactivex
 from pygame import Surface
-from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -231,31 +231,16 @@ class FlameGenerator:
 class FlameRenderer(StatefulBaseRenderer[FlameState]):
     """Display animated flames on all four sides of the screen."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, provider: FlameStateProvider | None = None) -> None:
+        self._provider = provider or FlameStateProvider()
+        super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self._flame_generator = FlameGenerator(64, 16)
-        self._provider: FlameStateProvider | None = None
-        self._subscription: Disposable | None = None
 
-    def reset(self) -> None:
-        if self._subscription is not None:
-            self._subscription.dispose()
-            self._subscription = None
-        super().reset()
-
-    def _create_initial_state(
-        self,
-        window: Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> FlameState:
-        self._provider = FlameStateProvider(peripheral_manager)
-        initial_state = self._provider.latest_state
-        self.set_state(initial_state)
-        self._subscription = self._provider.observable().subscribe(on_next=self.set_state)
-        return initial_state
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[FlameState]:
+        return self._provider.observable(peripheral_manager)
 
     def real_process(
         self,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.combined_bpm_screen.provider import \
     CombinedBpmScreenStateProvider
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
@@ -31,7 +30,6 @@ class TestCombinedBpmScreenProviderTransitions:
         """Verify elapsed time accumulates when below thresholds so screen phases stay steady."""
         metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = data
         provider = CombinedBpmScreenStateProvider(
-            peripheral_manager=PeripheralManager(),
             metadata_duration_ms=metadata_duration,
             max_bpm_duration_ms=max_bpm_duration,
         )
@@ -54,7 +52,6 @@ class TestCombinedBpmScreenProviderTransitions:
         """Verify exceeding thresholds flips screen phases so render cycles stay predictable."""
         metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = data
         provider = CombinedBpmScreenStateProvider(
-            peripheral_manager=PeripheralManager(),
             metadata_duration_ms=metadata_duration,
             max_bpm_duration_ms=max_bpm_duration,
         )

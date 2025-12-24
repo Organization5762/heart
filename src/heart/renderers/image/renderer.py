@@ -11,15 +11,24 @@ from heart.renderers.image.state import RenderImageState
 class RenderImage(StatefulBaseRenderer[RenderImageState]):
     """Render an image sourced from an asset file or a renderer event stream."""
 
-    def __init__(self, image_file: str) -> None:
-        super().__init__(builder=RenderImageStateProvider(image_file=image_file))
+    def __init__(
+        self,
+        image_file: str | None = None,
+        provider: RenderImageStateProvider | None = None,
+    ) -> None:
+        if provider is None:
+            if image_file is None:
+                raise ValueError("RenderImage requires an image_file or provider")
+            provider = RenderImageStateProvider(image_file=image_file)
+        self._provider = provider
+        super().__init__(builder=self._provider)
         self._scaled_image: pygame.Surface | None = None
         self._scaled_size: tuple[int, int] | None = None
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[RenderImageState]:
-        return self.builder.observable(peripheral_manager=peripheral_manager)
+        return self._provider.observable(peripheral_manager=peripheral_manager)
 
     def real_process(
         self,

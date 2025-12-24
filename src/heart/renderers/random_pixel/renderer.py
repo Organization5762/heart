@@ -19,15 +19,16 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
         num_pixels: int = 1,
         color: Color | None = None,
         brightness: float = 1.0,
+        provider: RandomPixelStateProvider | None = None,
         provider_factory: Callable[..., RandomPixelStateProvider] | None = None,
     ) -> None:
         self.num_pixels = num_pixels
         self.brightness = brightness
         self._initial_color = color
         self._provider_factory = provider_factory or RandomPixelStateProvider
-        self._provider: RandomPixelStateProvider | None = None
+        self._provider: RandomPixelStateProvider | None = provider
 
-        super().__init__()
+        super().__init__(builder=provider)
         self.device_display_mode = DeviceDisplayMode.FULL
 
     def initialize(

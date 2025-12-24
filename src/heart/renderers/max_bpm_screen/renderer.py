@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pygame
+import reactivex
 from pygame import Surface, font, time
-from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
@@ -27,10 +26,10 @@ class MaxBpmScreen(ComposedRenderer):
 
 
 class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, provider: AvatarBpmStateProvider | None = None) -> None:
+        self._provider = provider or AvatarBpmStateProvider()
+        super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self._subscription: Disposable | None = None
 
         self.avatar_images = {}
         for name in AVATAR_MAPPINGS.keys():
@@ -68,23 +67,7 @@ class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
 
         self.display_number(window, state.bpm, window_width // 2, center_y)
 
-    def reset(self) -> None:
-        if self._subscription is not None:
-            self._subscription.dispose()
-            self._subscription = None
-        super().reset()
-
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> AvatarBpmRendererState:
-        provider = AvatarBpmStateProvider(peripheral_manager)
-
-        initial_state = AvatarBpmRendererState.initial()
-        self.set_state(initial_state)
-        self._subscription = provider.observable().subscribe(on_next=self.set_state)
-
-        return initial_state
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[AvatarBpmRendererState]:
+        return self._provider.observable(peripheral_manager)

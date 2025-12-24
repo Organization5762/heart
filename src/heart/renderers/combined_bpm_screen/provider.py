@@ -15,16 +15,16 @@ DEFAULT_MAX_BPM_DURATION_MS = 5000
 class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState]):
     def __init__(
         self,
-        peripheral_manager: PeripheralManager,
         metadata_duration_ms: int = DEFAULT_METADATA_DURATION_MS,
         max_bpm_duration_ms: int = DEFAULT_MAX_BPM_DURATION_MS,
     ) -> None:
-        self._peripheral_manager = peripheral_manager
         self._metadata_duration_ms = metadata_duration_ms
         self._max_bpm_duration_ms = max_bpm_duration_ms
 
-    def observable(self) -> reactivex.Observable[CombinedBpmScreenState]:
-        clocks = self._peripheral_manager.clock.pipe(
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[CombinedBpmScreenState]:
+        clocks = peripheral_manager.clock.pipe(
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -37,7 +37,7 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
             return self._advance_state(state=state, elapsed_ms=clock.get_time())
 
         return (
-            self._peripheral_manager.game_tick.pipe(
+            peripheral_manager.game_tick.pipe(
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

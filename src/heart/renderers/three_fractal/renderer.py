@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
+import reactivex
 from OpenGL.GL import *
 from pygame.math import lerp
 
@@ -817,24 +818,33 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
         self.provider = provider or FractalSceneProvider()
         self.device_display_mode = DeviceDisplayMode.OPENGL
-        super().__init__()
+        self._initial_state: FractalSceneState | None = None
+        super().__init__(builder=self.provider)
         self.warmup = False
         self._peripheral_manager: PeripheralManager | None = None
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> FractalSceneState:
+    ) -> None:
         self._peripheral_manager = peripheral_manager
-        return self.provider.initial_state(
+        self._initial_state = self.provider.initial_state(
             window=window,
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
+        super().initialize(window, clock, peripheral_manager, orientation)
+
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[FractalSceneState]:
+        if self._initial_state is None:
+            raise ValueError("FractalScene requires an initial state")
+        return self.provider.observable(initial_state=self._initial_state)
 
     def real_process(
         self,
@@ -849,4 +859,3 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
             self._peripheral_manager,
             orientation,
         )
-

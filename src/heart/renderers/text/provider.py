@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-import pygame
+from dataclasses import replace
 
-from heart.device import Orientation
+import reactivex
+from reactivex import operators as ops
+
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.text.state import TextRenderingState
 
 
-class TextRenderingProvider:
+class TextRenderingProvider(ObservableProvider[TextRenderingState]):
     def __init__(
         self,
         *,
@@ -26,14 +29,10 @@ class TextRenderingProvider:
         self._x_location = x_location
         self._y_location = y_location
 
-    def build(
-        self,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-    ) -> TextRenderingState:
-        state = TextRenderingState(
+    def observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[TextRenderingState]:
+        initial_state = TextRenderingState(
             switch_state=None,
             text=self._text,
             font_name=self._font_name,
@@ -43,16 +42,17 @@ class TextRenderingProvider:
             y_location=self._y_location,
         )
 
-        def new_switch_state(value):
-            state.switch_state = value
-
-        source = peripheral_manager.get_main_switch_subscription()
-        source.subscribe(
-            on_next=new_switch_state,
-            on_error=lambda e: print("Error Occurred: {0}".format(e)),
+        return peripheral_manager.get_main_switch_subscription().pipe(
+            ops.start_with(None),
+            ops.scan(
+                lambda state, switch_state: replace(
+                    state, switch_state=switch_state
+                ),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
+            ops.share(),
         )
-
-        return state
 
     @classmethod
     def default(cls, text: str) -> "TextRenderingProvider":

@@ -3,6 +3,7 @@ import threading
 import time
 
 import pygame
+import reactivex
 import requests
 
 from heart import DeviceDisplayMode
@@ -63,7 +64,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
             flicker_speed=self.flicker_speed,
             flicker_intensity=self.flicker_intensity,
         )
-        super().__init__()
+        super().__init__(builder=self.provider)
 
         self.device_display_mode = DeviceDisplayMode.FULL
 
@@ -223,13 +224,13 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                     (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
                 )
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: pygame.Surface,
         clock: pygame.time.Clock,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> YoListenState:
+    ) -> None:
         for word in self.words:
             self.ascii_font_sizes[word] = self._calculate_optimal_ascii_font_size(word)
             font = pygame.font.SysFont("Courier New", self.ascii_font_sizes[word])
@@ -241,12 +242,12 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 text_width, _ = font.size(self.ascii_art[word][0])
                 self.word_widths[word] = text_width
 
-        initial_state = self.provider.initial_state()
-        self.set_state(initial_state)
-        self._subscription = self.provider.observable(peripheral_manager).subscribe(
-            on_next=self.set_state
-        )
-        return initial_state
+        super().initialize(window, clock, peripheral_manager, orientation)
+
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[YoListenState]:
+        return self.provider.observable(peripheral_manager)
 
 
 def poll_phyphox():

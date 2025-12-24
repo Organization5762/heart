@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, Iterable
 
-import pygame
+import reactivex
 from pygame import Rect, Surface, draw, time
-from reactivex.disposable import Disposable
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
@@ -22,7 +21,11 @@ logger = get_logger("HeartRateManager")
 
 
 class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
-    def __init__(self, colors: Iterable[str] | None = None) -> None:
+    def __init__(
+        self,
+        colors: Iterable[str] | None = None,
+        provider: MetadataScreenStateProvider | None = None,
+    ) -> None:
         self.colors = list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
 
         self.heart_images: Dict[str, dict[str, Surface]] = {}
@@ -34,12 +37,17 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
             }
 
         self.avatar_images: Dict[str, Surface] = {}
+        from heart.renderers.max_bpm_screen.provider import AVATAR_MAPPINGS
 
-        super().__init__()
+        for name, sensor_id in AVATAR_MAPPINGS.items():
+            try:
+                self.avatar_images[sensor_id] = Loader.load(f"avatars/{name}_16.png")
+            except Exception:
+                logger.warning(f"Could not load avatar for {name}")
+
+        self.provider = provider or MetadataScreenStateProvider(colors=self.colors)
+        super().__init__(builder=self.provider)
         self.device_display_mode = DeviceDisplayMode.FULL
-
-        self._provider: MetadataScreenStateProvider | None = None
-        self._subscription: Disposable | None = None
 
     def display_number(self, window: Surface, number: int, x: int, y: int) -> None:
         my_font = Loader.load_font("Grand9K Pixel.ttf")
@@ -118,36 +126,7 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
                 self.display_number(window, current_bpm, pos_x, pos_y)
                 self.display_battery_status(window, monitor_id, pos_x, pos_y)
 
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> MetadataScreenState:
-        from heart.renderers.max_bpm_screen.provider import AVATAR_MAPPINGS
-
-        for name, sensor_id in AVATAR_MAPPINGS.items():
-            try:
-                self.avatar_images[sensor_id] = Loader.load(f"avatars/{name}_16.png")
-            except Exception:
-                logger.warning(f"Could not load avatar for {name}")
-
-        self._provider = MetadataScreenStateProvider(
-            peripheral_manager=peripheral_manager, colors=self.colors
-        )
-
-        initial_state = MetadataScreenState.initial()
-        self.set_state(initial_state)
-
-        self._subscription = self._provider.observable().subscribe(on_next=self.set_state)
-
-        return initial_state
-
-    def reset(self) -> None:
-        if self._subscription is not None:
-            self._subscription.dispose()
-            self._subscription = None
-
-        self._provider = None
-        super().reset()
+    def state_observable(
+        self, peripheral_manager: PeripheralManager
+    ) -> reactivex.Observable[MetadataScreenState]:
+        return self.provider.observable(peripheral_manager)

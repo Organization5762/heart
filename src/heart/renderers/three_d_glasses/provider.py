@@ -9,18 +9,22 @@ from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 
 
 class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
-    def __init__(self, frame_duration_ms: int = 650) -> None:
+    def __init__(self, frame_duration_ms: int = 650, frame_count: int = 0) -> None:
         if frame_duration_ms <= 0:
             raise ValueError("frame_duration_ms must be positive")
         self._frame_duration_ms = frame_duration_ms
+        self._frame_count = frame_count
 
     def initial_state(self) -> ThreeDGlassesState:
         return ThreeDGlassesState()
 
+    def set_frame_count(self, frame_count: int) -> None:
+        self._frame_count = max(frame_count, 0)
+
     def next_state(
-        self, state: ThreeDGlassesState, *, frame_count: int, elapsed_ms: float
+        self, state: ThreeDGlassesState, *, elapsed_ms: float
     ) -> ThreeDGlassesState:
-        if frame_count == 0:
+        if self._frame_count == 0:
             return state
 
         total_elapsed = state.elapsed_ms + elapsed_ms
@@ -28,7 +32,7 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
 
         if total_elapsed >= self._frame_duration_ms:
             total_elapsed %= self._frame_duration_ms
-            index = (index + 1) % frame_count
+            index = (index + 1) % self._frame_count
 
         return ThreeDGlassesState(current_index=index, elapsed_ms=total_elapsed)
 
@@ -36,7 +40,6 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         self,
         peripheral_manager: PeripheralManager,
         *,
-        frame_count: int,
         initial_state: ThreeDGlassesState,
     ) -> reactivex.Observable[ThreeDGlassesState]:
         clocks = peripheral_manager.clock.pipe(
@@ -50,7 +53,6 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
             ops.map(
                 lambda latest: lambda state: self.next_state(
                     state,
-                    frame_count=frame_count,
                     elapsed_ms=float(latest[1].get_time()),
                 )
             ),
