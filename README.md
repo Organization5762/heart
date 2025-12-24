@@ -48,6 +48,7 @@ See the following references for deeper analysis:
 - [docs/runtime_overview.md](docs/runtime_overview.md) for loop orchestration details.
 - [docs/code_flow.md](docs/code_flow.md) for a diagram of launch and render paths.
 - [docs/program_configuration.md](docs/program_configuration.md) for playlist authoring guidance.
+- [docs/developer_experience.md](docs/developer_experience.md) for the devex snapshot workflow.
 
 ## Hardware Integration
 - `LEDMatrix` streams frames to the RGB matrix when `HEART_USE_ISOLATED_RENDERER=1`.
@@ -60,6 +61,7 @@ See the following references for deeper analysis:
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.
+- `make doctor` captures a developer experience snapshot for troubleshooting.
 
 The repository layout is summarised below:
 ```

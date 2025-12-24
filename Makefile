@@ -3,7 +3,7 @@ DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
-.PHONY: install pi_install format check test build check-harness build-info
+.PHONY: install pi_install format check test build check-harness build-info doctor
 
 install:
 	@uv sync --all-extras --group dev
@@ -38,6 +38,9 @@ build-info:
 
 check-harness:
 	@bash scripts/check_harness.sh
+
+doctor:
+	@uv run python scripts/devex_snapshot.py
 
 pi_install:
 	@sudo bash src/heart/manage/install_rgb_matrix.sh
