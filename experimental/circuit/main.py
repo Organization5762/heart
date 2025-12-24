@@ -305,7 +305,7 @@ class Hub75DriverBoard:
         self.assemble()
         ERC()
         generate_netlist(tool=KICAD8)
-        print("Netlist written as hub75_fpga_driver.net")
+        logger.info("Netlist written as hub75_fpga_driver.net")
 
 
 class FPGAPinAllocator:
