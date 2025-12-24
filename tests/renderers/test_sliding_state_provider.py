@@ -56,7 +56,7 @@ class TestSlidingStateProviderTransitions:
     def test_advance_state_uses_expected_width(self, spec: _ProviderSpec, data) -> None:
         """Verify window width drives offsets so scrolling remains predictable."""
         offset, speed, state_width, window_width = data
-        provider = spec.provider_cls(speed=speed)
+        provider = spec.provider_cls()
         state = spec.build_state(offset=offset, speed=speed, width=state_width)
         expected_width = window_width
 
@@ -74,7 +74,7 @@ class TestSlidingStateProviderTransitions:
     def test_reset_state_clears_offset(self, spec: _ProviderSpec, data) -> None:
         """Verify resets zero the offset so replays start at the leading edge reliably."""
         offset, speed, width = data
-        provider = spec.provider_cls(speed=speed)
+        provider = spec.provider_cls()
         state = spec.build_state(offset=offset, speed=speed, width=width)
 
         result = provider.reset_state(state)
