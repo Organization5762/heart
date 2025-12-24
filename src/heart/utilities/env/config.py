@@ -2,14 +2,16 @@ import os
 import platform
 import re
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cache
-from pathlib import Path
-from typing import Iterator
-
-import serial.tools.list_ports
 
 from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
+from heart.utilities.env.enums import (DeviceLayoutMode, FrameArrayStrategy,
+                                       LifeUpdateStrategy,
+                                       ReactivexEventBusScheduler,
+                                       ReactivexStreamConnectMode,
+                                       ReactivexStreamShareStrategy,
+                                       RenderMergeStrategy, RenderTileStrategy,
+                                       SpritesheetFrameCacheStrategy)
 
 TRUE_FLAG_VALUES = {"true", "1", "yes", "on"}
 
@@ -23,9 +25,7 @@ def _env_flag(env_var: str, *, default: bool = False) -> bool:
     return value.strip().lower() in TRUE_FLAG_VALUES
 
 
-def _env_int(
-    env_var: str, *, default: int, minimum: int | None = None
-) -> int:
+def _env_int(env_var: str, *, default: int, minimum: int | None = None) -> int:
     """Return the integer value of ``env_var`` with optional bounds checking."""
 
     value = os.environ.get(env_var)
@@ -76,10 +76,10 @@ class Configuration:
             model = raw.decode("ascii", errors="ignore").rstrip("\x00\n")
 
             # Match “Raspberry Pi X” and capture X
-            m = re.search(r"Raspberry Pi (\d+)", model)
-            if not m:
+            match = re.search(r"Raspberry Pi (\d+)", model)
+            if not match:
                 raise ValueError(f"Couldn't parse Pi model from {model!r}")
-            return Pi(version=int(m.group(1)))
+            return Pi(version=int(match.group(1)))
 
     @classmethod
     def is_profiling_mode(cls) -> bool:
@@ -110,7 +110,7 @@ class Configuration:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")
 
     @classmethod
-    def device_layout_mode(cls) -> "DeviceLayoutMode":
+    def device_layout_mode(cls) -> DeviceLayoutMode:
         raw = os.environ.get("HEART_DEVICE_LAYOUT", "cube").strip().lower()
         try:
             return DeviceLayoutMode(raw)
@@ -144,7 +144,7 @@ class Configuration:
         return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
-    def reactivex_event_bus_scheduler(cls) -> "ReactivexEventBusScheduler":
+    def reactivex_event_bus_scheduler(cls) -> ReactivexEventBusScheduler:
         scheduler = os.environ.get("HEART_RX_EVENT_BUS_SCHEDULER", "inline").strip().lower()
         try:
             return ReactivexEventBusScheduler(scheduler)
@@ -154,7 +154,7 @@ class Configuration:
             ) from exc
 
     @classmethod
-    def reactivex_stream_share_strategy(cls) -> "ReactivexStreamShareStrategy":
+    def reactivex_stream_share_strategy(cls) -> ReactivexStreamShareStrategy:
         strategy = os.environ.get(
             "HEART_RX_STREAM_SHARE_STRATEGY",
             "replay_latest",
@@ -206,7 +206,7 @@ class Configuration:
         )
 
     @classmethod
-    def reactivex_stream_connect_mode(cls) -> "ReactivexStreamConnectMode":
+    def reactivex_stream_connect_mode(cls) -> ReactivexStreamConnectMode:
         mode = os.environ.get("HEART_RX_STREAM_CONNECT_MODE", "lazy").strip().lower()
         try:
             return ReactivexStreamConnectMode(mode)
@@ -288,7 +288,7 @@ class Configuration:
         return _env_flag("HEART_RENDER_SURFACE_CACHE", default=True)
 
     @classmethod
-    def spritesheet_frame_cache_strategy(cls) -> "SpritesheetFrameCacheStrategy":
+    def spritesheet_frame_cache_strategy(cls) -> SpritesheetFrameCacheStrategy:
         strategy = os.environ.get(
             "HEART_SPRITESHEET_FRAME_CACHE_STRATEGY", "scaled"
         ).strip().lower()
@@ -304,7 +304,7 @@ class Configuration:
         return _env_flag("HEART_RENDER_SCREEN_CACHE", default=True)
 
     @classmethod
-    def render_tile_strategy(cls) -> "RenderTileStrategy":
+    def render_tile_strategy(cls) -> RenderTileStrategy:
         strategy = os.environ.get("HEART_RENDER_TILE_STRATEGY", "blits").strip().lower()
         try:
             return RenderTileStrategy(strategy)
@@ -314,7 +314,7 @@ class Configuration:
             ) from exc
 
     @classmethod
-    def render_merge_strategy(cls) -> "RenderMergeStrategy":
+    def render_merge_strategy(cls) -> RenderMergeStrategy:
         strategy = os.environ.get(
             "HEART_RENDER_MERGE_STRATEGY", "batched"
         ).strip().lower()
@@ -326,7 +326,7 @@ class Configuration:
             ) from exc
 
     @classmethod
-    def frame_array_strategy(cls) -> "FrameArrayStrategy":
+    def frame_array_strategy(cls) -> FrameArrayStrategy:
         strategy = os.environ.get("HEART_FRAME_ARRAY_STRATEGY", "copy").strip().lower()
         try:
             return FrameArrayStrategy(strategy)
@@ -336,7 +336,7 @@ class Configuration:
             ) from exc
 
     @classmethod
-    def life_update_strategy(cls) -> "LifeUpdateStrategy":
+    def life_update_strategy(cls) -> LifeUpdateStrategy:
         strategy = os.environ.get("HEART_LIFE_UPDATE_STRATEGY", "auto").strip().lower()
         try:
             return LifeUpdateStrategy(strategy)
@@ -345,91 +345,3 @@ class Configuration:
                 "HEART_LIFE_UPDATE_STRATEGY must be 'auto', 'convolve', or 'pad'"
             ) from exc
 
-
-class RenderTileStrategy(StrEnum):
-    BLITS = "blits"
-    LOOP = "loop"
-
-
-class RenderMergeStrategy(StrEnum):
-    IN_PLACE = "in_place"
-    BATCHED = "batched"
-
-
-class FrameArrayStrategy(StrEnum):
-    COPY = "copy"
-    VIEW = "view"
-
-
-class SpritesheetFrameCacheStrategy(StrEnum):
-    NONE = "none"
-    FRAMES = "frames"
-    SCALED = "scaled"
-
-
-class LifeUpdateStrategy(StrEnum):
-    AUTO = "auto"
-    CONVOLVE = "convolve"
-    PAD = "pad"
-
-
-class DeviceLayoutMode(StrEnum):
-    CUBE = "cube"
-    RECTANGLE = "rectangle"
-
-
-class ReactivexEventBusScheduler(StrEnum):
-    INLINE = "inline"
-    BACKGROUND = "background"
-    INPUT = "input"
-
-
-class ReactivexStreamShareStrategy(StrEnum):
-    SHARE = "share"
-    SHARE_AUTO_CONNECT = "share_auto_connect"
-    REPLAY_LATEST = "replay_latest"
-    REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
-    REPLAY_BUFFER = "replay_buffer"
-    REPLAY_BUFFER_AUTO_CONNECT = "replay_buffer_auto_connect"
-
-
-class ReactivexStreamConnectMode(StrEnum):
-    LAZY = "lazy"
-    EAGER = "eager"
-
-
-def get_device_ports(prefix: str) -> Iterator[str]:
-    base_port = Path("/dev/serial/by-id")
-
-    directory_matches = tuple(_iter_directory_ports(base_port, prefix))
-    if directory_matches:
-        yield from directory_matches
-        return
-
-    # Fallback for macOS and other platforms
-    if platform.system() == "Darwin":  # macOS
-        yield from _iter_serial_ports(prefix)
-
-
-def _iter_directory_ports(base_port: Path, prefix: str) -> Iterator[str]:
-    """Yield ports in ``base_port`` whose names begin with ``prefix``."""
-
-    try:
-        if not base_port.exists():
-            return
-        for entry in base_port.iterdir():
-            if entry.name.startswith(prefix):
-                yield str(entry)
-    except (FileNotFoundError, PermissionError):
-        return
-
-
-def _iter_serial_ports(prefix: str) -> Iterator[str]:
-    """Yield serial devices whose metadata contains ``prefix``."""
-
-    lower_prefix = prefix.lower()
-    for port in serial.tools.list_ports.comports():
-        port_name = Path(port.device).name
-        description = getattr(port, "description", "")
-        if lower_prefix in description.lower() or lower_prefix in port_name.lower():
-            yield port.device
