@@ -162,6 +162,13 @@ class TestUtilitiesEnv:
         assert Configuration.render_executor_max_workers() == 3
 
 
+    def test_render_merge_strategy_defaults_to_blits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify that render merge strategy defaults to blits. This keeps multi-renderer compositing efficient without extra tuning."""
+        _clear_env(monkeypatch, "HEART_RENDER_MERGE_STRATEGY")
+
+        assert Configuration.render_merge_strategy() == "blits"
+
+
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
         fake_entries = ["ttyHeart-123", "other"]

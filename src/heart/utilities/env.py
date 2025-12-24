@@ -201,6 +201,15 @@ class Configuration:
         )
 
     @classmethod
+    def render_merge_strategy(cls) -> str:
+        strategy = os.environ.get("HEART_RENDER_MERGE_STRATEGY", "blits").strip().lower()
+        if strategy in {"blits", "loop"}:
+            return strategy
+        raise ValueError(
+            "HEART_RENDER_MERGE_STRATEGY must be 'blits' or 'loop'"
+        )
+
+    @classmethod
     def frame_array_strategy(cls) -> str:
         strategy = os.environ.get("HEART_FRAME_ARRAY_STRATEGY", "copy").strip().lower()
         if strategy in {"copy", "view"}:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pygame
 import pytest
 
 from heart.environment import (HSV_TO_BGR_CACHE, RendererVariant,
@@ -175,23 +176,21 @@ class TestEnvironmentCoreLogic:
     def test_render_surface_iterative_skips_missing(self, loop, monkeypatch) -> None:
         """Verify that _render_surface_iterative skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
         renderers = ["r1", "r2", "r3"]
-        responses = {"r1": "surface-1", "r2": None, "r3": "surface-3"}
-        merges: list[tuple[str, str]] = []
+        surface_1 = pygame.Surface((2, 2), pygame.SRCALPHA)
+        surface_1.fill((255, 0, 0, 255))
+        surface_3 = pygame.Surface((2, 2), pygame.SRCALPHA)
+        surface_3.fill((0, 255, 0, 255))
+        responses = {"r1": surface_1, "r2": None, "r3": surface_3}
 
-        def fake_process(renderer: str) -> str | None:
+        def fake_process(renderer: str) -> pygame.Surface | None:
             return responses[renderer]
 
-        def fake_merge(surface1: str, surface2: str) -> str:
-            merges.append((surface1, surface2))
-            return f"merge({surface1},{surface2})"
-
         monkeypatch.setattr(loop, "process_renderer", fake_process)
-        monkeypatch.setattr(loop, "merge_surfaces", fake_merge)
 
         result = loop._render_surface_iterative(renderers)
 
-        assert result == "merge(surface-1,surface-3)"
-        assert merges == [("surface-1", "surface-3")]
+        assert result is surface_1
+        assert result.get_at((0, 0)) == surface_3.get_at((0, 0))
 
 
     def test_render_fn_selects_renderer(self, loop) -> None:
