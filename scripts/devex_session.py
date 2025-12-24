@@ -10,9 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from heart.utilities.logging import get_logger
+
 
 WATCH_SUFFIXES = {".py", ".toml", ".yaml", ".yml", ".json"}
 SKIP_DIRS = {".git", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache"}
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -118,12 +121,12 @@ def run_session(config: SessionConfig, repo_root: Path) -> int:
 
     command = build_command(config)
     env = prepare_env(config)
-    print("Developer session starting...")
-    print(f"Command: {' '.join(command)}")
+    logger.info("Developer session starting...")
+    logger.info("Command: %s", " ".join(command))
     if config.watch:
-        print("Watch paths:")
+        logger.info("Watch paths:")
         for path in config.watch_paths:
-            print(f"  - {path}")
+            logger.info("  - %s", path)
 
     state = SessionState(
         snapshot=snapshot_paths(config.watch_paths, repo_root),
@@ -138,7 +141,7 @@ def run_session(config: SessionConfig, repo_root: Path) -> int:
         while process.poll() is None:
             time.sleep(config.poll_interval)
             if has_changes(state, config, repo_root):
-                print("\nChange detected. Restarting the runtime...")
+                logger.info("Change detected. Restarting the runtime...")
                 process.terminate()
                 try:
                     process.wait(timeout=5)

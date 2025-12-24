@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class FocusTargets:
@@ -116,7 +119,7 @@ def run_command(command: list[str], repo_root: Path) -> int:
     """Run a subprocess command and return the exit code."""
 
     display = " ".join(command)
-    print(f"\n> {display}")
+    logger.info("> %s", display)
     result = subprocess.run(command, check=False, cwd=repo_root)
     return result.returncode
 
@@ -185,12 +188,12 @@ def run_tests(
 
     exit_codes: list[int] = []
     if test_scope == "none":
-        print("\n> Skipping tests (--test-scope none)")
+        logger.info("> Skipping tests (--test-scope none)")
         return exit_codes
 
     if test_scope == "changed":
         if not targets.test_files:
-            print("\n> No changed tests detected")
+            logger.info("> No changed tests detected")
             return exit_codes
         test_args = [str(path.relative_to(repo_root)) for path in targets.test_files]
         exit_codes.append(run_command(["uv", "run", "pytest", *test_args], repo_root))
@@ -205,7 +208,7 @@ def run_tests(
         if last_failed.exists():
             exit_codes.append(run_command(["uv", "run", "pytest", "--lf"], repo_root))
         else:
-            print("\n> No changed tests or last-failed cache found")
+            logger.info("> No changed tests or last-failed cache found")
         return exit_codes
 
     if test_scope == "all":
@@ -225,13 +228,13 @@ def run_focus(
 
     targets = collect_focus_targets(repo_root, base)
     if not targets.has_targets:
-        print("No matching files found for focus checks.")
+        logger.info("No matching files found for focus checks.")
         return 0
 
-    print("Focus targets:")
-    print(f"  Python files: {len(targets.python_files)}")
-    print(f"  Docs files: {len(targets.doc_files)}")
-    print(f"  Test files: {len(targets.test_files)}")
+    logger.info("Focus targets:")
+    logger.info("  Python files: %s", len(targets.python_files))
+    logger.info("  Docs files: %s", len(targets.doc_files))
+    logger.info("  Test files: %s", len(targets.test_files))
 
     exit_codes: list[int] = []
     exit_codes.extend(run_formatting(targets, repo_root, mode))

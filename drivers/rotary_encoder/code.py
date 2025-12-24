@@ -13,6 +13,12 @@ IDENTITY = identity.Identity(
     firmware_commit=identity.default_firmware_commit(),
     device_id=identity.persistent_device_id(),
 )
+DEBUG = False
+
+
+def _debug(message: str) -> None:
+    if DEBUG:
+        print(message)
 
 
 def respond_to_identify_query(*, stdin=None, print_fn=print) -> bool:
@@ -54,7 +60,7 @@ def main() -> None:  # pragma: no cover - exercised on hardware
     while True:
         respond_to_identify_query()
         for event in read_events(handler):
-            print(event)
+            _debug(event)
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised on hardware
