@@ -103,14 +103,11 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
 
         screen_width, screen_height = window.get_size()
         current_kf = self.provider.frames[state.phase][state.current_frame]
-        image = spritesheet.image_at(current_kf.frame)
-        scaled = pygame.transform.scale(
-            image,
-            (
-                int(screen_width * self.provider.image_scale),
-                int(screen_height * self.provider.image_scale),
-            ),
+        target_size = (
+            int(screen_width * self.provider.image_scale),
+            int(screen_height * self.provider.image_scale),
         )
+        scaled = spritesheet.image_at(current_kf.frame, scale_to=target_size)
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2
 

@@ -238,6 +238,19 @@ class Configuration:
             ) from exc
 
     @classmethod
+    def spritesheet_frame_cache_strategy(cls) -> "SpritesheetFrameCacheStrategy":
+        strategy = os.environ.get(
+            "HEART_SPRITESHEET_FRAME_CACHE_STRATEGY",
+            "scaled",
+        ).strip().lower()
+        try:
+            return SpritesheetFrameCacheStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_SPRITESHEET_FRAME_CACHE_STRATEGY must be 'off', 'raw', or 'scaled'"
+            ) from exc
+
+    @classmethod
     def life_update_strategy(cls) -> "LifeUpdateStrategy":
         strategy = os.environ.get("HEART_LIFE_UPDATE_STRATEGY", "auto").strip().lower()
         try:
@@ -256,6 +269,12 @@ class RenderTileStrategy(StrEnum):
 class FrameArrayStrategy(StrEnum):
     COPY = "copy"
     VIEW = "view"
+
+
+class SpritesheetFrameCacheStrategy(StrEnum):
+    OFF = "off"
+    RAW = "raw"
+    SCALED = "scaled"
 
 
 class LifeUpdateStrategy(StrEnum):

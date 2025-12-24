@@ -6,6 +6,8 @@ from typing import Any
 
 import pygame
 
+from heart.utilities.env import Configuration, SpritesheetFrameCacheStrategy
+
 
 class Loader:
     @classmethod
@@ -58,15 +60,48 @@ class spritesheet(object):
 
         with open(filename, "rb") as f:
             self.sheet = pygame.image.load(f).convert_alpha()
+        self._cache_strategy = Configuration.spritesheet_frame_cache_strategy()
+        self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
+        self._scaled_cache: dict[
+            tuple[int, int, int, int, int, int], pygame.Surface
+        ] = {}
 
     def get_size(self):
         return self.sheet.get_size()
 
-    def image_at(self, rectangle):
+    def image_at(
+        self,
+        rectangle,
+        *,
+        scale_to: tuple[int, int] | None = None,
+    ) -> pygame.Surface:
         rect = pygame.Rect(rectangle)
-        image = pygame.Surface(rect.size, pygame.SRCALPHA)
-        image.blit(self.sheet, (0, 0), rect)
-        return image
+        cache_key = (rect.x, rect.y, rect.w, rect.h)
+
+        image: pygame.Surface
+        if self._cache_strategy == SpritesheetFrameCacheStrategy.OFF:
+            image = pygame.Surface(rect.size, pygame.SRCALPHA)
+            image.blit(self.sheet, (0, 0), rect)
+        else:
+            cached = self._frame_cache.get(cache_key)
+            if cached is None:
+                cached = pygame.Surface(rect.size, pygame.SRCALPHA)
+                cached.blit(self.sheet, (0, 0), rect)
+                self._frame_cache[cache_key] = cached
+            image = cached
+
+        if scale_to is None or scale_to == image.get_size():
+            return image
+
+        if self._cache_strategy == SpritesheetFrameCacheStrategy.SCALED:
+            scale_key = (*cache_key, scale_to[0], scale_to[1])
+            cached_scaled = self._scaled_cache.get(scale_key)
+            if cached_scaled is None:
+                cached_scaled = pygame.transform.scale(image, scale_to)
+                self._scaled_cache[scale_key] = cached_scaled
+            return cached_scaled
+
+        return pygame.transform.scale(image, scale_to)
 
     def images_at(self, rects):
         "Loads multiple images, supply a list of coordinates"

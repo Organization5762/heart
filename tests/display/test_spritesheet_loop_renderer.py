@@ -18,9 +18,15 @@ class _StubSpritesheet:
     def get_size(self) -> tuple[int, int]:
         return (192, 64)
 
-    def image_at(self, rect: tuple[int, int, int, int]) -> pygame.Surface:
+    def image_at(
+        self,
+        rect: tuple[int, int, int, int],
+        *,
+        scale_to: tuple[int, int] | None = None,
+    ) -> pygame.Surface:
         self.calls.append(rect)
-        surface = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+        size = scale_to or (rect[2], rect[3])
+        surface = pygame.Surface(size, pygame.SRCALPHA)
         surface.fill((255, 0, 0, 255))
         return surface
 
