@@ -70,16 +70,22 @@ class LifeState:
         return _count_neighbors_shifted(self.grid, self._ensure_neighbor_buffer())
 
     def _convolve_neighbors(self, kernel: np.ndarray) -> np.ndarray:
-        neighbors = self._ensure_neighbor_buffer()
+        neighbors = self._ensure_neighbor_buffer(
+            dtype=np.result_type(self.grid, kernel)
+        )
         convolve(self.grid, kernel, mode="constant", cval=0, output=neighbors)
         return neighbors
 
-    def _ensure_neighbor_buffer(self) -> np.ndarray:
+    def _ensure_neighbor_buffer(self, dtype: np.dtype | None = None) -> np.ndarray:
+        if dtype is None:
+            dtype = np.result_type(self.grid, np.int16)
+        dtype = np.dtype(dtype)
         if (
             self.neighbor_buffer is None
             or self.neighbor_buffer.shape != self.grid.shape
+            or self.neighbor_buffer.dtype != dtype
         ):
-            self.neighbor_buffer = np.zeros(self.grid.shape, dtype=np.int16)
+            self.neighbor_buffer = np.zeros(self.grid.shape, dtype=dtype)
         else:
             self.neighbor_buffer.fill(0)
         return self.neighbor_buffer
