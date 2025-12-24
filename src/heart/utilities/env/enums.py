@@ -26,6 +26,7 @@ class LifeUpdateStrategy(StrEnum):
     AUTO = "auto"
     CONVOLVE = "convolve"
     PAD = "pad"
+    SHIFTED = "shifted"
 
 
 class DeviceLayoutMode(StrEnum):
