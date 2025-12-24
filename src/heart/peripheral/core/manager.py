@@ -3,6 +3,7 @@ from typing import Any, Iterable, TypeVar
 
 import reactivex
 from reactivex import operators as ops
+from reactivex.abc import SchedulerBase
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -12,11 +13,14 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import (background_scheduler,
+                                               input_scheduler)
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
 R = TypeVar("R")
+
 
 class PeripheralManager:
     """Coordinate detection and execution of available peripherals."""
@@ -40,7 +44,6 @@ class PeripheralManager:
     @property
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
         return tuple(self._peripherals)
-
 
     def get_gamepad(self) -> Gamepad:
         """Return the first detected gamepad."""
@@ -90,13 +93,16 @@ class PeripheralManager:
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
 
-    ###
-    # New
-    ###
     def get_event_bus(self) -> reactivex.Observable[Any]:
-        return reactivex.merge(
-            *[peripheral.observe for peripheral in self.peripherals]
-        )
+        event_sources = [peripheral.observe for peripheral in self.peripherals]
+        if not event_sources:
+            event_bus = reactivex.empty()
+        else:
+            event_bus = reactivex.merge(*event_sources)
+        scheduler = self._event_bus_scheduler()
+        if scheduler is not None:
+            event_bus = event_bus.pipe(ops.observe_on(scheduler))
+        return event_bus.pipe(ops.share())
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [
@@ -104,6 +110,9 @@ class PeripheralManager:
             for peripheral in self.peripherals
             if isinstance(peripheral, FakeSwitch)
         ]
+
+        if not main_switches:
+            return reactivex.empty()
 
         return reactivex.merge(*main_switches).pipe(
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
@@ -120,3 +129,12 @@ class PeripheralManager:
     @cached_property
     def clock(self) -> reactivex.Subject[Any]:
         return BehaviorSubject[Any](None)
+
+    @staticmethod
+    def _event_bus_scheduler() -> SchedulerBase | None:
+        strategy = Configuration.reactivex_event_bus_scheduler()
+        if strategy == "background":
+            return background_scheduler()
+        if strategy == "input":
+            return input_scheduler()
+        return None

@@ -162,6 +162,25 @@ class TestUtilitiesEnv:
         assert Configuration.render_executor_max_workers() == 3
 
 
+    def test_reactivex_event_bus_scheduler_defaults_inline(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the event bus scheduler defaults to inline so delivery stays predictable by default."""
+        _clear_env(monkeypatch, "HEART_RX_EVENT_BUS_SCHEDULER")
+
+        assert Configuration.reactivex_event_bus_scheduler() == "inline"
+
+
+    def test_reactivex_event_bus_scheduler_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify invalid event bus scheduler values fail fast to keep configuration errors visible."""
+        monkeypatch.setenv("HEART_RX_EVENT_BUS_SCHEDULER", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.reactivex_event_bus_scheduler()
+
+
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
         fake_entries = ["ttyHeart-123", "other"]

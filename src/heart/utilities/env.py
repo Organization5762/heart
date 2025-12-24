@@ -116,6 +116,15 @@ class Configuration:
         return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
+    def reactivex_event_bus_scheduler(cls) -> str:
+        scheduler = os.environ.get("HEART_RX_EVENT_BUS_SCHEDULER", "inline").strip().lower()
+        if scheduler in {"inline", "background", "input"}:
+            return scheduler
+        raise ValueError(
+            "HEART_RX_EVENT_BUS_SCHEDULER must be 'inline', 'background', or 'input'"
+        )
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":
