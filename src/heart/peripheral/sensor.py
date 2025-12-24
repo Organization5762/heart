@@ -11,7 +11,7 @@ import serial
 from reactivex import operators as ops
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.input_payloads import AccelerometerVector
+from heart.peripheral.input_payloads.motion import AccelerometerVector
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller

@@ -12,7 +12,7 @@ from typing import Any, Self, cast
 import numpy as np
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.input_payloads import MicrophoneLevel
+from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
