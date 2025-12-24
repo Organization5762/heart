@@ -45,8 +45,9 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         if spritesheet is None:
             return
 
-        image = spritesheet.image_at(current_kf.frame)
-        scaled = pygame.transform.scale(image, (self.screen_width, self.screen_height))
+        scaled = spritesheet.image_at_scaled(
+            current_kf.frame, (self.screen_width, self.screen_height)
+        )
         window.blit(scaled, (state.current_screen * self.screen_width, 0))
 
     def state_observable(
