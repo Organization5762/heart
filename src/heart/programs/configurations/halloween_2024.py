@@ -1,6 +1,6 @@
 from heart.display.color import Color
 from heart.environment import GameLoop
-from heart.modules.life.renderer import Life
+from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.pacman import PacmanGhostRenderer
 from heart.renderers.pixels import Border
