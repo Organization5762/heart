@@ -7,7 +7,7 @@ Reduce the per-frame cost of the Game of Life update while keeping the rules ide
 ## Materials
 
 - Python environment with `numpy` and `scipy` installed.
-- `heart.modules.life.state.LifeState` for the update loop.
+- `heart.renderers.modules.life.state.LifeState` for the update loop.
 - `heart.utilities.env.Configuration` for environment-driven settings.
 
 ## Update Strategy Options
