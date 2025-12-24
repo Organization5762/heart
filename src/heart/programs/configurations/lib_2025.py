@@ -5,7 +5,12 @@ from lagom import Singleton
 
 from heart.display.color import Color
 from heart.environment import GameLoop
+from heart.modules.life.renderer import Life
+from heart.modules.mario.provider import MarioRendererProvider
+from heart.modules.mario.renderer import MarioRenderer
+from heart.modules.water_cube.renderer import WaterCube
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.renderers.artist import ArtistScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.renderers.heart_title_screen import HeartTitleScreen
@@ -14,12 +19,6 @@ from heart.renderers.image import RenderImage
 from heart.renderers.kirby import KirbyScene
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
-from heart.renderers.modules.devices.acceleration.provider import \
-    AllAccelerometersProvider
-from heart.renderers.modules.life.renderer import Life
-from heart.renderers.modules.mario.provider import MarioRendererProvider
-from heart.renderers.modules.mario.renderer import MarioRenderer
-from heart.renderers.modules.water_cube.renderer import WaterCube
 from heart.renderers.multicolor import (MulticolorRenderer,
                                         MulticolorStateProvider)
 from heart.renderers.random_pixel import RandomPixel
