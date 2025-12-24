@@ -18,7 +18,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterator, Mapping, Self
+from typing import Any, Iterator, Mapping, Self, cast
 
 import reactivex
 from reactivex import operators as ops
@@ -102,12 +102,16 @@ class DrawingPad(Peripheral[Any]):
         if event_bus is None:
             raise ValueError("event_bus is required to describe DrawingPad inputs")
         stroke_stream = event_bus.pipe(
-            ops.filter(lambda event: event.event_type == "drawing_pad.stroke"),
-            ops.map(lambda event: event.data),
+            ops.filter(
+                lambda event: cast(Input, event).event_type == "drawing_pad.stroke"
+            ),
+            ops.map(lambda event: cast(Input, event).data),
         )
         erase_stream = event_bus.pipe(
-            ops.filter(lambda event: event.event_type == "drawing_pad.erase"),
-            ops.map(lambda event: event.data),
+            ops.filter(
+                lambda event: cast(Input, event).event_type == "drawing_pad.erase"
+            ),
+            ops.map(lambda event: cast(Input, event).data),
         )
         return (
             InputDescriptor(
