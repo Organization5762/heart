@@ -136,7 +136,8 @@ class Configuration:
             return ReactivexStreamShareStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', "
+                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', "
+                "'share_auto_connect', 'replay_latest', "
                 "'replay_latest_auto_connect', 'replay_buffer', or "
                 "'replay_buffer_auto_connect'"
             ) from exc
@@ -323,6 +324,7 @@ class ReactivexEventBusScheduler(StrEnum):
 
 class ReactivexStreamShareStrategy(StrEnum):
     SHARE = "share"
+    SHARE_AUTO_CONNECT = "share_auto_connect"
     REPLAY_LATEST = "replay_latest"
     REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
     REPLAY_BUFFER = "replay_buffer"

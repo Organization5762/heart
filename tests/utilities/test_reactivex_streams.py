@@ -15,11 +15,13 @@ class TestShareStreamStrategy:
         ("strategy", "expected_initial"),
         [
             ("share", []),
+            ("share_auto_connect", []),
             ("replay_latest", [2]),
             ("replay_latest_auto_connect", [2]),
         ],
         ids=[
             "share_no_replay",
+            "share_auto_connect_no_replay",
             "replay_latest_replays_last",
             "replay_latest_auto_connect_replays_last",
         ],
@@ -52,15 +54,23 @@ class TestShareStreamStrategy:
         assert received_a == [1, 2, 3]
         assert received_b == [*expected_initial, 3]
 
+    @pytest.mark.parametrize(
+        ("strategy", "expected_second_subscriber"),
+        [
+            ("replay_latest_auto_connect", [1]),
+            ("share_auto_connect", []),
+        ],
+        ids=["replay_latest_auto_connect_replays", "share_auto_connect_no_replay"],
+    )
     def test_share_stream_auto_connect_avoids_resubscribe(
         self,
         monkeypatch: pytest.MonkeyPatch,
+        strategy: str,
+        expected_second_subscriber: list[int],
     ) -> None:
         """Verify auto-connect keeps a single subscription to reduce churn and preserve hot stream state."""
 
-        monkeypatch.setenv(
-            "HEART_RX_STREAM_SHARE_STRATEGY", "replay_latest_auto_connect"
-        )
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", strategy)
         subscribe_count = 0
 
         def _subscribe(observer, scheduler=None):
@@ -81,7 +91,7 @@ class TestShareStreamStrategy:
 
         assert subscribe_count == 1
         assert received_a == [1]
-        assert received_b == [1]
+        assert received_b == expected_second_subscriber
 
     def test_share_stream_replays_buffer_when_configured(
         self,
