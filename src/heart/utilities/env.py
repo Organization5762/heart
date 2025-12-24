@@ -117,25 +117,27 @@ class Configuration:
         return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
-    def reactivex_event_bus_scheduler(cls) -> str:
+    def reactivex_event_bus_scheduler(cls) -> "ReactivexEventBusScheduler":
         scheduler = os.environ.get("HEART_RX_EVENT_BUS_SCHEDULER", "inline").strip().lower()
-        if scheduler in {"inline", "background", "input"}:
-            return scheduler
-        raise ValueError(
-            "HEART_RX_EVENT_BUS_SCHEDULER must be 'inline', 'background', or 'input'"
-        )
+        try:
+            return ReactivexEventBusScheduler(scheduler)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RX_EVENT_BUS_SCHEDULER must be 'inline', 'background', or 'input'"
+            ) from exc
 
     @classmethod
-    def reactivex_stream_share_strategy(cls) -> str:
+    def reactivex_stream_share_strategy(cls) -> "ReactivexStreamShareStrategy":
         strategy = os.environ.get(
             "HEART_RX_STREAM_SHARE_STRATEGY",
             "replay_latest",
         ).strip().lower()
-        if strategy in {"share", "replay_latest", "replay_buffer"}:
-            return strategy
-        raise ValueError(
-            "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', or 'replay_buffer'"
-        )
+        try:
+            return ReactivexStreamShareStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', or 'replay_buffer'"
+            ) from exc
 
     @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
@@ -279,6 +281,18 @@ class LifeUpdateStrategy(StrEnum):
     AUTO = "auto"
     CONVOLVE = "convolve"
     PAD = "pad"
+
+
+class ReactivexEventBusScheduler(StrEnum):
+    INLINE = "inline"
+    BACKGROUND = "background"
+    INPUT = "input"
+
+
+class ReactivexStreamShareStrategy(StrEnum):
+    SHARE = "share"
+    REPLAY_LATEST = "replay_latest"
+    REPLAY_BUFFER = "replay_buffer"
 
 
 def get_device_ports(prefix: str) -> Iterator[str]:
