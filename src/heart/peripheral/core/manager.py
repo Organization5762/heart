@@ -13,6 +13,7 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_streams import share_stream
 from heart.utilities.reactivex_threads import (background_scheduler,
                                                input_scheduler)
 
@@ -102,7 +103,7 @@ class PeripheralManager:
         scheduler = self._event_bus_scheduler()
         if scheduler is not None:
             event_bus = event_bus.pipe(ops.observe_on(scheduler))
-        return event_bus.pipe(ops.share())
+        return share_stream(event_bus, stream_name="PeripheralManager.event_bus")
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [

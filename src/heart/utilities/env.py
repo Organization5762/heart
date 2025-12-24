@@ -126,6 +126,22 @@ class Configuration:
         )
 
     @classmethod
+    def reactivex_stream_share_strategy(cls) -> str:
+        strategy = os.environ.get(
+            "HEART_RX_STREAM_SHARE_STRATEGY",
+            "replay_latest",
+        ).strip().lower()
+        if strategy in {"share", "replay_latest", "replay_buffer"}:
+            return strategy
+        raise ValueError(
+            "HEART_RX_STREAM_SHARE_STRATEGY must be 'share', 'replay_latest', or 'replay_buffer'"
+        )
+
+    @classmethod
+    def reactivex_stream_replay_buffer(cls) -> int:
+        return _env_int("HEART_RX_STREAM_REPLAY_BUFFER", default=16, minimum=1)
+
+    @classmethod
     def isolated_renderer_socket(cls) -> str | None:
         socket_path = os.environ.get("ISOLATED_RENDER_SOCKET")
         if socket_path == "":
