@@ -21,7 +21,8 @@ from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
-from heart.utilities.env import Configuration
+from heart.renderers.internal import FrameAccumulator
+from heart.utilities.env import Configuration, RenderMergeStrategy
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
@@ -355,6 +356,8 @@ class GameLoop:
         self._renderer_surface_cache: dict[
             tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
         ] = {}
+        self._composite_surface_cache: dict[tuple[int, int], pygame.Surface] = {}
+        self._composite_accumulator: FrameAccumulator | None = None
 
         # jank slide animation state machine
         self.mode_change: tuple[int, int] = (0, 0)
@@ -396,6 +399,31 @@ class GameLoop:
         else:
             cached.fill((0, 0, 0, 0))
         return cached
+
+    def _get_composite_surface(self, size: tuple[int, int]) -> pygame.Surface:
+        if not Configuration.render_screen_cache_enabled():
+            surface = pygame.Surface(size, pygame.SRCALPHA)
+            surface.fill((0, 0, 0, 0))
+            return surface
+
+        cached = self._composite_surface_cache.get(size)
+        if cached is None:
+            cached = pygame.Surface(size, pygame.SRCALPHA)
+            self._composite_surface_cache[size] = cached
+        cached.fill((0, 0, 0, 0))
+        return cached
+
+    def _get_composite_accumulator(
+        self, surface: pygame.Surface
+    ) -> FrameAccumulator:
+        if (
+            self._composite_accumulator is None
+            or self._composite_accumulator.surface is not surface
+        ):
+            self._composite_accumulator = FrameAccumulator(surface)
+        else:
+            self._composite_accumulator.reset()
+        return self._composite_accumulator
 
     def _get_render_executor(self) -> ThreadPoolExecutor:
         if self._render_executor is None:
@@ -628,7 +656,7 @@ class GameLoop:
             1,
         )
 
-    def merge_surfaces(
+    def _merge_surfaces_in_place(
         self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
         # Ensure both surfaces are the same size
@@ -638,20 +666,55 @@ class GameLoop:
         surface1.blit(surface2, (0, 0))
         return surface1
 
+    def merge_surfaces(
+        self, surface1: pygame.Surface, surface2: pygame.Surface
+    ) -> pygame.Surface:
+        return self._merge_surfaces_in_place(surface1, surface2)
+
+    def _compose_surfaces_batched(
+        self, surfaces: list[pygame.Surface]
+    ) -> pygame.Surface:
+        size = surfaces[0].get_size()
+        composite = self._get_composite_surface(size)
+        accumulator = self._get_composite_accumulator(composite)
+        for surface in surfaces:
+            accumulator.queue_blit(surface)
+        return accumulator.flush(clear=False)
+
+    def _compose_surfaces(
+        self, surfaces: list[pygame.Surface]
+    ) -> pygame.Surface | None:
+        if not surfaces:
+            return None
+        if Configuration.render_merge_strategy() == RenderMergeStrategy.IN_PLACE:
+            base = surfaces[0]
+            for surface in surfaces[1:]:
+                base = self.merge_surfaces(base, surface)
+            return base
+        return self._compose_surfaces_batched(surfaces)
+
     def _render_surface_iterative(
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._render_queue_depth = len(renderers)
-        base = None
+        if Configuration.render_merge_strategy() == RenderMergeStrategy.IN_PLACE:
+            base = None
+            for renderer in renderers:
+                surface = self.process_renderer(renderer)
+                if base is None:
+                    base = surface
+                elif surface is None:
+                    continue
+                else:
+                    base = self.merge_surfaces(base, surface)
+            return base
+
+        surfaces: list[pygame.Surface] = []
         for renderer in renderers:
             surface = self.process_renderer(renderer)
-            if base is None:
-                base = surface
-            elif surface is None:
-                continue
-            else:
-                base = self.merge_surfaces(base, surface)
-        return base
+            if surface is not None:
+                surfaces.append(surface)
+        return self._compose_surfaces_batched(surfaces) if surfaces else None
 
     def _render_surfaces_binary(
         self, renderers: list["StatefulBaseRenderer[Any]"]
@@ -667,6 +730,11 @@ class GameLoop:
             for surface in executor.map(self.process_renderer, renderers)
             if surface is not None
         ]
+
+        if not surfaces:
+            return None
+        if Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED:
+            return self._compose_surfaces_batched(surfaces)
 
         # Iteratively merge surfaces until only one remains
         while len(surfaces) > 1:
@@ -684,9 +752,7 @@ class GameLoop:
             # Update the surfaces list for the next iteration
             surfaces = merged_surfaces
 
-        if surfaces:
-            return surfaces[0]
-        return None
+        return surfaces[0]
 
     def _resolve_render_variant(
         self,

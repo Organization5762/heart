@@ -42,6 +42,21 @@ def dummy_sdl_video_driver(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def default_render_merge_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set the default render merge strategy to keep tests deterministic."""
+
+    monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "batched")
+    yield
+
+
+@pytest.fixture()
+def render_merge_strategy_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Opt into in-place merge strategy for tests that assert pairwise merges."""
+
+    monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "in_place")
+    yield
+
+@pytest.fixture(autouse=True)
 def init_pygame() -> None:
     pygame.init()
     yield
