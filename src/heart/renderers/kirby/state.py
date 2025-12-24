@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet import SpritesheetLoop
 
 
 @dataclass
 class KirbyState:
-    scenes: list[BaseRenderer]
+    scenes: list[StatefulBaseRenderer]
 
     @staticmethod
     def build() -> "KirbyState":

@@ -11,7 +11,7 @@ from PIL import Image
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
     from heart.environment import GameLoop
-    from heart.renderers import BaseRenderer
+    from heart.renderers import StatefulBaseRenderer
 
 
 class ScreenRecorder:
@@ -37,7 +37,9 @@ class ScreenRecorder:
 
     def record(
         self,
-        inputs: Iterable[Sequence["BaseRenderer"] | list["BaseRenderer"]],
+        inputs: Iterable[
+            Sequence["StatefulBaseRenderer"] | list["StatefulBaseRenderer"]
+        ],
         output_path: str | Path,
     ) -> Path:
         """Record the screen for each batch of ``inputs``.

@@ -9,15 +9,15 @@ from reactivex import operators as ops
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.renderers import BaseRenderer
+from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import SlideTransitionState
 
 
 class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
     def __init__(
         self,
-        renderer_a: BaseRenderer,
-        renderer_b: BaseRenderer,
+        renderer_a: StatefulBaseRenderer,
+        renderer_b: StatefulBaseRenderer,
         *,
         direction: int = 1,
         slide_speed: int = 10,
