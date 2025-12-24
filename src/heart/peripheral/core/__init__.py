@@ -74,7 +74,7 @@ class Peripheral(Generic[A]):
                 peripheral_info=self.peripheral_info()
             )
 
-        return self._event_stream().pipe(ops.map(wrap))
+        return self._event_stream().pipe(ops.map(wrap), ops.share())
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
