@@ -9,15 +9,18 @@ loop implementation.
 ## Materials
 
 - `src/heart/environment.py`
-- `src/heart/utilities/env.py`
 - `src/heart/renderers/internal/frame_accumulator.py`
+- `src/heart/runtime/rendering/composition.py`
+- `src/heart/utilities/env.py`
 
 ## Composition flow
 
 The render loop gathers one surface per renderer and then combines those
 surfaces into a single composite frame before presenting it. The merge step is
 configurable so the runtime can trade parallel merge work against a single
-batched blit.
+batched blit. The batching logic lives in
+`src/heart/runtime/rendering/composition.py` so composition behavior stays
+isolated from the rest of the render pipeline.
 
 ## Merge strategies
 

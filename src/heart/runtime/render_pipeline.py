@@ -11,11 +11,10 @@ from PIL import Image
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.render_pipeline_helpers import (RGBA_IMAGE_FORMAT,
-                                                   DisplayModeManager,
-                                                   RendererVariant,
-                                                   RenderMethod,
-                                                   SurfaceComposer)
+from heart.runtime.rendering.composition import SurfaceComposer
+from heart.runtime.rendering.display import DisplayModeManager
+from heart.runtime.rendering.variants import (RGBA_IMAGE_FORMAT,
+                                              RendererVariant, RenderMethod)
 from heart.utilities.env import Configuration, RenderMergeStrategy
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
