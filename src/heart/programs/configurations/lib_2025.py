@@ -4,7 +4,6 @@ import numpy as np
 from lagom import Singleton
 
 from heart.display.color import Color
-from heart.environment import GameLoop
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.renderers.artist import ArtistScene
@@ -28,6 +27,7 @@ from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandStateProvider
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
+from heart.runtime.game_loop import GameLoop
 
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:

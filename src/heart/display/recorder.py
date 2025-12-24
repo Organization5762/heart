@@ -1,4 +1,4 @@
-"""Utilities for recording :class:`~heart.environment.GameLoop` output."""
+"""Utilities for recording :class:`~heart.runtime.game_loop.GameLoop` output."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ import pygame
 from PIL import Image
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle guard
-    from heart.environment import GameLoop
     from heart.renderers import StatefulBaseRenderer
+    from heart.runtime.game_loop import GameLoop
 
 
 class ScreenRecorder:
-    """Record frames produced by a :class:`~heart.environment.GameLoop`.
+    """Record frames produced by a :class:`~heart.runtime.game_loop.GameLoop`.
 
     The recorder advances the provided ``GameLoop`` through a sequence of
     renderer batches, captures the resulting screen for each step, and writes an

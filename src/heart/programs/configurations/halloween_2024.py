@@ -1,5 +1,4 @@
 from heart.display.color import Color
-from heart.environment import GameLoop
 from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.pacman import PacmanGhostRenderer
@@ -7,6 +6,7 @@ from heart.renderers.pixels import Border
 from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.runtime.game_loop import GameLoop
 
 
 def configure(loop: GameLoop) -> None:

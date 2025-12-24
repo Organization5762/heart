@@ -12,7 +12,6 @@ import pygame
 from numba import jit, prange
 
 from heart.device import Cube, Orientation, Rectangle
-from heart.environment import DeviceDisplayMode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
 from heart.renderers import StatefulBaseRenderer
@@ -22,6 +21,7 @@ from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
                                                          SwitchProControls)
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
+from heart.runtime.game_loop import DeviceDisplayMode
 
 ColorPalette = list[tuple[int, int, int]]
 
