@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from heart.renderers.color_conversion import (HSV_TO_BGR_CACHE,
+from heart.runtime.game_loop import RendererVariant
+from heart.utilities.color_conversion import (HSV_TO_BGR_CACHE,
                                               _convert_bgr_to_hsv,
                                               _convert_hsv_to_bgr)
-from heart.runtime.game_loop import RendererVariant
 from heart.utilities.env import Configuration
 
 
@@ -16,7 +16,7 @@ from heart.utilities.env import Configuration
 def disable_cv2(monkeypatch):
     """Force the color conversion helpers to use the numpy fallbacks."""
 
-    monkeypatch.setattr("heart.renderers.color_conversion.CV2_MODULE", None)
+    monkeypatch.setattr("heart.utilities.color_conversion.CV2_MODULE", None)
 
 
 @pytest.fixture(autouse=True)
