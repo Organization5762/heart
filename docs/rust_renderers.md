@@ -10,8 +10,8 @@ import renderer modules built as Rust-backed Python extensions without editing
 ## Approach
 
 Use `heart.renderers.import_rust_renderer` to import a compiled Rust module at
-runtime. The helper temporarily amends `sys.path` so extensions built outside of
-`src/` can be discovered.
+runtime. The helper uses `importlib` search APIs to locate extension modules
+without mutating `sys.path`.
 
 ### Materials
 
