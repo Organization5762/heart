@@ -6,7 +6,7 @@ import reactivex
 from reactivex.disposable import Disposable
 from reactivex.subject import Subject
 
-from heart.utilities.reactivex_streams import share_stream
+from heart.utilities.reactivex import share_stream
 
 
 class TestShareStreamStrategy:
@@ -326,7 +326,7 @@ class TestShareStreamFlowControl:
     ) -> None:
         """Confirm overdue coalescing windows flush pending values to avoid delayed updates."""
 
-        from heart.utilities import reactivex_streams
+        import heart.utilities.reactivex.coalescing as reactivex_coalescing
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "5")
@@ -335,7 +335,7 @@ class TestShareStreamFlowControl:
             return Disposable()
 
         monkeypatch.setattr(
-            reactivex_streams,
+            reactivex_coalescing,
             "_COALESCE_SCHEDULER",
             SimpleNamespace(schedule_relative=_schedule_relative),
         )
