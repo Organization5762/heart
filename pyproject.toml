@@ -60,6 +60,7 @@ dev = [
     "Pillow",
     "scipy",
     "mypy",
+    "types-protobuf",
     "types-requests",
     "types-toml",
     # Git
@@ -181,6 +182,7 @@ lint = [
     "isort>=7.0.0",
     "mdformat>=1.0.0",
     "mypy>=1.13.0",
+    "types-protobuf",
     "ruff>=0.14.3",
     "semgrep>=1.115.0",
 ]
