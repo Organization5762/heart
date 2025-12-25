@@ -319,13 +319,6 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             # start_coords = self._clip_line_to_surface_boundary(start_coords, end_coords, width, height)
             # end_coords = self._clip_line_to_surface_boundary(start_coords, end_coords, width, height)
 
-            # print("before", end_coords)
-            # end_coords = (
-            #     int(max(0, min(end_coords[0], width / 2))),
-            #     int(max(0, min(end_coords[1], height / 2)))
-            # )
-            # print("after", end_coords)
-
             if start_coords and end_coords:
                 try:
                     pygame.draw.line(

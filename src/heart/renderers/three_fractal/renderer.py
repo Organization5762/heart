@@ -663,15 +663,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             )
         self.key_pressed_last_frame[pygame.K_r] = keys[pygame.K_r]
 
-        # if keys[pygame.K_o] and not self.key_pressed_last_frame[pygame.K_o]:
-        #     print("changing color")
-        #     # self.shader.set("_orbit_color", to_vec3((1, 1, 1)))
-        #     # self.shader.set("s_radius", 3.0)
-        #     self.active_color = (1, 1, 1)
-        #     self.shader.set("_orbit_color", to_vec3(self.active_color))
-
-        # self.key_pressed_last_frame[pygame.K_o] = keys[pygame.K_o]
-
         # "inflate/deflate" sphere on hold/release
         try:
             if keys[pygame.K_SPACE]:
@@ -747,9 +738,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         else:
             self._process_input(peripheral_manager)
             self._check_enter_auto(peripheral_manager)
-
-        # print(f"\n\n{self.vel=}\n\n")
-        # if not np.allclose(self.vel, 0.0):
 
         self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
         # self._check_switch_auto(peripheral_manager)
