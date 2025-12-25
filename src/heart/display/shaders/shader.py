@@ -1,7 +1,12 @@
-from ctypes import *
+from ctypes import byref, c_int
 from pathlib import Path
 
-from OpenGL.GL import *
+from OpenGL.GL import (GL_COMPILE_STATUS, GL_FRAGMENT_SHADER,
+                       GL_INFO_LOG_LENGTH, GL_VERTEX_SHADER, glAttachShader,
+                       glBindAttribLocation, glCompileShader, glCreateProgram,
+                       glCreateShader, glDeleteShader, glGetShaderInfoLog,
+                       glGetShaderiv, glGetUniformLocation, glLinkProgram,
+                       glShaderSource, glUniform1f, glUniform3fv)
 
 from heart.display.shaders.template import __file__ as template_location
 from heart.display.shaders.util import _UNIFORMS, to_vec3
