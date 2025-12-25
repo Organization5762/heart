@@ -1,15 +1,9 @@
 import asyncio
-import dataclasses
-import json
 import threading
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from enum import Enum
-from typing import Any, Mapping, Sequence, cast
-from uuid import UUID
+from typing import Any, cast
 
 import websockets
-from google.protobuf.message import Message  # type: ignore[import-untyped]
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
 from heart.device.beats.proto import \
@@ -17,43 +11,17 @@ from heart.device.beats.proto import \
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
 from heart.peripheral.core import PeripheralMessageEnvelope
+from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
+                                            encode_peripheral_payload)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 beats_streaming_pb2 = cast(Any, _beats_streaming_pb2)
 
 
-def _normalize_payload(payload: object) -> object:
-    if dataclasses.is_dataclass(payload):
-        return dataclasses.asdict(payload)  # type: ignore[arg-type]
-
-    if isinstance(payload, Enum):
-        return payload.value
-
-    if isinstance(payload, UUID):
-        return str(payload)
-
-    if isinstance(payload, (datetime, date)):
-        return payload.isoformat()
-
-    if isinstance(payload, bytes):
-        return payload.hex()
-
-    if isinstance(payload, Mapping):
-        return {
-            str(key): _normalize_payload(value)
-            for key, value in payload.items()
-        }
-
-    if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
-        return [_normalize_payload(value) for value in payload]
-
-    return payload
-
-
 def _encode_peripheral_message(
     envelope: PeripheralMessageEnvelope[Any],
-) -> Message:
+) -> Any:
     info = envelope.peripheral_info
     tags = [
         beats_streaming_pb2.PeripheralTag(
@@ -63,28 +31,19 @@ def _encode_peripheral_message(
         )
         for tag in info.tags
     ]
-    payload = envelope.data
-    if isinstance(payload, Message):
-        encoded_payload = payload.SerializeToString()
+    encoded_payload = encode_peripheral_payload(envelope.data)
+    if encoded_payload.encoding == PeripheralPayloadEncoding.PROTOBUF:
         payload_encoding = beats_streaming_pb2.PROTOBUF
-        payload_type = payload.DESCRIPTOR.full_name
     else:
-        normalized = _normalize_payload(payload)
-        encoded_payload = json.dumps(
-            normalized,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
         payload_encoding = beats_streaming_pb2.JSON_UTF8
-        payload_type = ""
     return beats_streaming_pb2.PeripheralEnvelope(
         peripheral_info=beats_streaming_pb2.PeripheralInfo(
             id=info.id or "",
             tags=tags,
         ),
-        payload=encoded_payload,
+        payload=encoded_payload.payload,
         payload_encoding=payload_encoding,
-        payload_type=payload_type,
+        payload_type=encoded_payload.payload_type,
     )
 
 

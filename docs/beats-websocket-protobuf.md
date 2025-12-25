@@ -7,6 +7,7 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 ## Sources
 
 - `src/heart/device/beats/websocket.py`
+- `src/heart/peripheral/core/encoding.py`
 - `src/heart/device/beats/proto/beats_streaming.proto`
 - `experimental/beats/src/actions/ws/protocol.ts`
 
@@ -20,7 +21,7 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 `StreamEnvelope` wraps the payload in a `oneof` so clients can switch on the message type without JSON parsing:
 
 - `frame`: contains raw PNG bytes in `png_data`.
-- `peripheral`: includes `PeripheralInfo`, an encoded payload, a payload encoding enum, and an optional payload type string for protobuf payloads.
+- `peripheral`: includes `PeripheralInfo`, an encoded payload, a payload encoding enum, and an optional payload type string for protobuf payloads. `encode_peripheral_payload` in `heart.peripheral.core.encoding` centralizes the encoding logic so other integrations can reuse the same protobuf-aware rules.
 
 ## Client decoding
 
