@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import math
 import threading
 from collections import deque
@@ -31,7 +32,14 @@ else:
     def least_squares(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError("scipy.optimize.least_squares is not available")
 
-logger = get_logger(__name__)
+_logger: logging.Logger | None = None
+
+
+def _get_logger() -> logging.Logger:
+    global _logger
+    if _logger is None:
+        _logger = get_logger(__name__)
+    return _logger
 
 SPEED_OF_LIGHT = 299_792_458.0  # metres per second
 
@@ -310,7 +318,7 @@ class IRSensorArray(Peripheral[Input]):
 
         expected_crc = IRArrayDMAQueue._crc_for_samples(packet.samples)
         if expected_crc != packet.crc:
-            logger.warning(
+            _get_logger().warning(
                 "Dropping packet due to CRC mismatch (expected=%s, got=%s)",
                 expected_crc,
                 packet.crc,
