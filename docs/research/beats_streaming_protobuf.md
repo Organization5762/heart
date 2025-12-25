@@ -19,5 +19,5 @@ Record the protobuf schema and encoding decisions for the Beats websocket stream
 ## Notes
 
 - `StreamEnvelope` carries either a `Frame` or a `PeripheralEnvelope` in a `oneof` payload.
-- Peripheral data is encoded in the protobuf envelope alongside an explicit payload encoding enum, so JSON payloads can remain stable while leaving room for future encodings.
+- Peripheral data is encoded in the protobuf envelope alongside an explicit payload encoding enum and optional payload type string. JSON payloads can remain stable while leaving room for future encodings, and protobuf payloads can declare their message name.
 - The Beats UI parses the envelope and maps it into typed `StreamEvent` objects for downstream providers.

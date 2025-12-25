@@ -5,19 +5,22 @@ import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 from uuid import UUID
 
 import websockets
+from google.protobuf.message import Message  # type: ignore[import-untyped]
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-from heart.device.beats.proto import beats_streaming_pb2
+from heart.device.beats.proto import \
+    beats_streaming_pb2 as _beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+beats_streaming_pb2 = cast(Any, _beats_streaming_pb2)
 
 
 def _normalize_payload(payload: object) -> object:
@@ -50,7 +53,7 @@ def _normalize_payload(payload: object) -> object:
 
 def _encode_peripheral_message(
     envelope: PeripheralMessageEnvelope[Any],
-) -> beats_streaming_pb2.PeripheralEnvelope:
+) -> Message:
     info = envelope.peripheral_info
     tags = [
         beats_streaming_pb2.PeripheralTag(
@@ -60,19 +63,28 @@ def _encode_peripheral_message(
         )
         for tag in info.tags
     ]
-    normalized = _normalize_payload(envelope.data)
-    json_payload = json.dumps(
-        normalized,
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ).encode("utf-8")
+    payload = envelope.data
+    if isinstance(payload, Message):
+        encoded_payload = payload.SerializeToString()
+        payload_encoding = beats_streaming_pb2.PROTOBUF
+        payload_type = payload.DESCRIPTOR.full_name
+    else:
+        normalized = _normalize_payload(payload)
+        encoded_payload = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        payload_encoding = beats_streaming_pb2.JSON_UTF8
+        payload_type = ""
     return beats_streaming_pb2.PeripheralEnvelope(
         peripheral_info=beats_streaming_pb2.PeripheralInfo(
             id=info.id or "",
             tags=tags,
         ),
-        payload=json_payload,
-        payload_encoding=beats_streaming_pb2.JSON_UTF8,
+        payload=encoded_payload,
+        payload_encoding=payload_encoding,
+        payload_type=payload_type,
     )
 
 
@@ -210,7 +222,7 @@ class WebSocket:
                 return None
             frame = beats_streaming_pb2.Frame(png_data=bytes(payload))
             envelope = beats_streaming_pb2.StreamEnvelope(frame=frame)
-            return envelope.SerializeToString()
+            return cast(bytes, envelope.SerializeToString())
 
         if kind == "peripheral":
             if not isinstance(payload, PeripheralMessageEnvelope):
@@ -222,7 +234,7 @@ class WebSocket:
             envelope = beats_streaming_pb2.StreamEnvelope(
                 peripheral=_encode_peripheral_message(payload)
             )
-            return envelope.SerializeToString()
+            return cast(bytes, envelope.SerializeToString())
 
         logger.warning("Unknown websocket payload kind: %s.", kind)
         return None
