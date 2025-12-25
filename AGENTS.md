@@ -29,6 +29,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Avoid swallowing recoverable exceptions; log them with the shared logger (use debug-level logging for high-frequency loops).
 - When logging caught exceptions at error level, include traceback context with `logger.exception` (or `exc_info=True`) unless you intentionally suppress it.
 - Avoid placeholder early returns or unreachable docstrings in production methods; remove stubs once real implementations are available.
+- For CLI commands, log expected user-facing errors and exit with `typer.Exit` instead of raising generic exceptions.
 
 ## Testing
 
