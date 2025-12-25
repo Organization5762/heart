@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between surface preparation (display-mode coordination and caching) and composition management (merge-strategy selection plus parallel merge coordination).
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between surface preparation (display-mode coordination and caching) and composition management (merge-strategy selection plus parallel merge coordination). The runtime loop calls an event pump to drain pygame events and manage shutdown or joystick resets.
 
 ## Flow Diagram
 
@@ -35,6 +35,7 @@ flowchart LR
         direction TB
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
         AppRouter["AppController / Mode Router"]
+        EventPump["Event Pump\n(pygame.event.get)"]
         ModeServices["Mode Services & Renderers"]
         RenderPipeline["Render Pipeline"]
         SurfaceProvider["Surface Provider\n(display mode + surface cache)"]
@@ -66,6 +67,7 @@ flowchart LR
     CLI --> Registry --> Configurer --> Loop
     Configurer --> AppRouter
     Loop --> AppRouter
+    Loop --> EventPump
     Loop --> RenderPipeline
     AppRouter --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
     RenderPipeline --> SurfaceProvider
@@ -80,7 +82,7 @@ flowchart LR
     RxScheduler --> HeartRate --> AppRouter
     RxScheduler --> PhoneText --> AppRouter
 
-    class CLI,Registry,Configurer,ModeServices,RenderPipeline,SurfaceProvider,CompositionManager service;
+    class CLI,Registry,Configurer,ModeServices,RenderPipeline,SurfaceProvider,CompositionManager,EventPump service;
     class Loop,AppRouter orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;

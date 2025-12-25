@@ -3,8 +3,8 @@ from dataclasses import replace
 from typing import Any, Callable, Generic, TypeVar, final
 
 import pygame
-from reactivex import Observable
 from reactivex.disposable import Disposable
+from reactivex.observable import Observable
 
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation

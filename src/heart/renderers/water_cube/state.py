@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Self, Tuple
 
 import numpy as np
-from reactivex import Observable
 from reactivex import operators as ops
+from reactivex.observable import Observable
 
 from heart.peripheral.sensor import Acceleration
 

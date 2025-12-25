@@ -8,10 +8,10 @@ from lagom import Container
 
 from heart.device import Device
 from heart.navigation import AppController, ComposedRenderer, MultiScene
-from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.event_pump import EventPump
 from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
@@ -52,13 +52,7 @@ class GameLoop:
             display=self.display,
             render_pipeline=self.render_pipeline,
         )
-
-        # jank slide animation state machine
-        self.mode_change: tuple[int, int] = (0, 0)
-        self._last_mode_offset = 0
-        self._last_offset_on_change = 0
-        self._current_offset_on_change = 0
-        self.renderers_cache: list["StatefulBaseRenderer[Any]"] | None = None
+        self.event_pump = EventPump()
 
         self._active_mode_index = 0
 
@@ -150,21 +144,6 @@ class GameLoop:
             self.display.screen.blit(render_surface, (0, 0))
         self.frame_presenter.present(renderers, render_surface)
 
-    def _handle_events(self) -> None:
-        try:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                if event.type == events.REQUEST_JOYSTICK_MODULE_RESET:
-                    logger.info("resetting joystick module")
-                    pygame.joystick.quit()
-                    pygame.joystick.init()
-        except SystemError:
-            # (clem): gamepad shit is weird and can randomly put caught segfault
-            #   events on queue, I see allusions to this online, people say
-            #   try pygame-ce instead
-            logger.exception("Encountered segfaulted event")
-
     def _preprocess_setup(self) -> None:
         self._dim_display()
 
@@ -218,7 +197,7 @@ class GameLoop:
         clock = self.display.clock
         while self.running:
             self.peripheral_runtime.tick()
-            self._handle_events()
+            self.running = self.event_pump.pump(self.running)
             self._preprocess_setup()
             renderers = self._select_renderers()
             self._one_loop(renderers)

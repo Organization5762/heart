@@ -10,7 +10,7 @@ import reactivex
 from reactivex import operators as ops
 
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex import share_stream
+from heart.utilities.reactivex.sharing import share_stream
 
 
 @dataclass(slots=True)
