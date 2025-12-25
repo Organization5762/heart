@@ -41,7 +41,7 @@ def _screen_refresh_inputs(draw: st.DrawFn) -> tuple[int, int, int]:
 
 
 class TestSlideTransitionProviderStateTransitions:
-    """Property checks for slide transitions to keep renderer sequencing stable."""
+    """Property checks for slide transitions so renderer sequencing stays stable under motion."""
 
     class _StubRenderer(StatefulBaseRenderer[int]):
         def _create_initial_state(self, window, clock, peripheral_manager, orientation) -> int:

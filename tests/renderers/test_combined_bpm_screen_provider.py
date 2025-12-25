@@ -21,7 +21,7 @@ def _timing_inputs(draw: st.DrawFn) -> tuple[int, int, int, int, bool]:
 
 
 class TestCombinedBpmScreenProviderTransitions:
-    """Property tests for combined BPM transitions to keep screen toggles reliable."""
+    """Property tests for combined BPM transitions so screen toggles stay predictable."""
 
     @given(data=_timing_inputs())
     def test_advance_state_holds_until_threshold(
