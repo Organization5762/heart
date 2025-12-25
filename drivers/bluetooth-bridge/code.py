@@ -43,9 +43,10 @@ MINIMUM_LIGHT_ON_SECONDS = 0.05
 
 END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"
+DEVICE_NAME = "bluetooth-bridge"
 
 IDENTITY = identity.Identity(
-    device_name="bluetooth-bridge",
+    device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
     device_id=device_id.persistent_device_id(),
 )

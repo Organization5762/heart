@@ -9,6 +9,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 Run `make format` before committing changes. This applies Ruff fixes, isort, Black, docformatter, and mdformat to Python sources and documentation. Documentation updates should avoid marketing language, state the technical problem in plain terms, and include a materials list when relevant.
 
 - Avoid declaring module-level `__all__` exports. Prefer explicit imports at call sites instead of curating export lists.
+- Define device identifiers (such as firmware `device_name` values) as module-level constants instead of inline literals.
 - Avoid building filesystem paths via string concatenation. Use `os.path.join` or `pathlib.Path` instead.
 - Prefer `pathlib.Path` over `os.path.join` when constructing paths, and ensure functions annotated to return a `Path` return a `Path` object.
 - When CLI arguments accept file paths, parse them as `pathlib.Path` objects and ensure parent directories exist before writing.

@@ -20,6 +20,7 @@ from heart.firmware_io import constants, device_id, identity
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 DEBUG = False
+DEVICE_NAME = "sensor-bus"
 
 
 def _debug(message: str) -> None:
@@ -27,7 +28,7 @@ def _debug(message: str) -> None:
         print(message)
 
 IDENTITY = identity.Identity(
-    device_name="sensor-bus",
+    device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
     device_id=device_id.persistent_device_id(),
 )
