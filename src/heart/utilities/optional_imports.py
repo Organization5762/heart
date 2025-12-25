@@ -36,3 +36,24 @@ def optional_import(
             "Optional dependency %s failed to import: %s", module_name, exc
         )
         return None
+
+
+def optional_import_attribute(
+    module_name: str,
+    attribute: str,
+    *,
+    logger: Logger | None = None,
+) -> Any | None:
+    """Return ``attribute`` from ``module_name`` if available, otherwise ``None``."""
+
+    resolved_logger = logger or get_logger(__name__)
+    module = optional_import(module_name, logger=resolved_logger)
+    if module is None:
+        return None
+    try:
+        return getattr(module, attribute)
+    except AttributeError:
+        resolved_logger.warning(
+            "Optional dependency %s is missing attribute %s.", module_name, attribute
+        )
+        return None

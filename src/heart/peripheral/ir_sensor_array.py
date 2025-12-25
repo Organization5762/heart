@@ -8,29 +8,30 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from types import ModuleType
 from typing import Any, Callable, Iterator, Mapping, Sequence, cast
 
 import numpy as np
 
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger
-from heart.utilities.optional_imports import optional_import
+from heart.utilities.optional_imports import optional_import_attribute
 
 LeastSquaresCallable = Callable[..., Any]
 
 logger = get_logger(__name__)
 
-_optimize_module = cast(
-    ModuleType | None,
-    optional_import("scipy.optimize", logger=logger),
+_least_squares = cast(
+    LeastSquaresCallable | None,
+    optional_import_attribute("scipy.optimize", "least_squares", logger=logger),
 )
 
-if _optimize_module is not None:
-    least_squares = cast(LeastSquaresCallable, getattr(_optimize_module, "least_squares"))
-else:
+if _least_squares is None:
+
     def least_squares(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError("scipy.optimize.least_squares is not available")
+
+else:
+    least_squares = _least_squares
 
 SPEED_OF_LIGHT = 299_792_458.0  # metres per second
 
