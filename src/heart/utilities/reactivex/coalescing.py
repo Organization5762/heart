@@ -39,7 +39,9 @@ def coalesce_latest(
             with lock:
                 value = pending
                 pending = _NO_PENDING
-                timer = None
+                if timer is not None:
+                    timer.dispose()
+                    timer = None
                 if fallback_timer is not None:
                     fallback_timer.cancel()
                     fallback_timer = None
