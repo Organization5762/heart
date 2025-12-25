@@ -10,7 +10,7 @@ from PIL import Image
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
-from heart.runtime.rendering.renderer_processor import RendererFrameProcessor
+from heart.runtime.rendering.renderer_processor import RendererProcessor
 from heart.runtime.rendering.surface_merge import SurfaceCompositionManager
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration
@@ -40,7 +40,7 @@ class RenderPipeline:
         self._composition_manager = SurfaceCompositionManager(
             strategy_provider=self._get_merge_strategy
         )
-        self._renderer_processor = RendererFrameProcessor(device, peripheral_manager)
+        self._renderer_processor = RendererProcessor(device, peripheral_manager)
         self._timing_tracker = self._renderer_processor.timing_tracker
 
         binary_method = cast(RenderMethod, self._render_surfaces_binary)

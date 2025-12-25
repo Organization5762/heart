@@ -3,7 +3,7 @@
 ## Summary
 
 Refactor per-renderer frame preparation, execution, and logging into a dedicated
-`RendererFrameProcessor`. The goal is to keep `RenderPipeline` focused on
+`RendererProcessor`. The goal is to keep `RenderPipeline` focused on
 render dispatch, executor management, and surface composition while preserving
 existing timing and logging behavior.
 
@@ -16,7 +16,7 @@ simpler to evolve per-renderer behavior without touching dispatch logic.
 
 ## Implementation notes
 
-- Added `RendererFrameProcessor` to encapsulate surface preparation, renderer
+- Added `RendererProcessor` to encapsulate surface preparation, renderer
   initialization, per-frame execution, timing updates, and per-renderer logging.
 - Updated `RenderPipeline` to delegate per-renderer work and queue depth updates
   to the new processor while keeping merge strategy selection and composition
