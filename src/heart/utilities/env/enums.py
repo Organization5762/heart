@@ -20,6 +20,14 @@ class AssetCacheStrategy(StrEnum):
     ALL = "all"
 
 
+class AssetIOCacheStrategy(StrEnum):
+    NONE = "none"
+    METADATA = "metadata"
+    IMAGES = "images"
+    SPRITESHEETS = "spritesheets"
+    ALL = "all"
+
+
 class FrameArrayStrategy(StrEnum):
     COPY = "copy"
     VIEW = "view"

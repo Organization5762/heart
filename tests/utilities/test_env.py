@@ -9,8 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import (AssetCacheStrategy, Configuration,
-                                 FrameExportStrategy,
+from heart.utilities.env import (AssetCacheStrategy, AssetIOCacheStrategy,
+                                 Configuration, FrameExportStrategy,
                                  ReactivexStreamConnectMode,
                                  RenderMergeStrategy, get_device_ports)
 
@@ -191,6 +191,57 @@ class TestUtilitiesEnv:
 
         with pytest.raises(ValueError):
             Configuration.asset_cache_max_entries()
+
+    def test_asset_io_cache_strategy_defaults_all(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache strategy defaults to all. This keeps byte reuse enabled without extra tuning."""
+        _clear_env(monkeypatch, "HEART_ASSET_IO_CACHE_STRATEGY")
+
+        assert Configuration.asset_io_cache_strategy() == AssetIOCacheStrategy.ALL
+
+    def test_asset_io_cache_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache strategy rejects invalid values. This keeps byte caching configuration explicit."""
+        monkeypatch.setenv("HEART_ASSET_IO_CACHE_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_io_cache_strategy()
+
+    def test_asset_io_cache_strategy_accepts_images(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache strategy accepts images. This keeps byte caching configurable per asset type."""
+        monkeypatch.setenv("HEART_ASSET_IO_CACHE_STRATEGY", "images")
+
+        assert Configuration.asset_io_cache_strategy() == AssetIOCacheStrategy.IMAGES
+
+    def test_asset_io_cache_max_entries_defaults_to_64(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache max entries defaults to 64. This provides bounded byte caching by default."""
+        _clear_env(monkeypatch, "HEART_ASSET_IO_CACHE_MAX_ENTRIES")
+
+        assert Configuration.asset_io_cache_max_entries() == 64
+
+    def test_asset_io_cache_max_entries_rejects_non_integer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache max entries rejects non-integers. This prevents ambiguous cache sizing."""
+        monkeypatch.setenv("HEART_ASSET_IO_CACHE_MAX_ENTRIES", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_io_cache_max_entries()
+
+    def test_asset_io_cache_max_entries_rejects_negative(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset IO cache max entries rejects negatives. This avoids undefined cache behaviour."""
+        monkeypatch.setenv("HEART_ASSET_IO_CACHE_MAX_ENTRIES", "-1")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_io_cache_max_entries()
 
 
     def test_render_parallel_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:

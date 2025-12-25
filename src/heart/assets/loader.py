@@ -1,3 +1,4 @@
+import io
 import json
 from os import PathLike
 from pathlib import Path
@@ -6,14 +7,17 @@ from typing import Any
 import pygame
 
 from heart.assets.cache import AssetCache
-from heart.utilities.env import (AssetCacheStrategy, Configuration,
-                                 SpritesheetFrameCacheStrategy)
+from heart.utilities.env import (AssetCacheStrategy, AssetIOCacheStrategy,
+                                 Configuration, SpritesheetFrameCacheStrategy)
 
 
 class Loader:
     _image_cache: AssetCache[Path, pygame.Surface] | None = None
     _spritesheet_cache: AssetCache[Path, "spritesheet"] | None = None
     _metadata_cache: AssetCache[Path, dict[str, Any]] | None = None
+    _image_bytes_cache: AssetCache[Path, bytes] | None = None
+    _spritesheet_bytes_cache: AssetCache[Path, bytes] | None = None
+    _metadata_bytes_cache: AssetCache[Path, bytes] | None = None
 
     @classmethod
     def _resolve_cache_strategy(cls) -> AssetCacheStrategy:
@@ -22,6 +26,14 @@ class Loader:
     @classmethod
     def _cache_max_entries(cls) -> int:
         return Configuration.asset_cache_max_entries()
+
+    @classmethod
+    def _io_cache_max_entries(cls) -> int:
+        return Configuration.asset_io_cache_max_entries()
+
+    @classmethod
+    def _resolve_io_cache_strategy(cls) -> AssetIOCacheStrategy:
+        return Configuration.asset_io_cache_strategy()
 
     @classmethod
     def _get_spritesheet_cache(cls) -> AssetCache[Path, "spritesheet"] | None:
@@ -55,10 +67,49 @@ class Loader:
         return cls._metadata_cache
 
     @classmethod
+    def _get_image_bytes_cache(cls) -> AssetCache[Path, bytes] | None:
+        strategy = cls._resolve_io_cache_strategy()
+        if strategy not in {AssetIOCacheStrategy.IMAGES, AssetIOCacheStrategy.ALL}:
+            return None
+        if cls._image_bytes_cache is None:
+            cls._image_bytes_cache = AssetCache(
+                cls._io_cache_max_entries(), name="image-bytes"
+            )
+        return cls._image_bytes_cache
+
+    @classmethod
+    def _get_spritesheet_bytes_cache(cls) -> AssetCache[Path, bytes] | None:
+        strategy = cls._resolve_io_cache_strategy()
+        if strategy not in {
+            AssetIOCacheStrategy.SPRITESHEETS,
+            AssetIOCacheStrategy.ALL,
+        }:
+            return None
+        if cls._spritesheet_bytes_cache is None:
+            cls._spritesheet_bytes_cache = AssetCache(
+                cls._io_cache_max_entries(), name="spritesheet-bytes"
+            )
+        return cls._spritesheet_bytes_cache
+
+    @classmethod
+    def _get_metadata_bytes_cache(cls) -> AssetCache[Path, bytes] | None:
+        strategy = cls._resolve_io_cache_strategy()
+        if strategy not in {AssetIOCacheStrategy.METADATA, AssetIOCacheStrategy.ALL}:
+            return None
+        if cls._metadata_bytes_cache is None:
+            cls._metadata_bytes_cache = AssetCache(
+                cls._io_cache_max_entries(), name="metadata-bytes"
+            )
+        return cls._metadata_bytes_cache
+
+    @classmethod
     def reset_caches(cls) -> None:
         cls._image_cache = None
         cls._spritesheet_cache = None
         cls._metadata_cache = None
+        cls._image_bytes_cache = None
+        cls._spritesheet_bytes_cache = None
+        cls._metadata_bytes_cache = None
 
     @classmethod
     def resolve_path(cls, path: str | PathLike[str]) -> Path:
@@ -71,6 +122,19 @@ class Loader:
         return cls.resolve_path(path)
 
     @classmethod
+    def _load_bytes(
+        cls, resolved_path: Path, cache: AssetCache[Path, bytes] | None
+    ) -> bytes:
+        if cache is not None:
+            cached = cache.get(resolved_path)
+            if cached is not None:
+                return cached
+        payload = resolved_path.read_bytes()
+        if cache is not None:
+            cache.set(resolved_path, payload)
+        return payload
+
+    @classmethod
     def load(cls, path: str | PathLike[str]) -> pygame.Surface:
         resolved_path = cls._resolve_path(path)
         cache = cls._get_image_cache()
@@ -78,7 +142,12 @@ class Loader:
             cached = cache.get(resolved_path)
             if cached is not None:
                 return cached
-        loaded = pygame.image.load(resolved_path)
+        bytes_cache = cls._get_image_bytes_cache()
+        if bytes_cache is not None:
+            payload = cls._load_bytes(resolved_path, bytes_cache)
+            loaded = pygame.image.load(io.BytesIO(payload))
+        else:
+            loaded = pygame.image.load(resolved_path)
         if cache is not None:
             cache.set(resolved_path, loaded)
         return loaded
@@ -91,7 +160,12 @@ class Loader:
             cached = cache.get(resolved_path)
             if cached is not None:
                 return cached
-        loaded = spritesheet(resolved_path)
+        bytes_cache = cls._get_spritesheet_bytes_cache()
+        if bytes_cache is not None:
+            payload = cls._load_bytes(resolved_path, bytes_cache)
+            loaded = spritesheet(resolved_path, raw_bytes=payload)
+        else:
+            loaded = spritesheet(resolved_path)
         if cache is not None:
             cache.set(resolved_path, loaded)
         return loaded
@@ -112,26 +186,33 @@ class Loader:
             cached = cache.get(resolved_path)
             if cached is not None:
                 return dict(cached)
-        with resolved_path.open("r") as fp:
-            payload = json.load(fp)
+        bytes_cache = cls._get_metadata_bytes_cache()
+        if bytes_cache is not None:
+            payload = cls._load_bytes(resolved_path, bytes_cache)
+            parsed = json.loads(payload)
+        else:
+            with resolved_path.open("r") as fp:
+                parsed = json.load(fp)
         if cache is not None:
-            cache.set(resolved_path, payload)
-        return dict(payload)
+            cache.set(resolved_path, parsed)
+        return dict(parsed)
 
 
 # https://www.pygame.org/wiki/Spritesheet
 # I copied this from here it is kinda meh lol
 class spritesheet(object):
-    def __init__(self, filename: str):
+    def __init__(self, filename: str | Path, *, raw_bytes: bytes | None = None) -> None:
         path = Path(filename)
-        if not path.exists():
-            raise ValueError(f"'{path}' does not exist.")
+        if raw_bytes is None:
+            if not path.exists():
+                raise ValueError(f"'{path}' does not exist.")
 
-        if not path.is_file():
-            raise ValueError(f"'{path}' is not a file.")
+            if not path.is_file():
+                raise ValueError(f"'{path}' is not a file.")
 
-        with path.open("rb") as f:
-            self.sheet = pygame.image.load(f).convert_alpha()
+            raw_bytes = path.read_bytes()
+
+        self.sheet = pygame.image.load(io.BytesIO(raw_bytes)).convert_alpha()
         self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
         self._scaled_cache: dict[tuple[int, int, int, int, int, int], pygame.Surface] = {}
 

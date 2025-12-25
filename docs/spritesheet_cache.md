@@ -33,9 +33,23 @@ Use `HEART_ASSET_CACHE_MAX_ENTRIES` to cap the number of cached items
 per asset type. Set `0` to disable caching without changing the strategy
 value.
 
+Set `HEART_ASSET_IO_CACHE_STRATEGY` to cache raw asset bytes and reduce disk IO:
+
+- `all` caches bytes for images, spritesheets, and metadata (default).
+- `images` caches image file bytes only.
+- `spritesheets` caches spritesheet file bytes only.
+- `metadata` caches JSON file bytes only.
+- `none` disables the IO byte cache.
+
+Use `HEART_ASSET_IO_CACHE_MAX_ENTRIES` to cap the number of cached byte
+entries per asset type. Set `0` to disable byte caching without changing
+the strategy value.
+
 ## Materials
 
 - Environment variable: `HEART_SPRITESHEET_FRAME_CACHE_STRATEGY`.
 - Environment variables: `HEART_ASSET_CACHE_STRATEGY`,
   `HEART_ASSET_CACHE_MAX_ENTRIES`.
+- Environment variables: `HEART_ASSET_IO_CACHE_STRATEGY`,
+  `HEART_ASSET_IO_CACHE_MAX_ENTRIES`.
 - Spritesheet assets loaded via `src/heart/assets/loader.py`.

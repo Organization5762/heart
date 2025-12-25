@@ -1,6 +1,7 @@
 import os
 
 from heart.utilities.env.enums import (AssetCacheStrategy,
+                                       AssetIOCacheStrategy,
                                        SpritesheetFrameCacheStrategy)
 
 
@@ -28,6 +29,29 @@ class AssetsConfiguration:
             raise ValueError(
                 "HEART_ASSET_CACHE_MAX_ENTRIES must be an integer >= 0"
             )
+        return parsed
+
+    @classmethod
+    def asset_io_cache_strategy(cls) -> AssetIOCacheStrategy:
+        strategy = os.environ.get("HEART_ASSET_IO_CACHE_STRATEGY", "all").strip().lower()
+        try:
+            return AssetIOCacheStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_ASSET_IO_CACHE_STRATEGY must be 'none', 'metadata', 'images', 'spritesheets', or 'all'"
+            ) from exc
+
+    @classmethod
+    def asset_io_cache_max_entries(cls) -> int:
+        value = os.environ.get("HEART_ASSET_IO_CACHE_MAX_ENTRIES", "64").strip()
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_ASSET_IO_CACHE_MAX_ENTRIES must be an integer >= 0"
+            ) from exc
+        if parsed < 0:
+            raise ValueError("HEART_ASSET_IO_CACHE_MAX_ENTRIES must be an integer >= 0")
         return parsed
 
     @classmethod

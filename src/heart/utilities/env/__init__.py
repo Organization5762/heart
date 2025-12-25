@@ -2,6 +2,8 @@
 
 from heart.utilities.env.config import Configuration as Configuration
 from heart.utilities.env.enums import AssetCacheStrategy as AssetCacheStrategy
+from heart.utilities.env.enums import \
+    AssetIOCacheStrategy as AssetIOCacheStrategy
 from heart.utilities.env.enums import DeviceLayoutMode as DeviceLayoutMode
 from heart.utilities.env.enums import FrameArrayStrategy as FrameArrayStrategy
 from heart.utilities.env.enums import \
