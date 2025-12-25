@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pygame
 from lagom import Container
-from PIL import Image
 
 from heart.device import Device
 from heart.device.beats import WebSocket
@@ -14,6 +13,7 @@ from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
 from heart.utilities.logging import get_logger
 
@@ -45,6 +45,11 @@ class GameLoop:
             device=device,
             peripheral_manager=self.peripheral_manager,
             render_variant=render_variant,
+        )
+        self.frame_presenter = FramePresenter(
+            device=device,
+            display=self.display,
+            render_pipeline=self.render_pipeline,
         )
 
         # jank slide animation state machine
@@ -142,7 +147,7 @@ class GameLoop:
         )
         if render_surface is not None:
             self.display.screen.blit(render_surface, (0, 0))
-        self._present_rendered_frame(renderers, render_surface)
+        self.frame_presenter.present(renderers, render_surface)
 
     def _handle_events(self) -> None:
         try:
@@ -238,28 +243,3 @@ class GameLoop:
             renderers = self._select_renderers()
             self._one_loop(renderers)
             clock.tick(self.max_fps)
-
-    def _present_rendered_frame(
-        self,
-        renderers: list["StatefulBaseRenderer[Any]"],
-        render_surface: pygame.Surface | None,
-    ) -> None:
-        if not renderers:
-            return
-        pygame.display.flip()
-        if render_surface is not None:
-            render_image = self.render_pipeline.finalize_rendering(render_surface)
-            device_image = (
-                render_image.convert("RGB")
-                if render_image.mode != "RGB"
-                else render_image
-            )
-            self.device.set_image(device_image)
-            return
-
-        if self.display.screen is None:
-            raise RuntimeError("GameLoop screen is not initialized")
-        screen_array = pygame.surfarray.array3d(self.display.screen)
-        transposed_array = np.transpose(screen_array, (1, 0, 2))
-        pil_image = Image.fromarray(transposed_array)
-        self.device.set_image(pil_image)
