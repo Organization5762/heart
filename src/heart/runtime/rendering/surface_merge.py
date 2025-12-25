@@ -10,9 +10,14 @@ from heart.runtime.rendering.composition import SurfaceComposer
 from heart.utilities.env import Configuration, RenderMergeStrategy
 
 
-class SurfaceMerger:
-    def __init__(self, composer: SurfaceComposer | None = None) -> None:
+class SurfaceCompositionManager:
+    def __init__(
+        self,
+        composer: SurfaceComposer | None = None,
+        strategy_provider: Callable[[], RenderMergeStrategy] | None = None,
+    ) -> None:
         self._composer = composer or SurfaceComposer()
+        self._strategy_provider = strategy_provider or Configuration.render_merge_strategy
 
     def merge_in_place(
         self, surface1: pygame.Surface, surface2: pygame.Surface
@@ -23,17 +28,22 @@ class SurfaceMerger:
         surface1.blit(surface2, (0, 0))
         return surface1
 
-    def compose(self, surfaces: list[pygame.Surface]) -> pygame.Surface | None:
+    def compose_serial(
+        self,
+        surfaces: list[pygame.Surface],
+        merge_fn: Callable[[pygame.Surface, pygame.Surface], pygame.Surface] | None = None,
+    ) -> pygame.Surface | None:
         if not surfaces:
             return None
-        if Configuration.render_merge_strategy() == RenderMergeStrategy.IN_PLACE:
+        if self._strategy_provider() == RenderMergeStrategy.IN_PLACE:
             base = surfaces[0]
+            merge_surfaces = merge_fn or self.merge_in_place
             for surface in surfaces[1:]:
-                base = self.merge_in_place(base, surface)
+                base = merge_surfaces(base, surface)
             return base
         return self._composer.compose_batched(surfaces)
 
-    def merge_parallel(
+    def compose_parallel(
         self,
         surfaces: list[pygame.Surface],
         executor: ThreadPoolExecutor,
@@ -41,11 +51,10 @@ class SurfaceMerger:
     ) -> pygame.Surface | None:
         if not surfaces:
             return None
-        if Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED:
+        if self._strategy_provider() == RenderMergeStrategy.BATCHED:
             return self._composer.compose_batched(surfaces)
-        return self._merge_surfaces_parallel(
-            surfaces, executor, merge_fn or self.merge_in_place
-        )
+        merge_surfaces = merge_fn or self.merge_in_place
+        return self._merge_surfaces_parallel(surfaces, executor, merge_surfaces)
 
     def _merge_surface_pair(
         self,
