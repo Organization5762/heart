@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from threading import RLock
 from typing import Any, Protocol, TypeVar, cast
 
@@ -137,47 +138,65 @@ def _coalesce_latest(
         lock = RLock()
         pending: Any = _NO_PENDING
         timer: Any | None = None
+        deadline: float | None = None
 
         def _flush() -> None:
-            nonlocal pending, timer
+            nonlocal pending, timer, deadline
             with lock:
                 value = pending
                 pending = _NO_PENDING
                 timer = None
+                deadline = None
             if value is _NO_PENDING:
                 return
             observer.on_next(value)
 
         def _schedule_flush() -> None:
-            nonlocal timer
+            nonlocal timer, deadline
             if timer is not None:
                 return
+            deadline = time.monotonic() + (window_ms / 1000)
             timer = _COALESCE_SCHEDULER.schedule_relative(
                 window_ms / 1000,
                 lambda *_: _flush(),
             )
 
         def _on_next(value: Any) -> None:
-            nonlocal pending
+            nonlocal pending, timer, deadline
+            emit_now: Any = _NO_PENDING
             with lock:
+                if (
+                    timer is not None
+                    and deadline is not None
+                    and time.monotonic() >= deadline
+                ):
+                    emit_now = pending
+                    pending = _NO_PENDING
+                    timer.dispose()
+                    timer = None
+                    deadline = None
                 pending = value
                 _schedule_flush()
+            if emit_now is not _NO_PENDING:
+                observer.on_next(emit_now)
 
         def _on_error(err: Exception) -> None:
-            nonlocal pending, timer
+            nonlocal pending, timer, deadline
             with lock:
                 if timer is not None:
                     timer.dispose()
                     timer = None
+                    deadline = None
                 pending = _NO_PENDING
             observer.on_error(err)
 
         def _on_completed() -> None:
-            nonlocal timer
+            nonlocal timer, deadline
             with lock:
                 if timer is not None:
                     timer.dispose()
                     timer = None
+                    deadline = None
             _flush()
             observer.on_completed()
 
@@ -189,13 +208,14 @@ def _coalesce_latest(
         )
 
         def _dispose() -> None:
-            nonlocal pending, timer
+            nonlocal pending, timer, deadline
             subscription.dispose()
             with lock:
                 pending = _NO_PENDING
                 if timer is not None:
                     timer.dispose()
                     timer = None
+                    deadline = None
 
         logger.debug(
             "Coalescing %s with window_ms=%d",

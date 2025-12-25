@@ -25,7 +25,10 @@ if (
     importlib.util.find_spec("sounddevice") is not None
     and ctypes.util.find_library("portaudio") is not None
 ):  # pragma: no cover - optional dependency
-    sd = cast(Any | None, importlib.import_module("sounddevice"))
+    try:
+        sd = cast(Any | None, importlib.import_module("sounddevice"))
+    except Exception as exc:  # pragma: no cover - depends on host
+        logger.info("sounddevice import failed; skipping microphone support: %s", exc)
 
 
 class Microphone(Peripheral[MicrophoneLevel]):
