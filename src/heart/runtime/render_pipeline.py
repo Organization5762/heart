@@ -11,16 +11,17 @@ from PIL import Image
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.rendering.composition import SurfaceComposer
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.runtime.rendering.display import DisplayModeManager
+from heart.runtime.rendering.surface_cache import RendererSurfaceCache
+from heart.runtime.rendering.surface_merge import SurfaceMerger
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration, RenderMergeStrategy
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
-    from heart.renderers import BaseRenderer, StatefulBaseRenderer
+    from heart.renderers import StatefulBaseRenderer
 
 logger = get_logger(__name__)
 log_controller = get_logging_controller()
@@ -38,7 +39,8 @@ class RenderPipeline:
         self.renderer_variant = render_variant
         self.clock: pygame.time.Clock | None = None
         self._display_manager = DisplayModeManager(device)
-        self._surface_composer = SurfaceComposer()
+        self._surface_cache = RendererSurfaceCache(device)
+        self._surface_merger = SurfaceMerger()
 
         binary_method = cast(RenderMethod, self._render_surfaces_binary)
         iterative_method = cast(RenderMethod, self._render_surface_iterative)
@@ -51,9 +53,6 @@ class RenderPipeline:
         self._render_executor: ThreadPoolExecutor | None = None
 
         self._render_queue_depth = 0
-        self._renderer_surface_cache: dict[
-            tuple[int, DeviceDisplayMode, tuple[int, int]], pygame.Surface
-        ] = {}
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self.clock = clock
@@ -62,22 +61,6 @@ class RenderPipeline:
         if self._render_executor is not None:
             self._render_executor.shutdown(wait=True)
             self._render_executor = None
-
-    def _get_renderer_surface(
-        self, renderer: "BaseRenderer | StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface:
-        size = self.device.full_display_size()
-        if not Configuration.render_screen_cache_enabled():
-            return pygame.Surface(size, pygame.SRCALPHA)
-
-        cache_key = (id(renderer), renderer.device_display_mode, size)
-        cached = self._renderer_surface_cache.get(cache_key)
-        if cached is None:
-            cached = pygame.Surface(size, pygame.SRCALPHA)
-            self._renderer_surface_cache[cache_key] = cached
-        else:
-            cached.fill((0, 0, 0, 0))
-        return cached
 
     def _get_render_executor(self) -> ThreadPoolExecutor:
         if self._render_executor is None:
@@ -96,7 +79,7 @@ class RenderPipeline:
         self, renderer: "StatefulBaseRenderer[Any]"
     ) -> pygame.Surface:
         self._display_manager.ensure_mode(renderer.device_display_mode)
-        return self._get_renderer_surface(renderer)
+        return self._surface_cache.get(renderer)
 
     def process_renderer(
         self, renderer: "StatefulBaseRenderer[Any]"
@@ -177,20 +160,10 @@ class RenderPipeline:
             1,
         )
 
-    def _merge_surfaces_in_place(
-        self, surface1: pygame.Surface, surface2: pygame.Surface
-    ) -> pygame.Surface:
-        # Ensure both surfaces are the same size
-        assert surface1.get_size() == surface2.get_size(), (
-            "Surfaces must be the same size to merge."
-        )
-        surface1.blit(surface2, (0, 0))
-        return surface1
-
     def merge_surfaces(
         self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
-        return self._merge_surfaces_in_place(surface1, surface2)
+        return self._surface_merger.merge_in_place(surface1, surface2)
 
     def _compose_surfaces(
         self, surfaces: list[pygame.Surface]
@@ -202,7 +175,7 @@ class RenderPipeline:
             for surface in surfaces[1:]:
                 base = self.merge_surfaces(base, surface)
             return base
-        return self._surface_composer.compose_batched(surfaces)
+        return self._surface_merger.compose(surfaces)
 
     def _collect_surfaces_serial(
         self,
@@ -230,29 +203,6 @@ class RenderPipeline:
             if surface is not None
         ]
 
-    def _merge_surface_pair(
-        self, surfaces: tuple[pygame.Surface, pygame.Surface]
-    ) -> pygame.Surface:
-        return self.merge_surfaces(*surfaces)
-
-    def _merge_surfaces_parallel(
-        self,
-        surfaces: list[pygame.Surface],
-        executor: ThreadPoolExecutor,
-    ) -> pygame.Surface | None:
-        if not surfaces:
-            return None
-        while len(surfaces) > 1:
-            pairs = list(zip(surfaces[0::2], surfaces[1::2]))
-
-            merged_surfaces = list(executor.map(self._merge_surface_pair, pairs))
-
-            if len(surfaces) % 2 == 1:
-                merged_surfaces.append(surfaces[-1])
-
-            surfaces = merged_surfaces
-        return surfaces[0]
-
     def _render_surface_iterative(
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
@@ -267,12 +217,10 @@ class RenderPipeline:
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
         surfaces = self._collect_surfaces_parallel(renderers)
-        if not surfaces:
-            return None
-        if Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED:
-            return self._surface_composer.compose_batched(surfaces)
         executor = self._get_render_executor()
-        return self._merge_surfaces_parallel(surfaces, executor)
+        return self._surface_merger.merge_parallel(
+            surfaces, executor, merge_fn=self.merge_surfaces
+        )
 
     def _resolve_render_variant(
         self,
