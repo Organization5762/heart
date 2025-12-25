@@ -9,7 +9,7 @@ import board
 import busio
 import digitalio
 
-from heart.firmware_io import bluetooth, identity, rotary_encoder
+from heart.firmware_io import bluetooth, device_id, identity, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 
@@ -17,7 +17,7 @@ MINIMUM_LIGHT_ON_SECONDS = 0.05
 IDENTITY = identity.Identity(
     device_name="lampe-controller",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(),
+    device_id=device_id.persistent_device_id(),
 )
 
 

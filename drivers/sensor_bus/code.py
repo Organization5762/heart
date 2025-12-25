@@ -16,7 +16,7 @@ from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
 
-from heart.firmware_io import constants, identity
+from heart.firmware_io import constants, device_id, identity
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 DEBUG = False
@@ -29,7 +29,7 @@ def _debug(message: str) -> None:
 IDENTITY = identity.Identity(
     device_name="sensor-bus",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(),
+    device_id=device_id.persistent_device_id(),
 )
 
 

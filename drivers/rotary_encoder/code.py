@@ -13,12 +13,12 @@ import board
 import rotaryio
 from digitalio import DigitalInOut, Direction, Pull
 
-from heart.firmware_io import identity, rotary_encoder
+from heart.firmware_io import device_id, identity, rotary_encoder
 
 IDENTITY = identity.Identity(
     device_name="rotary-encoder",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(),
+    device_id=device_id.persistent_device_id(),
 )
 DEBUG = False
 
