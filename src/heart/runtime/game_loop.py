@@ -7,14 +7,12 @@ import pygame
 from lagom import Container
 
 from heart.device import Device
-from heart.navigation import AppController, ComposedRenderer, MultiScene
+from heart.navigation import ComposedRenderer, MultiScene
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
-from heart.runtime.display_context import DisplayContext
-from heart.runtime.frame_presenter import FramePresenter
+from heart.runtime.game_loop_components import build_game_loop_components
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.runtime.pygame_event_handler import PygameEventHandler
-from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
+from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -40,19 +38,16 @@ class GameLoop:
         self.peripheral_runtime = PeripheralRuntime(self.peripheral_manager)
 
         self.max_fps = max_fps
-        self.app_controller = AppController()
-        self.display = DisplayContext(device=device)
-        self.render_pipeline = RenderPipeline(
+        components = build_game_loop_components(
             device=device,
             peripheral_manager=self.peripheral_manager,
             render_variant=render_variant,
         )
-        self.frame_presenter = FramePresenter(
-            device=device,
-            display=self.display,
-            render_pipeline=self.render_pipeline,
-        )
-        self.event_handler = PygameEventHandler()
+        self.app_controller = components.app_controller
+        self.display = components.display
+        self.render_pipeline = components.render_pipeline
+        self.frame_presenter = components.frame_presenter
+        self.event_handler = components.event_handler
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
@@ -89,7 +84,7 @@ class GameLoop:
             logger.info("Finished initializing GameLoop.")
 
         if self.app_controller.is_empty():
-            raise Exception("Unable to start as no GameModes were added.")
+            raise RuntimeError("Unable to start as no GameModes were added.")
 
         # Initialize all renderers
 

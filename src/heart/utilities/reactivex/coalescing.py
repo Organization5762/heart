@@ -53,7 +53,16 @@ def coalesce_latest(
         def _schedule_flush(now: float) -> None:
             nonlocal timer, fallback_timer, due_time
             if timer is not None or fallback_timer is not None:
-                return
+                if due_time is not None and now >= due_time:
+                    if timer is not None:
+                        timer.dispose()
+                        timer = None
+                    if fallback_timer is not None:
+                        fallback_timer.cancel()
+                        fallback_timer = None
+                    due_time = None
+                else:
+                    return
             due_time = now + window_seconds
             timer = _COALESCE_SCHEDULER.schedule_relative(
                 window_seconds,
