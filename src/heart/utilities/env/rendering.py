@@ -1,8 +1,9 @@
 import os
 
 from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env.enums import (FrameArrayStrategy, LifeUpdateStrategy,
-                                       RenderMergeStrategy, RenderTileStrategy)
+from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
+                                       LifeUpdateStrategy, RenderMergeStrategy,
+                                       RenderTileStrategy)
 from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
 
 
@@ -85,6 +86,18 @@ class RenderingConfiguration:
         except ValueError as exc:
             raise ValueError(
                 "HEART_FRAME_ARRAY_STRATEGY must be 'copy' or 'view'"
+            ) from exc
+
+    @classmethod
+    def frame_export_strategy(cls) -> FrameExportStrategy:
+        strategy = os.environ.get(
+            "HEART_FRAME_EXPORT_STRATEGY", "buffer"
+        ).strip().lower()
+        try:
+            return FrameExportStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_FRAME_EXPORT_STRATEGY must be 'buffer' or 'array'"
             ) from exc
 
     @classmethod
