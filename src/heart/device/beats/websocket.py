@@ -61,13 +61,18 @@ def _encode_peripheral_message(
         for tag in info.tags
     ]
     normalized = _normalize_payload(envelope.data)
-    json_payload = json.dumps(normalized)
+    json_payload = json.dumps(
+        normalized,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
     return beats_streaming_pb2.PeripheralEnvelope(
         peripheral_info=beats_streaming_pb2.PeripheralInfo(
             id=info.id or "",
             tags=tags,
         ),
-        json_payload=json_payload,
+        payload=json_payload,
+        payload_encoding=beats_streaming_pb2.JSON_UTF8,
     )
 
 

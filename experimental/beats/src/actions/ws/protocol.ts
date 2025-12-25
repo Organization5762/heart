@@ -16,6 +16,7 @@ type PeripheralInfo = {
 type PeripheralPayload = {
   peripheralInfo: PeripheralInfo;
   data: unknown;
+  payloadEncoding: number | null;
 };
 
 type FramePayload = {
@@ -28,6 +29,7 @@ export type StreamEvent =
 
 const root = parse(protoSchema, { keepCase: true }).root;
 const StreamEnvelope = root.lookupType("heart.beats.streaming.StreamEnvelope");
+const textDecoder = new TextDecoder("utf-8");
 
 function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
   if (!raw || typeof raw !== "object") {
@@ -43,7 +45,11 @@ function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
 export function decodeStreamEvent(buffer: ArrayBuffer): StreamEvent | null {
   const envelope = StreamEnvelope.decode(new Uint8Array(buffer)) as {
     frame?: { png_data?: Uint8Array } | null;
-    peripheral?: { peripheral_info?: unknown; json_payload?: string } | null;
+    peripheral?: {
+      peripheral_info?: unknown;
+      payload?: Uint8Array;
+      payload_encoding?: number;
+    } | null;
   };
 
   if (envelope.frame?.png_data) {
@@ -55,18 +61,22 @@ export function decodeStreamEvent(buffer: ArrayBuffer): StreamEvent | null {
     };
   }
 
-  if (envelope.peripheral?.json_payload) {
+  if (envelope.peripheral?.payload) {
     let data: unknown = null;
-    try {
-      data = JSON.parse(envelope.peripheral.json_payload);
-    } catch {
-      data = null;
+    const payloadEncoding = envelope.peripheral.payload_encoding ?? null;
+    if (payloadEncoding === 1) {
+      try {
+        data = JSON.parse(textDecoder.decode(envelope.peripheral.payload));
+      } catch {
+        data = null;
+      }
     }
     return {
       type: "peripheral",
       payload: {
         peripheralInfo: normalizePeripheralInfo(envelope.peripheral.peripheral_info),
         data,
+        payloadEncoding,
       },
     };
   }

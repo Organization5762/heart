@@ -20,8 +20,8 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 `StreamEnvelope` wraps the payload in a `oneof` so clients can switch on the message type without JSON parsing:
 
 - `frame`: contains raw PNG bytes in `png_data`.
-- `peripheral`: includes `PeripheralInfo` and a JSON-encoded payload string.
+- `peripheral`: includes `PeripheralInfo`, an encoded payload, and a payload encoding enum.
 
 ## Client decoding
 
-The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a typed `StreamEvent` into the RxJS stream. Frame bytes are converted directly into PNG blobs, and peripheral payloads are JSON-parsed into the `data` field for UI components.
+The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a typed `StreamEvent` into the RxJS stream. Frame bytes are converted directly into PNG blobs, and peripheral payloads are decoded from UTF-8 JSON when the payload encoding signals `JSON_UTF8`.

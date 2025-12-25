@@ -15,7 +15,8 @@ message PeripheralInfo {
 
 message PeripheralEnvelope {
   PeripheralInfo peripheral_info = 1;
-  string json_payload = 2;
+  bytes payload = 2;
+  PeripheralPayloadEncoding payload_encoding = 3;
 }
 
 message Frame {
@@ -27,4 +28,9 @@ message StreamEnvelope {
     Frame frame = 1;
     PeripheralEnvelope peripheral = 2;
   }
+}
+
+enum PeripheralPayloadEncoding {
+  PERIPHERAL_PAYLOAD_ENCODING_UNSPECIFIED = 0;
+  JSON_UTF8 = 1;
 }
