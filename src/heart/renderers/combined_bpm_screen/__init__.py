@@ -1,4 +1,4 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.combined_bpm_screen.provider import \
     CombinedBpmScreenStateProvider
 from heart.renderers.combined_bpm_screen.renderer import \
@@ -6,4 +6,4 @@ from heart.renderers.combined_bpm_screen.renderer import \
 from heart.renderers.combined_bpm_screen.state import \
     CombinedBpmScreenState  # noqa: F401
 
-container[CombinedBpmScreenStateProvider] = CombinedBpmScreenStateProvider
+register_provider(CombinedBpmScreenStateProvider, CombinedBpmScreenStateProvider)

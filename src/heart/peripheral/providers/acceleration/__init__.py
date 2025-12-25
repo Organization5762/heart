@@ -1,5 +1,5 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 
 from .provider import AllAccelerometersProvider
 
-container[AllAccelerometersProvider] = AllAccelerometersProvider
+register_provider(AllAccelerometersProvider, AllAccelerometersProvider)

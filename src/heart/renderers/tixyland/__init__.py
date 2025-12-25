@@ -1,5 +1,5 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.tixyland.provider import TixylandStateProvider
 from heart.renderers.tixyland.renderer import Tixyland  # noqa: F401
 
-container[TixylandStateProvider] = TixylandStateProvider
+register_provider(TixylandStateProvider, TixylandStateProvider)
