@@ -89,7 +89,7 @@ class GameLoop:
             logger.info("Finished initializing GameLoop.")
 
         if self.app_controller.is_empty():
-            raise Exception("Unable to start as no GameModes were added.")
+            raise RuntimeError("Unable to start as no GameModes were added.")
 
         # Initialize all renderers
 

@@ -123,7 +123,7 @@ def make_color(geo):
     elif geo.color == "orbit" or geo.color == "o":
         return "vec4(orbit, " + geo.glsl() + ")"
     else:
-        raise Exception("Invalid coloring type")
+        raise ValueError("Invalid coloring type")
 
 
 _UNIFORMS: dict[str, UniformValue] = {}
