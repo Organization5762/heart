@@ -149,6 +149,20 @@ class TestUtilitiesEnv:
         assert Configuration.render_parallel_threshold() == 6
 
 
+    def test_render_parallel_cost_threshold_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render parallel cost threshold defaults. This keeps adaptive tuning predictable without extra configuration."""
+        _clear_env(monkeypatch, "HEART_RENDER_PARALLEL_COST_THRESHOLD_MS")
+
+        assert Configuration.render_parallel_cost_threshold_ms() == 12
+
+
+    def test_render_parallel_cost_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render parallel cost threshold reads the environment value. This keeps adaptive render tuning explicit."""
+        monkeypatch.setenv("HEART_RENDER_PARALLEL_COST_THRESHOLD_MS", "18")
+
+        assert Configuration.render_parallel_cost_threshold_ms() == 18
+
+
     def test_render_executor_max_workers_returns_none_when_unset(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -191,6 +205,13 @@ class TestUtilitiesEnv:
         assert Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED
 
 
+    def test_render_merge_strategy_accepts_adaptive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render merge strategy accepts adaptive mode. This keeps runtime tuning flexible for composition overhead."""
+        monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "adaptive")
+
+        assert Configuration.render_merge_strategy() == RenderMergeStrategy.ADAPTIVE
+
+
     def test_render_merge_strategy_rejects_invalid_value(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -199,6 +220,20 @@ class TestUtilitiesEnv:
 
         with pytest.raises(ValueError):
             Configuration.render_merge_strategy()
+
+
+    def test_render_merge_cost_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render merge cost threshold reads the environment value. This keeps adaptive merge tuning configurable."""
+        monkeypatch.setenv("HEART_RENDER_MERGE_COST_THRESHOLD_MS", "9")
+
+        assert Configuration.render_merge_cost_threshold_ms() == 9
+
+
+    def test_render_merge_surface_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render merge surface threshold reads the environment value. This keeps adaptive merge decisions consistent."""
+        monkeypatch.setenv("HEART_RENDER_MERGE_SURFACE_THRESHOLD", "5")
+
+        assert Configuration.render_merge_surface_threshold() == 5
 
 
     def test_reactivex_event_bus_scheduler_defaults_inline(

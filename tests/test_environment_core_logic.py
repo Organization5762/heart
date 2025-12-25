@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -151,11 +153,12 @@ class TestEnvironmentCoreLogic:
         loop, monkeypatch, render_merge_strategy_in_place, values: list[str]
     ) -> None:
         """Verify that the render pipeline binary merge combines all renderers. This validates the pairwise merge optimisation for high-FPS scenes."""
-        sequence = {value: f"surface-{value}" for value in values}
+        renderers = [SimpleNamespace(name=value) for value in values]
+        sequence = {renderer.name: f"surface-{renderer.name}" for renderer in renderers}
         pipeline = loop.render_pipeline
 
-        def fake_process(renderer: str) -> str:
-            return sequence[renderer]
+        def fake_process(renderer: SimpleNamespace) -> str:
+            return sequence[renderer.name]
 
         def fake_merge(surface1: str, surface2: str) -> str:
             return f"merge({surface1},{surface2})"
@@ -163,7 +166,7 @@ class TestEnvironmentCoreLogic:
         monkeypatch.setattr(pipeline, "process_renderer", fake_process)
         monkeypatch.setattr(pipeline, "merge_surfaces", fake_merge)
 
-        result = pipeline._render_surfaces_binary(values)
+        result = pipeline._render_surfaces_binary(renderers)
         expected = _sequential_binary_merge(list(sequence.values()))
         assert result == expected
 
@@ -179,13 +182,13 @@ class TestEnvironmentCoreLogic:
         self, loop, monkeypatch, render_merge_strategy_in_place
     ) -> None:
         """Verify that the render pipeline skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
-        renderers = ["r1", "r2", "r3"]
+        renderers = [SimpleNamespace(name=renderer) for renderer in ["r1", "r2", "r3"]]
         responses = {"r1": "surface-1", "r2": None, "r3": "surface-3"}
         merges: list[tuple[str, str]] = []
         pipeline = loop.render_pipeline
 
-        def fake_process(renderer: str) -> str | None:
-            return responses[renderer]
+        def fake_process(renderer: SimpleNamespace) -> str | None:
+            return responses[renderer.name]
 
         def fake_merge(surface1: str, surface2: str) -> str:
             merges.append((surface1, surface2))
@@ -202,7 +205,7 @@ class TestEnvironmentCoreLogic:
 
     def test_render_fn_selects_renderer(self, loop) -> None:
         """Verify that the render pipeline selects the expected merge strategy. This keeps render mode selection predictable."""
-        renderers = ["r1", "r2"]
+        renderers = [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")]
         pipeline = loop.render_pipeline
         assert (
             pipeline._render_fn(renderers, RendererVariant.BINARY)
@@ -216,7 +219,7 @@ class TestEnvironmentCoreLogic:
 
     def test_render_fn_default_uses_loop_variant(self, loop) -> None:
         """Verify that the render pipeline respects its configured renderer variant. This keeps runtime switches effective without reconfiguring callers."""
-        renderers = ["r1"]
+        renderers = [SimpleNamespace(name="r1")]
         pipeline = loop.render_pipeline
         pipeline.renderer_variant = RendererVariant.BINARY
         assert pipeline._render_fn(renderers, None) is pipeline._render_surfaces_binary
@@ -250,7 +253,12 @@ class TestEnvironmentCoreLogic:
     )
     def test_render_fn_handles_unknown_variant(self, loop, variant: RendererVariant) -> None:
         """Verify that the render pipeline returns a callable for each variant. This avoids runtime errors when iterating through supported strategies."""
-        renderers = ["r1", "r2", "r3", "r4"]
+        renderers = [
+            SimpleNamespace(name="r1"),
+            SimpleNamespace(name="r2"),
+            SimpleNamespace(name="r3"),
+            SimpleNamespace(name="r4"),
+        ]
         assert callable(loop.render_pipeline._render_fn(renderers, variant))
 
 
@@ -260,14 +268,41 @@ class TestEnvironmentCoreLogic:
             "heart.runtime.render_pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
+        monkeypatch.setattr(
+            "heart.runtime.render_pipeline.Configuration.render_parallel_cost_threshold_ms",
+            lambda: 0,
+        )
         pipeline = loop.render_pipeline
 
         assert (
-            pipeline._render_fn(["r1"], RendererVariant.AUTO)
+            pipeline._render_fn([SimpleNamespace(name="r1")], RendererVariant.AUTO)
             is pipeline._render_surface_iterative
         )
         assert (
-            pipeline._render_fn(["r1", "r2"], RendererVariant.AUTO)
+            pipeline._render_fn(
+                [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")],
+                RendererVariant.AUTO,
+            )
+            is pipeline._render_surfaces_binary
+        )
+
+    def test_render_fn_auto_uses_cost_estimates(self, loop, monkeypatch) -> None:
+        """Verify auto rendering uses timing estimates to choose parallelism. This keeps scheduling overhead aligned with actual renderer costs."""
+        monkeypatch.setattr(
+            "heart.runtime.render_pipeline.Configuration.render_parallel_threshold",
+            lambda: 2,
+        )
+        monkeypatch.setattr(
+            "heart.runtime.render_pipeline.Configuration.render_parallel_cost_threshold_ms",
+            lambda: 5,
+        )
+        pipeline = loop.render_pipeline
+        renderers = [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")]
+        pipeline._timing_tracker.record("r1", 4.0)
+        pipeline._timing_tracker.record("r2", 3.0)
+
+        assert (
+            pipeline._render_fn(renderers, RendererVariant.AUTO)
             is pipeline._render_surfaces_binary
         )
 

@@ -45,6 +45,12 @@ class RenderingConfiguration:
         return _env_int("HEART_RENDER_PARALLEL_THRESHOLD", default=4, minimum=1)
 
     @classmethod
+    def render_parallel_cost_threshold_ms(cls) -> int:
+        return _env_int(
+            "HEART_RENDER_PARALLEL_COST_THRESHOLD_MS", default=12, minimum=0
+        )
+
+    @classmethod
     def render_executor_max_workers(cls) -> int | None:
         return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
 
@@ -75,8 +81,16 @@ class RenderingConfiguration:
             return RenderMergeStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_RENDER_MERGE_STRATEGY must be 'batched' or 'in_place'"
+                "HEART_RENDER_MERGE_STRATEGY must be 'batched', 'in_place', or 'adaptive'"
             ) from exc
+
+    @classmethod
+    def render_merge_cost_threshold_ms(cls) -> int:
+        return _env_int("HEART_RENDER_MERGE_COST_THRESHOLD_MS", default=6, minimum=0)
+
+    @classmethod
+    def render_merge_surface_threshold(cls) -> int:
+        return _env_int("HEART_RENDER_MERGE_SURFACE_THRESHOLD", default=3, minimum=1)
 
     @classmethod
     def frame_array_strategy(cls) -> FrameArrayStrategy:
