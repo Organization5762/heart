@@ -27,5 +27,7 @@ peripherals emit high-frequency events.
 - Apply changes by restarting the process so configuration values are reloaded.
 - Start with small coalescing windows (for example, `10`–`30` ms) to smooth
   spikes without starving downstream consumers.
+- Overdue coalescing windows flush the last pending value on the next emission
+  or completion so late timers do not drop updates.
 - Enable stream diagnostics only when needed; debug logs can add noise on busy
   systems.

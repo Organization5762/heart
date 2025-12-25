@@ -1,4 +1,5 @@
 import time
+from types import SimpleNamespace
 
 import pytest
 import reactivex
@@ -318,3 +319,36 @@ class TestShareStreamFlowControl:
         source.on_completed()
 
         assert received == [42]
+
+    def test_share_stream_coalesce_flushes_overdue_window(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Confirm overdue coalescing windows flush pending values to avoid delayed updates."""
+
+        from heart.utilities import reactivex_streams
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "5")
+
+        def _schedule_relative(_delay: float, _action):
+            return Disposable()
+
+        monkeypatch.setattr(
+            reactivex_streams,
+            "_COALESCE_SCHEDULER",
+            SimpleNamespace(schedule_relative=_schedule_relative),
+        )
+
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="coalesce_overdue")
+
+        received: list[int] = []
+        shared.subscribe(received.append)
+
+        source.on_next(1)
+        time.sleep(0.02)
+        source.on_next(2)
+        source.on_completed()
+
+        assert received == [1, 2]
