@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from heart.utilities.logging import get_logger
-from heart.utilities.optional_imports import optional_import
+from heart.utilities.optional_imports import optional_import_attribute
 
 logger = get_logger(__name__)
 
@@ -11,20 +11,17 @@ BLERadio: type[Any] | None = None
 ProvideServicesAdvertisement: type[Any] | None = None
 UARTService: type[Any] | None = None
 
-ble_module = optional_import("adafruit_ble", logger=logger)
-advertising_module = optional_import(
+BLERadio = optional_import_attribute("adafruit_ble", "BLERadio", logger=logger)
+ProvideServicesAdvertisement = optional_import_attribute(
     "adafruit_ble.advertising.standard",
+    "ProvideServicesAdvertisement",
     logger=logger,
 )
-services_module = optional_import(
+UARTService = optional_import_attribute(
     "adafruit_ble.services.nordic",
+    "UARTService",
     logger=logger,
 )
-
-if ble_module is not None and advertising_module is not None and services_module is not None:
-    BLERadio = getattr(ble_module, "BLERadio", None)
-    ProvideServicesAdvertisement = getattr(advertising_module, "ProvideServicesAdvertisement", None)
-    UARTService = getattr(services_module, "UARTService", None)
 
 
 if BLERadio is not None and UARTService is not None and ProvideServicesAdvertisement is not None:
