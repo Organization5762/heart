@@ -4,6 +4,9 @@ import typer
 
 from heart.cli.commands.game_loop import build_game_loop
 from heart.programs.registry import ConfigurationRegistry
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_command(
@@ -18,7 +21,8 @@ def run_command(
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
-        raise ValueError(f"Configuration '{configuration}' not found in registry")
+        logger.error("Configuration '%s' not found in registry", configuration)
+        raise typer.Exit(code=1)
     loop = build_game_loop(x11_forward=x11_forward)
     configuration_fn(loop)
 
