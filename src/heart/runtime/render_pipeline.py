@@ -8,7 +8,7 @@ from PIL import Image
 
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.render_planner import RenderPlanner
+from heart.runtime.render_planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.runtime.rendering.renderer_processor import RendererProcessor
 from heart.runtime.rendering.surface_merge import SurfaceCompositionManager
@@ -49,6 +49,7 @@ class RenderPipeline:
             RendererVariant.ITERATIVE: iterative_method,
         }
         self._render_executor: ThreadPoolExecutor | None = None
+        self._active_plan: RenderPlan | None = None
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self.clock = clock
@@ -118,7 +119,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._planner.update_merge_strategy(renderers)
+        self._ensure_plan(renderers)
         surfaces = self._collect_surfaces_serial(renderers)
         return self._composition_manager.compose_serial(
             surfaces, merge_fn=self.merge_surfaces
@@ -128,7 +129,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._planner.update_merge_strategy(renderers)
+        self._ensure_plan(renderers)
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
         surfaces = self._collect_surfaces_parallel(renderers)
@@ -142,11 +143,20 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
-        self._planner.set_default_variant(self.renderer_variant)
-        variant = self._planner.resolve_variant(renderers, override_renderer_variant)
+        plan = self._ensure_plan(renderers, override_renderer_variant)
         return self._render_dispatch.get(
-            variant, self._render_dispatch[RendererVariant.ITERATIVE]
+            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )
+
+    def _ensure_plan(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> RenderPlan:
+        if self._active_plan is not None:
+            return self._active_plan
+        self._planner.set_default_variant(self.renderer_variant)
+        return self._planner.plan(renderers, override_renderer_variant)
 
     def render(
         self,
@@ -158,4 +168,8 @@ class RenderPipeline:
         render_fn = self._render_dispatch.get(
             plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )
-        return render_fn(renderers)
+        self._active_plan = plan
+        try:
+            return render_fn(renderers)
+        finally:
+            self._active_plan = None

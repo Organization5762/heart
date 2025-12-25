@@ -4,7 +4,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from heart.runtime.rendering.timing import RendererTimingTracker
+from heart.runtime.rendering.timing import (RendererTimingSnapshot,
+                                            RendererTimingTracker)
 from heart.runtime.rendering.variants import RendererVariant
 from heart.utilities.env import Configuration
 from heart.utilities.env.enums import RenderMergeStrategy
@@ -22,6 +23,10 @@ log_controller = get_logging_controller()
 class RenderPlan:
     variant: RendererVariant
     merge_strategy: RenderMergeStrategy
+    estimated_cost_ms: float
+    has_samples: bool
+    timing_snapshots: list[RendererTimingSnapshot]
+    timing_missing: list[str]
 
 
 class RenderPlanner:
@@ -38,21 +43,28 @@ class RenderPlanner:
     def set_default_variant(self, default_variant: RendererVariant) -> None:
         self._default_variant = default_variant
 
-    def update_merge_strategy(
-        self, renderers: list["StatefulBaseRenderer[Any]"]
-    ) -> RenderMergeStrategy:
-        self._current_merge_strategy = self._resolve_merge_strategy(renderers)
-        return self._current_merge_strategy
-
     def plan(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderPlan:
         variant = self.resolve_variant(renderers, override_renderer_variant)
-        self._current_merge_strategy = self._resolve_merge_strategy(renderers)
-        self._log_render_plan(renderers, variant)
-        return RenderPlan(variant=variant, merge_strategy=self._current_merge_strategy)
+        merge_strategy = self._resolve_merge_strategy(renderers)
+        estimated_cost_ms, has_samples = self._timing_tracker.estimate_total_ms(
+            renderers
+        )
+        snapshots, missing = self._timing_tracker.snapshot(renderers)
+        self._current_merge_strategy = merge_strategy
+        plan = RenderPlan(
+            variant=variant,
+            merge_strategy=merge_strategy,
+            estimated_cost_ms=estimated_cost_ms,
+            has_samples=has_samples,
+            timing_snapshots=snapshots,
+            timing_missing=missing,
+        )
+        self._log_render_plan(plan, len(renderers))
+        return plan
 
     def resolve_variant(
         self,
@@ -101,15 +113,7 @@ class RenderPlanner:
             return RendererVariant.ITERATIVE
         return variant
 
-    def _log_render_plan(
-        self,
-        renderers: list["StatefulBaseRenderer[Any]"],
-        variant: RendererVariant,
-    ) -> None:
-        estimated_cost_ms, has_samples = self._timing_tracker.estimate_total_ms(
-            renderers
-        )
-        snapshots, missing = self._timing_tracker.snapshot(renderers)
+    def _log_render_plan(self, plan: RenderPlan, renderer_count: int) -> None:
         snapshot_payload = [
             {
                 "renderer": snapshot.name,
@@ -117,27 +121,27 @@ class RenderPlanner:
                 "last_ms": snapshot.last_ms,
                 "samples": snapshot.sample_count,
             }
-            for snapshot in snapshots
+            for snapshot in plan.timing_snapshots
         ]
         log_message = (
             "render.plan variant=%s merge_strategy=%s renderer_count=%s "
             "estimated_cost_ms=%.2f has_samples=%s"
         )
         log_args = (
-            variant.name,
-            self._current_merge_strategy.value,
-            len(renderers),
-            estimated_cost_ms,
-            has_samples,
+            plan.variant.name,
+            plan.merge_strategy.value,
+            renderer_count,
+            plan.estimated_cost_ms,
+            plan.has_samples,
         )
         log_extra = {
-            "variant": variant.name,
-            "merge_strategy": self._current_merge_strategy.value,
-            "renderer_count": len(renderers),
-            "estimated_cost_ms": estimated_cost_ms,
-            "has_samples": has_samples,
+            "variant": plan.variant.name,
+            "merge_strategy": plan.merge_strategy.value,
+            "renderer_count": renderer_count,
+            "estimated_cost_ms": plan.estimated_cost_ms,
+            "has_samples": plan.has_samples,
             "renderer_timings": snapshot_payload,
-            "renderer_timings_missing": missing,
+            "renderer_timings_missing": plan.timing_missing,
         }
 
         log_controller.log(
