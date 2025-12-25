@@ -123,6 +123,10 @@ class SerialRadioDriver(RadioDriver):
     # Internal helpers
     # ------------------------------------------------------------------
     def _open_serial(self) -> Any:  # pragma: no cover - thin wrapper around pyserial
+        if self._serial_module is None:
+            raise ModuleNotFoundError(
+                "pyserial is required for SerialRadioDriver but is not installed"
+            )
         return self._serial_module.Serial(
             self._port,
             self._baudrate,
