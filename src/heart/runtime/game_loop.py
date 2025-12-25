@@ -8,10 +8,7 @@ from lagom import Container
 
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
-from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import container
 from heart.runtime.game_loop_components import build_game_loop_components
-from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.logging import get_logger
 
@@ -34,13 +31,11 @@ class GameLoop:
         self.context_container = resolver
         self.initialized = False
         self.device = device
-        self.peripheral_manager = container.resolve(PeripheralManager)
-        self.peripheral_runtime = PeripheralRuntime(self.peripheral_manager)
 
         self.max_fps = max_fps
         components = build_game_loop_components(
+            resolver=resolver,
             device=device,
-            peripheral_manager=self.peripheral_manager,
             render_variant=render_variant,
         )
         self.app_controller = components.app_controller
@@ -48,6 +43,8 @@ class GameLoop:
         self.render_pipeline = components.render_pipeline
         self.frame_presenter = components.frame_presenter
         self.event_handler = components.event_handler
+        self.peripheral_manager = components.peripheral_manager
+        self.peripheral_runtime = components.peripheral_runtime
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
