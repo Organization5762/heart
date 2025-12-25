@@ -11,7 +11,8 @@ patterns such as `print`-based diagnostics, wildcard imports, module-level
 
 Heart uses Semgrep with a repo-local configuration file at `semgrep.yml`. The
 current rules focus on Python files under `src/` and align with the guidance in
-`AGENTS.md`.
+`AGENTS.md`. Semgrep runs with metrics reporting disabled and version checks
+turned off to keep CI and offline runs consistent.
 
 ## Usage
 
@@ -21,8 +22,12 @@ current rules focus on Python files under `src/` and align with the guidance in
   - `make check`
 - Override the default target set (for example, to scan `tests/` too):
   - `make semgrep SEMGREP_TARGETS="src tests"`
+- Pass additional Semgrep options without overriding the defaults:
+  - `make semgrep SEMGREP_EXTRA_ARGS="--exclude tests"`
 
-Both targets run `uv run semgrep --config semgrep.yml --error src` by default.
+Both targets run
+`uv run semgrep --config semgrep.yml --error --metrics=off --disable-version-check src`
+by default.
 
 ## Rule catalog
 
