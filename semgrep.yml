@@ -33,8 +33,9 @@ rules:
     message: Avoid module-level __all__ exports; prefer explicit imports at call sites.
     severity: ERROR
     patterns:
-      - pattern: __all__ = [...]
-      - pattern: __all__ = (...)
+      - pattern-either:
+          - pattern: __all__ = [...]
+          - pattern: __all__ = (...)
     paths:
       include:
         - src/**/*.py
