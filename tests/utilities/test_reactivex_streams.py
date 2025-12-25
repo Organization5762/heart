@@ -6,7 +6,7 @@ import reactivex
 from reactivex.disposable import Disposable
 from reactivex.subject import Subject
 
-from heart.utilities.reactivex import share_stream
+from heart.utilities.reactivex.sharing import share_stream
 
 
 class TestShareStreamStrategy:
