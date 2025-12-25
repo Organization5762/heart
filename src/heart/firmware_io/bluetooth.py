@@ -1,40 +1,21 @@
 from __future__ import annotations
 
-import importlib
-import importlib.util
 from typing import Any
 
-from heart.utilities.logging import get_logger
-
-logger = get_logger(__name__)
+from heart.utilities.imports import optional_import
 
 BLERadio: type[Any] | None = None
 ProvideServicesAdvertisement: type[Any] | None = None
 UARTService: type[Any] | None = None
 
-def _safe_find_spec(module_name: str) -> bool:
-    try:
-        return importlib.util.find_spec(module_name) is not None
-    except Exception:
-        logger.debug("BLE dependency lookup failed for %s.", module_name)
-        return False
+ble_module = optional_import("adafruit_ble")
+advertising_module = optional_import("adafruit_ble.advertising.standard")
+services_module = optional_import("adafruit_ble.services.nordic")
 
-
-if (
-    _safe_find_spec("adafruit_ble")
-    and _safe_find_spec("adafruit_ble.advertising.standard")
-    and _safe_find_spec("adafruit_ble.services.nordic")
-):
-    try:
-        ble_module = importlib.import_module("adafruit_ble")
-        advertising_module = importlib.import_module("adafruit_ble.advertising.standard")
-        services_module = importlib.import_module("adafruit_ble.services.nordic")
-    except Exception:
-        logger.debug("BLE dependencies failed to import. BLE support is disabled.")
-    else:
-        BLERadio = getattr(ble_module, "BLERadio", None)
-        ProvideServicesAdvertisement = getattr(advertising_module, "ProvideServicesAdvertisement", None)
-        UARTService = getattr(services_module, "UARTService", None)
+if ble_module is not None and advertising_module is not None and services_module is not None:
+    BLERadio = getattr(ble_module, "BLERadio", None)
+    ProvideServicesAdvertisement = getattr(advertising_module, "ProvideServicesAdvertisement", None)
+    UARTService = getattr(services_module, "UARTService", None)
 
 
 if BLERadio is not None and UARTService is not None and ProvideServicesAdvertisement is not None:
