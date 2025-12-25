@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import threading
@@ -15,15 +14,12 @@ from typing import Any, Callable, Iterator, Mapping, Sequence, cast
 import numpy as np
 
 from heart.peripheral.core import Input, Peripheral
+from heart.utilities.imports import optional_import
 from heart.utilities.logging import get_logger
 
 LeastSquaresCallable = Callable[..., Any]
 
-_optimize_module: ModuleType | None
-try:  # pragma: no cover - optional dependency
-    _optimize_module = importlib.import_module("scipy.optimize")
-except Exception:  # pragma: no cover - optional dependency may be absent
-    _optimize_module = None
+_optimize_module: ModuleType | None = optional_import("scipy.optimize")
 
 if _optimize_module is not None:
     least_squares = cast(LeastSquaresCallable, getattr(_optimize_module, "least_squares"))

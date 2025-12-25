@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from typing import Callable, Sequence, cast
 
 import numpy as np
+
+from heart.utilities.imports import optional_import
 
 _scipy_hilbert: Callable[[np.ndarray], np.ndarray] | None = None
 _FFT_CORRELATION_THRESHOLD = 50_000
@@ -15,11 +16,8 @@ def _load_scipy_hilbert() -> Callable[[np.ndarray], np.ndarray] | None:
     global _scipy_hilbert
     if _scipy_hilbert is not None:
         return _scipy_hilbert
-    try:  # pragma: no cover - optional dependency
-        module = import_module("scipy.signal")
-        hilbert_fn = getattr(module, "hilbert", None)
-    except Exception:  # pragma: no cover - optional dependency
-        hilbert_fn = None
+    module = optional_import("scipy.signal")
+    hilbert_fn = getattr(module, "hilbert", None) if module else None
     if callable(hilbert_fn):
         _scipy_hilbert = hilbert_fn
     else:
