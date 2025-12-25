@@ -21,6 +21,7 @@ class BeatsStreamingSettings:
 
 
 class BeatsStreamingConfiguration:
+    @classmethod
     @cache
     def settings(cls) -> BeatsStreamingSettings:
         queue_max_size = _env_int("BEATS_STREAM_QUEUE_SIZE", default=256, minimum=1)
