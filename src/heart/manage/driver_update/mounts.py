@@ -55,7 +55,7 @@ def circuitpy_mounts(
 
 
 def _parse_board_id(boot_out_path: Path) -> str:
-    with boot_out_path.open("r") as file_handle:
+    with boot_out_path.open("r", encoding="utf-8") as file_handle:
         for line in file_handle:
             if "Board ID:" in line:
                 return line.split("Board ID:")[1].strip()

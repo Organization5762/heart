@@ -112,7 +112,7 @@ class Loader:
             cached = cache.get(resolved_path)
             if cached is not None:
                 return dict(cached)
-        with resolved_path.open("r") as fp:
+        with resolved_path.open("r", encoding="utf-8") as fp:
             payload = json.load(fp)
         if cache is not None:
             cache.set(resolved_path, payload)
