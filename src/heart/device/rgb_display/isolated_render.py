@@ -37,7 +37,7 @@ class MatrixClient:
             raise ValueError("Specify either socket_path or tcp_address, not both")
         self._socket: Optional[socket.socket] = None
         self._last_payload_signature: Optional[tuple[int, int, int]] = None
-        self._last_source_signature: Optional[tuple[str, int, int, int]] = None
+        self._last_source_signature: Optional[tuple[str, int, int, int, int]] = None
 
     def _connect(self) -> socket.socket:
         if self._socket is not None:
@@ -111,6 +111,27 @@ class MatrixClient:
         signature = self._source_signature(image)
         return signature == self._last_source_signature
 
-    def _source_signature(self, image: Image.Image) -> tuple[str, int, int, int]:
+    def _source_signature(self, image: Image.Image) -> tuple[str, int, int, int, int]:
         payload = image.tobytes()
-        return (image.mode, image.width, image.height, zlib.adler32(payload))
+        palette_bytes = b""
+        if image.palette is not None:
+            palette_bytes = image.palette.tobytes()
+        transparency = image.info.get("transparency")
+        transparency_bytes = b""
+        if isinstance(transparency, bytes):
+            transparency_bytes = transparency
+        elif isinstance(transparency, int):
+            transparency_bytes = transparency.to_bytes(4, "big", signed=False)
+        elif isinstance(transparency, tuple):
+            transparency_bytes = bytes(transparency)
+        elif transparency is not None:
+            transparency_bytes = str(transparency).encode()
+        state_payload = palette_bytes + transparency_bytes
+        state_signature = zlib.adler32(state_payload) if state_payload else 0
+        return (
+            image.mode,
+            image.width,
+            image.height,
+            zlib.adler32(payload),
+            state_signature,
+        )
