@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
 import os
 import threading
@@ -13,13 +14,14 @@ from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
 
-serial: Any
-try:  # pragma: no cover - optional dependency on host systems
-    serial = importlib.import_module("serial")
-except ModuleNotFoundError:  # pragma: no cover - pyserial may be unavailable
-    serial = None
-except Exception:  # pragma: no cover - defensive catch for partial installs
-    serial = None
+
+def _load_optional_module(module_name: str) -> Any | None:
+    if importlib.util.find_spec(module_name) is None:  # pragma: no cover - optional
+        return None
+    return importlib.import_module(module_name)
+
+
+serial = _load_optional_module("serial")
 
 logger = get_logger(__name__)
 

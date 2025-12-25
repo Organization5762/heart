@@ -6,6 +6,8 @@ null terminator (`\0`).  The most-recent message is available via
 `PhoneText.get_last_text()` for inspection by other code/tests.
 """
 
+import importlib
+import importlib.util
 from collections.abc import Iterator
 from types import ModuleType
 from typing import Any, Self
@@ -13,19 +15,15 @@ from typing import Any, Self
 from heart.peripheral.core import Peripheral
 from heart.utilities.logging import get_logger
 
-adapter: ModuleType | None
-bz_peripheral: ModuleType | None
 
-try:
-    # bluezero is only required when the peripheral is actually *run*.
-    from bluezero import adapter as adapter_module
-    from bluezero import peripheral as peripheral_module
-except ModuleNotFoundError:  # pragma: no cover – only imported on the target device
-    adapter_module = None
-    peripheral_module = None
+def _load_optional_module(module_name: str) -> ModuleType | None:
+    if importlib.util.find_spec(module_name) is None:  # pragma: no cover - optional
+        return None
+    return importlib.import_module(module_name)
 
-adapter = adapter_module
-bz_peripheral = peripheral_module
+
+adapter = _load_optional_module("bluezero.adapter")
+bz_peripheral = _load_optional_module("bluezero.peripheral")
 
 # UUIDs shared with the legacy test script so that existing iOS/Mac apps keep
 # working without any change.
