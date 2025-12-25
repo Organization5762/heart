@@ -25,7 +25,7 @@ from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 
-from heart.firmware_io import identity
+from heart.firmware_io import device_id, identity
 
 
 class SupportsWrite(Protocol):
@@ -47,7 +47,7 @@ ENCODING = "utf-8"
 IDENTITY = identity.Identity(
     device_name="bluetooth-bridge",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(),
+    device_id=device_id.persistent_device_id(),
 )
 
 

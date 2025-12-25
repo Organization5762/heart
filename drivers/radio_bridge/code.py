@@ -7,13 +7,13 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Mapping
 
-from heart.firmware_io import identity
+from heart.firmware_io import device_id, identity
 from heart.firmware_io.constants import RADIO_PACKET
 
 IDENTITY = identity.Identity(
     device_name="radio-bridge",
     firmware_commit=identity.default_firmware_commit(),
-    device_id=identity.persistent_device_id(),
+    device_id=device_id.persistent_device_id(),
 )
 
 
