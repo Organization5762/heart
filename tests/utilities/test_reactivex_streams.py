@@ -301,6 +301,58 @@ class TestShareStreamFlowControl:
 
         assert received == [2, 3]
 
+    def test_share_stream_coalesce_cancels_stale_scheduler_after_fallback(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure fallback flush cancels laggy scheduler timers so coalescing windows stay consistent."""
+
+        import heart.utilities.reactivex.coalescing as reactivex_coalescing
+
+        class StubDisposable:
+            def __init__(self) -> None:
+                self.disposed = False
+
+            def dispose(self) -> None:
+                self.disposed = True
+
+        scheduled: list[dict[str, object]] = []
+
+        def _schedule_relative(_delay: float, action):
+            disposable = StubDisposable()
+            scheduled.append({"action": action, "disposable": disposable})
+            return disposable
+
+        monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "10")
+        monkeypatch.setattr(
+            reactivex_coalescing,
+            "_COALESCE_SCHEDULER",
+            SimpleNamespace(schedule_relative=_schedule_relative),
+        )
+
+        source: Subject[int] = Subject()
+        shared = share_stream(source, stream_name="coalesce_stale_scheduler")
+
+        received: list[int] = []
+        shared.subscribe(received.append)
+
+        source.on_next(1)
+        time.sleep(0.03)
+
+        assert received == [1]
+        assert scheduled[0]["disposable"].disposed is True
+
+        source.on_next(2)
+
+        stale = scheduled[0]
+        if not stale["disposable"].disposed:
+            stale["action"]()
+
+        time.sleep(0.03)
+
+        assert received == [1, 2]
+
     def test_share_stream_flushes_pending_values_on_completion(
         self,
         monkeypatch: pytest.MonkeyPatch,
