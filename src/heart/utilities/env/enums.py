@@ -72,3 +72,8 @@ class ReactivexStreamShareStrategy(StrEnum):
 class ReactivexStreamConnectMode(StrEnum):
     LAZY = "lazy"
     EAGER = "eager"
+
+
+class BeatsStreamOverflowStrategy(StrEnum):
+    DROP_NEWEST = "drop_newest"
+    DROP_OLDEST = "drop_oldest"
