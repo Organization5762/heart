@@ -1,19 +1,28 @@
-# Render pipeline refactor note
+# Render pipeline refactor notes
 
 ## Summary
 
-The render-loop composition and surface-merging logic now lives in a dedicated
-`RenderPipeline` helper so `GameLoop` can focus on initialization, event handling,
-and device updates. The pipeline retains the renderer scheduling, surface caching,
-and render-variant selection behaviors previously embedded in the loop.
+- The render pipeline previously managed per-renderer setup, frame timing, and
+  logging alongside orchestration and surface composition.
+- Per-renderer processing now lives in a focused helper so the pipeline can
+  stay centered on scheduling and composition flow.
 
-## Sources
+## Technical motivation
 
-- `src/heart/runtime/render_pipeline.py` (new render pipeline helper)
-- `src/heart/runtime/game_loop.py` (game loop orchestration)
-- `src/heart/loop.py` (renderer variant selection)
-- `src/heart/environment.py` (legacy import shim updates)
+The `RenderPipeline` class handled both orchestration (queue depth decisions,
+surface collection, and composition) and renderer-specific concerns (clock
+validation, renderer initialization, and metrics logging). Splitting the
+renderer-specific work into its own helper clarifies responsibilities and keeps
+each file focused on one concern.
+
+## Implementation notes
+
+- Added `RendererFrameProcessor` to encapsulate renderer surface preparation,
+  frame execution, and metrics logging.
+- Updated `RenderPipeline` to delegate renderer work to the new processor while
+  keeping dispatch and surface composition logic in place.
 
 ## Materials
 
-- None
+- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/rendering/renderer_processor.py`
