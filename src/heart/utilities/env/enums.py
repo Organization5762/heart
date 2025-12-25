@@ -35,6 +35,12 @@ class LifeUpdateStrategy(StrEnum):
     SHIFTED = "shifted"
 
 
+class LifeRuleStrategy(StrEnum):
+    AUTO = "auto"
+    DIRECT = "direct"
+    TABLE = "table"
+
+
 class DeviceLayoutMode(StrEnum):
     CUBE = "cube"
     RECTANGLE = "rectangle"

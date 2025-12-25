@@ -2,8 +2,8 @@ import os
 
 from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
-                                       LifeUpdateStrategy, RenderMergeStrategy,
-                                       RenderTileStrategy)
+                                       LifeRuleStrategy, LifeUpdateStrategy,
+                                       RenderMergeStrategy, RenderTileStrategy)
 from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
 
 
@@ -127,3 +127,17 @@ class RenderingConfiguration:
     @classmethod
     def life_convolve_threshold(cls) -> int:
         return _env_int("HEART_LIFE_CONVOLVE_THRESHOLD", default=0, minimum=0)
+
+    @classmethod
+    def life_rule_strategy(cls) -> LifeRuleStrategy:
+        strategy = os.environ.get("HEART_LIFE_RULE_STRATEGY", "auto").strip().lower()
+        try:
+            return LifeRuleStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_LIFE_RULE_STRATEGY must be 'auto', 'direct', or 'table'"
+            ) from exc
+
+    @classmethod
+    def life_random_seed(cls) -> int | None:
+        return _env_optional_int("HEART_LIFE_RANDOM_SEED", minimum=0)

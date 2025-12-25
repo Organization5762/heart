@@ -5,9 +5,17 @@ from typing import Any
 import numpy as np
 from scipy.ndimage import convolve
 
-from heart.utilities.env import Configuration, LifeUpdateStrategy
+from heart.utilities.env import (Configuration, LifeRuleStrategy,
+                                 LifeUpdateStrategy)
 
 DEFAULT_LIFE_KERNEL = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=int)
+LIFE_RULE_TABLE = np.array(
+    [
+        [0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0, 0, 0],
+    ],
+    dtype=int,
+)
 
 
 @dataclass
@@ -21,12 +29,23 @@ class LifeState:
         compare=False,
     )
 
+    @staticmethod
+    def resolve_rng(seed: int | None = None) -> np.random.Generator:
+        return np.random.default_rng(seed)
+
+    @classmethod
+    def random_grid(
+        cls, size: tuple[int, int], rng: np.random.Generator | None = None
+    ) -> np.ndarray:
+        if rng is None:
+            rng = cls.resolve_rng()
+        return rng.integers(0, 2, size=size, dtype=int)
+
     def _update_grid(self) -> Any:
         kernel = self.kernel
         strategy = Configuration.life_update_strategy()
         neighbors = self._resolve_neighbors(kernel, strategy)
-
-        new_grid = (neighbors == 3) | (self.grid & (neighbors == 2))
+        new_grid = self._apply_rules(neighbors)
 
         assert new_grid.shape == self.grid.shape, "Grid size must match"
 
@@ -59,6 +78,35 @@ class LifeState:
         if kernel is None:
             kernel = DEFAULT_LIFE_KERNEL
         return self._convolve_neighbors(kernel)
+
+    def _apply_rules(self, neighbors: np.ndarray) -> np.ndarray:
+        rule_strategy = Configuration.life_rule_strategy()
+        if rule_strategy == LifeRuleStrategy.DIRECT:
+            return self._apply_direct_rules(neighbors)
+        if rule_strategy == LifeRuleStrategy.TABLE:
+            return self._apply_table_rules(neighbors)
+        if self._can_use_rule_table(neighbors):
+            return self._apply_table_rules(neighbors)
+        return self._apply_direct_rules(neighbors)
+
+    def _apply_direct_rules(self, neighbors: np.ndarray) -> np.ndarray:
+        return (neighbors == 3) | (self.grid & (neighbors == 2))
+
+    def _apply_table_rules(self, neighbors: np.ndarray) -> np.ndarray:
+        if not self._can_use_rule_table(neighbors):
+            return self._apply_direct_rules(neighbors)
+        return LIFE_RULE_TABLE[self.grid, neighbors]
+
+    def _can_use_rule_table(self, neighbors: np.ndarray) -> bool:
+        if self.kernel is not None and not np.array_equal(
+            self.kernel, DEFAULT_LIFE_KERNEL
+        ):
+            return False
+        if not np.issubdtype(neighbors.dtype, np.integer):
+            return False
+        min_value = int(neighbors.min())
+        max_value = int(neighbors.max())
+        return min_value >= 0 and max_value <= 8
 
     def _auto_neighbors(self, kernel: np.ndarray | None) -> np.ndarray:
         if kernel is not None:
