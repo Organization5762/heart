@@ -11,6 +11,8 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
+from heart.peripheral.uart_buffer import UartMessageBuffer
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
@@ -18,7 +20,7 @@ from heart.utilities.logging_control import get_logging_controller
 NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
 SINGLE_CLIENT_TIMEOUT_SECONDS = 60 * 60 * 12  # 12 hours
-OBJECT_SEPARATOR = "\n"
+OBJECT_SEPARATOR = b"\n"
 
 
 class UartListener:
@@ -26,9 +28,9 @@ class UartListener:
 
     __slots__ = (
         "device",
-        "buffer",
         "events",
         "disconnected",
+        "_buffer",
         "_logger",
         "_log_controller",
         "_bytes_received",
@@ -37,9 +39,12 @@ class UartListener:
 
     def __init__(self, device: BLEDevice) -> None:
         self.device = device
-        self.buffer: str = ""
         self.events: deque[dict[str, Any]] = deque([], maxlen=50)
         self.disconnected = False
+        self._buffer = UartMessageBuffer(
+            strategy_provider=Configuration.ble_uart_buffer_strategy,
+            delimiter=OBJECT_SEPARATOR,
+        )
         self._logger = get_logger(f"{__name__}.{type(self).__name__}")
         self._log_controller = get_logging_controller()
         self._bytes_received = 0
@@ -131,22 +136,20 @@ class UartListener:
             data (bytearray): The data received from the characteristic.
 
         """
-        # Append the decoded data to the buffer
-        decoded = self.__decode_read_data(data)
-        self._bytes_received += len(decoded)
-        self.buffer += decoded
-
-        while OBJECT_SEPARATOR in self.buffer:
-            line, _, remainder = self.buffer.partition(OBJECT_SEPARATOR)
-            self.buffer = remainder
+        self._bytes_received += len(data)
+        for line in self._buffer.append(data):
             if not line:
                 continue
             try:
                 self.events.append(json.loads(line))
                 self._messages_received += 1
             except json.decoder.JSONDecodeError:
+                if isinstance(line, (bytes, bytearray)):
+                    display_line = line.decode("utf-8", errors="ignore")
+                else:
+                    display_line = line
                 self._logger.debug(
-                    "Failed to decode payload: %s", line, exc_info=True
+                    "Failed to decode payload: %s", display_line, exc_info=True
                 )
 
         self._log_controller.log(
@@ -157,12 +160,9 @@ class UartListener:
             args=(
                 self._bytes_received,
                 self._messages_received,
-                len(self.buffer),
+                self._buffer.buffer_size,
             ),
         )
 
-    def __decode_read_data(self, data: bytearray) -> str:
-        return data.decode("utf-8", errors="ignore")
-
     def __clear_buffer(self) -> None:
-        self.buffer = ""
+        self._buffer.clear()

@@ -9,8 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import (AssetCacheStrategy, Configuration,
-                                 FrameExportStrategy,
+from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
+                                 Configuration, FrameExportStrategy,
                                  ReactivexStreamConnectMode,
                                  RenderMergeStrategy, get_device_ports)
 
@@ -164,6 +164,25 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_ASSET_CACHE_STRATEGY", "images")
 
         assert Configuration.asset_cache_strategy() == AssetCacheStrategy.IMAGES
+
+
+    def test_ble_uart_buffer_strategy_defaults_bytes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify BLE UART buffer strategy defaults to bytes. This keeps IO parsing efficient by default."""
+        _clear_env(monkeypatch, "HEART_BLE_UART_BUFFER_STRATEGY")
+
+        assert Configuration.ble_uart_buffer_strategy() == BleUartBufferStrategy.BYTES
+
+
+    def test_ble_uart_buffer_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify BLE UART buffer strategy rejects invalid values. This prevents ambiguous IO buffering."""
+        monkeypatch.setenv("HEART_BLE_UART_BUFFER_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.ble_uart_buffer_strategy()
 
 
     def test_asset_cache_max_entries_defaults_to_64(self, monkeypatch: pytest.MonkeyPatch) -> None:

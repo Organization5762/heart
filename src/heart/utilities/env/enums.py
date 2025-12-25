@@ -30,6 +30,11 @@ class FrameExportStrategy(StrEnum):
     ARRAY = "array"
 
 
+class BleUartBufferStrategy(StrEnum):
+    BYTES = "bytes"
+    TEXT = "text"
+
+
 class SpritesheetFrameCacheStrategy(StrEnum):
     NONE = "none"
     FRAMES = "frames"
