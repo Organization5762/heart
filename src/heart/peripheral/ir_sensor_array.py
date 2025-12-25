@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import threading
@@ -16,22 +15,22 @@ import numpy as np
 
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger
+from heart.utilities.optional_imports import optional_import
 
 LeastSquaresCallable = Callable[..., Any]
 
-_optimize_module: ModuleType | None
-try:  # pragma: no cover - optional dependency
-    _optimize_module = importlib.import_module("scipy.optimize")
-except Exception:  # pragma: no cover - optional dependency may be absent
-    _optimize_module = None
+logger = get_logger(__name__)
+
+_optimize_module = cast(
+    ModuleType | None,
+    optional_import("scipy.optimize", logger=logger),
+)
 
 if _optimize_module is not None:
     least_squares = cast(LeastSquaresCallable, getattr(_optimize_module, "least_squares"))
 else:
     def least_squares(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError("scipy.optimize.least_squares is not available")
-
-logger = get_logger(__name__)
 
 SPEED_OF_LIGHT = 299_792_458.0  # metres per second
 
