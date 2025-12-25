@@ -8,7 +8,8 @@ from enum import Enum, StrEnum
 from typing import Mapping, Sequence
 from uuid import UUID
 
-from google.protobuf.message import Message  # type: ignore[import-untyped]
+from google.protobuf import symbol_database
+from google.protobuf.message import Message
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -21,6 +22,10 @@ class PeripheralPayload:
     payload: bytes
     encoding: PeripheralPayloadEncoding
     payload_type: str = ""
+
+
+class PeripheralPayloadDecodeError(ValueError):
+    """Raised when a peripheral payload cannot be decoded."""
 
 
 def _normalize_payload(payload: object) -> object:
@@ -69,4 +74,33 @@ def encode_peripheral_payload(payload: object) -> PeripheralPayload:
         payload=encoded_payload,
         encoding=PeripheralPayloadEncoding.JSON_UTF8,
         payload_type="",
+    )
+
+
+def decode_peripheral_payload(payload: PeripheralPayload) -> object:
+    if payload.encoding == PeripheralPayloadEncoding.JSON_UTF8:
+        return json.loads(payload.payload.decode("utf-8"))
+
+    if payload.encoding == PeripheralPayloadEncoding.PROTOBUF:
+        if not payload.payload_type:
+            raise PeripheralPayloadDecodeError(
+                "Protobuf payload is missing a payload type."
+            )
+        try:
+            message_class = symbol_database.Default().GetSymbol(payload.payload_type)
+        except KeyError as exc:
+            raise PeripheralPayloadDecodeError(
+                f"Unknown protobuf payload type: {payload.payload_type}"
+            ) from exc
+        message = message_class()
+        try:
+            message.ParseFromString(payload.payload)
+        except Exception as exc:
+            raise PeripheralPayloadDecodeError(
+                f"Failed to decode protobuf payload: {payload.payload_type}"
+            ) from exc
+        return message
+
+    raise PeripheralPayloadDecodeError(
+        f"Unsupported payload encoding: {payload.encoding}"
     )

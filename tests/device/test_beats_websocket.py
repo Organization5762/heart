@@ -1,10 +1,14 @@
 import json
 from dataclasses import dataclass
 
+import pytest
+
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import _encode_peripheral_message
 from heart.peripheral.core import PeripheralInfo, PeripheralMessageEnvelope
-from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
+from heart.peripheral.core.encoding import (PeripheralPayloadDecodeError,
+                                            PeripheralPayloadEncoding,
+                                            decode_peripheral_payload,
                                             encode_peripheral_payload)
 
 
@@ -63,3 +67,37 @@ class TestPeripheralPayloadEncoding:
         assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
         assert encoded.payload_type == "heart.beats.streaming.Frame"
         assert encoded.payload == message.SerializeToString()
+
+
+class TestPeripheralPayloadDecoding:
+    """Validate payload decoding so receivers can reconstruct peripheral data accurately."""
+
+    def test_decodes_json_payloads_into_mappings(self) -> None:
+        """Verify JSON payloads decode to mappings so consumers can inspect fields without protobuf tooling."""
+        payload = encode_peripheral_payload({"level": 9})
+
+        decoded = decode_peripheral_payload(payload)
+
+        assert decoded == {"level": 9}
+
+    def test_decodes_protobuf_payloads_into_messages(self) -> None:
+        """Verify protobuf payloads decode to message objects so typed data stays intact across transports."""
+        message = beats_streaming_pb2.Frame(png_data=b"frame-bytes")
+        payload = encode_peripheral_payload(message)
+
+        decoded = decode_peripheral_payload(payload)
+
+        assert isinstance(decoded, beats_streaming_pb2.Frame)
+        assert decoded == message
+
+    def test_raises_on_unknown_protobuf_type(self) -> None:
+        """Verify unknown protobuf types raise explicit errors so integration issues surface quickly."""
+        payload = encode_peripheral_payload(beats_streaming_pb2.Frame(png_data=b"x"))
+        payload = payload.__class__(
+            payload=payload.payload,
+            encoding=payload.encoding,
+            payload_type="heart.beats.streaming.Unknown",
+        )
+
+        with pytest.raises(PeripheralPayloadDecodeError):
+            decode_peripheral_payload(payload)

@@ -26,3 +26,7 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 ## Client decoding
 
 The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a typed `StreamEvent` into the RxJS stream. Frame bytes are converted directly into PNG blobs, and peripheral payloads are decoded from UTF-8 JSON when the payload encoding signals `JSON_UTF8`. Protobuf payloads set `payload_type` to the fully-qualified message name and set the encoding to `PROTOBUF`.
+
+## Python decoding helper
+
+`heart.peripheral.core.encoding.decode_peripheral_payload` mirrors the envelope rules when decoding payloads in Python. JSON payloads return mappings, while protobuf payloads are parsed using the `payload_type` message name. Import the relevant `*_pb2` modules before decoding so the message classes are registered with the protobuf symbol database.
