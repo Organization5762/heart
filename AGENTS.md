@@ -20,6 +20,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
 - Use `heart.utilities.logging.get_logger` for internal logging so handlers and log levels stay consistent across modules.
 - Prefer module-level constants for tunable loop intervals instead of embedding sleep literals in long-running loops.
+- When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 
 ## Error Handling
 

@@ -46,10 +46,11 @@ class Shader:
         return None
 
     def create(self):
-        with open(Path(template_location).parent / "vert.glsl") as f:
+        template_path = Path(template_location).parent
+        with (template_path / "vert.glsl").open(encoding="utf-8") as f:
             vert_shader = f.read()
 
-        with open(Path(template_location).parent / "frag_gen.glsl") as f:
+        with (template_path / "frag_gen.glsl").open(encoding="utf-8") as f:
             frag_shader = f.read()
 
         program = self.compile_program(vert_shader, frag_shader)
