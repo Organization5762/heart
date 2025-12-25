@@ -60,8 +60,8 @@ class SensorReader:
         self._last_gyro: tuple | None = None
 
     def read(self):
+        """Yield JSON strings for each channel that crossed ``min_change``."""
         for sensor in self.sensors:
-            """Yield JSON strings for each channel that crossed ``min_change``."""
             if hasattr(sensor, "acceleration"):
                 accel = sensor.acceleration  # m/s²
                 if self._changed_enough(accel, self._last_accel, self.min_change):
