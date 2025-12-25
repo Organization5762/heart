@@ -167,7 +167,7 @@ def main() -> int:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(f"{output}\n", encoding="utf-8")
     else:
-        print(output)
+        sys.stdout.write(f"{output}\n")
     return 0
 
 
