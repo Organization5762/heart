@@ -11,6 +11,7 @@ from heart.manage.driver_update.filesystem import (DRIVER_FILES, copy_file,
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+UF2_INSTALL_DELAY_SECONDS = 10
 
 
 def mount_points(media_directory: Path) -> list[Path]:
@@ -33,7 +34,7 @@ def install_uf2_if_available(
     if uf2_destination.is_dir():
         downloaded_file_path = download_file(config.uf2_url, config.uf2_checksum)
         copy_file(downloaded_file_path, uf2_destination)
-        time.sleep(10)
+        time.sleep(UF2_INSTALL_DELAY_SECONDS)
     else:
         logger.info(
             "Skipping CircuitPython UF2 installation as no device is in boot mode currently"

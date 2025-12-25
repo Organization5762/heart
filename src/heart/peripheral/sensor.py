@@ -17,6 +17,7 @@ from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 logger = get_logger(__name__)
+RECONNECT_DELAY_SECONDS = 1.0
 
 
 @dataclass
@@ -71,7 +72,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
                 raise
             except Exception:
                 logger.exception("Accelerometer stream failed; reconnecting")
-                time.sleep(1.0)
+                time.sleep(RECONNECT_DELAY_SECONDS)
 
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()

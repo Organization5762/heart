@@ -15,6 +15,8 @@ from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
 
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
+PHYPOX_POLL_INTERVAL_SECONDS = 0.05
+PHYPOX_LOG_POLL_INTERVAL_SECONDS = 0.1
 logger = get_logger(__name__)
 
 
@@ -127,7 +129,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 self.phyphox_db = data["buffer"]["dB"]["buffer"][-1]
             except Exception:
                 logger.exception("Failed to poll phyphox data")
-            time.sleep(0.05)
+            time.sleep(PHYPOX_POLL_INTERVAL_SECONDS)
 
     def real_process(
         self,
@@ -261,4 +263,4 @@ def poll_phyphox():
             logger.info("Phyphox acceleration x=%s, y=%s, z=%s", x, y, z)
         except Exception:
             logger.exception("Error")
-        time.sleep(0.1)
+        time.sleep(PHYPOX_LOG_POLL_INTERVAL_SECONDS)
