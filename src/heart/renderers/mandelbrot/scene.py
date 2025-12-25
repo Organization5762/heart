@@ -4,7 +4,6 @@ import io
 import itertools
 import os
 import pstats
-import sys
 import time
 
 import numpy as np
@@ -681,11 +680,7 @@ def main():
                 "You can analyze this file later, e.g., using 'snakeviz %s'",
                 profile_filename,
             )
-
-    # Clean up
-    raise Exception("stopping")
-    pygame.quit()
-    sys.exit()
+        pygame.quit()
 
 
 if __name__ == "__main__":
