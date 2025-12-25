@@ -21,7 +21,9 @@ if Configuration.is_pi():
 else:
     MEDIA_DIRECTORY = Path("/Volumes")
 
-CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = "adafruit-circuitpython-bundle-9.x-mpy-20250412"
+CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = (
+    "adafruit-circuitpython-bundle-9.x-mpy-20250412"
+)
 CIRCUIT_PY_COMMON_LIBS = (
     "https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/"
     f"20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
@@ -262,9 +264,12 @@ def _mount_points(media_directory: Path) -> list[Path]:
     ]
 
 
-def main(device_driver_name: str) -> None:
-    base_path = Path(heart.__file__).resolve().parents[2] / "drivers"
-    code_path = base_path / device_driver_name
+def _driver_base_path() -> Path:
+    return Path(heart.__file__).resolve().parents[2] / "drivers"
+
+
+def _get_driver_path(device_driver_name: str) -> Path:
+    code_path = _driver_base_path() / device_driver_name
     if not code_path.is_dir():
         message = (
             "The path "
@@ -272,30 +277,22 @@ def main(device_driver_name: str) -> None:
         )
         logger.error(message)
         raise UpdateError(message)
+    return code_path
 
-    ###
-    # Load a bunch of env vars the driver declares
-    ###
-    config = _load_driver_config(code_path / DRIVER_SETTINGS_FILENAME)
-    _ensure_driver_files(code_path)
-    mount_points = _mount_points(MEDIA_DIRECTORY)
 
-    ###
-    # If the device is not a CIRCUIT_PY device yet, load the UF2 so that it is converted
-    ###
-    UF2_DESTINATION = MEDIA_DIRECTORY / config.device_boot_name
-    if UF2_DESTINATION.is_dir():
+def _install_uf2_if_available(config: DriverConfig) -> None:
+    uf2_destination = MEDIA_DIRECTORY / config.device_boot_name
+    if uf2_destination.is_dir():
         downloaded_file_path = download_file(config.uf2_url, config.uf2_checksum)
-        copy_file(downloaded_file_path, UF2_DESTINATION)
+        copy_file(downloaded_file_path, uf2_destination)
         time.sleep(10)
     else:
         logger.info(
             "Skipping CircuitPython UF2 installation as no device is in boot mode currently"
         )
 
-    ###
-    # For all the CIRCUITPY devices, try to find whether this specific driver should be loaded onto them
-    ###
+
+def _circuitpy_mounts(mount_points: list[Path]) -> list[Path]:
     circuitpy_mounts = [
         mount_point
         for mount_point in mount_points
@@ -303,37 +300,51 @@ def main(device_driver_name: str) -> None:
     ]
     if not circuitpy_mounts:
         logger.warning("No CIRCUITPY volumes found under %s.", MEDIA_DIRECTORY)
+    return circuitpy_mounts
 
-    for media_location in circuitpy_mounts:
-        boot_out_path = media_location / "boot_out.txt"
 
-        if boot_out_path.exists():
-            try:
-                board_id = _parse_board_id(boot_out_path)
-            except ValueError as error:
-                logger.warning("Unable to parse board ID: %s", error)
-                continue
+def _update_circuitpy_mount(
+    media_location: Path, config: DriverConfig, code_path: Path
+) -> None:
+    boot_out_path = media_location / "boot_out.txt"
+    if not boot_out_path.exists():
+        logger.info("%s is missing, skipping...", boot_out_path)
+        return
 
-            if board_id not in config.valid_board_ids:
-                logger.info(
-                    "Skipping: The board ID %s is not in the list of valid board IDs: %s",
-                    board_id,
-                    config.valid_board_ids,
-                )
-                continue
+    try:
+        board_id = _parse_board_id(boot_out_path)
+    except ValueError as error:
+        logger.warning("Unable to parse board ID: %s", error)
+        return
 
-            for file_name in DRIVER_FILES:
-                copy_file(
-                    code_path / file_name,
-                    media_location / file_name,
-                )
+    if board_id not in config.valid_board_ids:
+        logger.info(
+            "Skipping: The board ID %s is not in the list of valid board IDs: %s",
+            board_id,
+            config.valid_board_ids,
+        )
+        return
 
-            load_driver_libs(
-                libs=config.driver_libs,
-                destination=media_location / "lib",
-            )
-        else:
-            logger.info("%s is missing, skipping...", boot_out_path)
+    for file_name in DRIVER_FILES:
+        copy_file(
+            code_path / file_name,
+            media_location / file_name,
+        )
+
+    load_driver_libs(
+        libs=config.driver_libs,
+        destination=media_location / "lib",
+    )
+
+
+def main(device_driver_name: str) -> None:
+    code_path = _get_driver_path(device_driver_name)
+    config = _load_driver_config(code_path / DRIVER_SETTINGS_FILENAME)
+    _ensure_driver_files(code_path)
+    mount_points = _mount_points(MEDIA_DIRECTORY)
+    _install_uf2_if_available(config)
+    for media_location in _circuitpy_mounts(mount_points):
+        _update_circuitpy_mount(media_location, config, code_path)
 
 
 if __name__ == "__main__":
