@@ -17,7 +17,11 @@ from heart.utilities.logging import get_logger
 
 
 def _load_optional_module(module_name: str) -> ModuleType | None:
-    if importlib.util.find_spec(module_name) is None:  # pragma: no cover - optional
+    try:
+        module_spec = importlib.util.find_spec(module_name)
+    except ModuleNotFoundError:  # pragma: no cover - optional
+        module_spec = None
+    if module_spec is None:  # pragma: no cover - optional
         return None
     return importlib.import_module(module_name)
 
