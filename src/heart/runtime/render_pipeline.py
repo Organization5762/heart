@@ -118,6 +118,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
+        self._planner.update_merge_strategy(renderers)
         surfaces = self._collect_surfaces_serial(renderers)
         return self._composition_manager.compose_serial(
             surfaces, merge_fn=self.merge_surfaces
@@ -127,6 +128,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
+        self._planner.update_merge_strategy(renderers)
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
         surfaces = self._collect_surfaces_parallel(renderers)
@@ -140,9 +142,8 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
-        variant = self._planner.plan(
-            renderers, override_renderer_variant
-        ).variant
+        self._planner.set_default_variant(self.renderer_variant)
+        variant = self._planner.resolve_variant(renderers, override_renderer_variant)
         return self._render_dispatch.get(
             variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )
@@ -152,6 +153,7 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> pygame.Surface | None:
+        self._planner.set_default_variant(self.renderer_variant)
         plan = self._planner.plan(renderers, override_renderer_variant)
         render_fn = self._render_dispatch.get(
             plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]

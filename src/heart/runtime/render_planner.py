@@ -35,15 +35,31 @@ class RenderPlanner:
     def get_merge_strategy(self) -> RenderMergeStrategy:
         return self._current_merge_strategy
 
+    def set_default_variant(self, default_variant: RendererVariant) -> None:
+        self._default_variant = default_variant
+
+    def update_merge_strategy(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> RenderMergeStrategy:
+        self._current_merge_strategy = self._resolve_merge_strategy(renderers)
+        return self._current_merge_strategy
+
     def plan(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderPlan:
-        variant = self._resolve_render_variant(renderers, override_renderer_variant)
+        variant = self.resolve_variant(renderers, override_renderer_variant)
         self._current_merge_strategy = self._resolve_merge_strategy(renderers)
         self._log_render_plan(renderers, variant)
         return RenderPlan(variant=variant, merge_strategy=self._current_merge_strategy)
+
+    def resolve_variant(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None,
+    ) -> RendererVariant:
+        return self._resolve_render_variant(renderers, override_renderer_variant)
 
     def _resolve_merge_strategy(
         self, renderers: list["StatefulBaseRenderer[Any]"]
