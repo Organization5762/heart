@@ -18,7 +18,7 @@ def run_command(
     registry = ConfigurationRegistry()
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
-        raise Exception(f"Configuration '{configuration}' not found in registry")
+        raise ValueError(f"Configuration '{configuration}' not found in registry")
     loop = build_game_loop(x11_forward=x11_forward)
     configuration_fn(loop)
 

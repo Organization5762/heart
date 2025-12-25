@@ -22,6 +22,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 ## Error Handling
 
 - Avoid catching `BaseException`; catch `Exception` or more specific error types so system-exiting signals propagate.
+- Avoid raising bare `Exception` values; raise more specific exception types instead.
 - Avoid swallowing recoverable exceptions; log them with the shared logger (use debug-level logging for high-frequency loops).
 - Avoid placeholder early returns or unreachable docstrings in production methods; remove stubs once real implementations are available.
 
