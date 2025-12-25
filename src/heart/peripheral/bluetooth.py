@@ -21,6 +21,7 @@ NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
 SINGLE_CLIENT_TIMEOUT_SECONDS = 60 * 60 * 12  # 12 hours
 OBJECT_SEPARATOR = b"\n"
+RECONNECT_DELAY_SECONDS = 1.0
 
 
 class UartListener:
@@ -108,10 +109,9 @@ class UartListener:
                 await client.start_notify(
                     NOTIFICATION_CHANNEL, callback=self.__callback
                 )
-
                 await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
             # On failure, wait a bit before retrying
-            time.sleep(1.0)
+            time.sleep(RECONNECT_DELAY_SECONDS)
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:

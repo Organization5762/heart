@@ -25,6 +25,10 @@ from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
+SERIAL_RECONNECT_DELAY_SECONDS = 0.1
+BLUETOOTH_EVENT_POLL_DELAY_SECONDS = 0.1
+BLUETOOTH_RETRY_DELAY_SECONDS = 5
+BLUETOOTH_SLOW_RETRY_DELAY_SECONDS = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,7 +208,7 @@ class Switch(BaseSwitch):
             except Exception:
                 pass
 
-            time.sleep(0.1)
+            time.sleep(SERIAL_RECONNECT_DELAY_SECONDS)
         return Disposable()
 
     def run(self) -> None:
@@ -297,7 +301,7 @@ class BluetoothSwitch(BaseSwitch):
                     while True:
                         for event in self.listener.consume_events():
                             self.update_due_to_data(event)
-                        time.sleep(0.1)
+                        time.sleep(BLUETOOTH_EVENT_POLL_DELAY_SECONDS)
                 except KeyboardInterrupt:
                     logger.info("Program terminated")
                 except Exception:
@@ -312,4 +316,8 @@ class BluetoothSwitch(BaseSwitch):
                 if number_of_retries_without_success > 5:
                     slow_poll = True
 
-            time.sleep(30 if slow_poll else 5)
+            time.sleep(
+                BLUETOOTH_SLOW_RETRY_DELAY_SECONDS
+                if slow_poll
+                else BLUETOOTH_RETRY_DELAY_SECONDS
+            )

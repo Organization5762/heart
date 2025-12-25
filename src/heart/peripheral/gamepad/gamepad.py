@@ -16,6 +16,7 @@ from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
+INITIALIZATION_DELAY_SECONDS = 1.5
 
 
 class GamepadIdentifier(Enum):
@@ -229,7 +230,7 @@ class Gamepad(Peripheral[Any]):
     def run(self) -> None:
         # Give pygame and USB subsystems time to fully initialize
         # TODO: Is this needed?
-        time.sleep(1.5)
+        time.sleep(INITIALIZATION_DELAY_SECONDS)
 
         # check every 1 second for controller state, so that we can attempt to connect
         scheduler = input_scheduler()
