@@ -106,17 +106,17 @@ def connect_to_sensors(i2c):
         ISM330DHCX: An instance of the ISM330DHCX sensor.
 
     """
-    sensor_fn = [
+    sensor_factories = [
         LSM303_Accel,
         LIS2MDL,
         ISM330DHCX,
     ]
     sensors = []
-    for sensor_fn in sensor_fn:
+    for sensor_factory in sensor_factories:
         try:
-            sensors.append(sensor_fn(i2c))
+            sensors.append(sensor_factory(i2c))
         except Exception as exc:  # noqa: BLE001
-            _debug(f"Failed to initialize sensor {sensor_fn.__name__}: {exc}")
+            _debug(f"Failed to initialize sensor {sensor_factory.__name__}: {exc}")
     return sensors
 
 

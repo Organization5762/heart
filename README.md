@@ -62,6 +62,7 @@ See the following references for deeper analysis:
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.
 - `make doctor` captures a developer experience snapshot for troubleshooting.
+- Keep collection and element variable names distinct (for example, `sensors` and `sensor`).
 
 The repository layout is summarised below:
 ```
