@@ -8,9 +8,11 @@ loop implementation.
 
 ## Materials
 
-- `src/heart/environment.py`
-- `src/heart/utilities/env.py`
-- `src/heart/renderers/internal/frame_accumulator.py`
+- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/rendering/composition.py`
+- `src/heart/runtime/rendering/surface_merge.py`
+- `src/heart/utilities/env/enums.py`
+- `src/heart/utilities/env/rendering.py`
 
 ## Composition flow
 
@@ -45,12 +47,29 @@ batched blit.
   renderers expect their cached surface to remain unmodified after the frame.
 - Still performs repeated blits, so overhead grows with renderer count.
 
+### Adaptive
+
+- Choose `batched` or `in_place` based on recent renderer timing history.
+- Favors `in_place` when renderer costs are low to minimize merge overhead.
+- Switches to `batched` once renderer costs exceed a configurable threshold.
+
+**Trade-offs**
+
+- Requires recent timing samples to make a decision.
+- Produces per-frame decisions that are sensitive to the configured thresholds.
+
 ## Runtime configuration
 
 Set `HEART_RENDER_MERGE_STRATEGY` to switch strategies at runtime:
 
 - `batched` (default)
 - `in_place`
+- `adaptive`
 
 Changing the configuration does not require modifications to renderer
 implementations.
+
+When `adaptive` is enabled, tune decisions with:
+
+- `HEART_RENDER_MERGE_COST_THRESHOLD_MS` (total renderer cost threshold)
+- `HEART_RENDER_MERGE_SURFACE_THRESHOLD` (minimum renderer count before batching)

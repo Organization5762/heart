@@ -9,6 +9,7 @@ class RenderTileStrategy(StrEnum):
 class RenderMergeStrategy(StrEnum):
     IN_PLACE = "in_place"
     BATCHED = "batched"
+    ADAPTIVE = "adaptive"
 
 
 class FrameArrayStrategy(StrEnum):
