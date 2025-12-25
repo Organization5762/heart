@@ -1,5 +1,4 @@
 # ant_hr_manager.py
-import logging
 import threading
 import time
 from typing import (Any, Callable, Dict, Iterator, List, Optional,
@@ -29,11 +28,6 @@ last_seen: Dict[str, float] = {}  # NEW: last packet time-stamp
 _mutex = threading.Lock()  # protects the three dicts above
 # ──────────────────────────────────────────────────────────────────────────────
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()],
-)
 logger = get_logger("HeartRateManager")
 
 # ---------------------------------------------------------------------------
