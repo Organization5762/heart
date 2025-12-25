@@ -5,9 +5,17 @@ from typing import Any
 import numpy as np
 from scipy.ndimage import convolve
 
-from heart.utilities.env import Configuration, LifeUpdateStrategy
+from heart.utilities.env import (Configuration, LifeRuleStrategy,
+                                 LifeUpdateStrategy)
 
 DEFAULT_LIFE_KERNEL = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=int)
+LIFE_RULE_TABLE = np.array(
+    [
+        [0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0, 0, 0],
+    ],
+    dtype=int,
+)
 
 
 @dataclass
@@ -21,12 +29,26 @@ class LifeState:
         compare=False,
     )
 
+    @staticmethod
+    def resolve_rng(
+        seed: int | None, rng: np.random.Generator | None = None
+    ) -> np.random.Generator:
+        if rng is not None:
+            return rng
+        return np.random.default_rng(seed)
+
+    @staticmethod
+    def random_grid(
+        size: tuple[int, int], rng: np.random.Generator
+    ) -> np.ndarray:
+        return rng.integers(0, 2, size=size, dtype=int)
+
     def _update_grid(self) -> Any:
         kernel = self.kernel
         strategy = Configuration.life_update_strategy()
+        rule_strategy = Configuration.life_rule_strategy()
         neighbors = self._resolve_neighbors(kernel, strategy)
-
-        new_grid = (neighbors == 3) | (self.grid & (neighbors == 2))
+        new_grid = self._apply_rules(neighbors, kernel, rule_strategy)
 
         assert new_grid.shape == self.grid.shape, "Grid size must match"
 
@@ -37,6 +59,36 @@ class LifeState:
             kernel=self.kernel,
             neighbor_buffer=self.neighbor_buffer,
         )
+
+    def _apply_rules(
+        self,
+        neighbors: np.ndarray,
+        kernel: np.ndarray | None,
+        strategy: LifeRuleStrategy,
+    ) -> np.ndarray:
+        if strategy == LifeRuleStrategy.DIRECT:
+            return self._apply_direct_rules(neighbors)
+        if strategy == LifeRuleStrategy.TABLE:
+            return self._apply_table_rules(neighbors, kernel)
+        if kernel is not None:
+            return self._apply_direct_rules(neighbors)
+        return self._apply_table_rules(neighbors, kernel)
+
+    def _apply_direct_rules(self, neighbors: np.ndarray) -> np.ndarray:
+        return (neighbors == 3) | (self.grid & (neighbors == 2))
+
+    def _apply_table_rules(
+        self, neighbors: np.ndarray, kernel: np.ndarray | None
+    ) -> np.ndarray:
+        if kernel is not None:
+            return self._apply_direct_rules(neighbors)
+        if neighbors.size == 0:
+            return neighbors.astype(int)
+        if np.max(neighbors) > 8 or np.min(neighbors) < 0:
+            return self._apply_direct_rules(neighbors)
+        state_index = self.grid.astype(np.int8, copy=False)
+        neighbor_index = neighbors.astype(np.int8, copy=False)
+        return LIFE_RULE_TABLE[state_index, neighbor_index]
 
     def _resolve_neighbors(
         self, kernel: np.ndarray | None, strategy: LifeUpdateStrategy

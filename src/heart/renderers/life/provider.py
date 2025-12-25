@@ -1,4 +1,3 @@
-
 from typing import Callable
 
 import numpy as np
@@ -8,6 +7,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
+from heart.utilities.env import Configuration
 
 
 class LifeStateProvider:
@@ -19,8 +19,10 @@ class LifeStateProvider:
         self,
     ) -> reactivex.Observable[LifeState]:
         StateOp = Callable[[LifeState], LifeState]
-        def create_new_grid(size):
-            return np.random.choice([0, 1], size=size)
+        rng = LifeState.resolve_rng(Configuration.life_random_seed())
+
+        def create_new_grid(size: tuple[int, int]) -> np.ndarray:
+            return LifeState.random_grid(size, rng)
 
         def create_state(x: np.ndarray) -> LifeState:
             return LifeState(grid=x)
