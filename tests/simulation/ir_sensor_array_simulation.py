@@ -20,6 +20,9 @@ from typing import Iterable, Sequence
 import numpy as np
 
 from heart.peripheral.ir_sensor_array import radial_layout
+from heart.utilities.logging import get_logger
+
+LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -173,17 +176,22 @@ def main() -> None:
         f"{'Line point':<36} | {'Line dir.':<36} | Error (deg)"
     )
     divider = "-" * len(header)
-    print(header)
-    print(divider)
+    LOGGER.info(header)
+    LOGGER.info(divider)
     for result in results:
-        error = f"{result.angular_error_deg:10.4f}" if result.angular_error_deg is not None else "    --    "
-        print(
-            f"{result.scenario.name:<12} | "
-            f"{list(result.active_indices)!s:<12} | "
-            f"{_format_vector(result.view_direction):<36} | "
-            f"{_format_vector(result.line_point):<36} | "
-            f"{_format_vector(result.line_direction):<36} | "
-            f"{error}"
+        error = (
+            f"{result.angular_error_deg:10.4f}"
+            if result.angular_error_deg is not None
+            else "    --    "
+        )
+        LOGGER.info(
+            "%-12s | %-12s | %-36s | %-36s | %-36s | %s",
+            result.scenario.name,
+            list(result.active_indices),
+            _format_vector(result.view_direction),
+            _format_vector(result.line_point),
+            _format_vector(result.line_direction),
+            error,
         )
 
 
