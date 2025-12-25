@@ -51,6 +51,7 @@ class RenderPipeline:
         self._render_executor: ThreadPoolExecutor | None = None
 
         self._render_queue_depth = 0
+        self._renderer_costs_ms: dict[int, float] = {}
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self.clock = clock
@@ -85,6 +86,7 @@ class RenderPipeline:
             start_ns = time.perf_counter_ns()
             screen = self._render_renderer_frame(renderer)
             duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+            self._update_renderer_cost(renderer, duration_ms)
             self._log_renderer_metrics(renderer, duration_ms)
             return screen
         except Exception:
@@ -143,6 +145,28 @@ class RenderPipeline:
             args=log_args,
             extra=log_extra,
             fallback_level=logging.DEBUG,
+        )
+
+    def _update_renderer_cost(
+        self, renderer: "StatefulBaseRenderer[Any]", duration_ms: float
+    ) -> None:
+        renderer_key = id(renderer)
+        alpha = Configuration.render_parallel_cost_smoothing()
+        previous = self._renderer_costs_ms.get(renderer_key)
+        if previous is None:
+            self._renderer_costs_ms[renderer_key] = duration_ms
+            return
+        self._renderer_costs_ms[renderer_key] = previous + alpha * (
+            duration_ms - previous
+        )
+
+    def _estimate_render_cost_ms(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> float:
+        default_cost = Configuration.render_parallel_cost_default_ms()
+        return sum(
+            self._renderer_costs_ms.get(id(renderer), default_cost)
+            for renderer in renderers
         )
 
     def finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
@@ -211,23 +235,37 @@ class RenderPipeline:
 
     def _resolve_render_variant(
         self,
-        renderer_count: int,
+        renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RendererVariant:
         variant = override_renderer_variant or self.renderer_variant
         if variant == RendererVariant.AUTO:
             threshold = Configuration.render_parallel_threshold()
-            if threshold > 1 and renderer_count >= threshold:
+            if threshold > 1 and len(renderers) >= threshold:
                 return RendererVariant.BINARY
             return RendererVariant.ITERATIVE
+        if variant == RendererVariant.ADAPTIVE:
+            return self._resolve_adaptive_variant(renderers)
         return variant
+
+    def _resolve_adaptive_variant(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> RendererVariant:
+        threshold = Configuration.render_parallel_threshold()
+        if len(renderers) < threshold:
+            return RendererVariant.ITERATIVE
+        estimated_cost = self._estimate_render_cost_ms(renderers)
+        cost_threshold = Configuration.render_parallel_cost_threshold_ms()
+        if estimated_cost >= cost_threshold:
+            return RendererVariant.BINARY
+        return RendererVariant.ITERATIVE
 
     def _render_fn(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
-        variant = self._resolve_render_variant(len(renderers), override_renderer_variant)
+        variant = self._resolve_render_variant(renderers, override_renderer_variant)
         return self._render_dispatch.get(
             variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )

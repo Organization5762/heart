@@ -4,7 +4,8 @@ from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        LifeUpdateStrategy, RenderMergeStrategy,
                                        RenderTileStrategy)
-from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
+from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
+                                         _env_optional_int)
 
 
 class RenderingConfiguration:
@@ -47,6 +48,31 @@ class RenderingConfiguration:
     @classmethod
     def render_executor_max_workers(cls) -> int | None:
         return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
+
+    @classmethod
+    def render_parallel_cost_threshold_ms(cls) -> float:
+        return _env_float(
+            "HEART_RENDER_PARALLEL_COST_THRESHOLD_MS",
+            default=6.0,
+            minimum=0.0,
+        )
+
+    @classmethod
+    def render_parallel_cost_default_ms(cls) -> float:
+        return _env_float(
+            "HEART_RENDER_PARALLEL_COST_DEFAULT_MS",
+            default=1.5,
+            minimum=0.0,
+        )
+
+    @classmethod
+    def render_parallel_cost_smoothing(cls) -> float:
+        return _env_float(
+            "HEART_RENDER_PARALLEL_COST_SMOOTHING",
+            default=0.3,
+            minimum=0.01,
+            maximum=1.0,
+        )
 
     @classmethod
     def render_surface_cache_enabled(cls) -> bool:

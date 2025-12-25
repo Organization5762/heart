@@ -15,6 +15,7 @@ class RendererVariant(enum.StrEnum):
     BINARY = "BINARY"
     ITERATIVE = "ITERATIVE"
     AUTO = "AUTO"
+    ADAPTIVE = "ADAPTIVE"
     # TODO: Add more
 
     @classmethod
