@@ -8,7 +8,13 @@ from enum import Enum, StrEnum
 from typing import Mapping, Sequence
 from uuid import UUID
 
+from google.protobuf import symbol_database
 from google.protobuf.message import Message
+
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
+protobuf_symbol_database = symbol_database.Default()
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -21,6 +27,10 @@ class PeripheralPayload:
     payload: bytes
     encoding: PeripheralPayloadEncoding
     payload_type: str = ""
+
+
+class PeripheralPayloadDecodingError(ValueError):
+    """Raised when a peripheral payload cannot be decoded."""
 
 
 def _normalize_payload(payload: object) -> object:
@@ -69,4 +79,49 @@ def encode_peripheral_payload(payload: object) -> PeripheralPayload:
         payload=encoded_payload,
         encoding=PeripheralPayloadEncoding.JSON_UTF8,
         payload_type="",
+    )
+
+
+def decode_peripheral_payload(
+    payload: bytes,
+    *,
+    encoding: PeripheralPayloadEncoding,
+    payload_type: str = "",
+) -> object:
+    if encoding == PeripheralPayloadEncoding.JSON_UTF8:
+        try:
+            decoded = payload.decode("utf-8")
+            return json.loads(decoded)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            logger.exception("Failed to decode JSON peripheral payload.")
+            raise PeripheralPayloadDecodingError(
+                "Failed to decode JSON peripheral payload."
+            ) from exc
+
+    if encoding == PeripheralPayloadEncoding.PROTOBUF:
+        if not payload_type:
+            raise PeripheralPayloadDecodingError(
+                "Protobuf payloads require a payload_type."
+            )
+        try:
+            message_class = protobuf_symbol_database.GetSymbol(payload_type)
+        except KeyError as exc:
+            raise PeripheralPayloadDecodingError(
+                f"Unknown protobuf payload type: {payload_type}"
+            ) from exc
+        message = message_class()
+        try:
+            message.ParseFromString(payload)
+        except Exception as exc:
+            logger.exception(
+                "Failed to decode protobuf payload for type %s.",
+                payload_type,
+            )
+            raise PeripheralPayloadDecodingError(
+                f"Failed to decode protobuf payload for type {payload_type}."
+            ) from exc
+        return message
+
+    raise PeripheralPayloadDecodingError(
+        f"Unsupported peripheral payload encoding: {encoding}"
     )

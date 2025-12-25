@@ -2,9 +2,12 @@ import json
 from dataclasses import dataclass
 
 from heart.device.beats.proto import beats_streaming_pb2
-from heart.device.beats.websocket import _encode_peripheral_message
-from heart.peripheral.core import PeripheralInfo, PeripheralMessageEnvelope
+from heart.device.beats.websocket import (_encode_peripheral_message,
+                                          decode_stream_envelope)
+from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
+                                   PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
+                                            decode_peripheral_payload,
                                             encode_peripheral_payload)
 
 
@@ -63,3 +66,77 @@ class TestPeripheralPayloadEncoding:
         assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
         assert encoded.payload_type == "heart.beats.streaming.Frame"
         assert encoded.payload == message.SerializeToString()
+
+
+class TestPeripheralPayloadDecoding:
+    """Validate protobuf-aware payload decoding so inbound streams round-trip correctly."""
+
+    def test_decodes_json_payloads(self) -> None:
+        """Verify JSON payloads decode to native mappings so peripheral data stays usable."""
+        encoded = encode_peripheral_payload({"level": 9})
+
+        decoded = decode_peripheral_payload(
+            encoded.payload,
+            encoding=encoded.encoding,
+            payload_type=encoded.payload_type,
+        )
+
+        assert decoded == {"level": 9}
+
+    def test_decodes_protobuf_payloads(self) -> None:
+        """Verify protobuf payloads decode into messages so typed events remain structured."""
+        message = beats_streaming_pb2.Frame(png_data=b"frame-bytes")
+        encoded = encode_peripheral_payload(message)
+
+        decoded = decode_peripheral_payload(
+            encoded.payload,
+            encoding=encoded.encoding,
+            payload_type=encoded.payload_type,
+        )
+
+        assert isinstance(decoded, beats_streaming_pb2.Frame)
+        assert decoded == message
+
+
+class TestStreamEnvelopeDecoding:
+    """Exercise websocket stream decoding so protobuf envelopes can be consumed in Python."""
+
+    def test_decodes_frame_envelopes(self) -> None:
+        """Verify frame envelopes decode to raw bytes so render streams are portable."""
+        envelope = beats_streaming_pb2.StreamEnvelope(
+            frame=beats_streaming_pb2.Frame(png_data=b"frame-bytes")
+        )
+
+        decoded = decode_stream_envelope(envelope.SerializeToString())
+
+        assert decoded == ("frame", b"frame-bytes")
+
+    def test_decodes_peripheral_envelopes_with_protobuf_payloads(self) -> None:
+        """Verify peripheral envelopes decode to typed messages so clients can interpret payloads."""
+        message = beats_streaming_pb2.Frame(png_data=b"frame-bytes")
+        source = PeripheralMessageEnvelope(
+            peripheral_info=PeripheralInfo(
+                id="peripheral-3",
+                tags=[
+                    PeripheralTag(
+                        name="input_variant",
+                        variant="button",
+                        metadata={"version": "v1"},
+                    )
+                ],
+            ),
+            data=message,
+        )
+
+        peripheral_envelope = _encode_peripheral_message(source)
+        envelope = beats_streaming_pb2.StreamEnvelope(peripheral=peripheral_envelope)
+
+        decoded = decode_stream_envelope(envelope.SerializeToString())
+
+        assert decoded is not None
+        kind, payload = decoded
+        assert kind == "peripheral"
+        assert isinstance(payload, PeripheralMessageEnvelope)
+        assert payload.peripheral_info == source.peripheral_info
+        assert isinstance(payload.data, beats_streaming_pb2.Frame)
+        assert payload.data == message

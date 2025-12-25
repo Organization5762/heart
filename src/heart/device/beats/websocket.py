@@ -10,8 +10,11 @@ from heart.device.beats.proto import \
     beats_streaming_pb2 as _beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
-from heart.peripheral.core import PeripheralMessageEnvelope
-from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
+from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
+                                   PeripheralTag)
+from heart.peripheral.core.encoding import (PeripheralPayloadDecodingError,
+                                            PeripheralPayloadEncoding,
+                                            decode_peripheral_payload,
                                             encode_peripheral_payload)
 from heart.utilities.logging import get_logger
 
@@ -45,6 +48,69 @@ def _encode_peripheral_message(
         payload_encoding=payload_encoding,
         payload_type=encoded_payload.payload_type,
     )
+
+
+def _decode_peripheral_payload_encoding(
+    payload_encoding: int,
+) -> PeripheralPayloadEncoding | None:
+    if payload_encoding == beats_streaming_pb2.JSON_UTF8:
+        return PeripheralPayloadEncoding.JSON_UTF8
+    if payload_encoding == beats_streaming_pb2.PROTOBUF:
+        return PeripheralPayloadEncoding.PROTOBUF
+    return None
+
+
+def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
+    envelope = beats_streaming_pb2.StreamEnvelope()
+    try:
+        envelope.ParseFromString(frame)
+    except Exception:
+        logger.exception("Failed to decode websocket stream envelope.")
+        return None
+
+    payload_kind = envelope.WhichOneof("payload")
+    if payload_kind == "frame":
+        return payload_kind, bytes(envelope.frame.png_data)
+
+    if payload_kind == "peripheral":
+        payload_encoding = _decode_peripheral_payload_encoding(
+            envelope.peripheral.payload_encoding
+        )
+        if payload_encoding is None:
+            logger.warning(
+                "Unknown peripheral payload encoding: %s.",
+                envelope.peripheral.payload_encoding,
+            )
+            return None
+        try:
+            decoded_payload = decode_peripheral_payload(
+                envelope.peripheral.payload,
+                encoding=payload_encoding,
+                payload_type=envelope.peripheral.payload_type,
+            )
+        except PeripheralPayloadDecodingError:
+            logger.exception("Failed to decode peripheral payload.")
+            return None
+        info = envelope.peripheral.peripheral_info
+        tags = [
+            PeripheralTag(
+                name=tag.name,
+                variant=tag.variant,
+                metadata=dict(tag.metadata),
+            )
+            for tag in info.tags
+        ]
+        message = PeripheralMessageEnvelope(
+            peripheral_info=PeripheralInfo(
+                id=info.id or None,
+                tags=tags,
+            ),
+            data=decoded_payload,
+        )
+        return payload_kind, message
+
+    logger.warning("Unknown websocket payload kind: %s.", payload_kind)
+    return None
 
 
 @dataclass
