@@ -14,6 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from heart.utilities.logging import get_logger
+
+
+logger = get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -167,7 +172,7 @@ def main() -> int:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(f"{output}\n", encoding="utf-8")
     else:
-        print(output)
+        logger.info(output)
     return 0
 
 
