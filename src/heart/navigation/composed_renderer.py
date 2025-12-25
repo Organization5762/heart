@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol, TypeVar
 
 import pygame
-from lagom import Container
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
+
+RendererT = TypeVar("RendererT", bound=StatefulBaseRenderer)
+
+
+class RendererResolver(Protocol):
+    def resolve(self, dependency: type[RendererT]) -> RendererT:
+        """Resolve renderer instances from the shared container."""
 
 
 @dataclass
@@ -62,9 +69,9 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
                 )
 
     def resolve_renderer(
-        self, container: Container, renderer: type[StatefulBaseRenderer]
+        self, resolver: RendererResolver, renderer: type[StatefulBaseRenderer]
     ) -> None:
-        resolved = container.resolve(renderer)
+        resolved = resolver.resolve(renderer)
         self.renderers.append(resolved)
         if self.is_initialized():
             resolved.initialize(

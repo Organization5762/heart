@@ -8,7 +8,7 @@ from enum import Enum, StrEnum
 from typing import Mapping, Sequence
 from uuid import UUID
 
-from google.protobuf.message import Message  # type: ignore[import-untyped]
+from google.protobuf.message import Message
 
 
 class PeripheralPayloadEncoding(StrEnum):
