@@ -9,7 +9,7 @@ from heart.utilities.reactivex_streams import share_stream
 
 
 class TestShareStreamStrategy:
-    """Validate reactive stream sharing strategies for core event pipelines."""
+    """Validate reactive stream sharing strategies so core event pipelines stay consistent."""
 
     @pytest.mark.parametrize(
         ("strategy", "expected_initial"),
@@ -97,7 +97,7 @@ class TestShareStreamStrategy:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Confirm replay buffer sizing keeps recent context available for observability and recovery."""
+        """Confirm replay buffer sizing keeps recent context available so observability stays accurate."""
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_buffer")
         monkeypatch.setenv("HEART_RX_STREAM_REPLAY_BUFFER", "2")
@@ -274,7 +274,7 @@ class TestShareStreamStrategy:
 
 
 class TestShareStreamFlowControl:
-    """Cover flow-control safeguards that protect reactive streams under high-frequency loads."""
+    """Cover flow-control safeguards so reactive streams stay stable under high-frequency loads."""
 
     def test_share_stream_coalesces_latest_when_configured(
         self,

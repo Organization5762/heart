@@ -23,7 +23,7 @@ class _ColdAtomicRenderer(StatefulBaseRenderer[int]):
 
 
 class TestComposedRendererInitialization:
-    """Validate composed renderer warms up child state even when warmup is disabled."""
+    """Validate composed renderer warms up child state so cold renderers do not crash."""
 
     def test_initializes_child_renderer_with_warmup_disabled(self) -> None:
         """The composed renderer should initialize children regardless of warmup flags to avoid atomic errors."""
