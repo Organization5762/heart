@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 log_controller = get_logging_controller()
 
 
-class RendererFrameProcessor:
+class RendererProcessor:
     def __init__(self, device: Device, peripheral_manager: PeripheralManager) -> None:
         self.device = device
         self.peripheral_manager = peripheral_manager
