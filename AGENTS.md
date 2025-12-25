@@ -20,6 +20,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 ## Error Handling
 
 - Avoid catching `BaseException`; catch `Exception` or more specific error types so system-exiting signals propagate.
+- Avoid swallowing recoverable exceptions; log them with the shared logger (use debug-level logging for high-frequency loops).
 
 ## Testing
 
