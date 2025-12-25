@@ -14,7 +14,7 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.utilities.env import Configuration, ReactivexEventBusScheduler
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_streams import share_stream
+from heart.utilities.reactivex import share_stream
 from heart.utilities.reactivex_threads import (background_scheduler,
                                                input_scheduler)
 

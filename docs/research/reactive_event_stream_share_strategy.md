@@ -61,7 +61,7 @@ buffered replay when tuning for performance and correctness.
 
 ## Implementation notes
 
-- `heart.utilities.reactivex_streams.share_stream` wraps the sharing logic and
+- `heart.utilities.reactivex.share_stream` wraps the sharing logic and
   provides logging hints for the configured strategy.
 - `heart.utilities.env.Configuration.reactivex_stream_connect_mode` controls
   the ref-count connect timing for shared streams.
@@ -78,6 +78,11 @@ buffered replay when tuning for performance and correctness.
 
 ## Materials
 
+- `src/heart/utilities/reactivex/sharing.py`
+- `src/heart/utilities/reactivex/coalescing.py`
+- `src/heart/utilities/reactivex/instrumentation.py`
+- `src/heart/utilities/reactivex/settings.py`
+- `src/heart/utilities/reactivex/types.py`
 - `src/heart/utilities/reactivex_streams.py`
 - `src/heart/utilities/env.py`
 - `src/heart/peripheral/core/__init__.py`
