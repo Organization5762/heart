@@ -15,8 +15,9 @@ from digitalio import DigitalInOut, Direction, Pull
 
 from heart.firmware_io import device_id, identity, rotary_encoder
 
+DEVICE_NAME = "rotary-encoder"
 IDENTITY = identity.Identity(
-    device_name="rotary-encoder",
+    device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
     device_id=device_id.persistent_device_id(),
 )

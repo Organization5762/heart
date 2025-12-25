@@ -10,8 +10,9 @@ from typing import Callable, Mapping
 from heart.firmware_io import device_id, identity
 from heart.firmware_io.constants import RADIO_PACKET
 
+DEVICE_NAME = "radio-bridge"
 IDENTITY = identity.Identity(
-    device_name="radio-bridge",
+    device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
     device_id=device_id.persistent_device_id(),
 )

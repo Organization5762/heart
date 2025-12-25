@@ -12,10 +12,11 @@ import digitalio
 from heart.firmware_io import bluetooth, device_id, identity, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
+DEVICE_NAME = "lampe-controller"
 
 
 IDENTITY = identity.Identity(
-    device_name="lampe-controller",
+    device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
     device_id=device_id.persistent_device_id(),
 )
