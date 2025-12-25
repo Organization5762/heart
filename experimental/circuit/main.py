@@ -2,7 +2,7 @@ import logging
 import string
 from collections import Counter
 
-from skidl import *
+from skidl import ERC, KICAD8, Net, POWER, Part, Rgx, generate_netlist
 from skidl.pin import pin_types
 
 logger = logging.getLogger(__name__)
