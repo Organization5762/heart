@@ -12,6 +12,14 @@ class RenderMergeStrategy(StrEnum):
     ADAPTIVE = "adaptive"
 
 
+class AssetCacheStrategy(StrEnum):
+    NONE = "none"
+    METADATA = "metadata"
+    IMAGES = "images"
+    SPRITESHEETS = "spritesheets"
+    ALL = "all"
+
+
 class FrameArrayStrategy(StrEnum):
     COPY = "copy"
     VIEW = "view"

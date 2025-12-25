@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import (Configuration, FrameExportStrategy,
+from heart.utilities.env import (AssetCacheStrategy, Configuration,
+                                 FrameExportStrategy,
                                  ReactivexStreamConnectMode,
                                  RenderMergeStrategy, get_device_ports)
 
@@ -140,6 +141,56 @@ class TestUtilitiesEnv:
         _clear_env(monkeypatch, "HEART_RENDER_VARIANT")
 
         assert Configuration.render_variant() == "iterative"
+
+
+    def test_asset_cache_strategy_defaults_all(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify asset cache strategy defaults to all. This keeps IO reuse enabled without explicit tuning."""
+        _clear_env(monkeypatch, "HEART_ASSET_CACHE_STRATEGY")
+
+        assert Configuration.asset_cache_strategy() == AssetCacheStrategy.ALL
+
+
+    def test_asset_cache_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset cache strategy rejects invalid values. This keeps misconfiguration visible."""
+        monkeypatch.setenv("HEART_ASSET_CACHE_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_cache_strategy()
+
+    def test_asset_cache_strategy_accepts_images(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify asset cache strategy accepts images. This keeps image IO caching configurable."""
+        monkeypatch.setenv("HEART_ASSET_CACHE_STRATEGY", "images")
+
+        assert Configuration.asset_cache_strategy() == AssetCacheStrategy.IMAGES
+
+
+    def test_asset_cache_max_entries_defaults_to_64(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify asset cache max entries defaults to 64. This provides bounded caching without extra config."""
+        _clear_env(monkeypatch, "HEART_ASSET_CACHE_MAX_ENTRIES")
+
+        assert Configuration.asset_cache_max_entries() == 64
+
+
+    def test_asset_cache_max_entries_rejects_non_integer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset cache max entries rejects non-integers. This prevents ambiguous cache sizing."""
+        monkeypatch.setenv("HEART_ASSET_CACHE_MAX_ENTRIES", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_cache_max_entries()
+
+
+    def test_asset_cache_max_entries_rejects_negative(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify asset cache max entries rejects negatives. This avoids undefined cache behaviour."""
+        monkeypatch.setenv("HEART_ASSET_CACHE_MAX_ENTRIES", "-1")
+
+        with pytest.raises(ValueError):
+            Configuration.asset_cache_max_entries()
 
 
     def test_render_parallel_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -21,7 +21,21 @@ Set `HEART_SPRITESHEET_FRAME_CACHE_STRATEGY` to choose a cache mode:
 - `frames` caches extracted frames only.
 - `none` disables spritesheet frame caching.
 
+Set `HEART_ASSET_CACHE_STRATEGY` to configure loader-level caching:
+
+- `all` caches spritesheets and parsed JSON metadata (default).
+- `images` caches loaded image surfaces only.
+- `spritesheets` caches spritesheet objects only.
+- `metadata` caches parsed JSON metadata only.
+- `none` disables loader-level asset caching.
+
+Use `HEART_ASSET_CACHE_MAX_ENTRIES` to cap the number of cached items
+per asset type. Set `0` to disable caching without changing the strategy
+value.
+
 ## Materials
 
 - Environment variable: `HEART_SPRITESHEET_FRAME_CACHE_STRATEGY`.
+- Environment variables: `HEART_ASSET_CACHE_STRATEGY`,
+  `HEART_ASSET_CACHE_MAX_ENTRIES`.
 - Spritesheet assets loaded via `src/heart/assets/loader.py`.
