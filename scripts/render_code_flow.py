@@ -58,11 +58,27 @@ COLUMNS: tuple[ColumnDef, ...] = (
     ColumnDef(
         "GameLoop Orchestration",
         (
-            NodeDef("loop", "GameLoop Service\n(start + main loop)", "orchestrator"),
+            NodeDef(
+                "loop",
+                "GameLoop Service\n(heart.runtime.game_loop.GameLoop)",
+                "orchestrator",
+            ),
             NodeDef("app_router", "AppController / Mode Router", "orchestrator"),
             NodeDef("mode_services", "Mode Services & Renderers", "service"),
             NodeDef(
-                "frame_composer", "Frame Composer\n(surface merge + timing)", "service"
+                "render_pipeline",
+                "Render Pipeline",
+                "service",
+            ),
+            NodeDef(
+                "surface_provider",
+                "Surface Provider\n(display mode + surface cache)",
+                "service",
+            ),
+            NodeDef(
+                "composition_manager",
+                "Composition Manager\n(merge strategy + parallel loops)",
+                "service",
             ),
         ),
     ),
@@ -99,10 +115,12 @@ EDGES: tuple[EdgeDef, ...] = (
     EdgeDef("configurer", "loop"),
     EdgeDef("configurer", "app_router", "adds modes & scenes"),
     EdgeDef("loop", "app_router"),
-    EdgeDef("loop", "frame_composer"),
+    EdgeDef("loop", "render_pipeline"),
     EdgeDef("app_router", "mode_services"),
-    EdgeDef("mode_services", "frame_composer"),
-    EdgeDef("frame_composer", "display_service"),
+    EdgeDef("mode_services", "render_pipeline"),
+    EdgeDef("render_pipeline", "composition_manager"),
+    EdgeDef("render_pipeline", "surface_provider"),
+    EdgeDef("composition_manager", "display_service"),
     EdgeDef("display_service", "local_screen"),
     EdgeDef("display_service", "capture"),
     EdgeDef("capture", "device_bridge"),

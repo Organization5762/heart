@@ -14,7 +14,7 @@
     <text x="194.00" y="74.00" text-anchor="middle" class="column-title">Launch &amp; Configuration Services</text>
   </g>
   <g>
-    <rect x="404.00" y="48.00" width="260.00" height="400.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <rect x="404.00" y="48.00" width="260.00" height="564.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
     <text x="534.00" y="74.00" text-anchor="middle" class="column-title">GameLoop Orchestration</text>
   </g>
   <g>
@@ -34,7 +34,9 @@
     <path d="M 534.00 174.00 C 534.00 265.00 534.00 265.00 534.00 356.00" marker-end="url(#arrowhead)" />
     <path d="M 534.00 256.00 C 534.00 265.00 534.00 265.00 534.00 274.00" marker-end="url(#arrowhead)" />
     <path d="M 534.00 338.00 C 534.00 347.00 534.00 347.00 534.00 356.00" marker-end="url(#arrowhead)" />
-    <path d="M 646.00 388.00 C 686.00 388.00 1062.00 142.00 1102.00 142.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 420.00 C 534.00 470.00 534.00 470.00 534.00 520.00" marker-end="url(#arrowhead)" />
+    <path d="M 534.00 420.00 C 534.00 429.00 534.00 429.00 534.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 646.00 552.00 C 686.00 552.00 1062.00 142.00 1102.00 142.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 174.00 C 1214.00 183.00 1214.00 183.00 1214.00 192.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 174.00 C 1214.00 224.00 1214.00 224.00 1214.00 274.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 338.00 C 1214.00 347.00 1214.00 347.00 1214.00 356.00" marker-end="url(#arrowhead)" />
@@ -70,7 +72,7 @@
     <rect x="422.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#1d4ed8" stroke="#1d4ed8" />
     <text x="534.00" y="133.00" fill="#f8fafc" text-anchor="middle">
       <tspan x="534.00">GameLoop Service</tspan>
-      <tspan x="534.00" dy="18">(start + main loop)</tspan>
+      <tspan x="534.00" dy="18">(heart.runtime.game_loop.GameLoop)</tspan>
     </text>
     <rect x="422.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#1d4ed8" stroke="#1d4ed8" />
     <text x="534.00" y="224.00" fill="#f8fafc" text-anchor="middle">
@@ -81,9 +83,18 @@
       <tspan x="534.00">Mode Services &amp; Renderers</tspan>
     </text>
     <rect x="422.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
-    <text x="534.00" y="379.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="534.00">Frame Composer</tspan>
-      <tspan x="534.00" dy="18">(surface merge + timing)</tspan>
+    <text x="534.00" y="388.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">Render Pipeline</tspan>
+    </text>
+    <rect x="422.00" y="438.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="534.00" y="461.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">Surface Provider</tspan>
+      <tspan x="534.00" dy="18">(display mode + surface cache)</tspan>
+    </text>
+    <rect x="422.00" y="520.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
+    <text x="534.00" y="543.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="534.00">Composition Manager</tspan>
+      <tspan x="534.00" dy="18">(merge strategy + parallel loops)</tspan>
     </text>
     <rect x="762.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="133.00" fill="#f8fafc" text-anchor="middle">
