@@ -1,8 +1,11 @@
 import json
+from dataclasses import dataclass
 
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import _encode_peripheral_message
 from heart.peripheral.core import PeripheralInfo, PeripheralMessageEnvelope
+from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
+                                            encode_peripheral_payload)
 
 
 class TestPeripheralEnvelopeEncoding:
@@ -32,5 +35,31 @@ class TestPeripheralEnvelopeEncoding:
         encoded = _encode_peripheral_message(envelope)
 
         assert encoded.payload_encoding == beats_streaming_pb2.PROTOBUF
+        assert encoded.payload_type == "heart.beats.streaming.Frame"
+        assert encoded.payload == message.SerializeToString()
+
+
+class TestPeripheralPayloadEncoding:
+    """Ensure the shared peripheral payload encoder emits metadata for protobuf-aware clients."""
+
+    @dataclass(frozen=True)
+    class ExamplePayload:
+        level: int
+
+    def test_encodes_dataclass_payloads_as_json(self) -> None:
+        """Verify dataclass payloads serialize to JSON so non-protobuf sources stay compatible."""
+        encoded = encode_peripheral_payload(self.ExamplePayload(level=7))
+
+        assert encoded.encoding == PeripheralPayloadEncoding.JSON_UTF8
+        assert encoded.payload_type == ""
+        assert json.loads(encoded.payload.decode("utf-8")) == {"level": 7}
+
+    def test_encodes_protobuf_payloads_with_type_name(self) -> None:
+        """Verify protobuf payloads include a type name so clients can decode them safely."""
+        message = beats_streaming_pb2.Frame(png_data=b"frame-bytes")
+
+        encoded = encode_peripheral_payload(message)
+
+        assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
         assert encoded.payload_type == "heart.beats.streaming.Frame"
         assert encoded.payload == message.SerializeToString()
