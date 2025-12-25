@@ -59,7 +59,6 @@ class Microphone(Peripheral[MicrophoneLevel]):
     # ------------------------------------------------------------------
     @classmethod
     def detect(cls) -> Iterator[Self]:
-        return
         """Yield a microphone peripheral if audio backends are available."""
 
         if sd is None:
