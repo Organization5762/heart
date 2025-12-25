@@ -1,4 +1,4 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.water_cube.provider import WaterCubeStateProvider
 
-container[WaterCubeStateProvider] = WaterCubeStateProvider
+register_provider(WaterCubeStateProvider, WaterCubeStateProvider)

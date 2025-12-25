@@ -2,13 +2,17 @@ from abc import abstractmethod
 from typing import Generic, TypeVar
 
 import reactivex
-from lagom import Container
 from reactivex import operators as ops
 
 from heart.peripheral.core import InputDescriptor
-from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import registry as providers_registry
+
+apply_provider_registrations = providers_registry.apply_provider_registrations
+register_provider = providers_registry.register_provider
+registered_providers = providers_registry.registered_providers
 
 T = TypeVar("T")
+
 
 class ObservableProvider(Generic[T]):
     @abstractmethod
@@ -20,6 +24,7 @@ class ObservableProvider(Generic[T]):
 
         return ()
 
+
 class StaticStateProvider(ObservableProvider[T]):
     def __init__(self, state: T) -> None:
         self._state = state
@@ -30,6 +35,3 @@ class StaticStateProvider(ObservableProvider[T]):
 
     def observable(self) -> reactivex.Observable[T]:
         return reactivex.just(self._state).pipe(ops.share())
-
-container = Container()
-container[PeripheralManager] = PeripheralManager()

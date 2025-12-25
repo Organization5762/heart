@@ -1,16 +1,18 @@
 import sys
 import types
 from collections import deque
-from typing import Callable, Container
+from typing import Callable
 
 import pygame
 import pytest
 from hypothesis import HealthCheck, settings
+from lagom import Container
 
 from heart.device import Cube, Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import container
+from heart.runtime.container import build_runtime_container
 from heart.runtime.game_loop import GameLoop
+from heart.runtime.render_pipeline import RendererVariant
 
 settings.register_profile(
     "default",
@@ -148,8 +150,11 @@ def manager() -> PeripheralManager:
     return PeripheralManager()
 
 @pytest.fixture()
-def resolver() -> Container:
-    return container
+def resolver(device: Device) -> Container:
+    return build_runtime_container(
+        device=device,
+        render_variant=RendererVariant.ITERATIVE,
+    )
 
 
 @pytest.fixture()

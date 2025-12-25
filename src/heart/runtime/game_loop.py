@@ -8,6 +8,7 @@ from lagom import Container
 
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.runtime.container import build_runtime_container
 from heart.runtime.game_loop_components import build_game_loop_components
 from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.logging import get_logger
@@ -24,20 +25,19 @@ class GameLoop:
     def __init__(
         self,
         device: Device,
-        resolver: Container,
+        resolver: Container | None = None,
         max_fps: int = 500,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
-        self.context_container = resolver
+        self.context_container = resolver or build_runtime_container(
+            device=device,
+            render_variant=render_variant,
+        )
         self.initialized = False
         self.device = device
 
         self.max_fps = max_fps
-        components = build_game_loop_components(
-            resolver=resolver,
-            device=device,
-            render_variant=render_variant,
-        )
+        components = build_game_loop_components(resolver=self.context_container)
         self.app_controller = components.app_controller
         self.display = components.display
         self.render_pipeline = components.render_pipeline

@@ -1,4 +1,4 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.metadata_screen.provider import \
     MetadataScreenStateProvider
 from heart.renderers.metadata_screen.renderer import \
@@ -6,4 +6,4 @@ from heart.renderers.metadata_screen.renderer import \
 from heart.renderers.metadata_screen.state import \
     MetadataScreenState  # noqa: F401
 
-container[MetadataScreenStateProvider] = MetadataScreenStateProvider
+register_provider(MetadataScreenStateProvider, MetadataScreenStateProvider)

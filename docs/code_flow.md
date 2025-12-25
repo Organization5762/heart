@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
 
 ## Flow Diagram
 
@@ -29,6 +29,12 @@ flowchart LR
         CLI["CLI (Typer `totem run`)"]
         Registry["Configuration Registry"]
         Configurer["Program Configuration\n`configure(loop)`"]
+    end
+
+    subgraph Wiring["Dependency Wiring"]
+        direction TB
+        ContainerBuilder["Runtime Container Builder\n(heart.runtime.container.build_runtime_container)"]
+        RuntimeContainer["Lagom Container\n(shared runtime services)"]
     end
 
     subgraph Runtime["GameLoop Orchestration"]
@@ -64,9 +70,12 @@ flowchart LR
         SingleLED["Single LED Device"]
     end
 
-    CLI --> Registry --> Configurer --> Loop
-    Configurer --> AppRouter
+    CLI --> Registry --> ContainerBuilder --> RuntimeContainer --> Loop
+    Loop --> Configurer --> AppRouter
     Loop --> AppRouter
+    RuntimeContainer --> AppRouter
+    RuntimeContainer --> RenderPipeline
+    RuntimeContainer --> PeripheralMgr
     Loop --> RenderPipeline
     AppRouter --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
     RenderPipeline --> RendererProcessor --> SurfaceProvider
@@ -81,7 +90,7 @@ flowchart LR
     RxScheduler --> HeartRate --> AppRouter
     RxScheduler --> PhoneText --> AppRouter
 
-    class CLI,Registry,Configurer,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
+    class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;

@@ -1,5 +1,5 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 
 from .provider import MainSwitchProvider
 
-container[MainSwitchProvider] = MainSwitchProvider
+register_provider(MainSwitchProvider, MainSwitchProvider)

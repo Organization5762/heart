@@ -1,4 +1,4 @@
-from heart.peripheral.core.providers import container
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.sliding_image.provider import \
     SlidingImageStateProvider as SlidingImageStateProvider
 from heart.renderers.sliding_image.provider import \
@@ -11,5 +11,5 @@ from heart.renderers.sliding_image.state import \
 from heart.renderers.sliding_image.state import \
     SlidingRendererState as SlidingRendererState
 
-container[SlidingImageStateProvider] = SlidingImageStateProvider
-container[SlidingRendererStateProvider] = SlidingRendererStateProvider
+register_provider(SlidingImageStateProvider, SlidingImageStateProvider)
+register_provider(SlidingRendererStateProvider, SlidingRendererStateProvider)
