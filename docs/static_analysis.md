@@ -19,8 +19,10 @@ current rules focus on Python files under `src/` and align with the guidance in
   - `make semgrep`
 - Run with the rest of the linting checks:
   - `make check`
+- Override the default target set (for example, to scan `tests/` too):
+  - `make semgrep SEMGREP_TARGETS="src tests"`
 
-Both targets run `uv run semgrep --config semgrep.yml --error`.
+Both targets run `uv run semgrep --config semgrep.yml --error src` by default.
 
 ## Rule catalog
 
@@ -36,3 +38,9 @@ Both targets run `uv run semgrep --config semgrep.yml --error`.
 1. Edit `semgrep.yml` to add or refine rules.
 1. Keep rule messages aligned with the guidance in `/workspace/heart/AGENTS.md`.
 1. Validate new rules with `make semgrep` before committing changes.
+
+## Materials
+
+- `semgrep.yml`
+- `make semgrep`
+- `make check`

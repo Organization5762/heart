@@ -3,6 +3,9 @@ DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
+SEMGREP_CONFIG ?= semgrep.yml
+SEMGREP_TARGETS ?= src
+SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --error
 .PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
 
 install:
@@ -26,10 +29,10 @@ check:
 	@uvx docformatter --check -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat --check $(DOCS_SOURCES)
 	@uv run mypy --config-file pyproject.toml
-	@uv run semgrep --config semgrep.yml --error
+	@uv run semgrep $(SEMGREP_ARGS) $(SEMGREP_TARGETS)
 
 semgrep:
-	@uv run semgrep --config semgrep.yml --error
+	@uv run semgrep $(SEMGREP_ARGS) $(SEMGREP_TARGETS)
 
 test:
 	@uv run pytest
