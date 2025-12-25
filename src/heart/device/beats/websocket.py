@@ -5,39 +5,70 @@ import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 import websockets
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
+from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
+from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class UniversalJSONEncoder(json.JSONEncoder):
-    """JSON encoder that supports dataclasses, enums, UUID, datetime, and bytes."""
+def _normalize_payload(payload: object) -> object:
+    if dataclasses.is_dataclass(payload):
+        return dataclasses.asdict(payload)  # type: ignore[arg-type]
 
-    def default(self, obj: object) -> object:
-        if dataclasses.is_dataclass(obj):
-            return dataclasses.asdict(obj)  # type: ignore[arg-type]
+    if isinstance(payload, Enum):
+        return payload.value
 
-        if isinstance(obj, Enum):
-            return obj.value
+    if isinstance(payload, UUID):
+        return str(payload)
 
-        if isinstance(obj, UUID):
-            return str(obj)
+    if isinstance(payload, (datetime, date)):
+        return payload.isoformat()
 
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
+    if isinstance(payload, bytes):
+        return payload.hex()
 
-        if isinstance(obj, bytes):
-            return obj.hex()
+    if isinstance(payload, Mapping):
+        return {
+            str(key): _normalize_payload(value)
+            for key, value in payload.items()
+        }
 
-        return super().default(obj)
+    if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
+        return [_normalize_payload(value) for value in payload]
+
+    return payload
+
+
+def _encode_peripheral_message(
+    envelope: PeripheralMessageEnvelope[Any],
+) -> beats_streaming_pb2.PeripheralEnvelope:
+    info = envelope.peripheral_info
+    tags = [
+        beats_streaming_pb2.PeripheralTag(
+            name=tag.name,
+            variant=tag.variant,
+            metadata=dict(tag.metadata),
+        )
+        for tag in info.tags
+    ]
+    normalized = _normalize_payload(envelope.data)
+    json_payload = json.dumps(normalized)
+    return beats_streaming_pb2.PeripheralEnvelope(
+        peripheral_info=beats_streaming_pb2.PeripheralInfo(
+            id=info.id or "",
+            tags=tags,
+        ),
+        json_payload=json_payload,
+    )
 
 
 @dataclass
@@ -120,15 +151,11 @@ class WebSocket:
 
     def send(self, kind: str, payload: object) -> None:
         if self._broadcast_queue and self._loop:
-            data = {"type": kind, "payload": payload}
-            json_bytes = json.dumps(
-                data,
-                cls=UniversalJSONEncoder,
-                sort_keys=self._streaming_settings.json_sort_keys,
-                indent=self._streaming_settings.json_indent,
-            ).encode()
+            frame_bytes = self._encode_payload(kind=kind, payload=payload)
+            if frame_bytes is None:
+                return
             self._loop.call_soon_threadsafe(
-                self._enqueue_frame, json_bytes, self._broadcast_queue
+                self._enqueue_frame, frame_bytes, self._broadcast_queue
             )
 
     def _enqueue_frame(self, frame: bytes, queue: asyncio.Queue[bytes]) -> None:
@@ -150,3 +177,30 @@ class WebSocket:
             except asyncio.QueueEmpty:
                 logger.debug("Queue was empty while handling overflow.")
             queue.put_nowait(frame)
+
+    def _encode_payload(self, kind: str, payload: object) -> bytes | None:
+        if kind == "frame":
+            if not isinstance(payload, (bytes, bytearray, memoryview)):
+                logger.warning(
+                    "Expected bytes payload for frame message, got %s.",
+                    type(payload).__name__,
+                )
+                return None
+            frame = beats_streaming_pb2.Frame(png_data=bytes(payload))
+            envelope = beats_streaming_pb2.StreamEnvelope(frame=frame)
+            return envelope.SerializeToString()
+
+        if kind == "peripheral":
+            if not isinstance(payload, PeripheralMessageEnvelope):
+                logger.warning(
+                    "Expected PeripheralMessageEnvelope for peripheral message, got %s.",
+                    type(payload).__name__,
+                )
+                return None
+            envelope = beats_streaming_pb2.StreamEnvelope(
+                peripheral=_encode_peripheral_message(payload)
+            )
+            return envelope.SerializeToString()
+
+        logger.warning("Unknown websocket payload kind: %s.", kind)
+        return None

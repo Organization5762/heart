@@ -62,9 +62,7 @@ export function ImageProvider({
 
       setFps(Number(computedFPS.toFixed(0)));
 
-      // --- Decode base64 PNG data ---
-      const b64 = msg.payload;
-      const blob = base64ToBlob(b64);
+      const blob = bytesToBlob(msg.payload.pngData);
       const newURL = URL.createObjectURL(blob);
 
       setImgURL((old) => {
@@ -114,9 +112,6 @@ export function useStreamedImage() {
 }
 
 // --- Helpers ---
-function base64ToBlob(b64: string) {
-  const byteChars = atob(b64);
-  const arr = new Uint8Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) arr[i] = byteChars.charCodeAt(i);
-  return new Blob([arr], { type: "image/png" });
+function bytesToBlob(data: Uint8Array) {
+  return new Blob([data], { type: "image/png" });
 }

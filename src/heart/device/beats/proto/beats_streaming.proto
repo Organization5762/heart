@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package heart.beats.streaming;
+
+message PeripheralTag {
+  string name = 1;
+  string variant = 2;
+  map<string, string> metadata = 3;
+}
+
+message PeripheralInfo {
+  string id = 1;
+  repeated PeripheralTag tags = 2;
+}
+
+message PeripheralEnvelope {
+  PeripheralInfo peripheral_info = 1;
+  string json_payload = 2;
+}
+
+message Frame {
+  bytes png_data = 1;
+}
+
+message StreamEnvelope {
+  oneof payload {
+    Frame frame = 1;
+    PeripheralEnvelope peripheral = 2;
+  }
+}

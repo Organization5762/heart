@@ -1,4 +1,3 @@
-import base64
 import io
 from dataclasses import dataclass
 
@@ -24,5 +23,5 @@ class StreamedScreen(Device):
 
         self.websocket.send(
             kind="frame",
-            payload=base64.b64encode(frame_bytes).decode("utf-8")
+            payload=frame_bytes,
         )

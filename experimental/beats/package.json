@@ -93,6 +93,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-i18next": "^16.2.4",
+    "protobufjs": "^7.5.4",
     "rxjs": "^7.8.2",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
