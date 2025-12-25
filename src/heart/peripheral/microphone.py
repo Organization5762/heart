@@ -11,6 +11,7 @@ from types import TracebackType
 from typing import Any, Self, cast
 
 import numpy as np
+from reactivex.subject import Subject
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
@@ -45,6 +46,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         self._latest_level: dict[str, Any] | None = None
         self._stop_event = threading.Event()
+        self._level_subject: Subject[MicrophoneLevel] = Subject()
 
     # ------------------------------------------------------------------
     # Detection lifecycle
@@ -78,6 +80,9 @@ class Microphone(Peripheral[MicrophoneLevel]):
         """Return the most recent loudness measurement."""
 
         return self._latest_level
+
+    def _event_stream(self) -> Subject[MicrophoneLevel]:
+        return self._level_subject
 
     def stop(self) -> None:
         """Signal the run-loop to stop on the next iteration."""
@@ -159,8 +164,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
         )
         payload = level.to_input()
         self._latest_level = cast(dict[str, Any], payload.data)
-
-        raise NotImplementedError("")
+        self._level_subject.on_next(level)
 
     # ------------------------------------------------------------------
     # Context manager helpers
