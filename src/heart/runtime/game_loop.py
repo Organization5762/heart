@@ -7,13 +7,13 @@ import pygame
 from lagom import Container
 
 from heart.device import Device
-from heart.device.beats import WebSocket
 from heart.navigation import AppController, ComposedRenderer, MultiScene
 from heart.peripheral.core import events
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.frame_presenter import FramePresenter
+from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
 from heart.utilities.logging import get_logger
 
@@ -37,6 +37,7 @@ class GameLoop:
         self.initialized = False
         self.device = device
         self.peripheral_manager = container.resolve(PeripheralManager)
+        self.peripheral_runtime = PeripheralRuntime(self.peripheral_manager)
 
         self.max_fps = max_fps
         self.app_controller = AppController()
@@ -105,7 +106,7 @@ class GameLoop:
 
         self._initialize_app_controller()
         self._ensure_display_initialized()
-        self._configure_peripheral_streaming()
+        self.peripheral_runtime.configure_streaming()
 
         try:
             self._run_main_loop()
@@ -183,22 +184,10 @@ class GameLoop:
         self.set_screen(self.display.screen)
         self.set_clock(self.display.clock)
 
-    def _initialize_peripherals(self) -> None:
-        logger.info("Attempting to detect attached peripherals")
-        self.peripheral_manager.detect()
-        peripherals = self.peripheral_manager.peripherals
-        logger.info(
-            "Detected attached peripherals - found %d. peripherals=%s",
-            len(peripherals),
-            peripherals,
-        )
-        logger.info("Starting all peripherals")
-        self.peripheral_manager.start()
-
     def _initialize(self) -> None:
         self._set_singleton()
         self._initialize_screen()
-        self._initialize_peripherals()
+        self.peripheral_runtime.detect_and_start()
         self.initialized = True
 
     def _dim_display(self) -> None:
@@ -223,21 +212,12 @@ class GameLoop:
     def _ensure_display_initialized(self) -> None:
         self.display.ensure_initialized()
 
-    def _configure_peripheral_streaming(self) -> None:
-        ws = WebSocket()
-        self.peripheral_manager.get_event_bus().subscribe(
-            on_next=lambda x: ws.send(kind="peripheral", payload=x)
-        )
-
-    def _tick_peripherals(self) -> None:
-        self.peripheral_manager.game_tick.on_next(True)
-
     def _run_main_loop(self) -> None:
         if self.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
         clock = self.display.clock
         while self.running:
-            self._tick_peripherals()
+            self.peripheral_runtime.tick()
             self._handle_events()
             self._preprocess_setup()
             renderers = self._select_renderers()

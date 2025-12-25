@@ -21,7 +21,7 @@ Explain how the Heart runtime composes configuration modules, orchestrates rende
 At startup the `totem` CLI builds three core subsystems:
 
 1. **Configuration loader** – `heart.programs.registry.ConfigurationRegistry` inspects `heart/programs/configurations` for modules exposing `configure(loop: GameLoop)`. Each callable mutates the loop with modes, renderers, and playlists.
-1. **Game loop orchestration** – `heart.environment.GameLoop` owns the pygame window, timing, and peripheral integration. Its `AppController` routes scene transitions and composes surfaces.
+1. **Game loop orchestration** – `heart.runtime.game_loop.GameLoop` owns the pygame window, timing, and peripheral integration. Its `AppController` routes scene transitions and composes surfaces, while `heart.runtime.peripheral_runtime.PeripheralRuntime` manages peripheral detection, streaming, and tick emission.
 1. **Device abstraction** – Implementations of `heart.device.Device` translate pygame surfaces into concrete outputs. `LocalScreen` targets desktop iteration, while `LEDMatrix` in `heart.device.rgb_display` streams frames through the `rgbmatrix` bindings.
 
 Refer to [code_flow.md](code_flow.md) for the full call graph and service boundaries.
@@ -38,7 +38,7 @@ Renderers extend `heart.renderers.BaseRenderer` (or a specialization) and draw i
 
 ## Peripheral Integration
 
-`heart.peripheral.core.manager.PeripheralManager` spawns background threads for:
+`heart.peripheral.core.manager.PeripheralManager` (coordinated by `heart.runtime.peripheral_runtime.PeripheralRuntime`) spawns background threads for:
 
 - Bluetooth switches and controllers (`heart.peripheral.switch`, `heart.peripheral.gamepad`).
 - Serial-connected sensors (`heart.peripheral.uart`).
