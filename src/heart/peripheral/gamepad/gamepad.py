@@ -173,8 +173,8 @@ class Gamepad(Peripheral[Any]):
             pygame.joystick.quit()
             pygame.joystick.init()
             yield cls()
-        except pygame.error as e:
-            logger.error("Error initializing joystick module: %s", e)
+        except pygame.error:
+            logger.exception("Error initializing joystick module")
             return
 
     def is_connected(self) -> bool:

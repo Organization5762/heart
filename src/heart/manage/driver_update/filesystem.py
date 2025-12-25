@@ -34,8 +34,8 @@ def copy_file(source: Path, destination: Path) -> None:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         logger.info("After copying: %s to %s", source, destination)
-    except (OSError, shutil.Error) as error:
-        logger.error("Failed to copy %s to %s: %s", source, destination, error)
+    except (OSError, shutil.Error):
+        logger.exception("Failed to copy %s to %s", source, destination)
 
 
 def ensure_driver_files(driver_path: Path) -> None:

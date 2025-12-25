@@ -101,8 +101,8 @@ class HeartRateManager(Peripheral[Any]):
             hrm = auto_create_device(self._node, dev_id, dev_type, tx_type)
             hrm.on_device_data = self._cb(hrm)
             self._devices.append(hrm)
-        except Exception as e:
-            logger.error("Could not create HR device: %s", e)
+        except Exception:
+            logger.exception("Could not create HR device")
 
     def _cb(self, hrm: HeartRate) -> Callable[[object, object, object], None]:
         def _inner(_pg: object, _name: object, data: object) -> None:
@@ -148,8 +148,10 @@ class HeartRateManager(Peripheral[Any]):
             # 1) program ANT+ network key
             try:
                 self._node.set_network_key(0x00, ANTPLUS_NETWORK_KEY)
-            except AntException as e:
-                logger.warning("Network-key ACK timed out, proceeding anyway (%s)", e)
+            except AntException:
+                logger.warning(
+                    "Network-key ACK timed out, proceeding anyway", exc_info=True
+                )
 
             # 2) HRM scanner
             self._scanner = Scanner(
@@ -180,15 +182,19 @@ class HeartRateManager(Peripheral[Any]):
                 try:
                     self._ant_cycle()
                 except DriverNotFound:
-                    logger.error("ANT driver not found - skipping HeartRateManager")
+                    logger.exception(
+                        "ANT driver not found - skipping HeartRateManager"
+                    )
                     return
                 except NoBackendError:
-                    logger.error(
+                    logger.exception(
                         "USB backend not available - skipping HeartRateManager"
                     )
                     return
-                except (AntException, OSError, RuntimeError) as e:
-                    logger.error("ANT error: %s – retrying in %d s", e, RETRY_DELAY)
+                except (AntException, OSError, RuntimeError):
+                    logger.exception(
+                        "ANT error: retrying in %d s", RETRY_DELAY
+                    )
                     time.sleep(RETRY_DELAY)
         finally:
             self._stop_evt.set()  # stop janitor when manager exits
