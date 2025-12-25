@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between surface preparation (display-mode coordination and caching) and composition management (merge-strategy selection plus parallel merge coordination).
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame processing is split between renderer preparation (initialization, surface preparation, and metrics logging) and composition management (merge-strategy selection plus parallel merge coordination).
 
 ## Flow Diagram
 
@@ -37,6 +37,7 @@ flowchart LR
         AppRouter["AppController / Mode Router"]
         ModeServices["Mode Services & Renderers"]
         RenderPipeline["Render Pipeline"]
+        RendererProcessor["Renderer Processor\n(renderer prep + metrics)"]
         SurfaceProvider["Surface Provider\n(display mode + surface cache)"]
         CompositionManager["Composition Manager\n(merge strategy + parallel loops)"]
     end
@@ -68,7 +69,7 @@ flowchart LR
     Loop --> AppRouter
     Loop --> RenderPipeline
     AppRouter --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
-    RenderPipeline --> SurfaceProvider
+    RenderPipeline --> RendererProcessor --> SurfaceProvider
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
@@ -80,7 +81,7 @@ flowchart LR
     RxScheduler --> HeartRate --> AppRouter
     RxScheduler --> PhoneText --> AppRouter
 
-    class CLI,Registry,Configurer,ModeServices,RenderPipeline,SurfaceProvider,CompositionManager service;
+    class CLI,Registry,Configurer,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;

@@ -1,29 +1,22 @@
 from __future__ import annotations
 
-import logging
-import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, cast
 
 import pygame
 from PIL import Image
 
-from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
+from heart.runtime.rendering.renderer_processor import RendererProcessor
 from heart.runtime.rendering.surface_merge import SurfaceCompositionManager
 from heart.runtime.rendering.surface_provider import RendererSurfaceProvider
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
-from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
-
-logger = get_logger(__name__)
-log_controller = get_logging_controller()
 
 
 class RenderPipeline:
@@ -39,6 +32,11 @@ class RenderPipeline:
         self.clock: pygame.time.Clock | None = None
         self._surface_provider = RendererSurfaceProvider(device)
         self._composition_manager = SurfaceCompositionManager()
+        self._renderer_processor = RendererProcessor(
+            device=device,
+            peripheral_manager=peripheral_manager,
+            surface_provider=self._surface_provider,
+        )
 
         binary_method = cast(RenderMethod, self._render_surfaces_binary)
         iterative_method = cast(RenderMethod, self._render_surface_iterative)
@@ -73,76 +71,14 @@ class RenderPipeline:
             raise RuntimeError("GameLoop clock is not initialized")
         return clock
 
-    def _prepare_renderer_surface(
-        self, renderer: "StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface:
-        return self._surface_provider.prepare(renderer)
-
     def process_renderer(
         self, renderer: "StatefulBaseRenderer[Any]"
     ) -> pygame.Surface | None:
-        try:
-            start_ns = time.perf_counter_ns()
-            screen = self._render_renderer_frame(renderer)
-            duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-            self._log_renderer_metrics(renderer, duration_ms)
-            return screen
-        except Exception:
-            logger.exception("Error processing renderer")
-            return None
-
-    def _render_renderer_frame(
-        self, renderer: "StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface:
         clock = self._require_clock()
-        screen = self._prepare_renderer_surface(renderer)
-        if not renderer.initialized:
-            renderer.initialize(
-                window=screen,
-                clock=clock,
-                peripheral_manager=self.peripheral_manager,
-                orientation=self.device.orientation,
-            )
-        renderer._internal_process(
-            window=screen,
+        return self._renderer_processor.process_renderer(
+            renderer=renderer,
             clock=clock,
-            peripheral_manager=self.peripheral_manager,
-            orientation=self.device.orientation,
-        )
-        return screen
-
-    def _log_renderer_metrics(
-        self, renderer: "StatefulBaseRenderer[Any]", duration_ms: float
-    ) -> None:
-        log_message = (
-            "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
-            "display_mode=%s uses_opengl=%s initialized=%s"
-        )
-        log_args = (
-            renderer.name,
-            duration_ms,
-            self._render_queue_depth,
-            renderer.device_display_mode.name,
-            renderer.device_display_mode == DeviceDisplayMode.OPENGL,
-            renderer.is_initialized(),
-        )
-        log_extra = {
-            "renderer": renderer.name,
-            "duration_ms": duration_ms,
-            "queue_depth": self._render_queue_depth,
-            "display_mode": renderer.device_display_mode.name,
-            "uses_opengl": renderer.device_display_mode == DeviceDisplayMode.OPENGL,
-            "initialized": renderer.is_initialized(),
-        }
-
-        log_controller.log(
-            key="render.loop",
-            logger=logger,
-            level=logging.INFO,
-            msg=log_message,
-            args=log_args,
-            extra=log_extra,
-            fallback_level=logging.DEBUG,
+            queue_depth=self._render_queue_depth,
         )
 
     def finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
