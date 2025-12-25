@@ -9,7 +9,8 @@ from types import SimpleNamespace
 import pytest
 
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
-from heart.utilities.env import (Configuration, ReactivexStreamConnectMode,
+from heart.utilities.env import (Configuration, FrameExportStrategy,
+                                 ReactivexStreamConnectMode,
                                  RenderMergeStrategy, get_device_ports)
 
 
@@ -162,6 +163,25 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RENDER_MAX_WORKERS", "3")
 
         assert Configuration.render_executor_max_workers() == 3
+
+
+    def test_frame_export_strategy_defaults_buffer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify frame export strategy defaults to buffer. This keeps frame conversion fast without extra config."""
+        _clear_env(monkeypatch, "HEART_FRAME_EXPORT_STRATEGY")
+
+        assert Configuration.frame_export_strategy() == FrameExportStrategy.BUFFER
+
+
+    def test_frame_export_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify frame export strategy rejects invalid values. This prevents silent misconfiguration."""
+        monkeypatch.setenv("HEART_FRAME_EXPORT_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.frame_export_strategy()
 
 
     def test_render_merge_strategy_defaults_batched(self, monkeypatch: pytest.MonkeyPatch) -> None:

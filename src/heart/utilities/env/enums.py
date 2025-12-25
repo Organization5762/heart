@@ -16,6 +16,11 @@ class FrameArrayStrategy(StrEnum):
     VIEW = "view"
 
 
+class FrameExportStrategy(StrEnum):
+    BUFFER = "buffer"
+    ARRAY = "array"
+
+
 class SpritesheetFrameCacheStrategy(StrEnum):
     NONE = "none"
     FRAMES = "frames"
