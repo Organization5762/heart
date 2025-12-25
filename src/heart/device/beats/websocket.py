@@ -159,9 +159,21 @@ class WebSocket:
             frame_bytes = self._encode_payload(kind=kind, payload=payload)
             if frame_bytes is None:
                 return
-            self._loop.call_soon_threadsafe(
-                self._enqueue_frame, frame_bytes, self._broadcast_queue
-            )
+            if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.ERROR:
+                if threading.current_thread() == self._thread:
+                    self._enqueue_frame(frame_bytes, self._broadcast_queue)
+                else:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._enqueue_frame_async(
+                            frame_bytes, self._broadcast_queue
+                        ),
+                        self._loop,
+                    )
+                    future.result()
+            else:
+                self._loop.call_soon_threadsafe(
+                    self._enqueue_frame, frame_bytes, self._broadcast_queue
+                )
 
     def _enqueue_frame(self, frame: bytes, queue: asyncio.Queue[bytes]) -> None:
         if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.ERROR:
@@ -182,6 +194,11 @@ class WebSocket:
             except asyncio.QueueEmpty:
                 logger.debug("Queue was empty while handling overflow.")
             queue.put_nowait(frame)
+
+    async def _enqueue_frame_async(
+        self, frame: bytes, queue: asyncio.Queue[bytes]
+    ) -> None:
+        self._enqueue_frame(frame, queue)
 
     def _encode_payload(self, kind: str, payload: object) -> bytes | None:
         if kind == "frame":
