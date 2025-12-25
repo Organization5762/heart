@@ -1,7 +1,9 @@
 import os
 
-from heart.device.rgb_display.isolated_render import DEFAULT_SOCKET_PATH
+from heart.device.rgb_display.constants import DEFAULT_SOCKET_PATH
 from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
+                                       IsolatedRendererAckStrategy,
+                                       IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
                                        RenderMergeStrategy, RenderTileStrategy)
 from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
@@ -35,6 +37,36 @@ class RenderingConfiguration:
                 "Both ISOLATED_RENDER_HOST and ISOLATED_RENDER_PORT must be set together"
             )
         return None
+
+    @classmethod
+    def isolated_renderer_ack_strategy(cls) -> IsolatedRendererAckStrategy:
+        strategy = os.environ.get(
+            "HEART_ISOLATED_RENDERER_ACK_STRATEGY", "always"
+        ).strip().lower()
+        try:
+            return IsolatedRendererAckStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_ISOLATED_RENDERER_ACK_STRATEGY must be 'always' or 'never'"
+            ) from exc
+
+    @classmethod
+    def isolated_renderer_ack_timeout_ms(cls) -> int:
+        return _env_int(
+            "HEART_ISOLATED_RENDERER_ACK_TIMEOUT_MS", default=1000, minimum=0
+        )
+
+    @classmethod
+    def isolated_renderer_dedup_strategy(cls) -> IsolatedRendererDedupStrategy:
+        strategy = os.environ.get(
+            "HEART_ISOLATED_RENDERER_DEDUP_STRATEGY", "source"
+        ).strip().lower()
+        try:
+            return IsolatedRendererDedupStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_ISOLATED_RENDERER_DEDUP_STRATEGY must be 'none', 'source', or 'payload'"
+            ) from exc
 
     @classmethod
     def render_variant(cls) -> str:

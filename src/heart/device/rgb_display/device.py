@@ -38,6 +38,11 @@ class LEDMatrix(Device, SampleBase):
             self._client = MatrixClient(
                 socket_path=socket_path,
                 tcp_address=tcp_address,
+                ack_strategy=Configuration.isolated_renderer_ack_strategy(),
+                ack_timeout_seconds=(
+                    Configuration.isolated_renderer_ack_timeout_ms() / 1000.0
+                ),
+                dedup_strategy=Configuration.isolated_renderer_dedup_strategy(),
             )
         else:
             from rgbmatrix import RGBMatrix, RGBMatrixOptions

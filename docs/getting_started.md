@@ -103,6 +103,18 @@ export HEART_PANEL_ROWS=64
 
 Set `--x11-forward` if you require a remote preview window while connected over SSH with X forwarding.
 
+## Isolated Renderer I/O Tuning
+
+The isolated renderer client is described in `src/heart/device/rgb_display/isolated_render.py` as the "Client for pushing RGB frames to the isolated renderer service." Use the tuning knobs below to reduce socket traffic or control acknowledgement waits when routing frames through the isolated renderer.
+
+Configuration options (defaults in parentheses):
+
+- `HEART_ISOLATED_RENDERER_ACK_STRATEGY` (`always`): wait for an acknowledgement after sending a payload (`always` or `never`).
+- `HEART_ISOLATED_RENDERER_ACK_TIMEOUT_MS` (`1000`): acknowledgement wait timeout in milliseconds.
+- `HEART_ISOLATED_RENDERER_DEDUP_STRATEGY` (`source`): skip duplicate payloads using source-frame or RGB-payload hashing (`none`, `source`, or `payload`).
+
+When `HEART_ISOLATED_RENDERER_DEDUP_STRATEGY` is set to `source`, the client hashes the original frame bytes to avoid converting to RGB unless a new payload must be sent.
+
 ## Peripheral Configuration
 
 `heart.peripheral.core.manager.PeripheralManager` supervises worker threads. Supported devices include:
