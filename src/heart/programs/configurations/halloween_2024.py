@@ -59,7 +59,7 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.resolve_renderer(container=loop, renderer=Life)
+    mode.resolve_renderer(loop.context_container, Life)
 
     mode = loop.add_mode()
     # MANDELBROT
@@ -119,4 +119,4 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.resolve_renderer(container=loop, renderer=Life)
+    mode.resolve_renderer(loop.context_container, Life)

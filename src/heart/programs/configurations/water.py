@@ -4,4 +4,4 @@ from heart.runtime.game_loop import GameLoop
 
 def configure(loop: GameLoop) -> None:
     mode = loop.add_mode("water")
-    mode.resolve_renderer(container=loop.context_container, renderer=WaterCube)
+    mode.resolve_renderer(loop.context_container, WaterCube)
