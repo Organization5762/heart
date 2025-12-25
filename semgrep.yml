@@ -1,0 +1,58 @@
+rules:
+  - id: heart-no-print
+    languages:
+      - python
+    message: Use heart.utilities.logging.get_logger instead of print for runtime diagnostics.
+    severity: ERROR
+    patterns:
+      - pattern: print(...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-no-wildcard-import
+    languages:
+      - python
+    message: Avoid wildcard imports to keep dependencies explicit.
+    severity: ERROR
+    patterns:
+      - pattern: from $MODULE import *
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-no-module-all
+    languages:
+      - python
+    message: Avoid module-level __all__ exports; prefer explicit imports at call sites.
+    severity: ERROR
+    patterns:
+      - pattern: __all__ = [...]
+      - pattern: __all__ = (...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-no-os-path-join
+    languages:
+      - python
+    message: Prefer pathlib.Path over os.path.join for path construction.
+    severity: ERROR
+    patterns:
+      - pattern: os.path.join(...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
