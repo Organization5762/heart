@@ -34,17 +34,21 @@ def coalesce_latest(
         due_time: float | None = None
         window_seconds = window_ms / 1000
 
+        def _cancel_timers() -> None:
+            nonlocal timer, fallback_timer
+            if timer is not None:
+                timer.dispose()
+                timer = None
+            if fallback_timer is not None:
+                fallback_timer.cancel()
+                fallback_timer = None
+
         def _flush() -> None:
             nonlocal pending, timer, fallback_timer, due_time
             with lock:
                 value = pending
                 pending = _NO_PENDING
-                if timer is not None:
-                    timer.dispose()
-                    timer = None
-                if fallback_timer is not None:
-                    fallback_timer.cancel()
-                    fallback_timer = None
+                _cancel_timers()
                 due_time = None
             if value is _NO_PENDING:
                 return
@@ -54,12 +58,7 @@ def coalesce_latest(
             nonlocal timer, fallback_timer, due_time
             if timer is not None or fallback_timer is not None:
                 if due_time is not None and now >= due_time:
-                    if timer is not None:
-                        timer.dispose()
-                        timer = None
-                    if fallback_timer is not None:
-                        fallback_timer.cancel()
-                        fallback_timer = None
+                    _cancel_timers()
                     due_time = None
                 else:
                     return
@@ -95,12 +94,7 @@ def coalesce_latest(
         def _on_error(err: Exception) -> None:
             nonlocal pending, timer, fallback_timer, due_time
             with lock:
-                if timer is not None:
-                    timer.dispose()
-                    timer = None
-                if fallback_timer is not None:
-                    fallback_timer.cancel()
-                    fallback_timer = None
+                _cancel_timers()
                 pending = _NO_PENDING
                 due_time = None
             observer.on_error(err)
@@ -108,12 +102,7 @@ def coalesce_latest(
         def _on_completed() -> None:
             nonlocal timer, fallback_timer, due_time
             with lock:
-                if timer is not None:
-                    timer.dispose()
-                    timer = None
-                if fallback_timer is not None:
-                    fallback_timer.cancel()
-                    fallback_timer = None
+                _cancel_timers()
                 due_time = None
             _flush()
             observer.on_completed()
@@ -130,12 +119,7 @@ def coalesce_latest(
             subscription.dispose()
             with lock:
                 pending = _NO_PENDING
-                if timer is not None:
-                    timer.dispose()
-                    timer = None
-                if fallback_timer is not None:
-                    fallback_timer.cancel()
-                    fallback_timer = None
+                _cancel_timers()
                 due_time = None
 
         logger.debug(

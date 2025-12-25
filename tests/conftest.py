@@ -5,11 +5,18 @@ from typing import Callable, Container
 
 import pygame
 import pytest
+from hypothesis import HealthCheck, settings
 
 from heart.device import Cube, Device
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import container
 from heart.runtime.game_loop import GameLoop
+
+settings.register_profile(
+    "default",
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+settings.load_profile("default")
 
 
 class _StubClock:
