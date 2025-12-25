@@ -4,8 +4,9 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import typer
 
-from heart.cli.loop_commands import (bench_device_command, run_command,
-                                     update_driver_command)
+from heart.cli.commands.bench_device import bench_device_command
+from heart.cli.commands.run import run_command
+from heart.cli.commands.update_driver import update_driver_command
 
 app = typer.Typer()
 
