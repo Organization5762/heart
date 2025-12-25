@@ -124,6 +124,8 @@ module = [
     "bleak.*",
     "cv2",
     "cv2.*",
+    "google.protobuf",
+    "google.protobuf.*",
     "moderngl",
     "numpy",
     "numpy.*",
