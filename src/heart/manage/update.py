@@ -33,6 +33,10 @@ DRIVER_SETTINGS_FILENAME = "settings.toml"
 DRIVER_FILES = ("boot.py", "code.py", DRIVER_SETTINGS_FILENAME)
 
 
+class UpdateError(Exception):
+    """Raise when driver update preconditions or downloads fail."""
+
+
 @dataclass(frozen=True)
 class DriverConfig:
     uf2_url: str
@@ -119,18 +123,18 @@ def download_file(url: str, checksum: str) -> Path:
         downloaded_checksum = _sha256sum(destination)
         logger.info("Checksum for %s: %s", destination, downloaded_checksum)
         if downloaded_checksum != checksum:
-            logger.error(
-                "Checksum mismatch for %s. Expected %s, but got %s.",
-                destination,
-                checksum,
-                downloaded_checksum,
+            message = (
+                f"Checksum mismatch for {destination}. "
+                f"Expected {checksum}, but got {downloaded_checksum}."
             )
-            sys.exit(1)
+            logger.error(message)
+            raise UpdateError(message)
         logger.info("Checksum matches expectations.")
         return destination
     except subprocess.CalledProcessError:
-        logger.error("Failed to download %s", url)
-        sys.exit(1)
+        message = f"Failed to download {url}"
+        logger.error(message)
+        raise UpdateError(message) from None
 
 
 def copy_file(source: Path, destination: Path) -> None:
@@ -171,8 +175,9 @@ def _load_driver_config(settings_path: Path) -> DriverConfig:
     try:
         config = toml.load(settings_path)
     except (FileNotFoundError, toml.TomlDecodeError) as error:
-        logger.error("Unable to read driver settings at %s: %s", settings_path, error)
-        sys.exit(1)
+        message = f"Unable to read driver settings at {settings_path}: {error}"
+        logger.error(message)
+        raise UpdateError(message) from error
 
     missing = [
         key
@@ -186,10 +191,11 @@ def _load_driver_config(settings_path: Path) -> DriverConfig:
         if key not in config
     ]
     if missing:
-        logger.error(
-            "Missing keys in %s: %s", settings_path, ", ".join(missing)
+        message = (
+            f"Missing keys in {settings_path}: {', '.join(missing)}"
         )
-        sys.exit(1)
+        logger.error(message)
+        raise UpdateError(message)
 
     try:
         driver_libs = _parse_csv(
@@ -210,8 +216,9 @@ def _load_driver_config(settings_path: Path) -> DriverConfig:
             config["CIRCUIT_PY_BOOT_NAME"], field_name="CIRCUIT_PY_BOOT_NAME"
         )
     except ValueError as error:
-        logger.error("Invalid driver settings in %s: %s", settings_path, error)
-        sys.exit(1)
+        message = f"Invalid driver settings in {settings_path}: {error}"
+        logger.error(message)
+        raise UpdateError(message) from error
 
     return DriverConfig(
         uf2_url=uf2_url,
@@ -237,18 +244,18 @@ def _ensure_driver_files(driver_path: Path) -> None:
         if not (driver_path / name).exists()
     ]
     if missing:
-        logger.error(
-            "Missing driver files in %s: %s", driver_path, ", ".join(missing)
-        )
-        sys.exit(1)
+        message = f"Missing driver files in {driver_path}: {', '.join(missing)}"
+        logger.error(message)
+        raise UpdateError(message)
 
 
 def _mount_points(media_directory: Path) -> list[Path]:
     if not media_directory.is_dir():
-        logger.error(
-            "Expected media directory %s to exist before updates.", media_directory
+        message = (
+            f"Expected media directory {media_directory} to exist before updates."
         )
-        sys.exit(1)
+        logger.error(message)
+        raise UpdateError(message)
 
     return [
         entry for entry in media_directory.iterdir() if entry.is_dir()
@@ -259,11 +266,12 @@ def main(device_driver_name: str) -> None:
     base_path = Path(heart.__file__).resolve().parents[2] / "drivers"
     code_path = base_path / device_driver_name
     if not code_path.is_dir():
-        logger.error(
-            "The path %s does not exist. This is where we expect the driver code to exist.",
-            code_path,
+        message = (
+            "The path "
+            f"{code_path} does not exist. This is where we expect the driver code to exist."
         )
-        sys.exit(1)
+        logger.error(message)
+        raise UpdateError(message)
 
     ###
     # Load a bunch of env vars the driver declares
@@ -340,4 +348,7 @@ if __name__ == "__main__":
             "DEVICE_DRIVER_NAME is not set. Please supply it as the first argument."
         )
         sys.exit(1)
-    main(sys.argv[1])
+    try:
+        main(sys.argv[1])
+    except UpdateError:
+        sys.exit(1)

@@ -1,5 +1,4 @@
 import argparse
-import sys
 from typing import Any
 
 from heart.utilities.logging import get_logger
@@ -199,6 +198,6 @@ class SampleBase:
             self.run()
         except KeyboardInterrupt:
             logger.info("Exiting")
-            sys.exit(0)
+            return False
 
         return True

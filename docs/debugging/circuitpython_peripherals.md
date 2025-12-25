@@ -30,6 +30,7 @@ When you use `heart`'s driver update helper (`src/heart/manage/update.py`), it w
 - Download the configured UF2 or CircuitPython bundle and verify its SHA-256 checksum.
 - Skip optional `.mpy` bundle files that are not present in the bundle.
 - Copy driver `code.py`, `boot.py`, and `settings.toml` into matching `CIRCUITPY` volumes.
+- Raise `UpdateError` when preconditions fail so CLIs can exit with a non-zero status.
 
 ## Iteration Practices
 

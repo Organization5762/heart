@@ -4,6 +4,7 @@ import typer
 from PIL import Image
 
 from heart.device.selection import select_device
+from heart.manage.update import UpdateError
 from heart.manage.update import main as update_driver_main
 from heart.peripheral.core.providers import container
 from heart.programs.registry import ConfigurationRegistry
@@ -46,7 +47,11 @@ def run_command(
 
 
 def update_driver_command(name: Annotated[str, typer.Option("--name")]) -> None:
-    update_driver_main(device_driver_name=name)
+    try:
+        update_driver_main(device_driver_name=name)
+    except UpdateError as error:
+        logger.error("Driver update failed: %s", error)
+        raise typer.Exit(code=1) from error
 
 
 def bench_device_command() -> None:
