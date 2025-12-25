@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
 import json
 import os
 import threading
@@ -13,17 +11,11 @@ from typing import Any, Iterator, Mapping
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
-
-
-def _load_optional_module(module_name: str) -> Any | None:
-    if importlib.util.find_spec(module_name) is None:  # pragma: no cover - optional
-        return None
-    return importlib.import_module(module_name)
-
-
-serial = _load_optional_module("serial")
+from heart.utilities.optional_imports import optional_import
 
 logger = get_logger(__name__)
+
+serial = optional_import("serial", logger=logger)
 
 @dataclass(slots=True)
 class RawRadioPacket:

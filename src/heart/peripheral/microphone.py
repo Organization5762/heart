@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import ctypes.util
-import importlib
-import importlib.util
 import threading
 import time
 from collections.abc import Iterator
@@ -17,19 +15,13 @@ import numpy as np
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
+from heart.utilities.optional_imports import optional_import
 
 logger = get_logger(__name__)
 
 sd: Any | None = None
-if (
-    importlib.util.find_spec("sounddevice") is not None
-    and ctypes.util.find_library("portaudio") is not None
-):  # pragma: no cover - optional dependency
-    try:
-        sd = cast(Any | None, importlib.import_module("sounddevice"))
-    except Exception as exc:
-        logger.warning("sounddevice import failed; disabling microphone support: %s", exc)
-        sd = None
+if ctypes.util.find_library("portaudio") is not None:  # pragma: no cover - optional dependency
+    sd = optional_import("sounddevice", logger=logger)
 
 
 class Microphone(Peripheral[MicrophoneLevel]):
