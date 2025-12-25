@@ -11,6 +11,7 @@ from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
+from heart.renderers.state_provider import RngStateProvider
 
 
 class BorderStateProvider(ObservableProvider[BorderState]):
@@ -27,7 +28,7 @@ class BorderStateProvider(ObservableProvider[BorderState]):
         self._color.on_next(color)
 
 
-class RainStateProvider(ObservableProvider[RainState]):
+class RainStateProvider(RngStateProvider[RainState]):
     def __init__(
         self,
         *,
@@ -36,15 +37,15 @@ class RainStateProvider(ObservableProvider[RainState]):
         peripheral_manager: PeripheralManager,
         rng: random.Random | None = None,
     ) -> None:
+        super().__init__(rng=rng)
         self._width = width
         self._height = height
         self._peripheral_manager = peripheral_manager
-        self._rng = rng or random.Random()
 
     def observable(self) -> reactivex.Observable[RainState]:
         initial_state = RainState(
-            starting_point=self._rng.randint(0, self._width),
-            current_y=self._rng.randint(0, 20),
+            starting_point=self.rng.randint(0, self._width),
+            current_y=self.rng.randint(0, 20),
         )
 
         return self._peripheral_manager.game_tick.pipe(
@@ -58,13 +59,13 @@ class RainStateProvider(ObservableProvider[RainState]):
         if new_y > self._height:
             return replace(
                 state,
-                starting_point=self._rng.randint(0, self._width),
+                starting_point=self.rng.randint(0, self._width),
                 current_y=0,
             )
         return replace(state, current_y=new_y)
 
 
-class SlinkyStateProvider(ObservableProvider[SlinkyState]):
+class SlinkyStateProvider(RngStateProvider[SlinkyState]):
     def __init__(
         self,
         *,
@@ -73,15 +74,15 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
         peripheral_manager: PeripheralManager,
         rng: random.Random | None = None,
     ) -> None:
+        super().__init__(rng=rng)
         self._width = width
         self._height = height
         self._peripheral_manager = peripheral_manager
-        self._rng = rng or random.Random()
 
     def observable(self) -> reactivex.Observable[SlinkyState]:
         initial_state = SlinkyState(
-            starting_point=self._rng.randint(0, self._width),
-            current_y=self._rng.randint(0, 20),
+            starting_point=self.rng.randint(0, self._width),
+            current_y=self.rng.randint(0, 20),
         )
 
         return self._peripheral_manager.game_tick.pipe(
@@ -95,7 +96,7 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
         if new_y > self._height:
             return replace(
                 state,
-                starting_point=self._rng.randint(0, self._width),
+                starting_point=self.rng.randint(0, self._width),
                 current_y=0,
             )
         return replace(state, current_y=new_y)
