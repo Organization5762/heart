@@ -5,6 +5,9 @@ import requests
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.sensor import Acceleration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Phyphox(Peripheral[Acceleration]):
@@ -27,8 +30,8 @@ class Phyphox(Peripheral[Acceleration]):
                 self.acc_x = float(data["buffer"]["accX"]["buffer"][-1])
                 self.acc_y = float(data["buffer"]["accY"]["buffer"][-1])
                 self.acc_z = float(data["buffer"]["accZ"]["buffer"][-1])
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Phyphox request failed: %s", exc)
             time.sleep(0.05)
 
     def get_acceleration(self) -> Acceleration | None:
