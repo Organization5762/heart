@@ -21,7 +21,7 @@ export function PeripheralProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const sub = peripheralStream.subscribe((msg) => {
-      const info = msg.payload.peripheral_info;
+      const info = msg.payload.peripheralInfo;
       const data = msg.payload.data;
       if (!info.id) return;
 

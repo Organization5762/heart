@@ -2,7 +2,7 @@
 
 ## Goal
 
-Capture the runtime controls that reduce websocket backpressure when streaming Beats frames. This note documents the queue and JSON formatting knobs alongside the code paths that consume them.
+Capture the runtime controls that reduce websocket backpressure when streaming Beats frames. This note documents the queue controls and protobuf payload framing alongside the code paths that consume them.
 
 ## Sources
 
@@ -11,7 +11,7 @@ Capture the runtime controls that reduce websocket backpressure when streaming B
 
 ## Materials
 
-- Environment variables (`BEATS_STREAM_QUEUE_SIZE`, `BEATS_STREAM_QUEUE_OVERFLOW`, `BEATS_STREAM_JSON_SORT_KEYS`, `BEATS_STREAM_JSON_INDENT`).
+- Environment variables (`BEATS_STREAM_QUEUE_SIZE`, `BEATS_STREAM_QUEUE_OVERFLOW`).
 
 ## Configuration surface
 
@@ -27,11 +27,9 @@ Capture the runtime controls that reduce websocket backpressure when streaming B
 - `drop_newest`: discard the incoming frame and retain the queued backlog.
 - `error`: raise a `QueueFull` error to surface the overflow condition.
 
-### JSON formatting
+### Protobuf framing
 
-`BEATS_STREAM_JSON_SORT_KEYS` toggles JSON key sorting in streamed payloads. Sorting keeps payloads stable for diffs and inspection but adds CPU overhead.
-
-`BEATS_STREAM_JSON_INDENT` controls JSON indentation. Unset or `none` produces compact output. Set to a non-negative integer to introduce whitespace for readability.
+Beats frames and peripheral updates are serialized into protobuf `StreamEnvelope` messages before they are queued for broadcast. This keeps payloads compact and lets the client decode binary frames without JSON parsing on every update.
 
 ## Runtime behavior summary
 

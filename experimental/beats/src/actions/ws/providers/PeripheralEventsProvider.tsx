@@ -37,5 +37,7 @@ export function usePeripheralEvents() {
 
 export function useSpecificPeripheralEvents(peripheralId: string) {
     const events = useContext(PeripheralEventsContext);
-    return events.filter((event) => event.msg.payload.peripheral_info.id === peripheralId);
+    return events.filter(
+      (event) => event.msg.payload.peripheralInfo.id === peripheralId,
+    );
   }

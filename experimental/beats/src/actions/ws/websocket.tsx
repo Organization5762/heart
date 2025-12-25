@@ -7,7 +7,9 @@ import {
 } from "react";
 import { Subject } from "rxjs";
 
-export const stream = new Subject<any>();
+import { decodeStreamEvent, StreamEvent } from "./protocol";
+
+export const stream = new Subject<StreamEvent>();
 
 type WSContextValue = {
   socket: WebSocket | null;
@@ -78,6 +80,7 @@ export function WSProvider({
       });
 
       const ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
       setSocket(ws);
       setReadyState(ws.readyState);
 
@@ -86,14 +89,17 @@ export function WSProvider({
         setReadyState(ws.readyState);
       };
 
-      ws.onmessage = async (ev: MessageEvent) => {
+      ws.onmessage = (ev: MessageEvent) => {
+        if (!(ev.data instanceof ArrayBuffer)) {
+          return;
+        }
         try {
-          const text = await ev.data.text();
-          const data = JSON.parse(text);
-          stream.next(data);
+          const decoded = decodeStreamEvent(ev.data);
+          if (decoded) {
+            stream.next(decoded);
+          }
         } catch (err) {
           stream.error(err);
-          // Log JSON parse errors (non-JSON messages or syntax errors)
           console.error("WebSocket message parse error:", err, ev.data);
         }
       };
