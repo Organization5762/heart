@@ -7,7 +7,20 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pygame
 import reactivex
-from OpenGL.GL import *
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
+                       GL_FLOAT, GL_LINEAR, GL_MODELVIEW, GL_NEAREST,
+                       GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,
+                       GL_SHADING_LANGUAGE_VERSION, GL_TEXTURE_2D,
+                       GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
+                       GL_TRIANGLE_STRIP, GL_UNSIGNED_BYTE, GL_VENDOR,
+                       GL_VERSION, glBegin, glBindTexture, glClear, glDisable,
+                       glDrawArrays, glEnable, glEnableVertexAttribArray,
+                       glEnd, glGenTextures, glGetString, glGetUniformLocation,
+                       glLoadIdentity, glMatrixMode, glOrtho, glReadPixels,
+                       glTexCoord2f, glTexImage2D, glTexParameteri,
+                       glTexSubImage2D, glUniform1f, glUniform2fv,
+                       glUniform3fv, glUniformMatrix4fv, glUseProgram,
+                       glVertex2f, glVertexAttribPointer, glViewport)
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
