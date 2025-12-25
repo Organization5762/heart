@@ -11,6 +11,8 @@ from uuid import UUID
 import websockets
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
+from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
+                                                 QueueOverflowStrategy)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,6 +51,7 @@ class WebSocket:
     _thread: threading.Thread | None = field(default=None, init=False)
     _loop: asyncio.AbstractEventLoop | None = field(default=None, init=False)
     _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
+    _streaming_settings = BeatsStreamingConfiguration.settings()
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "WebSocket":
         if cls._instance is None:
@@ -71,7 +74,9 @@ class WebSocket:
     def _ws_thread_main(self) -> None:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
-        self._broadcast_queue = asyncio.Queue()
+        self._broadcast_queue = asyncio.Queue(
+            maxsize=self._streaming_settings.queue_max_size
+        )
         loop = self._loop
         broadcast_queue = self._broadcast_queue
         assert loop is not None
@@ -87,13 +92,18 @@ class WebSocket:
         async def broadcast_worker() -> None:
             while True:
                 frame = await broadcast_queue.get()
-                for ws in list(self.clients):
-                    try:
-                        await ws.send(frame)
-                    except (ConnectionClosedOK, ConnectionClosedError):
+                if not self.clients:
+                    continue
+                clients = list(self.clients)
+                results = await asyncio.gather(
+                    *[ws.send(frame) for ws in clients], return_exceptions=True
+                )
+                for ws, result in zip(clients, results, strict=True):
+                    if isinstance(result, (ConnectionClosedOK, ConnectionClosedError)):
                         self.clients.discard(ws)
-                    except Exception as error:
-                        logger.warning("Error sending frame to client: %s", error)
+                        continue
+                    if isinstance(result, Exception):
+                        logger.warning("Error sending frame to client: %s", result)
                         self.clients.discard(ws)
 
         async def main() -> None:
@@ -114,12 +124,29 @@ class WebSocket:
             json_bytes = json.dumps(
                 data,
                 cls=UniversalJSONEncoder,
-                sort_keys=True,
-                indent=0,
+                sort_keys=self._streaming_settings.json_sort_keys,
+                indent=self._streaming_settings.json_indent,
             ).encode()
-
-            fut = asyncio.run_coroutine_threadsafe(
-                self._broadcast_queue.put(json_bytes),
-                self._loop,
+            self._loop.call_soon_threadsafe(
+                self._enqueue_frame, json_bytes, self._broadcast_queue
             )
-            fut.result()
+
+    def _enqueue_frame(self, frame: bytes, queue: asyncio.Queue[bytes]) -> None:
+        if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.ERROR:
+            queue.put_nowait(frame)
+            return
+
+        if not queue.full():
+            queue.put_nowait(frame)
+            return
+
+        if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.DROP_NEWEST:
+            logger.debug("Dropping websocket frame because queue is full.")
+            return
+
+        if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.DROP_OLDEST:
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                logger.debug("Queue was empty while handling overflow.")
+            queue.put_nowait(frame)
