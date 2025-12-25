@@ -259,6 +259,6 @@ def poll_phyphox():
             y = data["buffer"]["acceleration"]["y"][-1]
             z = data["buffer"]["acceleration"]["z"][-1]
             logger.info("Phyphox acceleration x=%s, y=%s, z=%s", x, y, z)
-        except Exception as exc:
-            logger.error("Error: %s", exc)
+        except Exception:
+            logger.exception("Error")
         time.sleep(0.1)

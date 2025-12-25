@@ -13,5 +13,5 @@ def update_driver_command(name: Annotated[str, typer.Option("--name")]) -> None:
     try:
         update_driver_main(device_driver_name=name)
     except UpdateError as error:
-        logger.error("Driver update failed: %s", error)
+        logger.exception("Driver update failed")
         raise typer.Exit(code=1) from error
