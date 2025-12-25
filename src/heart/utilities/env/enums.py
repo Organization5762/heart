@@ -72,3 +72,14 @@ class ReactivexStreamShareStrategy(StrEnum):
 class ReactivexStreamConnectMode(StrEnum):
     LAZY = "lazy"
     EAGER = "eager"
+
+
+class IsolatedRendererAckStrategy(StrEnum):
+    ALWAYS = "always"
+    NEVER = "never"
+
+
+class IsolatedRendererDedupStrategy(StrEnum):
+    NONE = "none"
+    SOURCE = "source"
+    PAYLOAD = "payload"
