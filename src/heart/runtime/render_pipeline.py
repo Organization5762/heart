@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 import pygame
@@ -21,6 +22,12 @@ if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class RenderResult:
+    surface: pygame.Surface | None
+    plan: RenderPlan
 
 
 class RenderPipeline:
@@ -52,7 +59,9 @@ class RenderPipeline:
         self._render_executor: ThreadPoolExecutor | None = None
         self._active_plan: RenderPlan | None = None
         self._plan_cache = RenderPlanCache(
-            self._planner, Configuration.render_plan_refresh_ms()
+            self._planner,
+            Configuration.render_plan_refresh_ms(),
+            Configuration.render_plan_signature_strategy(),
         )
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
@@ -190,10 +199,18 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> pygame.Surface | None:
+        return self.render_with_plan(renderers, override_renderer_variant).surface
+
+    def render_with_plan(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> RenderResult:
         plan = self._get_plan(renderers, override_renderer_variant)
         render_fn = self._resolve_render_method(plan)
         self._active_plan = plan
         try:
-            return render_fn(renderers)
+            surface = render_fn(renderers)
         finally:
             self._active_plan = None
+        return RenderResult(surface=surface, plan=plan)

@@ -7,7 +7,9 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
                                        RendererTimingStrategy,
                                        RenderLoopPacingStrategy,
-                                       RenderMergeStrategy, RenderTileStrategy)
+                                       RenderMergeStrategy,
+                                       RenderPlanSignatureStrategy,
+                                       RenderTileStrategy)
 from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
                                          _env_optional_int)
 
@@ -17,6 +19,7 @@ DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
 DEFAULT_RENDER_LOOP_PACING_STRATEGY = RenderLoopPacingStrategy.OFF
 DEFAULT_RENDER_LOOP_PACING_MIN_INTERVAL_MS = 0.0
 DEFAULT_RENDER_LOOP_PACING_UTILIZATION = 0.9
+DEFAULT_RENDER_PLAN_SIGNATURE_STRATEGY = RenderPlanSignatureStrategy.INSTANCE
 
 
 class RenderingConfiguration:
@@ -89,6 +92,19 @@ class RenderingConfiguration:
             default=DEFAULT_RENDER_PLAN_REFRESH_MS,
             minimum=0,
         )
+
+    @classmethod
+    def render_plan_signature_strategy(cls) -> RenderPlanSignatureStrategy:
+        strategy = os.environ.get(
+            "HEART_RENDER_PLAN_SIGNATURE_STRATEGY",
+            DEFAULT_RENDER_PLAN_SIGNATURE_STRATEGY.value,
+        ).strip().lower()
+        try:
+            return RenderPlanSignatureStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_PLAN_SIGNATURE_STRATEGY must be 'instance' or 'type'"
+            ) from exc
 
     @classmethod
     def render_parallel_threshold(cls) -> int:

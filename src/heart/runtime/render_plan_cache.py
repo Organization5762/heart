@@ -5,15 +5,22 @@ from typing import TYPE_CHECKING, Any, cast
 
 from heart.runtime.render_planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.variants import RendererVariant
+from heart.utilities.env.enums import RenderPlanSignatureStrategy
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
 
 
 class RenderPlanCache:
-    def __init__(self, planner: RenderPlanner, refresh_ms: int) -> None:
+    def __init__(
+        self,
+        planner: RenderPlanner,
+        refresh_ms: int,
+        signature_strategy: RenderPlanSignatureStrategy,
+    ) -> None:
         self._planner = planner
         self._refresh_ms = refresh_ms
+        self._signature_strategy = signature_strategy
         self._signature: tuple[int, ...] | None = None
         self._override: RendererVariant | None = None
         self._default_variant: RendererVariant | None = None
@@ -26,7 +33,7 @@ class RenderPlanCache:
         default_variant: RendererVariant,
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
-        signature = self._renderers_signature(renderers)
+        signature = self._renderers_signature(renderers, self._signature_strategy)
         if self._is_cache_valid(
             signature,
             override_renderer_variant,
@@ -60,5 +67,8 @@ class RenderPlanCache:
     @staticmethod
     def _renderers_signature(
         renderers: list["StatefulBaseRenderer[Any]"],
+        signature_strategy: RenderPlanSignatureStrategy,
     ) -> tuple[int, ...]:
+        if signature_strategy == RenderPlanSignatureStrategy.TYPE:
+            return tuple(id(type(renderer)) for renderer in renderers)
         return tuple(id(renderer) for renderer in renderers)
