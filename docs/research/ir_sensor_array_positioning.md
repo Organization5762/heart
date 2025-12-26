@@ -22,7 +22,7 @@ The existing sensor bus code paths in `drivers/` timestamp rising edges with
 millisecond precision before forwarding payloads to the host. This is
 insufficient for triangulation: 1 ms of uncertainty at the speed of light
 produces ~300 km of spatial error. We therefore implemented
-`IRArrayDMAQueue` in `src/heart/peripheral/ir_sensor_array.py` to simulate the
+`IRArrayDMAQueue` in `src/heart/peripheral/ir_sensor_array/dma.py` to simulate the
 embedded double-buffered DMA queue. The queue stores raw `IRSample` objects with
 microsecond resolution, computes a lightweight CRC across each buffer, and emits
 `IRDMAPacket` instances that the host peripheral validates prior to decoding.
@@ -38,7 +38,7 @@ planar degeneracy. The solver returns both a pose estimate and a confidence
 score derived from the residual root mean square error (RMSE). Unit tests in
 `tests/peripheral/test_ir_sensor_array.py::test_multilateration_solver_converges_on_known_point`
 exercise the solver with synthetic geometry and confirm convergence to a known
-point within a millimetre.【F:src/heart/peripheral/ir_sensor_array.py†L118-L207】【F:tests/peripheral/test_ir_sensor_array.py†L28-L52】
+point within a millimetre.【F:src/heart/peripheral/ir_sensor_array/solver.py†L38-L121】【F:tests/peripheral/test_ir_sensor_array.py†L28-L52】
 
 ## Solver performance and configuration
 
@@ -48,7 +48,7 @@ per-iteration Python overhead and provides direct control over the gradient
 estimate. The solver method (`trf` by default) and Jacobian usage are
 configuration parameters on both `MultilaterationSolver` and `IRSensorArray`,
 so deployments can tune convergence behaviour alongside frame processing
-without modifying the algorithm itself.【F:src/heart/peripheral/ir_sensor_array.py†L118-L268】
+without modifying the algorithm itself.【F:src/heart/peripheral/ir_sensor_array/solver.py†L38-L121】
 
 ## Frame assembly and decoding
 
@@ -63,7 +63,7 @@ planning document and can be tuned once actual modulation measurements arrive.
 offsets, and emits pose events through the runtime `EventBus`. Tests in
 `tests/peripheral/test_ir_sensor_array.py::test_sensor_array_emits_frame_event`
 demonstrate that the peripheral produces a frame event with centimetre accuracy
-and expected payload bits after applying synthetic calibration offsets.【F:src/heart/peripheral/ir_sensor_array.py†L191-L264】【F:tests/peripheral/test_ir_sensor_array.py†L54-L90】
+and expected payload bits after applying synthetic calibration offsets.【F:src/heart/peripheral/ir_sensor_array/peripheral.py†L30-L99】【F:tests/peripheral/test_ir_sensor_array.py†L54-L90】
 
 ## Calibration workflow
 
