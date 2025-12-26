@@ -6,6 +6,7 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
                                        RendererTimingStrategy,
+                                       RenderLoopPacingStrategy,
                                        RenderMergeStrategy, RenderTileStrategy)
 from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
                                          _env_optional_int)
@@ -13,6 +14,9 @@ from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
 DEFAULT_RENDER_PLAN_REFRESH_MS = 100
 DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
 DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
+DEFAULT_RENDER_LOOP_PACING_STRATEGY = RenderLoopPacingStrategy.OFF
+DEFAULT_RENDER_LOOP_PACING_MIN_INTERVAL_MS = 0.0
+DEFAULT_RENDER_LOOP_PACING_UTILIZATION = 0.9
 
 
 class RenderingConfiguration:
@@ -164,6 +168,41 @@ class RenderingConfiguration:
                 "HEART_RENDER_TIMING_EMA_ALPHA must be greater than 0 and at most 1"
             )
         return alpha
+
+    @classmethod
+    def render_loop_pacing_strategy(cls) -> RenderLoopPacingStrategy:
+        strategy = os.environ.get(
+            "HEART_RENDER_LOOP_PACING_STRATEGY",
+            DEFAULT_RENDER_LOOP_PACING_STRATEGY.value,
+        ).strip().lower()
+        try:
+            return RenderLoopPacingStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_LOOP_PACING_STRATEGY must be 'off' or 'adaptive'"
+            ) from exc
+
+    @classmethod
+    def render_loop_pacing_min_interval_ms(cls) -> float:
+        return _env_float(
+            "HEART_RENDER_LOOP_PACING_MIN_INTERVAL_MS",
+            default=DEFAULT_RENDER_LOOP_PACING_MIN_INTERVAL_MS,
+            minimum=0.0,
+        )
+
+    @classmethod
+    def render_loop_pacing_utilization(cls) -> float:
+        utilization = _env_float(
+            "HEART_RENDER_LOOP_PACING_UTILIZATION",
+            default=DEFAULT_RENDER_LOOP_PACING_UTILIZATION,
+            minimum=0.0,
+            maximum=1.0,
+        )
+        if utilization <= 0.0:
+            raise ValueError(
+                "HEART_RENDER_LOOP_PACING_UTILIZATION must be greater than 0 and at most 1"
+            )
+        return utilization
 
     @classmethod
     def frame_array_strategy(cls) -> FrameArrayStrategy:

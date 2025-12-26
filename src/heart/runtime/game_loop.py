@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -10,7 +11,9 @@ from heart.navigation import ComposedRenderer, MultiScene
 from heart.runtime.container import (RuntimeContainer, build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.game_loop_components import GameLoopComponents
+from heart.runtime.render_pacing import RenderLoopPacer
 from heart.runtime.render_pipeline import RendererVariant
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -50,6 +53,11 @@ class GameLoop:
         self.event_handler = components.event_handler
         self.peripheral_manager = components.peripheral_manager
         self.peripheral_runtime = components.peripheral_runtime
+        self._render_pacer = RenderLoopPacer(
+            strategy=Configuration.render_loop_pacing_strategy(),
+            min_interval_ms=Configuration.render_loop_pacing_min_interval_ms(),
+            utilization_target=Configuration.render_loop_pacing_utilization(),
+        )
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
@@ -223,9 +231,12 @@ class GameLoop:
             raise RuntimeError("GameLoop failed to initialize display clock")
         clock = self.display.clock
         while self.running:
+            frame_start = time.monotonic()
             self.peripheral_runtime.tick()
             self.running = self.event_handler.handle_events()
             self._preprocess_setup()
             renderers = self._select_renderers()
             self._one_loop(renderers)
+            estimated_cost_ms = self.render_pipeline.estimate_render_cost_ms(renderers)
+            self._render_pacer.pace(frame_start, estimated_cost_ms)
             clock.tick(self.max_fps)
