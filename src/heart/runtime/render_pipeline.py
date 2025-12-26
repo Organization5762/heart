@@ -44,7 +44,7 @@ class RenderPipeline:
         iterative_method = cast(RenderMethod, self._render_surface_iterative)
         object.__setattr__(self, "_render_surfaces_binary", binary_method)
         object.__setattr__(self, "_render_surface_iterative", iterative_method)
-        self._render_dispatch: dict[RendererVariant, RenderMethod] = {
+        self._render_methods: dict[RendererVariant, RenderMethod] = {
             RendererVariant.BINARY: binary_method,
             RendererVariant.ITERATIVE: iterative_method,
         }
@@ -119,7 +119,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._ensure_plan(renderers)
+        self._get_active_plan(renderers)
         surfaces = self._collect_surfaces_serial(renderers)
         return self._composition_manager.compose_serial(
             surfaces, merge_fn=self.merge_surfaces
@@ -129,7 +129,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._ensure_plan(renderers)
+        self._get_active_plan(renderers)
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
         surfaces = self._collect_surfaces_parallel(renderers)
@@ -138,36 +138,43 @@ class RenderPipeline:
             surfaces, executor, merge_fn=self.merge_surfaces
         )
 
-    def _render_fn(
+    def _plan_render(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
-        override_renderer_variant: RendererVariant | None,
-    ) -> RenderMethod:
-        plan = self._ensure_plan(renderers, override_renderer_variant)
-        return self._render_dispatch.get(
-            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
-        )
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> RenderPlan:
+        self._planner.set_default_variant(self.renderer_variant)
+        return self._planner.plan(renderers, override_renderer_variant)
 
-    def _ensure_plan(
+    def _get_active_plan(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
         if self._active_plan is not None:
             return self._active_plan
-        self._planner.set_default_variant(self.renderer_variant)
-        return self._planner.plan(renderers, override_renderer_variant)
+        return self._plan_render(renderers, override_renderer_variant)
+
+    def _select_render_method(self, plan: RenderPlan) -> RenderMethod:
+        return self._render_methods.get(
+            plan.variant, self._render_methods[RendererVariant.ITERATIVE]
+        )
+
+    def _render_fn(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None,
+    ) -> RenderMethod:
+        plan = self._get_active_plan(renderers, override_renderer_variant)
+        return self._select_render_method(plan)
 
     def render(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> pygame.Surface | None:
-        self._planner.set_default_variant(self.renderer_variant)
-        plan = self._planner.plan(renderers, override_renderer_variant)
-        render_fn = self._render_dispatch.get(
-            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
-        )
+        plan = self._plan_render(renderers, override_renderer_variant)
+        render_fn = self._select_render_method(plan)
         self._active_plan = plan
         try:
             return render_fn(renderers)
