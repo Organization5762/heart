@@ -25,8 +25,8 @@ This plan proposes consolidating runtime dependency wiring into a single Lagom c
 | Peripheral provider registry uses container-scoped bindings | Container module exposes registration for `PeripheralManager` and providers | Peripheral owner |
 | Renderers can be resolved through container with explicit scopes | `ComposedRenderer.resolve_renderer` uses shared container API and tests cover container binding | Rendering owner |
 | Container configuration is centralized | New module (e.g., `src/heart/runtime/container.py`) defines container construction and registration | Runtime owner |
-| Tests can swap implementations via container overrides | Unit tests use Lagom `Container` overrides without changing runtime modules | Test owner |
-| Lagom imports stay centralized | Lagom types are only imported in `src/heart/runtime/container.py` and `src/heart/peripheral/core/providers/` | Runtime owner |
+| Tests can swap implementations via container overrides | Unit tests use Lagom `Container` overrides or `RuntimeContainer` helper APIs without changing runtime modules | Test owner |
+| Lagom imports stay centralized in production modules | Lagom types are only imported in `src/heart/runtime/container.py` and `src/heart/peripheral/core/providers/`; test modules may import Lagom for overrides | Runtime owner |
 
 ## Task Breakdown Checklists
 
