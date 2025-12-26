@@ -13,9 +13,10 @@ from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 
-from .composed_renderer import ComposedRenderer, RendererResolver
+from .composed_renderer import ComposedRenderer
 from .game_modes import GameModes
 from .multi_scene import MultiScene
+from .renderer_specs import RendererResolver
 
 
 @dataclass
