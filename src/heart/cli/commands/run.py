@@ -2,9 +2,9 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.game_loop import build_game_loop_container
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.game_loop import GameLoop
+from heart.runtime.launcher import build_game_loop_container
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
