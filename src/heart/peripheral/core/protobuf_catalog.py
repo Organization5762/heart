@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from heart.peripheral.core.protobuf_registry import protobuf_registry
-
 BEATS_STREAMING_PACKAGE = "heart.beats.streaming"
 BEATS_STREAMING_MODULE = "heart.device.beats.proto.beats_streaming_pb2"
 PERIPHERAL_PAYLOADS_PACKAGE = "heart.peripheral.payloads"
@@ -32,6 +30,8 @@ PROTOBUF_CATALOG: tuple[ProtobufCatalogEntry, ...] = (
 
 
 def register_protobuf_catalog() -> None:
+    from heart.peripheral.core.protobuf_registry import protobuf_registry
+
     for entry in PROTOBUF_CATALOG:
         protobuf_registry.register_type_prefix(entry.package_prefix, entry.module_path)
 

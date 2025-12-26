@@ -161,6 +161,10 @@ module = [
 ]
 follow_imports = "skip"
 
+[[tool.mypy.overrides]]
+module = ["heart.peripheral.proto.peripheral_payloads_pb2"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
