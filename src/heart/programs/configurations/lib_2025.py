@@ -3,7 +3,7 @@ from typing import Callable
 import numpy as np
 
 from heart.display.color import Color
-from heart.navigation import ComposedRenderer, MultiScene
+from heart.navigation import MultiScene
 from heart.renderers.artist import ArtistScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.renderers.heart_title_screen import HeartTitleScreen
@@ -37,7 +37,7 @@ def configure(loop: GameLoop) -> None:
     kirby_mode.resolve_renderer_from_container(KirbyScene)
 
     modelbrot = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
                 MandelbrotTitle(),
                 TextRendering(
@@ -59,7 +59,7 @@ def configure(loop: GameLoop) -> None:
     hilbert_mode.resolve_renderer_from_container(HilbertScene)
 
     mario_mode = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
                 RenderImage(image_file="mario_still.png"),
                 TextRendering(
@@ -75,10 +75,10 @@ def configure(loop: GameLoop) -> None:
     mario_mode.resolve_renderer_from_container(MarioRenderer)
 
     def multicolor_renderer() -> MulticolorRenderer:
-        return loop.context_container.resolve(MulticolorRenderer)
+        return loop.resolve(MulticolorRenderer)
 
     shroomed_mode = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
                 multicolor_renderer(),
                 TextRendering(
@@ -92,7 +92,7 @@ def configure(loop: GameLoop) -> None:
         )
     )
     shroomed_mode.add_renderer(
-        ComposedRenderer(
+        loop.compose(
             [
                 multicolor_renderer(),
                 SpritesheetLoop("ness.png", "ness.json"),
@@ -101,9 +101,9 @@ def configure(loop: GameLoop) -> None:
     )
 
     heart_rate_mode = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
-                loop.context_container.resolve(HeartTitleScreen),
+                loop.resolve(HeartTitleScreen),
                 TextRendering(
                     text=["heart rate"],
                     font="Roboto",
@@ -117,9 +117,9 @@ def configure(loop: GameLoop) -> None:
     heart_rate_mode.resolve_renderer_from_container(CombinedBpmScreen)
 
     water_mode = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
-                loop.context_container.resolve(WaterTitleScreen),
+                loop.resolve(WaterTitleScreen),
                 TextRendering(
                     text=["water"],
                     font="Roboto",
@@ -180,7 +180,7 @@ def configure(loop: GameLoop) -> None:
 
     # Some random ones
     tixyland = loop.add_mode("tixyland")
-    tixyland_factory = loop.context_container.resolve(TixylandFactory)
+    tixyland_factory = loop.resolve(TixylandFactory)
 
     def build_tixyland(
         fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
@@ -223,7 +223,7 @@ def configure(loop: GameLoop) -> None:
 
     confetti = loop.add_mode("confetti")
     confetti.add_renderer(
-        ComposedRenderer(
+        loop.compose(
             [
                 RandomPixel(num_pixels=40000, brightness=0.05),
                 RandomPixel(num_pixels=4000, brightness=0.10),

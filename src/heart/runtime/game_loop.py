@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pygame
@@ -8,6 +8,7 @@ from lagom import Container
 
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.peripheral.core.providers import apply_provider_registrations
 from heart.runtime.container import build_runtime_container
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
+DependencyT = TypeVar("DependencyT")
 
 
 class GameLoop:
@@ -36,6 +38,7 @@ class GameLoop:
             )
         else:
             self.context_container = resolver
+            apply_provider_registrations(self.context_container)
             if Device not in self.context_container.defined_types:
                 self.context_container[Device] = device
             if RendererVariant not in self.context_container.defined_types:
@@ -58,6 +61,14 @@ class GameLoop:
         self.edge_thresh = 1
 
         self.display.configure_window()
+
+    def resolve(self, dependency: type[DependencyT]) -> DependencyT:
+        return self.context_container.resolve(dependency)
+
+    def compose(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> ComposedRenderer:
+        return ComposedRenderer(renderers, renderer_resolver=self.context_container)
 
     def add_mode(
         self,

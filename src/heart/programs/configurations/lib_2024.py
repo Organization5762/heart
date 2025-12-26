@@ -1,5 +1,5 @@
 from heart.display.color import Color
-from heart.navigation import ComposedRenderer, MultiScene
+from heart.navigation import MultiScene
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.kirby import KirbyScene
 from heart.renderers.mandelbrot.scene import MandelbrotMode
@@ -13,7 +13,7 @@ def configure(loop: GameLoop) -> None:
     kirby_mode.resolve_renderer_from_container(KirbyScene)
 
     modelbrot = loop.add_mode(
-        ComposedRenderer(
+        loop.compose(
             [
                 MandelbrotTitle(),
                 TextRendering(
