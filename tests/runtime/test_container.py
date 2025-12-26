@@ -1,4 +1,5 @@
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop import GameLoop
@@ -23,6 +24,18 @@ class TestRuntimeContainer:
         assert container.resolve(DisplayContext) is container.resolve(DisplayContext)
         assert render_pipeline is container.resolve(RenderPipeline)
         assert render_pipeline.renderer_variant is RendererVariant.BINARY
+
+    def test_container_injects_configuration_registry(self, device) -> None:
+        """Confirm the container shares a registry instance so configuration overrides stay consistent at runtime."""
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.BINARY,
+        )
+
+        registry = container.resolve(PeripheralConfigurationRegistry)
+        manager = container.resolve(PeripheralManager)
+
+        assert manager.configuration_registry is registry
 
     def test_game_loop_uses_container_overrides(self, device) -> None:
         """Ensure GameLoop honors container overrides so tests can swap implementations without touching runtime code."""

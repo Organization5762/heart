@@ -44,6 +44,14 @@ class PeripheralManager:
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
         return tuple(self._peripherals)
 
+    @property
+    def configuration_loader(self) -> PeripheralConfigurationLoader:
+        return self._configuration_loader
+
+    @property
+    def configuration_registry(self) -> PeripheralConfigurationRegistry:
+        return self._configuration_loader.registry
+
     def get_gamepad(self) -> Gamepad:
         """Return the first detected gamepad."""
 
