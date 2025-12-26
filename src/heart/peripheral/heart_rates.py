@@ -110,7 +110,7 @@ class HeartRateManager(Peripheral[Any]):
                 device_id = f"{hrm.device_id:05X}"
                 with _mutex:
                     current_bpms[device_id] = data.heart_rate
-                    last_seen[device_id] = time.time()
+                    last_seen[device_id] = time.monotonic()
                     if hasattr(data, "battery_percentage"):
                         battery_status[device_id] = data.battery_percentage * 100 / 256
 
@@ -123,7 +123,7 @@ class HeartRateManager(Peripheral[Any]):
     def _cleanup_loop(self) -> None:
         """Drop straps that have been quiet for DEVICE_TIMEOUT seconds."""
         while not self._stop_evt.wait(CLEANUP_INTERVAL):
-            now = time.time()
+            now = time.monotonic()
             stale: List[str] = []
             with _mutex:
                 for dev_id, ts in list(last_seen.items()):
