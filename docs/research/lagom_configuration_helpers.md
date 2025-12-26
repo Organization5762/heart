@@ -25,3 +25,9 @@ custom container is supplied, keeping renderer provider bindings consistent even
 outside the default builder. Configuration modules now call these helpers
 instead of reaching into the container directly, keeping Lagom usage centralized
 in the runtime layer.
+
+`ComposedRenderer` now resolves renderer classes passed at construction or via
+`add_renderer` when a resolver is available. `AppController` accepts renderer
+classes or lists of renderer classes for titles, allowing configuration code to
+lean on Lagom for renderer instantiation without reaching into container
+internals.

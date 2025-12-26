@@ -66,14 +66,16 @@ class GameLoop:
         return self.context_container.resolve(dependency)
 
     def compose(
-        self, renderers: list["StatefulBaseRenderer[Any]"]
+        self,
+        renderers: list["StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]],
     ) -> ComposedRenderer:
         return ComposedRenderer(renderers, renderer_resolver=self.context_container)
 
     def add_mode(
         self,
         title: str
-        | list["StatefulBaseRenderer[Any]"]
+        | list["StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]]
+        | type["StatefulBaseRenderer[Any]"]
         | "StatefulBaseRenderer[Any]"
         | None = None,
     ) -> ComposedRenderer:
