@@ -9,6 +9,7 @@ from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.runtime.container import (RuntimeContainer, build_runtime_container,
                                      configure_runtime_container)
+from heart.runtime.frame_pacer import FramePacer
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.logging import get_logger
@@ -20,6 +21,7 @@ logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 DependencyT = TypeVar("DependencyT")
+DEFAULT_GAME_LOOP_MAX_FPS = 500
 
 
 class GameLoop:
@@ -27,7 +29,7 @@ class GameLoop:
         self,
         device: Device,
         resolver: RuntimeContainer | None = None,
-        max_fps: int = 500,
+        max_fps: int = DEFAULT_GAME_LOOP_MAX_FPS,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
         if resolver is None:
@@ -46,6 +48,7 @@ class GameLoop:
         self.device = self.context_container.resolve(Device)
 
         self.max_fps = max_fps
+        self.frame_pacer = FramePacer(max_fps=self.max_fps)
         components = self.context_container.resolve(GameLoopComponents)
         self.app_controller = components.app_controller
         self.display = components.display
@@ -209,5 +212,10 @@ class GameLoop:
             self.running = self.event_handler.handle_events()
             self._preprocess_setup()
             renderers = self._select_renderers()
+            estimated_cost_ms = self.render_pipeline.estimate_render_cost_ms(renderers)
+            if not self.frame_pacer.should_render(estimated_cost_ms):
+                clock.tick(self.max_fps)
+                continue
             self._one_loop(renderers)
+            self.frame_pacer.mark_rendered()
             clock.tick(self.max_fps)

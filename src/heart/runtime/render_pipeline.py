@@ -76,6 +76,16 @@ class RenderPipeline:
     ) -> pygame.Surface | None:
         return self._renderer_processor.process_renderer(renderer)
 
+    def estimate_render_cost_ms(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> float | None:
+        estimated_cost_ms, has_samples = (
+            self._renderer_processor.timing_tracker.estimate_total_ms(renderers)
+        )
+        if not has_samples:
+            return None
+        return estimated_cost_ms
+
     def finalize_rendering(self, screen: pygame.Surface) -> Image.Image:
         image_bytes = pygame.image.tostring(screen, RGBA_IMAGE_FORMAT)
         return Image.frombuffer(

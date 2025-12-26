@@ -2,6 +2,7 @@ import os
 
 from heart.device.rgb_display.constants import DEFAULT_SOCKET_PATH
 from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
+                                       FramePacingStrategy,
                                        IsolatedRendererAckStrategy,
                                        IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
@@ -11,8 +12,11 @@ from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
                                          _env_optional_int)
 
 DEFAULT_RENDER_PLAN_REFRESH_MS = 100
+DEFAULT_RENDER_FRAME_MIN_INTERVAL_MS = 0
+DEFAULT_RENDER_FRAME_UTILIZATION_TARGET = 0.85
 DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
 DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
+DEFAULT_RENDER_FRAME_PACING_STRATEGY = FramePacingStrategy.ADAPTIVE
 
 
 class RenderingConfiguration:
@@ -85,6 +89,41 @@ class RenderingConfiguration:
             default=DEFAULT_RENDER_PLAN_REFRESH_MS,
             minimum=0,
         )
+
+    @classmethod
+    def render_frame_pacing_strategy(cls) -> FramePacingStrategy:
+        strategy = os.environ.get(
+            "HEART_RENDER_FRAME_PACING_STRATEGY",
+            DEFAULT_RENDER_FRAME_PACING_STRATEGY.value,
+        ).strip().lower()
+        try:
+            return FramePacingStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_FRAME_PACING_STRATEGY must be 'fixed' or 'adaptive'"
+            ) from exc
+
+    @classmethod
+    def render_frame_min_interval_ms(cls) -> int:
+        return _env_int(
+            "HEART_RENDER_FRAME_MIN_INTERVAL_MS",
+            default=DEFAULT_RENDER_FRAME_MIN_INTERVAL_MS,
+            minimum=0,
+        )
+
+    @classmethod
+    def render_frame_utilization_target(cls) -> float:
+        utilization = _env_float(
+            "HEART_RENDER_FRAME_UTILIZATION_TARGET",
+            default=DEFAULT_RENDER_FRAME_UTILIZATION_TARGET,
+            minimum=0.0,
+            maximum=1.0,
+        )
+        if utilization <= 0.0:
+            raise ValueError(
+                "HEART_RENDER_FRAME_UTILIZATION_TARGET must be greater than 0 and at most 1"
+            )
+        return utilization
 
     @classmethod
     def render_parallel_threshold(cls) -> int:
