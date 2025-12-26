@@ -11,6 +11,7 @@ from heart.firmware_io import device_id, identity
 from heart.firmware_io.constants import RADIO_PACKET
 
 DEVICE_NAME = "radio-bridge"
+RADIO_BRIDGE_LOOP_INTERVAL_SECONDS = 0.1
 IDENTITY = identity.Identity(
     device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
@@ -41,7 +42,7 @@ class RadioBridgeRuntime:
     gather_packet: Callable[[], Mapping[str, object]] = _default_packet
     print_fn: Callable[[str], None] = print
     sleep_fn: Callable[[float], None] = time.sleep
-    interval_seconds: float = 0.1
+    interval_seconds: float = RADIO_BRIDGE_LOOP_INTERVAL_SECONDS
 
     def _encode_payload(self, payload: Mapping[str, object]) -> str:
         frame = {"event_type": RADIO_PACKET, "data": dict(payload)}
