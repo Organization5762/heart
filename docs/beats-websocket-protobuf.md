@@ -8,13 +8,16 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 
 - `src/heart/device/beats/websocket.py`
 - `src/heart/peripheral/core/encoding.py`
+- `src/heart/peripheral/core/protobuf_catalog.py`
 - `src/heart/device/beats/proto/beats_streaming.proto`
+- `src/heart/peripheral/proto/peripheral_payloads.proto`
 - `experimental/beats/src/actions/ws/protocol.ts`
 
 ## Materials
 
 - `protobuf` runtime for Python message serialization.
 - `protobufjs` for decoding the protobuf envelope in the Beats UI.
+- `protoc` for generating `*_pb2.py` modules.
 
 ## Message layout
 
@@ -29,4 +32,13 @@ The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a type
 
 ## Python decoding helpers
 
-`heart.device.beats.websocket.decode_stream_envelope` provides the Python mirror for decoding envelopes. It returns a `(kind, payload)` tuple for `frame` and `peripheral` payloads, and uses `decode_peripheral_payload` from `heart.peripheral.core.encoding` to decode JSON or protobuf payload bytes. Protobuf decoding resolves the `payload_type` with `google.protobuf.symbol_database.Default()`. The `heart.peripheral.core.protobuf_registry` helper can import modules registered to a package prefix when a symbol is missing, and `heart.device.beats.proto` registers the Beats package prefix so decoding can succeed without manual imports.
+`heart.device.beats.websocket.decode_stream_envelope` provides the Python mirror for decoding envelopes. It returns a `(kind, payload)` tuple for `frame` and `peripheral` payloads, and uses `decode_peripheral_payload` from `heart.peripheral.core.encoding` to decode JSON or protobuf payload bytes. Protobuf decoding resolves the `payload_type` with `google.protobuf.symbol_database.Default()`. The `heart.peripheral.core.protobuf_registry` helper can import modules registered to a package prefix when a symbol is missing, and `heart.peripheral.core.protobuf_catalog` registers the Beats and peripheral packages so decoding can succeed without manual imports.
+
+## Schema catalog and generation
+
+`heart.peripheral.core.protobuf_catalog` centralizes protobuf package registration. Add new schema packages there so the registry can resolve types without bespoke imports. Use `scripts/generate_protobuf.py` to regenerate `*_pb2.py` modules after editing `.proto` files. For example:
+
+```bash
+./scripts/generate_protobuf.py src/heart/device/beats/proto/beats_streaming.proto \
+  src/heart/peripheral/proto/peripheral_payloads.proto
+```
