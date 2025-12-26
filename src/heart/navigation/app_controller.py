@@ -13,9 +13,11 @@ from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 
-from .composed_renderer import ComposedRenderer, RendererResolver
+from .composed_renderer import ComposedRenderer
 from .game_modes import GameModes
 from .multi_scene import MultiScene
+from .renderer_resolution import (RendererResolver, RendererSpec,
+                                  resolve_renderer_spec)
 
 
 @dataclass
@@ -76,7 +78,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
     def add_mode(
         self,
         title: str
-        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | list[RendererSpec]
         | type[StatefulBaseRenderer]
         | StatefulBaseRenderer
         | None = None,
@@ -104,7 +106,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
     def _build_title_renderer(
         self,
         title: str
-        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | list[RendererSpec]
         | type[StatefulBaseRenderer]
         | StatefulBaseRenderer,
     ) -> StatefulBaseRenderer:
@@ -118,9 +120,9 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         if isinstance(title, list):
             return ComposedRenderer(title, renderer_resolver=self._renderer_resolver)
         if isinstance(title, type) and issubclass(title, StatefulBaseRenderer):
-            if self._renderer_resolver is None:
-                raise ValueError("AppController requires a renderer resolver")
-            return self._renderer_resolver.resolve(title)
+            return resolve_renderer_spec(
+                title, self._renderer_resolver, context="AppController title"
+            )
         if isinstance(title, StatefulBaseRenderer):
             return title
         raise ValueError(f"Title must be a string or StatefulBaseRenderer, got: {title}")
