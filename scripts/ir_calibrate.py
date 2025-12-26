@@ -25,7 +25,7 @@ class CaptureRecord:
 
 
 def _load_records(path: Path) -> list[CaptureRecord]:
-    text = path.read_text().strip()
+    text = path.read_text(encoding="utf-8").strip()
     if not text:
         return []
 
@@ -68,7 +68,7 @@ def _load_records(path: Path) -> list[CaptureRecord]:
 
 def _resolve_layout(layout: str, layout_file: Path | None) -> np.ndarray:
     if layout_file is not None:
-        data = json.loads(layout_file.read_text())
+        data = json.loads(layout_file.read_text(encoding="utf-8"))
         if not isinstance(data, (list, tuple)):
             raise typer.BadParameter("Layout file must contain a list of positions")
         return np.asarray(data, dtype=float)
@@ -169,7 +169,8 @@ def calibrate(
     )
 
     payload = {"offsets": offsets, "metrics": metrics}
-    output.write_text(json.dumps(payload, indent=2))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     typer.echo(f"Wrote calibration to {output}")
 
     if telemetry_url:
@@ -183,4 +184,3 @@ def calibrate(
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     app()
-
