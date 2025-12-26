@@ -87,3 +87,37 @@ rules:
       category: error-handling
       technology:
         - python
+  - id: heart-no-text-open-without-encoding
+    languages:
+      - python
+    message: Specify an explicit encoding when reading or writing text files.
+    severity: ERROR
+    patterns:
+      - pattern: open($FILE, $MODE, ...)
+      - metavariable-regex:
+          metavariable: $MODE
+          regex: ^["']?[rwa]([t+])?["']?$
+      - pattern-not: open($FILE, $MODE, ..., encoding=$ENCODING, ...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-no-path-concat
+    languages:
+      - python
+    message: Avoid string concatenation for filesystem paths; use pathlib.Path.
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: $LEFT + "/" + $RIGHT
+          - pattern: f"{$LEFT}/{$RIGHT}"
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
