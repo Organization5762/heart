@@ -19,6 +19,7 @@ from adafruit_lsm303_accel import LSM303_Accel
 from heart.firmware_io import constants, device_id, identity
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
+DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS: float = 0.1
 DEBUG = False
 DEVICE_NAME = "sensor-bus"
 
@@ -180,7 +181,7 @@ def main() -> None:
     # 2. That actually checking the sensor takes roughly 0 time
     sample_rates = [(1000 / get_sample_rate(sensor)) / 1000 for sensor in sensors]
     if len(sample_rates) == 0:
-        wait_between_payloads_seconds = 0.1
+        wait_between_payloads_seconds = DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS
     else:
         wait_between_payloads_seconds = min(sample_rates)
 
