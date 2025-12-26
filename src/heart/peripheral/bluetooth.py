@@ -22,6 +22,7 @@ NOTIFICATION_CHANNEL = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 SINGLE_CLIENT_TIMEOUT_SECONDS = 60 * 60 * 12  # 12 hours
 OBJECT_SEPARATOR = b"\n"
 RECONNECT_DELAY_SECONDS = 1.0
+DEVICE_NAME = "totem-controller"
 
 
 class UartListener:
@@ -58,7 +59,7 @@ class UartListener:
             device
             for device in devices
             # TODO: This should come from somewhere more principled
-            if device.name == "totem-controller"
+            if device.name == DEVICE_NAME
         ]
 
     def start(self) -> None:
