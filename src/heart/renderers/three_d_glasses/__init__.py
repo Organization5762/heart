@@ -1,6 +1,9 @@
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.three_d_glasses.provider import \
-    ThreeDGlassesStateProvider  # noqa: F401
+    ThreeDGlassesStateProvider as ThreeDGlassesStateProvider
 from heart.renderers.three_d_glasses.renderer import \
-    ThreeDGlassesRenderer  # noqa: F401
+    ThreeDGlassesRenderer as ThreeDGlassesRenderer
 from heart.renderers.three_d_glasses.state import \
-    ThreeDGlassesState  # noqa: F401
+    ThreeDGlassesState as ThreeDGlassesState
+
+register_provider(ThreeDGlassesStateProvider, ThreeDGlassesStateProvider)

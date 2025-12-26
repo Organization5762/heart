@@ -1,6 +1,9 @@
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.channel_diffusion.provider import \
-    ChannelDiffusionStateProvider  # noqa: F401
+    ChannelDiffusionStateProvider as ChannelDiffusionStateProvider
 from heart.renderers.channel_diffusion.renderer import \
-    ChannelDiffusionRenderer  # noqa: F401
+    ChannelDiffusionRenderer as ChannelDiffusionRenderer
 from heart.renderers.channel_diffusion.state import \
-    ChannelDiffusionState  # noqa: F401
+    ChannelDiffusionState as ChannelDiffusionState
+
+register_provider(ChannelDiffusionStateProvider, ChannelDiffusionStateProvider)

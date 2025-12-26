@@ -5,7 +5,8 @@ import pygame
 
 from heart.device import Rectangle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers.channel_diffusion import ChannelDiffusionRenderer
+from heart.renderers.channel_diffusion import (ChannelDiffusionRenderer,
+                                               ChannelDiffusionStateProvider)
 
 
 class TestChannelDiffusionRenderer:
@@ -14,7 +15,7 @@ class TestChannelDiffusionRenderer:
     def test_single_white_pixel_spreads_channels(self, stub_clock_factory) -> None:
         """Ensure a lone white pixel fans out by channel while dimming in place to keep the seed deterministic."""
 
-        renderer = ChannelDiffusionRenderer()
+        renderer = ChannelDiffusionRenderer(ChannelDiffusionStateProvider())
         manager = PeripheralManager()
         clock = stub_clock_factory(0)
         orientation = Rectangle.with_layout(1, 1)
