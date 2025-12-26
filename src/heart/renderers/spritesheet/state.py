@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from heart.peripheral.gamepad.gamepad import Gamepad
@@ -54,7 +54,7 @@ class FrameDescription:
         )
 
 
-class LoopPhase(Enum):
+class LoopPhase(StrEnum):
     START = "start"
     LOOP = "loop"
     END = "end"
