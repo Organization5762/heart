@@ -24,6 +24,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - When starting background threads, provide a descriptive name via `threading.Thread(name=...)` to keep diagnostics readable.
 - Prefer module-level constants for tunable loop intervals instead of embedding sleep literals in long-running loops.
 - Prefer module-level constants for retry thresholds in reconnect or recovery loops instead of inline numeric literals.
+- Use `time.monotonic()` for elapsed-time comparisons, and reserve `time.time()` for wall-clock timestamps that leave the process.
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 
