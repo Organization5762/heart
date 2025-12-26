@@ -33,6 +33,9 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 
 - Prefer using `heart.runtime.container.build_runtime_container` and the provider registration helpers in
   `heart.peripheral.core.providers` rather than instantiating new Lagom `Container` objects in feature modules.
+- Only `heart.runtime.container` and `heart.peripheral.core.providers` should import Lagom types directly. Other
+  modules should depend on `heart.runtime.container.RuntimeContainer` when they need to reference the container
+  type so dependency wiring stays centralized.
 
 ## Error Handling
 
