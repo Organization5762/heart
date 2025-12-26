@@ -9,6 +9,7 @@ from heart.peripheral.core.providers import registry as providers_registry
 
 apply_provider_registrations = providers_registry.apply_provider_registrations
 register_provider = providers_registry.register_provider
+register_singleton_provider = providers_registry.register_singleton_provider
 registered_providers = providers_registry.registered_providers
 
 T = TypeVar("T")
