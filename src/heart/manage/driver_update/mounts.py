@@ -6,8 +6,9 @@ from pathlib import Path
 from heart.manage.driver_update.configuration import DriverConfig
 from heart.manage.driver_update.downloads import download_file
 from heart.manage.driver_update.exceptions import UpdateError
-from heart.manage.driver_update.filesystem import (DRIVER_FILES, copy_file,
-                                                   load_driver_libs)
+from heart.manage.driver_update.filesystem import copy_file
+from heart.manage.driver_update.layout import DRIVER_FILES
+from heart.manage.driver_update.libraries import load_driver_libs
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
