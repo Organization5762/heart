@@ -29,6 +29,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
+- When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
 
 ## Dependency Injection (Lagom)
 
