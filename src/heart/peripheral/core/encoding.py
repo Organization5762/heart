@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum, StrEnum
 from typing import Any, Mapping, Sequence, cast
 from uuid import UUID
@@ -17,6 +17,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 input_events_pb2 = cast(Any, _input_events_pb2)
+INPUT_EVENT_TYPE = input_events_pb2.InputEvent.DESCRIPTOR.full_name
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -51,6 +52,31 @@ def _encode_input_payload(payload: Input) -> PeripheralPayload:
         payload=event.SerializeToString(),
         encoding=PeripheralPayloadEncoding.PROTOBUF,
         payload_type=event.DESCRIPTOR.full_name,
+    )
+
+
+def _decode_input_event(message: Message) -> Input:
+    event = cast(Any, message)
+    try:
+        data = json.loads(event.data_json.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        logger.exception("Failed to decode InputEvent payload data.")
+        raise PeripheralPayloadDecodingError(
+            "Failed to decode InputEvent payload data."
+        ) from exc
+    try:
+        timestamp = datetime.fromisoformat(event.timestamp)
+    except ValueError as exc:
+        logger.exception("Failed to decode InputEvent timestamp.")
+        raise PeripheralPayloadDecodingError(
+            "Failed to decode InputEvent timestamp."
+        ) from exc
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    return Input(
+        event_type=event.event_type,
+        data=data,
+        timestamp=timestamp,
     )
 
 
@@ -143,6 +169,8 @@ def decode_peripheral_payload(
             raise PeripheralPayloadDecodingError(
                 f"Failed to decode protobuf payload for type {payload_type}."
             ) from exc
+        if payload_type == INPUT_EVENT_TYPE:
+            return _decode_input_event(message)
         return message
 
     raise PeripheralPayloadDecodingError(

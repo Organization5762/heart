@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import (_encode_peripheral_message,
@@ -117,6 +118,27 @@ class TestPeripheralPayloadDecoding:
 
         assert isinstance(decoded, beats_streaming_pb2.Frame)
         assert decoded == message
+
+    def test_decodes_input_payloads_into_inputs(self) -> None:
+        """Verify Input protobuf payloads decode into Input instances so event routing stays consistent."""
+        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        payload = Input(
+            event_type="peripheral.switch.tick",
+            data={"rotation": 1},
+            timestamp=timestamp,
+        )
+        encoded = encode_peripheral_payload(payload)
+
+        decoded = decode_peripheral_payload(
+            encoded.payload,
+            encoding=encoded.encoding,
+            payload_type=encoded.payload_type,
+        )
+
+        assert isinstance(decoded, Input)
+        assert decoded.event_type == payload.event_type
+        assert decoded.data == payload.data
+        assert decoded.timestamp == payload.timestamp
 
 
 class TestStreamEnvelopeDecoding:
