@@ -39,6 +39,8 @@ _HEADER = struct.Struct("<4sHHQ")  # magic, width, height, version
 _HEADER_SIZE = _HEADER.size
 _VERSION_SIZE = struct.calcsize("<Q")
 _VERSION_OFFSET = _HEADER_SIZE - _VERSION_SIZE
+READ_RETRY_SLEEP_SECONDS = 0.0005
+DEFAULT_POLL_INTERVAL_SECONDS = 0.002
 
 
 def _pixel_stride(mode: str) -> int:
@@ -151,7 +153,7 @@ class SharedMemoryFile:
             version = self._read_version(mm)
             if version % 2 == 1:
                 # Writer in progress. Give it a moment.
-                time.sleep(0.0005)
+                time.sleep(READ_RETRY_SLEEP_SECONDS)
                 continue
             if version == last_version:
                 return version, None
@@ -193,7 +195,7 @@ class SharedMemoryWatcher:
         self,
         path: Path,
         frame_buffer: FrameBuffer,
-        poll_interval: float = 0.002,
+        poll_interval: float = DEFAULT_POLL_INTERVAL_SECONDS,
     ) -> None:
         self._file = SharedMemoryFile(path, size=frame_buffer.size, mode=frame_buffer.mode)
         self._frame_buffer = frame_buffer
