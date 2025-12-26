@@ -1,5 +1,20 @@
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
+import {
+  AmbientLight,
+  BoxGeometry,
+  CanvasTexture,
+  DirectionalLight,
+  GridHelper,
+  Mesh,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  RepeatWrapping,
+  Scene,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
+  WebGLRenderer,
+} from "three";
 
 import { Skeleton } from "./ui/skeleton";
 
@@ -19,15 +34,15 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const cubeRef = useRef<THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial[]> | null>(
+  const rendererRef = useRef<WebGLRenderer | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const cubeRef = useRef<Mesh<BoxGeometry, MeshStandardMaterial[]> | null>(
     null,
   );
-  const gridRef = useRef<THREE.GridHelper | null>(null);
-  const fallbackTextureRef = useRef<THREE.Texture | null>(null);
-  const lastTextureRef = useRef<THREE.Texture | null>(null);
+  const gridRef = useRef<GridHelper | null>(null);
+  const fallbackTextureRef = useRef<Texture | null>(null);
+  const lastTextureRef = useRef<Texture | null>(null);
   const animationRef = useRef<number | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -38,27 +53,27 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
     if (!container || !canvas) return undefined;
 
     try {
-      const renderer = new THREE.WebGLRenderer({
+      const renderer = new WebGLRenderer({
         antialias: true,
         alpha: true,
         canvas,
       });
       renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.outputColorSpace = SRGBColorSpace;
 
-      const scene = new THREE.Scene();
+      const scene = new Scene();
       scene.background = null;
 
       const { clientWidth: width, clientHeight: height } = container;
-      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+      const camera = new PerspectiveCamera(45, width / height, 0.1, 100);
       camera.position.set(0, 0, CAMERA_DISTANCE);
 
-      const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-      const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+      const ambient = new AmbientLight(0xffffff, 0.6);
+      const directional = new DirectionalLight(0xffffff, 0.8);
       directional.position.set(2, 3, 4);
       scene.add(ambient, directional);
 
-      const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR, GRID_COLOR);
+      const grid = new GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR, GRID_COLOR);
       grid.position.y = -1.2;
       const gridMaterial = grid.material;
       if (Array.isArray(gridMaterial)) {
@@ -72,12 +87,12 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       }
       scene.add(grid);
 
-      const geometry = new THREE.BoxGeometry(2, 2, 2);
+      const geometry = new BoxGeometry(2, 2, 2);
       const fallbackTexture = createFallbackTexture();
       const materials = Array.from({ length: 6 }, () =>
-        new THREE.MeshStandardMaterial({ map: fallbackTexture }),
+        new MeshStandardMaterial({ map: fallbackTexture }),
       );
-      const cube = new THREE.Mesh(geometry, materials);
+      const cube = new Mesh(geometry, materials);
       scene.add(cube);
 
       renderer.setSize(width, height, false);
@@ -163,7 +178,7 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
     const applyTexture = async () => {
       if (!cubeRef.current || !fallbackTextureRef.current) return;
 
-      let nextTexture: THREE.Texture | null = null;
+      let nextTexture: Texture | null = null;
       try {
         nextTexture = imgURL ? await loadTexture(imgURL) : fallbackTextureRef.current;
       } catch (error) {
@@ -231,22 +246,22 @@ function createFallbackTexture() {
     }
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.wrapS = RepeatWrapping;
+  texture.wrapT = RepeatWrapping;
   texture.repeat.set(2, 2);
 
   return texture;
 }
 
 function loadTexture(url: string) {
-  return new Promise<THREE.Texture>((resolve, reject) => {
-    const loader = new THREE.TextureLoader();
+  return new Promise<Texture>((resolve, reject) => {
+    const loader = new TextureLoader();
     loader.load(
       url,
       (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.colorSpace = SRGBColorSpace;
         resolve(texture);
       },
       undefined,

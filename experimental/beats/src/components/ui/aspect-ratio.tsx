@@ -1,5 +1,3 @@
-import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
-
-const AspectRatio = AspectRatioPrimitive.Root
+import { Root as AspectRatio } from "@radix-ui/react-aspect-ratio"
 
 export { AspectRatio }

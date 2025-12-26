@@ -2,6 +2,7 @@ import { useStreamedImage } from "@/actions/ws/providers/ImageProvider";
 import { useWS } from "@/actions/ws/websocket";
 import { Antenna } from "lucide-react";
 import { useCallback, useState } from "react";
+import type { ComponentProps } from "react";
 
 import { StreamCube } from "./stream-cube";
 import { Separator } from "./ui/separator";
@@ -17,7 +18,7 @@ export function StreamStatus(
   {
     streamIsActive,
     ...divProps
-  }: React.ComponentProps<"div"> & {
+  }: ComponentProps<"div"> & {
     streamIsActive: boolean;
   },
 ) {

@@ -1,4 +1,4 @@
-import * as path from "path";
+import { resolve } from "path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -20,7 +20,7 @@ export default defineConfig({
   resolve: {
     preserveSymlinks: true,
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": resolve(__dirname, "./src"),
     },
   },
 });
