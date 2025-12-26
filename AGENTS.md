@@ -23,6 +23,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Prefer `get_logger(__name__)` so loggers include their module path and stay consistent in telemetry.
 - Prefer module-level constants for tunable loop intervals instead of embedding sleep literals in long-running loops.
 - Prefer module-level constants for retry thresholds in reconnect or recovery loops instead of inline numeric literals.
+- Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 
 ## Error Handling
