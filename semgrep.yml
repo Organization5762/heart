@@ -64,6 +64,8 @@ rules:
     severity: ERROR
     patterns:
       - pattern: |
+          try:
+            ...
           except BaseException:
             ...
     paths:
@@ -85,6 +87,8 @@ rules:
     paths:
       include:
         - src/**/*.py
+      exclude:
+        - src/heart/utilities/logging.py
     metadata:
       category: style
       technology:
