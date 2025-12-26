@@ -17,6 +17,11 @@ class RendererTimingStrategy(StrEnum):
     EMA = "ema"
 
 
+class RenderLoopPacingStrategy(StrEnum):
+    OFF = "off"
+    ADAPTIVE = "adaptive"
+
+
 class AssetCacheStrategy(StrEnum):
     NONE = "none"
     METADATA = "metadata"

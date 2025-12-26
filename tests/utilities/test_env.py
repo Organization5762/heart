@@ -12,7 +12,8 @@ from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
                                  ReactivexStreamConnectMode,
-                                 RenderMergeStrategy, get_device_ports)
+                                 RenderLoopPacingStrategy, RenderMergeStrategy,
+                                 get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -231,6 +232,32 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RENDER_PARALLEL_COST_THRESHOLD_MS", "18")
 
         assert Configuration.render_parallel_cost_threshold_ms() == 18
+
+    def test_render_loop_pacing_strategy_defaults_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify render loop pacing strategy defaults to off. This avoids unexpected throttling without explicit configuration."""
+        _clear_env(monkeypatch, "HEART_RENDER_LOOP_PACING_STRATEGY")
+
+        assert (
+            Configuration.render_loop_pacing_strategy()
+            == RenderLoopPacingStrategy.OFF
+        )
+
+    def test_render_loop_pacing_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify render loop pacing strategy rejects invalid values. This keeps pacing configuration explicit."""
+        monkeypatch.setenv("HEART_RENDER_LOOP_PACING_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.render_loop_pacing_strategy()
+
+    def test_render_loop_pacing_utilization_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify render loop pacing utilization reads environment value. This keeps throttling targets configurable."""
+        monkeypatch.setenv("HEART_RENDER_LOOP_PACING_UTILIZATION", "0.75")
+
+        assert Configuration.render_loop_pacing_utilization() == 0.75
 
 
     def test_render_executor_max_workers_returns_none_when_unset(

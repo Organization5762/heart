@@ -54,6 +54,8 @@ Each frame flows through the same stages:
 1. `heart.display.service.DisplayService` manages timing and double buffering to prevent tearing.
 1. The chosen `Device` implementation emits the output. `LocalScreen` writes to a pygame window, whereas the LED matrix driver streams pixel rows over SPI. Optional capture paths such as `heart.device.bridge.DeviceBridge` share frames with auxiliary processes.
 
+When `HEART_RENDER_LOOP_PACING_STRATEGY=adaptive` is enabled, `heart.runtime.render_pacing.RenderLoopPacer` delays the loop based on renderer timing estimates from `heart.runtime.render_pipeline.RenderPipeline`. The pacer enforces `HEART_RENDER_LOOP_PACING_MIN_INTERVAL_MS` as a floor and uses `HEART_RENDER_LOOP_PACING_UTILIZATION` to compute a target interval so the loop does not saturate the render budget.
+
 ## Extending the Runtime
 
 To add a scene or peripheral:
