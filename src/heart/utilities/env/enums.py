@@ -64,6 +64,11 @@ class LifeRuleStrategy(StrEnum):
     TABLE = "table"
 
 
+class MandelbrotInteriorStrategy(StrEnum):
+    NONE = "none"
+    CARDIOID = "cardioid"
+
+
 class DeviceLayoutMode(StrEnum):
     CUBE = "cube"
     RECTANGLE = "rectangle"
