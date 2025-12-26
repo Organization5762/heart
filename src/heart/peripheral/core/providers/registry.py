@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lagom import Container
+from lagom import Container, Singleton
 
 ProviderKey = type[Any]
 ProviderValue = Any
@@ -15,6 +15,12 @@ def register_provider(key: ProviderKey, provider: ProviderValue) -> None:
     _registry[key] = provider
     for container in _containers:
         _register_container_provider(container, key, provider)
+
+
+def register_singleton_provider(
+    key: ProviderKey, provider: ProviderValue
+) -> None:
+    register_provider(key, Singleton(provider))
 
 
 def apply_provider_registrations(container: Container) -> None:

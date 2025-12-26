@@ -36,6 +36,9 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Only `heart.runtime.container` and `heart.peripheral.core.providers` should import Lagom types directly. Other
   modules should depend on `heart.runtime.container.RuntimeContainer` when they need to reference the container
   type so dependency wiring stays centralized.
+- Feature modules should register singleton bindings with provider helpers (for example,
+  `register_singleton_provider`) instead of reaching for Lagom bindings directly, so container usage remains
+  encapsulated.
 
 ## Error Handling
 
