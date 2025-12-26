@@ -141,6 +141,7 @@ class WebSocket:
         self._thread = threading.Thread(
             target=self._ws_thread_main,
             daemon=True,
+            name="Beats websocket server",
         )
         self._thread.start()
 
