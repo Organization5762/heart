@@ -9,6 +9,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 
+from .composed_renderer import RendererResolver, RendererSpec
+
 
 @dataclass
 class MultiSceneState:
@@ -17,9 +19,14 @@ class MultiSceneState:
 
 
 class MultiScene(StatefulBaseRenderer[MultiSceneState]):
-    def __init__(self, scenes: list[StatefulBaseRenderer]) -> None:
+    def __init__(
+        self,
+        scenes: list[RendererSpec],
+        renderer_resolver: RendererResolver | None = None,
+    ) -> None:
         super().__init__()
-        self.scenes = scenes
+        self._renderer_resolver = renderer_resolver
+        self.scenes = [self._resolve_renderer_spec(scene) for scene in scenes]
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         index = self._active_scene_index()
@@ -58,3 +65,12 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     def _active_scene_index(self) -> int:
         offset = self.state.offset_of_button_value or 0
         return (self.state.current_button_value - offset) % len(self.scenes)
+
+    def _resolve_renderer_spec(self, renderer: RendererSpec) -> StatefulBaseRenderer:
+        if isinstance(renderer, type):
+            if not issubclass(renderer, StatefulBaseRenderer):
+                raise TypeError("MultiScene requires StatefulBaseRenderer subclasses")
+            if self._renderer_resolver is None:
+                raise ValueError("MultiScene requires a renderer resolver")
+            return self._renderer_resolver.resolve(renderer)
+        return renderer
