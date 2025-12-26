@@ -53,6 +53,35 @@ def configure_runtime_container(
     )
     _bind(container, overrides, Device, device)
     _bind(container, overrides, RendererVariant, render_variant)
+    _configure_peripheral_bindings(container, overrides)
+    _configure_display_bindings(container, overrides)
+    _configure_render_bindings(container, overrides)
+    _configure_runtime_bindings(container, overrides)
+    _configure_game_loop_bindings(container, overrides)
+    apply_provider_registrations(container)
+
+
+def _bind(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+    key: type[Any],
+    value: object,
+) -> None:
+    if overrides and key in overrides:
+        container[key] = overrides[key]
+        logger.debug("Applied Lagom override for %s.", key)
+        return
+    if key in container.defined_types:
+        logger.debug("Lagom already defined %s; skipping registration.", key)
+        return
+    container[key] = value
+    logger.debug("Registered Lagom provider for %s.", key)
+
+
+def _configure_peripheral_bindings(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+) -> None:
     _bind(
         container,
         overrides,
@@ -79,12 +108,24 @@ def configure_runtime_container(
             )
         ),
     )
+
+
+def _configure_display_bindings(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+) -> None:
     _bind(
         container,
         overrides,
         DisplayContext,
         Singleton(lambda resolver: DisplayContext(device=resolver[Device])),
     )
+
+
+def _configure_render_bindings(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+) -> None:
     _bind(
         container,
         overrides,
@@ -109,6 +150,12 @@ def configure_runtime_container(
             )
         ),
     )
+
+
+def _configure_runtime_bindings(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+) -> None:
     _bind(
         container,
         overrides,
@@ -127,6 +174,13 @@ def configure_runtime_container(
         ConfigurationRegistry,
         Singleton(ConfigurationRegistry),
     )
+    _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
+
+
+def _configure_game_loop_bindings(
+    container: RuntimeContainer,
+    overrides: Mapping[type[Any], object] | None,
+) -> None:
     _bind(
         container,
         overrides,
@@ -143,7 +197,6 @@ def configure_runtime_container(
             )
         ),
     )
-    _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
     from heart.runtime.game_loop import GameLoop
 
     _bind(
@@ -158,21 +211,3 @@ def configure_runtime_container(
             )
         ),
     )
-    apply_provider_registrations(container)
-
-
-def _bind(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-    key: type[Any],
-    value: object,
-) -> None:
-    if overrides and key in overrides:
-        container[key] = overrides[key]
-        logger.debug("Applied Lagom override for %s.", key)
-        return
-    if key in container.defined_types:
-        logger.debug("Lagom already defined %s; skipping registration.", key)
-        return
-    container[key] = value
-    logger.debug("Registered Lagom provider for %s.", key)
