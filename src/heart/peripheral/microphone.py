@@ -27,6 +27,11 @@ sd: Any | None = None
 if ctypes.util.find_library("portaudio") is not None:  # pragma: no cover - optional dependency
     sd = optional_import("sounddevice", logger=logger)
 
+DEFAULT_SAMPLE_RATE = 16_000
+DEFAULT_BLOCK_DURATION_SECONDS = 0.1
+DEFAULT_CHANNELS = 1
+DEFAULT_RETRY_DELAY_SECONDS = 1.0
+
 
 class Microphone(Peripheral[MicrophoneLevel]):
     """Capture audio input and emit loudness metrics"""
@@ -36,10 +41,10 @@ class Microphone(Peripheral[MicrophoneLevel]):
     def __init__(
         self,
         *,
-        samplerate: int = 16_000,
-        block_duration: float = 0.1,
-        channels: int = 1,
-        retry_delay: float = 1.0,
+        samplerate: int = DEFAULT_SAMPLE_RATE,
+        block_duration: float = DEFAULT_BLOCK_DURATION_SECONDS,
+        channels: int = DEFAULT_CHANNELS,
+        retry_delay: float = DEFAULT_RETRY_DELAY_SECONDS,
     ) -> None:
         super().__init__()
         self.samplerate = samplerate

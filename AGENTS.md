@@ -27,6 +27,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Use `time.monotonic()` for elapsed-time comparisons, and reserve `time.time()` for wall-clock timestamps that leave the process.
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
+- Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
 
 ## Error Handling
 
