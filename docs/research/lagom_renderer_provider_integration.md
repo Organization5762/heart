@@ -15,6 +15,8 @@ DI concerns.
   `src/heart/renderers/cloth_sail/`,
   `src/heart/renderers/three_fractal/`,
   `src/heart/programs/configurations/lib_2025.py`,
+  `src/heart/programs/configurations/l_system.py`,
+  `src/heart/programs/configurations/porthole_window.py`,
   `src/heart/programs/configurations/cloth_sail.py`.
 
 ## Notes
@@ -26,3 +28,8 @@ renderers through `GameLoop.context_container` instead of manually constructing 
 Fractal scene provider now takes a `Device` dependency from the container, which keeps device
 wiring centralized in `build_runtime_container` and avoids leaking device plumbing into
 configuration modules.
+
+`LSystem` and `PortholeWindowRenderer` configurations now rely on
+`ComposedRenderer.resolve_renderer_from_container` so Lagom supplies the registered state
+providers. This reduces direct provider construction in configuration modules while keeping the
+runtime container responsible for provider wiring.
