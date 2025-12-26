@@ -44,6 +44,9 @@ buffered replay when tuning for performance and correctness.
   - Integer buffer size used when the strategy is `replay_buffer`.
 - `HEART_RX_STREAM_REPLAY_WINDOW_MS`
   - Optional millisecond window used to evict old replayed events.
+- `HEART_RX_STREAM_COALESCE_WINDOW_MS`
+  - Millisecond window that coalesces upstream events to the most recent value,
+    limiting shared stream emissions to 500 Hz by default (2 ms).
 - `HEART_RX_STREAM_AUTO_CONNECT_MIN_SUBSCRIBERS`
   - Integer subscriber count required before auto-connect strategies attach to
     the upstream source.
