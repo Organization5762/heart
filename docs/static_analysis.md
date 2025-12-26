@@ -37,6 +37,8 @@ by default.
 | `heart-no-wildcard-import` | Avoid wildcard imports. | `src/**/*.py` |
 | `heart-no-module-all` | Avoid module-level `__all__` exports. | `src/**/*.py` |
 | `heart-no-os-path-join` | Prefer `pathlib.Path` over `os.path.join`. | `src/**/*.py` |
+| `heart-no-baseexception-catch` | Avoid catching `BaseException`. | `src/**/*.py` |
+| `heart-no-bare-exception-raise` | Require specific exception types instead of `Exception`. | `src/**/*.py` |
 
 ## Updating the rules
 
