@@ -72,7 +72,11 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
 
     def add_mode(
         self,
-        title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer | None = None,
+        title: str
+        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | type[StatefulBaseRenderer]
+        | StatefulBaseRenderer
+        | None = None,
     ) -> ComposedRenderer:
         # TODO: Add a navigation page back in
         result = ComposedRenderer([], renderer_resolver=self._renderer_resolver)
@@ -95,7 +99,11 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         self.modes.real_process(window=window, clock=clock, orientation=orientation)
 
     def _build_title_renderer(
-        self, title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer
+        self,
+        title: str
+        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | type[StatefulBaseRenderer]
+        | StatefulBaseRenderer,
     ) -> StatefulBaseRenderer:
         if isinstance(title, str):
             return TextRendering(
@@ -104,8 +112,12 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
                 font_size=14,
                 color=Color(255, 105, 180),
             )
-        if isinstance(title, StatefulBaseRenderer):
-            return title
         if isinstance(title, list):
             return ComposedRenderer(title, renderer_resolver=self._renderer_resolver)
+        if isinstance(title, type) and issubclass(title, StatefulBaseRenderer):
+            if self._renderer_resolver is None:
+                raise ValueError("AppController requires a renderer resolver")
+            return self._renderer_resolver.resolve(title)
+        if isinstance(title, StatefulBaseRenderer):
+            return title
         raise ValueError(f"Title must be a string or StatefulBaseRenderer, got: {title}")

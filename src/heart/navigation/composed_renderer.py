@@ -10,6 +10,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 
 RendererT = TypeVar("RendererT", bound=StatefulBaseRenderer)
+RendererSpec = StatefulBaseRenderer | type[StatefulBaseRenderer]
 
 
 class RendererResolver(Protocol):
@@ -28,12 +29,12 @@ class ComposedRendererState:
 class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
     def __init__(
         self,
-        renderers: list[StatefulBaseRenderer],
+        renderers: list[RendererSpec],
         renderer_resolver: RendererResolver | None = None,
     ) -> None:
         super().__init__()
-        self.renderers: list[StatefulBaseRenderer] = renderers
         self._renderer_resolver = renderer_resolver
+        self.renderers = [self._resolve_renderer_spec(renderer) for renderer in renderers]
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []
@@ -62,10 +63,13 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             orientation=orientation,
         )
 
-    def add_renderer(self, *renderers: StatefulBaseRenderer) -> None:
-        self.renderers.extend(renderers)
+    def add_renderer(self, *renderers: RendererSpec) -> None:
+        resolved_renderers = [
+            self._resolve_renderer_spec(renderer) for renderer in renderers
+        ]
+        self.renderers.extend(resolved_renderers)
         if self.is_initialized():
-            for item in renderers:
+            for item in resolved_renderers:
                 item.initialize(
                     self.state.window,
                     self.state.clock,
@@ -89,9 +93,18 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
     def resolve_renderer_from_container(
         self, renderer: type[StatefulBaseRenderer]
     ) -> None:
-        if self._renderer_resolver is None:
-            raise ValueError("ComposedRenderer requires a renderer resolver")
-        self.resolve_renderer(self._renderer_resolver, renderer)
+        self.add_renderer(renderer)
+
+    def _resolve_renderer_spec(self, renderer: RendererSpec) -> StatefulBaseRenderer:
+        if isinstance(renderer, type):
+            if not issubclass(renderer, StatefulBaseRenderer):
+                raise TypeError(
+                    "ComposedRenderer requires StatefulBaseRenderer subclasses"
+                )
+            if self._renderer_resolver is None:
+                raise ValueError("ComposedRenderer requires a renderer resolver")
+            return self._renderer_resolver.resolve(renderer)
+        return renderer
 
     def real_process(
         self,
