@@ -6,6 +6,7 @@ from digitalio import Pull
 from heart.firmware_io import constants
 
 LONG_PRESS_DURATION_SECONDS = 0.5
+DEFAULT_ROTARY_ENCODER_INDEX = 0
 
 
 # We don't use `json` here because the Trinkey doesn't support it by default
@@ -26,7 +27,7 @@ class RotaryEncoderHandler:
         self,
         encoder,
         switch,
-        index=0,
+        index=DEFAULT_ROTARY_ENCODER_INDEX,
         *,
         clock: Callable[[], float] | None = None,
     ):
