@@ -9,7 +9,7 @@ from PIL import Image
 
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.render_plan_cache import RenderPlanCache
+from heart.runtime.render_plan_selector import RenderPlanSelector
 from heart.runtime.render_planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.runtime.rendering.renderer_processor import RendererProcessor
@@ -17,12 +17,9 @@ from heart.runtime.rendering.surface_collection import RenderSurfaceCollector
 from heart.runtime.rendering.surface_merge import SurfaceCompositionManager
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
-
-logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -60,13 +57,11 @@ class RenderPipeline:
             RendererVariant.BINARY: binary_method,
             RendererVariant.ITERATIVE: iterative_method,
         }
-        self._render_executor: ThreadPoolExecutor | None = None
-        self._active_plan: RenderPlan | None = None
-        self._plan_cache = RenderPlanCache(
+        self._plan_selector = RenderPlanSelector(
             self._planner,
-            Configuration.render_plan_refresh_ms(),
-            Configuration.render_plan_signature_strategy(),
+            self._render_dispatch,
         )
+        self._render_executor: ThreadPoolExecutor | None = None
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self.clock = clock
@@ -157,7 +152,7 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
-        return self._plan_cache.get_plan(
+        return self._plan_selector.get_plan(
             renderers,
             self.renderer_variant,
             override_renderer_variant,
@@ -168,14 +163,14 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
-        if self._active_plan is not None:
-            return self._active_plan
-        return self._get_plan(renderers, override_renderer_variant)
+        return self._plan_selector.get_active_plan(
+            renderers,
+            self.renderer_variant,
+            override_renderer_variant,
+        )
 
     def _resolve_render_method(self, plan: RenderPlan) -> RenderMethod:
-        return self._render_dispatch.get(
-            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
-        )
+        return self._plan_selector.resolve_render_method(plan)
 
     def render(
         self,
@@ -190,10 +185,7 @@ class RenderPipeline:
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderResult:
         plan = self._get_plan(renderers, override_renderer_variant)
-        render_fn = self._resolve_render_method(plan)
-        self._active_plan = plan
-        try:
+        render_fn = self._plan_selector.resolve_render_method(plan)
+        with self._plan_selector.activate_plan(plan):
             surface = render_fn(renderers)
-        finally:
-            self._active_plan = None
         return RenderResult(surface=surface, plan=plan)
