@@ -12,8 +12,4 @@ def build_game_loop(*, x11_forward: bool) -> GameLoop:
         device=device,
         render_variant=render_variant,
     )
-    return GameLoop(
-        device=device,
-        resolver=resolver,
-        render_variant=render_variant,
-    )
+    return resolver.resolve(GameLoop)

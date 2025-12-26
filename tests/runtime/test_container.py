@@ -93,3 +93,15 @@ class TestRuntimeContainer:
         loop = GameLoop(device=device, resolver=container)
 
         assert loop.device is alternate_device
+
+    def test_container_resolves_game_loop(self, device) -> None:
+        """Confirm the container can resolve GameLoop so entrypoints reuse the shared DI wiring."""
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.ITERATIVE,
+        )
+
+        loop = container.resolve(GameLoop)
+
+        assert loop.context_container is container
+        assert loop.device is device
