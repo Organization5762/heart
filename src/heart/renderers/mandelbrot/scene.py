@@ -21,6 +21,8 @@ from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
 from heart.runtime.game_loop import DeviceDisplayMode
+from heart.utilities.env import Configuration
+from heart.utilities.env.enums import MandelbrotInteriorStrategy
 from heart.utilities.logging import get_logger
 
 ColorPalette = list[tuple[int, int, int]]
@@ -40,10 +42,15 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self.individual_screen_height: int | None = None
         self.screens: dict[tuple[int, int], pygame.Surface] = {}
         self.palettes = self._generate_palettes()
+        self.palette_arrays = [
+            np.array(palette, dtype=np.uint8) for palette in self.palettes
+        ]
 
         # cache properties for computed converge times for current view port
         self.cached_result = None
         self.last_params = None
+        self.cached_julia_result = None
+        self.last_julia_params = None
 
         # auto-zoom loop properties
         self.max_auto_zoom = 20093773861.78
@@ -61,6 +68,12 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         )
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
+        self.mandelbrot_interior_strategy = (
+            Configuration.mandelbrot_interior_strategy()
+        )
+        self.use_mandelbrot_interior = (
+            self.mandelbrot_interior_strategy == MandelbrotInteriorStrategy.CARDIOID
+        )
 
     def _create_initial_state(
         self,
@@ -123,6 +136,10 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
     @property
     def active_palette(self):
         return self.palettes[self.state.palette_index]
+
+    @property
+    def active_palette_array(self) -> np.ndarray:
+        return self.palette_arrays[self.state.palette_index]
 
     def reset(self):
         self.initialized = False
@@ -401,33 +418,46 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self, surface: pygame.Surface, clock: pygame.time.Clock
     ) -> None:
         width, height = surface.get_size()
-        aspect_ratio = width / height
-
-        fixed_zoom = self.state.jzoom
-        height_range = 4.0 / fixed_zoom
-        width_range = height_range * aspect_ratio
-
-        re = np.linspace(
-            -width_range / 2 + self.state.jmovement.x,
-            width_range / 2 + self.state.jmovement.x,
+        current_params = (
+            self.state.jzoom,
+            self.state.jmovement.x,
+            self.state.jmovement.y,
+            self.state.julia_constant.real,
+            self.state.julia_constant.imag,
+            self.state.max_iterations,
             width,
-        )
-        im = np.linspace(
-            -height_range / 2 + self.state.jmovement.y,
-            height_range / 2 + self.state.jmovement.y,
             height,
         )
-        re, im = np.meshgrid(re, im)
+        if self.cached_julia_result is None or self.last_julia_params != current_params:
+            aspect_ratio = width / height
+            fixed_zoom = self.state.jzoom
+            height_range = 4.0 / fixed_zoom
+            width_range = height_range * aspect_ratio
 
-        c_real = self.state.julia_constant.real
-        c_imag = self.state.julia_constant.imag
+            re = np.linspace(
+                -width_range / 2 + self.state.jmovement.x,
+                width_range / 2 + self.state.jmovement.x,
+                width,
+            )
+            im = np.linspace(
+                -height_range / 2 + self.state.jmovement.y,
+                height_range / 2 + self.state.jmovement.y,
+                height,
+            )
+            re, im = np.meshgrid(re, im)
 
-        converge_time = get_julia_converge_time(
-            re, im, c_real, c_imag, self.state.max_iterations
+            c_real = self.state.julia_constant.real
+            c_imag = self.state.julia_constant.imag
+
+            self.cached_julia_result = get_julia_converge_time(
+                re, im, c_real, c_imag, self.state.max_iterations
+            )
+            self.last_julia_params = current_params
+
+        clipped_times = np.clip(
+            self.cached_julia_result, 0, len(self.active_palette) - 1
         )
-        clipped_times = np.clip(converge_time, 0, len(self.active_palette) - 1)
-        palette_array = np.array(self.active_palette, dtype=np.uint8)
-        color_surface = palette_array[clipped_times]
+        color_surface = self.active_palette_array[clipped_times]
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
         pygame.surfarray.blit_array(surface, surface_array)
@@ -472,13 +502,17 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             crit_real = self.state.critical_point.real
             crit_imag = self.state.critical_point.imag
             self.cached_result = get_mandelbrot_converge_time(
-                re, im, crit_real, crit_imag, self.state.max_iterations
+                re,
+                im,
+                crit_real,
+                crit_imag,
+                self.state.max_iterations,
+                self.use_mandelbrot_interior,
             )
             self.last_params = current_params
 
         clipped_times = np.clip(self.cached_result, 0, len(self.active_palette) - 1)
-        palette_array = np.array(self.active_palette, dtype=np.uint8)
-        color_surface = palette_array[clipped_times]
+        color_surface = self.active_palette_array[clipped_times]
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
         pygame.surfarray.blit_array(surface, surface_array)
@@ -543,8 +577,25 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         return colors
 
 
+@jit(nopython=True, fastmath=True, cache=True)
+def _is_in_mandelbrot_interior(c_real, c_imag):
+    x_minus = c_real - 0.25
+    y2 = c_imag * c_imag
+    q = x_minus * x_minus + y2
+
+    if q * (q + x_minus) <= 0.25 * y2:
+        return True
+
+    if (c_real + 1.0) * (c_real + 1.0) + y2 <= 0.0625:
+        return True
+
+    return False
+
+
 @jit(nopython=True, parallel=True, fastmath=True, cache=True)
-def get_mandelbrot_converge_time(re, im, critical_real, critical_imag, max_iter):
+def get_mandelbrot_converge_time(
+    re, im, critical_real, critical_imag, max_iter, use_interior_check
+):
     height, width = re.shape
     result = np.zeros((height, width), dtype=np.int32)
 
@@ -554,9 +605,8 @@ def get_mandelbrot_converge_time(re, im, critical_real, critical_imag, max_iter)
             c_imag = im[i, j]
             z_real = critical_real
             z_imag = critical_imag
-            # if (c_real * c_real) + (c_imag * c_imag) > 4.0:
-            #     # result[i, j] = 0  # Set to "inside" color (black)
-            #     continue  # Skip to the next point
+            if use_interior_check and _is_in_mandelbrot_interior(c_real, c_imag):
+                continue
             for k in range(max_iter):
                 z_real2 = z_real * z_real
                 z_imag2 = z_imag * z_imag
