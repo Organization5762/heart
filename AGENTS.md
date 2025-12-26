@@ -41,6 +41,8 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
   encapsulated.
 - When tracking runtime containers for provider registration updates, use weak references (for example,
   `weakref.WeakSet`) so stale containers do not stay alive after shutdown.
+- Define Lagom provider factories as named module-level callables instead of inline lambdas so the dependency
+  graph stays discoverable and traceable in logs and stack traces.
 
 ## Error Handling
 

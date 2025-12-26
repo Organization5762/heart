@@ -25,6 +25,65 @@ RuntimeContainer = Container
 logger = get_logger(__name__)
 
 
+def _build_peripheral_configuration_loader(
+    resolver: RuntimeContainer,
+) -> PeripheralConfigurationLoader:
+    return PeripheralConfigurationLoader(
+        registry=resolver[PeripheralConfigurationRegistry]
+    )
+
+
+def _build_peripheral_manager(
+    resolver: RuntimeContainer,
+) -> PeripheralManager:
+    return PeripheralManager(
+        configuration_loader=resolver[PeripheralConfigurationLoader]
+    )
+
+
+def _build_display_context(resolver: RuntimeContainer) -> DisplayContext:
+    return DisplayContext(device=resolver[Device])
+
+
+def _build_render_pipeline(resolver: RuntimeContainer) -> RenderPipeline:
+    return RenderPipeline(
+        device=resolver[Device],
+        peripheral_manager=resolver[PeripheralManager],
+        render_variant=resolver[RendererVariant],
+    )
+
+
+def _build_frame_presenter(resolver: RuntimeContainer) -> FramePresenter:
+    return FramePresenter(
+        device=resolver[Device],
+        display=resolver[DisplayContext],
+        render_pipeline=resolver[RenderPipeline],
+        frame_exporter=resolver[FrameExporter],
+    )
+
+
+def _build_peripheral_runtime(resolver: RuntimeContainer) -> PeripheralRuntime:
+    return PeripheralRuntime(resolver[PeripheralManager])
+
+
+def _build_app_controller(resolver: RuntimeContainer) -> AppController:
+    return AppController(renderer_resolver=resolver)
+
+
+def _build_game_loop_components(
+    resolver: RuntimeContainer,
+) -> GameLoopComponents:
+    return GameLoopComponents(
+        app_controller=resolver[AppController],
+        display=resolver[DisplayContext],
+        render_pipeline=resolver[RenderPipeline],
+        frame_presenter=resolver[FramePresenter],
+        event_handler=resolver[PygameEventHandler],
+        peripheral_manager=resolver[PeripheralManager],
+        peripheral_runtime=resolver[PeripheralRuntime],
+    )
+
+
 def build_runtime_container(
     device: Device,
     render_variant: RendererVariant,
@@ -93,21 +152,13 @@ def _configure_peripheral_bindings(
         container,
         overrides,
         PeripheralConfigurationLoader,
-        Singleton(
-            lambda resolver: PeripheralConfigurationLoader(
-                registry=resolver[PeripheralConfigurationRegistry]
-            )
-        ),
+        Singleton(_build_peripheral_configuration_loader),
     )
     _bind(
         container,
         overrides,
         PeripheralManager,
-        Singleton(
-            lambda resolver: PeripheralManager(
-                configuration_loader=resolver[PeripheralConfigurationLoader]
-            )
-        ),
+        Singleton(_build_peripheral_manager),
     )
 
 
@@ -119,7 +170,7 @@ def _configure_display_bindings(
         container,
         overrides,
         DisplayContext,
-        Singleton(lambda resolver: DisplayContext(device=resolver[Device])),
+        Singleton(_build_display_context),
     )
 
 
@@ -131,27 +182,14 @@ def _configure_render_bindings(
         container,
         overrides,
         RenderPipeline,
-        Singleton(
-            lambda resolver: RenderPipeline(
-                device=resolver[Device],
-                peripheral_manager=resolver[PeripheralManager],
-                render_variant=resolver[RendererVariant],
-            )
-        ),
+        Singleton(_build_render_pipeline),
     )
     _bind(container, overrides, FrameExporter, Singleton(FrameExporter))
     _bind(
         container,
         overrides,
         FramePresenter,
-        Singleton(
-            lambda resolver: FramePresenter(
-                device=resolver[Device],
-                display=resolver[DisplayContext],
-                render_pipeline=resolver[RenderPipeline],
-                frame_exporter=resolver[FrameExporter],
-            )
-        ),
+        Singleton(_build_frame_presenter),
     )
 
 
@@ -163,13 +201,13 @@ def _configure_runtime_bindings(
         container,
         overrides,
         PeripheralRuntime,
-        Singleton(lambda resolver: PeripheralRuntime(resolver[PeripheralManager])),
+        Singleton(_build_peripheral_runtime),
     )
     _bind(
         container,
         overrides,
         AppController,
-        Singleton(lambda resolver: AppController(renderer_resolver=resolver)),
+        Singleton(_build_app_controller),
     )
     _bind(
         container,
@@ -188,17 +226,7 @@ def _configure_game_loop_bindings(
         container,
         overrides,
         GameLoopComponents,
-        Singleton(
-            lambda resolver: GameLoopComponents(
-                app_controller=resolver[AppController],
-                display=resolver[DisplayContext],
-                render_pipeline=resolver[RenderPipeline],
-                frame_presenter=resolver[FramePresenter],
-                event_handler=resolver[PygameEventHandler],
-                peripheral_manager=resolver[PeripheralManager],
-                peripheral_runtime=resolver[PeripheralRuntime],
-            )
-        ),
+        Singleton(_build_game_loop_components),
     )
     from heart.runtime.game_loop import GameLoop
 
