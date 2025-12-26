@@ -11,6 +11,7 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 - `src/heart/peripheral/core/protobuf_catalog.py`
 - `src/heart/device/beats/proto/beats_streaming.proto`
 - `src/heart/peripheral/proto/peripheral_payloads.proto`
+- `src/heart/peripheral/proto/input_events.proto`
 - `experimental/beats/src/actions/ws/protocol.ts`
 
 ## Materials
@@ -24,11 +25,11 @@ Define the protobuf envelope used to stream frames and peripheral updates into t
 `StreamEnvelope` wraps the payload in a `oneof` so clients can switch on the message type without JSON parsing:
 
 - `frame`: contains raw PNG bytes in `png_data`.
-- `peripheral`: includes `PeripheralInfo`, an encoded payload, a payload encoding enum, and an optional payload type string for protobuf payloads. `encode_peripheral_payload` in `heart.peripheral.core.encoding` centralizes the encoding logic so other integrations can reuse the same protobuf-aware rules.
+- `peripheral`: includes `PeripheralInfo`, an encoded payload, a payload encoding enum, and an optional payload type string for protobuf payloads. `encode_peripheral_payload` in `heart.peripheral.core.encoding` centralizes the encoding logic so other integrations can reuse the same protobuf-aware rules, including emitting `InputEvent` protobuf payloads for `heart.peripheral.core.Input` instances.
 
 ## Client decoding
 
-The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a typed `StreamEvent` into the RxJS stream. Frame bytes are converted directly into PNG blobs, and peripheral payloads are decoded from UTF-8 JSON when the payload encoding signals `JSON_UTF8`. Protobuf payloads set `payload_type` to the fully-qualified message name and set the encoding to `PROTOBUF`.
+The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a typed `StreamEvent` into the RxJS stream. Frame bytes are converted directly into PNG blobs, and peripheral payloads are decoded from UTF-8 JSON when the payload encoding signals `JSON_UTF8`. Protobuf payloads set `payload_type` to the fully-qualified message name and set the encoding to `PROTOBUF`. `Input` payloads will use the `heart.peripheral.input.InputEvent` schema when they are serialized by `encode_peripheral_payload`.
 
 ## Python decoding helpers
 
@@ -40,5 +41,6 @@ The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a type
 
 ```bash
 ./scripts/generate_protobuf.py src/heart/device/beats/proto/beats_streaming.proto \
-  src/heart/peripheral/proto/peripheral_payloads.proto
+  src/heart/peripheral/proto/peripheral_payloads.proto \
+  src/heart/peripheral/proto/input_events.proto
 ```

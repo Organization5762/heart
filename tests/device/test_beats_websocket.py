@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import (_encode_peripheral_message,
                                           decode_stream_envelope)
-from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
-                                   PeripheralTag)
+from heart.peripheral.core import (Input, PeripheralInfo,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
                                             decode_peripheral_payload,
                                             encode_peripheral_payload)
+from heart.peripheral.proto import input_events_pb2
 
 
 class TestPeripheralEnvelopeEncoding:
@@ -66,6 +67,26 @@ class TestPeripheralPayloadEncoding:
         assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
         assert encoded.payload_type == "heart.beats.streaming.Frame"
         assert encoded.payload == message.SerializeToString()
+
+
+class TestInputPayloadEncoding:
+    """Validate Input payload protobuf encoding so event streams stay binary-friendly."""
+
+    def test_encodes_input_payloads_as_protobuf(self) -> None:
+        """Verify Input payloads serialize to protobuf so event data stays structured for clients."""
+        payload = Input(
+            event_type="peripheral.switch.tick",
+            data={"rotation": 3, "button": 1},
+        )
+
+        encoded = encode_peripheral_payload(payload)
+
+        assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
+        assert encoded.payload_type == "heart.peripheral.input.InputEvent"
+        event = input_events_pb2.InputEvent()
+        event.ParseFromString(encoded.payload)
+        assert event.event_type == payload.event_type
+        assert json.loads(event.data_json.decode("utf-8")) == payload.data
 
 
 class TestPeripheralPayloadDecoding:

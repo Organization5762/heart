@@ -5,15 +5,18 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum, StrEnum
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 from uuid import UUID
 
 from google.protobuf.message import Message
 
+from heart.peripheral.core import Input
 from heart.peripheral.core.protobuf_registry import protobuf_registry
+from heart.peripheral.proto import input_events_pb2 as _input_events_pb2
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+input_events_pb2 = cast(Any, _input_events_pb2)
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -30,6 +33,25 @@ class PeripheralPayload:
 
 class PeripheralPayloadDecodingError(ValueError):
     """Raised when a peripheral payload cannot be decoded."""
+
+
+def _encode_input_payload(payload: Input) -> PeripheralPayload:
+    normalized = _normalize_payload(payload.data)
+    data_json = json.dumps(
+        normalized,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    event = input_events_pb2.InputEvent(
+        event_type=payload.event_type,
+        timestamp=payload.timestamp.isoformat(),
+        data_json=data_json,
+    )
+    return PeripheralPayload(
+        payload=event.SerializeToString(),
+        encoding=PeripheralPayloadEncoding.PROTOBUF,
+        payload_type=event.DESCRIPTOR.full_name,
+    )
 
 
 def _normalize_payload(payload: object) -> object:
@@ -61,6 +83,9 @@ def _normalize_payload(payload: object) -> object:
 
 
 def encode_peripheral_payload(payload: object) -> PeripheralPayload:
+    if isinstance(payload, Input):
+        return _encode_input_payload(payload)
+
     if isinstance(payload, Message):
         return PeripheralPayload(
             payload=payload.SerializeToString(),
