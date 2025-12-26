@@ -17,6 +17,9 @@ from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
+DEFAULT_JOYSTICK_ID = 0
+DEFAULT_AXIS_DEAD_ZONE = 0.0
+DEFAULT_AXIS_THRESHOLD = 0.0
 
 
 class GamepadIdentifier(StrEnum):
@@ -33,7 +36,9 @@ class Gamepad(Peripheral[Any]):
     EVENT_LIFECYCLE = "gamepad.lifecycle"
 
     def __init__(
-        self, joystick_id: int = 0, joystick: pygame.joystick.JoystickType | None = None
+        self,
+        joystick_id: int = DEFAULT_JOYSTICK_ID,
+        joystick: pygame.joystick.JoystickType | None = None,
     ) -> None:
         super().__init__()
         self.joystick_id = joystick_id
@@ -64,16 +69,22 @@ class Gamepad(Peripheral[Any]):
         self._tap_flag[button_id] = False
         return tapped
 
-    def axis_value(self, axis_id: int, dead_zone: float = 0) -> float:
+    def axis_value(
+        self, axis_id: int, dead_zone: float = DEFAULT_AXIS_DEAD_ZONE
+    ) -> float:
         axis_value = self._axis_curr_frame[self.axis_key(axis_id)]
         if abs(axis_value) < dead_zone:
             return 0
         return axis_value
 
-    def axis_passed_threshold(self, axis_id: int, threshold: float = 0) -> bool:
+    def axis_passed_threshold(
+        self, axis_id: int, threshold: float = DEFAULT_AXIS_THRESHOLD
+    ) -> bool:
         return self._axis_curr_frame[self.axis_key(axis_id)] > threshold
 
-    def axis_tapped(self, axis_id: int, threshold: float = 0) -> bool:
+    def axis_tapped(
+        self, axis_id: int, threshold: float = DEFAULT_AXIS_THRESHOLD
+    ) -> bool:
         tapped = self._axis_curr_frame[self.axis_key(axis_id)] > threshold
         tapped_last_frame = self._axis_tapped_prev_frame[self.axis_key(axis_id)]
         self._axis_tapped_prev_frame[self.axis_key(axis_id)] = tapped

@@ -11,11 +11,15 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.doppler.provider import DopplerStateProvider
 from heart.renderers.doppler.state import DopplerState
 
+DEFAULT_HUE_EXTENT = 2.0 / 3.0
+
 
 class DopplerRenderer(StatefulBaseRenderer[DopplerState]):
     """Render a Doppler-style 3D particle effect credited to Sri."""
 
-    def __init__(self, builder: DopplerStateProvider, hue_extent: float = 2.0 / 3.0):
+    def __init__(
+        self, builder: DopplerStateProvider, hue_extent: float = DEFAULT_HUE_EXTENT
+    ):
         super().__init__(builder=builder)
         self.device_display_mode = DeviceDisplayMode.FULL
         self._hue_extent = hue_extent

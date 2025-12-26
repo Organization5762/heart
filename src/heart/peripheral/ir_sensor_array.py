@@ -34,6 +34,8 @@ else:
     least_squares = _least_squares
 
 SPEED_OF_LIGHT = 299_792_458.0  # metres per second
+DEFAULT_DMA_BUFFER_SIZE = 64
+DEFAULT_RADIAL_LAYOUT_RADIUS = 0.12
 
 
 @dataclass(slots=True)
@@ -73,7 +75,7 @@ class IRDMAPacket:
 class IRArrayDMAQueue:
     """Double-buffered queue that simulates a DMA capture pipeline."""
 
-    def __init__(self, *, buffer_size: int = 64) -> None:
+    def __init__(self, *, buffer_size: int = DEFAULT_DMA_BUFFER_SIZE) -> None:
         if buffer_size <= 0:
             msg = "buffer_size must be positive"
             raise ValueError(msg)
@@ -346,7 +348,7 @@ class IRSensorArray(Peripheral[Input]):
         )
 
 
-def radial_layout(radius: float = 0.12) -> list[list[float]]:
+def radial_layout(radius: float = DEFAULT_RADIAL_LAYOUT_RADIUS) -> list[list[float]]:
     """Return sensor positions for a square radial layout."""
 
     half = radius / math.sqrt(2)

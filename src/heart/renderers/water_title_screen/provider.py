@@ -8,9 +8,15 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.water_title_screen.state import WaterTitleScreenState
 
+DEFAULT_WAVE_SPEED = 0.5
+
 
 class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
-    def __init__(self, peripheral_manager: PeripheralManager, wave_speed: float = 0.5):
+    def __init__(
+        self,
+        peripheral_manager: PeripheralManager,
+        wave_speed: float = DEFAULT_WAVE_SPEED,
+    ):
         self._peripheral_manager = peripheral_manager
         self._wave_speed = wave_speed
 

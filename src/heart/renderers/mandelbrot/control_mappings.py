@@ -13,6 +13,8 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.utilities.env import Configuration
 
+DEFAULT_STICK_MULTIPLIER = 1.0
+
 
 class SceneControlsMapping(ABC):
     def update(self):
@@ -210,7 +212,7 @@ class SwitchLikeControls(SceneControlsMapping, ABC):
         if self.gamepad.was_tapped(self.mapping.BUTTON_X):
             self.scene_controls.cycle_palette(forward=False)
 
-    def _handle_stick(self, multiplier: float = 1.0):
+    def _handle_stick(self, multiplier: float = DEFAULT_STICK_MULTIPLIER):
         x_mov = self.gamepad.axis_value(self.mapping.AXIS_LEFT_X, self.dead_zone)
         y_mov = self.gamepad.axis_value(self.mapping.AXIS_LEFT_Y, self.dead_zone)
 
