@@ -307,7 +307,7 @@ class BluetoothSwitch(BaseSwitch):
                     logger.info("Program terminated")
                 except Exception:
                     self.connected = False
-                    pass
+                    logger.exception("Bluetooth switch listener failed; reconnecting.")
                 finally:
                     self.connected = False
                     self.listener.close()
@@ -316,6 +316,11 @@ class BluetoothSwitch(BaseSwitch):
                 number_of_retries_without_success += 1
                 if number_of_retries_without_success > BLUETOOTH_MAX_RETRY_ATTEMPTS:
                     slow_poll = True
+                logger.exception(
+                    "Failed to connect to Bluetooth switch; retrying (%s/%s).",
+                    number_of_retries_without_success,
+                    BLUETOOTH_MAX_RETRY_ATTEMPTS,
+                )
 
             time.sleep(
                 BLUETOOTH_SLOW_RETRY_DELAY_SECONDS
