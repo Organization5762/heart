@@ -67,7 +67,7 @@ def _form_payload(name: str, data) -> str:
 
     """
     payload = {"event_type": name, "data": data}
-    return "\n" + json.dumps(payload) + "\n"
+    return f"{json.dumps(payload)}\n"
 
 
 def form_tuple_payload(name: str, data: tuple) -> str:

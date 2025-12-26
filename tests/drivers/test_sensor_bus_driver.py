@@ -71,7 +71,8 @@ class TestDriversSensorBusDriver:
     def test_form_tuple_payload_returns_json(self, sensor_bus):
         """Verify that form_tuple_payload encodes sensor tuples into the expected JSON string. This keeps bus messages compatible with consumers that parse structured telemetry."""
         payload = sensor_bus.form_tuple_payload("rotation", (1.0, 2.0, 3.0))
-        assert payload.startswith("\n")
+        assert payload.startswith("{")
+        assert payload.endswith("\n")
         decoded = json.loads(payload.strip())
         assert decoded == {"event_type": "rotation", "data": {"x": 1.0, "y": 2.0, "z": 3.0}}
 
