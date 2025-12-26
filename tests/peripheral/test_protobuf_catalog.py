@@ -4,8 +4,9 @@ import pytest
 
 from heart.peripheral.core.protobuf_registry import (protobuf_registry,
                                                      protobuf_symbol_database)
+from heart.peripheral.core.protobuf_types import PeripheralPayloadType
 
-PERIPHERAL_STATUS_TYPE = "heart.peripheral.payloads.PeripheralStatus"
+PERIPHERAL_STATUS_TYPE = PeripheralPayloadType.PERIPHERAL_STATUS
 
 
 class TestProtobufCatalog:
@@ -14,7 +15,7 @@ class TestProtobufCatalog:
     def test_resolves_catalog_payload_type(self) -> None:
         """Verify catalog entries load protobuf modules so peripheral payloads decode without manual imports."""
         try:
-            protobuf_symbol_database.GetSymbol(PERIPHERAL_STATUS_TYPE)
+            protobuf_symbol_database.GetSymbol(PERIPHERAL_STATUS_TYPE.value)
         except KeyError:
             pass
         else:
