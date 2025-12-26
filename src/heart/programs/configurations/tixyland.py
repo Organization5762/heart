@@ -3,7 +3,7 @@ from typing import Callable
 import numpy as np
 
 from heart.navigation import MultiScene
-from heart.renderers.tixyland import Tixyland, TixylandStateProvider
+from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.runtime.game_loop import GameLoop
 
 
@@ -14,13 +14,12 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 def configure(loop: GameLoop) -> None:
+    tixyland_factory = loop.context_container.resolve(TixylandFactory)
+
     def build_tixyland(
         fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
     ) -> Tixyland:
-        return Tixyland(
-            builder=loop.context_container.resolve(TixylandStateProvider),
-            fn=fn,
-        )
+        return tixyland_factory(fn)
 
     mode = loop.add_mode()
     mode.add_renderer(

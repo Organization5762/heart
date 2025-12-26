@@ -20,7 +20,7 @@ from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
 from heart.renderers.three_fractal import FractalScene
-from heart.renderers.tixyland import Tixyland, TixylandStateProvider
+from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
 from heart.runtime.game_loop import GameLoop
@@ -180,14 +180,12 @@ def configure(loop: GameLoop) -> None:
 
     # Some random ones
     tixyland = loop.add_mode("tixyland")
+    tixyland_factory = loop.context_container.resolve(TixylandFactory)
 
     def build_tixyland(
         fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
     ) -> Tixyland:
-        return Tixyland(
-            builder=loop.context_container.resolve(TixylandStateProvider),
-            fn=fn,
-        )
+        return tixyland_factory(fn)
 
     tixyland.add_renderer(
         MultiScene(
