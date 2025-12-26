@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from typing import Any
 
 from lagom import Container, Singleton
@@ -10,7 +11,7 @@ ProviderKey = type[Any]
 ProviderValue = Any
 
 _registry: dict[ProviderKey, ProviderValue] = {}
-_containers: list[Container] = []
+_containers: weakref.WeakSet[Container] = weakref.WeakSet()
 logger = get_logger(__name__)
 
 
@@ -34,8 +35,7 @@ def apply_provider_registrations(container: Container) -> None:
     )
     for key, provider in _registry.items():
         _register_container_provider(container, key, provider)
-    if container not in _containers:
-        _containers.append(container)
+    _containers.add(container)
 
 
 def registered_providers() -> dict[ProviderKey, ProviderValue]:
