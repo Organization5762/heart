@@ -10,6 +10,7 @@ from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
+from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.game_loop_components import GameLoopComponents
@@ -109,6 +110,12 @@ def configure_runtime_container(
         overrides,
         AppController,
         Singleton(lambda resolver: AppController(renderer_resolver=resolver)),
+    )
+    _bind(
+        container,
+        overrides,
+        ConfigurationRegistry,
+        Singleton(ConfigurationRegistry),
     )
     _bind(
         container,

@@ -2,8 +2,9 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.game_loop import build_game_loop
+from heart.cli.commands.game_loop import build_game_loop_container
 from heart.programs.registry import ConfigurationRegistry
+from heart.runtime.game_loop import GameLoop
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,12 +27,13 @@ def run_command(
         help="Use X11 forwarding for RGB display",
     ),
 ) -> None:
-    registry = ConfigurationRegistry()
+    resolver = build_game_loop_container(x11_forward=x11_forward)
+    registry = resolver.resolve(ConfigurationRegistry)
     configuration_fn = registry.get(configuration)
     if configuration_fn is None:
         logger.error("Configuration '%s' not found in registry", configuration)
         raise typer.Exit(code=1)
-    loop = build_game_loop(x11_forward=x11_forward)
+    loop = resolver.resolve(GameLoop)
     configuration_fn(loop)
 
     ## ============================= ##
