@@ -1,3 +1,4 @@
+from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
@@ -35,3 +36,16 @@ class TestRuntimeContainer:
         loop = GameLoop(device=device, resolver=container)
 
         assert loop.peripheral_manager is stub_manager
+
+    def test_container_overrides_configuration_loader(self, device) -> None:
+        """Confirm configuration loader overrides flow into PeripheralManager so tests can swap config wiring safely."""
+        stub_loader = PeripheralConfigurationLoader(configuration="stubbed")
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.BINARY,
+            overrides={PeripheralConfigurationLoader: stub_loader},
+        )
+
+        manager = container.resolve(PeripheralManager)
+
+        assert manager.configuration_loader is stub_loader

@@ -31,14 +31,21 @@ class PeripheralManager:
         self,
         *,
         configuration: str | None = None,
+        configuration_loader: PeripheralConfigurationLoader | None = None,
         configuration_registry: PeripheralConfigurationRegistry | None = None,
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
         self._started = False
-        self._configuration_loader = PeripheralConfigurationLoader(
+        self._configuration_loader = configuration_loader or PeripheralConfigurationLoader(
             configuration=configuration,
             registry=configuration_registry,
         )
+
+    @property
+    def configuration_loader(self) -> PeripheralConfigurationLoader:
+        """Expose the configuration loader for container wiring diagnostics."""
+
+        return self._configuration_loader
 
     @property
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
