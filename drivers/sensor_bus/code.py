@@ -20,6 +20,7 @@ from heart.firmware_io import constants, device_id, identity
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS: float = 0.1
+DEFAULT_MIN_CHANGE_THRESHOLD: float = 0.1
 DEBUG = False
 DEVICE_NAME = "sensor-bus"
 
@@ -125,7 +126,7 @@ def connect_to_sensors(i2c):
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
 
-    def __init__(self, sensors, min_change: float = 0.1) -> None:
+    def __init__(self, sensors, min_change: float = DEFAULT_MIN_CHANGE_THRESHOLD) -> None:
         self.sensors = sensors
         self.min_change = min_change
 
@@ -185,7 +186,7 @@ def main() -> None:
     else:
         wait_between_payloads_seconds = min(sample_rates)
 
-    sr = SensorReader(sensors=sensors, min_change=0.1)
+    sr = SensorReader(sensors=sensors, min_change=DEFAULT_MIN_CHANGE_THRESHOLD)
 
     while True:
         try:

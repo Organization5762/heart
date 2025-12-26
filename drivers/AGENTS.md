@@ -4,6 +4,7 @@
 - Assume these drivers will run under CircuitPython first and CPython second. Keep dependencies to the built-ins that ship with CircuitPython or a clearly documented external bundle.
 - Avoid dynamic imports, reflection, or heavy use of Python metaprogramming features that CircuitPython omits.
 - Prefer small, synchronous functions. CircuitPython lacks threads and has very limited heap space, so do not allocate large temporary buffers or rely on recursion.
+- Keep tunable thresholds as module-level constants so they are easy to discover and adjust.
 
 ## Debugging guidance
 - When adding diagnostic output, use `print` statements guarded behind a module-level `DEBUG` flag rather than logging frameworks that CircuitPython does not ship with by default.
