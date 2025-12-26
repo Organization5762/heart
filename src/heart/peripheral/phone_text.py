@@ -98,7 +98,8 @@ class PhoneText(Peripheral[str]):
 
     @staticmethod
     def _select_adapter_address(bluezero_adapter: ModuleType) -> str:
-        return list(bluezero_adapter.Adapter.available())[0].address
+        address = list(bluezero_adapter.Adapter.available())[0].address
+        return cast(str, address)
 
     def _configure_services(self, pi_ble: Any) -> None:
         pi_ble.add_service(1, _SERVICE_UUID, True)
