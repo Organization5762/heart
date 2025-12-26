@@ -41,26 +41,18 @@ def to_str(x):
 
 def float_str(x):
     if type(x) is str:
-        return "_" + x
+        return f"_{x}"
     else:
         return str(x)
 
 
 def vec3_str(v):
     if type(v) is str:
-        return "_" + v
+        return f"_{v}"
     elif isinstance(v, (float, int)):
-        return "vec3(" + str(v) + ")"
+        return f"vec3({v})"
     else:
-        return (
-            "vec3("
-            + float_str(v[0])
-            + ","
-            + float_str(v[1])
-            + ","
-            + float_str(v[2])
-            + ")"
-        )
+        return f"vec3({float_str(v[0])},{float_str(v[1])},{float_str(v[2])})"
 
 
 def vec3_eq(v, val):
@@ -107,21 +99,21 @@ def set_global_vec3(k):
 
 def cond_offset(p):
     if type(p) is str or np.count_nonzero(p) > 0:
-        return " - vec4(" + vec3_str(p) + ", 0)"
+        return f" - vec4({vec3_str(p)}, 0)"
     return ""
 
 
 def cond_subtract(p):
     if type(p) is str or p > 0:
-        return " - " + float_str(p)
+        return f" - {float_str(p)}"
     return ""
 
 
 def make_color(geo):
     if type(geo.color) is tuple or type(geo.color) is np.ndarray:
-        return "vec4(" + vec3_str(geo.color) + ", " + geo.glsl() + ")"
+        return f"vec4({vec3_str(geo.color)}, {geo.glsl()})"
     elif geo.color == "orbit" or geo.color == "o":
-        return "vec4(orbit, " + geo.glsl() + ")"
+        return f"vec4(orbit, {geo.glsl()})"
     else:
         raise ValueError("Invalid coloring type")
 
