@@ -17,8 +17,11 @@ from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.pygame_event_handler import PygameEventHandler
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
+from heart.utilities.logging import get_logger
 
 RuntimeContainer = Container
+
+logger = get_logger(__name__)
 
 
 def build_runtime_container(
@@ -27,6 +30,7 @@ def build_runtime_container(
     overrides: Mapping[type[Any], object] | None = None,
 ) -> RuntimeContainer:
     container = Container()
+    logger.debug("Created Lagom container for runtime configuration.")
     configure_runtime_container(
         container=container,
         device=device,
@@ -43,6 +47,10 @@ def configure_runtime_container(
     render_variant: RendererVariant,
     overrides: Mapping[type[Any], object] | None = None,
 ) -> None:
+    logger.debug(
+        "Configuring Lagom runtime container with overrides=%s.",
+        set(overrides.keys()) if overrides else set(),
+    )
     _bind(container, overrides, Device, device)
     _bind(container, overrides, RendererVariant, render_variant)
     _bind(
@@ -161,7 +169,10 @@ def _bind(
 ) -> None:
     if overrides and key in overrides:
         container[key] = overrides[key]
+        logger.debug("Applied Lagom override for %s.", key)
         return
     if key in container.defined_types:
+        logger.debug("Lagom already defined %s; skipping registration.", key)
         return
     container[key] = value
+    logger.debug("Registered Lagom provider for %s.", key)
