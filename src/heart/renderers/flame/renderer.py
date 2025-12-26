@@ -14,6 +14,9 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.flame.provider import FlameStateProvider
 from heart.renderers.flame.state import FlameState
 
+DEFAULT_FLAME_WIDTH = 64
+DEFAULT_FLAME_HEIGHT = 16
+DEFAULT_FLAME_SIDE = "bottom"
 
 # ------------------------------------------------------------------------------------
 #  Utility helpers
@@ -159,7 +162,11 @@ class FlameGenerator:
         ((1.000, 0.900, 0.600), 0.990),
     ]
 
-    def __init__(self, width: int = 64, height: int = 16):
+    def __init__(
+        self,
+        width: int = DEFAULT_FLAME_WIDTH,
+        height: int = DEFAULT_FLAME_HEIGHT,
+    ):
         self.w, self.h = width, height
 
         # Static UV grids (pixelated to 1/64 like the shader)
@@ -180,7 +187,7 @@ class FlameGenerator:
     # -------------------------------------------------------------------------
     #  Public API
     # -------------------------------------------------------------------------
-    def surface(self, t: float, side: str = "bottom") -> pygame.Surface:
+    def surface(self, t: float, side: str = DEFAULT_FLAME_SIDE) -> pygame.Surface:
         """Generate the flame strip for the given time `t`.
 
         side ∈ {"bottom","top","left","right"} – controls orientation.

@@ -13,6 +13,8 @@ if TYPE_CHECKING:  # pragma: no cover - import cycle guard
     from heart.renderers import StatefulBaseRenderer
     from heart.runtime.game_loop import GameLoop
 
+DEFAULT_RECORDING_FPS = 30
+
 
 class ScreenRecorder:
     """Record frames produced by a :class:`~heart.runtime.game_loop.GameLoop`.
@@ -23,7 +25,7 @@ class ScreenRecorder:
     container that behaves like a video when inspected during development.
     """
 
-    def __init__(self, loop: "GameLoop", *, fps: int = 30) -> None:
+    def __init__(self, loop: "GameLoop", *, fps: int = DEFAULT_RECORDING_FPS) -> None:
         if fps <= 0:
             raise ValueError("fps must be a positive integer")
         self._loop = loop

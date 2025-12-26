@@ -7,9 +7,16 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 
+DEFAULT_FRAME_DURATION_MS = 650
+DEFAULT_FRAME_COUNT = 0
+
 
 class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
-    def __init__(self, frame_duration_ms: int = 650, frame_count: int = 0) -> None:
+    def __init__(
+        self,
+        frame_duration_ms: int = DEFAULT_FRAME_DURATION_MS,
+        frame_count: int = DEFAULT_FRAME_COUNT,
+    ) -> None:
         if frame_duration_ms <= 0:
             raise ValueError("frame_duration_ms must be positive")
         self._frame_duration_ms = frame_duration_ms

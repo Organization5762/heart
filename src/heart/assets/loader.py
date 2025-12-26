@@ -9,6 +9,8 @@ from heart.assets.cache import AssetCache
 from heart.utilities.env import (AssetCacheStrategy, Configuration,
                                  SpritesheetFrameCacheStrategy)
 
+DEFAULT_FONT_SIZE = 10
+
 
 class Loader:
     _image_cache: AssetCache[Path, pygame.Surface] | None = None
@@ -101,7 +103,9 @@ class Loader:
         return Animation(cls._resolve_path(path), 100)
 
     @classmethod
-    def load_font(cls, path: str | PathLike[str], font_size: int = 10) -> pygame.font.Font:
+    def load_font(
+        cls, path: str | PathLike[str], font_size: int = DEFAULT_FONT_SIZE
+    ) -> pygame.font.Font:
         return pygame.font.Font(cls._resolve_path(path), size=font_size)
 
     @classmethod

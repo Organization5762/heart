@@ -5,6 +5,14 @@ import numpy as np
 
 from heart.renderers.mandelbrot.state import AppState, ViewMode
 
+DEFAULT_PAN_ZOOM: float | None = None
+DEFAULT_CURSOR_DELTA = 0
+DEFAULT_CURSOR_MODE = "julia"
+DEFAULT_PALETTE_FORWARD = True
+DEFAULT_SHOW_FPS: bool | None = None
+DEFAULT_EXPLICIT_MODE: str | None = None
+DEFAULT_MOVE_MULTIPLIER = 1.0
+
 
 class SceneControls:
     def __init__(self, state: AppState):
@@ -19,7 +27,7 @@ class SceneControls:
     def disable_auto(self):
         self.state.mode = "free"
 
-    def get_pan_amount(self, zoom: float = None):
+    def get_pan_amount(self, zoom: float | None = DEFAULT_PAN_ZOOM):
         pan_scaling = 0.05
         return pan_scaling / zoom
 
@@ -32,7 +40,12 @@ class SceneControls:
         # self._reset_mandelbrot()
         self.state.reset()
 
-    def update_cursor_pos(self, delta_x: int = 0, delta_y: int = 0, cursor="julia"):
+    def update_cursor_pos(
+        self,
+        delta_x: int = DEFAULT_CURSOR_DELTA,
+        delta_y: int = DEFAULT_CURSOR_DELTA,
+        cursor: str = DEFAULT_CURSOR_MODE,
+    ):
         padding = 3
         y_lo_bound = -(self.state.msurface_height // 2) + padding  # - 2
         y_hi_bound = (self.state.msurface_height // 2) - padding  # - padding + 1
@@ -62,7 +75,7 @@ class SceneControls:
         elif target_y > y_hi_bound:
             self._move_down("panning")
 
-    def cycle_palette(self, forward: bool = True):
+    def cycle_palette(self, forward: bool = DEFAULT_PALETTE_FORWARD):
         step = 1 if forward else -1
         self.state.palette_index = (
             self.state.palette_index + step
@@ -112,7 +125,7 @@ class SceneControls:
         self.state.movement_mode = "cursor" if self.state.julia_mode else "panning"
         self.state.show_left_cursor = self.state.julia_mode
 
-    def _toggle_fps(self, show: bool = None):
+    def _toggle_fps(self, show: bool | None = DEFAULT_SHOW_FPS):
         if show is None:
             self.state.show_fps = not self.state.show_fps
         else:
@@ -232,7 +245,13 @@ class SceneControls:
             "notes": None,  # No clear cycle detected
         }
 
-    def _move(self, x: int, y: int, explicit_mode: str = None, multiplier: float = 1.0):
+    def _move(
+        self,
+        x: int,
+        y: int,
+        explicit_mode: str | None = DEFAULT_EXPLICIT_MODE,
+        multiplier: float = DEFAULT_MOVE_MULTIPLIER,
+    ):
         cursor_mode = explicit_mode or "cursor"
         self.disable_auto()
         x = x * multiplier
@@ -297,7 +316,7 @@ class SceneControls:
         #     self.state.jmovement.y += y * self.get_pan_amount(self.state.jzoom)
 
     # Movement handlers
-    def _move_up(self, explicit_mode: str = None):
+    def _move_up(self, explicit_mode: str | None = DEFAULT_EXPLICIT_MODE):
         self._move(0, -1, explicit_mode=explicit_mode)
         # mode = explicit_mode or self.state.movement_mode
         # if mode == "cursor":
@@ -306,7 +325,7 @@ class SceneControls:
         # else:
         #     self.state.movement.y -= self.get_pan_amount()
 
-    def _move_down(self, explicit_mode: str = None):
+    def _move_down(self, explicit_mode: str | None = DEFAULT_EXPLICIT_MODE):
         self._move(0, 1, explicit_mode=explicit_mode)
         # mode = explicit_mode or self.state.movement_mode
         # if mode == "cursor":
@@ -315,7 +334,7 @@ class SceneControls:
         # else:
         #     self.state.movement.y += self.get_pan_amount()
 
-    def _move_left(self, explicit_mode: str = None):
+    def _move_left(self, explicit_mode: str | None = DEFAULT_EXPLICIT_MODE):
         self._move(-1, 0, explicit_mode=explicit_mode)
         # mode = explicit_mode or self.state.movement_mode
         # if mode == "cursor":
@@ -327,7 +346,7 @@ class SceneControls:
         #     elif self.state.selected_surface == "julia":
         #         self.state.jmovement.x -= self.get_pan_amount()
 
-    def _move_right(self, explicit_mode: str = None):
+    def _move_right(self, explicit_mode: str | None = DEFAULT_EXPLICIT_MODE):
         self._move(1, 0, explicit_mode=explicit_mode)
         # mode = explicit_mode or self.state.movement_mode
         # if mode == "cursor":
