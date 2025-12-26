@@ -6,6 +6,7 @@ from importlib import import_module
 from google.protobuf import symbol_database
 from google.protobuf.message import Message
 
+from heart.peripheral.core.protobuf_types import PeripheralPayloadType
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -19,11 +20,14 @@ class ProtobufTypeRegistry:
     def register_type_prefix(self, prefix: str, module_path: str) -> None:
         self._prefix_to_module[prefix] = module_path
 
-    def get_message_class(self, payload_type: str) -> type[Message] | None:
+    def get_message_class(
+        self, payload_type: str | PeripheralPayloadType
+    ) -> type[Message] | None:
+        payload_type_value = _normalize_payload_type(payload_type)
         try:
-            return protobuf_symbol_database.GetSymbol(payload_type)
+            return protobuf_symbol_database.GetSymbol(payload_type_value)
         except KeyError:
-            module_path = self._resolve_module_path(payload_type)
+            module_path = self._resolve_module_path(payload_type_value)
             if module_path is None:
                 return None
             try:
@@ -32,7 +36,7 @@ class ProtobufTypeRegistry:
                 logger.warning(
                     "Failed to import protobuf module '%s' for payload type '%s'.",
                     module_path,
-                    payload_type,
+                    payload_type_value,
                 )
                 return None
             register_hook = getattr(module, "register_protobuf_types", None)
@@ -46,11 +50,11 @@ class ProtobufTypeRegistry:
                     )
                     return None
             try:
-                return protobuf_symbol_database.GetSymbol(payload_type)
+                return protobuf_symbol_database.GetSymbol(payload_type_value)
             except KeyError:
                 logger.warning(
                     "Protobuf payload type '%s' is still unknown after importing '%s'.",
-                    payload_type,
+                    payload_type_value,
                     module_path,
                 )
                 return None
@@ -65,6 +69,12 @@ class ProtobufTypeRegistry:
             return None
         best_prefix = max(matching_prefixes, key=len)
         return self._prefix_to_module[best_prefix]
+
+
+def _normalize_payload_type(payload_type: str | PeripheralPayloadType) -> str:
+    if isinstance(payload_type, PeripheralPayloadType):
+        return payload_type.value
+    return payload_type
 
 
 protobuf_registry = ProtobufTypeRegistry()

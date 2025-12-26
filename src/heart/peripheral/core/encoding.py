@@ -12,12 +12,13 @@ from google.protobuf.message import Message
 
 from heart.peripheral.core import Input
 from heart.peripheral.core.protobuf_registry import protobuf_registry
+from heart.peripheral.core.protobuf_types import (INPUT_EVENT_TYPE,
+                                                  PeripheralPayloadType)
 from heart.peripheral.proto import input_events_pb2 as _input_events_pb2
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 input_events_pb2 = cast(Any, _input_events_pb2)
-INPUT_EVENT_TYPE = input_events_pb2.InputEvent.DESCRIPTOR.full_name
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -136,8 +137,9 @@ def decode_peripheral_payload(
     payload: bytes,
     *,
     encoding: PeripheralPayloadEncoding,
-    payload_type: str = "",
+    payload_type: str | PeripheralPayloadType = "",
 ) -> object:
+    normalized_payload_type = _normalize_payload_type(payload_type)
     if encoding == PeripheralPayloadEncoding.JSON_UTF8:
         try:
             decoded = payload.decode("utf-8")
@@ -149,14 +151,14 @@ def decode_peripheral_payload(
             ) from exc
 
     if encoding == PeripheralPayloadEncoding.PROTOBUF:
-        if not payload_type:
+        if not normalized_payload_type:
             raise PeripheralPayloadDecodingError(
                 "Protobuf payloads require a payload_type."
             )
-        message_class = protobuf_registry.get_message_class(payload_type)
+        message_class = protobuf_registry.get_message_class(normalized_payload_type)
         if message_class is None:
             raise PeripheralPayloadDecodingError(
-                f"Unknown protobuf payload type: {payload_type}"
+                f"Unknown protobuf payload type: {normalized_payload_type}"
             )
         message = message_class()
         try:
@@ -164,15 +166,21 @@ def decode_peripheral_payload(
         except Exception as exc:
             logger.exception(
                 "Failed to decode protobuf payload for type %s.",
-                payload_type,
+                normalized_payload_type,
             )
             raise PeripheralPayloadDecodingError(
-                f"Failed to decode protobuf payload for type {payload_type}."
+                f"Failed to decode protobuf payload for type {normalized_payload_type}."
             ) from exc
-        if payload_type == INPUT_EVENT_TYPE:
+        if normalized_payload_type == INPUT_EVENT_TYPE:
             return _decode_input_event(message)
         return message
 
     raise PeripheralPayloadDecodingError(
         f"Unsupported peripheral payload encoding: {encoding}"
     )
+
+
+def _normalize_payload_type(payload_type: str | PeripheralPayloadType) -> str:
+    if isinstance(payload_type, PeripheralPayloadType):
+        return payload_type.value
+    return payload_type
