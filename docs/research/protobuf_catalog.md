@@ -20,6 +20,7 @@ Protobuf payload decoding relied on ad hoc package registration, which made it e
 - The catalog registers package prefixes with `protobuf_registry` at import time, keeping protobuf type resolution centralized.
 - `protobuf_registry` still imports module paths on demand when a payload type is unknown, so decode paths stay lazy while the catalog remains declarative.
 - The `scripts/generate_protobuf.py` helper provides a repeatable entry point for regenerating `*_pb2.py` modules after schema updates.
+- `encode_peripheral_payload` resolves the `InputEvent` message class through `protobuf_registry`, keeping payload encoding aligned with the catalog.
 - `PeripheralPayloadType` in `src/heart/peripheral/core/protobuf_types.py` exposes canonical payload type names to avoid hard-coded strings.
 
 ## Impact
