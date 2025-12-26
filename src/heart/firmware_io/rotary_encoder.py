@@ -12,13 +12,8 @@ DEFAULT_ROTARY_ENCODER_INDEX = 0
 # We don't use `json` here because the Trinkey doesn't support it by default
 def form_json(name: str, data: int, producer_id: int):
     return (
-        '{"event_type": "'
-        + name
-        + '", "data": '
-        + str(data)
-        + ', "producer_id": '
-        + str(producer_id)
-        + "}"
+        f'{{"event_type": "{name}", "data": {data}, '
+        f'"producer_id": {producer_id}}}'
     )
 
 

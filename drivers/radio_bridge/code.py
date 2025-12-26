@@ -54,7 +54,7 @@ class RadioBridgeRuntime:
 
     def _encode_payload(self, payload: Mapping[str, object]) -> str:
         frame = {"event_type": RADIO_PACKET, "data": dict(payload)}
-        return json.dumps(frame) + "\n"
+        return f"{json.dumps(frame)}\n"
 
     def run_once(self) -> None:
         respond_to_identify_query()
