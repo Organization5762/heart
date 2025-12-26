@@ -8,13 +8,12 @@ from enum import Enum, StrEnum
 from typing import Mapping, Sequence
 from uuid import UUID
 
-from google.protobuf import symbol_database
 from google.protobuf.message import Message
 
+from heart.peripheral.core.protobuf_registry import protobuf_registry
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
-protobuf_symbol_database = symbol_database.Default()
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -103,12 +102,11 @@ def decode_peripheral_payload(
             raise PeripheralPayloadDecodingError(
                 "Protobuf payloads require a payload_type."
             )
-        try:
-            message_class = protobuf_symbol_database.GetSymbol(payload_type)
-        except KeyError as exc:
+        message_class = protobuf_registry.get_message_class(payload_type)
+        if message_class is None:
             raise PeripheralPayloadDecodingError(
                 f"Unknown protobuf payload type: {payload_type}"
-            ) from exc
+            )
         message = message_class()
         try:
             message.ParseFromString(payload)
