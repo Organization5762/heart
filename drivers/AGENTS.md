@@ -8,6 +8,7 @@
 
 ## Debugging guidance
 - When adding diagnostic output, use `print` statements guarded behind a module-level `DEBUG` flag rather than logging frameworks that CircuitPython does not ship with by default.
+- When emitting serial payloads, route writes through a dedicated helper function so serial output behavior stays consistent and testable.
 - Keep exception handling minimal; allow errors to propagate so they can be inspected over the serial REPL. Only catch exceptions when you can recover or to add chip-specific hints.
 - Include docstrings that describe how to reproduce hardware issues via the REPL so that future debugging does not require the full game runtime.
 - Keep serial payload framing to a single trailing newline to avoid redundant whitespace on constrained links.
