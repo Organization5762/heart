@@ -13,6 +13,7 @@ from heart.runtime.container import (RuntimeContainer, build_runtime_container,
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pacing import RenderLoopPacer
 from heart.runtime.render_pipeline import RendererVariant
+from heart.runtime.render_planner import RenderPlan
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -169,15 +170,17 @@ class GameLoop:
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
-    ) -> None:
+    ) -> RenderPlan:
         if self.display.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
-        render_surface = self.render_pipeline.render(
+        render_result = self.render_pipeline.render_with_plan(
             renderers, override_renderer_variant
         )
+        render_surface = render_result.surface
         if render_surface is not None:
             self.display.screen.blit(render_surface, (0, 0))
         self.frame_presenter.present(renderers, render_surface)
+        return render_result.plan
 
     def _preprocess_setup(self) -> None:
         self._dim_display()
@@ -236,7 +239,7 @@ class GameLoop:
             self.running = self.event_handler.handle_events()
             self._preprocess_setup()
             renderers = self._select_renderers()
-            self._one_loop(renderers)
-            estimated_cost_ms = self.render_pipeline.estimate_render_cost_ms(renderers)
+            plan = self._one_loop(renderers)
+            estimated_cost_ms = plan.estimated_cost_ms if plan.has_samples else None
             self._render_pacer.pace(frame_start, estimated_cost_ms)
             clock.tick(self.max_fps)

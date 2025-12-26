@@ -17,6 +17,11 @@ class RendererTimingStrategy(StrEnum):
     EMA = "ema"
 
 
+class RenderPlanSignatureStrategy(StrEnum):
+    INSTANCE = "instance"
+    TYPE = "type"
+
+
 class RenderLoopPacingStrategy(StrEnum):
     OFF = "off"
     ADAPTIVE = "adaptive"

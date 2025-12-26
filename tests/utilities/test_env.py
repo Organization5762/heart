@@ -13,7 +13,7 @@ from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
                                  ReactivexStreamConnectMode,
                                  RenderLoopPacingStrategy, RenderMergeStrategy,
-                                 get_device_ports)
+                                 RenderPlanSignatureStrategy, get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -218,6 +218,26 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RENDER_PARALLEL_THRESHOLD", "6")
 
         assert Configuration.render_parallel_threshold() == 6
+
+    def test_render_plan_signature_strategy_defaults_instance(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify render plan signature strategy defaults to instance. This keeps caching behavior aligned with per-renderer timing."""
+        _clear_env(monkeypatch, "HEART_RENDER_PLAN_SIGNATURE_STRATEGY")
+
+        assert (
+            Configuration.render_plan_signature_strategy()
+            == RenderPlanSignatureStrategy.INSTANCE
+        )
+
+    def test_render_plan_signature_strategy_rejects_invalid_value(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify render plan signature strategy rejects invalid values. This prevents ambiguous render-plan caching."""
+        monkeypatch.setenv("HEART_RENDER_PLAN_SIGNATURE_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.render_plan_signature_strategy()
 
 
     def test_render_parallel_cost_threshold_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:

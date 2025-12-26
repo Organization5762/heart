@@ -22,6 +22,8 @@ from heart.utilities.env.enums import \
     RenderLoopPacingStrategy as RenderLoopPacingStrategy
 from heart.utilities.env.enums import \
     RenderMergeStrategy as RenderMergeStrategy
+from heart.utilities.env.enums import \
+    RenderPlanSignatureStrategy as RenderPlanSignatureStrategy
 from heart.utilities.env.enums import RenderTileStrategy as RenderTileStrategy
 from heart.utilities.env.enums import \
     SpritesheetFrameCacheStrategy as SpritesheetFrameCacheStrategy
