@@ -24,6 +24,22 @@ def build_runtime_container(
     overrides: Mapping[type[Any], object] | None = None,
 ) -> Container:
     container = Container()
+    configure_runtime_container(
+        container=container,
+        device=device,
+        render_variant=render_variant,
+        overrides=overrides,
+    )
+    return container
+
+
+def configure_runtime_container(
+    *,
+    container: Container,
+    device: Device,
+    render_variant: RendererVariant,
+    overrides: Mapping[type[Any], object] | None = None,
+) -> None:
     _bind(container, overrides, Device, device)
     _bind(container, overrides, RendererVariant, render_variant)
     _bind(
@@ -112,7 +128,6 @@ def build_runtime_container(
     )
     _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
     apply_provider_registrations(container)
-    return container
 
 
 def _bind(
@@ -123,5 +138,7 @@ def _bind(
 ) -> None:
     if overrides and key in overrides:
         container[key] = overrides[key]
+        return
+    if key in container.defined_types:
         return
     container[key] = value

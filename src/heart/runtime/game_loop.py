@@ -8,8 +8,8 @@ from lagom import Container
 
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
-from heart.peripheral.core.providers import apply_provider_registrations
-from heart.runtime.container import build_runtime_container
+from heart.runtime.container import (build_runtime_container,
+                                     configure_runtime_container)
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant
 from heart.utilities.logging import get_logger
@@ -38,11 +38,11 @@ class GameLoop:
             )
         else:
             self.context_container = resolver
-            apply_provider_registrations(self.context_container)
-            if Device not in self.context_container.defined_types:
-                self.context_container[Device] = device
-            if RendererVariant not in self.context_container.defined_types:
-                self.context_container[RendererVariant] = render_variant
+            configure_runtime_container(
+                container=self.context_container,
+                device=device,
+                render_variant=render_variant,
+            )
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
