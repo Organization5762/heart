@@ -37,7 +37,7 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
-    kirby_mode.resolve_renderer(loop.context_container, KirbyScene)
+    kirby_mode.resolve_renderer_from_container(KirbyScene)
 
     modelbrot = loop.add_mode(
         ComposedRenderer(
@@ -53,13 +53,13 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    modelbrot.resolve_renderer(loop.context_container, MandelbrotMode)
+    modelbrot.resolve_renderer_from_container(MandelbrotMode)
 
     sphere_mode = loop.add_mode("3d fractal")
-    sphere_mode.resolve_renderer(loop.context_container, FractalScene)
+    sphere_mode.resolve_renderer_from_container(FractalScene)
 
     hilbert_mode = loop.add_mode("hilbert")
-    hilbert_mode.resolve_renderer(loop.context_container, HilbertScene)
+    hilbert_mode.resolve_renderer_from_container(HilbertScene)
 
     mario_mode = loop.add_mode(
         ComposedRenderer(
@@ -78,10 +78,7 @@ def configure(loop: GameLoop) -> None:
     loop.context_container[MarioRendererProvider] = Singleton(
         lambda builder: MarioRendererProvider(accel_stream=builder[AllAccelerometersProvider], sheet_file_path="mario_64.png", metadata_file_path="mario_64.json")
     )
-    mario_mode.resolve_renderer(
-        container=loop.context_container,
-        renderer=MarioRenderer
-    )
+    mario_mode.resolve_renderer_from_container(MarioRenderer)
 
     def multicolor_renderer() -> MulticolorRenderer:
         return loop.context_container.resolve(MulticolorRenderer)
@@ -123,7 +120,7 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    heart_rate_mode.resolve_renderer(loop.context_container, CombinedBpmScreen)
+    heart_rate_mode.resolve_renderer_from_container(CombinedBpmScreen)
 
     water_mode = loop.add_mode(
         ComposedRenderer(
@@ -140,10 +137,10 @@ def configure(loop: GameLoop) -> None:
         )
     )
 
-    water_mode.resolve_renderer(loop.context_container, WaterCube)
+    water_mode.resolve_renderer_from_container(WaterCube)
 
     artist_mode = loop.add_mode(ArtistScene.title_scene())
-    artist_mode.resolve_renderer(loop.context_container, ArtistScene)
+    artist_mode.resolve_renderer_from_container(ArtistScene)
 
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(
@@ -219,7 +216,7 @@ def configure(loop: GameLoop) -> None:
     )
 
     life = loop.add_mode("life")
-    life.resolve_renderer(loop.context_container, Life)
+    life.resolve_renderer_from_container(Life)
 
     spooky = loop.add_mode("spook")
     spooky.add_renderer(

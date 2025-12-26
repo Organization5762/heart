@@ -34,7 +34,7 @@ def configure(loop: GameLoop) -> None:
     # PacMan
     mode = loop.add_mode()
     mode.add_renderer(RandomPixel(color=Color(187, 10, 30), num_pixels=50))
-    mode.resolve_renderer(loop.context_container, PacmanGhostRenderer)
+    mode.resolve_renderer_from_container(PacmanGhostRenderer)
     mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))
 
     # SpookyEye
@@ -59,11 +59,11 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.resolve_renderer(loop.context_container, Life)
+    mode.resolve_renderer_from_container(Life)
 
     mode = loop.add_mode()
     # MANDELBROT
-    mode.resolve_renderer(loop.context_container, MandelbrotMode)
+    mode.resolve_renderer_from_container(MandelbrotMode)
 
     width = 64
     height = 64
@@ -90,7 +90,7 @@ def configure(loop: GameLoop) -> None:
     # PacMan
     mode = loop.add_mode()
     mode.add_renderer(RandomPixel(color=Color(187, 10, 30), num_pixels=50))
-    mode.resolve_renderer(loop.context_container, PacmanGhostRenderer)
+    mode.resolve_renderer_from_container(PacmanGhostRenderer)
     mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))
 
     # SpookyEye
@@ -119,4 +119,4 @@ def configure(loop: GameLoop) -> None:
 
     # Game of Life
     mode = loop.add_mode()
-    mode.resolve_renderer(loop.context_container, Life)
+    mode.resolve_renderer_from_container(Life)
