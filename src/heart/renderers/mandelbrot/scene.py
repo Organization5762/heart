@@ -70,7 +70,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         orientation: Orientation,
     ) -> AppState:
         pygame.font.init()
-        self.time_initialized = time.time()
+        self.time_initialized = time.monotonic()
         self.font = pygame.font.SysFont("monospace", 8)
         self.clock = clock
         self.height = window.get_height()
@@ -132,7 +132,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def process_input(self) -> bool:
         # when we first enter the scene, ignore input for a bit
-        if time.time() - self.time_initialized < 0.5:
+        if time.monotonic() - self.time_initialized < 0.5:
             return False
 
         self.keyboard_controls.update()

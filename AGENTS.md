@@ -26,6 +26,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Prefer module-level constants for retry thresholds in reconnect or recovery loops instead of inline numeric literals.
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
+- Prefer `time.monotonic()` for elapsed-time tracking (including animation timing) and reserve `time.time()` for wall-clock timestamps.
 
 ## Error Handling
 

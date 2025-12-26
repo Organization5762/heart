@@ -110,7 +110,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
 
             state = self.update_flicker(
                 state,
-                time.time(),
+                time.monotonic(),
                 flicker_speed=self.flicker_speed,
                 flicker_intensity=self.flicker_intensity,
             )
