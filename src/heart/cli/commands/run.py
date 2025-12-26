@@ -8,14 +8,22 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+DEFAULT_CONFIGURATION = "lib_2025"
+DEFAULT_ADD_LOW_POWER_MODE = True
+DEFAULT_X11_FORWARD = False
+
 
 def run_command(
-    configuration: Annotated[str, typer.Option("--configuration")] = "lib_2025",
+    configuration: Annotated[str, typer.Option("--configuration")] = DEFAULT_CONFIGURATION,
     add_low_power_mode: bool = typer.Option(
-        True, "--add-low-power-mode", help="Add a low power mode"
+        DEFAULT_ADD_LOW_POWER_MODE,
+        "--add-low-power-mode",
+        help="Add a low power mode",
     ),
     x11_forward: bool = typer.Option(
-        False, "--x11-forward", help="Use X11 forwarding for RGB display"
+        DEFAULT_X11_FORWARD,
+        "--x11-forward",
+        help="Use X11 forwarding for RGB display",
     ),
 ) -> None:
     registry = ConfigurationRegistry()
