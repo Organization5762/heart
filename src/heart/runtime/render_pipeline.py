@@ -52,7 +52,9 @@ class RenderPipeline:
         self._render_executor: ThreadPoolExecutor | None = None
         self._active_plan: RenderPlan | None = None
         self._plan_cache = RenderPlanCache(
-            self._planner, Configuration.render_plan_refresh_ms()
+            self._planner,
+            Configuration.render_plan_refresh_ms(),
+            Configuration.render_plan_refresh_strategy(),
         )
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:

@@ -17,6 +17,11 @@ class RendererTimingStrategy(StrEnum):
     EMA = "ema"
 
 
+class RenderPlanRefreshStrategy(StrEnum):
+    TIME = "time"
+    ON_CHANGE = "on_change"
+
+
 class AssetCacheStrategy(StrEnum):
     NONE = "none"
     METADATA = "metadata"

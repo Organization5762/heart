@@ -12,7 +12,8 @@ from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
                                  ReactivexStreamConnectMode,
-                                 RenderMergeStrategy, get_device_ports)
+                                 RenderMergeStrategy,
+                                 RenderPlanRefreshStrategy, get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -141,6 +142,40 @@ class TestUtilitiesEnv:
         _clear_env(monkeypatch, "HEART_RENDER_VARIANT")
 
         assert Configuration.render_variant() == "iterative"
+
+    def test_render_plan_refresh_strategy_defaults_time(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify render plan refresh strategy defaults to time. This keeps planning behaviour consistent without tuning."""
+        _clear_env(monkeypatch, "HEART_RENDER_PLAN_REFRESH_STRATEGY")
+
+        assert (
+            Configuration.render_plan_refresh_strategy()
+            == RenderPlanRefreshStrategy.TIME
+        )
+
+    def test_render_plan_refresh_strategy_accepts_on_change(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify render plan refresh strategy accepts on_change. This allows low-overhead planning in stable scenes."""
+        monkeypatch.setenv("HEART_RENDER_PLAN_REFRESH_STRATEGY", "on_change")
+
+        assert (
+            Configuration.render_plan_refresh_strategy()
+            == RenderPlanRefreshStrategy.ON_CHANGE
+        )
+
+    def test_render_plan_refresh_strategy_rejects_invalid_value(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Verify render plan refresh strategy rejects invalid values. This prevents hidden misconfiguration."""
+        monkeypatch.setenv("HEART_RENDER_PLAN_REFRESH_STRATEGY", "nope")
+
+        with pytest.raises(ValueError):
+            Configuration.render_plan_refresh_strategy()
 
 
     def test_asset_cache_strategy_defaults_all(self, monkeypatch: pytest.MonkeyPatch) -> None:

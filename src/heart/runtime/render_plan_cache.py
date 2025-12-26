@@ -5,15 +5,22 @@ from typing import TYPE_CHECKING, Any, cast
 
 from heart.runtime.render_planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.variants import RendererVariant
+from heart.utilities.env.enums import RenderPlanRefreshStrategy
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
 
 
 class RenderPlanCache:
-    def __init__(self, planner: RenderPlanner, refresh_ms: int) -> None:
+    def __init__(
+        self,
+        planner: RenderPlanner,
+        refresh_ms: int,
+        refresh_strategy: RenderPlanRefreshStrategy,
+    ) -> None:
         self._planner = planner
         self._refresh_ms = refresh_ms
+        self._refresh_strategy = refresh_strategy
         self._signature: tuple[int, ...] | None = None
         self._override: RendererVariant | None = None
         self._default_variant: RendererVariant | None = None
@@ -48,11 +55,15 @@ class RenderPlanCache:
         override_renderer_variant: RendererVariant | None,
         default_variant: RendererVariant,
     ) -> bool:
-        if self._refresh_ms <= 0 or self._plan is None:
+        if self._plan is None:
             return False
         if signature != self._signature or override_renderer_variant != self._override:
             return False
         if default_variant != self._default_variant:
+            return False
+        if self._refresh_strategy == RenderPlanRefreshStrategy.ON_CHANGE:
+            return True
+        if self._refresh_ms <= 0:
             return False
         age_ms = (time.monotonic() - self._plan_time) * 1000.0
         return age_ms < self._refresh_ms

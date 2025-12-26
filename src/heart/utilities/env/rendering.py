@@ -6,11 +6,14 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
                                        RendererTimingStrategy,
-                                       RenderMergeStrategy, RenderTileStrategy)
+                                       RenderMergeStrategy,
+                                       RenderPlanRefreshStrategy,
+                                       RenderTileStrategy)
 from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
                                          _env_optional_int)
 
 DEFAULT_RENDER_PLAN_REFRESH_MS = 100
+DEFAULT_RENDER_PLAN_REFRESH_STRATEGY = RenderPlanRefreshStrategy.TIME
 DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
 DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
 
@@ -85,6 +88,19 @@ class RenderingConfiguration:
             default=DEFAULT_RENDER_PLAN_REFRESH_MS,
             minimum=0,
         )
+
+    @classmethod
+    def render_plan_refresh_strategy(cls) -> RenderPlanRefreshStrategy:
+        strategy = os.environ.get(
+            "HEART_RENDER_PLAN_REFRESH_STRATEGY",
+            DEFAULT_RENDER_PLAN_REFRESH_STRATEGY.value,
+        ).strip().lower()
+        try:
+            return RenderPlanRefreshStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_PLAN_REFRESH_STRATEGY must be 'time' or 'on_change'"
+            ) from exc
 
     @classmethod
     def render_parallel_threshold(cls) -> int:
