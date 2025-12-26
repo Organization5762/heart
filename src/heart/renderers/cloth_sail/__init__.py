@@ -1,3 +1,4 @@
+from heart.peripheral.core.providers import register_provider
 from heart.renderers.cloth_sail.provider import \
     ClothSailStateProvider  # noqa: F401
 from heart.renderers.cloth_sail.renderer import ClothSailRenderer  # noqa: F401
@@ -17,3 +18,5 @@ from heart.renderers.cloth_sail.renderer import \
     glVertexAttribPointer  # noqa: F401
 from heart.renderers.cloth_sail.renderer import glViewport  # noqa: F401
 from heart.renderers.cloth_sail.state import ClothSailState  # noqa: F401
+
+register_provider(ClothSailStateProvider, ClothSailStateProvider)

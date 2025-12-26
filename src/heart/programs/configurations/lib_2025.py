@@ -17,8 +17,7 @@ from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.mario.provider import MarioRendererProvider
 from heart.renderers.mario.renderer import MarioRenderer
-from heart.renderers.multicolor import (MulticolorRenderer,
-                                        MulticolorStateProvider)
+from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
@@ -57,7 +56,7 @@ def configure(loop: GameLoop) -> None:
     modelbrot.resolve_renderer(loop.context_container, MandelbrotMode)
 
     sphere_mode = loop.add_mode("3d fractal")
-    sphere_mode.add_renderer(FractalScene(loop.device))
+    sphere_mode.resolve_renderer(loop.context_container, FractalScene)
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.resolve_renderer(loop.context_container, HilbertScene)
@@ -85,9 +84,7 @@ def configure(loop: GameLoop) -> None:
     )
 
     def multicolor_renderer() -> MulticolorRenderer:
-        return MulticolorRenderer(
-            builder=MulticolorStateProvider(loop.peripheral_manager)
-        )
+        return loop.context_container.resolve(MulticolorRenderer)
 
     shroomed_mode = loop.add_mode(
         ComposedRenderer(

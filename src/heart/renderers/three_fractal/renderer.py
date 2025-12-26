@@ -2,7 +2,6 @@ import math
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pygame
@@ -31,12 +30,10 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
 from heart.renderers import StatefulBaseRenderer
+from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-
-if TYPE_CHECKING:
-    from heart.renderers.three_fractal.provider import FractalSceneProvider
 
 logger = get_logger(__name__)
 
@@ -839,12 +836,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):
-    def __init__(
-        self, provider: "FractalSceneProvider" | None = None
-    ) -> None:
-        from heart.renderers.three_fractal.provider import FractalSceneProvider
-
-        self.provider = provider or FractalSceneProvider()
+    def __init__(self, provider: FractalSceneProvider) -> None:
+        self.provider = provider
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self._initial_state: FractalSceneState | None = None
         super().__init__(builder=self.provider)
