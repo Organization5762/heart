@@ -129,7 +129,7 @@ def _cluster_positions(values: Iterable[float], tolerance: float) -> list[float]
 
     clusters: list[list[float]] = [[sorted_values[0]]]
     for value in sorted_values[1:]:
-        if abs(value - clusters[-1][-1]) <= tolerance:
+        if value - clusters[-1][0] <= tolerance:
             clusters[-1].append(value)
         else:
             clusters.append([value])
