@@ -1,58 +1,72 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from threading import Lock
-from typing import Any, cast
+from typing import Any, Callable, cast
 
 from reactivex.scheduler import ThreadPoolScheduler
 
 from heart.utilities.env import Configuration
 
-_SCHEDULER_LOCK = Lock()
-_SCHEDULER: ThreadPoolScheduler | None = None
-_EXECUTOR: ThreadPoolExecutor | None = None
-_INPUT_SCHEDULER_LOCK = Lock()
-_INPUT_SCHEDULER: ThreadPoolScheduler | None = None
-_INPUT_EXECUTOR: ThreadPoolExecutor | None = None
+DEFAULT_MAX_WORKERS: int | None = None
+BACKGROUND_THREAD_PREFIX = "heart-rx"
+INPUT_THREAD_PREFIX = "heart-rx-input"
 
 
-def background_scheduler(max_workers: int | None = None) -> ThreadPoolScheduler:
+@dataclass
+class _SchedulerState:
+    lock: Lock
+    scheduler: ThreadPoolScheduler | None = None
+    executor: ThreadPoolExecutor | None = None
+
+
+_BACKGROUND_SCHEDULER = _SchedulerState(lock=Lock())
+_INPUT_SCHEDULER = _SchedulerState(lock=Lock())
+
+
+def _build_scheduler(
+    state: _SchedulerState,
+    *,
+    max_workers: int | None,
+    default_workers: Callable[[], int],
+    thread_name_prefix: str,
+) -> ThreadPoolScheduler:
+    if state.scheduler is None:
+        with state.lock:
+            if state.scheduler is None:
+                resolved_workers = (
+                    max_workers if max_workers is not None else default_workers()
+                )
+                executor = ThreadPoolExecutor(
+                    max_workers=resolved_workers,
+                    thread_name_prefix=thread_name_prefix,
+                )
+                state.executor = executor
+                state.scheduler = ThreadPoolScheduler(cast(Any, executor))
+    assert state.scheduler is not None
+    return state.scheduler
+
+
+def background_scheduler(
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
+) -> ThreadPoolScheduler:
     """Return the shared scheduler for background reactivex work."""
-    global _SCHEDULER, _EXECUTOR
-    if _SCHEDULER is None:
-        with _SCHEDULER_LOCK:
-            if _SCHEDULER is None:
-                resolved_workers = (
-                    max_workers
-                    if max_workers is not None
-                    else Configuration.reactivex_background_max_workers()
-                )
-                executor = ThreadPoolExecutor(
-                    max_workers=resolved_workers,
-                    thread_name_prefix="heart-rx",
-                )
-                _EXECUTOR = executor
-                _SCHEDULER = ThreadPoolScheduler(cast(Any, executor))
-    assert _SCHEDULER is not None
-    return _SCHEDULER
+    return _build_scheduler(
+        _BACKGROUND_SCHEDULER,
+        max_workers=max_workers,
+        default_workers=Configuration.reactivex_background_max_workers,
+        thread_name_prefix=BACKGROUND_THREAD_PREFIX,
+    )
 
 
-def input_scheduler(max_workers: int | None = None) -> ThreadPoolScheduler:
+def input_scheduler(
+    max_workers: int | None = DEFAULT_MAX_WORKERS,
+) -> ThreadPoolScheduler:
     """Return the shared scheduler for key input reactivex work."""
-    global _INPUT_SCHEDULER, _INPUT_EXECUTOR
-    if _INPUT_SCHEDULER is None:
-        with _INPUT_SCHEDULER_LOCK:
-            if _INPUT_SCHEDULER is None:
-                resolved_workers = (
-                    max_workers
-                    if max_workers is not None
-                    else Configuration.reactivex_input_max_workers()
-                )
-                executor = ThreadPoolExecutor(
-                    max_workers=resolved_workers,
-                    thread_name_prefix="heart-rx-input",
-                )
-                _INPUT_EXECUTOR = executor
-                _INPUT_SCHEDULER = ThreadPoolScheduler(cast(Any, executor))
-    assert _INPUT_SCHEDULER is not None
-    return _INPUT_SCHEDULER
+    return _build_scheduler(
+        _INPUT_SCHEDULER,
+        max_workers=max_workers,
+        default_workers=Configuration.reactivex_input_max_workers,
+        thread_name_prefix=INPUT_THREAD_PREFIX,
+    )
