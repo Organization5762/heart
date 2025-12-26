@@ -593,7 +593,7 @@ def get_julia_converge_time(re, im, c_real, c_imag, max_iter):
 def main() -> None:
     import pygame
 
-    from heart.device.selection import select_device
+    from heart.device.local import LocalScreen
     from heart.runtime.container import build_runtime_container
     from heart.runtime.render_pipeline import RendererVariant
     from heart.utilities.env import Configuration
@@ -605,8 +605,8 @@ def main() -> None:
     pygame.init()
 
     # Set up the display
-    WIDTH, HEIGHT = 512, 256
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    width, height = 512, 256
+    screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption("Mandelbrot Explorer")
 
     # Create the mandelbrot renderer
@@ -623,7 +623,8 @@ def main() -> None:
     frame_count = 0
 
     render_variant = RendererVariant.parse(Configuration.render_variant())
-    device = select_device(x11_forward=False)
+    orientation = Rectangle.with_layout(1, 1)
+    device = LocalScreen(width=width, height=height, orientation=orientation)
     container = build_runtime_container(
         device=device,
         render_variant=render_variant,
@@ -642,9 +643,7 @@ def main() -> None:
             screen.fill((0, 0, 0))
 
             # Process and render
-            mandelbrot._internal_process(
-                screen, clock, manager, Rectangle.with_layout(1, 1)
-            )
+            mandelbrot._internal_process(screen, clock, manager, orientation)
 
             # Update the display
             pygame.display.flip()
