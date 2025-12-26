@@ -68,3 +68,8 @@ class ProtobufTypeRegistry:
 
 
 protobuf_registry = ProtobufTypeRegistry()
+
+from heart.peripheral.core import \
+    protobuf_catalog as _protobuf_catalog  # noqa: E402
+
+_protobuf_catalog.register_protobuf_catalog()
