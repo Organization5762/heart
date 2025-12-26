@@ -1,15 +1,21 @@
 """Bluetooth bridge firmware loop.
 
 The original firmware was written with direct hardware calls that executed on
-import.  That behaviour makes it impossible to exercise in CI because the
-module immediately tries to talk to the board and blocks forever.  The driver
-is now organised around a small runtime object so that unit tests can inject
-test doubles for the BLE stack, LED and timing helpers.
+import. That behaviour makes it impossible to exercise in CI because the module
+immediately tries to talk to the board and blocks forever. The driver is now
+organized around a small runtime object so that unit tests can inject test
+doubles for the BLE stack, LED, and timing helpers.
+
+REPL reproduction:
+    1. Connect to the board REPL and import this module.
+    2. Call ``create_runtime()`` to initialize the BLE stack and UART service.
+    3. Invoke ``runtime.run_once()`` in a loop to observe UART payloads and LED
+       activity without the full game runtime.
 
 When running on the microcontroller the ``main`` function still spins forever,
-but the class based structure means CI can call :meth:`BluetoothBridgeRuntime.run_once`
-with fake values and assert on the produced UART output without needing any of
-the real hardware modules.
+but the class-based structure means CI can call
+:meth:`BluetoothBridgeRuntime.run_once` with fake values and assert on the
+produced UART output without needing any of the real hardware modules.
 """
 
 from __future__ import annotations
