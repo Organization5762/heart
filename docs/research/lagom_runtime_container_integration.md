@@ -21,3 +21,4 @@ Runtime services were wired manually in `GameLoop`, and provider registrations r
 ## Integration Notes
 
 The container builder registers `Device`, `RendererVariant`, and runtime singletons so they can be resolved wherever needed. `GameLoopComponents` is registered as a container singleton, so `GameLoop` resolves a single bundle of runtime services through Lagom instead of manually wiring each service. Provider registration is centralized in a registry that can apply to any runtime container, allowing late imports (such as renderer modules) to update active containers without a global `Container` instance. This keeps Lagom integration consistent across runtime components while still allowing tests to override dependencies in a single place.
+`GameLoop` itself is now constructed through the named `_build_game_loop` provider so container wiring remains traceable in logs and stack traces.
