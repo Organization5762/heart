@@ -57,6 +57,16 @@ def default_render_merge_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
     yield
 
 
+@pytest.fixture(autouse=True)
+def default_reactivex_stream_coalesce_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Disable stream coalescing by default so reactive tests remain deterministic."""
+
+    monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "0")
+    yield
+
+
 @pytest.fixture()
 def render_merge_strategy_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
     """Opt into in-place merge strategy for tests that assert pairwise merges."""

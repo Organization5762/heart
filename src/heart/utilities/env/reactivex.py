@@ -5,6 +5,9 @@ from heart.utilities.env.enums import (ReactivexEventBusScheduler,
                                        ReactivexStreamShareStrategy)
 from heart.utilities.env.parsing import _env_int, _env_optional_int
 
+DEFAULT_STREAM_MAX_HZ = 500
+DEFAULT_STREAM_COALESCE_WINDOW_MS = int(1000 / DEFAULT_STREAM_MAX_HZ)
+
 
 class ReactivexConfiguration:
     @classmethod
@@ -43,7 +46,11 @@ class ReactivexConfiguration:
 
     @classmethod
     def reactivex_stream_coalesce_window_ms(cls) -> int:
-        return _env_int("HEART_RX_STREAM_COALESCE_WINDOW_MS", default=0, minimum=0)
+        return _env_int(
+            "HEART_RX_STREAM_COALESCE_WINDOW_MS",
+            default=DEFAULT_STREAM_COALESCE_WINDOW_MS,
+            minimum=0,
+        )
 
     @classmethod
     def reactivex_stream_replay_buffer(cls) -> int:
