@@ -24,7 +24,7 @@ We need a shader that demonstrates how 3D lighting data can be quantized into a 
 - Instantiate `PixelSunriseRenderer` inside a playlist or debugging harness that expects a `BaseRenderer` implementation.
 - The renderer requests `DeviceDisplayMode.OPENGL` and uses `pygame._sdl2` when available to match the drawable pixel size to the window, so run it on a platform with OpenGL 2.1 support or better.
 - No additional uniforms are required; the class updates time and resolution for you each frame.
-- Launch `totem run --configuration pixel_sunrise_demo` to exercise the stock configuration that boots directly into the shader. The module lives at `heart/programs/configurations/pixel_sunrise_demo.py` and mirrors the integration notes in `docs/pixel_sunrise_renderer.md`.
+- Launch `totem run --configuration pixel_sunrise_demo` to exercise the stock configuration that boots directly into the shader. The module lives at `heart/programs/configurations/pixel_sunrise_demo.py` and mirrors the integration notes in `docs/renderers/renderer_catalog.md`.
 
 ## Materials
 

@@ -1,60 +1,97 @@
-# Markdown Style Guide
+# Documentation map
 
-This guide outlines the preferred conventions for writing Markdown documents in the `docs/` directory. It focuses on producing consistent, scannable documentation that renders cleanly on GitHub.
+This directory is curated as two complementary collections:
 
-## Use Descriptive Titles and Headings
+- **Books**: step-by-step narratives that guide someone through a workflow or
+  multi-stage decision. Use a book when the reader should start at the top and
+  read in order.
+- **Library**: reference material meant for lookup. Use a library entry when
+  the reader needs a quick answer, a configuration detail, or a concise system
+  description without following a long narrative.
 
-- Use `#` for the document title and start with a concise, action-oriented phrase (for example, `# Configure the Sensor Driver`).
-- Use heading levels in order (`##`, `###`, `####`) to create a clear outline. Avoid skipping levels.
-- Keep headings brief—prefer noun phrases or imperative verbs that make scanning easy.
-- When adding long-form guidance, insert a short introductory paragraph before the first secondary heading to summarize the page.
+When a topic can stand alone, file it in the library. Reserve books for guided
+sequences, cross-cutting workflows, or onboarding paths.
 
-## Provide Structured Navigation
+## Table of contents
 
-- Use a table of contents for documents longer than a few screens. Link each entry to the relevant section using fragment identifiers, for example: `- [Calibrate the Magnetometer](#calibrate-the-magnetometer)`.
-- When referencing a section elsewhere in the document, repeat the fragment link inline: `See [Calibrate the Magnetometer](#calibrate-the-magnetometer) for details.`
-- Keep anchor text descriptive. Avoid "click here" in favor of phrases like `See [Diagnostics Workflow](#diagnostics-workflow)`.
+- [Books](#books)
+- [Library](#library)
+- [Lab](#lab)
+- [Plans](#plans)
+- [Style guide](#style-guide)
 
-## Write Focused Paragraphs and Lists
+## Books
 
-- Favor short paragraphs (2–4 sentences) that cover a single idea.
-- Use bullet lists to enumerate related items or prerequisites. Use numbered lists for sequences of steps that must be followed in order.
-- Introduce each list with a lead-in sentence ending in a colon.
-- Indent nested lists by two spaces to keep GitHub rendering aligned.
+- [Getting started](./getting_started.md)
+- [Developer experience notes](./developer_experience.md)
+- [Development session habits](./dev_session.md)
+- [Development focus loop](./dev_focus_loop.md)
 
-## Call Out Key Syntax Elements
+## Library
 
-- Use fenced code blocks with a language identifier for command-line or code snippets, for example:
+### Runtime and architecture
 
-  ```bash
-  make format
-  ```
+- [Runtime overview](./runtime_overview.md)
+- [Runtime feedback loop](./runtime_feedback_loop.md)
+- [Code flow](./code_flow.md)
+- [Events and metrics](./events_metrics.md)
+- [ReactiveX tuning](./reactivex_tuning.md)
+- [Runtime feedback demo](./virtual_feedback_demo.md)
 
-- Use inline code (`` `like this` ``) to highlight filenames, commands, or configuration keys.
+### Renderers and visuals
 
-- Bold important warnings or decision points. Reserve italics for emphasis or terminology being defined.
+- [Renderer catalog](./renderers/renderer_catalog.md)
+- [Renderer roles](./renderers/renderer_roles.md)
+- [Renderer base class layout](./renderers/base_class_layout.md)
+- [Renderer composition](./rendering_composition.md)
+- [Renderer refactor update](./renderer_refactor_update.md)
+- [Renderers: L-system refactor](./renderers_l_system_refactor.md)
+- [Renderers: stateful refactor](./renderers_stateful_refactor.md)
+- [Rust renderers](./rust_renderers.md)
+- [Spritesheet cache](./spritesheet_cache.md)
 
-## Organize Tabular and Supplementary Information
+### Peripherals, hardware, and beats
 
-- Use tables to compare options, list configuration flags, or present structured data. Keep header labels short and align text using standard GitHub table syntax.
-- Collapse long examples or reference material with details using HTML `<details>` blocks to keep main narratives concise.
-- Reference external assets (images, diagrams) with descriptive alt text: `![Flight controller diagram](./images/flight-controller.png)`.
+- [Peripheral configurations](./peripheral_configurations.md)
+- [Device display resolution](./device_display_resolution.md)
+- [Hardware debug CLI](./hardware_debug_cli.md)
+- [Beats cube renderer](./beats-cube-renderer.md)
+- [Beats peripheral snapshots](./beats-peripheral-snapshots.md)
+- [Beats websocket protobuf](./beats-websocket-protobuf.md)
 
-## Leverage GitHub Markdown Features
+### Configuration and tooling
 
-- Use automatic section links to create contextual shortcuts, such as `Link to the helpful section: [Θ Tuning](#theta-tuning)`.
-- Include task lists (`- [ ]`) when tracking outstanding work items or checklists.
-- Apply callouts by combining bold text with emojis when highlighting alerts, for example: `**⚠️ Warning:** Always disconnect power before servicing hardware.`
-- Add footnotes for supplemental detail that would otherwise interrupt the main flow. Define them at the bottom of the document.
+- [CLI structure](./cli_structure.md)
+- [Program configuration](./program_configuration.md)
+- [Logging control](./logging_control.md)
+- [Sync harness](./sync_harness.md)
+- [Static analysis](./static_analysis.md)
+- [Publish to PyPI](./publish_pypi.md)
 
-## Maintain Cross-References and Context
+### Rendering experiments
 
-- When referencing code, cite the module path or script name explicitly, e.g., `See \`src/drivers/imu.py\`\`.
-- Link to related documents within the repository using relative paths so navigation works from any branch, for example: `[Driver bring-up checklist](./planning/driver_bringup.md)`.
-- Provide a short "Further reading" section at the end of long-form guides to aggregate related resources.
+- [Channel diffusion](./channel_diffusion.md)
+- [Color conversion tuning](./color_conversion_tuning.md)
 
-## Review Before Publishing
+### Debugging and operations
 
-- Run `make format` to apply mdformat and keep spacing consistent.
-- Preview the rendered Markdown locally (e.g., via a Markdown viewer or GitHub web preview) to verify tables, code blocks, and anchors render correctly.
-- Confirm that all section links resolve, code blocks have language hints, and lists render as expected.
+- [Debugging toolkit](./debugging/README.md)
+- [Performance notes](./performance)
+- [Migrations](./migrations)
+- [Devlog](./devlog)
+
+### API references
+
+- [API index](./api)
+
+## Lab
+
+- [Research notes](./research/README.md)
+
+## Plans
+
+- [Planning hub](./planning/README.md)
+
+## Style guide
+
+- [Markdown style guide](./markdown_style_guide.md)
