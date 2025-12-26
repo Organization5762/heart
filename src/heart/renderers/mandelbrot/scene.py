@@ -590,8 +590,13 @@ def get_julia_converge_time(re, im, c_real, c_imag, max_iter):
     return result
 
 
-def main():
+def main() -> None:
     import pygame
+
+    from heart.device.selection import select_device
+    from heart.runtime.container import build_runtime_container
+    from heart.runtime.render_pipeline import RendererVariant
+    from heart.utilities.env import Configuration
 
     profiling = os.environ.get("PROFILING", "False").lower() == "true"
     check_frames = int(os.environ.get("CHECK_FRAMES", "100"))
@@ -617,7 +622,13 @@ def main():
 
     frame_count = 0
 
-    manager = PeripheralManager()
+    render_variant = RendererVariant.parse(Configuration.render_variant())
+    device = select_device(x11_forward=False)
+    container = build_runtime_container(
+        device=device,
+        render_variant=render_variant,
+    )
+    manager = container.resolve(PeripheralManager)
     manager.detect()
     manager.start()
     try:
