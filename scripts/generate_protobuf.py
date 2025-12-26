@@ -28,10 +28,10 @@ def generate(
         readable=True,
         resolve_path=True,
     ),
-    proto_path: Path = typer.Option(
-        DEFAULT_PROTO_PATH,
+    proto_path: list[Path] = typer.Option(
+        [DEFAULT_PROTO_PATH],
         "--proto-path",
-        help="Root directory for protobuf imports.",
+        help="Root directory for protobuf imports. Repeat to add more.",
     ),
     python_out: Path = typer.Option(
         DEFAULT_PYTHON_OUT,
@@ -40,13 +40,13 @@ def generate(
     ),
 ) -> None:
     """Compile .proto files into *_pb2.py modules."""
-    proto_path = proto_path.resolve()
+    proto_paths = [path.resolve() for path in proto_path]
     python_out = python_out.resolve()
     python_out.mkdir(parents=True, exist_ok=True)
 
     args = [
         "protoc",
-        f"--proto_path={proto_path}",
+        *[f"--proto_path={path}" for path in proto_paths],
         f"--python_out={python_out}",
         *(str(path) for path in proto),
     ]

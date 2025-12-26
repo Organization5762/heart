@@ -98,6 +98,7 @@ ignore = ["E501", "F403", "F405"]
 "src/heart/renderers/three_fractal.py" = ["F403", "F405"]
 "src/heart/device/beats/proto/beats_streaming_pb2.py" = ["E712", "F821"]
 "src/heart/peripheral/proto/peripheral_payloads_pb2.py" = ["E712", "F821"]
+"src/heart/peripheral/proto/input_events_pb2.py" = ["E712", "F821"]
 
 
 [tool.mypy]
@@ -160,6 +161,13 @@ module = [
     "heart.navigation.*",
 ]
 follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = [
+    "heart.device.beats.proto.*",
+    "heart.peripheral.proto.*",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
