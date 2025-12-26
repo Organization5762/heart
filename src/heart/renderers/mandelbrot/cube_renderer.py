@@ -21,13 +21,14 @@ logger = get_logger(__name__)
 DEFAULT_MAX_ITERATIONS = 200
 PALETTE_SIZE = 256
 PALETTE_CYCLE_LENGTH = 64
-REAL_CENTER = -0.5
-REAL_HALF_RANGE = 1.75
-IMAG_HALF_RANGE = 1.5
-ROTATION_SPEED = 0.15
-TWO_PI = math.tau
-REAL_SCALE = REAL_HALF_RANGE / math.pi
-IMAG_SCALE = IMAG_HALF_RANGE / (math.pi / 2.0)
+REAL_CENTER = np.float32(-0.5)
+REAL_HALF_RANGE = np.float32(1.75)
+IMAG_HALF_RANGE = np.float32(1.5)
+ROTATION_SPEED = np.float32(0.15)
+PI = np.float32(math.pi)
+TWO_PI = np.float32(math.tau)
+REAL_SCALE = np.float32(REAL_HALF_RANGE / PI)
+IMAG_SCALE = np.float32(IMAG_HALF_RANGE / (PI / np.float32(2.0)))
 
 
 @dataclass(frozen=True)
@@ -84,14 +85,15 @@ def _build_cube_angles(
     azimuths = np.zeros((face_height, face_width * face_count), dtype=np.float32)
     elevations = np.zeros_like(azimuths)
 
+    angle_step = TWO_PI / np.float32(face_count)
+    elevation = np.arcsin(np.clip(y_base, -1.0, 1.0))
     for face_index in range(face_count):
-        angle = (2 * math.pi / face_count) * face_index
-        cos_angle = math.cos(angle)
-        sin_angle = math.sin(angle)
+        angle = angle_step * np.float32(face_index)
+        cos_angle = np.cos(angle)
+        sin_angle = np.sin(angle)
         x_rot = x_base * cos_angle + z_base * sin_angle
         z_rot = -x_base * sin_angle + z_base * cos_angle
         azimuth = np.arctan2(x_rot, z_rot)
-        elevation = np.arcsin(np.clip(y_base, -1.0, 1.0))
         start = face_index * face_width
         end = start + face_width
         azimuths[:, start:end] = azimuth
@@ -139,7 +141,7 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
             (face_height, face_width * face_count, 3), dtype=np.uint8
         )
         iteration_buffer = np.zeros(
-            (face_height, face_width * face_count), dtype=np.int32
+            (face_height, face_width * face_count), dtype=np.uint16
         )
         surface_view = np.swapaxes(color_buffer, 0, 1)
 
@@ -167,11 +169,11 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
         orientation: Orientation,
     ) -> None:
         elapsed = time.monotonic() - self.state.start_time
-        rotation = elapsed * ROTATION_SPEED
+        rotation = np.float32(elapsed * ROTATION_SPEED)
         np.add(self.state.base_azimuths, rotation, out=self.state.azimuths)
-        np.add(self.state.azimuths, math.pi, out=self.state.azimuths)
+        np.add(self.state.azimuths, PI, out=self.state.azimuths)
         np.remainder(self.state.azimuths, TWO_PI, out=self.state.azimuths)
-        np.subtract(self.state.azimuths, math.pi, out=self.state.azimuths)
+        np.subtract(self.state.azimuths, PI, out=self.state.azimuths)
 
         np.multiply(self.state.azimuths, REAL_SCALE, out=self.state.real_coords)
         np.add(self.state.real_coords, REAL_CENTER, out=self.state.real_coords)
