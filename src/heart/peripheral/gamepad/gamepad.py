@@ -226,7 +226,7 @@ class Gamepad(Peripheral[Any]):
         except KeyboardInterrupt:
             logger.info("Program terminated")
         except Exception:
-            pass
+            logger.debug("Unexpected error while reading gamepad state", exc_info=True)
 
     def run(self) -> None:
         # Give pygame and USB subsystems time to fully initialize
