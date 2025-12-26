@@ -111,6 +111,20 @@ def build_runtime_container(
         ),
     )
     _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
+    from heart.runtime.game_loop import GameLoop
+
+    _bind(
+        container,
+        overrides,
+        GameLoop,
+        Singleton(
+            lambda resolver: GameLoop(
+                device=resolver[Device],
+                resolver=resolver,
+                render_variant=resolver[RendererVariant],
+            )
+        ),
+    )
     apply_provider_registrations(container)
     return container
 
