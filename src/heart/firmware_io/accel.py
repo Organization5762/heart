@@ -10,8 +10,6 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_MIN_CHANGE_THRESHOLD = 0.1
-
 
 def _form_payload(name: str, data) -> str:
     """Forms a JSON payload string from a dictionary of data.
@@ -58,7 +56,7 @@ class SensorReader:
     """Tracks last values and determines when updates are significant."""
 
     def __init__(
-        self, sensors, min_change: float = DEFAULT_MIN_CHANGE_THRESHOLD
+        self, sensors, min_change: float = constants.ACCEL_MIN_CHANGE_DEFAULT
     ) -> None:
         self.sensors = sensors
         self.min_change = min_change
@@ -88,7 +86,7 @@ class SensorReader:
         return any(abs(n - o) > min_change for n, o in zip(new, old))
 
     @classmethod
-    def connect(cls, i2c, min_change: float = DEFAULT_MIN_CHANGE_THRESHOLD):
+    def connect(cls, i2c, min_change: float = constants.ACCEL_MIN_CHANGE_DEFAULT):
         sensors = cls.connect_to_sensors(i2c=i2c)
         return cls(sensors=sensors, min_change=min_change)
 
