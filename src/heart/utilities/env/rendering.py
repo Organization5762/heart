@@ -5,8 +5,14 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        IsolatedRendererAckStrategy,
                                        IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
+                                       RendererTimingStrategy,
                                        RenderMergeStrategy, RenderTileStrategy)
-from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
+from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
+                                         _env_optional_int)
+
+DEFAULT_RENDER_PLAN_REFRESH_MS = 100
+DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
+DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
 
 
 class RenderingConfiguration:
@@ -73,6 +79,14 @@ class RenderingConfiguration:
         return os.environ.get("HEART_RENDER_VARIANT", "iterative")
 
     @classmethod
+    def render_plan_refresh_ms(cls) -> int:
+        return _env_int(
+            "HEART_RENDER_PLAN_REFRESH_MS",
+            default=DEFAULT_RENDER_PLAN_REFRESH_MS,
+            minimum=0,
+        )
+
+    @classmethod
     def render_parallel_threshold(cls) -> int:
         return _env_int("HEART_RENDER_PARALLEL_THRESHOLD", default=4, minimum=1)
 
@@ -123,6 +137,33 @@ class RenderingConfiguration:
     @classmethod
     def render_merge_surface_threshold(cls) -> int:
         return _env_int("HEART_RENDER_MERGE_SURFACE_THRESHOLD", default=3, minimum=1)
+
+    @classmethod
+    def render_timing_strategy(cls) -> RendererTimingStrategy:
+        strategy = os.environ.get(
+            "HEART_RENDER_TIMING_STRATEGY",
+            DEFAULT_RENDER_TIMING_STRATEGY.value,
+        ).strip().lower()
+        try:
+            return RendererTimingStrategy(strategy)
+        except ValueError as exc:
+            raise ValueError(
+                "HEART_RENDER_TIMING_STRATEGY must be 'cumulative' or 'ema'"
+            ) from exc
+
+    @classmethod
+    def render_timing_ema_alpha(cls) -> float:
+        alpha = _env_float(
+            "HEART_RENDER_TIMING_EMA_ALPHA",
+            default=DEFAULT_RENDER_TIMING_EMA_ALPHA,
+            minimum=0.0,
+            maximum=1.0,
+        )
+        if alpha <= 0.0:
+            raise ValueError(
+                "HEART_RENDER_TIMING_EMA_ALPHA must be greater than 0 and at most 1"
+            )
+        return alpha
 
     @classmethod
     def frame_array_strategy(cls) -> FrameArrayStrategy:

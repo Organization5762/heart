@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, cast
 
@@ -50,6 +51,11 @@ class RenderPipeline:
         }
         self._render_executor: ThreadPoolExecutor | None = None
         self._active_plan: RenderPlan | None = None
+        self._plan_refresh_ms = Configuration.render_plan_refresh_ms()
+        self._plan_cache_signature: tuple[int, ...] | None = None
+        self._plan_cache_override: RendererVariant | None = None
+        self._plan_cache_time = 0.0
+        self._plan_cache: RenderPlan | None = None
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self.clock = clock
@@ -158,13 +164,42 @@ class RenderPipeline:
         self._planner.set_default_variant(self.renderer_variant)
         return self._planner.plan(renderers, override_renderer_variant)
 
+    @staticmethod
+    def _renderers_signature(
+        renderers: list["StatefulBaseRenderer[Any]"],
+    ) -> tuple[int, ...]:
+        return tuple(id(renderer) for renderer in renderers)
+
+    def _get_render_plan(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> RenderPlan:
+        refresh_ms = self._plan_refresh_ms
+        signature = self._renderers_signature(renderers)
+        now = time.monotonic()
+        if (
+            refresh_ms > 0
+            and self._plan_cache is not None
+            and self._plan_cache_signature == signature
+            and self._plan_cache_override == override_renderer_variant
+            and ((now - self._plan_cache_time) * 1000.0) < refresh_ms
+        ):
+            return self._plan_cache
+        self._planner.set_default_variant(self.renderer_variant)
+        plan = self._planner.plan(renderers, override_renderer_variant)
+        self._plan_cache_signature = signature
+        self._plan_cache_override = override_renderer_variant
+        self._plan_cache_time = now
+        self._plan_cache = plan
+        return plan
+
     def render(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> pygame.Surface | None:
-        self._planner.set_default_variant(self.renderer_variant)
-        plan = self._planner.plan(renderers, override_renderer_variant)
+        plan = self._get_render_plan(renderers, override_renderer_variant)
         render_fn = self._render_dispatch.get(
             plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )

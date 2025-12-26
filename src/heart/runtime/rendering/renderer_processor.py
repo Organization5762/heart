@@ -9,6 +9,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.runtime.rendering.surface_provider import RendererSurfaceProvider
 from heart.runtime.rendering.timing import RendererTimingTracker
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
@@ -27,7 +28,10 @@ class RendererProcessor:
         self.peripheral_manager = peripheral_manager
         self.clock: pygame.time.Clock | None = None
         self._surface_provider = RendererSurfaceProvider(device)
-        self._timing_tracker = RendererTimingTracker()
+        self._timing_tracker = RendererTimingTracker(
+            strategy=Configuration.render_timing_strategy(),
+            ema_alpha=Configuration.render_timing_ema_alpha(),
+        )
         self._render_queue_depth = 0
 
     @property
