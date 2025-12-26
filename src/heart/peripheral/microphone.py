@@ -23,6 +23,8 @@ from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 
+DEFAULT_RETRY_DELAY_SECONDS = 1.0
+
 sd: Any | None = None
 if ctypes.util.find_library("portaudio") is not None:  # pragma: no cover - optional dependency
     sd = optional_import("sounddevice", logger=logger)
@@ -39,7 +41,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
         samplerate: int = 16_000,
         block_duration: float = 0.1,
         channels: int = 1,
-        retry_delay: float = 1.0,
+        retry_delay: float = DEFAULT_RETRY_DELAY_SECONDS,
     ) -> None:
         super().__init__()
         self.samplerate = samplerate
