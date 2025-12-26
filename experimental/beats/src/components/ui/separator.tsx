@@ -1,5 +1,5 @@
-import * as React from "react"
-import * as SeparatorPrimitive from "@radix-ui/react-separator"
+import type { ComponentProps } from "react"
+import { Root as SeparatorRoot } from "@radix-ui/react-separator"
 
 import { cn } from "@/utils/tailwind"
 
@@ -8,9 +8,9 @@ function Separator({
   orientation = "horizontal",
   decorative = true,
   ...props
-}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
+}: ComponentProps<typeof SeparatorRoot>) {
   return (
-    <SeparatorPrimitive.Root
+    <SeparatorRoot
       data-slot="separator"
       decorative={decorative}
       orientation={orientation}
