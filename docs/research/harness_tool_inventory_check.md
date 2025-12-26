@@ -19,4 +19,4 @@ steps could fail later if a required uv tool was missing.
 - `scripts/harness_tools.txt`
 - `Makefile`
 - `scripts/check_harness.sh`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`

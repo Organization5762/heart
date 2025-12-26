@@ -18,7 +18,7 @@ teams can align on the same settings and switch quickly between them.
 
 - `scripts/build_package.sh` (profile parsing, build hashing, manifest updates)
 - `scripts/build_profiles.json` (profile definitions)
-- `docs/sync_harness.md` (build helper documentation)
+- `docs/library/tooling_and_configuration.md` (build helper documentation)
 
 ## Observations
 

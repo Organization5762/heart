@@ -13,7 +13,7 @@ Protobuf payload decoding relied on ad hoc package registration, which made it e
 - `src/heart/device/beats/proto/beats_streaming.proto`
 - `src/heart/peripheral/proto/peripheral_payloads.proto`
 - `scripts/generate_protobuf.py`
-- `docs/beats-websocket-protobuf.md`
+- `docs/library/peripherals_and_beats.md`
 
 ## Notes
 

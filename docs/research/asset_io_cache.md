@@ -30,4 +30,4 @@ latency in a controlled way.
 - `src/heart/assets/cache.py` (LRU container for asset reuse).
 - `src/heart/assets/loader.py` (spritesheet and metadata loading).
 - `src/heart/utilities/env/assets.py` (configuration parsing).
-- `docs/spritesheet_cache.md` (configuration summary for cache strategies).
+- `docs/library/renderers_systems.md` (configuration summary for cache strategies).

@@ -10,7 +10,7 @@ planning overhead.
 
 ## Sources
 
-- "Use the tuning knobs below to reduce socket traffic or control acknowledgement waits when routing frames through the isolated renderer." (`docs/getting_started.md`)
+- "Use the tuning knobs below to reduce socket traffic or control acknowledgement waits when routing frames through the isolated renderer." (`docs/books/getting_started.md`)
 - "Maintain an internal status cache to avoid publishing unchanged lifecycle events." (`docs/api/input_bus.md`)
 
 ## Proposed changes
@@ -33,7 +33,7 @@ change.
 
 ## Materials list
 
-- `docs/getting_started.md` (Isolated Renderer I/O Tuning section)
+- `docs/books/getting_started.md` (Isolated Renderer I/O Tuning section)
 - `docs/api/input_bus.md` (Lifecycle signalling section)
 - `src/heart/runtime/render_pipeline.py`
 - `src/heart/runtime/rendering/timing.py`

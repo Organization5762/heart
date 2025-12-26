@@ -9,7 +9,7 @@ harness skips hooks and rsync when the dry-run reports no changes.
 ## Materials
 
 - `sync.sh`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`
 
 ## Notes
 

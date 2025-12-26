@@ -6,7 +6,7 @@
 - `scripts/list_harness_tools.sh`
 - `scripts/check_harness.sh`
 - `Makefile`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`
 
 ## Note
 
