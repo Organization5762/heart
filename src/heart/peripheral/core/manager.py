@@ -32,10 +32,15 @@ class PeripheralManager:
         *,
         configuration: str | None = None,
         configuration_registry: PeripheralConfigurationRegistry | None = None,
+        configuration_loader: PeripheralConfigurationLoader | None = None,
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
         self._started = False
-        self._configuration_loader = PeripheralConfigurationLoader(
+        if configuration_loader and (configuration or configuration_registry):
+            raise ValueError(
+                "Provide configuration_loader or configuration/configuration_registry, not both."
+            )
+        self._configuration_loader = configuration_loader or PeripheralConfigurationLoader(
             configuration=configuration,
             registry=configuration_registry,
         )

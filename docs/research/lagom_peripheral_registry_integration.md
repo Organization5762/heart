@@ -9,14 +9,16 @@ the manager and its loader.
 
 ## Notes
 
-- Registered `PeripheralConfigurationRegistry` in
-  `heart.runtime.container.build_runtime_container` so Lagom can manage a shared
-  instance for runtime overrides.
-- Injected the registry into `PeripheralManager` and surfaced it through
-  `PeripheralConfigurationLoader.registry` and
+- Registered `PeripheralConfigurationRegistry` and
+  `PeripheralConfigurationLoader` in
+  `heart.runtime.container.build_runtime_container` so Lagom can manage shared
+  instances for runtime overrides.
+- Injected the loader into `PeripheralManager` and surfaced registry access
+  through `PeripheralConfigurationLoader.registry` and
   `PeripheralManager.configuration_registry` to support validation and testing.
 - Added container coverage in `tests/runtime/test_container.py` to confirm the
-  registry instance is shared by the manager.
+  registry instance is shared by the manager and that loader overrides flow
+  through the container.
 
 ## Materials
 

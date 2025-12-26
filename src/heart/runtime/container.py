@@ -6,6 +6,7 @@ from lagom import Container, Singleton
 
 from heart.device import Device
 from heart.navigation import AppController
+from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -34,10 +35,20 @@ def build_runtime_container(
     _bind(
         container,
         overrides,
+        PeripheralConfigurationLoader,
+        Singleton(
+            lambda resolver: PeripheralConfigurationLoader(
+                registry=resolver[PeripheralConfigurationRegistry]
+            )
+        ),
+    )
+    _bind(
+        container,
+        overrides,
         PeripheralManager,
         Singleton(
             lambda resolver: PeripheralManager(
-                configuration_registry=resolver[PeripheralConfigurationRegistry]
+                configuration_loader=resolver[PeripheralConfigurationLoader]
             )
         ),
     )
