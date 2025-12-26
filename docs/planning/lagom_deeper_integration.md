@@ -43,6 +43,7 @@ This plan proposes consolidating runtime dependency wiring into a single Lagom c
 - [ ] Update `GameLoop` to accept a container created by the builder module and remove ad-hoc instantiation.
 - [ ] Align `ComposedRenderer.resolve_renderer` with the shared container instance so renderers can share registered services.
 - [ ] Move the global container from `src/heart/peripheral/core/providers/__init__.py` into the container builder module or a dedicated peripheral container module to avoid multiple container instances.
+- [ ] Update standalone renderer scripts (for example, `src/heart/renderers/mandelbrot/scene.py`) to resolve `PeripheralManager` through the runtime container instead of direct instantiation.
 - [ ] Ensure configuration and overrides for tests are documented and demonstrate the pattern in a new test module.
 
 ### Validation
