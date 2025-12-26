@@ -40,6 +40,7 @@ flowchart LR
     subgraph Runtime["GameLoop Orchestration"]
         direction TB
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
+        RenderPacer["Render Loop Pacer\n(heart.runtime.render_pacing.RenderLoopPacer)"]
         AppRouter["AppController / Mode Router"]
         ModeServices["Mode Services & Renderers"]
         RenderPipeline["Render Pipeline"]
@@ -71,6 +72,7 @@ flowchart LR
     end
 
     CLI --> Registry --> ContainerBuilder --> RuntimeContainer --> Loop
+    RuntimeContainer --> RenderPacer --> Loop
     Loop --> Configurer --> AppRouter
     Loop --> AppRouter
     RuntimeContainer --> AppRouter
@@ -91,7 +93,7 @@ flowchart LR
     RxScheduler --> PhoneText --> AppRouter
 
     class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
-    class Loop,AppRouter orchestrator;
+    class Loop,AppRouter,RenderPacer orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```

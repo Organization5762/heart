@@ -17,7 +17,9 @@ from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.pygame_event_handler import PygameEventHandler
+from heart.runtime.render_pacing import RenderLoopPacer
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 RuntimeContainer = Container
@@ -71,6 +73,14 @@ def _build_peripheral_runtime(resolver: RuntimeContainer) -> PeripheralRuntime:
 
 def _build_app_controller(resolver: RuntimeContainer) -> AppController:
     return AppController(renderer_resolver=resolver)
+
+
+def _build_render_loop_pacer(_: RuntimeContainer) -> RenderLoopPacer:
+    return RenderLoopPacer(
+        strategy=Configuration.render_loop_pacing_strategy(),
+        min_interval_ms=Configuration.render_loop_pacing_min_interval_ms(),
+        utilization_target=Configuration.render_loop_pacing_utilization(),
+    )
 
 
 def _build_game_loop_components(
@@ -221,6 +231,12 @@ def _configure_runtime_bindings(
         overrides,
         AppController,
         Singleton(_build_app_controller),
+    )
+    _bind(
+        container,
+        overrides,
+        RenderLoopPacer,
+        Singleton(_build_render_loop_pacer),
     )
     _bind(
         container,
