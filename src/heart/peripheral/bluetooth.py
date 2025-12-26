@@ -63,8 +63,16 @@ class UartListener:
 
     def start(self) -> None:
         self._logger.debug("Starting UART listener thread for %s", self.device.address)
+
+        def _run_listener() -> None:
+            try:
+                asyncio.run(self.connect_and_listen())
+            except Exception:
+                self.disconnected = True
+                self._logger.exception("UART listener thread terminated unexpectedly.")
+
         t = threading.Thread(
-            target=lambda: asyncio.run(self.connect_and_listen()),
+            target=_run_listener,
             daemon=True,
             name=f"UartListener-{self.device.address}",
         )
