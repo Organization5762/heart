@@ -83,7 +83,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
 
     def _check_if_pressed(self) -> KeyboardEvent | None:
         keys = pygame.key.get_pressed()
-        now = time.time() * 1000
+        now = time.monotonic() * 1000
         current = self.state
         event: KeyboardEvent | None = None
         key_name = pygame.key.name(self.key)
