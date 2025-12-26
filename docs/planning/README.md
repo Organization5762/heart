@@ -13,6 +13,7 @@ Consult this index before opening or updating plans. Each linked document must f
 - [ ] [Lagom Deep Integration](lagom_deeper_integration.md)
 - [ ] [Multi-App Split](multi_app_split.md)
 - [ ] [Peripheral Color Sync](peripheral_color_sync.md)
+- [ ] [Protobuf Deep Integration](protobuf_deep_integration.md)
 - [ ] [UWB Peripheral Rollout](uwb_peripheral_rollout.md)
 
 ## Active
