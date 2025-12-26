@@ -123,7 +123,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._ensure_plan(renderers)
+        self._get_active_plan(renderers)
         surfaces = self._collect_surfaces_serial(renderers)
         return self._composition_manager.compose_serial(
             surfaces, merge_fn=self.merge_surfaces
@@ -133,7 +133,7 @@ class RenderPipeline:
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
-        self._ensure_plan(renderers)
+        self._get_active_plan(renderers)
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
         surfaces = self._collect_surfaces_parallel(renderers)
@@ -147,22 +147,32 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None,
     ) -> RenderMethod:
-        plan = self._ensure_plan(renderers, override_renderer_variant)
-        return self._render_dispatch.get(
-            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
+        plan = self._get_active_plan(renderers, override_renderer_variant)
+        return self._resolve_render_method(plan)
+
+    def _get_plan(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        override_renderer_variant: RendererVariant | None = None,
+    ) -> RenderPlan:
+        return self._plan_cache.get_plan(
+            renderers,
+            self.renderer_variant,
+            override_renderer_variant,
         )
 
-    def _ensure_plan(
+    def _get_active_plan(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
         if self._active_plan is not None:
             return self._active_plan
-        return self._plan_cache.get_plan(
-            renderers,
-            self.renderer_variant,
-            override_renderer_variant,
+        return self._get_plan(renderers, override_renderer_variant)
+
+    def _resolve_render_method(self, plan: RenderPlan) -> RenderMethod:
+        return self._render_dispatch.get(
+            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
         )
 
     def render(
@@ -170,14 +180,8 @@ class RenderPipeline:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> pygame.Surface | None:
-        plan = self._plan_cache.get_plan(
-            renderers,
-            self.renderer_variant,
-            override_renderer_variant,
-        )
-        render_fn = self._render_dispatch.get(
-            plan.variant, self._render_dispatch[RendererVariant.ITERATIVE]
-        )
+        plan = self._get_plan(renderers, override_renderer_variant)
+        render_fn = self._resolve_render_method(plan)
         self._active_plan = plan
         try:
             return render_fn(renderers)
