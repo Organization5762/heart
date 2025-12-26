@@ -1,15 +1,16 @@
-# Mandelbrot Cube Rendering Performance Notes
+# Mandelbrot cube performance notes
 
-## Problem statement
+## Problem
 
-The Mandelbrot cube renderer in `src/heart/renderers/mandelbrot/cube_renderer.py` was allocating multiple large arrays every frame (azimuths, real/imag coordinates, palette lookups, and a transposed color buffer). Those allocations added CPU overhead and created extra GC pressure while the scene was animating.
+The mandelbrot cube renderer was allocating a fresh iteration buffer every frame when
+calling the converge-time routine. The extra allocation and per-frame memory traffic
+showed up as avoidable overhead during rendering, especially on constrained devices.
 
-## Approach
+## Change summary
 
-- Preallocate per-frame buffers (azimuths, real coordinates, color buffer) inside the renderer state to reuse them across frames.
-- Precompute the static imaginary coordinates for the cube faces so they are not recomputed every frame.
-- Use NumPy in-place math (`np.add`, `np.multiply`, `np.remainder`, `np.clip`) and `np.take(..., out=...)` to avoid intermediate arrays during rotation, coordinate conversion, and palette lookup.
-- Keep a swapped-axis view of the color buffer so `pygame.surfarray.blit_array` can consume it without creating a new transposed array each frame.
+- Added a Numba helper that writes converge-time results into a caller-provided buffer.
+- The cube renderer now stores a reusable iteration buffer in state and reuses it
+  each frame before palette lookup.
 
 ## Materials
 
