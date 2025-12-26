@@ -3,6 +3,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.frame_exporter import FrameExporter
+from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.game_loop import GameLoop
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
@@ -55,6 +57,19 @@ class TestRuntimeContainer:
         manager = container.resolve(PeripheralManager)
 
         assert manager.configuration_loader is loader
+
+    def test_container_injects_frame_exporter_overrides(self, device) -> None:
+        """Ensure FramePresenter honors container overrides so frame export strategies remain testable."""
+        exporter = FrameExporter()
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.BINARY,
+            overrides={FrameExporter: exporter},
+        )
+
+        presenter = container.resolve(FramePresenter)
+
+        assert presenter.frame_exporter is exporter
 
     def test_game_loop_uses_container_overrides(self, device) -> None:
         """Ensure GameLoop honors container overrides so tests can swap implementations without touching runtime code."""

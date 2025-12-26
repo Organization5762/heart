@@ -14,13 +14,15 @@ from heart.runtime.render_pipeline import RenderPipeline
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
 
+DEFAULT_FRAME_EXPORTER_FACTORY = FrameExporter
+
 
 @dataclass
 class FramePresenter:
     device: Device
     display: DisplayContext
     render_pipeline: RenderPipeline
-    frame_exporter: FrameExporter = field(default_factory=FrameExporter)
+    frame_exporter: FrameExporter = field(default_factory=DEFAULT_FRAME_EXPORTER_FACTORY)
 
     def present(
         self,

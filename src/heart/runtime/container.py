@@ -12,6 +12,7 @@ from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.frame_exporter import FrameExporter
 from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.peripheral_runtime import PeripheralRuntime
@@ -97,6 +98,7 @@ def configure_runtime_container(
             )
         ),
     )
+    _bind(container, overrides, FrameExporter, Singleton(FrameExporter))
     _bind(
         container,
         overrides,
@@ -106,6 +108,7 @@ def configure_runtime_container(
                 device=resolver[Device],
                 display=resolver[DisplayContext],
                 render_pipeline=resolver[RenderPipeline],
+                frame_exporter=resolver[FrameExporter],
             )
         ),
     )
