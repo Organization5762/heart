@@ -165,7 +165,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             next_order, width, height, self.xmargin, self.ymargin
         )
         target_curve = resample_curve_numba(next_points, self.resample_count)
-        now = time.time()
+        now = time.monotonic()
         return HilbertCurveState(
             width=width,
             height=height,
@@ -274,7 +274,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             initial_state = self.initial_state(width=size[0], height=size[1])
             return peripheral_manager.game_tick.pipe(
                 ops.filter(lambda tick: tick is not None),
-                ops.map(lambda _: time.time()),
+                ops.map(lambda _: time.monotonic()),
                 ops.scan(
                     lambda state, now: self.advance(state, now=now),
                     seed=initial_state,

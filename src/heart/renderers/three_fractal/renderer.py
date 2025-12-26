@@ -187,7 +187,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             ),
         )
 
-        self.time_initialized = time.time()
+        self.time_initialized = time.monotonic()
         self.target_surface = window
         window_size = window.get_size()
         tiled_mode = isinstance(orientation, Cube)
@@ -223,10 +223,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.mat = np.identity(4, np.float32)
         self.mat[3, :3] = np.array(start_pos)
         self.prevMat = np.copy(self.mat)
-        self.last_update_time = time.time()
+        self.last_update_time = time.monotonic()
 
         self.shader.set(self.sphere_radius_var, self.BASE_RADIUS)
-        self.last_frame_time = time.time()
+        self.last_frame_time = time.monotonic()
         return FractalRuntimeState(peripheral_manager=peripheral_manager)
 
         self.mode = "auto"
@@ -473,7 +473,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def _check_break_auto(self, peripheral_manager: PeripheralManager):
         # ignore break auto check at first to avoid inut overlap from scene
         # select mode
-        if time.time() - self.time_initialized < 0.3:
+        if time.monotonic() - self.time_initialized < 0.3:
             return
 
         gamepad = peripheral_manager.get_gamepad()
@@ -725,7 +725,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if window is not self.target_surface:
             self.target_surface = window
 
-        now = time.time()
+        now = time.monotonic()
         self.delta_real_time = now - (self.last_frame_time or 0.0)
         self.last_frame_time = now
 
