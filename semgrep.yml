@@ -57,3 +57,33 @@ rules:
       category: style
       technology:
         - python
+  - id: heart-no-baseexception-catch
+    languages:
+      - python
+    message: Avoid catching BaseException so system-exiting signals propagate.
+    severity: ERROR
+    patterns:
+      - pattern: |
+          except BaseException:
+            ...
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: error-handling
+      technology:
+        - python
+  - id: heart-no-bare-exception-raise
+    languages:
+      - python
+    message: Raise a specific exception type instead of a bare Exception.
+    severity: ERROR
+    patterns:
+      - pattern: raise Exception(...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: error-handling
+      technology:
+        - python
