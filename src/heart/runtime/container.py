@@ -60,7 +60,12 @@ def build_runtime_container(
         PeripheralRuntime,
         Singleton(lambda resolver: PeripheralRuntime(resolver[PeripheralManager])),
     )
-    _bind(container, overrides, AppController, Singleton(AppController))
+    _bind(
+        container,
+        overrides,
+        AppController,
+        Singleton(lambda resolver: AppController(renderer_resolver=resolver)),
+    )
     _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
     apply_provider_registrations(container)
     return container

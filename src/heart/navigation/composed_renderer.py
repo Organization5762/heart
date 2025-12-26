@@ -26,9 +26,14 @@ class ComposedRendererState:
 
 
 class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
-    def __init__(self, renderers: list[StatefulBaseRenderer]) -> None:
+    def __init__(
+        self,
+        renderers: list[StatefulBaseRenderer],
+        renderer_resolver: RendererResolver | None = None,
+    ) -> None:
         super().__init__()
         self.renderers: list[StatefulBaseRenderer] = renderers
+        self._renderer_resolver = renderer_resolver
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []
@@ -80,6 +85,13 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
                 self.state.peripheral_manager,
                 self.state.orientation,
             )
+
+    def resolve_renderer_from_container(
+        self, renderer: type[StatefulBaseRenderer]
+    ) -> None:
+        if self._renderer_resolver is None:
+            raise ValueError("ComposedRenderer requires a renderer resolver")
+        self.resolve_renderer(self._renderer_resolver, renderer)
 
     def real_process(
         self,
