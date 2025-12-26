@@ -43,6 +43,9 @@ class RenderPlanner:
     def set_default_variant(self, default_variant: RendererVariant) -> None:
         self._default_variant = default_variant
 
+    def timing_version(self) -> int:
+        return self._timing_tracker.version
+
     def plan(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],

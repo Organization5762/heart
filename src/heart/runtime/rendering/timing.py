@@ -56,6 +56,11 @@ class RendererTimingTracker:
         self._stats: dict[str, _RendererTimingState] = {}
         self._strategy = strategy
         self._ema_alpha = self._validate_ema_alpha(ema_alpha)
+        self._version = 0
+
+    @property
+    def version(self) -> int:
+        return self._version
 
     @staticmethod
     def _validate_ema_alpha(alpha: float) -> float:
@@ -73,6 +78,7 @@ class RendererTimingTracker:
             strategy=self._strategy,
             ema_alpha=self._ema_alpha,
         )
+        self._version += 1
 
     def estimate_total_ms(self, renderers: Iterable[_RendererLike]) -> tuple[float, bool]:
         total_ms = 0.0
