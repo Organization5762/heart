@@ -65,7 +65,10 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         mode.add_renderer(RenderColor(Color(0, 0, 0)))
 
     def add_scene(self) -> MultiScene:
-        new_scene = MultiScene(scenes=[])
+        new_scene = MultiScene(
+            scenes=[],
+            renderer_resolver=self._renderer_resolver,
+        )
         title_renderer = self._build_title_renderer("Untitled")
         self.modes.add_new_pages(title_renderer, new_scene)
         return new_scene
