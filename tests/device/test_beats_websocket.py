@@ -10,7 +10,8 @@ from heart.peripheral.core import (Input, PeripheralInfo,
 from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
                                             decode_peripheral_payload,
                                             encode_peripheral_payload)
-from heart.peripheral.proto import input_events_pb2
+from heart.peripheral.core.protobuf_registry import protobuf_registry
+from heart.peripheral.core.protobuf_types import PeripheralPayloadType
 
 
 class TestPeripheralEnvelopeEncoding:
@@ -84,7 +85,11 @@ class TestInputPayloadEncoding:
 
         assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
         assert encoded.payload_type == "heart.peripheral.input.InputEvent"
-        event = input_events_pb2.InputEvent()
+        message_class = protobuf_registry.get_message_class(
+            PeripheralPayloadType.INPUT_EVENT
+        )
+        assert message_class is not None
+        event = message_class()
         event.ParseFromString(encoded.payload)
         assert event.event_type == payload.event_type
         assert json.loads(event.data_json.decode("utf-8")) == payload.data

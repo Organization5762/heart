@@ -14,11 +14,9 @@ from heart.peripheral.core import Input
 from heart.peripheral.core.protobuf_registry import protobuf_registry
 from heart.peripheral.core.protobuf_types import (INPUT_EVENT_TYPE,
                                                   PeripheralPayloadType)
-from heart.peripheral.proto import input_events_pb2 as _input_events_pb2
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
-input_events_pb2 = cast(Any, _input_events_pb2)
 
 
 class PeripheralPayloadEncoding(StrEnum):
@@ -37,14 +35,35 @@ class PeripheralPayloadDecodingError(ValueError):
     """Raised when a peripheral payload cannot be decoded."""
 
 
+class PeripheralPayloadEncodingError(ValueError):
+    """Raised when a peripheral payload cannot be encoded."""
+
+
+def _get_message_class(
+    payload_type: str | PeripheralPayloadType,
+) -> type[Message]:
+    message_class = protobuf_registry.get_message_class(payload_type)
+    if message_class is None:
+        normalized = _normalize_payload_type(payload_type)
+        logger.error(
+            "Protobuf payload type '%s' is not registered for encoding.",
+            normalized,
+        )
+        raise PeripheralPayloadEncodingError(
+            f"Unknown protobuf payload type: {normalized}"
+        )
+    return message_class
+
+
 def _encode_input_payload(payload: Input) -> PeripheralPayload:
+    message_class = _get_message_class(INPUT_EVENT_TYPE)
     normalized = _normalize_payload(payload.data)
     data_json = json.dumps(
         normalized,
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
-    event = input_events_pb2.InputEvent(
+    event = message_class(
         event_type=payload.event_type,
         timestamp=payload.timestamp.isoformat(),
         data_json=data_json,
