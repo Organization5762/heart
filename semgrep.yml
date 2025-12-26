@@ -142,10 +142,13 @@ rules:
     message: Specify an explicit encoding when reading or writing text files.
     severity: ERROR
     patterns:
-      - pattern: open($FILE, $MODE, ...)
+      - pattern-either:
+          - pattern: open($FILE)
+          - pattern: open($FILE, $MODE, ...)
       - metavariable-regex:
           metavariable: $MODE
           regex: ^["']?[rwa]([t+])?["']?$
+      - pattern-not: open($FILE, encoding=$ENCODING, ...)
       - pattern-not: open($FILE, $MODE, ..., encoding=$ENCODING, ...)
     paths:
       include:
