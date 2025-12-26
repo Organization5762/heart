@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from lagom import Container, Singleton
 
@@ -23,6 +23,9 @@ from heart.utilities.logging import get_logger
 RuntimeContainer = Container
 
 logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from heart.runtime.game_loop import GameLoop
 
 
 def _build_peripheral_configuration_loader(
@@ -81,6 +84,16 @@ def _build_game_loop_components(
         event_handler=resolver[PygameEventHandler],
         peripheral_manager=resolver[PeripheralManager],
         peripheral_runtime=resolver[PeripheralRuntime],
+    )
+
+
+def _build_game_loop(resolver: RuntimeContainer) -> GameLoop:
+    from heart.runtime.game_loop import GameLoop
+
+    return GameLoop(
+        device=resolver[Device],
+        resolver=resolver,
+        render_variant=resolver[RendererVariant],
     )
 
 
@@ -234,11 +247,5 @@ def _configure_game_loop_bindings(
         container,
         overrides,
         GameLoop,
-        Singleton(
-            lambda resolver: GameLoop(
-                device=resolver[Device],
-                resolver=resolver,
-                render_variant=resolver[RendererVariant],
-            )
-        ),
+        Singleton(_build_game_loop),
     )
