@@ -55,7 +55,7 @@ class Shader:
 
         program = self.compile_program(vert_shader, frag_shader)
         for k in _UNIFORMS:
-            self.keys[k] = glGetUniformLocation(program, "_" + k)
+            self.keys[k] = glGetUniformLocation(program, f"_{k}")
 
         # Return the program
         return program

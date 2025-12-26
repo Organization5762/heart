@@ -28,7 +28,7 @@ def _form_payload(name: str, data) -> str:
             "value": data,
         },
     }
-    return "\n" + json.dumps(payload) + "\n"
+    return f"\n{json.dumps(payload)}\n"
 
 
 def form_tuple_payload(name: str, data: tuple) -> str:

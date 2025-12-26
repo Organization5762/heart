@@ -26,7 +26,7 @@ def extract_mermaid_blocks(markdown: str) -> Iterable[str]:
         if line.strip().startswith("```"):
             in_block = False
             if block_lines:
-                yield "\n".join(block_lines).strip() + "\n"
+                yield f"{'\n'.join(block_lines).strip()}\n"
             block_lines = []
         else:
             block_lines.append(line)

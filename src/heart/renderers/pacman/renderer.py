@@ -46,11 +46,17 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
         ghost_red = "redghost.png"
 
         if state.reverse:
-            self.ghost1 = pygame.transform.flip(load("scaredghost1.png" if state.blood else ghost_prefix + ".png"), True, False)
+            self.ghost1 = pygame.transform.flip(
+                load("scaredghost1.png" if state.blood else f"{ghost_prefix}.png"),
+                True,
+                False,
+            )
             self.ghost2 = pygame.transform.flip(load(ghost_blue if not state.blood else "scaredghost2.png"), True, False)
             self.ghost3 = pygame.transform.flip(load("scaredghost1.png" if state.blood else ghost_red), True, False)
         else:
-            self.ghost1 = load("scaredghost1.png" if state.blood else ghost_prefix + ".png")
+            self.ghost1 = load(
+                "scaredghost1.png" if state.blood else f"{ghost_prefix}.png"
+            )
             self.ghost2 = load("scaredghost2.png" if state.blood else ghost_blue)
             self.ghost3 = load("scaredghost1.png" if state.blood else ghost_red)
 
