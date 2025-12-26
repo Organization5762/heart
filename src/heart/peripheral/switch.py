@@ -29,6 +29,7 @@ SERIAL_RECONNECT_DELAY_SECONDS = 0.1
 BLUETOOTH_EVENT_POLL_DELAY_SECONDS = 0.1
 BLUETOOTH_RETRY_DELAY_SECONDS = 5
 BLUETOOTH_SLOW_RETRY_DELAY_SECONDS = 30
+BLUETOOTH_MAX_RETRY_ATTEMPTS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,7 +314,7 @@ class BluetoothSwitch(BaseSwitch):
             except Exception:
                 self.connected = False
                 number_of_retries_without_success += 1
-                if number_of_retries_without_success > 5:
+                if number_of_retries_without_success > BLUETOOTH_MAX_RETRY_ATTEMPTS:
                     slow_poll = True
 
             time.sleep(
