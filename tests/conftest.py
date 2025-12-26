@@ -6,11 +6,10 @@ from typing import Callable
 import pygame
 import pytest
 from hypothesis import HealthCheck, settings
-from lagom import Container
 
 from heart.device import Cube, Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.container import build_runtime_container
+from heart.runtime.container import RuntimeContainer, build_runtime_container
 from heart.runtime.game_loop import GameLoop
 from heart.runtime.render_pipeline import RendererVariant
 
@@ -150,7 +149,7 @@ def manager() -> PeripheralManager:
     return PeripheralManager()
 
 @pytest.fixture()
-def resolver(device: Device) -> Container:
+def resolver(device: Device) -> RuntimeContainer:
     return build_runtime_container(
         device=device,
         render_variant=RendererVariant.ITERATIVE,
