@@ -623,6 +623,37 @@ def get_mandelbrot_converge_time(
 
 
 @jit(nopython=True, parallel=True, fastmath=True, cache=True)
+def get_mandelbrot_converge_time_into(
+    re, im, critical_real, critical_imag, max_iter, use_interior_check, result
+):
+    height, width = re.shape
+
+    for i in prange(height):
+        for j in range(width):
+            c_real = re[i, j]
+            c_imag = im[i, j]
+            z_real = critical_real
+            z_imag = critical_imag
+            if use_interior_check and _is_in_mandelbrot_interior(c_real, c_imag):
+                result[i, j] = 0
+                continue
+            for k in range(max_iter):
+                z_real2 = z_real * z_real
+                z_imag2 = z_imag * z_imag
+
+                if z_real2 + z_imag2 > 4.0:
+                    result[i, j] = k
+                    break
+
+                z_imag = 2.0 * z_real * z_imag + c_imag
+                z_real = z_real2 - z_imag2 + c_real
+            else:
+                result[i, j] = 0
+
+    return result
+
+
+@jit(nopython=True, parallel=True, fastmath=True, cache=True)
 def get_julia_converge_time(re, im, c_real, c_imag, max_iter):
     height, width = re.shape
     result = np.zeros((height, width), dtype=np.int32)

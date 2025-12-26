@@ -11,7 +11,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.mandelbrot.scene import get_mandelbrot_converge_time
+from heart.renderers.mandelbrot.scene import get_mandelbrot_converge_time_into
 from heart.utilities.env import Configuration
 from heart.utilities.env.enums import MandelbrotInteriorStrategy
 from heart.utilities.logging import get_logger
@@ -44,6 +44,7 @@ class CubeMandelbrotState:
     face_height: int
     face_count: int
     color_buffer: np.ndarray
+    iteration_buffer: np.ndarray
     surface_view: np.ndarray
 
 
@@ -137,6 +138,9 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
         color_buffer = np.zeros(
             (face_height, face_width * face_count, 3), dtype=np.uint8
         )
+        iteration_buffer = np.zeros(
+            (face_height, face_width * face_count), dtype=np.int32
+        )
         surface_view = np.swapaxes(color_buffer, 0, 1)
 
         return CubeMandelbrotState(
@@ -152,6 +156,7 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
             face_height=face_height,
             face_count=face_count,
             color_buffer=color_buffer,
+            iteration_buffer=iteration_buffer,
             surface_view=surface_view,
         )
 
@@ -171,15 +176,26 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
         np.multiply(self.state.azimuths, REAL_SCALE, out=self.state.real_coords)
         np.add(self.state.real_coords, REAL_CENTER, out=self.state.real_coords)
 
-        iterations = get_mandelbrot_converge_time(
+        get_mandelbrot_converge_time_into(
             self.state.real_coords,
             self.state.imag_coords,
             0.0,
             0.0,
             self.state.max_iterations,
             self.use_mandelbrot_interior,
+            self.state.iteration_buffer,
         )
 
-        np.clip(iterations, 0, self.state.palette.shape[0] - 1, out=iterations)
-        np.take(self.state.palette, iterations, axis=0, out=self.state.color_buffer)
+        np.clip(
+            self.state.iteration_buffer,
+            0,
+            self.state.palette.shape[0] - 1,
+            out=self.state.iteration_buffer,
+        )
+        np.take(
+            self.state.palette,
+            self.state.iteration_buffer,
+            axis=0,
+            out=self.state.color_buffer,
+        )
         pygame.surfarray.blit_array(window, self.state.surface_view)
