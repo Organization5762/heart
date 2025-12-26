@@ -141,7 +141,7 @@ The loop registers the renderer in
 
 ## 3D glasses renderer
 
-**Module:** `src/heart/renderers/three_d_glasses.py`
+**Module:** `src/heart/renderers/three_d_glasses/renderer.py`
 
 `ThreeDGlassesRenderer` remaps static imagery into a red/cyan anaglyph so the
 left and right lenses see offset channel data. Frames advance on a configurable
