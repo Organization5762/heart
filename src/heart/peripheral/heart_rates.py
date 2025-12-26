@@ -21,11 +21,47 @@ RETRY_DELAY = 5
 DEVICE_TIMEOUT = 30  # seconds of silence ⇒ forget the strap
 CLEANUP_INTERVAL = 5  # how often the janitor thread wakes up
 
+BATTERY_PERCENT_SCALE = 100 / 256
+
+
+class HeartRateStore:
+    """Shared state store for detected heart rate monitors."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.current_bpms: Dict[str, int] = {}
+        self.battery_status: Dict[str, int] = {}
+        self.last_seen: Dict[str, float] = {}
+
+    def update_from_data(self, device_id: str, data: HeartRateData) -> None:
+        with self._lock:
+            self.current_bpms[device_id] = data.heart_rate
+            self.last_seen[device_id] = time.monotonic()
+            if hasattr(data, "battery_percentage"):
+                self.battery_status[device_id] = (
+                    data.battery_percentage * BATTERY_PERCENT_SCALE
+                )
+
+    def prune_stale(self, now: float) -> List[str]:
+        stale: List[str] = []
+        with self._lock:
+            for dev_id, ts in list(self.last_seen.items()):
+                if now - ts > DEVICE_TIMEOUT:
+                    stale.append(dev_id)
+
+            for dev_id in stale:
+                self.current_bpms.pop(dev_id, None)
+                self.battery_status.pop(dev_id, None)
+                self.last_seen.pop(dev_id, None)
+        return stale
+
+
+_STATE = HeartRateStore()
+
 # ──────────────────────────────────────────────────────────────────────────────
-current_bpms: Dict[str, int] = {}
-battery_status: Dict[str, int] = {}
-last_seen: Dict[str, float] = {}  # NEW: last packet time-stamp
-_mutex = threading.Lock()  # protects the three dicts above
+current_bpms = _STATE.current_bpms
+battery_status = _STATE.battery_status
+last_seen = _STATE.last_seen
 # ──────────────────────────────────────────────────────────────────────────────
 
 logger = get_logger(__name__)
@@ -76,6 +112,7 @@ class HeartRateManager(Peripheral[Any]):
         self._node: Optional[Node] = None
         self._scanner: Optional[Scanner] = None
         self._devices: List[HeartRate] = []
+        self._store = _STATE
 
         # Background janitor that forgets silent devices
         self._stop_evt = threading.Event()
@@ -108,11 +145,7 @@ class HeartRateManager(Peripheral[Any]):
         def _inner(_pg: object, _name: object, data: object) -> None:
             if isinstance(data, HeartRateData):
                 device_id = f"{hrm.device_id:05X}"
-                with _mutex:
-                    current_bpms[device_id] = data.heart_rate
-                    last_seen[device_id] = time.monotonic()
-                    if hasattr(data, "battery_percentage"):
-                        battery_status[device_id] = data.battery_percentage * 100 / 256
+                self._store.update_from_data(device_id, data)
 
                 logger.debug("HR %s BPM (device %s)", data.heart_rate, device_id)
 
@@ -123,20 +156,11 @@ class HeartRateManager(Peripheral[Any]):
     def _cleanup_loop(self) -> None:
         """Drop straps that have been quiet for DEVICE_TIMEOUT seconds."""
         while not self._stop_evt.wait(CLEANUP_INTERVAL):
-            now = time.monotonic()
-            stale: List[str] = []
-            with _mutex:
-                for dev_id, ts in list(last_seen.items()):
-                    if now - ts > DEVICE_TIMEOUT:
-                        stale.append(dev_id)
-
-                for dev_id in stale:
-                    current_bpms.pop(dev_id, None)
-                    battery_status.pop(dev_id, None)
-                    last_seen.pop(dev_id, None)
-                    logger.info(
-                        "Pruned silent HR strap %s (>%ds idle)", dev_id, DEVICE_TIMEOUT
-                    )
+            stale = self._store.prune_stale(time.monotonic())
+            for dev_id in stale:
+                logger.info(
+                    "Pruned silent HR strap %s (>%ds idle)", dev_id, DEVICE_TIMEOUT
+                )
 
     # ---------- ANT+ life-cycle ---------------------------------------------
 
