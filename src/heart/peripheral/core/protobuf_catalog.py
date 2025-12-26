@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from heart.peripheral.core.protobuf_registry import protobuf_registry
+if TYPE_CHECKING:
+    from heart.peripheral.core.protobuf_registry import ProtobufTypeRegistry
 
 BEATS_STREAMING_PACKAGE = "heart.beats.streaming"
 BEATS_STREAMING_MODULE = "heart.device.beats.proto.beats_streaming_pb2"
@@ -31,9 +33,6 @@ PROTOBUF_CATALOG: tuple[ProtobufCatalogEntry, ...] = (
 )
 
 
-def register_protobuf_catalog() -> None:
+def register_protobuf_catalog(registry: ProtobufTypeRegistry) -> None:
     for entry in PROTOBUF_CATALOG:
-        protobuf_registry.register_type_prefix(entry.package_prefix, entry.module_path)
-
-
-register_protobuf_catalog()
+        registry.register_type_prefix(entry.package_prefix, entry.module_path)
