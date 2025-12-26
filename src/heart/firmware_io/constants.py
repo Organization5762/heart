@@ -7,3 +7,5 @@ GYROSCOPE = "sensor.gyroscope"
 MAGNETIC = "sensor.magnetic"
 DEVICE_IDENTIFY = "device.identify"
 RADIO_PACKET = "peripheral.radio.packet"
+
+ACCEL_MIN_CHANGE_DEFAULT = 0.1
