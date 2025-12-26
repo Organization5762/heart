@@ -195,7 +195,7 @@ def main() -> None:
                 sensors = connect_to_sensors(i2c=i2c)
 
             for sensor_data_payload in sr.read():
-                print(sensor_data_payload)
+                print(sensor_data_payload, end="")
 
             # This also has a `temperature` field but I'm not sure if that's chip temperature or ambient
             time.sleep(wait_between_payloads_seconds)
