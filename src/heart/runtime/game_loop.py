@@ -229,12 +229,12 @@ class GameLoop:
             raise RuntimeError("GameLoop failed to initialize display clock")
         clock = self.display.clock
         while self.running:
-            frame_start = time.monotonic()
             self.peripheral_runtime.tick()
             self.running = self.event_handler.handle_events()
             self._preprocess_setup()
             renderers = self._select_renderers()
+            render_start = time.monotonic()
             plan = self._one_loop(renderers)
             estimated_cost_ms = plan.estimated_cost_ms if plan.has_samples else None
-            self._render_pacer.pace(frame_start, estimated_cost_ms)
+            self._render_pacer.pace(render_start, estimated_cost_ms)
             clock.tick(self.max_fps)
