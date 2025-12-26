@@ -61,7 +61,7 @@ def default_render_merge_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
 def default_reactivex_stream_coalesce_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Disable stream coalescing by default so reactive tests remain deterministic."""
+    """Disable stream coalescing for deterministic reactive tests; mutates env vars per test."""
 
     monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "0")
     yield
