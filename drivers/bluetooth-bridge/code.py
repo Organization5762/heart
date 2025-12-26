@@ -15,6 +15,7 @@ the real hardware modules.
 from __future__ import annotations
 
 import json
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable, Deque, Iterable, Protocol
@@ -141,8 +142,6 @@ def create_runtime(
     led = led or _ensure_output_led()
 
     if sleeper is None:
-        import time
-
         sleeper = time
 
     return BluetoothBridgeRuntime(
