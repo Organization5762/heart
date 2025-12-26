@@ -39,6 +39,8 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Feature modules should register singleton bindings with provider helpers (for example,
   `register_singleton_provider`) instead of reaching for Lagom bindings directly, so container usage remains
   encapsulated.
+- When tracking runtime containers for provider registration updates, use weak references (for example,
+  `weakref.WeakSet`) so stale containers do not stay alive after shutdown.
 
 ## Error Handling
 
