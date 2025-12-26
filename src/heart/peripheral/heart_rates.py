@@ -28,7 +28,7 @@ last_seen: Dict[str, float] = {}  # NEW: last packet time-stamp
 _mutex = threading.Lock()  # protects the three dicts above
 # ──────────────────────────────────────────────────────────────────────────────
 
-logger = get_logger("HeartRateManager")
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # OpenANT sometimes has race conditions where it receives broadcast data
