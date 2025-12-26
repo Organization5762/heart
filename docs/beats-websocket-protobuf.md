@@ -35,6 +35,8 @@ The Beats UI uses `protobufjs` to parse `StreamEnvelope` frames and emits a type
 
 `heart.device.beats.websocket.decode_stream_envelope` provides the Python mirror for decoding envelopes. It returns a `(kind, payload)` tuple for `frame` and `peripheral` payloads, and uses `decode_peripheral_payload` from `heart.peripheral.core.encoding` to decode JSON or protobuf payload bytes. Protobuf decoding resolves the `payload_type` with `google.protobuf.symbol_database.Default()`. The `heart.peripheral.core.protobuf_registry` helper can import modules registered to a package prefix when a symbol is missing, and `heart.peripheral.core.protobuf_catalog` registers the Beats and peripheral packages so decoding can succeed without manual imports.
 
+When the payload type is `heart.peripheral.input.InputEvent`, `decode_peripheral_payload` returns a `heart.peripheral.core.Input` instance with the decoded event data and timestamp. This keeps Python-side handlers aligned with the same input model used by the peripheral manager.
+
 ## Schema catalog and generation
 
 `heart.peripheral.core.protobuf_catalog` centralizes protobuf package registration. Add new schema packages there so the registry can resolve types without bespoke imports. Use `scripts/generate_protobuf.py` to regenerate `*_pb2.py` modules after editing `.proto` files. For example:
