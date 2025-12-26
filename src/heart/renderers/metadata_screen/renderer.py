@@ -18,7 +18,7 @@ from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    MetadataScreenState)
 from heart.utilities.logging import get_logger
 
-logger = get_logger("HeartRateManager")
+logger = get_logger(__name__)
 
 
 class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
@@ -47,7 +47,7 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
                     Path("avatars") / f"{name}_16.png"
                 )
             except Exception:
-                logger.warning(f"Could not load avatar for {name}")
+                logger.warning("Could not load avatar for %s", name)
 
         self.provider = provider or MetadataScreenStateProvider(colors=self.colors)
         super().__init__(builder=self.provider)
