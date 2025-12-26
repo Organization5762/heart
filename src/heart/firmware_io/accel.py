@@ -6,6 +6,9 @@ from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
 
 from heart.firmware_io import constants
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _form_payload(name: str, data) -> str:
@@ -112,9 +115,12 @@ class SensorReader:
         sensors = []
         for sensor_fn in sensor_fn:
             try:
+                logger.info("Initializing firmware sensor: %s", sensor_fn.__name__)
                 sensors.append(sensor_fn(i2c))
             except Exception:
-                pass
+                logger.exception(
+                    "Failed to initialize firmware sensor: %s", sensor_fn.__name__
+                )
         return sensors
 
     def get_sample_rate(self, sensor) -> float:
