@@ -58,7 +58,8 @@ def _resolve_search_paths(search_paths: Sequence[Path] | None) -> list[Path]:
 def _parse_env_paths(raw_paths: str) -> list[Path]:
     if not raw_paths:
         return []
-    return [Path(entry) for entry in raw_paths.split(os.pathsep) if entry]
+    entries = (entry.strip() for entry in raw_paths.split(os.pathsep))
+    return [Path(entry) for entry in entries if entry]
 
 
 def _load_spec(module_name: str, spec: importlib.machinery.ModuleSpec) -> ModuleType:
