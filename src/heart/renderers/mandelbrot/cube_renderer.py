@@ -25,18 +25,26 @@ REAL_CENTER = -0.5
 REAL_HALF_RANGE = 1.75
 IMAG_HALF_RANGE = 1.5
 ROTATION_SPEED = 0.15
+TWO_PI = math.tau
+REAL_SCALE = REAL_HALF_RANGE / math.pi
+IMAG_SCALE = IMAG_HALF_RANGE / (math.pi / 2.0)
 
 
 @dataclass(frozen=True)
 class CubeMandelbrotState:
     base_azimuths: np.ndarray
     elevations: np.ndarray
+    azimuths: np.ndarray
+    real_coords: np.ndarray
+    imag_coords: np.ndarray
     palette: np.ndarray
     max_iterations: int
     start_time: float
     face_width: int
     face_height: int
     face_count: int
+    color_buffer: np.ndarray
+    surface_view: np.ndarray
 
 
 def _generate_palette(num_colors: int, cycle_length: int) -> np.ndarray:
@@ -121,18 +129,30 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
             face_height=face_height,
             face_count=face_count,
         )
+        azimuths = np.zeros_like(base_azimuths)
+        real_coords = np.zeros_like(base_azimuths)
+        imag_coords = elevations * IMAG_SCALE
         palette = _generate_palette(PALETTE_SIZE, PALETTE_CYCLE_LENGTH)
         max_iterations = min(DEFAULT_MAX_ITERATIONS, palette.shape[0] - 1)
+        color_buffer = np.zeros(
+            (face_height, face_width * face_count, 3), dtype=np.uint8
+        )
+        surface_view = np.swapaxes(color_buffer, 0, 1)
 
         return CubeMandelbrotState(
             base_azimuths=base_azimuths,
             elevations=elevations,
+            azimuths=azimuths,
+            real_coords=real_coords,
+            imag_coords=imag_coords,
             palette=palette,
             max_iterations=max_iterations,
             start_time=time.monotonic(),
             face_width=face_width,
             face_height=face_height,
             face_count=face_count,
+            color_buffer=color_buffer,
+            surface_view=surface_view,
         )
 
     def real_process(
@@ -143,22 +163,23 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     ) -> None:
         elapsed = time.monotonic() - self.state.start_time
         rotation = elapsed * ROTATION_SPEED
-        azimuths = self.state.base_azimuths + rotation
-        azimuths = (azimuths + math.pi) % (2 * math.pi) - math.pi
+        np.add(self.state.base_azimuths, rotation, out=self.state.azimuths)
+        np.add(self.state.azimuths, math.pi, out=self.state.azimuths)
+        np.remainder(self.state.azimuths, TWO_PI, out=self.state.azimuths)
+        np.subtract(self.state.azimuths, math.pi, out=self.state.azimuths)
 
-        re = REAL_CENTER + (azimuths / math.pi) * REAL_HALF_RANGE
-        im = (self.state.elevations / (math.pi / 2)) * IMAG_HALF_RANGE
+        np.multiply(self.state.azimuths, REAL_SCALE, out=self.state.real_coords)
+        np.add(self.state.real_coords, REAL_CENTER, out=self.state.real_coords)
 
         iterations = get_mandelbrot_converge_time(
-            re,
-            im,
+            self.state.real_coords,
+            self.state.imag_coords,
             0.0,
             0.0,
             self.state.max_iterations,
             self.use_mandelbrot_interior,
         )
 
-        clipped = np.clip(iterations, 0, self.state.palette.shape[0] - 1)
-        color_surface = self.state.palette[clipped]
-        surface_array = np.transpose(color_surface, (1, 0, 2))
-        pygame.surfarray.blit_array(window, surface_array)
+        np.clip(iterations, 0, self.state.palette.shape[0] - 1, out=iterations)
+        np.take(self.state.palette, iterations, axis=0, out=self.state.color_buffer)
+        pygame.surfarray.blit_array(window, self.state.surface_view)
