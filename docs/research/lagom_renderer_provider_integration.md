@@ -14,6 +14,7 @@ DI concerns.
 - Source files: `src/heart/renderers/multicolor/`,
   `src/heart/renderers/cloth_sail/`,
   `src/heart/renderers/three_fractal/`,
+  `src/heart/renderers/mario/`,
   `src/heart/programs/configurations/lib_2025.py`,
   `src/heart/programs/configurations/l_system.py`,
   `src/heart/programs/configurations/porthole_window.py`,
@@ -21,13 +22,13 @@ DI concerns.
 
 ## Notes
 
-`MulticolorStateProvider`, `ClothSailStateProvider`, and `FractalSceneProvider` are now registered
-with the shared provider registry so Lagom can resolve them from the runtime container. The
-corresponding renderers now require injected providers, and configuration modules resolve those
-renderers through `GameLoop.context_container` instead of manually constructing providers. The
-Fractal scene provider now takes a `Device` dependency from the container, which keeps device
-wiring centralized in `build_runtime_container` and avoids leaking device plumbing into
-configuration modules.
+`MulticolorStateProvider`, `ClothSailStateProvider`, `FractalSceneProvider`, and
+`MarioRendererProvider` are now registered with the shared provider registry so Lagom can resolve
+them from the runtime container. The corresponding renderers now require injected providers, and
+configuration modules resolve those renderers through `GameLoop.context_container` instead of
+manually constructing providers. The Fractal scene provider now takes a `Device` dependency from
+the container, which keeps device wiring centralized in `build_runtime_container` and avoids
+leaking device plumbing into configuration modules.
 
 `LSystem` and `PortholeWindowRenderer` configurations now rely on
 `ComposedRenderer.resolve_renderer_from_container` so Lagom supplies the registered state

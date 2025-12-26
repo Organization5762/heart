@@ -1,11 +1,9 @@
 from typing import Callable
 
 import numpy as np
-from lagom import Singleton
 
 from heart.display.color import Color
 from heart.navigation import ComposedRenderer, MultiScene
-from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.renderers.artist import ArtistScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.renderers.heart_title_screen import HeartTitleScreen
@@ -15,7 +13,6 @@ from heart.renderers.kirby import KirbyScene
 from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
-from heart.renderers.mario.provider import MarioRendererProvider
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.random_pixel import RandomPixel
@@ -74,9 +71,6 @@ def configure(loop: GameLoop) -> None:
                 ),
             ]
         )
-    )
-    loop.context_container[MarioRendererProvider] = Singleton(
-        lambda builder: MarioRendererProvider(accel_stream=builder[AllAccelerometersProvider], sheet_file_path="mario_64.png", metadata_file_path="mario_64.json")
     )
     mario_mode.resolve_renderer_from_container(MarioRenderer)
 
