@@ -8,6 +8,7 @@ from heart.device import Device
 from heart.navigation import AppController
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
+from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.peripheral_runtime import PeripheralRuntime
@@ -23,7 +24,22 @@ def build_runtime_container(
     container = Container()
     _bind(container, overrides, Device, device)
     _bind(container, overrides, RendererVariant, render_variant)
-    _bind(container, overrides, PeripheralManager, Singleton(PeripheralManager))
+    _bind(
+        container,
+        overrides,
+        PeripheralConfigurationRegistry,
+        Singleton(PeripheralConfigurationRegistry),
+    )
+    _bind(
+        container,
+        overrides,
+        PeripheralManager,
+        Singleton(
+            lambda resolver: PeripheralManager(
+                configuration_registry=resolver[PeripheralConfigurationRegistry]
+            )
+        ),
+    )
     _bind(
         container,
         overrides,

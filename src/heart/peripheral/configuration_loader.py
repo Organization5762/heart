@@ -27,6 +27,10 @@ class PeripheralConfigurationLoader:
     def name(self) -> str:
         return self._configuration_name
 
+    @property
+    def registry(self) -> PeripheralConfigurationRegistry:
+        return self._registry
+
     def load(self) -> PeripheralConfiguration:
         if self._configuration is None:
             self._configuration = self._load_configuration(self._configuration_name)
