@@ -20,6 +20,9 @@ logger = get_logger(__name__)
 
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 DependencyT = TypeVar("DependencyT")
+DEFAULT_MAX_FPS = 500
+DEFAULT_RENDER_VARIANT = RendererVariant.ITERATIVE
+EDGE_THRESHOLD = 1
 
 
 class GameLoop:
@@ -27,26 +30,19 @@ class GameLoop:
         self,
         device: Device,
         resolver: RuntimeContainer | None = None,
-        max_fps: int = 500,
-        render_variant: RendererVariant = RendererVariant.ITERATIVE,
+        max_fps: int = DEFAULT_MAX_FPS,
+        render_variant: RendererVariant = DEFAULT_RENDER_VARIANT,
     ) -> None:
-        if resolver is None:
-            self.context_container = build_runtime_container(
-                device=device,
-                render_variant=render_variant,
-            )
-        else:
-            self.context_container = resolver
-            configure_runtime_container(
-                container=self.context_container,
-                device=device,
-                render_variant=render_variant,
-            )
+        self.context_container = self._prepare_container(
+            device=device,
+            resolver=resolver,
+            render_variant=render_variant,
+        )
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
         self.max_fps = max_fps
-        components = self.context_container.resolve(GameLoopComponents)
+        components = self._load_components()
         self.app_controller = components.app_controller
         self.display = components.display
         self.render_pipeline = components.render_pipeline
@@ -57,7 +53,7 @@ class GameLoop:
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
-        self.edge_thresh = 1
+        self.edge_thresh = EDGE_THRESHOLD
 
         self.display.configure_window()
 
@@ -138,6 +134,28 @@ class GameLoop:
         base_renderers = self.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
+
+    def _prepare_container(
+        self,
+        *,
+        device: Device,
+        resolver: RuntimeContainer | None,
+        render_variant: RendererVariant,
+    ) -> RuntimeContainer:
+        if resolver is None:
+            return build_runtime_container(
+                device=device,
+                render_variant=render_variant,
+            )
+        configure_runtime_container(
+            container=resolver,
+            device=device,
+            render_variant=render_variant,
+        )
+        return resolver
+
+    def _load_components(self) -> GameLoopComponents:
+        return self.context_container.resolve(GameLoopComponents)
 
     def _one_loop(
         self,
