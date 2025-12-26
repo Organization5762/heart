@@ -10,6 +10,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.frame_presenter import FramePresenter
+from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.pygame_event_handler import PygameEventHandler
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
@@ -65,6 +66,22 @@ def build_runtime_container(
         overrides,
         AppController,
         Singleton(lambda resolver: AppController(renderer_resolver=resolver)),
+    )
+    _bind(
+        container,
+        overrides,
+        GameLoopComponents,
+        Singleton(
+            lambda resolver: GameLoopComponents(
+                app_controller=resolver[AppController],
+                display=resolver[DisplayContext],
+                render_pipeline=resolver[RenderPipeline],
+                frame_presenter=resolver[FramePresenter],
+                event_handler=resolver[PygameEventHandler],
+                peripheral_manager=resolver[PeripheralManager],
+                peripheral_runtime=resolver[PeripheralRuntime],
+            )
+        ),
     )
     _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
     apply_provider_registrations(container)

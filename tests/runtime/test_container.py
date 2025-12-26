@@ -2,6 +2,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop import GameLoop
+from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
 
 
@@ -35,3 +36,29 @@ class TestRuntimeContainer:
         loop = GameLoop(device=device, resolver=container)
 
         assert loop.peripheral_manager is stub_manager
+
+    def test_container_resolves_game_loop_components(self, device) -> None:
+        """Confirm GameLoopComponents resolve from the container so runtime services stay centrally wired."""
+        stub_manager = PeripheralManager()
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.BINARY,
+            overrides={PeripheralManager: stub_manager},
+        )
+
+        components = container.resolve(GameLoopComponents)
+
+        assert components.peripheral_manager is stub_manager
+        assert components.render_pipeline.renderer_variant is RendererVariant.BINARY
+
+    def test_game_loop_prefers_container_device(self, device) -> None:
+        """Verify the GameLoop uses the container-provided Device so overrides remain consistent across services."""
+        alternate_device = type(device)(orientation=device.orientation)
+        container = build_runtime_container(
+            device=alternate_device,
+            render_variant=RendererVariant.BINARY,
+        )
+
+        loop = GameLoop(device=device, resolver=container)
+
+        assert loop.device is alternate_device
