@@ -9,6 +9,7 @@ The current codebase uses Lagom only in a few isolated places, leaving many runt
 - Python 3.11 runtime with `uv` for dependency management.
 - Existing Lagom dependency (`lagom` in `pyproject.toml`).
 - Access to the Heart runtime modules (e.g., `src/heart/runtime/`, `src/heart/navigation/`, `src/heart/peripheral/`).
+- Access to the Lagom container entry points (`src/heart/runtime/container.py`, `src/heart/peripheral/core/providers/`).
 - A development environment that can run `make format` and `make test`.
 - Optional hardware peripherals for validating `PeripheralManager` integration and event streams.
 
@@ -25,6 +26,7 @@ This plan proposes consolidating runtime dependency wiring into a single Lagom c
 | Renderers can be resolved through container with explicit scopes | `ComposedRenderer.resolve_renderer` uses shared container API and tests cover container binding | Rendering owner |
 | Container configuration is centralized | New module (e.g., `src/heart/runtime/container.py`) defines container construction and registration | Runtime owner |
 | Tests can swap implementations via container overrides | Unit tests use Lagom `Container` overrides without changing runtime modules | Test owner |
+| Lagom imports stay centralized | Lagom types are only imported in `src/heart/runtime/container.py` and `src/heart/peripheral/core/providers/` | Runtime owner |
 
 ## Task Breakdown Checklists
 
@@ -37,12 +39,13 @@ This plan proposes consolidating runtime dependency wiring into a single Lagom c
 
 ### Implementation
 
-- [ ] Create a dedicated container builder module (e.g., `src/heart/runtime/container.py`) that exposes `build_runtime_container(device: Device, render_variant: RendererVariant) -> Container`.
-- [ ] Register `PeripheralManager`, `DisplayContext`, `RenderPipeline`, `FramePresenter`, `PeripheralRuntime`, `PygameEventHandler`, and `AppController` in the container builder, using `Singleton` or provider callables as appropriate.
+- [ ] Create a dedicated container builder module (e.g., `src/heart/runtime/container.py`) that exposes `build_runtime_container(device: Device, render_variant: RendererVariant) -> RuntimeContainer`.
+- [ ] Register `PeripheralManager`, `DisplayContext`, `RenderPipeline`, `FramePresenter`, `PeripheralRuntime`, `PygameEventHandler`, and `AppController` in the container builder, using named provider callables and `register_singleton_provider` helpers.
 - [ ] Refactor `build_game_loop_components` to resolve all components from the container rather than constructing them inline.
 - [ ] Update `GameLoop` to accept a container created by the builder module and remove ad-hoc instantiation.
 - [ ] Align `ComposedRenderer.resolve_renderer` with the shared container instance so renderers can share registered services.
-- [ ] Move the global container from `src/heart/peripheral/core/providers/__init__.py` into the container builder module or a dedicated peripheral container module to avoid multiple container instances.
+- [ ] Update the provider registry to register against the runtime container instead of holding a module-level `Container()` instance.
+- [ ] Replace feature-module imports of Lagom types with references to `RuntimeContainer` so wiring remains centralized.
 - [ ] Update standalone renderer scripts (for example, `src/heart/renderers/mandelbrot/scene.py`) to resolve `PeripheralManager` through the runtime container instead of direct instantiation.
 - [ ] Ensure configuration and overrides for tests are documented and demonstrate the pattern in a new test module.
 
@@ -82,6 +85,7 @@ flowchart TD
 | Risk | Probability | Impact | Mitigation | Early Warning Signal |
 | --- | --- | --- | --- | --- |
 | Multiple containers remain in use leading to split lifecycles | Medium | High | Remove the global container in `peripheral/core/providers/__init__.py` and centralize container ownership | Instances of `Container()` outside the builder module remain |
+| Lagom imports leak into feature modules | Medium | Medium | Enforce `RuntimeContainer` usage and register providers through `heart.peripheral.core.providers` helpers | New Lagom imports appear outside the container and provider modules |
 | Components require runtime state not easily provided by Lagom | Medium | Medium | Use provider functions with explicit arguments and register `Device` as a singleton value | New constructors added in `game_loop_components` to pass state manually |
 | Renderer resolution breaks due to missing registrations | Low | Medium | Add container registration tests for renderer factories and document registration patterns | Runtime error resolving renderer types in `ComposedRenderer.resolve_renderer` |
 | Tests become brittle due to container state leakage | Medium | Medium | Provide factory helpers to create isolated containers for tests | Tests depend on global container state |
