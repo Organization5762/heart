@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from heart.assets.loader import spritesheet as SpritesheetAsset
+from heart.assets.spritesheet import Spritesheet
 from heart.peripheral.switch import SwitchState
 
 
@@ -14,7 +14,7 @@ class LoopPhase(StrEnum):
 @dataclass
 class SpritesheetLoopRandomState:
     switch_state: SwitchState | None
-    spritesheet: SpritesheetAsset | None = None
+    spritesheet: Spritesheet | None = None
     current_frame: int = 0
     loop_count: int = 0
     phase: LoopPhase = LoopPhase.LOOP
