@@ -39,6 +39,9 @@ by default.
 | `heart-no-os-path-join` | Prefer `pathlib.Path` over `os.path.join`. | `src/**/*.py` |
 | `heart-no-baseexception-catch` | Avoid catching `BaseException`. | `src/**/*.py` |
 | `heart-no-bare-exception-raise` | Require specific exception types instead of `Exception`. | `src/**/*.py` |
+| `heart-no-logging-getlogger` | Use the shared logger helper instead of `logging.getLogger`. | `src/**/*.py` |
+| `heart-require-open-encoding-default` | Require `encoding=` for default-mode text file opens. | `src/**/*.py` |
+| `heart-require-open-encoding-text-mode` | Require `encoding=` for text-mode file opens. | `src/**/*.py` |
 
 ## Updating the rules
 
