@@ -14,7 +14,6 @@ from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pacing import RenderLoopPacer
 from heart.runtime.render_pipeline import RendererVariant
 from heart.runtime.render_planner import RenderPlan
-from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -54,11 +53,7 @@ class GameLoop:
         self.event_handler = components.event_handler
         self.peripheral_manager = components.peripheral_manager
         self.peripheral_runtime = components.peripheral_runtime
-        self._render_pacer = RenderLoopPacer(
-            strategy=Configuration.render_loop_pacing_strategy(),
-            min_interval_ms=Configuration.render_loop_pacing_min_interval_ms(),
-            utilization_target=Configuration.render_loop_pacing_utilization(),
-        )
+        self._render_pacer = self.context_container.resolve(RenderLoopPacer)
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None

@@ -7,6 +7,7 @@ from heart.runtime.frame_exporter import FrameExporter
 from heart.runtime.frame_presenter import FramePresenter
 from heart.runtime.game_loop import GameLoop
 from heart.runtime.game_loop_components import GameLoopComponents
+from heart.runtime.render_pacing import RenderLoopPacer
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
 
 
@@ -28,6 +29,7 @@ class TestRuntimeContainer:
         assert container.resolve(DisplayContext) is container.resolve(DisplayContext)
         assert render_pipeline is container.resolve(RenderPipeline)
         assert render_pipeline.renderer_variant is RendererVariant.BINARY
+        assert container.resolve(RenderLoopPacer) is container.resolve(RenderLoopPacer)
 
     def test_container_injects_configuration_registry(self, device) -> None:
         """Confirm the container shares a registry instance so configuration overrides stay consistent at runtime."""
