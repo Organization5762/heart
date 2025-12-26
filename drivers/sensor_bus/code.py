@@ -29,6 +29,12 @@ def _debug(message: str) -> None:
     if DEBUG:
         print(message)
 
+
+def _write_serial_bus(message: str) -> None:
+    """Emit the event payload over the serial bus."""
+
+    print(message, end="")
+
 IDENTITY = identity.Identity(
     device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
@@ -195,7 +201,7 @@ def main() -> None:
                 sensors = connect_to_sensors(i2c=i2c)
 
             for sensor_data_payload in sr.read():
-                print(sensor_data_payload, end="")
+                _write_serial_bus(sensor_data_payload)
 
             # This also has a `temperature` field but I'm not sure if that's chip temperature or ambient
             time.sleep(wait_between_payloads_seconds)
