@@ -17,12 +17,18 @@ from heart.utilities.logging import get_logger
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
 PHYPOX_POLL_INTERVAL_SECONDS = 0.05
 PHYPOX_LOG_POLL_INTERVAL_SECONDS = 0.1
+DEFAULT_BASE_COLOR = Color(255, 0, 0)
 logger = get_logger(__name__)
 
 
 class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
-    def __init__(self, color: Color = Color(255, 0, 0), provider: YoListenStateProvider | None = None) -> None:
-        self.base_color = color
+    def __init__(
+        self,
+        color: Color | None = None,
+        provider: YoListenStateProvider | None = None,
+    ) -> None:
+        resolved_color = color or DEFAULT_BASE_COLOR
+        self.base_color = resolved_color
         self.words = ["YO", "LISTEN", "Y'HEAR", "THAT"]
         self.screen_count = 4
         self.flicker_intensity = 0.4
@@ -65,7 +71,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         self.test_mode = False
         self.phyphox_db = 50.0
         self.provider = provider or YoListenStateProvider(
-            color,
+            resolved_color,
             base_scroll_speed=self._base_scroll_speed,
             flicker_speed=self.flicker_speed,
             flicker_intensity=self.flicker_intensity,
