@@ -13,7 +13,7 @@ from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 
-from .composed_renderer import ComposedRenderer
+from .composed_renderer import ComposedRenderer, RendererResolver
 from .game_modes import GameModes
 from .multi_scene import MultiScene
 
@@ -24,11 +24,12 @@ class AppControllerState:
 
 
 class AppController(StatefulBaseRenderer[AppControllerState]):
-    def __init__(self) -> None:
+    def __init__(self, renderer_resolver: RendererResolver | None = None) -> None:
         super().__init__()
         self.modes = GameModes()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.warmup = True
+        self._renderer_resolver = renderer_resolver
 
     def _create_initial_state(
         self,
@@ -74,7 +75,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         title: str | list[StatefulBaseRenderer] | StatefulBaseRenderer | None = None,
     ) -> ComposedRenderer:
         # TODO: Add a navigation page back in
-        result = ComposedRenderer([])
+        result = ComposedRenderer([], renderer_resolver=self._renderer_resolver)
         if title is None:
             title = "Untitled"
 
@@ -106,5 +107,5 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         if isinstance(title, StatefulBaseRenderer):
             return title
         if isinstance(title, list):
-            return ComposedRenderer(title)
+            return ComposedRenderer(title, renderer_resolver=self._renderer_resolver)
         raise ValueError(f"Title must be a string or StatefulBaseRenderer, got: {title}")
