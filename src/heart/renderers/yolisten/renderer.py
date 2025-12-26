@@ -54,7 +54,11 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         self.phyphox_accel_z = 0.0
         self.use_phyphox = False
         if self.use_phyphox:
-            threading.Thread(target=self._poll_phyphox_background, daemon=True).start()
+            threading.Thread(
+                target=self._poll_phyphox_background,
+                daemon=True,
+                name="YoListen phyphox poller",
+            ).start()
         self.sim_accel_x = 0.0
         self.sim_accel_y = 0.0
         self.sim_accel_step = 0.1
