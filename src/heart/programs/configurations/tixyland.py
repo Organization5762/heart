@@ -14,7 +14,7 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 def configure(loop: GameLoop) -> None:
-    tixyland_factory = loop.context_container.resolve(TixylandFactory)
+    tixyland_factory = loop.resolve(TixylandFactory)
 
     def build_tixyland(
         fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
