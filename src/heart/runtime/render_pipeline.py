@@ -12,6 +12,7 @@ from heart.runtime.render_plan_cache import RenderPlanCache
 from heart.runtime.render_planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.runtime.rendering.renderer_processor import RendererProcessor
+from heart.runtime.rendering.surface_collection import RenderSurfaceCollector
 from heart.runtime.rendering.surface_merge import SurfaceCompositionManager
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration
@@ -39,6 +40,9 @@ class RenderPipeline:
         self._planner = RenderPlanner(self._timing_tracker, render_variant)
         self._composition_manager = SurfaceCompositionManager(
             strategy_provider=self._planner.get_merge_strategy
+        )
+        self._surface_collector = RenderSurfaceCollector(
+            self._process_renderer_delegate, self._get_render_executor
         )
 
         binary_method = cast(RenderMethod, self._render_surfaces_binary)
@@ -76,6 +80,11 @@ class RenderPipeline:
     ) -> pygame.Surface | None:
         return self._renderer_processor.process_renderer(renderer)
 
+    def _process_renderer_delegate(
+        self, renderer: "StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface | None:
+        return self.process_renderer(renderer)
+
     def estimate_render_cost_ms(
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> float | None:
@@ -103,38 +112,12 @@ class RenderPipeline:
     ) -> pygame.Surface:
         return self._composition_manager.merge_in_place(surface1, surface2)
 
-    def _collect_surfaces_serial(
-        self,
-        renderers: list["StatefulBaseRenderer[Any]"],
-    ) -> list[pygame.Surface]:
-        if not renderers:
-            return []
-        surfaces: list[pygame.Surface] = []
-        for renderer in renderers:
-            surface = self.process_renderer(renderer)
-            if surface is not None:
-                surfaces.append(surface)
-        return surfaces
-
-    def _collect_surfaces_parallel(
-        self,
-        renderers: list["StatefulBaseRenderer[Any]"],
-    ) -> list[pygame.Surface]:
-        if not renderers:
-            return []
-        executor = self._get_render_executor()
-        return [
-            surface
-            for surface in executor.map(self.process_renderer, renderers)
-            if surface is not None
-        ]
-
     def _render_surface_iterative(
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> pygame.Surface | None:
         self._renderer_processor.set_queue_depth(len(renderers))
         self._get_active_plan(renderers)
-        surfaces = self._collect_surfaces_serial(renderers)
+        surfaces = self._surface_collector.collect(renderers, parallel=False)
         return self._composition_manager.compose_serial(
             surfaces, merge_fn=self.merge_surfaces
         )
@@ -146,7 +129,7 @@ class RenderPipeline:
         self._get_active_plan(renderers)
         if len(renderers) == 1:
             return self.process_renderer(renderers[0])
-        surfaces = self._collect_surfaces_parallel(renderers)
+        surfaces = self._surface_collector.collect(renderers, parallel=True)
         executor = self._get_render_executor()
         return self._composition_manager.compose_parallel(
             surfaces, executor, merge_fn=self.merge_surfaces
