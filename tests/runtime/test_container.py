@@ -1,3 +1,4 @@
+from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
@@ -37,6 +38,23 @@ class TestRuntimeContainer:
         manager = container.resolve(PeripheralManager)
 
         assert manager.configuration_registry is registry
+
+    def test_container_allows_configuration_loader_overrides(self, device) -> None:
+        """Ensure configuration loader overrides propagate, so tests can inject loader behavior cleanly."""
+        registry = PeripheralConfigurationRegistry()
+        loader = PeripheralConfigurationLoader(
+            configuration="test-override",
+            registry=registry,
+        )
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.BINARY,
+            overrides={PeripheralConfigurationLoader: loader},
+        )
+
+        manager = container.resolve(PeripheralManager)
+
+        assert manager.configuration_loader is loader
 
     def test_game_loop_uses_container_overrides(self, device) -> None:
         """Ensure GameLoop honors container overrides so tests can swap implementations without touching runtime code."""
