@@ -2,7 +2,7 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import timedelta
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Iterator, Self
 
 import pygame.joystick
@@ -19,11 +19,12 @@ logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
 
 
-class GamepadIdentifier(Enum):
+class GamepadIdentifier(StrEnum):
     # string values need to exactly match what's reported from joystick.get_name()
     # so check that first when adding a controller type
     BIT_DO_LITE_2 = "8BitDo Lite 2"
     SWITCH_PRO = "Nintendo Switch Pro Controller"
+
 
 class Gamepad(Peripheral[Any]):
     EVENT_BUTTON = "gamepad.button"

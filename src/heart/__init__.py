@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class DeviceDisplayMode(Enum):
+class DeviceDisplayMode(StrEnum):
     MIRRORED = "mirrored"
     FULL = "full"
     OPENGL = "opengl"

@@ -27,6 +27,11 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 
+## Dependency Injection (Lagom)
+
+- Prefer using `heart.runtime.container.build_runtime_container` and the provider registration helpers in
+  `heart.peripheral.core.providers` rather than instantiating new Lagom `Container` objects in feature modules.
+
 ## Error Handling
 
 - Avoid catching `BaseException`; catch `Exception` or more specific error types so system-exiting signals propagate.
