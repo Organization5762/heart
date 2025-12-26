@@ -15,7 +15,7 @@ Developers need a faster iteration loop when editing runtime code because manual
 
 - `scripts/devex_session.py` for the restartable runtime loop and watch logic.
 - `Makefile` for the `dev-session` entry point.
-- `docs/dev_session.md` for usage and operational guidance.
+- `docs/books/development_workflow.md` for usage and operational guidance.
 
 ## Findings
 

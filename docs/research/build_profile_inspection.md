@@ -21,7 +21,7 @@ effective settings so developers can confirm build configuration before running
 - `scripts/build_profiles.json` (profile catalog).
 - `scripts/show_build_profile.sh` (profile inspection output).
 - `Makefile` (build-info target).
-- `docs/sync_harness.md` (build helper documentation).
+- `docs/library/tooling_and_configuration.md` (build helper documentation).
 
 ## Observations
 

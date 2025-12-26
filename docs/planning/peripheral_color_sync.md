@@ -23,7 +23,7 @@ We start by defining an `OutputChannel` registry inside `src/heart/renderers/__i
 | Renderer emits a statistics payload with average RGB per frame | Unit tests covering the sampling helper in `tests/display/test_frame_statistics.py` | Display pipeline |
 | Peripheral adaptor consumes statistics and updates colour on the event bus | Integration test using a fake peripheral in `tests/peripheral/test_ambient_adapter.py` | Peripheral platform |
 | Frame time impact stays below 5% on Raspberry Pi 4 | Benchmark recorded with `scripts/benchmark_render.py` | Runtime engineering |
-| Configuration allows mapping statistics to multiple devices with per-device transforms | Config snapshot in `docs/program_configuration.md` update | Developer experience |
+| Configuration allows mapping statistics to multiple devices with per-device transforms | Config snapshot in `docs/library/tooling_and_configuration.md` update | Developer experience |
 
 # Task Breakdown Checklists
 
@@ -87,10 +87,10 @@ flowchart LR
 - [ ] Instrument registry operations with structured logs using `heart.utilities.logging` to catch key collisions.
 - [ ] Add a sampling window size parameter so developers can trade fidelity for performance.
 - [ ] Implement a smoothing filter (exponential moving average) in `AmbientPeripheralAdapter` with unit coverage.
-- [ ] Document configuration examples and calibration workflow in `docs/program_configuration.md`.
+- [ ] Document configuration examples and calibration workflow in `docs/library/tooling_and_configuration.md`.
 
 # Outcome Snapshot
 
-Once implemented, renderers emit both the composed frame and derivative statistics. The ambient adapter consumes these statistics, maps them to configured peripherals, and publishes colour updates without requiring each renderer to understand peripheral protocols. Developers can reference `docs/program_configuration.md` for configuration snippets and can test ambient behaviour using fake peripherals in `tests/peripheral/`.
+Once implemented, renderers emit both the composed frame and derivative statistics. The ambient adapter consumes these statistics, maps them to configured peripherals, and publishes colour updates without requiring each renderer to understand peripheral protocols. Developers can reference `docs/library/tooling_and_configuration.md` for configuration snippets and can test ambient behaviour using fake peripherals in `tests/peripheral/`.
 
 The runtime exposes a consistent pattern for multi-device outputs: renderers focus on scene composition, statistics modules create data products, and adapters translate those products into peripheral commands. New peripherals can opt into statistics streams by implementing the adapter contract, enabling richer multi-device experiences than pushing a single oversized image.

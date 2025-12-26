@@ -1,84 +1,51 @@
-# Documentation map
+# Documentation Map
 
 This directory is curated as two complementary collections:
 
-- **Books**: step-by-step narratives that guide someone through a workflow or
-  multi-stage decision. Use a book when the reader should start at the top and
-  read in order.
-- **Library**: reference material meant for lookup. Use a library entry when
-  the reader needs a quick answer, a configuration detail, or a concise system
-  description without following a long narrative.
+- **Books**: linear guides meant to be read top-to-bottom. Use a book when the reader should
+  follow a workflow in sequence.
+- **Library**: reference material for lookup. Use a library entry when the reader needs a
+  specific answer, module pointer, or concise system description.
 
-When a topic can stand alone, file it in the library. Reserve books for guided
-sequences, cross-cutting workflows, or onboarding paths.
+When in doubt, prefer the library. Only promote a topic to a book when a single narrative thread
+is required for the work.
 
-## Table of contents
+## Table of Contents
 
 - [Books](#books)
 - [Library](#library)
 - [Lab](#lab)
 - [Plans](#plans)
+- [Operations](#operations)
 - [Style guide](#style-guide)
 
 ## Books
 
-- [Getting started](./getting_started.md)
-- [Developer experience notes](./developer_experience.md)
-- [Development session habits](./dev_session.md)
-- [Development focus loop](./dev_focus_loop.md)
+- [Getting started](./books/getting_started.md)
+- [Development workflow](./books/development_workflow.md)
 
 ## Library
 
 ### Runtime and architecture
 
-- [Runtime overview](./runtime_overview.md)
-- [Runtime feedback loop](./runtime_feedback_loop.md)
+- [Runtime systems](./library/runtime_systems.md)
 - [Code flow](./code_flow.md)
-- [Events and metrics](./events_metrics.md)
-- [ReactiveX tuning](./reactivex_tuning.md)
-- [Runtime feedback demo](./virtual_feedback_demo.md)
 
 ### Renderers and visuals
 
 - [Renderer catalog](./renderers/renderer_catalog.md)
 - [Renderer roles](./renderers/renderer_roles.md)
 - [Renderer base class layout](./renderers/base_class_layout.md)
-- [Renderer composition](./rendering_composition.md)
-- [Renderer refactor update](./renderer_refactor_update.md)
-- [Renderers: L-system refactor](./renderers_l_system_refactor.md)
-- [Renderers: stateful refactor](./renderers_stateful_refactor.md)
-- [Rust renderers](./rust_renderers.md)
-- [Spritesheet cache](./spritesheet_cache.md)
+- [Renderers and visual systems](./library/renderers_systems.md)
+- [Rendering experiments](./library/rendering_experiments.md)
 
-### Peripherals, hardware, and beats
+### Peripherals and hardware
 
-- [Peripheral configurations](./peripheral_configurations.md)
-- [Device display resolution](./device_display_resolution.md)
-- [Hardware debug CLI](./hardware_debug_cli.md)
-- [Beats cube renderer](./beats-cube-renderer.md)
-- [Beats peripheral snapshots](./beats-peripheral-snapshots.md)
-- [Beats websocket protobuf](./beats-websocket-protobuf.md)
+- [Peripherals and beats](./library/peripherals_and_beats.md)
 
 ### Configuration and tooling
 
-- [CLI structure](./cli_structure.md)
-- [Program configuration](./program_configuration.md)
-- [Logging control](./logging_control.md)
-- [Sync harness](./sync_harness.md)
-- [Static analysis](./static_analysis.md)
-- [Publish to PyPI](./publish_pypi.md)
-
-### Rendering experiments
-
-- [Channel diffusion](./channel_diffusion.md)
-- [Color conversion tuning](./color_conversion_tuning.md)
-
-### Debugging and operations
-
-- [Debugging toolkit](./debugging/README.md)
-- [Performance notes](./performance)
-- [Migrations](./migrations)
-- [Devlog](./devlog)
+- [Tooling and configuration](./library/tooling_and_configuration.md)
 
 ### API references
 
@@ -91,6 +58,13 @@ sequences, cross-cutting workflows, or onboarding paths.
 ## Plans
 
 - [Planning hub](./planning/README.md)
+
+## Operations
+
+- [Debugging toolkit](./debugging/README.md)
+- [Performance notes](./performance)
+- [Migrations](./migrations)
+- [Devlog](./devlog)
 
 ## Style guide
 

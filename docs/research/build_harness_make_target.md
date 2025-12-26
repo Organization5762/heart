@@ -13,4 +13,4 @@ that target. This left build hooks in `sync.sh` without a default build action.
 ## Materials
 
 - `Makefile`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`

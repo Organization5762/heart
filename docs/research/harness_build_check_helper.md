@@ -13,11 +13,11 @@ sync and build workflows before running hooks.
   `rsync`, report optional helpers, and confirm expected files exist.
 - Added a `make check-harness` target to make the helper easy to run from the
   standard build interface.
-- Documented the helper in `docs/sync_harness.md` so hook recipes point to a
+- Documented the helper in `docs/library/tooling_and_configuration.md` so hook recipes point to a
   real script.
 
 ## Materials
 
 - `scripts/check_harness.sh`
 - `Makefile`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`

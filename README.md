@@ -25,7 +25,7 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```bash
    uv run totem run --configuration lib_2025
    ```
-4. Review [docs/getting_started.md](docs/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
+4. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
 ## Command-Line Interfaces
 | Command | Purpose |
@@ -45,16 +45,16 @@ Key `totem run` flags:
 - `heart.peripheral.core.manager.PeripheralManager` supervises switches, gamepads, heart-rate monitors, and other inputs.
 
 See the following references for deeper analysis:
-- [docs/runtime_overview.md](docs/runtime_overview.md) for loop orchestration details.
+- [docs/library/runtime_systems.md](docs/library/runtime_systems.md) for loop orchestration details.
 - [docs/code_flow.md](docs/code_flow.md) for a diagram of launch and render paths.
-- [docs/program_configuration.md](docs/program_configuration.md) for playlist authoring guidance.
-- [docs/developer_experience.md](docs/developer_experience.md) for the devex snapshot workflow.
+- [docs/library/tooling_and_configuration.md](docs/library/tooling_and_configuration.md) for playlist authoring guidance.
+- [docs/books/development_workflow.md](docs/books/development_workflow.md) for the devex snapshot workflow.
 
 ## Hardware Integration
 - `LEDMatrix` streams frames to the RGB matrix when `HEART_USE_ISOLATED_RENDERER=1`.
 - Bluetooth gamepads, switches, accelerometers, and heart-rate sensors publish data through the event bus managed by the peripheral subsystem.
 - `totem update-driver --name <driver>` flashes device firmware located in `drivers/`.
-- [docs/hardware_debug_cli.md](docs/hardware_debug_cli.md) documents debugging helpers for pairing controllers and inspecting UART traffic.
+- [docs/library/tooling_and_configuration.md](docs/library/tooling_and_configuration.md) documents debugging helpers for pairing controllers and inspecting UART traffic.
 
 ## Development Workflow
 - `make install` sets up the editable package and dev extras using `uv`.

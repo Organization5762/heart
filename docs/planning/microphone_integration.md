@@ -37,14 +37,14 @@ We will extend the peripheral manager to host a microphone device that continuou
 - [ ] Add a streaming loop that computes RMS and peak amplitude per buffer with configurable window length.
 - [ ] Inject the runtime event bus using `attach_event_bus` and publish `peripheral.microphone.level` messages.
 - [ ] Extend `PeripheralManager` registration to gate activation behind capability detection.
-- [ ] Document configuration flags in `docs/program_configuration.md`.
+- [ ] Document configuration flags in `docs/library/tooling_and_configuration.md`.
 
 ### Validation
 
 - [ ] Unit-test buffer processing helpers using prerecorded fixtures.
 - [ ] Add a regression test ensuring absence of `sounddevice` triggers a warning rather than an exception.
 - [ ] Capture manual run logs verifying metrics in the developer devlog.
-- [ ] Update `docs/runtime_overview.md` with a summary of the new peripheral.
+- [ ] Update `docs/library/runtime_systems.md` with a summary of the new peripheral.
 
 ## Narrative Walkthrough
 

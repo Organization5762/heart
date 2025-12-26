@@ -12,7 +12,7 @@ has spare capacity.
 - `src/heart/runtime/rendering/timing.py`
 - `src/heart/runtime/render_planner.py`
 - `src/heart/runtime/game_loop.py`
-- `docs/runtime_overview.md`
+- `docs/library/runtime_systems.md`
 
 ## Source excerpts
 

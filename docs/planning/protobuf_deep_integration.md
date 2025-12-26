@@ -10,7 +10,7 @@ Heart uses protobuf for Beats websocket envelopes and peripheral payloads, but p
 - Protobuf compiler (`protoc`) plus a stable path for generated modules (e.g., under `src/heart/**/proto`).
 - Existing protobuf assets (`src/heart/device/beats/proto/beats_streaming.proto`, `src/heart/device/beats/proto/beats_streaming_pb2.py`).
 - Encoding/decoding helpers in `src/heart/peripheral/core/encoding.py` and the registry in `src/heart/peripheral/core/protobuf_registry.py`.
-- Documentation references in `docs/beats-websocket-protobuf.md` and `docs/research/beats_streaming_protobuf.md`.
+- Documentation references in `docs/library/peripherals_and_beats.md` and `docs/research/beats_streaming_protobuf.md`.
 
 ## Opening Abstract
 
@@ -31,7 +31,7 @@ This plan deepens protobuf integration across Heart by formalizing schema regist
 
 - [ ] Inventory current protobuf usage across `src/heart/device/beats/` and `src/heart/peripheral/core/`.
 - [ ] Identify candidate peripheral payloads that should migrate from JSON to protobuf (reference `heart.peripheral.core.encoding` call sites).
-- [ ] Review existing docs (`docs/beats-websocket-protobuf.md`, `docs/research/beats_streaming_protobuf.md`) for schema constraints and client expectations.
+- [ ] Review existing docs (`docs/library/peripherals_and_beats.md`, `docs/research/beats_streaming_protobuf.md`) for schema constraints and client expectations.
 
 ### Implementation
 

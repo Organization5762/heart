@@ -8,7 +8,7 @@ Iteration speed slows when developers must run repository-wide formatting and te
 
 - `scripts/devex_focus.py` for change detection and command orchestration.
 - `Makefile` targets that expose the workflow.
-- `docs/dev_focus_loop.md` for user-facing usage guidance.
+- `docs/books/development_workflow.md` for user-facing usage guidance.
 
 ## Findings
 
@@ -20,5 +20,5 @@ Iteration speed slows when developers must run repository-wide formatting and te
 
 - `scripts/devex_focus.py` (focus loop implementation)
 - `Makefile` (focus and focus-watch targets)
-- `docs/dev_focus_loop.md` (concept and usage)
-- `docs/developer_experience.md` (developer experience summary update)
+- `docs/books/development_workflow.md` (concept and usage)
+- `docs/books/development_workflow.md` (developer experience summary update)

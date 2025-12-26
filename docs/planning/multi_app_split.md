@@ -52,7 +52,7 @@ Upcoming installations require distributing peripheral capture across constraine
 
 - [ ] Extend integration tests with a fake MQTT broker covering publish/subscribe flows.
 - [ ] Produce Docker Compose examples for broker + services.
-- [ ] Update documentation (`docs/runtime_overview.md`, `docs/code_flow.md`, `docs/program_configuration.md`) to reflect the architecture.
+- [ ] Update documentation (`docs/library/runtime_systems.md`, `docs/code_flow.md`, `docs/library/tooling_and_configuration.md`) to reflect the architecture.
 
 ## Narrative Walkthrough
 

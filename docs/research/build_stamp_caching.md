@@ -23,7 +23,7 @@ teams can force rebuilds or expand the input list for specialized workflows.
 
 - `Makefile`
 - `scripts/build_package.sh`
-- `docs/sync_harness.md`
+- `docs/library/tooling_and_configuration.md`
 
 ## Materials
 

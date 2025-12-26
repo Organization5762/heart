@@ -36,7 +36,7 @@ This plan extends regression coverage for the aggregate metrics helpers and defi
 - [ ] Add targeted regression cases for resets, mixed pruning policies, and missing-key handling in `tests/events/metrics/`.
 - [ ] Introduce helper fixtures for ingesting sensor traces into rolling windows.
 - [ ] Wire aggregate emitters into accelerometer, heart-rate, microphone, IR array, and UWB pipelines.
-- [ ] Document metric schemas inline and export via `docs/runtime_overview.md`.
+- [ ] Document metric schemas inline and export via `docs/library/runtime_systems.md`.
 
 ## Validation
 

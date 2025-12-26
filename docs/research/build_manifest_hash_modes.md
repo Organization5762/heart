@@ -17,7 +17,7 @@ appropriate.
 ## Sources
 
 - `scripts/build_package.sh` (build hash logic, manifest writer, input handling)
-- `docs/sync_harness.md` (environment variables for build helpers)
+- `docs/library/tooling_and_configuration.md` (environment variables for build helpers)
 
 ## Observations
 
