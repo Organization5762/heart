@@ -17,6 +17,8 @@ from heart.utilities.env.enums import \
 from heart.utilities.env.enums import \
     ReactivexStreamShareStrategy as ReactivexStreamShareStrategy
 from heart.utilities.env.enums import \
+    RendererTimingStrategy as RendererTimingStrategy
+from heart.utilities.env.enums import \
     RenderMergeStrategy as RenderMergeStrategy
 from heart.utilities.env.enums import RenderTileStrategy as RenderTileStrategy
 from heart.utilities.env.enums import \

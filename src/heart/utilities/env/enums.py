@@ -12,6 +12,11 @@ class RenderMergeStrategy(StrEnum):
     ADAPTIVE = "adaptive"
 
 
+class RendererTimingStrategy(StrEnum):
+    CUMULATIVE = "cumulative"
+    EMA = "ema"
+
+
 class AssetCacheStrategy(StrEnum):
     NONE = "none"
     METADATA = "metadata"
