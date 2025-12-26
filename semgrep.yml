@@ -73,6 +73,55 @@ rules:
       category: error-handling
       technology:
         - python
+  - id: heart-no-logging-getlogger
+    languages:
+      - python
+    message: Use heart.utilities.logging.get_logger instead of logging.getLogger.
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: logging.getLogger(...)
+          - pattern: getLogger(...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-require-open-encoding-default
+    languages:
+      - python
+    message: Specify encoding= when opening text files (prefer utf-8).
+    severity: ERROR
+    patterns:
+      - pattern: open($PATH)
+      - pattern-not: open($PATH, encoding=..., ...)
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
+  - id: heart-require-open-encoding-text-mode
+    languages:
+      - python
+    message: Specify encoding= when opening text files (prefer utf-8).
+    severity: ERROR
+    patterns:
+      - pattern: open($PATH, $MODE, ...)
+      - pattern-not: open($PATH, $MODE, encoding=..., ...)
+      - metavariable-regex:
+          metavariable: $MODE
+          regex: "^[\"'](?!.*b).*?[\"']$"
+    paths:
+      include:
+        - src/**/*.py
+    metadata:
+      category: style
+      technology:
+        - python
   - id: heart-no-bare-exception-raise
     languages:
       - python
