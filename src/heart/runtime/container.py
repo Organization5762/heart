@@ -17,12 +17,14 @@ from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.pygame_event_handler import PygameEventHandler
 from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
 
+RuntimeContainer = Container
+
 
 def build_runtime_container(
     device: Device,
     render_variant: RendererVariant,
     overrides: Mapping[type[Any], object] | None = None,
-) -> Container:
+) -> RuntimeContainer:
     container = Container()
     configure_runtime_container(
         container=container,
@@ -35,7 +37,7 @@ def build_runtime_container(
 
 def configure_runtime_container(
     *,
-    container: Container,
+    container: RuntimeContainer,
     device: Device,
     render_variant: RendererVariant,
     overrides: Mapping[type[Any], object] | None = None,
@@ -145,7 +147,7 @@ def configure_runtime_container(
 
 
 def _bind(
-    container: Container,
+    container: RuntimeContainer,
     overrides: Mapping[type[Any], object] | None,
     key: type[Any],
     value: object,

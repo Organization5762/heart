@@ -4,11 +4,10 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pygame
-from lagom import Container
 
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
-from heart.runtime.container import (build_runtime_container,
+from heart.runtime.container import (RuntimeContainer, build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.game_loop_components import GameLoopComponents
 from heart.runtime.render_pipeline import RendererVariant
@@ -27,7 +26,7 @@ class GameLoop:
     def __init__(
         self,
         device: Device,
-        resolver: Container | None = None,
+        resolver: RuntimeContainer | None = None,
         max_fps: int = 500,
         render_variant: RendererVariant = RendererVariant.ITERATIVE,
     ) -> None:
