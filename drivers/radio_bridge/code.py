@@ -1,4 +1,12 @@
-"""Minimal firmware stub that forwards radio packets over the USB REPL."""
+"""Minimal firmware stub that forwards radio packets over the USB REPL.
+
+REPL reproduction:
+    1. Connect to the board REPL and import this module.
+    2. Instantiate ``RadioBridgeRuntime`` with a stub ``gather_packet`` callable
+       to simulate packets.
+    3. Call ``runtime.run_once()`` to verify USB payload formatting without the
+       full game runtime.
+"""
 
 from __future__ import annotations
 

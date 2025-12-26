@@ -1,4 +1,11 @@
-"""Lampe controller firmware entry point."""
+"""Lampe controller firmware entry point.
+
+REPL reproduction:
+    1. Connect to the board REPL and import this module.
+    2. Call ``create_runtime()`` to initialize the Seesaw controller.
+    3. Invoke ``runtime.run_once()`` to emit encoder events over Bluetooth
+       without running the full game runtime.
+"""
 
 from __future__ import annotations
 
