@@ -13,8 +13,8 @@ from heart.renderers.channel_diffusion.state import ChannelDiffusionState
 
 
 class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
-    def __init__(self, provider: ChannelDiffusionStateProvider | None = None) -> None:
-        self._provider = provider or ChannelDiffusionStateProvider()
+    def __init__(self, provider: ChannelDiffusionStateProvider) -> None:
+        self._provider = provider
         self._initial_state: ChannelDiffusionState | None = None
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL

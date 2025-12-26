@@ -15,6 +15,8 @@ DI concerns.
   `src/heart/renderers/cloth_sail/`,
   `src/heart/renderers/three_fractal/`,
   `src/heart/renderers/mario/`,
+  `src/heart/renderers/channel_diffusion/`,
+  `src/heart/renderers/three_d_glasses/`,
   `src/heart/programs/configurations/lib_2025.py`,
   `src/heart/programs/configurations/l_system.py`,
   `src/heart/programs/configurations/porthole_window.py`,
@@ -34,3 +36,9 @@ leaking device plumbing into configuration modules.
 `ComposedRenderer.resolve_renderer_from_container` so Lagom supplies the registered state
 providers. This reduces direct provider construction in configuration modules while keeping the
 runtime container responsible for provider wiring.
+
+`ChannelDiffusionStateProvider` and `ThreeDGlassesStateProvider` are now registered with the
+provider registry. The channel diffusion configuration resolves its renderer through the Lagom
+container, and the 3D glasses demo resolves a container-managed provider before instantiating the
+renderer. This keeps provider construction centralized and makes it easier to override providers in
+tests.
