@@ -1,10 +1,12 @@
 """Validate Lagom-backed renderer resolution in multi-scene navigation helpers."""
 
 import pytest
-from lagom import Container
 
+from heart.device import Device
 from heart.navigation import MultiScene
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.container import build_runtime_container
+from heart.runtime.render_pipeline import RendererVariant
 
 
 class _ContainerScene(StatefulBaseRenderer[int]):
@@ -20,9 +22,12 @@ class _ContainerScene(StatefulBaseRenderer[int]):
 class TestMultiSceneResolution:
     """Ensure multi-scene navigation resolves class-based scenes via Lagom for consistent wiring."""
 
-    def test_resolves_scene_types_at_construction(self) -> None:
+    def test_resolves_scene_types_at_construction(self, device: Device) -> None:
         """Verify scene classes resolve via Lagom at init so multi-scene compositions stay container-aware."""
-        container = Container()
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.ITERATIVE,
+        )
         container[_ContainerScene] = _ContainerScene
 
         multi_scene = MultiScene([_ContainerScene], renderer_resolver=container)
