@@ -18,6 +18,7 @@ else:  # pragma: no cover - supervisor is unavailable on CPython
 
 
 _DEFAULT_COMMIT_CACHE: str | None = None
+DEFAULT_FIRMWARE_COMMIT = "UNKNOWN"
 
 class Identity:
     """Container describing a firmware build."""
@@ -45,7 +46,7 @@ class Identity:
         return payload
 
 
-def default_firmware_commit(default: str = "UNKNOWN") -> str:
+def default_firmware_commit(default: str = DEFAULT_FIRMWARE_COMMIT) -> str:
     """Return a best-effort commit identifier for the running firmware."""
 
     global _DEFAULT_COMMIT_CACHE
