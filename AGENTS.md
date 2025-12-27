@@ -30,6 +30,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
 - When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
+- Use module-level constants for default argument values and shared string literals in firmware helpers so configuration stays consistent.
 
 ## Dependency Injection (Lagom)
 
