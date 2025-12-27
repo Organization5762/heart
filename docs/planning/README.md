@@ -5,6 +5,7 @@ Consult this index before opening or updating plans. Each linked document must f
 ## Planning
 
 - [ ] [Benchmarking Tooling](benchmarking_tooling.md)
+- [ ] [Codebase Reorganization for Clarity](codebase_reorganization_clarity.md)
 - [ ] [Bluetooth Cube Scene Pipeline](bluetooth_cube_scene_pipeline.md)
 - [ ] [Bluetooth Reverse Engineering](bluetooth_reverse_engineering.md)
 - [ ] [Direct Sensor Access](direct_sensor_access.md)
