@@ -7,6 +7,7 @@ Consult this index before opening or updating plans. Each linked document must f
 - [ ] [Benchmarking Tooling](benchmarking_tooling.md)
 - [ ] [Bluetooth Cube Scene Pipeline](bluetooth_cube_scene_pipeline.md)
 - [ ] [Bluetooth Reverse Engineering](bluetooth_reverse_engineering.md)
+- [ ] [Codebase Reorganization for Clarity](codebase_reorganization_clarity.md)
 - [ ] [Direct Sensor Access](direct_sensor_access.md)
 - [ ] [Flow Toy Signal Interface](flow_toy_signal_interface.md)
 - [ ] [Light Dependent Resistor Peripheral](light_dependent_resistor_peripheral.md)
