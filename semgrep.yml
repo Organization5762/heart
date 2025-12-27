@@ -64,6 +64,8 @@ rules:
     severity: ERROR
     patterns:
       - pattern: |
+          try:
+            ...
           except BaseException:
             ...
     paths:

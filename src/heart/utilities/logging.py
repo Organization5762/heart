@@ -9,6 +9,8 @@ DEFAULT_LOG_SUBDIR = Path(".heart") / "logs"
 MAX_LOG_BYTES = 10 * 1024 * 1024  # 10 MiB
 BACKUP_COUNT = 5
 
+_LOGGER_CACHE: dict[str, logging.Logger] = {}
+
 
 def _resolve_log_directory() -> Path:
     """Return the directory where log files should be written."""
@@ -69,10 +71,20 @@ def _configure_logger(logger: logging.Logger, log_level: str) -> None:
     logger.propagate = False
 
 
+def _build_logger(name: str) -> logging.Logger:
+    logger_class = logging.getLoggerClass()
+    logger = logger_class(name)
+    logger.parent = logging.root
+    return logger
+
+
 def get_logger(name: str) -> logging.Logger:
     """Return a logger configured with stream and rolling file handlers."""
 
     log_level = os.getenv(LOG_LEVEL_ENV_VAR, "INFO").upper()
-    logger = logging.getLogger(name)
+    logger = _LOGGER_CACHE.get(name)
+    if logger is None:
+        logger = _build_logger(name)
+        _LOGGER_CACHE[name] = logger
     _configure_logger(logger, log_level)
     return logger
