@@ -201,13 +201,13 @@ class Switch(BaseSwitch):
                             data = json.loads(bus_data)
                             observer.on_next(data)
                 except KeyboardInterrupt:
-                    pass
+                    logger.info("Serial switch stream interrupted")
                 except Exception:
-                    pass
+                    logger.debug("Serial switch stream error", exc_info=True)
                 finally:
                     ser.close()
             except Exception:
-                pass
+                logger.debug("Failed to connect to serial switch", exc_info=True)
 
             time.sleep(SERIAL_RECONNECT_DELAY_SECONDS)
         return Disposable()
