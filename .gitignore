@@ -13,3 +13,4 @@ ant_hr.log
 .vscode
 .dev_install.stamp
 node_modules
+.worktrees
