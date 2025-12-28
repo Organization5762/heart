@@ -30,10 +30,10 @@ check:
 	@uvx docformatter --check -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat --check $(DOCS_SOURCES)
 	@uv run mypy --config-file pyproject.toml
-	@uv run semgrep ci $(SEMGREP_ARGS) $(SEMGREP_EXTRA_ARGS) $(SEMGREP_TARGETS)
+	@uv run semgrep ci $(SEMGREP_ARGS) $(SEMGREP_EXTRA_ARGS)
 
 semgrep:
-	@uv run semgrep ci $(SEMGREP_ARGS) $(SEMGREP_EXTRA_ARGS) $(SEMGREP_TARGETS)
+	@uv run semgrep ci $(SEMGREP_ARGS) $(SEMGREP_EXTRA_ARGS)
 
 test:
 	@uv run pytest
