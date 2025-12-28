@@ -15,5 +15,5 @@ orchestration class.
 
 ## Materials
 
-- `src/heart/runtime/game_loop.py`
-- `src/heart/runtime/pygame_event_handler.py`
+- `src/heart/runtime/game_loop/core.py`
+- `src/heart/runtime/game_loop/event_handler.py`

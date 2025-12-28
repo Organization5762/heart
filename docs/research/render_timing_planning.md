@@ -35,6 +35,6 @@ change.
 
 - `docs/books/getting_started.md` (Isolated Renderer I/O Tuning section)
 - `docs/api/input_bus.md` (Lifecycle signalling section)
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/timing.py`
 - `src/heart/utilities/env/rendering.py`

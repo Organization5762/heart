@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from heart.runtime.render_pipeline import RendererVariant
+from heart.runtime.render.pipeline import RendererVariant
 from heart.utilities.color_conversion import (HSV_TO_BGR_CACHE,
                                               _convert_bgr_to_hsv,
                                               _convert_hsv_to_bgr)
@@ -265,11 +265,11 @@ class TestEnvironmentCoreLogic:
     def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
         """Verify that auto rendering switches at the threshold in the pipeline. This keeps performance tuning predictable on constrained devices."""
         monkeypatch.setattr(
-            "heart.runtime.render_pipeline.Configuration.render_parallel_threshold",
+            "heart.runtime.render.pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
         monkeypatch.setattr(
-            "heart.runtime.render_pipeline.Configuration.render_parallel_cost_threshold_ms",
+            "heart.runtime.render.pipeline.Configuration.render_parallel_cost_threshold_ms",
             lambda: 0,
         )
         pipeline = loop.render_pipeline
@@ -289,11 +289,11 @@ class TestEnvironmentCoreLogic:
     def test_render_fn_auto_uses_cost_estimates(self, loop, monkeypatch) -> None:
         """Verify auto rendering uses timing estimates to choose parallelism. This keeps scheduling overhead aligned with actual renderer costs."""
         monkeypatch.setattr(
-            "heart.runtime.render_pipeline.Configuration.render_parallel_threshold",
+            "heart.runtime.render.pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
         monkeypatch.setattr(
-            "heart.runtime.render_pipeline.Configuration.render_parallel_cost_threshold_ms",
+            "heart.runtime.render.pipeline.Configuration.render_parallel_cost_threshold_ms",
             lambda: 5,
         )
         pipeline = loop.render_pipeline

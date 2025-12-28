@@ -9,8 +9,8 @@ from PIL import Image
 
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.runtime.render_plan_selector import RenderPlanSelector
-from heart.runtime.render_planner import RenderPlan, RenderPlanner
+from heart.runtime.render.plan_selector import RenderPlanSelector
+from heart.runtime.render.planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.runtime.rendering.renderer_processor import RendererProcessor
 from heart.runtime.rendering.surface_collection import RenderSurfaceCollector

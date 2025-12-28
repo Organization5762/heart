@@ -25,7 +25,7 @@ number of cross-cutting concerns in a single module.
 
 ## Materials
 
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/renderer_processor.py`
 - `src/heart/runtime/rendering/surface_provider.py`
 - `src/heart/runtime/rendering/timing.py`

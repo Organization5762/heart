@@ -11,7 +11,7 @@ container access in multiple configuration files.
 
 - Python 3.11 with `uv` for dependency resolution.
 - Lagom dependency (`lagom` in `pyproject.toml`).
-- Source modules: `src/heart/runtime/game_loop.py`,
+- Source modules: `src/heart/runtime/game_loop/core.py`,
   `src/heart/programs/configurations/lib_2024.py`,
   `src/heart/programs/configurations/lib_2025.py`,
   `src/heart/programs/configurations/tixyland.py`.

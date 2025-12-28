@@ -12,5 +12,5 @@ The render planning flow now carries a structured plan object that bundles the c
 ## Materials
 
 - Source files:
-  - `src/heart/runtime/render_planner.py`
-  - `src/heart/runtime/render_pipeline.py`
+  - `src/heart/runtime/render/planner.py`
+  - `src/heart/runtime/render/pipeline.py`

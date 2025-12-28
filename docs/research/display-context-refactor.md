@@ -16,9 +16,9 @@ This keeps the game loop focused on orchestration while the new helper isolates 
 ## Source references
 
 - `src/heart/runtime/display_context.py`
-- `src/heart/runtime/game_loop.py`
+- `src/heart/runtime/game_loop/core.py`
 
 ## Materials
 
 - `src/heart/runtime/display_context.py`
-- `src/heart/runtime/game_loop.py`
+- `src/heart/runtime/game_loop/core.py`

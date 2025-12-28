@@ -34,7 +34,7 @@ removing parallel options for heavy scenes.
 
 ## References
 
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/timing.py`
 - `src/heart/runtime/rendering/surface_merge.py`
 - `src/heart/utilities/env/enums.py`

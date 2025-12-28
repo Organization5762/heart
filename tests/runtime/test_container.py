@@ -3,12 +3,12 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.frame_exporter import FrameExporter
-from heart.runtime.frame_presenter import FramePresenter
+from heart.runtime.frame.exporter import FrameExporter
+from heart.runtime.frame.presenter import FramePresenter
 from heart.runtime.game_loop import GameLoop
-from heart.runtime.game_loop_components import GameLoopComponents
-from heart.runtime.render_pacing import RenderLoopPacer
-from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
+from heart.runtime.game_loop.components import GameLoopComponents
+from heart.runtime.render.pacing import RenderLoopPacer
+from heart.runtime.render.pipeline import RendererVariant, RenderPipeline
 
 
 class TestRuntimeContainer:

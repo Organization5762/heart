@@ -1,7 +1,7 @@
 from heart.device.selection import select_device
 from heart.runtime.container import RuntimeContainer, build_runtime_container
 from heart.runtime.game_loop import GameLoop
-from heart.runtime.render_pipeline import RendererVariant
+from heart.runtime.render.pipeline import RendererVariant
 from heart.utilities.env import Configuration
 
 

@@ -24,7 +24,7 @@ preserving the same timing-based decisions and structured logs.
 
 ## Materials
 
-- `src/heart/runtime/render_pipeline.py`
-- `src/heart/runtime/render_planner.py`
+- `src/heart/runtime/render/pipeline.py`
+- `src/heart/runtime/render/planner.py`
 - `src/heart/runtime/rendering/timing.py`
 - `src/heart/runtime/rendering/variants.py`

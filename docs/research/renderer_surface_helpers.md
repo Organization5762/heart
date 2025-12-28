@@ -14,12 +14,12 @@ while reusing the same caching and merge behavior across render variants.
 - `SurfaceMerger` (`src/heart/runtime/rendering/surface_merge.py`) centralizes
   the merge strategies, reusing `SurfaceComposer` for batched paths and handling
   in-place or parallel merges based on `RenderMergeStrategy`.
-- `RenderPipeline` (`src/heart/runtime/render_pipeline.py`) now composes these
+- `RenderPipeline` (`src/heart/runtime/render/pipeline.py`) now composes these
   helpers instead of managing cache or merge logic inline.
 
 ## Materials
 
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/surface_cache.py`
 - `src/heart/runtime/rendering/surface_merge.py`
 - `src/heart/runtime/rendering/composition.py`

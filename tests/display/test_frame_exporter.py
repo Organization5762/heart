@@ -1,7 +1,7 @@
 import pygame
 import pytest
 
-from heart.runtime.frame_exporter import FrameExporter
+from heart.runtime.frame.exporter import FrameExporter
 from heart.utilities.env import FrameExportStrategy
 
 

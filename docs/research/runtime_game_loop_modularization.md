@@ -14,7 +14,7 @@ that runtime services and rendering helpers stay focused and easier to reuse.
 
 ## Findings
 
-- `GameLoop` and `RendererVariant` now live in `src/heart/runtime/game_loop.py`.
+- `GameLoop` and `RendererVariant` now live in `src/heart/runtime/game_loop/core.py`.
   `src/heart/environment.py` is a compatibility shim that re-exports the runtime
   symbols for legacy imports.
 - HSV/BGR conversion helpers and the conversion cache moved to
@@ -26,7 +26,7 @@ that runtime services and rendering helpers stay focused and easier to reuse.
 
 ## References
 
-- `src/heart/runtime/game_loop.py`
+- `src/heart/runtime/game_loop/core.py`
 - `src/heart/utilities/color_conversion.py`
 - `src/heart/environment.py`
 - `src/heart/display/recorder.py`

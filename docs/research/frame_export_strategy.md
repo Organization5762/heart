@@ -38,8 +38,8 @@ an explicit option when that trade-off is desired.
 
 ## Materials
 
-- `src/heart/runtime/frame_exporter.py`
-- `src/heart/runtime/frame_presenter.py`
+- `src/heart/runtime/frame/exporter.py`
+- `src/heart/runtime/frame/presenter.py`
 - `src/heart/utilities/env/enums.py`
 - `src/heart/utilities/env/rendering.py`
 - `docs/research/perf_finalize_rendering.md`

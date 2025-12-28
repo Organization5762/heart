@@ -12,7 +12,7 @@ from reactivex.testing.marbles import marbles_testing
 
 from heart.assets.loader import Loader
 from heart.renderers.image.provider import RenderImageStateProvider
-from heart.runtime.frame_exporter import FrameExporter
+from heart.runtime.frame.exporter import FrameExporter
 from heart.utilities.env import FrameExportStrategy
 
 

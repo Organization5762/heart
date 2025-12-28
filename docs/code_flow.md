@@ -40,7 +40,7 @@ flowchart LR
     subgraph Runtime["GameLoop Orchestration"]
         direction TB
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
-        RenderPacer["Render Loop Pacer\n(heart.runtime.render_pacing.RenderLoopPacer)"]
+        RenderPacer["Render Loop Pacer\n(heart.runtime.render.pacing.RenderLoopPacer)"]
         AppRouter["AppController / Mode Router"]
         ModeServices["Mode Services & Renderers"]
         RenderPipeline["Render Pipeline"]

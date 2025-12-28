@@ -25,7 +25,7 @@ Set `HEART_RENDER_PLAN_SIGNATURE_STRATEGY` to either:
 
 ## Materials
 
-- `src/heart/runtime/game_loop.py`
-- `src/heart/runtime/render_pipeline.py`
-- `src/heart/runtime/render_plan_cache.py`
+- `src/heart/runtime/game_loop/core.py`
+- `src/heart/runtime/render/pipeline.py`
+- `src/heart/runtime/render/plan_cache.py`
 - `src/heart/utilities/env/rendering.py`
