@@ -10,6 +10,7 @@ import numpy as np
 import pygame
 from numba import jit, prange
 
+from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
@@ -20,7 +21,6 @@ from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
                                                          SwitchProControls)
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
-from heart.runtime.game_loop import DeviceDisplayMode
 from heart.utilities.env import Configuration
 from heart.utilities.env.enums import MandelbrotInteriorStrategy
 from heart.utilities.logging import get_logger

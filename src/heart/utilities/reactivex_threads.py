@@ -3,7 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any, Callable, cast
+from typing import Callable
 
 from reactivex.scheduler import ThreadPoolScheduler
 
@@ -38,12 +38,7 @@ def _build_scheduler(
                 resolved_workers = (
                     max_workers if max_workers is not None else default_workers()
                 )
-                executor = ThreadPoolExecutor(
-                    max_workers=resolved_workers,
-                    thread_name_prefix=thread_name_prefix,
-                )
-                state.executor = executor
-                state.scheduler = ThreadPoolScheduler(cast(Any, executor))
+                state.scheduler = ThreadPoolScheduler(max_workers=resolved_workers)
     assert state.scheduler is not None
     return state.scheduler
 
