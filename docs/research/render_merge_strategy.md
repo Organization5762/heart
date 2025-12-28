@@ -31,7 +31,7 @@ allocations and Python-level blit calls.
 
 ## Materials
 
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/composition.py`
 - `src/heart/runtime/rendering/surface_merge.py`
 - `src/heart/runtime/rendering/timing.py`

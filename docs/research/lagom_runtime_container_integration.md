@@ -13,8 +13,8 @@ Runtime services were wired manually in `GameLoop`, and provider registrations r
 ## Source Review
 
 - `src/heart/runtime/container.py` defines the Lagom container builder used for runtime service registration.
-- `src/heart/runtime/game_loop_components.py` defines the `GameLoopComponents` dataclass used by the container.
-- `src/heart/runtime/game_loop.py` accepts the container instance and keeps orchestration logic in one place.
+- `src/heart/runtime/game_loop/components.py` defines the `GameLoopComponents` dataclass used by the container.
+- `src/heart/runtime/game_loop/core.py` accepts the container instance and keeps orchestration logic in one place.
 - `src/heart/peripheral/core/providers/registry.py` tracks provider registrations and applies them to registered containers.
 - `src/heart/cli/commands/game_loop.py` builds the container before creating the loop to keep wiring consistent.
 

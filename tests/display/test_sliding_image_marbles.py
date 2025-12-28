@@ -12,7 +12,7 @@ from reactivex.testing.marbles import marbles_testing
 
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider
 from heart.renderers.sliding_image.state import SlidingImageState
-from heart.runtime.frame_exporter import FrameExporter
+from heart.runtime.frame.exporter import FrameExporter
 from heart.utilities.env import FrameExportStrategy
 
 

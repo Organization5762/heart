@@ -11,8 +11,8 @@ The runtime loop and render pipeline logic are correct but the control flow is d
 
 ## Source references
 
-- `src/heart/runtime/game_loop.py`
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/game_loop/core.py`
+- `src/heart/runtime/render/pipeline.py`
 
 ## Materials
 

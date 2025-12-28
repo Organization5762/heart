@@ -13,13 +13,13 @@ for the runtime loop.
 - Python 3.11 environment with `uv` for dependency resolution.
 - Lagom dependency (`lagom` in `pyproject.toml`).
 - Source modules: `src/heart/runtime/container.py`,
-  `src/heart/runtime/game_loop.py`,
-  `src/heart/runtime/render_pacing.py`.
+  `src/heart/runtime/game_loop/core.py`,
+  `src/heart/runtime/render/pacing.py`.
 
 ## Notes
 
 The runtime container now registers a singleton provider for
-`heart.runtime.render_pacing.RenderLoopPacer` using configuration values from
+`heart.runtime.render.pacing.RenderLoopPacer` using configuration values from
 `heart.utilities.env.Configuration`. `GameLoop` resolves the pacer from the shared
 container instead of building it inline, keeping pacing behaviour consistent with the
 rest of the runtime dependencies and allowing container overrides to customize the loop

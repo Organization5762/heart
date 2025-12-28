@@ -10,10 +10,10 @@ from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.runtime.container import (RuntimeContainer, build_runtime_container,
                                      configure_runtime_container)
-from heart.runtime.game_loop_components import GameLoopComponents
-from heart.runtime.render_pacing import RenderLoopPacer
-from heart.runtime.render_pipeline import RendererVariant
-from heart.runtime.render_planner import RenderPlan
+from heart.runtime.game_loop.components import GameLoopComponents
+from heart.runtime.render.pacing import RenderLoopPacer
+from heart.runtime.render.pipeline import RendererVariant
+from heart.runtime.render.planner import RenderPlan
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:

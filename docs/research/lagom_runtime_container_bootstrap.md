@@ -13,7 +13,7 @@ container instance.
 - Python 3.11 environment with `uv` for dependency management.
 - Lagom dependency (`lagom` in `pyproject.toml`).
 - Source modules: `src/heart/runtime/container.py`,
-  `src/heart/runtime/game_loop.py`,
+  `src/heart/runtime/game_loop/core.py`,
   `src/heart/peripheral/core/providers/registry.py`.
 
 ## Notes

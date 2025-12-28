@@ -18,5 +18,5 @@ initial estimate for an entire session.
 ## Materials
 
 - `src/heart/runtime/rendering/timing.py`
-- `src/heart/runtime/render_plan_cache.py`
-- `src/heart/runtime/render_planner.py`
+- `src/heart/runtime/render/plan_cache.py`
+- `src/heart/runtime/render/planner.py`

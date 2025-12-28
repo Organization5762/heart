@@ -11,7 +11,7 @@ from heart.device import Cube, Device
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import RuntimeContainer, build_runtime_container
 from heart.runtime.game_loop import GameLoop
-from heart.runtime.render_pipeline import RendererVariant
+from heart.runtime.render.pipeline import RendererVariant
 
 settings.register_profile(
     "default",

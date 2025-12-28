@@ -4,8 +4,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from heart.runtime.render_plan_cache import RenderPlanCache
-from heart.runtime.render_planner import RenderPlan, RenderPlanner
+from heart.runtime.render.plan_cache import RenderPlanCache
+from heart.runtime.render.planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.variants import RendererVariant, RenderMethod
 from heart.utilities.env import Configuration
 

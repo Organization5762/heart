@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from heart.navigation import AppController
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.frame_presenter import FramePresenter
+from heart.runtime.frame.presenter import FramePresenter
+from heart.runtime.game_loop.event_handler import PygameEventHandler
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.runtime.pygame_event_handler import PygameEventHandler
-from heart.runtime.render_pipeline import RenderPipeline
+from heart.runtime.render.pipeline import RenderPipeline
 
 
 @dataclass(frozen=True)

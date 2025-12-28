@@ -13,7 +13,7 @@ with container overrides in tests.
 - Python 3.11 environment with `uv` for dependency resolution.
 - Lagom dependency (`lagom` in `pyproject.toml`).
 - Source modules: `src/heart/runtime/container.py`,
-  `src/heart/runtime/game_loop.py`,
+  `src/heart/runtime/game_loop/core.py`,
   `src/heart/cli/commands/game_loop.py`,
   `tests/runtime/test_container.py`.
 

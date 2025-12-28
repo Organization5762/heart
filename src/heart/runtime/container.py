@@ -12,13 +12,13 @@ from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.frame_exporter import FrameExporter
-from heart.runtime.frame_presenter import FramePresenter
-from heart.runtime.game_loop_components import GameLoopComponents
+from heart.runtime.frame.exporter import FrameExporter
+from heart.runtime.frame.presenter import FramePresenter
+from heart.runtime.game_loop.components import GameLoopComponents
+from heart.runtime.game_loop.event_handler import PygameEventHandler
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.runtime.pygame_event_handler import PygameEventHandler
-from heart.runtime.render_pacing import RenderLoopPacer
-from heart.runtime.render_pipeline import RendererVariant, RenderPipeline
+from heart.runtime.render.pacing import RenderLoopPacer
+from heart.runtime.render.pipeline import RendererVariant, RenderPipeline
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

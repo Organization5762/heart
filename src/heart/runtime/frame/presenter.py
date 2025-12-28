@@ -8,8 +8,8 @@ from PIL import Image
 
 from heart.device import Device
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.frame_exporter import FrameExporter
-from heart.runtime.render_pipeline import RenderPipeline
+from heart.runtime.frame.exporter import FrameExporter
+from heart.runtime.render.pipeline import RenderPipeline
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer

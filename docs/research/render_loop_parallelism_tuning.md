@@ -32,6 +32,6 @@ their device and workload without editing code.
 
 ## References
 
-- `src/heart/runtime/render_pipeline.py`
+- `src/heart/runtime/render/pipeline.py`
 - `src/heart/runtime/rendering/timing.py`
 - `src/heart/utilities/env/rendering.py`

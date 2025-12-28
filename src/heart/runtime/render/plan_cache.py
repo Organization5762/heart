@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from heart.runtime.render_planner import RenderPlan, RenderPlanner
+from heart.runtime.render.planner import RenderPlan, RenderPlanner
 from heart.runtime.rendering.variants import RendererVariant
 from heart.utilities.env.enums import RenderPlanSignatureStrategy
 

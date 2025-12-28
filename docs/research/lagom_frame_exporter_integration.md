@@ -12,8 +12,8 @@ wiring and forced direct constructor access when configuring exporters.
 - Python 3.11 environment with `uv` for dependency resolution.
 - Lagom dependency (`lagom` in `pyproject.toml`).
 - Source modules: `src/heart/runtime/container.py`,
-  `src/heart/runtime/frame_presenter.py`,
-  `src/heart/runtime/frame_exporter.py`.
+  `src/heart/runtime/frame/presenter.py`,
+  `src/heart/runtime/frame/exporter.py`.
 - Tests: `tests/runtime/test_container.py`.
 
 ## Notes
