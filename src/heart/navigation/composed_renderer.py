@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
@@ -32,6 +33,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             resolve_renderer_spec(renderer, renderer_resolver, "ComposedRenderer")
             for renderer in renderers
         ]
+        self.device_display_mode = DeviceDisplayMode.FULL
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []

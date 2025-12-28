@@ -11,8 +11,10 @@ from reactivex import operators as ops
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import input_scheduler
 
+logger = get_logger(__name__)
 
 class KeyboardAction(StrEnum):
     PRESSED = "pressed"
@@ -64,7 +66,8 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
         """
 
         def _poll(_: int) -> KeyboardEvent | None:
-            return self._check_if_pressed()
+            result = self._check_if_pressed()
+            return result
 
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             # empty() is typed as Observable[NoReturn | Never] so we cast it

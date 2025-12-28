@@ -107,13 +107,17 @@ class GameLoop:
         self.running = True
         logger.info("Entering main loop.")
 
+        logger.info("Initializing app controller.")
         self._initialize_app_controller()
+        logger.info("Ensuring display is initialized.")
         self._ensure_display_initialized()
+        logger.info("Configuring streaming.")
         self.peripheral_runtime.configure_streaming()
 
         try:
             self._run_main_loop()
         finally:
+            logger.info("Shutting down GameLoop.")
             self.render_pipeline.shutdown()
             pygame.quit()
 
@@ -214,6 +218,7 @@ class GameLoop:
 
     def _initialize_app_controller(self) -> None:
         self.display.ensure_initialized()
+        logger.info("Initializing app controller components.")
         self.app_controller.initialize(
             window=self.display.screen,
             clock=self.display.clock,

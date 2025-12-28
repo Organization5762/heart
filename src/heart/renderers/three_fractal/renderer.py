@@ -27,12 +27,9 @@ from heart.device import Cube, Orientation
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
-                                                          BitDoLite2Bluetooth)
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
-from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -462,13 +459,14 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
         self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
-    def _check_enter_auto(self, peripheral_manager: PeripheralManager):
-        gamepad = peripheral_manager.get_gamepad()
-        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        if gamepad.is_connected():
-            if gamepad.was_tapped(mapping.BUTTON_Y):
-                self.mode = "auto"
-                self._reset_camera_pos()
+    # def _check_enter_auto(self, peripheral_manager: PeripheralManager):
+    #     gamepad = peripheral_manager.get_gamepad()
+    #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+    #     print(f"Gamepad: {gamepad}")
+    #     if gamepad.is_connected():
+    #         if gamepad.was_tapped(mapping.BUTTON_Y):
+    #             self.mode = "auto"
+    #             self._reset_camera_pos()
 
     def _check_break_auto(self, peripheral_manager: PeripheralManager):
         # ignore break auto check at first to avoid inut overlap from scene
@@ -476,32 +474,33 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if time.monotonic() - self.time_initialized < 0.3:
             return
 
-        gamepad = peripheral_manager.get_gamepad()
-        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        if gamepad.is_connected():
-            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
-            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
-            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
-            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
-            xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+        # gamepad = peripheral_manager.get_gamepad()
+        # mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        # if gamepad.is_connected():
+        #     xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
+        #     yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
+        #     xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
+        #     yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
+        #     xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
 
-            if (
-                xl_mov != 0
-                or yl_mov != 0
-                or xr_mov != 0
-                or yr_mov != 0
-                or xd_mov != 0
-                or yd_mov != 0
-            ):
-                self.mode = "free"
+        #     if (
+        #         xl_mov != 0
+        #         or yl_mov != 0
+        #         or xr_mov != 0
+        #         or yr_mov != 0
+        #         or xd_mov != 0
+        #         or yd_mov != 0
+        #     ):
+        #         self.mode = "free"
 
     def _check_switch_auto(self, peripheral_manager: PeripheralManager):
-        gamepad = peripheral_manager.get_gamepad()
-        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        if gamepad.is_connected():
-            if gamepad.was_tapped(mapping.BUTTON_Y):
-                self.mode = "auto"
-                self._reset_camera_pos()
+        pass
+        # gamepad = peripheral_manager.get_gamepad()
+        # mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        # if gamepad.is_connected():
+        #     if gamepad.was_tapped(mapping.BUTTON_Y):
+        #         self.mode = "auto"
+        #         self._reset_camera_pos()
 
     def set_mode_free(self):
         self.mode = "free"
@@ -509,118 +508,118 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def _process_input(self, peripheral_manager):
         try:
             self._process_gamepad_input(peripheral_manager)
-            # self._process_keyboard_input(peripheral_manager)
+            self._process_keyboard_input(peripheral_manager)
         except Exception:  # i haven't actually seen it fail but just in case
             pass
 
-    def _process_gamepad_input(self, peripheral_manager: PeripheralManager):
-        gamepad = peripheral_manager.get_gamepad()
-        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        acc = np.zeros((3,), dtype=np.float32)
+    # def _process_gamepad_input(self, peripheral_manager: PeripheralManager):
+    #     gamepad = peripheral_manager.get_gamepad()
+    #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+    #     acc = np.zeros((3,), dtype=np.float32)
 
-        if gamepad.is_connected():
-            # === process input (L stick) ===
-            xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
-            yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
+    #     if gamepad.is_connected():
+    #         # === process input (L stick) ===
+    #         xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
+    #         yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
 
-            acc[0] += xl_mov * self.speed_accel / self.max_fps
-            acc[2] += yl_mov * self.speed_accel / self.max_fps
+    #         acc[0] += xl_mov * self.speed_accel / self.max_fps
+    #         acc[2] += yl_mov * self.speed_accel / self.max_fps
 
-            # === process input (dpad) ===
-            xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
-            if xd_mov != 0:
-                acc[0] += xd_mov * self.speed_accel / self.max_fps
-            if yd_mov != 0:
-                # dir flipped wrt dpad sign
-                acc[2] -= yd_mov * self.speed_accel / self.max_fps
+    #         # === process input (dpad) ===
+    #         xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+    #         if xd_mov != 0:
+    #             acc[0] += xd_mov * self.speed_accel / self.max_fps
+    #         if yd_mov != 0:
+    #             # dir flipped wrt dpad sign
+    #             acc[2] -= yd_mov * self.speed_accel / self.max_fps
 
-            # === apply movement based on input ===
-            if np.isclose(np.dot(acc, acc), 0.0):
-                self.vel *= self.speed_decel
-            else:
-                # Calculate desired direction
-                self.mode = "free"
-                direction = np.dot(self.mat[:3, :3].T, acc)
-                direction_norm = np.linalg.norm(direction)
+    #         # === apply movement based on input ===
+    #         if np.isclose(np.dot(acc, acc), 0.0):
+    #             self.vel *= self.speed_decel
+    #         else:
+    #             # Calculate desired direction
+    #             self.mode = "free"
+    #             direction = np.dot(self.mat[:3, :3].T, acc)
+    #             direction_norm = np.linalg.norm(direction)
 
-                if direction_norm > 0:
-                    # Normalize direction and scale by max_velocity
-                    normalized_direction = direction / direction_norm
-                    target_velocity = normalized_direction * self.max_velocity
+    #             if direction_norm > 0:
+    #                 # Normalize direction and scale by max_velocity
+    #                 normalized_direction = direction / direction_norm
+    #                 target_velocity = normalized_direction * self.max_velocity
 
-                    # Smoothly interpolate current velocity toward target
-                    lerp_factor = 0.1  # Adjust for faster/slower response
-                    self.vel = (
-                        self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
-                    )
+    #                 # Smoothly interpolate current velocity toward target
+    #                 lerp_factor = 0.1  # Adjust for faster/slower response
+    #                 self.vel = (
+    #                     self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
+    #                 )
 
-            # === process movement (R stick) ===
-            xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
-            yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
+    #         # === process movement (R stick) ===
+    #         xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
+    #         yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
 
-            if xr_mov != 0 or yr_mov != 0:
-                self.mode = "free"
+    #         if xr_mov != 0 or yr_mov != 0:
+    #             self.mode = "free"
 
-            fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
-            stick_scale_factor = 8
+    #         fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
+    #         stick_scale_factor = 8
 
-            dx = xr_mov * stick_scale_factor * fps_scale_factor
-            dy = yr_mov * stick_scale_factor * fps_scale_factor
+    #         dx = xr_mov * stick_scale_factor * fps_scale_factor
+    #         dy = yr_mov * stick_scale_factor * fps_scale_factor
 
-            rx = self.make_rot(dx * self.look_speed, 1)
-            ry = self.make_rot(dy * self.look_speed, 0)
+    #         rx = self.make_rot(dx * self.look_speed, 1)
+    #         ry = self.make_rot(dy * self.look_speed, 0)
 
-            self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
-            self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
+    #         self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
+    #         self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
-            # === process button inputs ===
-            # invert the radius
-            if gamepad.axis_tapped(mapping.AXIS_R):
-                self.BASE_RADIUS = (
-                    self._LO_BASE
-                    if self.BASE_RADIUS == self._HI_BASE
-                    else self._HI_BASE
-                )
+    #         # === process button inputs ===
+    #         # invert the radius
+    #         if gamepad.axis_tapped(mapping.AXIS_R):
+    #             self.BASE_RADIUS = (
+    #                 self._LO_BASE
+    #                 if self.BASE_RADIUS == self._HI_BASE
+    #                 else self._HI_BASE
+    #             )
 
-            # pulse the radius
-            if gamepad.axis_passed_threshold(mapping.AXIS_L):
-                target = self.BASE_RADIUS + 0.2
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
-            else:
-                target = self.BASE_RADIUS
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
+    #         # pulse the radius
+    #         if gamepad.axis_passed_threshold(mapping.AXIS_L):
+    #             target = self.BASE_RADIUS + 0.2
+    #             self.active_radius = lerp(
+    #                 self.active_radius,
+    #                 target,
+    #                 self.delta_real_time * self.INFLATE_SPEED,
+    #             )
+    #         else:
+    #             target = self.BASE_RADIUS
+    #             self.active_radius = lerp(
+    #                 self.active_radius,
+    #                 target,
+    #                 self.delta_real_time * self.INFLATE_SPEED,
+    #             )
 
-            # orbit color
-            # if gamepad.was_tapped(mapping.BUTTON_X):
-            #     self.shader.set("_orbit_color", np.array([1, 0, 0]))
+    #         # orbit color
+    #         # if gamepad.was_tapped(mapping.BUTTON_X):
+    #         #     self.shader.set("_orbit_color", np.array([1, 0, 0]))
 
-            if not self.tiled_mode:
-                # eagerly apply the uniforms
-                self.shader.set("s_radius", self.active_radius)
+    #         if not self.tiled_mode:
+    #             # eagerly apply the uniforms
+    #             self.shader.set("s_radius", self.active_radius)
 
-            # rotations
-            if gamepad.is_held(mapping.BUTTON_ZL):
-                rz = self.make_rot(0.02, 2)
-                self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
-            if gamepad.is_held(mapping.BUTTON_ZR):
-                rz = self.make_rot(-0.02, 2)
-                self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+    #         # rotations
+    #         if gamepad.is_held(mapping.BUTTON_ZL):
+    #             rz = self.make_rot(0.02, 2)
+    #             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+    #         if gamepad.is_held(mapping.BUTTON_ZR):
+    #             rz = self.make_rot(-0.02, 2)
+    #             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
-            # speed
-            if gamepad.is_held(mapping.BUTTON_PLUS):
-                self.max_velocity += 0.03
-            if gamepad.is_held(mapping.BUTTON_MINUS):
-                self.max_velocity = max(self.max_velocity - 0.03, 0)
+    #         # speed
+    #         if gamepad.is_held(mapping.BUTTON_PLUS):
+    #             self.max_velocity += 0.03
+    #         if gamepad.is_held(mapping.BUTTON_MINUS):
+    #             self.max_velocity = max(self.max_velocity - 0.03, 0)
 
-        gamepad.update()
+    #     gamepad.update()
 
     def _process_keyboard_input(self, peripheral_manager):
         keys = pygame.key.get_pressed()

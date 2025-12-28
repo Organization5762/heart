@@ -19,7 +19,6 @@ from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
-from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
@@ -52,8 +51,8 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.resolve_renderer_from_container(MandelbrotMode)
 
-    sphere_mode = loop.add_mode("3d fractal")
-    sphere_mode.resolve_renderer_from_container(FractalScene)
+    # sphere_mode = loop.add_mode("3d fractal")
+    # sphere_mode.resolve_renderer_from_container(FractalScene)
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.resolve_renderer_from_container(HilbertScene)
@@ -95,7 +94,7 @@ def configure(loop: GameLoop) -> None:
         loop.compose(
             [
                 multicolor_renderer(),
-                SpritesheetLoop("ness.png", "ness.json"),
+                SpritesheetLoop(sheet_file_path="ness.png", metadata_file_path="ness.json"),
             ]
         )
     )

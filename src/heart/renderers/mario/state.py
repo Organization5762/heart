@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Any
 
+from heart.assets.spritesheet import Spritesheet
 from heart.peripheral.sensor import Acceleration
 
 
 @dataclass
 class MarioRendererState:
-    spritesheet: Any
+    spritesheet: Spritesheet
     current_frame: int = 0
     time_since_last_update: float | None = None
     in_loop: bool = False

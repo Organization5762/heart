@@ -11,7 +11,9 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
+from heart.utilities.logging import get_logger
 
+logger = get_logger(__name__)
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def __init__(
@@ -60,19 +62,22 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             msg = "StatefulBaseRenderer requires a builder or _create_initial_state"
             raise ValueError(msg)
 
+        logger.info(f"Creating initial state for {self.name}")
         state = self._create_initial_state(
             window=window,
             clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
+        logger.info(f"Setting state for {self.name}")
         self.set_state(state)
+        logger.info(f"Processing for {self.name}")
         if self.warmup:
             screen = self._get_input_screen(window, orientation)
             self.process(screen, clock, peripheral_manager, orientation)
         self.initialized = True
 
-    def reset(self):
+    def reset(self) -> None:
         if self._subscription is not None:
             self._subscription.dispose()
             self._subscription = None

@@ -122,11 +122,11 @@ class RenderingConfiguration:
 
     @classmethod
     def render_surface_cache_enabled(cls) -> bool:
-        return _env_flag("HEART_RENDER_SURFACE_CACHE", default=True)
+        return _env_flag("HEART_RENDER_SURFACE_CACHE", default=False)
 
     @classmethod
     def render_screen_cache_enabled(cls) -> bool:
-        return _env_flag("HEART_RENDER_SCREEN_CACHE", default=True)
+        return _env_flag("HEART_RENDER_SCREEN_CACHE", default=False)
 
     @classmethod
     def render_tile_strategy(cls) -> RenderTileStrategy:
@@ -141,7 +141,7 @@ class RenderingConfiguration:
     @classmethod
     def render_merge_strategy(cls) -> RenderMergeStrategy:
         strategy = os.environ.get(
-            "HEART_RENDER_MERGE_STRATEGY", "batched"
+            "HEART_RENDER_MERGE_STRATEGY", "in_place"
         ).strip().lower()
         try:
             return RenderMergeStrategy(strategy)

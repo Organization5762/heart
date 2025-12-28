@@ -55,7 +55,7 @@ class SystemConfiguration:
 
     @classmethod
     def forward_to_beats_app(cls) -> bool:
-        return _env_flag("FORWARD_TO_BEATS_MAP", default=True)
+        return _env_flag("FORWARD_TO_BEATS_MAP", default=False)
 
     @classmethod
     def peripheral_configuration(cls) -> str:

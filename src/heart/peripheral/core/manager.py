@@ -6,7 +6,6 @@ from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.streams import PeripheralStreams
-from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import SwitchState
 from heart.utilities.logging import get_logger
@@ -47,14 +46,6 @@ class PeripheralManager:
     @property
     def configuration_registry(self) -> PeripheralConfigurationRegistry:
         return self._configuration_loader.registry
-
-    def get_gamepad(self) -> Gamepad:
-        """Return the first detected gamepad."""
-
-        for peripheral in self._peripherals:
-            if isinstance(peripheral, Gamepad):
-                return peripheral
-        raise ValueError("No Gamepad peripheral registered")
 
     def detect(self) -> None:
         for peripheral in self._iter_detected_peripherals():

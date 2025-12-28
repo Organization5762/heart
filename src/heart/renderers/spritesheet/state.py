@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from heart.peripheral.gamepad.gamepad import Gamepad
 from heart.peripheral.switch import SwitchState
 
 
@@ -70,5 +69,4 @@ class SpritesheetLoopState:
     duration_scale: float = 0.0
     last_switch_rotation: float | None = None
     reverse_direction: bool = False
-    gamepad: Gamepad | None = None
     switch_state: SwitchState | None = None

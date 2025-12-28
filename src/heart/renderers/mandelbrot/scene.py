@@ -15,10 +15,8 @@ from heart.device import Cube, Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import GamepadIdentifier
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.mandelbrot.control_mappings import (BitDoLite2Controls,
-                                                         KeyboardControls,
-                                                         SceneControlsMapping,
-                                                         SwitchProControls)
+from heart.renderers.mandelbrot.control_mappings import (KeyboardControls,
+                                                         SceneControlsMapping)
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
 from heart.utilities.env import Configuration
@@ -61,7 +59,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         )
         # input properties
         self.time_initialized = None
-        self.gamepad = None
+        # self.gamepad = None
         self.scene_controls: SceneControls | None = None
         self.control_mappings: dict[GamepadIdentifier, SceneControlsMapping] | None = (
             None
@@ -114,17 +112,17 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             mode="auto",
         )
         self.set_state(state)
-        self.gamepad = peripheral_manager.get_gamepad()
+        # self.gamepad = peripheral_manager.get_gamepad()
         self.scene_controls = SceneControls(state)
         self.keyboard_controls = KeyboardControls(self.scene_controls)
-        self.control_mappings = {
-            GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(
-                self.scene_controls, self.gamepad
-            ),
-            GamepadIdentifier.SWITCH_PRO: SwitchProControls(
-                self.scene_controls, self.gamepad
-            ),
-        }
+        # self.control_mappings = {
+        #     GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(
+        #         self.scene_controls, self.gamepad
+        #     ),
+        #     GamepadIdentifier.SWITCH_PRO: SwitchProControls(
+        #         self.scene_controls, self.gamepad
+        #     ),
+        # }
 
         if isinstance(orientation, Cube):
             # warmup compilation of the jitted functions
@@ -153,10 +151,10 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             return False
 
         self.keyboard_controls.update()
-        if connected := self.gamepad.is_connected():
-            mapping = self.control_mappings.get(self.gamepad.gamepad_identifier)
-            mapping.update()
-        return connected
+        # if connected := self.gamepad.is_connected():
+        #     mapping = self.control_mappings.get(self.gamepad.gamepad_identifier)
+        #     mapping.update()
+        return False
 
     def real_process(
         self,

@@ -106,7 +106,6 @@ python_version = "3.11"
 mypy_path = "src"
 packages = [
     "heart.device",
-    "heart.environment",
     "heart.loop",
     "heart.peripheral",
     "heart.utilities",
