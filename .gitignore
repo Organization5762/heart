@@ -14,3 +14,4 @@ ant_hr.log
 .dev_install.stamp
 node_modules
 .worktrees
+.heart
