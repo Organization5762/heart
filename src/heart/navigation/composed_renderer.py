@@ -55,7 +55,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         orientation: Orientation,
     ) -> ComposedRendererState:
         for renderer in self.renderers:
-            
             renderer.initialize(window, clock, peripheral_manager, orientation)
         return ComposedRendererState(
             peripheral_manager=peripheral_manager,

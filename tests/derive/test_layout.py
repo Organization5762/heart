@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from heart.derive import layout
+from heart.device.derive import layout
 
 
 class TestClusterPositions:
