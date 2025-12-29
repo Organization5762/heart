@@ -15,6 +15,7 @@ from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
                                                  LedWaveBoatState,
                                                  SprayParticle)
+from heart.utilities.reactivex_threads import pipe_in_background
 
 HULL_DEPTH = 1.0
 
@@ -30,29 +31,34 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
         self._rng = random.Random()
 
     def observable(self) -> reactivex.Observable[LedWaveBoatState]:
-        window_sizes = self._peripheral_manager.window.pipe(
+        window_sizes = pipe_in_background(
+            self._peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
             ops.share(),
         )
-        clocks = self._peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
-        accelerations = self._accelerometers.observable().pipe(
+        accelerations = pipe_in_background(
+            self._accelerometers.observable(),
             ops.start_with(None),
             ops.share(),
         )
 
-        frame_inputs = self._peripheral_manager.game_tick.pipe(
+        frame_inputs = pipe_in_background(
+            self._peripheral_manager.game_tick,
             ops.with_latest_from(window_sizes, clocks, accelerations),
             ops.map(self._to_frame_input),
         )
 
         initial_state = self._initial_state()
 
-        return frame_inputs.pipe(
+        return pipe_in_background(
+            frame_inputs,
             ops.scan(
                 lambda state, frame: self._advance_state(state=state, frame=frame),
                 seed=initial_state,

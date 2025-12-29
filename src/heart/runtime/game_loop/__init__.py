@@ -15,6 +15,7 @@ from heart.runtime.rendering.pacing import RenderLoopPacer
 from heart.runtime.rendering.pipeline import RendererVariant
 from heart.runtime.rendering.plan import RenderPlan
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import shutdown
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
@@ -126,6 +127,12 @@ class GameLoop:
             self._run_main_loop()
         finally:
             logger.info("Shutting down GameLoop.")
+
+            # SHut down the IO threads
+            shutdown.on_next(True)
+            shutdown.on_completed()
+            shutdown.dispose()
+
             self.components.render_pipeline.shutdown()
             pygame.quit()
 
@@ -238,6 +245,6 @@ class GameLoop:
             self._render_pacer.pace(render_start, estimated_cost_ms)
 
             self.components.display.clock.tick(self.max_fps)
-            
+
             self.components.peripheral_runtime.tick()
             self.components.peripheral_manager.clock.on_next(self.components.display.clock)

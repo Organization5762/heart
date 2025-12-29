@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import threading
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -113,6 +114,7 @@ def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
     return None
 
 
+
 @dataclass
 class WebSocket:
     clients: set[Any] = field(default_factory=set, init=False)
@@ -140,9 +142,9 @@ class WebSocket:
 
         self._thread = threading.Thread(
             target=self._ws_thread_main,
-            daemon=True,
             name="Beats websocket server",
         )
+        atexit.register(self._thread.join, timeout=1)
         self._thread.start()
 
     def _ws_thread_main(self) -> None:
@@ -190,7 +192,8 @@ class WebSocket:
             loop.create_task(broadcast_worker())
             await self._server.wait_closed()
 
-        loop.run_until_complete(main())
+        main_task = loop.create_task(main())
+        loop.run_until_complete(main_task)
 
     def send(self, kind: str, payload: object) -> None:
         if self._broadcast_queue and self._loop:

@@ -12,6 +12,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 from heart.renderers.state_provider import RngStateProvider
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class BorderStateProvider(ObservableProvider[BorderState]):
@@ -19,7 +20,8 @@ class BorderStateProvider(ObservableProvider[BorderState]):
         self._color = BehaviorSubject(initial_color or Color.random())
 
     def observable(self) -> reactivex.Observable[BorderState]:
-        return self._color.pipe(
+        return pipe_in_background(
+            self._color,
             ops.map(lambda color: BorderState(color=color)),
             ops.share(),
         )
@@ -48,7 +50,8 @@ class RainStateProvider(RngStateProvider[RainState]):
             current_y=self.rng.randint(0, 20),
         )
 
-        return self._peripheral_manager.game_tick.pipe(
+        return pipe_in_background(
+            self._peripheral_manager.game_tick,
             ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),
@@ -85,7 +88,8 @@ class SlinkyStateProvider(RngStateProvider[SlinkyState]):
             current_y=self.rng.randint(0, 20),
         )
 
-        return self._peripheral_manager.game_tick.pipe(
+        return pipe_in_background(
+            self._peripheral_manager.game_tick,
             ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

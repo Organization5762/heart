@@ -12,7 +12,8 @@ from reactivex import operators as ops
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import input_scheduler
+from heart.utilities.reactivex_threads import (interval_in_background,
+                                               pipe_in_main_thread)
 
 logger = get_logger(__name__)
 
@@ -74,10 +75,8 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             # to keep type checkers happy about the return type.
             return cast(reactivex.Observable[KeyboardEvent], reactivex.empty())
 
-        return reactivex.interval(
-            timedelta(milliseconds=5),
-            scheduler=input_scheduler(),
-        ).pipe(
+        return pipe_in_main_thread(
+            interval_in_background(period=timedelta(milliseconds=5)),
             ops.map(_poll),
             ops.filter(lambda event: event is not None),
             ops.map(lambda event: cast(KeyboardEvent, event)),

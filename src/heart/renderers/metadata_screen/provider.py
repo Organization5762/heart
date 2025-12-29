@@ -12,6 +12,7 @@ from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
                                                    MetadataScreenState)
+from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
@@ -23,7 +24,8 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[MetadataScreenState]:
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -38,7 +40,8 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
             return self._update_state(state, active_monitors, elapsed_ms)
 
         return (
-            peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                peripheral_manager.game_tick,
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

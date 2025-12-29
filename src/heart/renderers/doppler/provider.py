@@ -6,6 +6,7 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.utilities.reactivex_threads import pipe_in_background
 
 from .state import DopplerState
 
@@ -75,7 +76,8 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
         )
 
     def observable(self) -> reactivex.Observable[DopplerState]:
-        clocks = self._peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -95,7 +97,8 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
             )
 
         return (
-            self._peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                self._peripheral_manager.game_tick,
                 ops.with_latest_from(clocks),
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),

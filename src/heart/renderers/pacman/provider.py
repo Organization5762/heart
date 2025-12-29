@@ -8,6 +8,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.pacman.state import PacmanGhostState
 from heart.renderers.state_provider import RngStateProvider
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class PacmanGhostStateProvider(RngStateProvider[PacmanGhostState]):
@@ -32,7 +33,8 @@ class PacmanGhostStateProvider(RngStateProvider[PacmanGhostState]):
             blood=True,
         )
 
-        return self._peripheral_manager.game_tick.pipe(
+        return pipe_in_background(
+            self._peripheral_manager.game_tick,
             ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

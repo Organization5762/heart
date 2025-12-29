@@ -20,10 +20,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, Self
 
-import reactivex
-from reactivex import operators as ops
-
-from heart.peripheral.core import Input, InputDescriptor, Peripheral
+from heart.peripheral.core import Input, Peripheral
 
 
 @dataclass(slots=True)
@@ -93,49 +90,6 @@ class DrawingPad(Peripheral[Any]):
             self._apply_stylus(**self._parse_payload(input.data, is_erase=False))
         elif input.event_type == "drawing_pad.erase":
             self._apply_stylus(**self._parse_payload(input.data, is_erase=True))
-
-    def inputs(
-        self,
-        *,
-        event_bus: reactivex.Observable[Input] | None = None,
-    ) -> tuple[InputDescriptor, ...]:
-        if event_bus is None:
-            raise ValueError("event_bus is required to describe DrawingPad inputs")
-        def is_stroke(event: Input) -> bool:
-            return event.event_type == "drawing_pad.stroke"
-
-        def is_erase(event: Input) -> bool:
-            return event.event_type == "drawing_pad.erase"
-
-        def payload(event: Input) -> Any:
-            return event.data
-
-        stroke_stream = event_bus.pipe(
-            ops.filter(is_stroke),
-            ops.map(payload),
-        )
-        erase_stream = event_bus.pipe(
-            ops.filter(is_erase),
-            ops.map(payload),
-        )
-        return (
-            InputDescriptor(
-                name="drawing_pad.stroke",
-                stream=stroke_stream,
-                payload_type=dict,
-                description=(
-                    "Stylus payload with x, y, pressure, radius, and units fields."
-                ),
-            ),
-            InputDescriptor(
-                name="drawing_pad.erase",
-                stream=erase_stream,
-                payload_type=dict,
-                description=(
-                    "Erase payload with x, y, radius, and units fields."
-                ),
-            ),
-        )
 
     def apply_stylus(
         self,

@@ -7,6 +7,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_METADATA_DURATION_MS = 12000
 DEFAULT_MAX_BPM_DURATION_MS = 5000
@@ -24,7 +25,9 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[CombinedBpmScreenState]:
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
+
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -37,7 +40,8 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
             return self._advance_state(state=state, elapsed_ms=clock.get_time())
 
         return (
-            peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                peripheral_manager.game_tick,
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

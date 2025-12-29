@@ -11,9 +11,9 @@ from reactivex.subject.behaviorsubject import BehaviorSubject
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.utilities.env import Configuration, ReactivexEventBusScheduler
-from heart.utilities.reactivex.sharing import share_stream
 from heart.utilities.reactivex_threads import (background_scheduler,
-                                               input_scheduler)
+                                               input_scheduler,
+                                               pipe_in_background)
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 
@@ -30,7 +30,7 @@ class PeripheralStreams:
             event_bus = reactivex.empty()
         else:
             event_bus = reactivex.merge(*event_sources)
-        return share_stream(event_bus, stream_name="PeripheralManager.event_bus")
+        return event_bus
 
     def main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [
@@ -43,10 +43,11 @@ class PeripheralStreams:
         if not observables:
             return reactivex.empty()
 
-        merged = reactivex.merge(*observables).pipe(
+        merged = pipe_in_background(
+            reactivex.merge(*observables),
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
-        return share_stream(merged, stream_name="PeripheralManager.main_switch")
+        return merged
 
     @cached_property
     def game_tick(self) -> reactivex.Subject[Any]:

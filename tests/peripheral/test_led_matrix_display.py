@@ -4,7 +4,9 @@ import numpy as np
 from PIL import Image
 
 from heart.peripheral.led_matrix import LEDMatrixDisplay
+from heart.utilities.logging import get_logger
 
+logger = get_logger(__name__)
 
 def _solid_image(width: int, height: int, *, value: int) -> Image.Image:
     array = np.full((height, width, 3), value, dtype=np.uint8)
@@ -33,7 +35,7 @@ class TestPeripheralLedMatrixDisplay:
         received: list = []
 
         subscription = peripheral.observe.subscribe(
-            on_next=lambda envelope: received.append(envelope.data)
+            on_next=lambda envelope: received.append(envelope.data),
         )
         frame = peripheral.publish_image(image)
         subscription.dispose()

@@ -7,6 +7,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.channel_diffusion.state import ChannelDiffusionState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
@@ -22,14 +23,16 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
         initial_state: ChannelDiffusionState,
     ) -> reactivex.Observable[ChannelDiffusionState]:
         initial_size = (initial_state.grid.shape[0], initial_state.grid.shape[1])
-        window_sizes = peripheral_manager.window.pipe(
+        window_sizes = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
             ops.start_with(initial_size),
         )
 
-        ticks = peripheral_manager.game_tick.pipe(
+        ticks = pipe_in_background(
+            peripheral_manager.game_tick,
             ops.filter(lambda tick: tick is not None),
         )
 
@@ -37,12 +40,14 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             size: tuple[int, int],
         ) -> reactivex.Observable[ChannelDiffusionState]:
             seeded_state = self.initial_state(width=size[0], height=size[1])
-            return ticks.pipe(
+            return pipe_in_background(
+                ticks,
                 ops.scan(lambda state, _: self.next_state(state), seed=seeded_state),
                 ops.start_with(seeded_state),
             )
 
-        return window_sizes.pipe(
+        return pipe_in_background(
+            window_sizes,
             ops.map(build_stream),
             ops.switch_latest(),
             ops.share(),

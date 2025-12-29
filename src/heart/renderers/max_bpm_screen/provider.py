@@ -7,6 +7,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.max_bpm_screen.state import AvatarBpmRendererState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
@@ -25,7 +26,8 @@ class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[AvatarBpmRendererState]:
         return (
-            peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                peripheral_manager.game_tick,
                 ops.map(lambda _: self._select_top_bpm()),
                 ops.start_with(
                     AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)

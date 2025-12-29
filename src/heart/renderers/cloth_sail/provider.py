@@ -7,6 +7,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.cloth_sail.state import ClothSailState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class ClothSailStateProvider(ObservableProvider[ClothSailState]):
@@ -14,7 +15,9 @@ class ClothSailStateProvider(ObservableProvider[ClothSailState]):
         self._peripheral_manager = peripheral_manager
 
     def observable(self) -> reactivex.Observable[ClothSailState]:
-        clocks = self._peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            self._peripheral_manager.clock,
+
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -28,7 +31,8 @@ class ClothSailStateProvider(ObservableProvider[ClothSailState]):
             return ClothSailState(elapsed_seconds=state.elapsed_seconds + dt_seconds)
 
         return (
-            self._peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                self._peripheral_manager.game_tick,
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

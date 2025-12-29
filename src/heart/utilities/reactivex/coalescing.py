@@ -6,14 +6,13 @@ from typing import Any, TypeVar
 
 import reactivex
 from reactivex.disposable import Disposable
-from reactivex.scheduler import TimeoutScheduler
 
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import coalesce_scheduler
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
-_COALESCE_SCHEDULER = TimeoutScheduler()
 _NO_PENDING: Any = object()
 
 
@@ -63,7 +62,7 @@ def coalesce_latest(
                 else:
                     return
             due_time = now + window_seconds
-            timer = _COALESCE_SCHEDULER.schedule_relative(
+            timer = coalesce_scheduler().schedule_relative(
                 window_seconds,
                 lambda *_: _flush(),
             )
@@ -111,7 +110,7 @@ def coalesce_latest(
             _on_next,
             _on_error,
             _on_completed,
-            scheduler=scheduler,
+            scheduler=coalesce_scheduler(),
         )
 
         def _dispose() -> None:

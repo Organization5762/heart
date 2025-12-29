@@ -6,6 +6,7 @@ from reactivex import operators as ops
 
 from heart.peripheral.core import InputDescriptor
 from heart.peripheral.core.providers import registry as providers_registry
+from heart.utilities.reactivex_threads import pipe_in_background
 
 apply_provider_registrations = providers_registry.apply_provider_registrations
 register_provider = providers_registry.register_provider
@@ -35,4 +36,7 @@ class StaticStateProvider(ObservableProvider[T]):
         return self._state
 
     def observable(self) -> reactivex.Observable[T]:
-        return reactivex.just(self._state).pipe(ops.share())
+        return pipe_in_background(
+            reactivex.just(self._state),
+            ops.share(),
+        )

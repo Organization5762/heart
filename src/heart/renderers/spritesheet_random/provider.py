@@ -11,6 +11,7 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
@@ -49,19 +50,22 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[SpritesheetLoopRandomState]:
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
         switches = peripheral_manager.get_main_switch_subscription()
-        switch_updates = switches.pipe(
+        switch_updates = pipe_in_background(
+            switches,
             ops.map(
                 lambda switch_state: lambda state: self.handle_switch_state(
                     state, switch_state
                 )
             )
         )
-        tick_updates = peripheral_manager.game_tick.pipe(
+        tick_updates = pipe_in_background(
+            peripheral_manager.game_tick,
             ops.with_latest_from(clocks),
             ops.map(
                 lambda latest: lambda state: self.next_state(
@@ -71,7 +75,8 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             ),
         )
         initial_state = self.initial_state()
-        return reactivex.merge(switch_updates, tick_updates).pipe(
+        return pipe_in_background(
+            reactivex.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

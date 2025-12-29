@@ -11,6 +11,8 @@ import reactivex
 from reactivex import operators as ops
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
+from heart.utilities.reactivex_threads import (interval_in_background,
+                                               pipe_in_background)
 
 # --- Shared types ------------------------------------------------------------
 
@@ -158,6 +160,7 @@ class FakeUWBPositioning(Peripheral[LocalizedTarget | None]):
             )
 
         # Emit a new multilateration solution every 500 ms
-        return reactivex.interval(timedelta(milliseconds=500)).pipe(
+        return pipe_in_background(
+            interval_in_background(period=timedelta(milliseconds=500)),
             ops.map(simulate_sample),
         )

@@ -11,6 +11,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
@@ -39,7 +40,8 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         if peripheral_manager is None:
             raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
 
-        window_stream = peripheral_manager.window.pipe(
+        window_stream = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: cast(pygame.Surface, window)),
             ops.map(lambda window: window.get_size()[0]),
@@ -48,7 +50,8 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         initial_state = self._initial_state_snapshot()
 
         return (
-            peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                peripheral_manager.game_tick,
                 ops.with_latest_from(window_stream),
                 ops.map(lambda pair: pair[1]),
                 ops.scan(
@@ -89,7 +92,8 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         if peripheral_manager is None:
             raise ValueError("SlidingRendererStateProvider requires a PeripheralManager")
 
-        window_stream = peripheral_manager.window.pipe(
+        window_stream = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: cast(pygame.Surface, window)),
             ops.map(lambda window: window.get_size()[0]),
@@ -98,7 +102,9 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         initial_state = self._initial_state_snapshot()
 
         return (
-            peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                peripheral_manager.game_tick,
+
                 ops.with_latest_from(window_stream),
                 ops.map(lambda pair: pair[1]),
                 ops.scan(

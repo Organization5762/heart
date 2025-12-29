@@ -1,3 +1,4 @@
+import atexit
 import queue
 import threading
 from typing import Any, Optional
@@ -13,8 +14,9 @@ class MatrixDisplayWorker:
         self.offscreen = self.matrix.CreateFrameCanvas()
         self.q: queue.Queue[Optional[Image.Image]] = queue.Queue(maxsize=2)
         self._worker = threading.Thread(
-            target=self._run, daemon=True, name="matrix display worker"
+            target=self._run, name="matrix display worker"
         )
+        atexit.register(self._worker.join, timeout=1)
         self._worker.start()
 
     def set_image_async(self, img: Image.Image) -> None:
@@ -26,7 +28,7 @@ class MatrixDisplayWorker:
 
     def shutdown(self) -> None:
         self.q.put(None)
-        self._worker.join()
+        self._worker.join(timeout=1)
 
     def _run(self) -> None:
         while True:

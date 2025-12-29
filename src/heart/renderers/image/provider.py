@@ -8,6 +8,7 @@ from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.image.state import RenderImageState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class RenderImageStateProvider(ObservableProvider[RenderImageState]):
@@ -26,7 +27,8 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
         if peripheral_manager is None:
             raise ValueError("RenderImageStateProvider requires a PeripheralManager")
 
-        window_stream = peripheral_manager.window.pipe(
+        window_stream = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: cast(pygame.Surface, window)),
             ops.map(lambda window: window.get_size()),
@@ -38,4 +40,8 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
         def build_state(size: tuple[int, int]) -> RenderImageState:
             return RenderImageState(base_image=base_image, window_size=size)
 
-        return window_stream.pipe(ops.map(build_state), ops.share())
+        return pipe_in_background(
+            window_stream,
+            ops.map(build_state),
+            ops.share(),
+        )
