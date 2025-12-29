@@ -14,6 +14,7 @@ import rotaryio
 from digitalio import DigitalInOut, Direction, Pull
 
 from heart.firmware_io import device_id, identity, rotary_encoder
+from heart.utilities.logging import get_logger
 
 DEVICE_NAME = "rotary-encoder"
 IDENTITY = identity.Identity(
@@ -22,11 +23,12 @@ IDENTITY = identity.Identity(
     device_id=device_id.persistent_device_id(),
 )
 DEBUG = False
+logger = get_logger(__name__)
 
 
 def _debug(message: str) -> None:
     if DEBUG:
-        print(message)
+        logger.debug(message)
 
 
 def _write_serial_bus(message: str) -> None:

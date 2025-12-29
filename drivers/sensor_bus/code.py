@@ -17,17 +17,19 @@ from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
 
 from heart.firmware_io import constants, device_id, identity
+from heart.utilities.logging import get_logger
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS: float = 0.1
 DEFAULT_MIN_CHANGE_THRESHOLD: float = 0.1
 DEBUG = False
 DEVICE_NAME = "sensor-bus"
+logger = get_logger(__name__)
 
 
 def _debug(message: str) -> None:
     if DEBUG:
-        print(message)
+        logger.debug(message)
 
 
 def _write_serial_bus(message: str) -> None:
