@@ -36,7 +36,6 @@ def _build_scheduler(
                 resolved_workers = (
                     max_workers if max_workers is not None else default_workers()
                 )
-                print(f"Building scheduler with {resolved_workers} workers")
                 state.scheduler = ThreadPoolScheduler(max_workers=resolved_workers)
     assert state.scheduler is not None
     return state.scheduler
