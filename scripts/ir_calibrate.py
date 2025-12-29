@@ -15,6 +15,12 @@ from heart.peripheral.ir_sensor_array import SPEED_OF_LIGHT, radial_layout
 
 app = typer.Typer(help="Calibrate IR sensor arrays from captured sweep data.")
 
+DEFAULT_OUTPUT_PATH = Path("ir_array_offsets.json")
+DEFAULT_LAYOUT = "radial"
+DEFAULT_LAYOUT_FILE = None
+DEFAULT_PROPAGATION_SPEED = SPEED_OF_LIGHT
+DEFAULT_TELEMETRY_URL = None
+
 
 @dataclass(slots=True)
 class CaptureRecord:
@@ -137,22 +143,22 @@ def _compute_offsets(
 def calibrate(
     data: Path = typer.Argument(..., help="Path to captured sweep data (JSON)."),
     output: Path = typer.Option(
-        Path("ir_array_offsets.json"),
+        DEFAULT_OUTPUT_PATH,
         "--output",
         "-o",
         help="Destination for calibration offsets (JSON).",
     ),
-    layout: str = typer.Option("radial", help="Built-in sensor layout to use."),
+    layout: str = typer.Option(DEFAULT_LAYOUT, help="Built-in sensor layout to use."),
     layout_file: Path | None = typer.Option(
-        None,
+        DEFAULT_LAYOUT_FILE,
         help="Optional path to custom sensor layout JSON overriding --layout.",
     ),
     propagation_speed: float = typer.Option(
-        SPEED_OF_LIGHT,
+        DEFAULT_PROPAGATION_SPEED,
         help="Propagation speed for the burst medium (m/s).",
     ),
     telemetry_url: str | None = typer.Option(
-        None,
+        DEFAULT_TELEMETRY_URL,
         help="Optional HTTP endpoint that receives the calibration payload.",
     ),
 ) -> None:

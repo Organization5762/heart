@@ -85,3 +85,7 @@ Keep files narrowly scoped. If a module starts handling multiple concerns (e.g.,
 ## Environment Cleanup
 
 If a single file or module starts accumulating setup, orchestration, configuration, and cleanup logic, move those responsibilities into smaller, focused modules or helpers so each file handles fewer concerns and is easier to reason about.
+
+## Configuration Defaults
+
+Define CLI default values as module-level constants so they stay consistent across commands and are easy to review.

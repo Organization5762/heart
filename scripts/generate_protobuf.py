@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 DEFAULT_PROTO_PATH = Path("src")
 DEFAULT_PYTHON_OUT = Path("src")
+DEFAULT_PROTO_PATHS = [DEFAULT_PROTO_PATH]
 
 app = typer.Typer(add_completion=False)
 
@@ -29,7 +30,7 @@ def generate(
         resolve_path=True,
     ),
     proto_path: list[Path] = typer.Option(
-        [DEFAULT_PROTO_PATH],
+        DEFAULT_PROTO_PATHS,
         "--proto-path",
         help="Root directory for protobuf imports. Repeat to add more.",
     ),
