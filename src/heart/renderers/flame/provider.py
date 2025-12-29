@@ -8,6 +8,7 @@ from reactivex.subject import BehaviorSubject
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.flame.state import FlameState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class FlameStateProvider(ObservableProvider[FlameState]):
@@ -19,7 +20,8 @@ class FlameStateProvider(ObservableProvider[FlameState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[FlameState]:
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -30,7 +32,8 @@ class FlameStateProvider(ObservableProvider[FlameState]):
                 dt_seconds=max(clock.get_time() / 1000.0, 1.0 / 120.0),
             )
 
-        return peripheral_manager.game_tick.pipe(
+        return pipe_in_background(
+            peripheral_manager.game_tick,
             ops.with_latest_from(clocks),
             ops.map(lambda latest: to_state(clock=latest[1])),
             ops.do_action(self._latest_state.on_next),

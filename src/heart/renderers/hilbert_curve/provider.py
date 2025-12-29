@@ -12,6 +12,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 def compute_bounding_box(points: np.ndarray) -> BoundingBox:
@@ -262,7 +263,8 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         self,
         peripheral_manager: PeripheralManager,
     ) -> reactivex.Observable[HilbertCurveState]:
-        window_sizes = peripheral_manager.window.pipe(
+        window_sizes = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
@@ -272,7 +274,8 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             size: tuple[int, int],
         ) -> reactivex.Observable[HilbertCurveState]:
             initial_state = self.initial_state(width=size[0], height=size[1])
-            return peripheral_manager.game_tick.pipe(
+            return pipe_in_background(
+                peripheral_manager.game_tick,
                 ops.filter(lambda tick: tick is not None),
                 ops.map(lambda _: time.monotonic()),
                 ops.scan(
@@ -282,7 +285,8 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
                 ops.start_with(initial_state),
             )
 
-        return window_sizes.pipe(
+        return pipe_in_background(
+            window_sizes,
             ops.map(build_stream),
             ops.switch_latest(),
             ops.share(),

@@ -12,6 +12,7 @@ from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.free_text.state import FreeTextRendererState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
@@ -25,7 +26,8 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[FreeTextRendererState]:
-        windows = peripheral_manager.window.pipe(
+        windows = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
@@ -48,7 +50,8 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
                 line_height=line_height,
             )
 
-        return ticks.pipe(
+        return pipe_in_background(
+            ticks,
             ops.with_latest_from(windows, self._text),
             ops.map(to_state),
             ops.start_with(self.initial_state()),

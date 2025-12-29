@@ -9,6 +9,7 @@ from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
 from heart.utilities.env import Configuration
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class LifeStateProvider:
@@ -37,7 +38,8 @@ class LifeStateProvider:
 
         # If the window size changes, we want to observe and correct for this
         window_sizes: reactivex.Observable[tuple[int, int]] = (
-            self._pm.window.pipe(
+            pipe_in_background(
+                self._pm.window,
                 ops.filter(lambda w: w is not None),
                 ops.map(lambda w: w.get_size()),
                 ops.distinct_until_changed(),
@@ -46,7 +48,9 @@ class LifeStateProvider:
         )
 
         # We create an initial state
-        initial_state: reactivex.Observable[LifeState] = window_sizes.pipe(
+        initial_state: reactivex.Observable[LifeState] = pipe_in_background(
+            window_sizes,
+
             ops.take(1),
             ops.map(create_new_grid),
             ops.map(create_state),
@@ -54,7 +58,9 @@ class LifeStateProvider:
 
         # If the button changes, reseed the state
         reseed_states: reactivex.Observable[LifeState] = (
-            self._main_switch.observable().pipe(
+            pipe_in_background(
+                self._main_switch.observable(),
+
                 ops.with_latest_from(window_sizes),
                 ops.map(lambda pair: create_new_grid((pair[1]))),
                 ops.map(create_state),
@@ -70,17 +76,24 @@ class LifeStateProvider:
 
         # Merge the initial state + update streams
         operations: reactivex.Observable[StateOp] = reactivex.merge(
-            injected_states.pipe(
+            pipe_in_background(
+                injected_states,
+
                 ops.map(op_from_injected),
             ),
-            self._pm.game_tick.pipe(
+            pipe_in_background(
+                self._pm.game_tick,
+
                 ops.map(op_from_tick),
             )
         )
 
-        result: reactivex.Observable[LifeState] = initial_state.pipe(
+        result: reactivex.Observable[LifeState] = pipe_in_background(
+            initial_state,
+
             ops.flat_map(
-                lambda first_state: operations.pipe(
+                lambda first_state: pipe_in_background(
+                    operations,
                     ops.scan(lambda acc, op: op(acc), seed=first_state),
                     ops.start_with(first_state),
                 )
@@ -88,4 +101,4 @@ class LifeStateProvider:
             ops.share(),
         )
 
-        return result        
+        return result

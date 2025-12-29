@@ -45,8 +45,8 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             font="Roboto",
             font_size=14,
             color=Color(255, 105, 180),
-            x_location=None,
-            y_location=None,
+            x_location=0.5,
+            y_location=0.5,
         )
 
     def _current_text(self) -> str:
@@ -83,7 +83,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
 
         window_width, window_height = window.get_size()
 
-    
+
         if self.state.y_location is not None:
             y_offset = int(self.state.y_location * window_height)
         else:

@@ -15,14 +15,14 @@ from reactivex.abc import ObserverBase, SchedulerBase
 from reactivex.disposable import Disposable
 
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import (Input, InputDescriptor, Peripheral,
-                                   PeripheralInfo, PeripheralMessageEnvelope,
-                                   PeripheralTag)
+from heart.peripheral.core import (Peripheral, PeripheralInfo,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.keyboard import (KeyboardAction, KeyboardEvent,
                                        KeyboardKey)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import input_scheduler
+from heart.utilities.reactivex_threads import (interval_in_background,
+                                               pipe_in_background)
 
 logger = get_logger(__name__)
 SERIAL_RECONNECT_DELAY_SECONDS = 0.1
@@ -58,19 +58,17 @@ class BaseSwitch(Peripheral[SwitchState]):
     def _event_stream(
         self
     ) -> reactivex.Observable[SwitchState]:
-        return reactivex.interval(
-            timedelta(milliseconds=10),
-            scheduler=input_scheduler(),
-        ).pipe(
+        return pipe_in_background(
+            interval_in_background(period=timedelta(milliseconds=10)),
             ops.map(lambda _: self._snapshot()),
             ops.distinct_until_changed(lambda x: x)
         )
-        
+
     def _snapshot(self) -> SwitchState:
         result = SwitchState(
             rotational_value=self.rotational_value,
             button_value=self.button_value,
-            rotation_since_last_button_press=self.rotation_value_at_last_button_press,
+            rotation_since_last_button_press=self.rotational_value - self.rotation_value_at_last_button_press,
             long_button_value=self.button_long_press_value,
             rotation_since_last_long_button_press=self.rotational_value - self.rotation_value_at_last_long_button_press,
         )
@@ -87,15 +85,17 @@ class FakeSwitch(BaseSwitch):
         def _is_pressed(event: KeyboardEvent) -> bool:
             return event.action is KeyboardAction.PRESSED
 
-        return KeyboardKey.get(key).observe.pipe(
+        return pipe_in_background(
+            KeyboardKey.get(key).observe,
             ops.map(_unwrap),
             ops.filter(_is_pressed),
+            ops.share(),
         )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
-    
+
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
             id="fake_switch",
@@ -113,35 +113,12 @@ class FakeSwitch(BaseSwitch):
             ]
         )
 
-    def inputs(
-        self,
-        *,
-        event_bus: reactivex.Observable[Input] | None = None,
-    ) -> tuple[InputDescriptor, ...]:
-        keyboard_stream = reactivex.merge(
-            self._key_press_stream(pygame.K_UP),
-            self._key_press_stream(pygame.K_DOWN),
-            self._key_press_stream(pygame.K_LEFT),
-            self._key_press_stream(pygame.K_RIGHT),
-        )
-        return (
-            InputDescriptor(
-                name="keyboard.arrow_keys.pressed",
-                stream=keyboard_stream,
-                payload_type=KeyboardEvent,
-                description=(
-                    "Arrow key press events (KeyboardAction.PRESSED) mapped to "
-                    "fake switch rotation and button increments."
-                ),
-            ),
-        )
-
     def run(self) -> None:
         if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
             def handle_key_up(_: Any) -> None:
                 self.button_long_press_value += 1
                 self.rotation_value_at_last_long_button_press = self.rotational_value
-            
+
             def handle_key_down(_: Any) -> None:
                 self.button_value += 1
                 self.rotation_value_at_last_button_press = self.rotational_value
@@ -165,12 +142,11 @@ class FakeSwitch(BaseSwitch):
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             return reactivex.empty()
         else:
-            return reactivex.interval(
-                timedelta(milliseconds=10),
-                scheduler=input_scheduler(),
-            ).pipe(
+            return pipe_in_background(
+                interval_in_background(period=timedelta(milliseconds=10)),
                 ops.map(lambda _: self._snapshot()),
-                ops.distinct_until_changed(lambda x: x)
+                ops.distinct_until_changed(lambda x: x),
+                ops.share(),
             )
 
 class Switch(BaseSwitch):
@@ -217,7 +193,6 @@ class Switch(BaseSwitch):
         source = create(self._read_from_switch)
         source.subscribe(
             on_next=self.update_due_to_data,
-            scheduler=input_scheduler(),
         )
 
 class BluetoothSwitch(BaseSwitch):

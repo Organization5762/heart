@@ -99,7 +99,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         else:
             state = GameModeState()
         peripheral_manager.get_main_switch_subscription().subscribe(
-            on_next=self.handle_state
+            on_next=self.handle_state,
         )
         return state
 

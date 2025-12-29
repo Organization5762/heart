@@ -13,6 +13,7 @@ from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
@@ -97,7 +98,8 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     ) -> reactivex.Observable[SpritesheetLoopState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
         ticks = peripheral_manager.game_tick
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -106,11 +108,13 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             switch_updates = reactivex.empty()
         else:
             switches = peripheral_manager.get_main_switch_subscription()
-            switch_updates = switches.pipe(
+            switch_updates = pipe_in_background(
+                switches,
                 ops.map(lambda switch_state: lambda state: self.handle_switch(state, switch_state))
             )
 
-        tick_updates = ticks.pipe(
+        tick_updates = pipe_in_background(
+            ticks,
             ops.with_latest_from(clocks),
             ops.map(
                 lambda latest: lambda state: self.advance(
@@ -120,7 +124,8 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             ),
         )
 
-        return reactivex.merge(switch_updates, tick_updates).pipe(
+        return pipe_in_background(
+            reactivex.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),
@@ -159,8 +164,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     #         duration_scale += 0.005
     #     elif gamepad.axis_passed_threshold(mapping.AXIS_L):
     #         duration_scale -= 0.005
-
-        return replace(state, duration_scale=duration_scale)
+    #     return replace(state, duration_scale=duration_scale)
 
     def _next_frame(
         self,

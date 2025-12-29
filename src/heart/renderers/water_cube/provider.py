@@ -6,6 +6,7 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
@@ -24,8 +25,10 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
         initial = WaterCubeState.initial_state()
 
-        return accel.pipe(
+        return pipe_in_background(
+            accel,
             ops.start_with(initial),
+
             ops.scan(update_state),
             ops.share(),
         )

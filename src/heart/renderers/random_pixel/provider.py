@@ -11,6 +11,7 @@ from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.random_pixel.state import RandomPixelState
 from heart.renderers.state_provider import RngStateProvider
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class RandomPixelStateProvider(RngStateProvider[RandomPixelState]):
@@ -37,14 +38,17 @@ class RandomPixelStateProvider(RngStateProvider[RandomPixelState]):
             color=initial_color, pixels=self._random_pixels()
         )
 
-        color_updates = self._color.pipe(
+        color_updates = pipe_in_background(
+            self._color,
             ops.map(lambda color: ("color", color)),
         )
-        tick_updates = self._peripheral_manager.game_tick.pipe(
+        tick_updates = pipe_in_background(
+            self._peripheral_manager.game_tick,
             ops.map(lambda _: ("tick", None)),
         )
 
-        return reactivex.merge(color_updates, tick_updates).pipe(
+        return pipe_in_background(
+            reactivex.merge(color_updates, tick_updates),
             ops.scan(self._advance_state, seed=initial_state),
             ops.share(),
         )

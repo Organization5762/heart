@@ -11,6 +11,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import SlideTransitionState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
@@ -59,14 +60,16 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         *,
         initial_state: SlideTransitionState,
     ) -> reactivex.Observable[SlideTransitionState]:
-        window_widths = peripheral_manager.window.pipe(
+        window_widths = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_width()),
             ops.distinct_until_changed(),
             ops.start_with(initial_state.screen_w),
         )
 
-        tick_updates = peripheral_manager.game_tick.pipe(
+        tick_updates = pipe_in_background(
+            peripheral_manager.game_tick,
             ops.filter(lambda tick: tick is not None),
             ops.with_latest_from(window_widths),
             ops.map(
@@ -77,7 +80,8 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
             ),
         )
 
-        return tick_updates.pipe(
+        return pipe_in_background(
+            tick_updates,
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

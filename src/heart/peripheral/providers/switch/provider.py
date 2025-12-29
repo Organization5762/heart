@@ -1,10 +1,11 @@
 import reactivex
 from reactivex import operators as ops
 
-from heart.peripheral.core import InputDescriptor, PeripheralMessageEnvelope
+from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import FakeSwitch, SwitchState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class MainSwitchProvider(ObservableProvider[SwitchState]):
@@ -19,18 +20,9 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
         ]
         if not main_switches:
             return reactivex.empty()
-        return reactivex.merge(*main_switches).pipe(
+        return pipe_in_background(
+            reactivex.merge(*main_switches),
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
-        )
-
-    def inputs(self) -> tuple[InputDescriptor, ...]:
-        return (
-            InputDescriptor(
-                name="fake_switch.observe.state",
-                stream=self._switch_stream(),
-                payload_type=SwitchState,
-                description="Observable stream of SwitchState updates from FakeSwitch.",
-            ),
         )
 
     def observable(self) -> reactivex.Observable[SwitchState]:

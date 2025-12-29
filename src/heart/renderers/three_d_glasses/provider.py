@@ -6,6 +6,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_FRAME_DURATION_MS = 650
 DEFAULT_FRAME_COUNT = 0
@@ -49,12 +50,14 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         *,
         initial_state: ThreeDGlassesState,
     ) -> reactivex.Observable[ThreeDGlassesState]:
-        clocks = peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
 
-        tick_updates = peripheral_manager.game_tick.pipe(
+        tick_updates = pipe_in_background(
+            peripheral_manager.game_tick,
             ops.filter(lambda tick: tick is not None),
             ops.with_latest_from(clocks),
             ops.map(
@@ -65,7 +68,8 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
             ),
         )
 
-        return tick_updates.pipe(
+        return pipe_in_background(
+            tick_updates,
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

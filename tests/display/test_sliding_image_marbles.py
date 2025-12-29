@@ -12,6 +12,7 @@ from reactivex.testing.marbles import marbles_testing
 
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider
 from heart.renderers.sliding_image.state import SlidingImageState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,7 @@ class TestSlidingImageMarbleOutputs:
             window_stream = cold("a------|", {"a": window_surface})
             tick_stream = cold(tick_pattern, tick_values)
             manager = _StubManager(window=window_stream, game_tick=tick_stream)
-            image_stream = provider.observable(manager).pipe(
+            image_stream = pipe_in_background(provider.observable(manager),
                 ops.filter(lambda state: state.width > 0),
                 ops.map(lambda state: _render_sliding_frame(state, base_surface)),
                 ops.map(

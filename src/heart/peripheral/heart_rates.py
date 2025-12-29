@@ -4,6 +4,7 @@ import time
 from typing import (Any, Callable, Dict, Iterator, List, Optional,
                     SupportsIndex, Tuple, overload)
 
+from openant.base.ant import usb
 from openant.base.driver import DriverNotFound
 from openant.devices import ANTPLUS_NETWORK_KEY
 from openant.devices.common import DeviceType
@@ -127,6 +128,12 @@ class HeartRateManager(Peripheral[Any]):
 
     @classmethod
     def detect(cls) -> Iterator["HeartRateManager"]:
+        # If this errors with NoBackendError, we can't detect heart rate monitors
+        try:
+            Node()
+        except usb.core.NoBackendError:
+            logger.info("Unable to detect heart rate monitors - USB backend not available")
+            return
         yield cls()
 
     # ---------- Callbacks -----------------------------------------------------

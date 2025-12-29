@@ -11,6 +11,7 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import pipe_in_background
 
 logger = get_logger(__name__)
 
@@ -93,11 +94,13 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
     ) -> reactivex.Observable[YoListenState]:
         initial_state = self.initial_state()
 
-        switch_updates = peripheral_manager.get_main_switch_subscription().pipe(
+        switch_updates = pipe_in_background(
+            peripheral_manager.get_main_switch_subscription(),
             ops.map(lambda switch_state: lambda state: self.handle_switch_state(state, switch_state)),
         )
 
-        window_widths = peripheral_manager.window.pipe(
+        window_widths = pipe_in_background(
+            peripheral_manager.window,
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_width()),
             ops.distinct_until_changed(),
@@ -122,13 +125,15 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
                 window_width=window_width,
             )
 
-        tick_updates = peripheral_manager.game_tick.pipe(
+        tick_updates = pipe_in_background(
+            peripheral_manager.game_tick,
             ops.filter(lambda tick: tick is not None),
             ops.with_latest_from(window_widths),
             ops.map(lambda latest: lambda state: advance(state, latest[1])),
         )
 
-        return reactivex.merge(switch_updates, tick_updates).pipe(
+        return pipe_in_background(
+            reactivex.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

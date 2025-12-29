@@ -7,6 +7,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.heart_title_screen.state import HeartTitleScreenState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
@@ -16,7 +17,9 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
         self._peripheral_manager = peripheral_manager
 
     def observable(self) -> reactivex.Observable[HeartTitleScreenState]:
-        clocks = self._peripheral_manager.clock.pipe(
+        clocks = pipe_in_background(
+            self._peripheral_manager.clock,
+
             ops.filter(lambda clock: clock is not None),
             ops.share(),
         )
@@ -29,7 +32,8 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
             return self._advance_state(state=state, frame_ms=clock.get_time())
 
         return (
-            self._peripheral_manager.game_tick.pipe(
+            pipe_in_background(
+                self._peripheral_manager.game_tick,
                 ops.with_latest_from(clocks),
                 ops.map(lambda latest: latest[1]),
                 ops.scan(advance_state, seed=initial_state),

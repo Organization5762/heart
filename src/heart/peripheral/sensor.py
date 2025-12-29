@@ -15,6 +15,8 @@ from heart.peripheral.input_payloads.motion import AccelerometerVector
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
+from heart.utilities.reactivex_threads import (interval_in_background,
+                                               pipe_in_background)
 
 logger = get_logger(__name__)
 RECONNECT_DELAY_SECONDS = 1.0
@@ -44,7 +46,9 @@ class Accelerometer(Peripheral[Acceleration | None]):
     def _event_stream(
         self
     ) -> reactivex.Observable[Acceleration | None]:
-        return reactivex.interval(timedelta(milliseconds=10)).pipe(
+        return pipe_in_background(
+            interval_in_background(period=timedelta(milliseconds=10)),
+
             ops.map(lambda _: self.get_acceleration()),
             ops.distinct_until_changed(lambda x: x)
         )
@@ -180,6 +184,7 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
                 y=random.random(),
                 z=9.8,
             )
-        return reactivex.interval(timedelta(milliseconds=500)).pipe(
+        return pipe_in_background(
+            interval_in_background(period=timedelta(milliseconds=500)),
             ops.map(random_accel)
         )

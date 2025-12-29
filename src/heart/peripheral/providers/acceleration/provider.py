@@ -4,10 +4,11 @@ from typing import TypeGuard, cast
 import reactivex
 from reactivex import operators as ops
 
-from heart.peripheral.core import InputDescriptor, PeripheralMessageEnvelope
+from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration, Accelerometer
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class AllAccelerometersProvider(ObservableProvider[Acceleration]):
@@ -34,7 +35,9 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
         def filter_acceleration(
             source: reactivex.Observable[Acceleration | None],
         ) -> reactivex.Observable[Acceleration]:
-            return source.pipe(
+            return pipe_in_background(
+                source,
+
                 ops.filter(is_acceleration),
                 ops.map(lambda accel: cast(Acceleration, accel)),
             )
@@ -50,22 +53,10 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
             [reactivex.Observable[PeripheralMessageEnvelope[Acceleration | None]]],
             reactivex.Observable[Acceleration | None],
         ] = ops.map(unwrap_acceleration)
-        return merged.pipe(
+        return pipe_in_background(
+            merged,
             map_op,
             filter_acceleration,
-        )
-
-    def inputs(self) -> tuple[InputDescriptor, ...]:
-        return (
-            InputDescriptor(
-                name="accelerometer.observe.acceleration",
-                stream=self._acceleration_stream(),
-                payload_type=Acceleration,
-                description=(
-                    "Observable stream of Acceleration readings emitted by "
-                    "Accelerometer peripherals."
-                ),
-            ),
         )
 
     def observable(self) -> reactivex.Observable[Acceleration]:

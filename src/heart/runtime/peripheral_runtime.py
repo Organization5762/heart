@@ -28,7 +28,7 @@ class PeripheralRuntime:
     def configure_streaming(self, websocket: WebSocket | None = None) -> None:
         ws = websocket or WebSocket()
         self._peripheral_manager.get_event_bus().subscribe(
-            on_next=lambda x: ws.send(kind="peripheral", payload=x)
+            on_next=lambda x: ws.send(kind="peripheral", payload=x),
         )
 
     def tick(self) -> None:

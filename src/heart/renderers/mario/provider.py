@@ -7,6 +7,7 @@ from heart.peripheral.sensor import Acceleration
 from heart.peripheral.uwb import ops
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import pipe_in_background
 
 logger = get_logger(__name__)
 
@@ -95,7 +96,8 @@ class MarioRendererProvider:
                 highest_z=highest_z,
             )
 
-        return observable.pipe(
+        return pipe_in_background(
+            observable,
             ops.start_with(initial),
             ops.scan(update_state),
             ops.share(),

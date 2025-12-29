@@ -9,6 +9,7 @@ from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.text.state import TextRenderingState
+from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class TextRenderingProvider(ObservableProvider[TextRenderingState]):
@@ -42,7 +43,8 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=self._y_location,
         )
 
-        return peripheral_manager.get_main_switch_subscription().pipe(
+        return pipe_in_background(
+            peripheral_manager.get_main_switch_subscription(),
             ops.start_with(None),
             ops.scan(
                 lambda state, switch_state: replace(

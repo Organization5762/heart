@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import functools
 import json
 import logging
@@ -74,9 +75,9 @@ class UartListener:
 
         t = threading.Thread(
             target=_run_listener,
-            daemon=True,
             name=f"UartListener-{self.device.address}",
         )
+        atexit.register(t.join, timeout=1)
         t.start()
 
     def close(self) -> None:

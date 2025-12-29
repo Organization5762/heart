@@ -6,6 +6,7 @@ from reactivex import Observable
 from reactivex import operators as ops
 
 from heart.peripheral.sensor import Acceleration
+from heart.utilities.reactivex_threads import pipe_in_background
 
 FACE_PX = 64  # physical LED face resolution (square)
 GRID = 64  # internal height-field resolution
@@ -123,7 +124,8 @@ class WaterCubeState:
                 acceleration=a,
             )
 
-        return acceleration.pipe(
+        return pipe_in_background(
+            acceleration,
             ops.scan(update_state, seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

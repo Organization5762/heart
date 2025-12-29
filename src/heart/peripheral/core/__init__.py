@@ -10,7 +10,6 @@ import reactivex
 from reactivex import operators as ops
 
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex.sharing import share_stream
 
 
 @dataclass(slots=True)
@@ -76,15 +75,6 @@ class Peripheral(Generic[A]):
         # to supply meaningful identification and metadata relevant to their hardware.
         return PeripheralInfo()
 
-    def inputs(
-        self,
-        *,
-        event_bus: reactivex.Observable[Input] | None = None,
-    ) -> tuple[InputDescriptor, ...]:
-        """Declare the input events this peripheral consumes."""
-
-        return ()
-
     @cached_property
     def observe(
         self
@@ -95,9 +85,8 @@ class Peripheral(Generic[A]):
                 peripheral_info=self.peripheral_info()
             )
 
-        return share_stream(
-            self._event_stream().pipe(ops.map(wrap)),
-            stream_name=f"{type(self).__name__}.observe",
+        return self._event_stream().pipe(
+            ops.map(wrap),
         )
 
     @classmethod
