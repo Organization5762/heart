@@ -21,7 +21,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(255, 255, 255),
-                    y_location=35,
+                    y_location=0.55,
                 ),
             ]
         )

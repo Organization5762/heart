@@ -9,7 +9,6 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers.surface_cache import RendererSurfaceCache
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -28,7 +27,6 @@ class AtomicBaseRenderer(Generic[StateT]):
         self.initialized = False
         self.warmup = True
         self._state: StateT | None = None
-        self._surface_cache = RendererSurfaceCache()
 
     def _create_initial_state(
         self,
@@ -57,8 +55,7 @@ class AtomicBaseRenderer(Generic[StateT]):
         )
         try:
             if self.warmup:
-                screen = self._get_input_screen(window, orientation)
-                self.process(screen, clock, peripheral_manager, orientation)
+                self.process(window, clock, peripheral_manager, orientation)
         except Exception as e:
             logger.warning(f"Error initializing renderer ({type(self)}): {e}")
             raise e
@@ -111,15 +108,6 @@ class AtomicBaseRenderer(Generic[StateT]):
     ) -> None:
         raise NotImplementedError("Please implement")
 
-    def _postprocess_input_screen(
-        self, screen: pygame.Surface, orientation: Orientation
-    ):
-        return self._surface_cache.postprocess_input_screen(
-            screen=screen,
-            orientation=orientation,
-            display_mode=self.device_display_mode,
-        )
-
     @final
     def _internal_process(
         self,
@@ -143,13 +131,9 @@ class AtomicBaseRenderer(Generic[StateT]):
         if not self.is_initialized():
             raise ValueError("Needs to be initialized")
 
-        screen = self._get_input_screen(window, orientation)
         start_ns = time.perf_counter_ns()
-        self.real_process(window=screen, clock=clock, orientation=orientation)
+        self.real_process(window=window, clock=clock, orientation=orientation)
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-        screen = self._postprocess_input_screen(screen, orientation)
-
-        window.blit(screen, (0, 0))
         logger.debug(
             "renderer.frame",
             extra={
@@ -160,15 +144,3 @@ class AtomicBaseRenderer(Generic[StateT]):
 
     def reset(self):
         pass
-
-    def _get_input_screen(self, window: pygame.Surface, orientation: Orientation):
-        return self._surface_cache.get_input_screen(
-            window=window,
-            orientation=orientation,
-            display_mode=self.device_display_mode,
-        )
-
-    def _tile_surface(
-        self, screen: pygame.Surface, rows: int, cols: int
-    ) -> pygame.Surface:
-        return self._surface_cache.tile_surface(screen=screen, rows=rows, cols=cols)

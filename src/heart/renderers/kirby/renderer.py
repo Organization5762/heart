@@ -14,18 +14,18 @@ class KirbyScene(MultiScene):
     @staticmethod
     def title_scene() -> list[StatefulBaseRenderer]:
         return [
-            TextRendering(
-                text=["kirby mode"],
-                font="Roboto",
-                font_size=14,
-                color=Color.kirby(),
-                y_location=35,
-            ),
             SpritesheetLoop(
                 sheet_file_path="kirby_flying_32.png",
                 metadata_file_path="kirby_flying_32.json",
                 image_scale=1 / 3,
                 offset_y=-5,
                 disable_input=True,
+            ),
+            TextRendering(
+                text=["kirby mode"],
+                font="Roboto",
+                font_size=12,
+                color=Color.kirby(),
+                y_location=0.65,
             ),
         ]

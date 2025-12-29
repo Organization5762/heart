@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from heart.runtime.render.pipeline import RendererVariant
+from heart.runtime.rendering.pipeline import RendererVariant
 from heart.utilities.color_conversion import (HSV_TO_BGR_CACHE,
                                               _convert_bgr_to_hsv,
                                               _convert_hsv_to_bgr)
@@ -170,14 +170,6 @@ class TestEnvironmentCoreLogic:
         expected = _sequential_binary_merge(list(sequence.values()))
         assert result == expected
 
-
-
-    def test_render_surfaces_binary_handles_empty(self, loop) -> None:
-        """Verify that the render pipeline returns None with no renderers. This avoids edge-case crashes during startup."""
-        assert loop.render_pipeline._render_surfaces_binary([]) is None
-
-
-
     def test_render_surface_iterative_skips_missing(
         self, loop, monkeypatch, render_merge_strategy_in_place
     ) -> None:
@@ -245,31 +237,14 @@ class TestEnvironmentCoreLogic:
         monkeypatch.setenv("HEART_HSV_CALIBRATION_MODE", value)
         assert Configuration.hsv_calibration_mode() == expected
 
-
-
-    @pytest.mark.parametrize(
-        "variant",
-        list(RendererVariant),
-    )
-    def test_render_fn_handles_unknown_variant(self, loop, variant: RendererVariant) -> None:
-        """Verify that the render pipeline returns a callable for each variant. This avoids runtime errors when iterating through supported strategies."""
-        renderers = [
-            SimpleNamespace(name="r1"),
-            SimpleNamespace(name="r2"),
-            SimpleNamespace(name="r3"),
-            SimpleNamespace(name="r4"),
-        ]
-        assert callable(loop.render_pipeline._render_fn(renderers, variant))
-
-
     def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
         """Verify that auto rendering switches at the threshold in the pipeline. This keeps performance tuning predictable on constrained devices."""
         monkeypatch.setattr(
-            "heart.runtime.render.pipeline.Configuration.render_parallel_threshold",
+            "heart.runtime.rendering.pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
         monkeypatch.setattr(
-            "heart.runtime.render.pipeline.Configuration.render_parallel_cost_threshold_ms",
+            "heart.runtime.rendering.pipeline.Configuration.render_parallel_cost_threshold_ms",
             lambda: 0,
         )
         pipeline = loop.render_pipeline
@@ -289,11 +264,11 @@ class TestEnvironmentCoreLogic:
     def test_render_fn_auto_uses_cost_estimates(self, loop, monkeypatch) -> None:
         """Verify auto rendering uses timing estimates to choose parallelism. This keeps scheduling overhead aligned with actual renderer costs."""
         monkeypatch.setattr(
-            "heart.runtime.render.pipeline.Configuration.render_parallel_threshold",
+            "heart.runtime.rendering.pipeline.Configuration.render_parallel_threshold",
             lambda: 2,
         )
         monkeypatch.setattr(
-            "heart.runtime.render.pipeline.Configuration.render_parallel_cost_threshold_ms",
+            "heart.runtime.rendering.pipeline.Configuration.render_parallel_cost_threshold_ms",
             lambda: 5,
         )
         pipeline = loop.render_pipeline

@@ -44,7 +44,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(255, 255, 255),
-                    y_location=35,
+                    y_location=0.55,
                 ),
             ]
         )
@@ -66,7 +66,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(255, 0, 0),
-                    y_location=5,
+                    y_location=0.05,
                 ),
             ]
         )
@@ -85,7 +85,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(0, 0, 0),
-                    y_location=32,
+                    y_location=0.5,
                 ),
             ]
         )
@@ -108,7 +108,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(255, 105, 180),
-                    y_location=32,
+                    y_location=0.5,
                 ),
             ]
         )
@@ -124,7 +124,7 @@ def configure(loop: GameLoop) -> None:
                     font="Roboto",
                     font_size=14,
                     color=Color(255, 105, 180),
-                    y_location=32,
+                    y_location=0.5,
                 ),
             ]
         )

@@ -12,8 +12,6 @@ from reactivex.testing.marbles import marbles_testing
 
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider
 from heart.renderers.sliding_image.state import SlidingImageState
-from heart.runtime.frame.exporter import FrameExporter
-from heart.utilities.env import FrameExportStrategy
 
 
 @dataclass(frozen=True)
@@ -71,7 +69,6 @@ class TestSlidingImageMarbleOutputs:
         window_surface = pygame.Surface((4, 1), pygame.SRCALPHA)
         initial_state = SlidingImageState(speed=speed, width=4)
         provider = SlidingImageStateProvider(initial_state=initial_state)
-        exporter = FrameExporter(strategy_provider=lambda: FrameExportStrategy.ARRAY)
 
         tick_values = {label: True for label in tick_pattern if label.isalpha()}
 
@@ -82,7 +79,6 @@ class TestSlidingImageMarbleOutputs:
             image_stream = provider.observable(manager).pipe(
                 ops.filter(lambda state: state.width > 0),
                 ops.map(lambda state: _render_sliding_frame(state, base_surface)),
-                ops.map(exporter.export),
                 ops.map(
                     lambda image: [
                         image.getpixel((x, 0)) for x in range(image.size[0])

@@ -141,7 +141,7 @@ class RenderingConfiguration:
     @classmethod
     def render_merge_strategy(cls) -> RenderMergeStrategy:
         strategy = os.environ.get(
-            "HEART_RENDER_MERGE_STRATEGY", "in_place"
+            "HEART_RENDER_MERGE_STRATEGY", "adaptive"
         ).strip().lower()
         try:
             return RenderMergeStrategy(strategy)
@@ -233,7 +233,7 @@ class RenderingConfiguration:
     @classmethod
     def frame_export_strategy(cls) -> FrameExportStrategy:
         strategy = os.environ.get(
-            "HEART_FRAME_EXPORT_STRATEGY", "buffer"
+            "HEART_FRAME_EXPORT_STRATEGY", "array"
         ).strip().lower()
         try:
             return FrameExportStrategy(strategy)

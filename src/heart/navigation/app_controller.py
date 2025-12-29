@@ -59,7 +59,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
                 font="Roboto",
                 font_size=16,
                 color=Color.kirby(),
-                y_location=35,
+                y_location=0.55,
             ),
         ]
         mode = self.add_mode(sleep_title)
@@ -83,7 +83,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         | None = None,
     ) -> ComposedRenderer:
         # TODO: Add a navigation page back in
-        result = ComposedRenderer([], renderer_resolver=self._renderer_resolver)
+        result = self._renderer_resolver.resolve(ComposedRenderer)
         if title is None:
             title = "Untitled"
 
@@ -113,11 +113,13 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
             return TextRendering(
                 text=[title],
                 font="Roboto",
-                font_size=14,
+                font_size=12,
                 color=Color(255, 105, 180),
             )
         if isinstance(title, list):
-            return ComposedRenderer(title, renderer_resolver=self._renderer_resolver)
+            composed = self._renderer_resolver.resolve(ComposedRenderer)
+            composed.add_renderer(*title)
+            return composed
         if isinstance(title, type) and issubclass(title, StatefulBaseRenderer):
             if self._renderer_resolver is None:
                 raise ValueError("AppController requires a renderer resolver")

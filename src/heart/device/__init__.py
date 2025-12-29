@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 
+import pygame
 from PIL import Image
 
 
@@ -51,6 +52,9 @@ class Device:
     @cached_property
     def scale_factor(self) -> int:
         return 1
+
+    def set_screen(self, screen: pygame.Surface) -> None:
+        pass
 
     def set_image(self, image: Image.Image) -> None:
         pass

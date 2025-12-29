@@ -1,4 +1,5 @@
 import pygame
+import pygame.ftfont
 import reactivex
 
 from heart.device import Orientation
@@ -16,8 +17,8 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         font: str,
         font_size: int,
         color: Color,
-        x_location: int | None = None,
-        y_location: int | None = None,
+        x_location: float | None = None,
+        y_location: float | None = None,
         provider: TextRenderingProvider | None = None,
     ) -> None:
         self._font: pygame.font.Font | None = None
@@ -70,7 +71,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         lines = current_text.split("\n")
         font_key = (self.state.font_name, self.state.font_size)
         if self._font is None or self._font_key != font_key:
-            self._font = pygame.font.SysFont(
+            self._font = pygame.ftfont.SysFont(
                 self.state.font_name,
                 self.state.font_size,
             )
@@ -80,20 +81,26 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         if font is None:
             return
 
-        total_text_height = len(lines) * font.get_linesize()
         window_width, window_height = window.get_size()
 
-        x_offset = self.state.x_location
-        y_offset = self.state.y_location
-
-        if self.state.y_location is None:
-            y_offset = (window_height - total_text_height) // 2
+    
+        if self.state.y_location is not None:
+            y_offset = int(self.state.y_location * window_height)
+        else:
+            y_offset = 0
 
         for line in lines:
-            text_surface = font.render(line, True, self.state.color._as_tuple())
+            text_surface = font.render(
+                line,
+                True,
+                self.state.color._as_tuple(),
+            )
             text_width, _ = text_surface.get_size()
+            # If x_location is not set, center the text
             if self.state.x_location is None:
                 x_offset = (window_width - text_width) // 2
-
+            else:
+                x_offset = int(self.state.x_location * window_width)
             window.blit(text_surface, (x_offset, y_offset))
-            y_offset += font.get_linesize()
+            # (x_offset, y_offset))
+            y_offset += font.get_sized_height()

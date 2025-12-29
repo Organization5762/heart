@@ -38,6 +38,7 @@ class DisplayContext:
 
     def set_screen(self, screen: pygame.Surface) -> None:
         self.screen = screen
+        self.device.set_screen(screen)
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
         self.clock = clock

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.runtime.rendering.surface_provider import RendererSurfaceProvider
+from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 from heart.runtime.rendering.timing import RendererTimingTracker
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
@@ -49,7 +49,7 @@ class RendererProcessor:
     ) -> pygame.Surface | None:
         try:
             start_ns = time.perf_counter_ns()
-            screen = self._render_renderer_frame(renderer)
+            screen = self._render_frame_using_renderer(renderer)
             duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
             self._timing_tracker.record(renderer.name, duration_ms)
             self._log_renderer_metrics(renderer, duration_ms)
@@ -64,16 +64,17 @@ class RendererProcessor:
             raise RuntimeError("GameLoop clock is not initialized")
         return clock
 
-    def _prepare_renderer_surface(
-        self, renderer: "StatefulBaseRenderer[Any]"
-    ) -> pygame.Surface:
-        return self._surface_provider.prepare(renderer)
-
-    def _render_renderer_frame(
+    def _render_frame_using_renderer(
         self, renderer: "StatefulBaseRenderer[Any]"
     ) -> pygame.Surface:
         clock = self._require_clock()
-        screen = self._prepare_renderer_surface(renderer)
+        screen = self._surface_provider._surface_cache.get(renderer)
+        screen = self._surface_provider.get_input_screen(
+            window=screen,
+            orientation=self.device.orientation,
+            display_mode=renderer.device_display_mode
+        )
+
         if not renderer.initialized:
             renderer.initialize(
                 window=screen,
@@ -86,6 +87,11 @@ class RendererProcessor:
             clock=clock,
             peripheral_manager=self.peripheral_manager,
             orientation=self.device.orientation,
+        )
+        screen = self._surface_provider.postprocess_input_screen(
+            screen=screen,
+            orientation=self.device.orientation,
+            display_mode=renderer.device_display_mode
         )
         return screen
 

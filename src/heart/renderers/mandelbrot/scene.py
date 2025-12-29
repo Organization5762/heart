@@ -674,7 +674,7 @@ def main() -> None:
 
     from heart.device.local import LocalScreen
     from heart.runtime.container import build_runtime_container
-    from heart.runtime.render.pipeline import RendererVariant
+    from heart.runtime.rendering.pipeline import RendererVariant
     from heart.utilities.env import Configuration
 
     profiling = os.environ.get("PROFILING", "False").lower() == "true"

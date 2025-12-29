@@ -8,6 +8,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 
 from .renderer_specs import (RendererResolver, RendererSpec,
                              resolve_renderer_spec)
@@ -25,6 +26,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
     def __init__(
         self,
         renderers: list[RendererSpec],
+        surface_provider: RendererSurfaceProvider,
         renderer_resolver: RendererResolver | None = None,
     ) -> None:
         super().__init__()
@@ -34,6 +36,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             for renderer in renderers
         ]
         self.device_display_mode = DeviceDisplayMode.FULL
+        self.surface_provider = surface_provider
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []
@@ -54,6 +57,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         orientation: Orientation,
     ) -> ComposedRendererState:
         for renderer in self.renderers:
+            
             renderer.initialize(window, clock, peripheral_manager, orientation)
         return ComposedRendererState(
             peripheral_manager=peripheral_manager,
@@ -101,14 +105,24 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         clock: pygame.time.Clock,
         orientation: Orientation,
     ) -> None:
-        # TODO: This overlaps a bit with what the environment does
         for renderer in self.renderers:
-            renderer._internal_process(
-                window,
-                clock,
-                self.state.peripheral_manager,
-                orientation,
+            surface = self.surface_provider.get_input_screen(
+                window=window,
+                orientation=orientation,
+                display_mode=renderer.device_display_mode,
             )
+            renderer._internal_process(
+                window=surface,
+                clock=clock,
+                peripheral_manager=self.state.peripheral_manager,
+                orientation=orientation,
+            )
+            result = self.surface_provider.postprocess_input_screen(
+                screen=surface,
+                orientation=orientation,
+                display_mode=renderer.device_display_mode,
+            )
+            window.blit(result, (0, 0))
 
     def reset(self) -> None:
         for renderer in self.renderers:

@@ -20,6 +20,6 @@ class ArtistScene(MultiScene):
                 font="Roboto",
                 font_size=14,
                 color=Color(255, 105, 180),
-                y_location=32,
+                y_location=0.5,
             ),
         ]

@@ -41,5 +41,5 @@ def run_command(
     ## ============================= ##
     # Retain an empty loop for "lower power" mode
     if add_low_power_mode:
-        loop.app_controller.add_sleep_mode()
+        loop.components.app_controller.add_sleep_mode()
     loop.start()

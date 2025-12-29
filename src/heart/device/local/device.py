@@ -34,26 +34,31 @@ class LocalScreen(Device):
         result = max(min(width // current_width, height // current_height), 1)
         return max(result // 3, 1)
 
+    def set_screen(self, screen: pygame.Surface) -> None:
+        # Clear previous pixels
+        self.scaled_screen.fill((0, 0, 0))
+
+        screen = pygame.transform.scale(screen, (self.full_display_size()[0] * self.scale_factor, self.full_display_size()[1] * self.scale_factor))
+
+                
+        self.scaled_screen.blit(
+            source=screen,
+            dest=(0, 0),
+        )
+
     def set_image(self, image: Image.Image) -> None:
         assert image.size == self.full_display_size(), (
             f"Image size does not match display size. Image size: {image.size}, Display size: {self.full_display_size()}"
         )
 
-        scaled_image = image.resize(
-            (
-                self.full_display_size()[0] * self.scale_factor,
-                self.full_display_size()[1] * self.scale_factor,
+        self.set_screen(
+            screen=pygame.image.fromstring(
+                image.tobytes(),
+                image.size,
+                _normalize_surface_mode(image.mode),
             )
         )
-
-        self.scaled_screen.blit(
-            pygame.image.fromstring(
-                scaled_image.tobytes(),
-                scaled_image.size,
-                _normalize_surface_mode(scaled_image.mode),
-            ),
-            (0, 0),
-        )
+    
 
 
 _SURFACE_MODES = {
