@@ -30,22 +30,20 @@ class PeripheralStreams:
             event_bus = reactivex.empty()
         else:
             event_bus = reactivex.merge(*event_sources)
-        scheduler = self._event_bus_scheduler()
-        if scheduler is not None:
-            event_bus = event_bus.pipe(ops.observe_on(scheduler))
         return share_stream(event_bus, stream_name="PeripheralManager.event_bus")
 
     def main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         main_switches = [
-            peripheral.observe
+            peripheral
             for peripheral in self._peripheral_source()
             if isinstance(peripheral, FakeSwitch)
         ]
+        observables = [peripheral.observe for peripheral in main_switches]
 
-        if not main_switches:
+        if not observables:
             return reactivex.empty()
 
-        merged = reactivex.merge(*main_switches).pipe(
+        merged = reactivex.merge(*observables).pipe(
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
         )
         return share_stream(merged, stream_name="PeripheralManager.main_switch")

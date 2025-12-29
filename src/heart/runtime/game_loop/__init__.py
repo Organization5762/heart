@@ -238,3 +238,6 @@ class GameLoop:
             self._render_pacer.pace(render_start, estimated_cost_ms)
 
             self.components.display.clock.tick(self.max_fps)
+            
+            self.components.peripheral_runtime.tick()
+            self.components.peripheral_manager.clock.on_next(self.components.display.clock)

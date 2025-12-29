@@ -8,26 +8,14 @@ from pygame import Surface, font, time
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.flame import FlameRenderer
 from heart.renderers.max_bpm_screen.provider import (AVATAR_MAPPINGS,
                                                      AvatarBpmStateProvider)
 from heart.renderers.max_bpm_screen.state import AvatarBpmRendererState
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class MaxBpmScreen(ComposedRenderer):
-    def __init__(self) -> None:
-        flame_renderer = FlameRenderer()
-        avatar_renderer = AvatarBpmRenderer()
-
-        super().__init__([flame_renderer, avatar_renderer])
-        self.device_display_mode = DeviceDisplayMode.MIRRORED
-        self.is_flame_renderer = True
 
 
 class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):

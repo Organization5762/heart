@@ -281,16 +281,6 @@ class TestEnvironmentCoreLogic:
             is pipeline._render_surfaces_binary
         )
 
-    @pytest.mark.skip(reason="Flame renderer is not implemented")
-    def test_ensure_flame_renderer_returns_singleton_with_marker(self, loop) -> None:
-        """Verify that _ensure_flame_renderer caches a marked flame renderer instance. This keeps flame overlays stable and avoids churn in render queues."""
-
-        first = loop._ensure_flame_renderer()
-        second = loop._ensure_flame_renderer()
-
-        assert first is second
-        assert getattr(first, "is_flame_renderer") is True
-
 
 def _sequential_binary_merge(values: list[str]) -> str:
     surfaces = list(values)

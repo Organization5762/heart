@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Lock
 from typing import Callable
@@ -18,7 +17,6 @@ INPUT_THREAD_PREFIX = "heart-rx-input"
 class _SchedulerState:
     lock: Lock
     scheduler: ThreadPoolScheduler | None = None
-    executor: ThreadPoolExecutor | None = None
 
 
 _BACKGROUND_SCHEDULER = _SchedulerState(lock=Lock())
@@ -38,6 +36,7 @@ def _build_scheduler(
                 resolved_workers = (
                     max_workers if max_workers is not None else default_workers()
                 )
+                print(f"Building scheduler with {resolved_workers} workers")
                 state.scheduler = ThreadPoolScheduler(max_workers=resolved_workers)
     assert state.scheduler is not None
     return state.scheduler
@@ -45,7 +44,8 @@ def _build_scheduler(
 
 def background_scheduler(
     max_workers: int | None = DEFAULT_MAX_WORKERS,
-) -> ThreadPoolScheduler:
+) -> ThreadPoolScheduler | None:
+    return None
     """Return the shared scheduler for background reactivex work."""
     return _build_scheduler(
         _BACKGROUND_SCHEDULER,
@@ -57,7 +57,8 @@ def background_scheduler(
 
 def input_scheduler(
     max_workers: int | None = DEFAULT_MAX_WORKERS,
-) -> ThreadPoolScheduler:
+) -> ThreadPoolScheduler | None:
+    return None
     """Return the shared scheduler for key input reactivex work."""
     return _build_scheduler(
         _INPUT_SCHEDULER,

@@ -67,13 +67,14 @@ class BaseSwitch(Peripheral[SwitchState]):
         )
         
     def _snapshot(self) -> SwitchState:
-        return SwitchState(
+        result = SwitchState(
             rotational_value=self.rotational_value,
             button_value=self.button_value,
             rotation_since_last_button_press=self.rotation_value_at_last_button_press,
             long_button_value=self.button_long_press_value,
             rotation_since_last_long_button_press=self.rotational_value - self.rotation_value_at_last_long_button_press,
         )
+        return result
 
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:

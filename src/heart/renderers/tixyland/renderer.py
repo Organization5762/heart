@@ -34,9 +34,14 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
         numpy_output = np.clip(numpy_output, -1, 1).astype(np.float16)
         mag = np.abs(numpy_output)
 
-        red = mag[..., None] * np.array([1, 0, 0]) * 255
-        white = mag[..., None] * np.array([1, 1, 1]) * 200
+        # Compute red and white intensity arrays, ensuring correct float32 dtype
+        red = (mag[..., None] * np.array([1, 0, 0], dtype=np.float32) * 255).astype(np.uint32)
+        white = (mag[..., None] * np.array([1, 1, 1], dtype=np.float32) * 200).astype(np.uint32)
 
-        rgb = np.where(numpy_output[..., None] < 0, red, white)
+        # Shape: (h, w, 3), dtype: uint32
+        rgb = np.where(numpy_output[..., None] < 0, red, white).astype(np.uint32)
 
-        pygame.surfarray.blit_array(window, rgb)
+        # Make sure the array is shape (w, h, 3) for blit_array
+        arr_for_blit = np.transpose(rgb, (1, 0, 2))
+
+        pygame.surfarray.blit_array(window, arr_for_blit)

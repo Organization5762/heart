@@ -12,14 +12,12 @@ from typing import Any, Self, cast
 
 import numpy as np
 import reactivex
-from reactivex import operators as ops
 from reactivex.subject import Subject
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
-from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 
@@ -90,7 +88,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
         return self._latest_level
 
     def _event_stream(self) -> reactivex.Observable[MicrophoneLevel]:
-        return self._level_subject.pipe(ops.observe_on(input_scheduler()))
+        return self._level_subject
 
     def stop(self) -> None:
         """Signal the run-loop to stop on the next iteration."""

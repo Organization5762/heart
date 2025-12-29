@@ -115,6 +115,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
                 font="Roboto",
                 font_size=12,
                 color=Color(255, 105, 180),
+                y_location=0.5,
             )
         if isinstance(title, list):
             composed = self._renderer_resolver.resolve(ComposedRenderer)

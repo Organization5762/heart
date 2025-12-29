@@ -8,12 +8,10 @@ from typing import Any, Iterator, Self
 import pygame.joystick
 import reactivex
 from pygame.event import Event
-from reactivex import operators as ops
 
 from heart.peripheral.core import Peripheral, events
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import input_scheduler
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
@@ -245,13 +243,9 @@ class Gamepad(Peripheral[Any]):
         time.sleep(INITIALIZATION_DELAY_SECONDS)
 
         # check every 1 second for controller state, so that we can attempt to connect
-        scheduler = input_scheduler()
-        reactivex.interval(timedelta(seconds=1), scheduler=scheduler).subscribe(
+        reactivex.interval(timedelta(seconds=1)).subscribe(
             on_next=self._read_from_gamepad,
-            scheduler=scheduler,
         )
 
         # Query the controller state frequently
-        reactivex.interval(timedelta(milliseconds=20), scheduler=scheduler).pipe(
-            ops.observe_on(scheduler),
-        ).subscribe(on_next=lambda x: self._update())
+        reactivex.interval(timedelta(milliseconds=20)).subscribe(on_next=lambda x: self._update())

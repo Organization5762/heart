@@ -7,14 +7,17 @@ from pygame import time as pygame_time
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
+from heart.navigation import ComposedRenderer
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.combined_bpm_screen.provider import (
     DEFAULT_MAX_BPM_DURATION_MS, DEFAULT_METADATA_DURATION_MS,
     CombinedBpmScreenStateProvider)
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
-from heart.renderers.max_bpm_screen import MaxBpmScreen
+from heart.renderers.flame.renderer import FlameRenderer
+from heart.renderers.max_bpm_screen import AvatarBpmRenderer
 from heart.renderers.metadata_screen import MetadataScreen
+from heart.runtime.container import container
 
 
 class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
@@ -25,12 +28,13 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
         provider: CombinedBpmScreenStateProvider | None = None,
     ) -> None:
         self.metadata_screen = MetadataScreen()
-        self.max_bpm_screen = MaxBpmScreen()
+        self.max_bpm_screen = container.resolve(ComposedRenderer)
+
+        self.max_bpm_screen.add_renderer(FlameRenderer())
+        self.max_bpm_screen.add_renderer(AvatarBpmRenderer())
 
         self.metadata_duration_ms = metadata_duration_ms
         self.max_bpm_duration_ms = max_bpm_duration_ms
-
-        self.is_flame_renderer = True
 
         self._provider = provider or CombinedBpmScreenStateProvider(
             metadata_duration_ms=metadata_duration_ms,
