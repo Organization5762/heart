@@ -27,12 +27,10 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         self,
         renderers: list[RendererSpec],
         surface_provider: RendererSurfaceProvider,
-        renderer_resolver: RendererResolver | None = None,
     ) -> None:
         super().__init__()
-        self._renderer_resolver = renderer_resolver
         self.renderers = [
-            resolve_renderer_spec(renderer, renderer_resolver, "ComposedRenderer")
+            resolve_renderer_spec(renderer)
             for renderer in renderers
         ]
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -68,7 +66,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
 
     def add_renderer(self, *renderers: RendererSpec) -> None:
         resolved_renderers = [
-            resolve_renderer_spec(renderer, self._renderer_resolver, "ComposedRenderer")
+            resolve_renderer_spec(renderer)
             for renderer in renderers
         ]
         self.renderers.extend(resolved_renderers)

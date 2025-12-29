@@ -58,8 +58,8 @@ def _build_peripheral_runtime(resolver: RuntimeContainer) -> PeripheralRuntime:
     return PeripheralRuntime(resolver[PeripheralManager])
 
 
-def _build_app_controller(resolver: RuntimeContainer) -> AppController:
-    return AppController(renderer_resolver=resolver)
+def _build_app_controller() -> AppController:
+    return AppController()
 
 
 def _build_render_loop_pacer(_: RuntimeContainer) -> RenderLoopPacer:

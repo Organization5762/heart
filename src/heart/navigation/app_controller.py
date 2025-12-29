@@ -12,11 +12,11 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
+from heart.runtime.container import container
 
 from .composed_renderer import ComposedRenderer
 from .game_modes import GameModes
 from .multi_scene import MultiScene
-from .renderer_specs import RendererResolver
 
 
 @dataclass
@@ -25,12 +25,12 @@ class AppControllerState:
 
 
 class AppController(StatefulBaseRenderer[AppControllerState]):
-    def __init__(self, renderer_resolver: RendererResolver | None = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.modes = GameModes()
         self.device_display_mode = DeviceDisplayMode.FULL
         self.warmup = True
-        self._renderer_resolver = renderer_resolver
+        self._renderer_resolver = container
 
     def _create_initial_state(
         self,
