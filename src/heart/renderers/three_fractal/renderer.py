@@ -462,7 +462,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     # def _check_enter_auto(self, peripheral_manager: PeripheralManager):
     #     gamepad = peripheral_manager.get_gamepad()
     #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-    #     print(f"Gamepad: {gamepad}")
     #     if gamepad.is_connected():
     #         if gamepad.was_tapped(mapping.BUTTON_Y):
     #             self.mode = "auto"
