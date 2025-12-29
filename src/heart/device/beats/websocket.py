@@ -22,6 +22,11 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 beats_streaming_pb2 = cast(Any, _beats_streaming_pb2)
 
+DEFAULT_HOST = "localhost"
+DEFAULT_PORT = 8765
+DEFAULT_PING_INTERVAL_SEC = 20
+THREAD_JOIN_TIMEOUT_SEC = 1
+
 
 def _encode_peripheral_message(
     envelope: PeripheralMessageEnvelope[Any],
@@ -126,6 +131,9 @@ class WebSocket:
     _thread: threading.Thread | None = field(default=None, init=False)
     _loop: asyncio.AbstractEventLoop | None = field(default=None, init=False)
     _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
+    _stop_event: asyncio.Event | None = field(default=None, init=False)
+    _shutdown_lock: threading.Lock = field(default_factory=threading.Lock, init=False)
+    _shutdown_requested: bool = field(default=False, init=False)
     _streaming_settings = BeatsStreamingConfiguration.settings()
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "WebSocket":
@@ -144,7 +152,7 @@ class WebSocket:
             target=self._ws_thread_main,
             name="Beats websocket server",
         )
-        atexit.register(self._thread.join, timeout=1)
+        atexit.register(self.shutdown)
         self._thread.start()
 
     def _ws_thread_main(self) -> None:
@@ -153,10 +161,13 @@ class WebSocket:
         self._broadcast_queue = asyncio.Queue(
             maxsize=self._streaming_settings.queue_max_size
         )
+        self._stop_event = asyncio.Event()
         loop = self._loop
         broadcast_queue = self._broadcast_queue
+        stop_event = self._stop_event
         assert loop is not None
         assert broadcast_queue is not None
+        assert stop_event is not None
 
         async def handler(ws: Any) -> None:
             self.clients.add(ws)
@@ -167,7 +178,18 @@ class WebSocket:
 
         async def broadcast_worker() -> None:
             while True:
-                frame = await broadcast_queue.get()
+                queue_task = asyncio.create_task(broadcast_queue.get())
+                stop_task = asyncio.create_task(stop_event.wait())
+                done, pending = await asyncio.wait(
+                    {queue_task, stop_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                if stop_task in done:
+                    break
+                frame = queue_task.result()
                 if not self.clients:
                     continue
                 clients = list(self.clients)
@@ -185,17 +207,32 @@ class WebSocket:
         async def main() -> None:
             self._server = await websockets.serve(
                 handler,
-                "localhost",
-                8765,
-                ping_interval=20,
+                DEFAULT_HOST,
+                DEFAULT_PORT,
+                ping_interval=DEFAULT_PING_INTERVAL_SEC,
             )
-            loop.create_task(broadcast_worker())
-            await self._server.wait_closed()
+            broadcast_task = loop.create_task(broadcast_worker())
+            try:
+                await self._server.wait_closed()
+            finally:
+                stop_event.set()
+                await broadcast_task
 
         main_task = loop.create_task(main())
-        loop.run_until_complete(main_task)
+        try:
+            loop.run_until_complete(main_task)
+        finally:
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
+            loop.close()
 
     def send(self, kind: str, payload: object) -> None:
+        if self._shutdown_requested:
+            return
         if self._broadcast_queue and self._loop:
             frame_bytes = self._encode_payload(kind=kind, payload=payload)
             if frame_bytes is None:
@@ -267,3 +304,25 @@ class WebSocket:
 
         logger.warning("Unknown websocket payload kind: %s.", kind)
         return None
+
+    def shutdown(self) -> None:
+        if self._shutdown_requested:
+            return
+        with self._shutdown_lock:
+            if self._shutdown_requested:
+                return
+            self._shutdown_requested = True
+        if not self._loop or not self._thread:
+            return
+
+        def request_shutdown() -> None:
+            if self._stop_event is not None:
+                self._stop_event.set()
+            if self._server is not None:
+                self._server.close()
+
+        if threading.current_thread() == self._thread:
+            request_shutdown()
+        else:
+            self._loop.call_soon_threadsafe(request_shutdown)
+        self._thread.join(timeout=THREAD_JOIN_TIMEOUT_SEC)

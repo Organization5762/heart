@@ -8,6 +8,7 @@ Capture the runtime controls that reduce websocket backpressure when streaming B
 
 - `src/heart/device/beats/websocket.py`
 - `src/heart/device/beats/streaming_config.py`
+- `src/heart/runtime/game_loop/__init__.py`
 
 ## Materials
 
@@ -36,3 +37,4 @@ Beats frames and peripheral updates are serialized into protobuf `StreamEnvelope
 - Frames are enqueued using non-blocking operations from the websocket send path, so the renderer thread does not stall when the queue is saturated.
 - Broadcast fan-out happens concurrently per client, reducing head-of-line blocking when one connection is slow.
 - Overflow behavior is determined by the strategy selection, so operators can prefer freshness (`drop_oldest`) or completeness (`drop_newest`) depending on the audience.
+- Websocket shutdown requests stop the broadcast worker, close the server, and join the background thread so keyboard interrupts unwind without leaving a live event loop.

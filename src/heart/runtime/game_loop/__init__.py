@@ -133,6 +133,7 @@ class GameLoop:
             shutdown.on_completed()
             shutdown.dispose()
 
+            self.components.peripheral_runtime.shutdown()
             self.components.render_pipeline.shutdown()
             pygame.quit()
 
