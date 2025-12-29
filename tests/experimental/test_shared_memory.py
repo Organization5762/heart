@@ -11,11 +11,23 @@ EXPERIMENTAL_SRC = ROOT / "experimental" / "isolated_rendering" / "src"
 
 
 def _load_experimental_classes():
+    if not EXPERIMENTAL_SRC.exists():
+        pytest.skip(
+            "experimental/isolated_rendering not present; skipping shared memory tests",
+            allow_module_level=True,
+        )
+
     if str(EXPERIMENTAL_SRC) not in sys.path:
         sys.path.insert(0, str(EXPERIMENTAL_SRC))
 
-    buffer_module = importlib.import_module("isolated_rendering.buffer")
-    shared_module = importlib.import_module("isolated_rendering.shared_memory")
+    try:
+        buffer_module = importlib.import_module("isolated_rendering.buffer")
+        shared_module = importlib.import_module("isolated_rendering.shared_memory")
+    except ModuleNotFoundError as exc:
+        pytest.skip(
+            f"isolated_rendering modules unavailable: {exc}",
+            allow_module_level=True,
+        )
     return (
         buffer_module.FrameBuffer,
         shared_module.SharedMemoryError,

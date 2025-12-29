@@ -47,17 +47,17 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         )
         initial_state = self._initial_state_snapshot()
 
-        return (
-            peripheral_manager.game_tick.pipe(
-                ops.with_latest_from(window_stream),
-                ops.map(lambda pair: pair[1]),
-                ops.scan(
-                    lambda state, width: self.advance_state(state, width),
-                    seed=initial_state,
-                ),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return reactivex.combine_latest(
+            window_stream,
+            peripheral_manager.game_tick,
+        ).pipe(
+            ops.map(lambda pair: pair[0]),
+            ops.scan(
+                lambda state, width: self.advance_state(state, width),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
 
@@ -97,15 +97,15 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         )
         initial_state = self._initial_state_snapshot()
 
-        return (
-            peripheral_manager.game_tick.pipe(
-                ops.with_latest_from(window_stream),
-                ops.map(lambda pair: pair[1]),
-                ops.scan(
-                    lambda state, width: self.advance_state(state, width),
-                    seed=initial_state,
-                ),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return reactivex.combine_latest(
+            window_stream,
+            peripheral_manager.game_tick,
+        ).pipe(
+            ops.map(lambda pair: pair[0]),
+            ops.scan(
+                lambda state, width: self.advance_state(state, width),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
+            ops.share(),
         )

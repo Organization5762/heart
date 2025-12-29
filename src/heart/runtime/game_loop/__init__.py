@@ -55,11 +55,21 @@ class GameLoop:
 
         self.components.display.configure_window()
 
+    @property
+    def render_pipeline(self):
+        return self.components.render_pipeline
+
+    @property
+    def peripheral_manager(self):
+        return self.components.peripheral_manager
+
     def _one_loop(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
+        if self.components.display.screen is None:
+            raise RuntimeError("GameLoop screen is not initialized")
         render_result = self.components.render_pipeline.render_with_plan(
             renderers=renderers,
             override_renderer_variant=override_renderer_variant,
