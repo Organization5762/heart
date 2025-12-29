@@ -186,6 +186,7 @@ test = [
     "pytest>=8.4.2",
     "pytest-benchmark>=5.2.0",
     "pytest-xdist>=3.8.0",
+    "ImageHash>=4.3.2",
 ]
 lint = [
     "docformatter[tomli]>=1.7.7",
