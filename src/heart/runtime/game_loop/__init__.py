@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.runtime.container.initialize import (build_runtime_container,
@@ -61,6 +62,8 @@ class GameLoop:
         renderers: list["StatefulBaseRenderer[Any]"],
         override_renderer_variant: RendererVariant | None = None,
     ) -> RenderPlan:
+        display_mode = self._resolve_display_mode(renderers)
+        self.components.display.ensure_display_mode(display_mode)
         render_result = self.components.render_pipeline.render_with_plan(
             renderers=renderers,
             override_renderer_variant=override_renderer_variant,
@@ -158,6 +161,21 @@ class GameLoop:
         base_renderers = self.components.app_controller.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
+
+    def _resolve_display_mode(
+        self, renderers: list["StatefulBaseRenderer[Any]"]
+    ) -> DeviceDisplayMode:
+        if any(
+            renderer.device_display_mode == DeviceDisplayMode.OPENGL
+            for renderer in renderers
+        ):
+            return DeviceDisplayMode.OPENGL
+        if any(
+            renderer.device_display_mode == DeviceDisplayMode.FULL
+            for renderer in renderers
+        ):
+            return DeviceDisplayMode.FULL
+        return DeviceDisplayMode.MIRRORED
 
     def _prepare_container(
         self,
