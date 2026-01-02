@@ -14,14 +14,19 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 from heart.utilities.reactivex_threads import pipe_in_background
 
+PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
+FONT_SIZE_MAX = 12
+FONT_SIZE_MIN = 6
+INITIAL_FONT_SIZE = 10
+
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
     def __init__(self) -> None:
         self._text = BehaviorSubject("Waiting for text...")
         self._font_cache: dict[int, pygame.font.Font] = {}
-        self._font_size_max: int = 12
-        self._font_size_min: int = 6
-        self._initial_font_size: int = 10
+        self._font_size_max: int = FONT_SIZE_MAX
+        self._font_size_min: int = FONT_SIZE_MIN
+        self._initial_font_size: int = INITIAL_FONT_SIZE
 
     def observable(
         self, peripheral_manager: PeripheralManager
@@ -73,7 +78,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
 
     def get_font(self, size: int) -> pygame.font.Font:
         if size not in self._font_cache:
-            self._font_cache[size] = Loader.load_font("Grand9K Pixel.ttf", font_size=size)
+            self._font_cache[size] = Loader.load_font(PIXEL_FONT_PATH, font_size=size)
         return self._font_cache[size]
 
     def _fit_font_and_wrap(

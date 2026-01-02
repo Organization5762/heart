@@ -18,7 +18,7 @@ def configure(loop: GameLoop) -> None:
                 MandelbrotTitle(),
                 TextRendering(
                     text=["mandelbrot"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(255, 255, 255),
                     y_location=0.55,
