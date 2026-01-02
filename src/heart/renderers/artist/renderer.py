@@ -17,7 +17,7 @@ class ArtistScene(MultiScene):
             RenderImage(image_file="artist/imaginal_disk.png"),
             TextRendering(
                 text=["artist"],
-                font="Roboto",
+                font="Grand9K Pixel.ttf",
                 font_size=14,
                 color=Color(255, 105, 180),
                 y_location=0.5,

@@ -201,7 +201,11 @@ totem run --configuration dual_output_demo
 **Package:** `src/heart/renderers/text/`
 
 The text renderer is split into focused modules so state, wiring, and rendering
-remain isolated:
+remain isolated. The free text pipeline renders with the pixel font and disables
+anti-aliasing to preserve crisp glyph edges on low-resolution displays.
+The text renderer defaults to the same pixel font; font names that end in
+`.ttf` load from assets while other names resolve through the system font
+registry.
 
 - `provider.py` builds `TextRenderingState` and wires the main switch
   subscription that updates state on rotations.

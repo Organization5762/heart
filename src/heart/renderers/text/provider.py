@@ -60,7 +60,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
     def default(cls, text: str) -> "TextRenderingProvider":
         return cls(
             text=[text],
-            font_name="Roboto",
+            font_name="Grand9K Pixel.ttf",
             font_size=14,
             color=Color(255, 105, 180),
             x_location=None,

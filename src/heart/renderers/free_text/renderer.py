@@ -10,6 +10,9 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.free_text.provider import FreeTextStateProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 
+TEXT_COLOR = (255, 105, 180)
+TEXT_ANTIALIAS = False
+
 
 class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
     """Render the most recent text message that arrived via *PhoneText*."""
@@ -55,7 +58,7 @@ class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
         y = (window_height - total_height) // 2
 
         for line in visible_lines:
-            rendered = font.render(line, True, (255, 105, 180))
+            rendered = font.render(line, TEXT_ANTIALIAS, TEXT_COLOR)
             text_width, _ = rendered.get_size()
             x = (window_width - text_width) // 2
             window.blit(rendered, (x, y))
