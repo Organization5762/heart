@@ -42,7 +42,7 @@ def configure(loop: GameLoop) -> None:
                 MandelbrotTitle(),
                 TextRendering(
                     text=["mandelbrot"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(255, 255, 255),
                     y_location=0.55,
@@ -64,7 +64,7 @@ def configure(loop: GameLoop) -> None:
                 RenderImage(image_file="mario_still.png"),
                 TextRendering(
                     text=["mario"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(255, 0, 0),
                     y_location=0.05,
@@ -83,7 +83,7 @@ def configure(loop: GameLoop) -> None:
                 multicolor_renderer(),
                 TextRendering(
                     text=["shroomed"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(0, 0, 0),
                     y_location=0.5,
@@ -106,7 +106,7 @@ def configure(loop: GameLoop) -> None:
                 loop.resolve(HeartTitleScreen),
                 TextRendering(
                     text=["heart rate"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(255, 105, 180),
                     y_location=0.5,
@@ -122,7 +122,7 @@ def configure(loop: GameLoop) -> None:
                 loop.resolve(WaterTitleScreen),
                 TextRendering(
                     text=["water"],
-                    font="Roboto",
+                    font="Grand9K Pixel.ttf",
                     font_size=14,
                     color=Color(255, 105, 180),
                     y_location=0.5,

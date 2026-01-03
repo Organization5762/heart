@@ -2,12 +2,16 @@ import pygame
 import pygame.ftfont
 import reactivex
 
+from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.text.provider import TextRenderingProvider
 from heart.renderers.text.state import TextRenderingState
+
+PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
+PIXEL_FONT_ANTIALIAS = False
 
 
 class TextRendering(StatefulBaseRenderer[TextRenderingState]):
@@ -42,7 +46,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
     def default(cls, text: str) -> "TextRendering":
         return cls(
             text=[text],
-            font="Roboto",
+            font=PIXEL_FONT_PATH,
             font_size=14,
             color=Color(255, 105, 180),
             x_location=0.5,
@@ -71,10 +75,15 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         lines = current_text.split("\n")
         font_key = (self.state.font_name, self.state.font_size)
         if self._font is None or self._font_key != font_key:
-            self._font = pygame.ftfont.SysFont(
-                self.state.font_name,
-                self.state.font_size,
-            )
+            if self.state.font_name.endswith(".ttf"):
+                self._font = Loader.load_font(
+                    self.state.font_name, font_size=self.state.font_size
+                )
+            else:
+                self._font = pygame.ftfont.SysFont(
+                    self.state.font_name,
+                    self.state.font_size,
+                )
             self._font_key = font_key
 
         font = self._font
@@ -89,10 +98,15 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         else:
             y_offset = 0
 
+        antialias = (
+            PIXEL_FONT_ANTIALIAS
+            if self.state.font_name.endswith(".ttf")
+            else True
+        )
         for line in lines:
             text_surface = font.render(
                 line,
-                True,
+                antialias,
                 self.state.color._as_tuple(),
             )
             text_width, _ = text_surface.get_size()

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Device
+from heart.runtime.rendering.display import DisplayModeManager
 from heart.utilities.env import Configuration
 
 
@@ -15,6 +17,10 @@ class DisplayContext:
     device: Device
     screen: pygame.Surface | None = None
     clock: pygame.time.Clock | None = None
+    _display_mode_manager: DisplayModeManager = field(init=False)
+
+    def __post_init__(self) -> None:
+        self._display_mode_manager = DisplayModeManager(self.device)
 
     def configure_window(self, mode: int) -> None:
         self.scaled_screen = pygame.display.set_mode(
@@ -35,6 +41,9 @@ class DisplayContext:
     def ensure_initialized(self) -> None:
         if self.clock is None or self.screen is None:
             raise RuntimeError("GameLoop failed to initialize display surfaces")
+
+    def ensure_display_mode(self, display_mode: DeviceDisplayMode) -> None:
+        self._display_mode_manager.ensure_mode(display_mode)
 
     def set_screen(self, screen: pygame.Surface) -> None:
         self.screen = screen

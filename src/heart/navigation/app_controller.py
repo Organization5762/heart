@@ -56,7 +56,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
             ),
             TextRendering(
                 text=["sleep"],
-                font="Roboto",
+                font="Grand9K Pixel.ttf",
                 font_size=16,
                 color=Color.kirby(),
                 y_location=0.55,
@@ -112,7 +112,7 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
         if isinstance(title, str):
             return TextRendering(
                 text=[title],
-                font="Roboto",
+                font="Grand9K Pixel.ttf",
                 font_size=12,
                 color=Color(255, 105, 180),
                 y_location=0.5,
