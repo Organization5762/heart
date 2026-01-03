@@ -77,7 +77,9 @@ class GameLoop:
         self,
         renderers: list["StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]],
     ) -> ComposedRenderer:
-        return self.context_container.resolve(ComposedRenderer)
+        result = self.context_container.resolve(ComposedRenderer)
+        result.add_renderer(*renderers)
+        return result
 
     def add_mode(
         self,
@@ -194,7 +196,7 @@ class GameLoop:
             )
 
     def _initialize_screen(self) -> None:
-        self.components.display.initialize()
+        self.components.display.initialize(pygame.SHOWN)
         if self.components.display.screen is None or self.components.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display surfaces")
         self.set_screen(self.components.display.screen)

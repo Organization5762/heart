@@ -29,9 +29,9 @@ class _SchedulerState:
         return self.scheduler
 
 
-_BACKGROUND_SCHEDULER = _SchedulerState(lock=Lock(), scheduler=TimeoutScheduler())
-_INPUT_SCHEDULER = _SchedulerState(lock=Lock(), scheduler=TimeoutScheduler())
-_INTERVAL_SCHEDULER = _SchedulerState(lock=Lock(), scheduler=TimeoutScheduler())
+_BACKGROUND_SCHEDULER = _SchedulerState(lock=Lock())
+_INPUT_SCHEDULER = _SchedulerState(lock=Lock())
+_INTERVAL_SCHEDULER = _SchedulerState(lock=Lock())
 _COALESCE_SCHEDULER =_SchedulerState(lock=Lock(), scheduler=TimeoutScheduler())
 _MAIN_THREAD_SCHEDULER =_SchedulerState(lock=Lock(), scheduler=TimeoutScheduler())
 

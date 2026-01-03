@@ -26,7 +26,6 @@ class ObservableProvider(Generic[T]):
 
         return ()
 
-
 class StaticStateProvider(ObservableProvider[T]):
     def __init__(self, state: T) -> None:
         self._state = state

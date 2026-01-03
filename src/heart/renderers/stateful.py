@@ -52,8 +52,6 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
                 peripheral_manager=peripheral_manager,
             )
             self._subscription = observable.subscribe(on_next=self.set_state)
-            if self.warmup:
-                self.process(window, clock, peripheral_manager, orientation)
             self.initialized = True
             return
 
@@ -71,8 +69,6 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         logger.info(f"Setting state for {self.name}")
         self.set_state(state)
         logger.info(f"Processing for {self.name}")
-        if self.warmup:
-            self.process(window, clock, peripheral_manager, orientation)
         self.initialized = True
 
     def reset(self) -> None:

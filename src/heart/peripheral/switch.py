@@ -85,12 +85,13 @@ class FakeSwitch(BaseSwitch):
         def _is_pressed(event: KeyboardEvent) -> bool:
             return event.action is KeyboardAction.PRESSED
 
-        return pipe_in_background(
+        result = pipe_in_background(
             KeyboardKey.get(key).observe,
             ops.map(_unwrap),
             ops.filter(_is_pressed),
             ops.share(),
         )
+        return result
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -142,12 +143,13 @@ class FakeSwitch(BaseSwitch):
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             return reactivex.empty()
         else:
-            return pipe_in_background(
+            result = pipe_in_background(
                 interval_in_background(period=timedelta(milliseconds=10)),
                 ops.map(lambda _: self._snapshot()),
                 ops.distinct_until_changed(lambda x: x),
                 ops.share(),
             )
+            return result
 
 class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:

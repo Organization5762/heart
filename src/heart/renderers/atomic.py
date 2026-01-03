@@ -28,39 +28,6 @@ class AtomicBaseRenderer(Generic[StateT]):
         self.warmup = True
         self._state: StateT | None = None
 
-    def _create_initial_state(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> StateT:
-        raise NotImplementedError
-
-    @final
-    def initialize(
-        self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        # We call process once incase there is any implicit cachable work to do
-        # e.g. for numba jitted functions we'll cache their compiled code
-        self._state = self._create_initial_state(
-            window=window,
-            clock=clock,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-        )
-        try:
-            if self.warmup:
-                self.process(window, clock, peripheral_manager, orientation)
-        except Exception as e:
-            logger.warning(f"Error initializing renderer ({type(self)}): {e}")
-            raise e
-        self.initialized = True
-
     @property
     def state(self) -> StateT:
         assert self._state is not None
