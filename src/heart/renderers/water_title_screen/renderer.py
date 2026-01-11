@@ -10,6 +10,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.water_title_screen.provider import \
     WaterTitleScreenStateProvider
 from heart.renderers.water_title_screen.state import WaterTitleScreenState
+from heart.runtime.display_context import DisplayContext
 
 
 class WaterTitleScreen(StatefulBaseRenderer[WaterTitleScreenState]):
@@ -17,12 +18,6 @@ class WaterTitleScreen(StatefulBaseRenderer[WaterTitleScreenState]):
 
     def __init__(self, builder: WaterTitleScreenStateProvider) -> None:
         super().__init__(builder=builder)
-        self.face_px = 64  # physical LED face resolution
-        self.cube_px_w = self.face_px * 4  # 256
-        self.cube_px_h = self.face_px  # 64
-        self.water_level = self.face_px // 2  # Half full
-        self.wave_height = 5  # Height of wave in pixels
-        self.wave_length = self.face_px * 1.5  # Length of wave
 
         # Water color (blue)
         self.water_color = (0, 90, 255)
@@ -37,19 +32,25 @@ class WaterTitleScreen(StatefulBaseRenderer[WaterTitleScreenState]):
 
     def real_process(
         self,
-        window: Surface,
-        clock: Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         wave_offset = self.state.wave_offset
 
-        window.fill((0, 0, 0))
+        window.screen.fill((0, 0, 0))
+
+        self.face_px = window.device.scaled_display_size()[0] // orientation.layout.columns
+        self.cube_px_w = self.face_px * orientation.layout.columns
+        self.cube_px_h = self.face_px * orientation.layout.rows
+        self.water_level = self.face_px // 2  # Half full
+        self.wave_height = 5  # Height of wave in pixels
+        self.wave_length = self.face_px * 1.5  # Length of wave
 
         for x in range(self.cube_px_w):
             height = int(self._generate_wave_height(x, wave_offset))
             if height > 0:
                 pygame.draw.line(
-                    window,
+                    window.screen,
                     self.water_color,
                     (x, self.cube_px_h - height),
                     (x, self.cube_px_h - 1),

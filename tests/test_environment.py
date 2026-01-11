@@ -10,15 +10,11 @@ class TestEnvironment:
     """Group runtime loop tests so rendering behaviour stays reliable. This preserves confidence in runtime orchestration for end-to-end scenarios."""
 
     @pytest.mark.parametrize("num_renderers", [1, 5, 10, 25, 50, 100, 1000])
-    @pytest.mark.parametrize(
-        "renderer_variant", [RendererVariant.BINARY, RendererVariant.ITERATIVE]
-    )
     def test_rendering_many_objects(
         self,
         benchmark: BenchmarkFixture,
         loop: GameLoop,
         num_renderers: int,
-        renderer_variant: RendererVariant,
     ) -> None:
         """Verify that rendering many objects. This keeps rendering behaviour consistent across scenes."""
         mode = loop.add_mode("Test")
@@ -29,6 +25,6 @@ class TestEnvironment:
         # https://chatgpt.com/share/68056214-a5e4-8001-8fd0-ca966dbecf9b
         benchmark(
             lambda: loop._one_loop(
-                mode.renderers, override_renderer_variant=renderer_variant
+                mode.renderers
             )
         )

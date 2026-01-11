@@ -77,7 +77,7 @@ class LedWaveBoat(StatefulBaseRenderer[LedWaveBoatState]):
     def real_process(
         self,
         window: Surface,
-        clock: Clock,
+
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -109,7 +109,7 @@ class LedWaveBoat(StatefulBaseRenderer[LedWaveBoatState]):
                     body_color=deep_color,
                 )
             else:
-                window.set_at((x, crest_px), crest_color)
+                window.screen.set_at((x, crest_px), crest_color)
 
         self._draw_particles(window, self.state.particles)
         self._draw_boat(window, self.state.boat_x, self.state.boat_y, self.state.sway)

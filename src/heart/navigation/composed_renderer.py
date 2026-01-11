@@ -8,6 +8,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.display_context import DisplayContext
 from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 
 from .renderer_specs import (RendererResolver, RendererSpec,
@@ -17,8 +18,7 @@ from .renderer_specs import (RendererResolver, RendererSpec,
 @dataclass
 class ComposedRendererState:
     peripheral_manager: PeripheralManager
-    window: pygame.Surface
-    clock: pygame.time.Clock
+    window: DisplayContext
     orientation: Orientation
 
 
@@ -33,7 +33,10 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             resolve_renderer_spec(renderer)
             for renderer in renderers
         ]
-        self.device_display_mode = DeviceDisplayMode.FULL
+        if any(renderer.device_display_mode == DeviceDisplayMode.OPENGL for renderer in self.renderers):
+            self.device_display_mode = DeviceDisplayMode.OPENGL
+        else:
+            self.device_display_mode = DeviceDisplayMode.FULL
         self.surface_provider = surface_provider
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
@@ -49,17 +52,15 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
 
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> ComposedRendererState:
         for renderer in self.renderers:
-            renderer.initialize(window, clock, peripheral_manager, orientation)
+            renderer.initialize(window, peripheral_manager, orientation)
         return ComposedRendererState(
             peripheral_manager=peripheral_manager,
             window=window,
-            clock=clock,
             orientation=orientation,
         )
 
@@ -73,7 +74,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             for item in resolved_renderers:
                 item.initialize(
                     self.state.window,
-                    self.state.clock,
+                    self.state.window.clock,
                     self.state.peripheral_manager,
                     self.state.orientation,
                 )
@@ -86,7 +87,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         if self.is_initialized():
             resolved.initialize(
                 self.state.window,
-                self.state.clock,
+                self.state.window.clock,
                 self.state.peripheral_manager,
                 self.state.orientation,
             )
@@ -98,28 +99,25 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         for renderer in self.renderers:
-            surface = self.surface_provider.get_input_screen(
-                window=window,
+            scartch_window = window.get_scratch_screen(
                 orientation=orientation,
                 display_mode=renderer.device_display_mode,
             )
             renderer._internal_process(
-                window=surface,
-                clock=clock,
+                window=scartch_window,
                 peripheral_manager=self.state.peripheral_manager,
                 orientation=orientation,
             )
             result = self.surface_provider.postprocess_input_screen(
-                screen=surface,
+                screen=scartch_window.screen,
                 orientation=orientation,
                 display_mode=renderer.device_display_mode,
             )
-            window.blit(result, (0, 0))
+            window.screen.blit(result, (0, 0))
 
     def reset(self) -> None:
         for renderer in self.renderers:

@@ -2,6 +2,7 @@ import reactivex
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
+from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.peripheral.uwb import ops
@@ -12,9 +13,7 @@ from heart.utilities.reactivex_threads import pipe_in_background
 logger = get_logger(__name__)
 
 
-class MarioRendererProvider:
-    # self._spritesheet: pygame.Surface | None = None
-
+class MarioRendererProvider(ObservableProvider[MarioRendererState]):
     def __init__(
         self,
         metadata_file_path: str,

@@ -9,6 +9,7 @@ from heart.device import Rectangle
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription,
                                          LoopPhase, Size, SpritesheetLoop)
+from heart.runtime.display_context import DisplayContext
 
 
 class _StubSpritesheet:
@@ -97,7 +98,7 @@ class TestSpritesheetLoopProvider:
         self,
         monkeypatch: pytest.MonkeyPatch,
         frame_data: list[FrameDescription],
-        window: pygame.Surface,
+        window: DisplayContext,
         orientation: Rectangle,
         stub_clock_factory,
     ) -> None:
@@ -117,7 +118,7 @@ class TestSpritesheetLoopProvider:
             boomerang=True,
             frame_data=frame_data,
         )
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
 
         history = []
         for _ in range(15):
@@ -133,7 +134,7 @@ class TestSpritesheetLoopProvider:
         self,
         monkeypatch: pytest.MonkeyPatch,
         frame_data: list[FrameDescription],
-        window: pygame.Surface,
+        window: DisplayContext,
         orientation: Rectangle,
         stub_clock_factory,
     ) -> None:
@@ -154,12 +155,12 @@ class TestSpritesheetLoopProvider:
             boomerang=False,
             frame_data=frame_data,
         )
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
         manager.game_tick.on_next(True)
 
         renderer.reset()
         manager.clock.on_next(None)
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
 
         state = renderer.state
 
@@ -175,7 +176,7 @@ class TestSpritesheetLoopProvider:
         self,
         monkeypatch: pytest.MonkeyPatch,
         frame_data: list[FrameDescription],
-        window: pygame.Surface,
+        window: DisplayContext,
         orientation: Rectangle,
         stub_clock_factory,
     ) -> None:
@@ -196,7 +197,7 @@ class TestSpritesheetLoopProvider:
             boomerang=False,
             frame_data=frame_data,
         )
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
 
         manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))
         manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 25, 0))
@@ -214,7 +215,7 @@ class TestSpritesheetLoopProvider:
         self,
         monkeypatch: pytest.MonkeyPatch,
         frame_data: list[FrameDescription],
-        window: pygame.Surface,
+        window: DisplayContext,
         orientation: Rectangle,
         stub_clock_factory,
     ) -> None:
@@ -234,7 +235,7 @@ class TestSpritesheetLoopProvider:
             boomerang=False,
             frame_data=frame_data,
         )
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
 
         initial_state = renderer.state
         manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))

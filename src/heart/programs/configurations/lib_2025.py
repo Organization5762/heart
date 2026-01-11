@@ -19,6 +19,7 @@ from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
+from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
@@ -36,7 +37,7 @@ def configure(loop: GameLoop) -> None:
     kirby_mode.resolve_renderer_from_container(KirbyScene)
 
     modelbrot = loop.add_mode(
-        loop.compose(
+        title=loop.compose(
             [
                 MandelbrotTitle(),
                 TextRendering(
@@ -51,8 +52,8 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.resolve_renderer_from_container(MandelbrotMode)
 
-    # sphere_mode = loop.add_mode("3d fractal")
-    # sphere_mode.resolve_renderer_from_container(FractalScene)
+    sphere_mode = loop.add_mode("3d fractal")
+    sphere_mode.resolve_renderer_from_container(FractalScene)
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.resolve_renderer_from_container(HilbertScene)

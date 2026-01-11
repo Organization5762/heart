@@ -11,6 +11,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.multicolor.provider import MulticolorStateProvider
 from heart.renderers.multicolor.state import MulticolorState
+from heart.runtime.display_context import DisplayContext
 
 
 @nb.njit(fastmath=True)
@@ -102,8 +103,7 @@ class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()

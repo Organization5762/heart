@@ -11,6 +11,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.random_pixel.provider import RandomPixelStateProvider
 from heart.renderers.random_pixel.state import RandomPixelState
+from heart.runtime.display_context import DisplayContext
 
 
 class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
@@ -33,8 +34,7 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -48,12 +48,11 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
                 initial_color=self._initial_color,
             )
             self.builder = self._provider
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -61,7 +60,7 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
         color_value = [int(x * self.brightness) for x in state.color._as_tuple()]
 
         for x, y in state.pixels:
-            window.set_at((x, y), color_value)
+            window.screen.set_at((x, y), color_value)
 
     def set_color(self, color: Color | None) -> None:
         self._initial_color = color

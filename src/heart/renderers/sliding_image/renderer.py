@@ -14,6 +14,7 @@ from heart.renderers.sliding_image.provider import (
     SlidingImageStateProvider, SlidingRendererStateProvider)
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
+from heart.runtime.display_context import DisplayContext
 
 
 class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
@@ -47,20 +48,18 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         if self._image is None or self._image.get_size() != window.get_size():
             image = Loader.load(self._image_file)
             self._image = pygame.transform.scale(image, window.get_size())
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         if self._image is None or self.state.width <= 0:
@@ -105,26 +104,24 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         self._peripheral_manager = peripheral_manager
-        self.composed.initialize(window, clock, peripheral_manager, orientation)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        self.composed.initialize(window, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         if self._peripheral_manager is None:
             return
 
         self.composed._internal_process(
-            window, clock, self._peripheral_manager, orientation
+            window, self._peripheral_manager, orientation
         )
 
         if self.state.width <= 0:

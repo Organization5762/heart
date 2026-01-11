@@ -18,7 +18,7 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
 
     renderer = SlidingImage("banner.png", speed=4)
     manager.window.on_next(window)
-    renderer.initialize(window, clock, manager, orientation)
+    renderer.initialize(window, manager, orientation)
     manager.game_tick.on_next(True)
 
     initial_state = renderer.state
@@ -39,7 +39,7 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
 
     renderer.reset()
 
-    renderer.initialize(window, clock, manager, orientation)
+    renderer.initialize(window, manager, orientation)
     assert renderer._image is image_ref
     after_reset_state = renderer.state
     assert after_reset_state.offset == after_reset_state.speed

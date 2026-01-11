@@ -7,6 +7,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.heart_title_screen.provider import \
     HeartTitleScreenStateProvider
 from heart.renderers.heart_title_screen.state import HeartTitleScreenState
+from heart.runtime.display_context import DisplayContext
 
 
 class HeartTitleScreen(StatefulBaseRenderer[HeartTitleScreenState]):
@@ -29,8 +30,7 @@ class HeartTitleScreen(StatefulBaseRenderer[HeartTitleScreenState]):
 
     def real_process(
         self,
-        window: Surface,
-        clock: time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         # Get window dimensions

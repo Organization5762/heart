@@ -3,6 +3,7 @@ from __future__ import annotations
 import pygame
 
 from heart.assets.spritesheet import Spritesheet
+from heart.runtime.display_context import DisplayContext
 
 
 class Animation:
@@ -20,7 +21,7 @@ class Animation:
         self.ms_since_last_update: float | None = None
         self.ms_per_frame = 25
 
-    def step(self, window: pygame.Surface, clock: pygame.time.Clock) -> pygame.Surface:
+    def step(self, window: DisplayContext) -> pygame.Surface:
         if (
             self.ms_since_last_update is None
             or self.ms_since_last_update > self.ms_per_frame
@@ -33,5 +34,5 @@ class Animation:
             self.ms_since_last_update = 0
 
         image = self.spritesheet.image_at(self.key_frames[self.current_frame])
-        self.ms_since_last_update += clock.get_time()
+        self.ms_since_last_update += window.clock.get_time()
         return image

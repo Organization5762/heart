@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.display_context import DisplayContext
 
 if TYPE_CHECKING:
     from heart.renderers.slide_transition import SlideTransitionRenderer
@@ -82,18 +84,24 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             PeripheralManager,
             Orientation,
         ] | None = None
+        # TODO: Fix this wonkiness
+        self.device_display_mode = None
+
+    def _internal_device_display_mode(self) -> DeviceDisplayMode:
+        if any(self.state.renderers == DeviceDisplayMode.OPENGL for renderer in self.state.renderers):
+            return DeviceDisplayMode.OPENGL
+        return DeviceDisplayMode.FULL
 
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> GameModeState:
-        self._init_context = (window, clock, peripheral_manager, orientation)
+        self._init_context = (window, peripheral_manager, orientation)
         if self._state is not None:
             self._initialize_registered_renderers(
-                window, clock, peripheral_manager, orientation
+                window, peripheral_manager, orientation
             )
             state = self._state
         else:
@@ -112,18 +120,17 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.state.title_renderers.append(title_renderer)
         if self.is_initialized() and self._init_context is not None:
             window, clock, peripheral_manager, orientation = self._init_context
-            title_renderer.initialize(window, clock, peripheral_manager, orientation)
-            renderers.initialize(window, clock, peripheral_manager, orientation)
+            title_renderer.initialize(window, peripheral_manager, orientation)
+            renderers.initialize(window, peripheral_manager, orientation)
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         active_renderer = self.state.active_renderer()
         return active_renderer.get_renderers()
 
     def real_process(
-        self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation
+        self, window: DisplayContext, orientation: Orientation
     ) -> None:
-        for renderer in self.get_renderers():
-            renderer.real_process(window=window, clock=clock, orientation=orientation)
+        raise NotImplementedError("GameModes.real_process is not implemented")
 
     def handle_state(self, input: SwitchState) -> None:
         new_long_button_value = input.long_button_value
@@ -143,12 +150,14 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def _initialize_registered_renderers(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
+        # Renderers nmay have different display modes, so we need to initialize them all
         for renderer in self.state.renderers:
-            renderer.initialize(window, clock, peripheral_manager, orientation)
+            window.configure_window(renderer.device_display_mode)
+            renderer.initialize(window, peripheral_manager, orientation)
         for renderer in self.state.title_renderers:
-            renderer.initialize(window, clock, peripheral_manager, orientation)
+            window.configure_window(renderer.device_display_mode)
+            renderer.initialize(window, peripheral_manager, orientation)

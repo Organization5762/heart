@@ -8,6 +8,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.porthole_window.provider import \
     PortholeWindowStateProvider
 from heart.renderers.porthole_window.state import PortholeWindowState
+from heart.runtime.display_context import DisplayContext
 
 
 class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
@@ -19,8 +20,7 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         elapsed = self.state.elapsed_seconds
@@ -43,13 +43,13 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
         self._draw_glass_highlights(window, center, inner_radius)
         self._draw_rivets(window, center, radius, frame_width)
 
-    def _draw_wall(self, window: pygame.Surface) -> None:
+    def _draw_wall(self, window: DisplayContext) -> None:
         wall_color = (222, 210, 191)
         window.fill(wall_color)
 
     def _draw_shadow(
         self,
-        window: pygame.Surface,
+        window: DisplayContext,
         center: tuple[int, int],
         radius: int,
         frame_width: int,
@@ -63,7 +63,7 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
 
     def _draw_frame(
         self,
-        window: pygame.Surface,
+        window: DisplayContext,
         center: tuple[int, int],
         radius: int,
         frame_width: int,
@@ -179,7 +179,7 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
 
     def _draw_glass_highlights(
         self,
-        window: pygame.Surface,
+        window: DisplayContext,
         center: tuple[int, int],
         radius: int,
     ) -> None:
@@ -208,7 +208,7 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
 
     def _draw_rivets(
         self,
-        window: pygame.Surface,
+        window: DisplayContext,
         center: tuple[int, int],
         radius: int,
         frame_width: int,

@@ -8,6 +8,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet_random.provider import \
     SpritesheetLoopRandomProvider
 from heart.renderers.spritesheet_random.state import SpritesheetLoopRandomState
+from heart.runtime.display_context import DisplayContext
 
 
 class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
@@ -33,8 +34,7 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state

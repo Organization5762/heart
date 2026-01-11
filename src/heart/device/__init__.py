@@ -49,6 +49,12 @@ class Device:
             self.individual_display_size()[1] * self.orientation.layout.rows,
         )
 
+    def scaled_display_size(self) -> tuple[int, int]:
+        return (
+            self.full_display_size()[0] * self.scale_factor,
+            self.full_display_size()[1] * self.scale_factor,
+        )
+
     @cached_property
     def scale_factor(self) -> int:
         return 1

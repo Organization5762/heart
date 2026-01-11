@@ -14,7 +14,6 @@ from heart.runtime.container.initialize import (build_runtime_container,
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.runtime.rendering.pacing import RenderLoopPacer
 from heart.runtime.rendering.pipeline import RendererVariant
-from heart.runtime.rendering.plan import RenderPlan
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import shutdown
 
@@ -54,24 +53,19 @@ class GameLoop:
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
         self.edge_thresh = EDGE_THRESHOLD
-
-        self.components.display.configure_window()
+        self.components.display.initialize()
 
     def _one_loop(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
-        override_renderer_variant: RendererVariant | None = None,
-    ) -> RenderPlan:
-        display_mode = self._resolve_display_mode(renderers)
-        self.components.display.ensure_display_mode(display_mode)
+    ):
         render_result = self.components.render_pipeline.render_with_plan(
             renderers=renderers,
-            override_renderer_variant=override_renderer_variant,
         )
         render_surface = render_result.surface
         if render_surface is not None:
-            self.set_screen(render_surface)
-        return render_result.plan
+            self.components.display.blit(render_surface, (0, 0))
+            pygame.display.flip()
 
     def resolve(self, dependency: type[DependencyT]) -> DependencyT:
         return self.context_container.resolve(dependency)
@@ -80,7 +74,9 @@ class GameLoop:
         self,
         renderers: list["StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]],
     ) -> ComposedRenderer:
-        return self.context_container.resolve(ComposedRenderer)
+        result = self.context_container.resolve(ComposedRenderer)
+        result.add_renderer(*renderers)
+        return result
 
     def add_mode(
         self,
@@ -140,8 +136,8 @@ class GameLoop:
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:
-        pygame.display.flip()
         self.components.display.set_screen(screen)
+        pygame.display.flip()
         self.components.peripheral_manager.window.on_next(self.components.display.screen)
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
@@ -212,9 +208,6 @@ class GameLoop:
             )
 
     def _initialize_screen(self) -> None:
-        self.components.display.initialize()
-        if self.components.display.screen is None or self.components.display.clock is None:
-            raise RuntimeError("GameLoop failed to initialize display surfaces")
         self.set_screen(self.components.display.screen)
         self.set_clock(self.components.display.clock)
 
@@ -238,8 +231,7 @@ class GameLoop:
         self.components.display.ensure_initialized()
         logger.info("Initializing app controller components.")
         self.components.app_controller.initialize(
-            window=self.components.display.screen,
-            clock=self.components.display.clock,
+            window=self.components.display,
             peripheral_manager=self.components.peripheral_manager,
             orientation=self.device.orientation,
         )
@@ -253,14 +245,13 @@ class GameLoop:
         while self.running:
             self.components.peripheral_runtime.tick()
             self.running = self.components.event_handler.handle_events()
-            self._preprocess_setup()
+            self._preprocess_setup() # can't dim display each time
             renderers = self._select_renderers()
+            self.components.display.configure_window(self._resolve_display_mode(renderers))
 
             render_start = time.monotonic()
-            plan = self._one_loop(renderers=renderers)
-
-            estimated_cost_ms = plan.estimated_cost_ms if plan.has_samples else None
-            self._render_pacer.pace(render_start, estimated_cost_ms)
+            self._one_loop(renderers=renderers)
+            # self._render_pacer.pace(render_start, 20)
 
             self.components.display.clock.tick(self.max_fps)
 

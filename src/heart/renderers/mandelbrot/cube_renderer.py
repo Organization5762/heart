@@ -118,7 +118,7 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     def _create_initial_state(
         self,
         window: Surface,
-        clock: Clock,
+
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> CubeMandelbrotState:
@@ -165,7 +165,7 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     def real_process(
         self,
         window: Surface,
-        clock: Clock,
+
         orientation: Orientation,
     ) -> None:
         elapsed = time.monotonic() - self.state.start_time

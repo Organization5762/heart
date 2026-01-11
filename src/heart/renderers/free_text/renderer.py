@@ -9,6 +9,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.free_text.provider import FreeTextStateProvider
 from heart.renderers.free_text.state import FreeTextRendererState
+from heart.runtime.display_context import DisplayContext
 
 TEXT_COLOR = (255, 105, 180)
 TEXT_ANTIALIAS = False
@@ -36,8 +37,7 @@ class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state

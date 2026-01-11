@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import pygame
 
 from heart import DeviceDisplayMode
+from heart.runtime.display_context import DisplayContext
 from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 from heart.runtime.rendering.timing import RendererTimingTracker
 from heart.utilities.env import Configuration
@@ -23,11 +24,11 @@ log_controller = get_logging_controller()
 
 
 class RendererProcessor:
-    def __init__(self, device: Device, peripheral_manager: PeripheralManager) -> None:
-        self.device = device
+    def __init__(self, display_context: DisplayContext, peripheral_manager: PeripheralManager) -> None:
         self.peripheral_manager = peripheral_manager
         self.clock: pygame.time.Clock | None = None
-        self._surface_provider = RendererSurfaceProvider(device)
+        self.display_context = display_context
+        self._surface_provider = RendererSurfaceProvider(display_context)
         self._timing_tracker = RendererTimingTracker(
             strategy=Configuration.render_timing_strategy(),
             ema_alpha=Configuration.render_timing_ema_alpha(),
@@ -58,39 +59,28 @@ class RendererProcessor:
             logger.exception("Error processing renderer")
             return None
 
-    def _require_clock(self) -> pygame.time.Clock:
-        clock = self.clock
-        if clock is None:
-            raise RuntimeError("GameLoop clock is not initialized")
-        return clock
-
     def _render_frame_using_renderer(
         self, renderer: "StatefulBaseRenderer[Any]"
     ) -> pygame.Surface:
-        clock = self._require_clock()
-        screen = self._surface_provider._surface_cache.get(renderer)
-        screen = self._surface_provider.get_input_screen(
-            window=screen,
-            orientation=self.device.orientation,
-            display_mode=renderer.device_display_mode
+        scratch_context = self.display_context.get_scratch_screen(
+            orientation=self.display_context.device.orientation,
+            display_mode=renderer.device_display_mode,
         )
 
         if not renderer.initialized:
             renderer.initialize(
-                window=screen,
-                clock=clock,
+                window=scratch_context,
                 peripheral_manager=self.peripheral_manager,
-                orientation=self.device.orientation,
+                orientation=self.display_context.device.orientation,
             )
         renderer._internal_process(
-            window=screen,
-            clock=clock,
+            window=scratch_context,
             peripheral_manager=self.peripheral_manager,
-            orientation=self.device.orientation,
+            orientation=self.display_context.device.orientation,
         )
         screen = self._surface_provider.postprocess_input_screen(
-            screen=screen,
-            orientation=self.device.orientation,
+            screen=scratch_context.screen,
+            orientation=self.display_context.device.orientation,
             display_mode=renderer.device_display_mode
         )
         return screen

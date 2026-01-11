@@ -9,6 +9,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.pacman.provider import PacmanGhostStateProvider
 from heart.renderers.pacman.state import PacmanGhostState
+from heart.runtime.display_context import DisplayContext
 
 
 class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
@@ -24,8 +25,7 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -37,7 +37,7 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
                 peripheral_manager=peripheral_manager,
             )
             self.builder = self._builder
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def _load_sprites(self, state: PacmanGhostState) -> None:
         load = Loader.load
@@ -62,8 +62,7 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state

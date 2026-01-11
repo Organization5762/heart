@@ -10,6 +10,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet.provider import SpritesheetProvider
 from heart.renderers.spritesheet.state import (FrameDescription,
                                                SpritesheetLoopState)
+from heart.runtime.display_context import DisplayContext
 
 
 class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
@@ -91,8 +92,7 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state

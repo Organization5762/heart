@@ -21,7 +21,7 @@ class TestChannelDiffusionRenderer:
         orientation = Rectangle.with_layout(1, 1)
         window = pygame.Surface((3, 3), pygame.SRCALPHA)
 
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
 
         initial_center = renderer.state.grid[1, 1]
         np.testing.assert_array_equal(initial_center, np.array([255, 255, 255], dtype=np.uint8))

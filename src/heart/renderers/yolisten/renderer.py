@@ -13,6 +13,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.yolisten.provider import YoListenStateProvider
 from heart.renderers.yolisten.state import YoListenState
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
@@ -144,8 +145,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state
@@ -239,8 +239,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -255,7 +254,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 text_width, _ = font.size(self.ascii_art[word][0])
                 self.word_widths[word] = text_width
 
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager

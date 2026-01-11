@@ -5,20 +5,16 @@ import numpy as np
 from reactivex import Observable
 from reactivex import operators as ops
 
+from heart.device import Device
 from heart.peripheral.sensor import Acceleration
 from heart.utilities.reactivex_threads import pipe_in_background
 
-FACE_PX = 64  # physical LED face resolution (square)
 GRID = 64  # internal height-field resolution
 SIM_SPEED = 1
 SPRING_K = 6.0e-2  # spring to static plane
 NEIGH_K = 2.0e-1  # neighbour coupling (ripples)
 DAMPING = 0.985  # velocity decay
-INIT_FILL = 0.5 * FACE_PX  # half-full cube at rest (pixels)
 BLUE = np.array([0, 90, 255], np.uint8)
-
-CUBE_PX_W = FACE_PX * 4  # 256
-CUBE_PX_H = FACE_PX  # 64
 
 # grid coordinate helpers
 _centre = (GRID - 1) / 2.0
@@ -27,7 +23,7 @@ DX = X_COORDS - _centre
 DY = Y_COORDS - _centre
 
 
-def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
+def _target_plane(face_px: int, g: Tuple[float, float, float]) -> np.ndarray:
     """Return GRID×GRID array of target heights for gravity **g**."""
     gx, gy, gz = g
     # avoid blow-up when gz ~ 0 (cube on its side)
@@ -35,11 +31,12 @@ def _target_plane(g: Tuple[float, float, float]) -> np.ndarray:
     slope_x = -gx / denom
     slope_y = gy / denom
 
-    return INIT_FILL + slope_x * DX + slope_y * DY
+    return (face_px * 0.5) + slope_x * DX + slope_y * DY
 
 
 @dataclass
 class WaterCubeState:
+    face_px: int
     heights: np.ndarray
     velocities: np.ndarray
     gvec: Acceleration | None
@@ -61,7 +58,7 @@ class WaterCubeState:
         gy = -acceleration.y if acceleration else 0.0
         gz = acceleration.z if acceleration else 1.0  # default "down"
         gvec = (gx, gy, gz)
-        h_target = _target_plane(gvec)
+        h_target = _target_plane(self.face_px, gvec)
 
         diff = heights - h_target
 
@@ -75,11 +72,11 @@ class WaterCubeState:
         new_velocities = new_velocities * DAMPING
         new_heights = heights + new_velocities * SIM_SPEED
 
-        over = new_heights >= FACE_PX
+        over = new_heights >= self.face_px
         under = new_heights <= 0
 
         adjusted_heights = new_heights.copy()
-        adjusted_heights[over] = FACE_PX
+        adjusted_heights[over] = self.face_px
         adjusted_heights[under] = 0
 
         adjusted_velocities = new_velocities.copy()
@@ -91,16 +88,19 @@ class WaterCubeState:
         # This is a good example of a state update that would benefit from itself being a virtual peripheral imo? Trying to think this one through
         # Ok with this like this I think we have a path to just registering this as a callback that depends on gvec changing?
         return WaterCubeState(
+            face_px=self.face_px,
             heights=adjusted_heights,
             velocities=adjusted_velocities,
             gvec=acceleration,
         )
 
     @classmethod
-    def initial_state(cls) -> Self:
-        heights = np.full((64, 64), INIT_FILL, dtype=np.float32)
+    def initial_state(cls, device: Device | None = None) -> Self:
+        FACE_PX = device.scaled_display_size()[0] // 4
+        heights = np.full((FACE_PX, FACE_PX), 0.5 * FACE_PX, dtype=np.float32)
         velocities = np.zeros_like(heights)
         return cls(
+            face_px=FACE_PX,
             heights=heights,
             velocities=velocities,
             gvec=None
@@ -111,7 +111,8 @@ class WaterCubeState:
         cls,
         acceleration: Observable["Acceleration"],
     ) -> "Observable[Self]":
-        initial_state = cls.initial_state()
+        # TODO: Listen for device changes and update the initial state
+        # initial_state = cls.initial_state()
 
         def update_state(
             accumulated: Self,
@@ -126,7 +127,6 @@ class WaterCubeState:
 
         return pipe_in_background(
             acceleration,
-            ops.scan(update_state, seed=initial_state),
-            ops.start_with(initial_state),
+            ops.scan(update_state),
             ops.share(),
         )

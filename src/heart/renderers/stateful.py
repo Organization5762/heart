@@ -6,11 +6,13 @@ import pygame
 from reactivex import Observable
 from reactivex.disposable import Disposable
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -42,8 +44,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -52,8 +53,6 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
                 peripheral_manager=peripheral_manager,
             )
             self._subscription = observable.subscribe(on_next=self.set_state)
-            if self.warmup:
-                self.process(window, clock, peripheral_manager, orientation)
             self.initialized = True
             return
 
@@ -64,15 +63,12 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         logger.info(f"Creating initial state for {self.name}")
         state = self._create_initial_state(
             window=window,
-            clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
         logger.info(f"Setting state for {self.name}")
         self.set_state(state)
         logger.info(f"Processing for {self.name}")
-        if self.warmup:
-            self.process(window, clock, peripheral_manager, orientation)
         self.initialized = True
 
     def reset(self) -> None:

@@ -56,7 +56,7 @@ class TestDisplayThreeDGlassesRenderer:
         clock = stub_clock_factory(0, 150, repeat_last=False)
         renderer = ThreeDGlassesRenderer(["one.png", "two.png"], frame_duration_ms=120)
 
-        renderer.initialize(window, clock, manager, orientation)
+        renderer.initialize(window, manager, orientation)
         manager.clock.on_next(clock)
 
         manager.game_tick.on_next(True)

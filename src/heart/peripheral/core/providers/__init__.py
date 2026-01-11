@@ -6,6 +6,7 @@ from reactivex import operators as ops
 
 from heart.peripheral.core import InputDescriptor
 from heart.peripheral.core.providers import registry as providers_registry
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.reactivex_threads import pipe_in_background
 
 apply_provider_registrations = providers_registry.apply_provider_registrations
@@ -25,7 +26,6 @@ class ObservableProvider(Generic[T]):
         """Declare the input streams this provider consumes."""
 
         return ()
-
 
 class StaticStateProvider(ObservableProvider[T]):
     def __init__(self, state: T) -> None:
