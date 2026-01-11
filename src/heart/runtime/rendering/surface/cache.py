@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from heart.device import Device
 from heart.runtime.display_context import DisplayContext
 
 if TYPE_CHECKING:

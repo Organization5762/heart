@@ -1,7 +1,6 @@
 import logging
 import time
 
-import pygame
 import reactivex
 
 from heart import DeviceDisplayMode
@@ -11,7 +10,6 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import SlideTransitionState
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
@@ -86,7 +84,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
             key=f"render.loop.{slide_label}",
             logger=logger,
             level=logging.INFO,
-            msg=f"renderer=%s duration_ms=%.2f",
+            msg="renderer=%s duration_ms=%.2f",
             args=(renderer.name, duration_ms),
         )
 

@@ -1,5 +1,4 @@
 
-import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation

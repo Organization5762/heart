@@ -1,7 +1,5 @@
 import time
 
-import pygame
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager

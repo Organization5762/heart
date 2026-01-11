@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import pygame
 import reactivex
-from pygame.time import Clock
 
 from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager

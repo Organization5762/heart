@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Callable
 
-import pygame
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
