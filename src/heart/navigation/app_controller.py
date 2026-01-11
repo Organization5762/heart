@@ -48,6 +48,9 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         return self.modes.get_renderers()
 
+    def get_post_processors(self) -> list[StatefulBaseRenderer]:
+        return self.modes.get_post_processors()
+
     def add_sleep_mode(self) -> None:
         sleep_title = [
             SpritesheetLoop(

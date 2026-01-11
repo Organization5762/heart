@@ -7,7 +7,7 @@ from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.streams import PeripheralStreams
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.switch import SwitchState
+from heart.peripheral.switch import BluetoothSwitch, SwitchState
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -85,6 +85,12 @@ class PeripheralManager:
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         return self._streams.main_switch_subscription()
+
+    def bluetooth_switch(self) -> BluetoothSwitch | None:
+        for peripheral in self._peripherals:
+            if isinstance(peripheral, BluetoothSwitch):
+                return peripheral
+        return None
 
     @property
     def game_tick(self) -> reactivex.Subject[Any]:

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from typing import assert_never
 
 import pygame

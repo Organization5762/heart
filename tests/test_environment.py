@@ -3,7 +3,7 @@ import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
 from heart.renderers.random_pixel import RandomPixel
-from heart.runtime.game_loop import GameLoop, RendererVariant
+from heart.runtime.game_loop import GameLoop
 
 
 class TestEnvironment:

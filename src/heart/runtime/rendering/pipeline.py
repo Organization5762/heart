@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.rendering.renderer_processor import RendererProcessor
 from heart.runtime.rendering.surface.collection import RenderSurfaceCollector
 from heart.runtime.rendering.surface.merge import SurfaceCompositionManager
-from heart.runtime.rendering.variants import RendererVariant, RenderMethod
+from heart.runtime.rendering.variants import RendererVariant
 from heart.utilities.env import Configuration
 
 if TYPE_CHECKING:

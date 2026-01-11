@@ -2,16 +2,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import pygame
 import reactivex
 from reactivex import operators as ops
 
-from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import SlideTransitionState
-from heart.runtime.display_context import DisplayContext
 from heart.utilities.reactivex_threads import pipe_in_background
 
 

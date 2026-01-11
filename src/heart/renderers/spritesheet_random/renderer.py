@@ -1,4 +1,3 @@
-import pygame
 import reactivex
 
 from heart import DeviceDisplayMode

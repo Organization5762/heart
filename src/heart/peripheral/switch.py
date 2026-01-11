@@ -74,6 +74,9 @@ class BaseSwitch(Peripheral[SwitchState]):
         )
         return result
 
+    def get_rotation_since_last_long_button_press(self) -> int:
+        return self.rotational_value - self.rotation_value_at_last_long_button_press
+
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

@@ -10,6 +10,10 @@ from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
+from heart.renderers.post_processing import (EdgePostProcessor,
+                                             HueShiftPostProcessor,
+                                             NullPostProcessor,
+                                             SaturationPostProcessor)
 from heart.runtime.display_context import DisplayContext
 
 if TYPE_CHECKING:
@@ -20,6 +24,7 @@ if TYPE_CHECKING:
 class GameModeState:
     title_renderers: list[StatefulBaseRenderer] = field(default_factory=list)
     renderers: list[StatefulBaseRenderer] = field(default_factory=list)
+    post_processors: list[StatefulBaseRenderer] = field(default_factory=list)
     in_select_mode: bool = True
     last_long_button_value: int = 0
     mode_offset: int = 0
@@ -106,6 +111,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             state = self._state
         else:
             state = GameModeState()
+        if not state.post_processors:
+            state.post_processors.extend(self._default_post_processors())
         peripheral_manager.get_main_switch_subscription().subscribe(
             on_next=self.handle_state,
         )
@@ -127,6 +134,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         active_renderer = self.state.active_renderer()
         return active_renderer.get_renderers()
 
+    def get_post_processors(self) -> list[StatefulBaseRenderer]:
+        return list(self.state.post_processors)
+
     def real_process(
         self, window: DisplayContext, orientation: Orientation
     ) -> None:
@@ -140,6 +150,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
                 self.state.mode_offset = 0
             else:
                 for renderer in self.state.renderers:
+                    renderer.reset()
+                for renderer in self.state.post_processors:
                     renderer.reset()
 
             self.state.in_select_mode = not self.state.in_select_mode
@@ -161,3 +173,15 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         for renderer in self.state.title_renderers:
             window.configure_window(renderer.device_display_mode)
             renderer.initialize(window, peripheral_manager, orientation)
+        for renderer in self.state.post_processors:
+            window.configure_window(renderer.device_display_mode)
+            renderer.initialize(window, peripheral_manager, orientation)
+
+    @staticmethod
+    def _default_post_processors() -> list[StatefulBaseRenderer]:
+        return [
+            SaturationPostProcessor(),
+            HueShiftPostProcessor(),
+            EdgePostProcessor(),
+            NullPostProcessor(),
+        ]

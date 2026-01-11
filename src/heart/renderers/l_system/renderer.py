@@ -6,7 +6,6 @@ from collections import deque
 import numpy as np
 import pygame
 from pygame import Surface
-from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pygame
 import reactivex
 from pygame import Surface
 from pygame import time as pygame_time

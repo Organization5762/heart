@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pygame
 from pygame import Surface
-from pygame.time import Clock
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
