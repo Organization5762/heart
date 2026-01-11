@@ -269,7 +269,7 @@ class GameLoop:
         while self.running:
             self.components.peripheral_runtime.tick()
             self.running = self.components.event_handler.handle_events()
-            self._preprocess_setup() # can't dim display each time
+            self._preprocess_setup()  # can't dim display each time
             renderers = self._select_renderers()
             self.components.display.configure_window(self._resolve_display_mode(renderers))
 

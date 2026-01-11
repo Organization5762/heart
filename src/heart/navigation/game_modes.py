@@ -93,7 +93,11 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.device_display_mode = None
 
     def _internal_device_display_mode(self) -> DeviceDisplayMode:
-        if any(self.state.renderers == DeviceDisplayMode.OPENGL for renderer in self.state.renderers):
+        renderers = self.state.renderers + self.state.title_renderers
+        if any(
+            renderer.device_display_mode == DeviceDisplayMode.OPENGL
+            for renderer in renderers
+        ):
             return DeviceDisplayMode.OPENGL
         return DeviceDisplayMode.FULL
 
