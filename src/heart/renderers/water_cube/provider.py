@@ -2,13 +2,11 @@
 import reactivex
 from reactivex import operators as ops
 
-from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
-from heart.runtime.display_context import DisplayContext
 from heart.utilities.reactivex_threads import pipe_in_background
 
 

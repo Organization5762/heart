@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import pygame
 import reactivex
 from reactivex import operators as ops
 

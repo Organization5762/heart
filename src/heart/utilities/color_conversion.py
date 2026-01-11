@@ -287,3 +287,13 @@ def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
             HSV_TO_BGR_CACHE.move_to_end(key)
 
     return result
+
+
+def convert_rgb_to_hsv(image: np.ndarray) -> np.ndarray:
+    bgr = np.ascontiguousarray(image[..., ::-1])
+    return _convert_bgr_to_hsv(bgr)
+
+
+def convert_hsv_to_rgb(image: np.ndarray) -> np.ndarray:
+    bgr = _convert_hsv_to_bgr(image)
+    return bgr[..., ::-1]

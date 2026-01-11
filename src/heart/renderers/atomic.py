@@ -4,8 +4,6 @@ import time
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, final
 
-import pygame
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pygame
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager

@@ -15,7 +15,6 @@ from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
 if TYPE_CHECKING:
-    from heart.device import Device
     from heart.peripheral.core.manager import PeripheralManager
     from heart.renderers import StatefulBaseRenderer
 

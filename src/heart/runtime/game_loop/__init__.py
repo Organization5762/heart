@@ -10,6 +10,7 @@ from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
 from heart.runtime.container.initialize import (build_runtime_container,
                                                 configure_runtime_container)
+from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.runtime.rendering.pacing import RenderLoopPacer
 from heart.runtime.rendering.pipeline import RendererVariant
@@ -63,8 +64,32 @@ class GameLoop:
         )
         render_surface = render_result.surface
         if render_surface is not None:
+            self._apply_post_processors(render_surface)
             self.components.display.blit(render_surface, (0, 0))
             pygame.display.flip()
+
+    def _apply_post_processors(self, surface: pygame.Surface) -> None:
+        post_processors = self.components.app_controller.get_post_processors()
+        if not post_processors:
+            return
+        post_context = DisplayContext(
+            device=self.device,
+            screen=surface,
+            clock=self.components.display.clock,
+            last_render_mode=self.components.display.last_render_mode,
+        )
+        for renderer in post_processors:
+            if not renderer.initialized:
+                renderer.initialize(
+                    window=post_context,
+                    peripheral_manager=self.components.peripheral_manager,
+                    orientation=self.device.orientation,
+                )
+            renderer._internal_process(
+                window=post_context,
+                peripheral_manager=self.components.peripheral_manager,
+                orientation=self.device.orientation,
+            )
 
     def resolve(self, dependency: type[DependencyT]) -> DependencyT:
         return self.context_container.resolve(dependency)

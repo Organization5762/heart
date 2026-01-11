@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import Generic
 
-import pygame
 from reactivex import Observable
 from reactivex.disposable import Disposable
 
-from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,

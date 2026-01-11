@@ -1,4 +1,4 @@
-from pygame import Surface, time
+from pygame import Surface
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Device, Layout, Orientation
+from heart.device import Layout, Orientation
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.rendering.surface.cache import RendererSurfaceCache
 from heart.utilities.env import Configuration, RenderTileStrategy
+
 
 class RendererSurfaceProvider:
     def __init__(
