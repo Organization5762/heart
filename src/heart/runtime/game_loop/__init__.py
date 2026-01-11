@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -249,7 +248,6 @@ class GameLoop:
             renderers = self._select_renderers()
             self.components.display.configure_window(self._resolve_display_mode(renderers))
 
-            render_start = time.monotonic()
             self._one_loop(renderers=renderers)
             # self._render_pacer.pace(render_start, 20)
 
