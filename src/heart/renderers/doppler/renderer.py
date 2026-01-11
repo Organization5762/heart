@@ -94,7 +94,7 @@ class DopplerRenderer(StatefulBaseRenderer[DopplerState]):
     def real_process(
         self,
         window: Surface,
-        clock: Clock,
+
         orientation: Orientation,
     ) -> None:
         state = self.state

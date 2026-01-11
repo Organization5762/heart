@@ -10,6 +10,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import SlideTransitionState
+from heart.runtime.display_context import DisplayContext
+from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
 
@@ -20,27 +22,24 @@ log_controller = get_logging_controller()
 class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     """Slides renderer_B into view while renderer_A moves out."""
 
-    def __init__(self, provider: SlideTransitionProvider) -> None:
+    def __init__(self, provider: SlideTransitionProvider,) -> None:
         self.provider = provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self._initial_state: SlideTransitionState | None = None
+        logger.info(f"Created SlideTransitionRenderer from {provider.renderer_a.name} and {provider.renderer_b.name}")
         super().__init__(builder=self.provider)
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        self._initialize_children(window, clock, peripheral_manager, orientation)
-        self._initial_state = self.provider.initial_state(
-            window=window,
-            clock=clock,
+        self._initialize_children(window, peripheral_manager, orientation)
+        self._initial_state = SlideTransitionState(
             peripheral_manager=peripheral_manager,
-            orientation=orientation,
         )
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -54,8 +53,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
 
     def _initialize_children(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -63,7 +61,6 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
             if not renderer.initialized:
                 renderer.initialize(
                     window=window,
-                    clock=clock,
                     peripheral_manager=peripheral_manager,
                     orientation=orientation,
                 )
@@ -72,46 +69,64 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     def is_done(self) -> bool:
         return not self.state.sliding
 
+    def _render_and_log(
+        self,
+        renderer,
+        scratch_window: DisplayContext,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+        slide_label: str,
+    ) -> None:
+        start_ns = time.perf_counter_ns()
+        renderer._internal_process(
+            scratch_window, peripheral_manager, orientation
+        )
+        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+        log_controller.log(
+            key=f"render.loop.{slide_label}",
+            logger=logger,
+            level=logging.INFO,
+            msg=f"renderer=%s duration_ms=%.2f",
+            args=(renderer.name, duration_ms),
+        )
+
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state
+        new_orientation = Rectangle.with_layout(1, 1)
 
-        size = window.get_size()
-        surf_a = pygame.Surface(size, pygame.SRCALPHA)
-        surf_b = pygame.Surface(size, pygame.SRCALPHA)
 
-        start_ns = time.perf_counter_ns()
-        self.provider.renderer_a._internal_process(
-            surf_a, clock, state.peripheral_manager, Rectangle.with_layout(1, 1)
+        window_a = window.get_scratch_screen(
+            orientation=new_orientation,
+            display_mode=self.provider.renderer_a.device_display_mode,
         )
-        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-        log_controller.log(
-            key="render.loop",
-            logger=logger,
-            level=logging.INFO,
-            msg="slide.A renderer=%s duration_ms=%.2f",
-            args=(self.provider.renderer_a.name, duration_ms),
+        window_b = window.get_scratch_screen(
+            orientation=new_orientation,
+            display_mode=self.provider.renderer_b.device_display_mode,
         )
 
-        start_ns = time.perf_counter_ns()
-        self.provider.renderer_b._internal_process(
-            surf_b, clock, state.peripheral_manager, Rectangle.with_layout(1, 1)
-        )
-        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-        log_controller.log(
-            key="render.loop",
-            logger=logger,
-            level=logging.INFO,
-            msg="slide.B renderer=%s duration_ms=%.2f",
-            args=(self.provider.renderer_b.name, duration_ms),
+        self._render_and_log(
+            self.provider.renderer_a,
+            window_a,
+            state.peripheral_manager,
+            new_orientation,
+            "slide.A",
         )
 
-        offset_a = (state.x_offset, 0)
-        offset_b = (state.x_offset + self.provider.direction * state.screen_w, 0)
+        self._render_and_log(
+            self.provider.renderer_b,
+            window_b,
+            state.peripheral_manager,
+            new_orientation,
+            "slide.B",
+        )
 
-        window.blit(surf_a, offset_a)
-        window.blit(surf_b, offset_b)
+        image_width = window_a.get_width()
+        offset_a = (-self.provider.direction * state.fraction_offset * image_width, 0)
+        offset_b = (offset_a[0] + self.provider.direction * image_width, 0)
+
+        window.screen.blit(window_a.screen, offset_a)
+        window.screen.blit(window_b.screen, offset_b)

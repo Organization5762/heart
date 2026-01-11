@@ -6,6 +6,7 @@ from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mario.provider import MarioRendererProvider
 from heart.renderers.mario.state import MarioRendererState
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 _LOGGER = get_logger(__name__)
@@ -22,8 +23,7 @@ class MarioRenderer(StatefulBaseRenderer[MarioRendererState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         screen_width, screen_height = window.get_size()

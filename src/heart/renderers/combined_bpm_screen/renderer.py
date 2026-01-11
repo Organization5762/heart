@@ -18,6 +18,7 @@ from heart.renderers.flame.renderer import FlameRenderer
 from heart.renderers.max_bpm_screen import AvatarBpmRenderer
 from heart.renderers.metadata_screen import MetadataScreen
 from heart.runtime.container import container
+from heart.runtime.display_context import DisplayContext
 
 
 class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
@@ -47,25 +48,22 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         self._peripheral_manager = peripheral_manager
         self.metadata_screen.initialize(
             window=window,
-            clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
         self.max_bpm_screen.initialize(
             window=window,
-            clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager

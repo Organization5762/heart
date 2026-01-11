@@ -25,25 +25,9 @@ class LocalScreen(Device):
         result = max(min(width // current_width, height // current_height), 1)
         return max(result // 3, 1)
 
-    def setup_screen(self) -> None:
-        self.scaled_screen = pygame.display.set_mode(
-            (
-                self.full_display_size()[0] * self.scale_factor,
-                self.full_display_size()[1] * self.scale_factor,
-            ),
-            pygame.SHOWN
-        )
-
 
     def set_screen(self, screen: pygame.Surface) -> None:
-        # Clear previous pixels
-        screen.fill((0, 0, 0))
-        screen = pygame.transform.scale(screen, (self.full_display_size()[0] * self.scale_factor, self.full_display_size()[1] * self.scale_factor))
-
-        # self.scaled_screen.blit(
-        #     source=screen,
-        #     dest=(0, 0),
-        # )
+        screen = pygame.transform.scale(screen, self.individual_display_size())
 
     def set_image(self, image: Image.Image) -> None:
         assert image.size == self.full_display_size(), (

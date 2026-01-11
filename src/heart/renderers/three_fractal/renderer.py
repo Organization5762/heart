@@ -30,6 +30,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -159,11 +160,12 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     # Modified initialize to use the provided window
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> FractalRuntimeState:
+        window.configure_window(DeviceDisplayMode.OPENGL)
+
         """Initialize the fractal renderer with the given window size."""
         logger.info(
             "OpenGL Version: %s",
@@ -190,7 +192,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         tiled_mode = isinstance(orientation, Cube)
 
         self.tiled_mode = tiled_mode
-        self.clock = clock
+        self.clock = window.clock
         self.mode = "auto"
 
         if self.tiled_mode:
@@ -714,8 +716,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         peripheral_manager = self.state.peripheral_manager
@@ -734,7 +735,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             self._process_input(peripheral_manager)
             self._check_enter_auto(peripheral_manager)
 
-        self.mat[3, :3] += self.vel * (clock.get_time() / 1000)
+        self.mat[3, :3] += self.vel * (self.clock.get_time() / 1000)
         # self._check_switch_auto(peripheral_manager)
 
         if self.check_collision():
@@ -844,19 +845,17 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         self._peripheral_manager = peripheral_manager
         self._initial_state = self.provider.initial_state(
             window=window,
-            clock=clock,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -867,13 +866,11 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         assert self._peripheral_manager is not None
         self.state.runtime.real_process(
             window,
-            clock,
             orientation,
         )

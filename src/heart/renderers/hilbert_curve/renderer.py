@@ -9,6 +9,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.hilbert_curve.provider import HilbertCurveProvider
 from heart.renderers.hilbert_curve.state import HilbertCurveState
+from heart.runtime.display_context import DisplayContext
 
 
 class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
@@ -25,11 +26,10 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         state = self.state
-        window.fill((0, 0, 0))
+        window.screen.fill((0, 0, 0))
         if len(state.frame_curve) > 1:
-            pygame.draw.lines(window, self.line_color, False, state.frame_curve, 1)
+            pygame.draw.lines(window.screen, self.line_color, False, state.frame_curve, 1)

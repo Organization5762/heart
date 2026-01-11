@@ -7,6 +7,7 @@ from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.tixyland.provider import TixylandStateProvider
 from heart.renderers.tixyland.state import TixylandState
+from heart.runtime.display_context import DisplayContext
 
 
 class Tixyland(StatefulBaseRenderer[TixylandState]):
@@ -20,8 +21,7 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         time_value = self.state.time_seconds
@@ -44,4 +44,4 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
         # Make sure the array is shape (w, h, 3) for blit_array
         arr_for_blit = np.transpose(rgb, (1, 0, 2))
 
-        pygame.surfarray.blit_array(window, arr_for_blit)
+        pygame.surfarray.blit_array(window.screen, arr_for_blit)

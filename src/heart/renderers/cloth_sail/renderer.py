@@ -31,6 +31,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.cloth_sail.provider import ClothSailStateProvider
 from heart.renderers.cloth_sail.state import ClothSailState
+from heart.runtime.display_context import DisplayContext
 
 _SDL2Window: Any | None
 _SDL2_WINDOW_SPEC = importlib.util.find_spec("pygame._sdl2.video")
@@ -184,7 +185,7 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
         self._pixel_buffer: Optional[np.ndarray] = None
 
     @staticmethod
-    def _get_drawable_size(window: pygame.Surface) -> tuple[int, int]:
+    def _get_drawable_size(window: DisplayContext) -> tuple[int, int]:
         if _SDL2Window is None:
             return window.get_size()
 
@@ -217,8 +218,7 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -267,7 +267,7 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
             glDisable(GL_DEPTH_TEST)
             glDisable(GL_CULL_FACE)
 
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -289,8 +289,7 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         surface_width, surface_height = window.get_size()

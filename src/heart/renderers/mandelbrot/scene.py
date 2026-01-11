@@ -19,6 +19,7 @@ from heart.renderers.mandelbrot.control_mappings import (KeyboardControls,
                                                          SceneControlsMapping)
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.env import Configuration
 from heart.utilities.env.enums import MandelbrotInteriorStrategy
 from heart.utilities.logging import get_logger
@@ -75,15 +76,14 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> AppState:
         pygame.font.init()
         self.time_initialized = time.monotonic()
         self.font = pygame.font.SysFont("monospace", 8)
-        self.clock = clock
+        self.clock = window.clock
         self.height = window.get_height()
         self.width = window.get_width()
         screen_cols = orientation.layout.columns
@@ -128,7 +128,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             # warmup compilation of the jitted functions
             mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
             julia_surface = pygame.Surface((self.width // 2, self.height))
-            self._draw_split_view(mandelbrot_surface, julia_surface, clock)
+            self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
         return state
 
     @property
@@ -158,8 +158,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         try:
@@ -181,10 +180,11 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         if self.state.view_mode == ViewMode.MANDELBROT:
             match self.state.orientation:
                 case Rectangle():
-                    self._draw_mandelbrot_to_surface(window, clock)
+                    self._draw_mandelbrot_to_surface(window.screen)
                 case Cube():
                     for (x, y), screen in self.screens.items():
-                        self._draw_mandelbrot_to_surface(screen, clock)
+                        # Same, unsure how this plays
+                        self._draw_mandelbrot_to_surface(screen)
                         window.blit(
                             screen,
                             (y * individual_screen_width, x * individual_screen_height),
@@ -197,7 +197,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
                 case Rectangle():
                     mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
                     julia_surface = pygame.Surface((self.width // 2, self.height))
-                    self._draw_split_view(mandelbrot_surface, julia_surface, clock)
+                    self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
                     # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))
                     window.blit(julia_surface, (self.width // 2, 0))
@@ -206,8 +206,8 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
                     screen1 = self.screens[(0, 1)]
                     screen2 = self.screens[(0, 2)]
                     screen3 = self.screens[(0, 3)]
-                    self._draw_split_view(screen0, screen1, clock)
-                    self._draw_split_view(screen2, screen3, clock)
+                    self._draw_split_view(screen0, screen1, window.clock)
+                    self._draw_split_view(screen2, screen3, window.clock)
                     window.blit(screen0, (0, 0))
                     window.blit(screen1, (individual_screen_width, 0))
                     window.blit(screen2, (individual_screen_width * 2, 0))
@@ -215,10 +215,11 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         elif self.state.view_mode == ViewMode.JULIA:
             match self.state.orientation:
                 case Rectangle():
-                    self._draw_julia_to_surface(window, clock)
+                    self._draw_julia_to_surface(window.screen)
                 case Cube():
+                    # lampe: unsure
                     for (x, y), screen in self.screens.items():
-                        self._draw_julia_to_surface(screen, clock)
+                        self._draw_julia_to_surface(screen)
                         window.blit(
                             screen,
                             (y * individual_screen_width, x * individual_screen_height),
@@ -377,7 +378,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def _draw_split_view(
         self,
-        mandelbrot_surface: pygame.Surface,
+        mandelbrot_surface: DisplayContext,
         julia_surface: pygame.Surface,
         clock: pygame.time.Clock,
     ):
@@ -385,8 +386,8 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         msurface_width = mandelbrot_surface.get_width()
         msurface_height = mandelbrot_surface.get_height()
 
-        self._draw_mandelbrot_to_surface(mandelbrot_surface, clock)
-        self._draw_julia_to_surface(julia_surface, clock)
+        self._draw_mandelbrot_to_surface(mandelbrot_surface)
+        self._draw_julia_to_surface(julia_surface)
 
         if self.state.view_mode == ViewMode.MANDELBROT_SELECTED:
             self._draw_perimeter_to_surface(mandelbrot_surface)
@@ -413,9 +414,9 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         )
 
     def _draw_julia_to_surface(
-        self, surface: pygame.Surface, clock: pygame.time.Clock
+        self, window: pygame.Surface
     ) -> None:
-        width, height = surface.get_size()
+        width, height = window.get_size()
         current_params = (
             self.state.jzoom,
             self.state.jmovement.x,
@@ -458,12 +459,12 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         color_surface = self.active_palette_array[clipped_times]
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
-        pygame.surfarray.blit_array(surface, surface_array)
+        pygame.surfarray.blit_array(window, surface_array)
 
     def _draw_mandelbrot_to_surface(
-        self, surface: pygame.Surface, clock: pygame.time.Clock
+        self, window: pygame.Surface
     ) -> None:
-        width, height = surface.get_size()
+        width, height = window.get_size()
         current_params = (
             self.state.zoom,
             self.state.movement.x,
@@ -513,15 +514,15 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         color_surface = self.active_palette_array[clipped_times]
 
         surface_array = np.transpose(color_surface, (1, 0, 2))
-        pygame.surfarray.blit_array(surface, surface_array)
+        pygame.surfarray.blit_array(window, surface_array)
 
-    def _draw_fps_to_surface(self, window: pygame.Surface):
+    def _draw_fps_to_surface(self, window: DisplayContext):
         text_color = (255, 255, 255)
         window.blit(
             self.font.render(f"{int(self.clock.get_fps())}", True, text_color), (5, 5)
         )
 
-    def _draw_debug_to_surface(self, window: pygame.Surface):
+    def _draw_debug_to_surface(self, window: DisplayContext):
         text_color = (255, 255, 255)
         init_y = 5
         y_spacing = 10

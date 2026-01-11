@@ -7,6 +7,7 @@ from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
+from heart.runtime.display_context import DisplayContext
 
 
 @dataclass
@@ -24,30 +25,27 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
 
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> MandelbrotTitleState:
         custom_orientation = Rectangle.with_layout(1, 1)
         self.mandelbrot.initialize(
             window,
-            clock,
             peripheral_manager,
             custom_orientation,
         )
         self.mandelbrot._internal_process(
-            window, clock, peripheral_manager, custom_orientation
+            window, peripheral_manager, custom_orientation
         )
-        first_image = window.copy()
+        first_image = window.screen.copy()
         del self.mandelbrot
         self.mandelbrot = None
         return MandelbrotTitleState(image=first_image)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         window.blit(self.state.image, (0, 0))

@@ -9,6 +9,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -23,10 +24,14 @@ class AtomicBaseRenderer(Generic[StateT]):
     """Base renderer that manages an immutable state snapshot."""
 
     def __init__(self, *args, **kwargs) -> None:
-        self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.initialized = False
         self.warmup = True
         self._state: StateT | None = None
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
+
+    @property
+    def _internal_device_display_mode(self) -> DeviceDisplayMode:
+        return self.device_display_mode
 
     @property
     def state(self) -> StateT:
@@ -60,17 +65,15 @@ class AtomicBaseRenderer(Generic[StateT]):
     @final
     def process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        return self.real_process(window=window, clock=clock, orientation=orientation)
+        return self.real_process(window=window, orientation=orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         raise NotImplementedError("Please implement")
@@ -78,28 +81,25 @@ class AtomicBaseRenderer(Generic[StateT]):
     @final
     def _internal_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         return self._real_internal_process(
             window=window,
-            clock=clock,
             orientation=orientation,
         )
 
     def _real_internal_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         if not self.is_initialized():
             raise ValueError("Needs to be initialized")
 
         start_ns = time.perf_counter_ns()
-        self.real_process(window=window, clock=clock, orientation=orientation)
+        self.real_process(window=window, orientation=orientation)
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         logger.debug(
             "renderer.frame",

@@ -10,6 +10,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.channel_diffusion.provider import \
     ChannelDiffusionStateProvider
 from heart.renderers.channel_diffusion.state import ChannelDiffusionState
+from heart.runtime.display_context import DisplayContext
 
 
 class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
@@ -22,14 +23,13 @@ class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
         self._initial_state = self._provider.initial_state(width=width, height=height)
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
@@ -43,8 +43,7 @@ class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         pygame.surfarray.blit_array(window, self.state.grid)

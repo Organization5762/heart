@@ -141,13 +141,13 @@ class RenderingConfiguration:
     @classmethod
     def render_merge_strategy(cls) -> RenderMergeStrategy:
         strategy = os.environ.get(
-            "HEART_RENDER_MERGE_STRATEGY", "adaptive"
+            "HEART_RENDER_MERGE_STRATEGY", "in_place"
         ).strip().lower()
         try:
             return RenderMergeStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                "HEART_RENDER_MERGE_STRATEGY must be 'batched', 'in_place', or 'adaptive'"
+                f"HEART_RENDER_MERGE_STRATEGY must be 'in_place', found: {strategy}"
             ) from exc
 
     @classmethod

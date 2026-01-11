@@ -4,6 +4,7 @@ from heart.device import Orientation
 from heart.display.color import Color
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.color.state import RenderColorState
+from heart.runtime.display_context import DisplayContext
 
 
 class RenderColor(StatefulBaseRenderer[RenderColorState]):
@@ -20,8 +21,7 @@ class RenderColor(StatefulBaseRenderer[RenderColorState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         image = pygame.Surface(window.get_size())

@@ -6,39 +6,18 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Device, Layout, Orientation
-from heart.runtime.rendering.display import DisplayModeManager
+from heart.runtime.display_context import DisplayContext
 from heart.runtime.rendering.surface.cache import RendererSurfaceCache
 from heart.utilities.env import Configuration, RenderTileStrategy
-
-if TYPE_CHECKING:
-    pass
-
 
 class RendererSurfaceProvider:
     def __init__(
         self,
-        device: Device,
-        display_manager: DisplayModeManager | None = None,
+        display_context: DisplayContext,
         surface_cache: RendererSurfaceCache | None = None,
     ) -> None:
-        self._display_manager = display_manager or DisplayModeManager(device)
-        self._surface_cache = surface_cache or RendererSurfaceCache(device)
-
-    def get_input_screen(
-        self,
-        window: pygame.Surface,
-        orientation: Orientation,
-        display_mode: DeviceDisplayMode,
-    ) -> pygame.Surface:
-        window_x, window_y = window.get_size()
-        match display_mode:
-            case DeviceDisplayMode.MIRRORED:
-                layout: Layout = orientation.layout
-                screen_size = (window_x // layout.columns, window_y // layout.rows)
-            case DeviceDisplayMode.FULL | DeviceDisplayMode.OPENGL:
-                # The screen is the full size of the device
-                screen_size = (window_x, window_y)
-        return pygame.Surface(screen_size, pygame.SRCALPHA)
+        self._display_context = display_context
+        self._surface_cache = surface_cache or RendererSurfaceCache(display_context)
 
     def postprocess_input_screen(
         self,

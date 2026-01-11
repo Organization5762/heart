@@ -9,6 +9,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.text.provider import TextRenderingProvider
 from heart.renderers.text.state import TextRenderingState
+from heart.runtime.display_context import DisplayContext
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 PIXEL_FONT_ANTIALIAS = False
@@ -66,8 +67,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         current_text = self._current_text()
@@ -115,6 +115,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
                 x_offset = (window_width - text_width) // 2
             else:
                 x_offset = int(self.state.x_location * window_width)
-            window.blit(text_surface, (x_offset, y_offset))
+            window.screen.blit(text_surface, (x_offset, y_offset))
             # (x_offset, y_offset))
-            y_offset += font.get_sized_height()
+            # TODO:
+            # y_offset += font.get_sized_height()

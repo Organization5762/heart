@@ -8,6 +8,7 @@ from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.display_context import DisplayContext
 
 from .renderer_specs import (RendererResolver, RendererSpec,
                              resolve_renderer_spec)
@@ -37,8 +38,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
 
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> MultiSceneState:
@@ -48,15 +48,15 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         observable.subscribe(on_next=self._process_switch)
 
         for scene in self.scenes:
-            scene.initialize(window, clock, peripheral_manager, orientation)
+            scene.initialize(window, peripheral_manager, orientation)
 
         return state
 
     def real_process(
-        self, window: pygame.Surface, clock: pygame.time.Clock, orientation: Orientation
+        self, window: DisplayContext, orientation: Orientation
     ) -> None:
         for render in self.get_renderers():
-            render.real_process(window=window, clock=clock, orientation=orientation)
+            render.real_process(window=window, orientation=orientation)
 
     def reset(self) -> None:
         self.state.offset_of_button_value = self.state.current_button_value

@@ -8,6 +8,7 @@ from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_fractal.state import FractalSceneState
+from heart.runtime.display_context import DisplayContext
 
 
 class FractalSceneProvider(ObservableProvider[FractalSceneState]):
@@ -16,15 +17,15 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
 
     def initial_state(
         self,
-        window: pygame.Surface,
-        clock: Clock,
+        window: DisplayContext,
+
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> FractalSceneState:
         from heart.renderers.three_fractal.renderer import FractalRuntime
 
         runtime = FractalRuntime(device=self.device)
-        runtime.initialize(window, clock, peripheral_manager, orientation)
+        runtime.initialize(window, peripheral_manager, orientation)
         return FractalSceneState(runtime=runtime)
 
     def observable(

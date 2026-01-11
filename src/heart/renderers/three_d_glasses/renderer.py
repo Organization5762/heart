@@ -19,6 +19,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_d_glasses.provider import ThreeDGlassesStateProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
+from heart.runtime.display_context import DisplayContext
 
 
 @dataclass(frozen=True)
@@ -147,8 +148,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         if not self._image_arrays:
@@ -166,8 +166,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -187,7 +186,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         self._profiles = self._generate_profiles(len(self._image_arrays))
         self._effect_surface = pygame.Surface(window_size, pygame.SRCALPHA)
         self._initial_state = self.provider.initial_state()
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def state_observable(
         self, peripheral_manager: PeripheralManager

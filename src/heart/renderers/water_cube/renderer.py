@@ -22,19 +22,15 @@ from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.water_cube.provider import WaterCubeStateProvider
 from heart.renderers.water_cube.state import WaterCubeState
+from heart.runtime.display_context import DisplayContext
 
 # ───────────────────────── constants & tunables ───────────────────────────────
-FACE_PX = 64  # physical LED face resolution (square)
 GRID = 64  # internal height-field resolution
 SIM_SPEED = 1
 SPRING_K = 6.0e-2  # spring to static plane
 NEIGH_K = 2.0e-1  # neighbour coupling (ripples)
 DAMPING = 0.985  # velocity decay
-INIT_FILL = 0.5 * FACE_PX  # half-full cube at rest (pixels)
 BLUE = np.array([0, 90, 255], np.uint8)
-
-CUBE_PX_W = FACE_PX * 4  # 256
-CUBE_PX_H = FACE_PX  # 64
 
 # grid coordinate helpers
 _centre = (GRID - 1) / 2.0
@@ -68,7 +64,7 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
             return heights[0, :]  # x = 0
         return heights[:, -1]  # −Y (south)
 
-    def _mask_from_heights(self, heights: np.ndarray, gz: float) -> np.ndarray:
+    def _mask_from_heights(self, FACE_PX: int, heights: np.ndarray, gz: float) -> np.ndarray:
         """Convert GRID-length *heights* → 64×64 boolean mask."""
         mask = np.zeros((FACE_PX, FACE_PX), bool)
         # map every LED column to a grid column via COL_LUT
@@ -85,21 +81,23 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
 
     def real_process(
         self,
-        window: Surface,
-        clock: Clock,
+        window: DisplayContext,
+
         orientation: Orientation,
     ) -> None:
         gvec = _norm(self.state.gvec_tuple())
         _, _, gz = gvec
 
         # --- compose frame -------------------------------------------------
-        frame = np.zeros((CUBE_PX_W, CUBE_PX_H, 3), dtype=np.uint8)
+        window_width, window_height = window.get_size()
+        frame = np.zeros((window_width, window_height, 3), dtype=np.uint8)
+
+        # TODO (lampe): Compute this using the orientation re. faces
         for face in range(4):
             face_heights = self._face_heights(self.state.heights, face)
-            mask = self._mask_from_heights(face_heights, gz)
-            x0 = face * FACE_PX
-            face_view = frame[x0 : x0 + FACE_PX, :]
+            mask = self._mask_from_heights(self.state.face_px, face_heights, gz)
+            x0 = face * self.state.face_px
+            face_view = frame[x0 : x0 + self.state.face_px, :]
             face_view[mask] = BLUE
 
-        # --- blit to LED surfaces -----------------------------------------
-        pygame.surfarray.blit_array(window, frame)
+        pygame.surfarray.blit_array(window.screen, frame)

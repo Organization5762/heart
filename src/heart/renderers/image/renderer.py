@@ -6,6 +6,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.image.provider import RenderImageStateProvider
 from heart.renderers.image.state import RenderImageState
+from heart.runtime.display_context import DisplayContext
 
 
 class RenderImage(StatefulBaseRenderer[RenderImageState]):
@@ -32,8 +33,7 @@ class RenderImage(StatefulBaseRenderer[RenderImageState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         if self._scaled_image is None or self._scaled_size != self.state.window_size:

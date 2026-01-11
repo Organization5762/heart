@@ -9,6 +9,7 @@ from heart.renderers.pixels.provider import (BorderStateProvider,
                                              RainStateProvider,
                                              SlinkyStateProvider)
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
+from heart.runtime.display_context import DisplayContext
 
 
 class Border(StatefulBaseRenderer[BorderState]):
@@ -25,8 +26,7 @@ class Border(StatefulBaseRenderer[BorderState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()
@@ -65,8 +65,7 @@ class Rain(StatefulBaseRenderer[RainState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -78,12 +77,11 @@ class Rain(StatefulBaseRenderer[RainState]):
                 peripheral_manager=peripheral_manager,
             )
             self.builder = self._provider
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         new_y = self.state.current_y
@@ -91,7 +89,7 @@ class Rain(StatefulBaseRenderer[RainState]):
 
         for i in range(self.l):
             color = self.starting_color.dim(fraction=i / self.l)
-            window.set_at((starting_point, new_y - i), color)
+            window.screen.set_at((starting_point, new_y - i), color)
 
 
 class Slinky(StatefulBaseRenderer[SlinkyState]):
@@ -104,8 +102,7 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
 
     def initialize(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
@@ -117,26 +114,25 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
                 peripheral_manager=peripheral_manager,
             )
             self.builder = self._provider
-        super().initialize(window, clock, peripheral_manager, orientation)
+        super().initialize(window, peripheral_manager, orientation)
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
         new_y = self.state.current_y
         starting_point = self.state.starting_point
 
-        window.set_at((starting_point, new_y), self.starting_color)
+        window.screen.set_at((starting_point, new_y), self.starting_color)
         dimmed_color = self.starting_color.dim(fraction=1 / self.l)
-        window.set_at((starting_point + 1, new_y), dimmed_color)
-        window.set_at((starting_point - 1, new_y), dimmed_color)
+        window.screen.set_at((starting_point + 1, new_y), dimmed_color)
+        window.screen.set_at((starting_point - 1, new_y), dimmed_color)
         for i in range(self.l):
             final_color = self.starting_color.dim(fraction=i / self.l)
-            window.set_at((starting_point, new_y + i), final_color)
-            window.set_at((starting_point, new_y - i), final_color)
+            window.screen.set_at((starting_point, new_y + i), final_color)
+            window.screen.set_at((starting_point, new_y - i), final_color)
             if i < 3:
                 more_dim = self.starting_color.dim(fraction=(i + 1) / self.l)
-                window.set_at((starting_point + 1, new_y + i), more_dim)
-                window.set_at((starting_point - 1, new_y - i), more_dim)
+                window.screen.set_at((starting_point + 1, new_y + i), more_dim)
+                window.screen.set_at((starting_point - 1, new_y - i), more_dim)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import pygame
 
@@ -13,6 +14,7 @@ from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 from heart.runtime.container import container
+from heart.runtime.display_context import DisplayContext
 
 from .composed_renderer import ComposedRenderer
 from .game_modes import GameModes
@@ -28,18 +30,19 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
     def __init__(self) -> None:
         super().__init__()
         self.modes = GameModes()
-        self.device_display_mode = DeviceDisplayMode.FULL
         self.warmup = True
         self._renderer_resolver = container
 
+    def _internal_device_display_mode(self) -> DeviceDisplayMode:
+        return self.modes._internal_device_display_mode()
+
     def _create_initial_state(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> AppControllerState:
-        self.modes.initialize(window, clock, peripheral_manager, orientation)
+        self.modes.initialize(window, peripheral_manager, orientation)
         return AppControllerState()
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
@@ -96,11 +99,10 @@ class AppController(StatefulBaseRenderer[AppControllerState]):
 
     def real_process(
         self,
-        window: pygame.Surface,
-        clock: pygame.time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
-    ) -> None:
-        self.modes.real_process(window=window, clock=clock, orientation=orientation)
+    ) -> Sequence[pygame.Surface]:
+        raise NotImplementedError("AppController.real_process is not implemented")
 
     def _build_title_renderer(
         self,

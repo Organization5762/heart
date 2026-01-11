@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 if TYPE_CHECKING:
     from heart.runtime.game_loop import GameLoop
     from heart.runtime.game_loop.components import GameLoopComponents
-    
+
 
 def _build_peripheral_configuration_loader(
     resolver: RuntimeContainer,
@@ -48,7 +48,7 @@ def _build_display_context(resolver: RuntimeContainer) -> DisplayContext:
 
 def _build_render_pipeline(resolver: RuntimeContainer) -> RenderPipeline:
     return RenderPipeline(
-        device=resolver[Device],
+        display_context=resolver[DisplayContext],
         peripheral_manager=resolver[PeripheralManager],
         render_variant=resolver[RendererVariant],
     )
