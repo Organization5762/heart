@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import reactivex
 from reactivex import operators as ops
@@ -10,6 +11,9 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import SlideTransitionState
 from heart.utilities.reactivex_threads import pipe_in_background
+
+if TYPE_CHECKING:
+    import pygame
 
 DEFAULT_SLIDE_DURATION_MS = 333
 MIN_SLIDE_DURATION_MS = 1
