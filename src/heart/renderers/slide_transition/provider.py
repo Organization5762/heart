@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pygame
 import reactivex
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.slide_transition.state import SlideTransitionState
+from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
+                                                    DEFAULT_STATIC_MASK_STEPS,
+                                                    SlideTransitionMode,
+                                                    SlideTransitionState)
 from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_SLIDE_DURATION_MS = 333
@@ -23,11 +27,17 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         *,
         direction: int = 1,
         slide_duration_ms: int = DEFAULT_SLIDE_DURATION_MS,
+        transition_mode: SlideTransitionMode = SlideTransitionMode.SLIDE,
+        static_mask_steps: int = DEFAULT_STATIC_MASK_STEPS,
+        gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA,
     ) -> None:
         self.renderer_a = renderer_a
         self.renderer_b = renderer_b
         self.direction = direction
         self.slide_duration_ms = max(slide_duration_ms, MIN_SLIDE_DURATION_MS)
+        self.transition_mode = transition_mode
+        self.static_mask_steps = max(static_mask_steps, 1)
+        self.gaussian_sigma = max(gaussian_sigma, 0.1)
 
     def observable(
         self,

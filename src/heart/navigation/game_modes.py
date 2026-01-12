@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import TYPE_CHECKING
 
 import pygame
@@ -14,13 +14,20 @@ from heart.renderers.post_processing import (EdgePostProcessor,
                                              HueShiftPostProcessor,
                                              NullPostProcessor,
                                              SaturationPostProcessor)
+from heart.renderers.slide_transition import \
+    DEFAULT_GAUSSIAN_SIGMA as SLIDE_DEFAULT_GAUSSIAN_SIGMA
+from heart.renderers.slide_transition import \
+    DEFAULT_STATIC_MASK_STEPS as SLIDE_DEFAULT_STATIC_MASK_STEPS
+from heart.renderers.slide_transition import SlideTransitionMode
 from heart.runtime.display_context import DisplayContext
 
 if TYPE_CHECKING:
     from heart.renderers.slide_transition import SlideTransitionRenderer
+DEFAULT_TRANSITION_MODE = SlideTransitionMode.SLIDE
+DEFAULT_STATIC_MASK_STEPS = SLIDE_DEFAULT_STATIC_MASK_STEPS
+DEFAULT_GAUSSIAN_SIGMA = SLIDE_DEFAULT_GAUSSIAN_SIGMA
 
 
-@dataclass
 class GameModeState:
     title_renderers: list[StatefulBaseRenderer] = field(default_factory=list)
     renderers: list[StatefulBaseRenderer] = field(default_factory=list)
@@ -31,6 +38,9 @@ class GameModeState:
     _active_mode_index: int = 0
     previous_mode_index: int = 0
     sliding_transition: SlideTransitionRenderer | None = None
+    transition_mode: SlideTransitionMode = DEFAULT_TRANSITION_MODE
+    static_mask_steps: int = DEFAULT_STATIC_MASK_STEPS
+    gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA
 
     def active_renderer(self) -> StatefulBaseRenderer:
         assert len(self.renderers) > 0, "Must have at least one renderer to select from"
@@ -42,11 +52,21 @@ class GameModeState:
             from heart.navigation import (  # avoids circular imports for patching
                 SlideTransitionProvider, SlideTransitionRenderer)
 
-            slide_dir = self._resolve_slide_direction(last_scene_index, mode_index)
+            slide_dir = self._resolve_slide_direction(
+                last_scene_index, mode_index, transition_mode=self.transition_mode
+            )
+            provider_kwargs: dict[str, object] = {}
+            if self.transition_mode is not SlideTransitionMode.SLIDE:
+                provider_kwargs["transition_mode"] = self.transition_mode
+            if self.static_mask_steps != DEFAULT_STATIC_MASK_STEPS:
+                provider_kwargs["static_mask_steps"] = self.static_mask_steps
+            if self.gaussian_sigma != DEFAULT_GAUSSIAN_SIGMA:
+                provider_kwargs["gaussian_sigma"] = self.gaussian_sigma
             provider = SlideTransitionProvider(
                 renderer_a=self.title_renderers[last_scene_index],
                 renderer_b=self.title_renderers[mode_index],
                 direction=slide_dir,
+                **provider_kwargs,
             )
             self.sliding_transition = SlideTransitionRenderer(provider)
             self.previous_mode_index = mode_index
@@ -64,7 +84,15 @@ class GameModeState:
         self.previous_mode_index = mode_index
         return self.renderers[mode_index]
 
-    def _resolve_slide_direction(self, last_scene_index: int, mode_index: int) -> int:
+    def _resolve_slide_direction(
+        self,
+        last_scene_index: int,
+        mode_index: int,
+        *,
+        transition_mode: SlideTransitionMode,
+    ) -> int:
+        if transition_mode in (SlideTransitionMode.STATIC, SlideTransitionMode.GAUSSIAN):
+            return 0
         if self.mode_offset > 0:
             return 1
         if self.mode_offset < 0:

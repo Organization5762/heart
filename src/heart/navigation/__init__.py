@@ -1,4 +1,6 @@
 from heart.renderers.slide_transition import \
+    SlideTransitionMode as SlideTransitionMode
+from heart.renderers.slide_transition import \
     SlideTransitionProvider as SlideTransitionProvider
 from heart.renderers.slide_transition import \
     SlideTransitionRenderer as SlideTransitionRenderer
