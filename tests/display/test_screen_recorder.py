@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-import imagehash
 import pygame
 import pytest
 from PIL import Image, ImageDraw, ImageSequence
 
 from heart.display.recorder import ScreenRecorder
+from heart.display.regression import compare_phash, phash_image
 from heart.renderers import StatefulBaseRenderer
 
 HASH_DISTANCE_LIMIT = 16
@@ -105,13 +105,13 @@ class TestDisplayScreenRecorder:
 
         with Image.open(result_path) as image:
             first_frame = next(ImageSequence.Iterator(image)).convert("RGB")
-            observed_hash = imagehash.phash(first_frame)
+            observed_hash = phash_image(first_frame)
 
         expected = Image.new("RGB", (64, 64), background)
         draw = ImageDraw.Draw(expected)
         draw.rectangle([8, 8, 55, 23], fill=accent)
         draw.rectangle([16, 40, 47, 55], fill=accent)
-        expected_hash = imagehash.phash(expected)
+        expected_hash = phash_image(expected)
 
         distance = observed_hash - expected_hash
         assert (
@@ -140,14 +140,14 @@ class TestDisplayScreenRecorder:
         draw = ImageDraw.Draw(expected)
         draw.rectangle([8, 8, 55, 23], fill=accent)
         draw.rectangle([16, 40, 47, 55], fill=accent)
-        expected_hash = imagehash.phash(expected)
+        expected_hash = phash_image(expected)
 
         with Image.open(result_path) as image:
             frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(image)]
 
         assert len(frames) == len(inputs)
         for frame in frames:
-            observed_hash = imagehash.phash(frame)
+            observed_hash = phash_image(frame)
             distance = observed_hash - expected_hash
             assert (
                 distance <= HASH_DISTANCE_LIMIT
@@ -164,13 +164,13 @@ class TestDisplayScreenRecorder:
         inputs = [[PatternRenderer(background, accent)] for background, accent in palette]
         result_path = screen_recorder.record(inputs, tmp_path / "sequence_hash.gif")
 
-        expected_hashes: list[imagehash.ImageHash] = []
+        expected_hashes = []
         for background, accent in palette:
             expected = Image.new("RGB", (64, 64), background)
             draw = ImageDraw.Draw(expected)
             draw.rectangle([8, 8, 55, 23], fill=accent)
             draw.rectangle([16, 40, 47, 55], fill=accent)
-            expected_hashes.append(imagehash.phash(expected))
+            expected_hashes.append(phash_image(expected))
 
         with Image.open(result_path) as image:
             observed_frames = [
@@ -181,11 +181,30 @@ class TestDisplayScreenRecorder:
         for observed_frame, expected_hash in zip(
             observed_frames, expected_hashes, strict=True
         ):
-            observed_hash = imagehash.phash(observed_frame)
+            observed_hash = phash_image(observed_frame)
             distance = observed_hash - expected_hash
             assert (
                 distance <= HASH_DISTANCE_LIMIT
             ), f"perceptual hash distance too high: {distance}"
+
+    def test_screen_recorder_phash_comparison_reports_distance(
+        self, screen_recorder: ScreenRecorder
+    ) -> None:
+        """Verify phash comparison returns a distance with expected bounds. This keeps the regression signal inspectable when reviewing failures."""
+        background = (5, 10, 20)
+        accent = (220, 40, 60)
+        inputs = [[PatternRenderer(background, accent)]]
+
+        frames = screen_recorder.capture_frames(inputs)
+        expected = Image.new("RGB", (64, 64), background)
+        draw = ImageDraw.Draw(expected)
+        draw.rectangle([8, 8, 55, 23], fill=accent)
+        draw.rectangle([16, 40, 47, 55], fill=accent)
+
+        comparison = compare_phash(frames[0], expected)
+
+        assert comparison.within(HASH_DISTANCE_LIMIT)
+        assert comparison.distance <= HASH_DISTANCE_LIMIT
 
     def test_screen_recorder_sets_frame_duration(
         self, screen_recorder: ScreenRecorder, tmp_path: Path
