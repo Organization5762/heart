@@ -56,21 +56,7 @@ class ScreenRecorder:
         """
 
         path = Path(output_path)
-        frames: list[Image.Image] = []
-
-        for batch in inputs:
-            renderers = list(batch)
-            self._loop._one_loop(renderers)  # noqa: SLF001 - exercised via tests
-            screen = self._loop.screen
-            if screen is None:  # pragma: no cover - defensive guard
-                raise RuntimeError("GameLoop screen not initialized")
-
-            pixels = pygame.surfarray.array3d(screen).swapaxes(0, 1)
-            frame = Image.fromarray(pixels, mode="RGB").copy()
-            frames.append(frame)
-
-        if not frames:
-            raise ValueError("inputs must contain at least one frame")
+        frames = self.capture_frames(inputs)
 
         path.parent.mkdir(parents=True, exist_ok=True)
         # GIF durations are stored in 10 ms increments. Round to the closest
@@ -87,3 +73,28 @@ class ScreenRecorder:
             loop=0,
         )
         return path
+
+    def capture_frames(
+        self,
+        inputs: Iterable[
+            Sequence["StatefulBaseRenderer"] | list["StatefulBaseRenderer"]
+        ],
+    ) -> list[Image.Image]:
+        """Capture each rendered frame as an RGB image."""
+        frames: list[Image.Image] = []
+
+        for batch in inputs:
+            renderers = list(batch)
+            self._loop._one_loop(renderers)  # noqa: SLF001 - exercised via tests
+            screen = self._loop.screen
+            if screen is None:  # pragma: no cover - defensive guard
+                raise RuntimeError("GameLoop screen not initialized")
+
+            pixels = pygame.surfarray.array3d(screen).swapaxes(0, 1)
+            frame = Image.fromarray(pixels, mode="RGB").copy()
+            frames.append(frame)
+
+        if not frames:
+            raise ValueError("inputs must contain at least one frame")
+
+        return frames
