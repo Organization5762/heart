@@ -70,6 +70,10 @@ When adding tests, it is reasonable to stub hardware- or framework-heavy depende
   classes and give every class a docstring that states the shared focus and broader value of the grouped scenarios so readers can
   immediately understand the collection's intent.
 
+## Validation
+
+- `make test` (fails: existing failures in display/reactivex/runtime tests unrelated to the added env parsing test; see latest run output).
+
 ## Linting (Optional Pre-Check)
 
 Running `make check` is recommended to verify formatting and linting without applying fixes.
