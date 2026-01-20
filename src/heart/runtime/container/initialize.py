@@ -16,6 +16,7 @@ from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.rendering.pacing import RenderLoopPacer
 from heart.runtime.rendering.pipeline import RendererVariant, RenderPipeline
+from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -47,19 +48,33 @@ def _build_display_context(resolver: RuntimeContainer) -> DisplayContext:
 
 
 def _build_render_pipeline(resolver: RuntimeContainer) -> RenderPipeline:
-    return RenderPipeline(
+    pipeline = RenderPipeline(
         display_context=resolver[DisplayContext],
         peripheral_manager=resolver[PeripheralManager],
         render_variant=resolver[RendererVariant],
     )
+    pipeline._renderer_processor._surface_provider._container = resolver
+    return pipeline
+
+
+def _build_render_surface_provider(
+    resolver: RuntimeContainer,
+) -> RendererSurfaceProvider:
+    provider = RendererSurfaceProvider(
+        display_context=resolver[DisplayContext],
+    )
+    provider._container = resolver
+    return provider
 
 
 def _build_peripheral_runtime(resolver: RuntimeContainer) -> PeripheralRuntime:
     return PeripheralRuntime(resolver[PeripheralManager])
 
 
-def _build_app_controller() -> AppController:
-    return AppController()
+def _build_app_controller(resolver: RuntimeContainer) -> AppController:
+    controller = AppController()
+    controller._renderer_resolver = resolver
+    return controller
 
 
 def _build_render_loop_pacer(_: RuntimeContainer) -> RenderLoopPacer:
@@ -102,13 +117,14 @@ def build_runtime_container(
     overrides: Mapping[type[Any], object] | None = None,
 ) -> RuntimeContainer:
     logger.debug("Created Lagom container for runtime configuration.")
+    runtime_container = RuntimeContainer()
     configure_runtime_container(
-        container=container,
+        container=runtime_container,
         device=device,
         render_variant=render_variant,
         overrides=overrides,
     )
-    return container
+    return runtime_container
 
 
 def configure_runtime_container(
@@ -194,6 +210,12 @@ def _configure_render_bindings(
         overrides,
         RenderPipeline,
         Singleton(_build_render_pipeline),
+    )
+    _bind(
+        container,
+        overrides,
+        RendererSurfaceProvider,
+        Singleton(_build_render_surface_provider),
     )
 
 

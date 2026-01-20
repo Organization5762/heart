@@ -16,9 +16,12 @@ class RendererResolver(Protocol):
 
 def resolve_renderer_spec(
     renderer: RendererSpec,
+    resolver: RendererResolver | None = None,
 ) -> StatefulBaseRenderer:
     if isinstance(renderer, type):
         if not issubclass(renderer, StatefulBaseRenderer):
             raise TypeError("Requires StatefulBaseRenderer subclasses")
-        return container.resolve(renderer)
+        if resolver is None:
+            raise ValueError("renderer resolver is required for class specs")
+        return resolver.resolve(renderer)
     return renderer

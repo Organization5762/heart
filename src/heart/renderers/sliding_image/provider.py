@@ -9,8 +9,10 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.renderers.sliding_image.state import (SlidingImageState,
-                                                 SlidingRendererState)
+from heart.renderers.sliding_image.state import (
+    SlidingImageState,
+    SlidingRendererState,
+)
 from heart.utilities.reactivex_threads import pipe_in_background
 
 
@@ -48,19 +50,21 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
+        window_stream = reactivex.merge(
+            reactivex.just(initial_state.width),
+            window_stream,
+        )
 
-        return (
-            pipe_in_background(
-                peripheral_manager.game_tick,
-                ops.with_latest_from(window_stream),
-                ops.map(lambda pair: pair[1]),
-                ops.scan(
-                    lambda state, width: self.advance_state(state, width),
-                    seed=initial_state,
-                ),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return pipe_in_background(
+            peripheral_manager.game_tick,
+            ops.with_latest_from(window_stream),
+            ops.map(lambda pair: pair[1]),
+            ops.scan(
+                lambda state, width: self.advance_state(state, width),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
+            ops.share(),
         )
 
 
@@ -100,18 +104,19 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
+        window_stream = reactivex.merge(
+            reactivex.just(initial_state.width),
+            window_stream,
+        )
 
-        return (
-            pipe_in_background(
-                peripheral_manager.game_tick,
-
-                ops.with_latest_from(window_stream),
-                ops.map(lambda pair: pair[1]),
-                ops.scan(
-                    lambda state, width: self.advance_state(state, width),
-                    seed=initial_state,
-                ),
-                ops.start_with(initial_state),
-                ops.share(),
-            )
+        return pipe_in_background(
+            peripheral_manager.game_tick,
+            ops.with_latest_from(window_stream),
+            ops.map(lambda pair: pair[1]),
+            ops.scan(
+                lambda state, width: self.advance_state(state, width),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
+            ops.share(),
         )

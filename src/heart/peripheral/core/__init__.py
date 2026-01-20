@@ -87,6 +87,7 @@ class Peripheral(Generic[A]):
 
         return self._event_stream().pipe(
             ops.map(wrap),
+            ops.share(),
         )
 
     @classmethod

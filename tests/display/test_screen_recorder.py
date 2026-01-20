@@ -19,13 +19,7 @@ class SolidColorState:
 
 class SolidColorRenderer(StatefulBaseRenderer[SolidColorState]):
     def __init__(self, color: tuple[int, int, int]) -> None:
-        super().__init__()
-        self._color = color
-
-    def _create_initial_state(
-        self, window, clock, peripheral_manager, orientation
-    ) -> SolidColorState:
-        return SolidColorState(color=self._color)
+        super().__init__(state=SolidColorState(color=color))
 
     def real_process(self, window, clock, orientation) -> None:
         window.fill(self.state.color)
@@ -41,14 +35,7 @@ class PatternRenderer(StatefulBaseRenderer[PatternState]):
     def __init__(
         self, background: tuple[int, int, int], accent: tuple[int, int, int]
     ) -> None:
-        super().__init__()
-        self._background = background
-        self._accent = accent
-
-    def _create_initial_state(
-        self, window, clock, peripheral_manager, orientation
-    ) -> PatternState:
-        return PatternState(background=self._background, accent=self._accent)
+        super().__init__(state=PatternState(background=background, accent=accent))
 
     def real_process(self, window, clock, orientation) -> None:
         window.fill(self.state.background)

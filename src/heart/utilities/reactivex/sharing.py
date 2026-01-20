@@ -8,14 +8,12 @@ from reactivex import operators as ops
 from reactivex.disposable import Disposable
 from reactivex.scheduler import TimeoutScheduler
 
-from heart.utilities.env import (ReactivexStreamConnectMode,
-                                 ReactivexStreamShareStrategy)
+from heart.utilities.env import ReactivexStreamConnectMode, ReactivexStreamShareStrategy
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex.coalescing import coalesce_latest
 from heart.utilities.reactivex.instrumentation import instrument_stream
 from heart.utilities.reactivex.settings import StreamShareSettings
 from heart.utilities.reactivex.types import ConnectableStream
-from heart.utilities.reactivex_threads import pipe_in_background
 
 logger = get_logger(__name__)
 
@@ -138,11 +136,11 @@ def share_stream(
         if replay_window_seconds is None:
             return cast(
                 ConnectableStream[T],
-                pipe_in_background(source, ops.replay(buffer_size=buffer_size)),
+                source.pipe(ops.replay(buffer_size=buffer_size)),
             )
         return cast(
             ConnectableStream[T],
-            pipe_in_background(source,
+            source.pipe(
                 ops.replay(
                     buffer_size=buffer_size,
                     window=replay_window_seconds,
@@ -167,7 +165,7 @@ def share_stream(
                 stream_name=stream_name,
             )
         else:
-            result = source.pipe( ops.share())
+            result = source.pipe(ops.share())
         return instrument_stream(
             result,
             stream_name=stream_name,
@@ -179,7 +177,7 @@ def share_stream(
             stream_name,
             auto_connect_min_subscribers,
         )
-        result = source.pipe( ops.publish()).auto_connect(auto_connect_min_subscribers)
+        result = source.pipe(ops.publish()).auto_connect(auto_connect_min_subscribers)
         return instrument_stream(
             result,
             stream_name=stream_name,
@@ -203,7 +201,7 @@ def share_stream(
                 stream_name=stream_name,
             )
         else:
-            result = replayed.pipe( ops.ref_count())
+            result = replayed.pipe(ops.ref_count())
         return instrument_stream(
             result,
             stream_name=stream_name,
@@ -243,7 +241,7 @@ def share_stream(
                 stream_name=stream_name,
             )
         else:
-            result = replayed.pipe( ops.ref_count())
+            result = replayed.pipe(ops.ref_count())
         return instrument_stream(
             result,
             stream_name=stream_name,

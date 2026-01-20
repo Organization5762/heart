@@ -66,6 +66,8 @@ class AtomicBaseRenderer(Generic[StateT]):
         window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         return self.real_process(window=window, orientation=orientation)
 
@@ -97,7 +99,27 @@ class AtomicBaseRenderer(Generic[StateT]):
             raise ValueError("Needs to be initialized")
 
         start_ns = time.perf_counter_ns()
-        self.real_process(window=window, orientation=orientation)
+        try:
+            self.real_process(window=window, orientation=orientation)
+        except TypeError as exc:
+            if "clock" not in str(exc):
+                raise
+            try:
+                self.real_process(
+                    window=window,
+                    clock=None,
+                    orientation=orientation,
+                )
+            except TypeError as clock_exc:
+                if "pygame.surface.Surface" not in str(clock_exc):
+                    raise
+                if not hasattr(window, "screen"):
+                    raise
+                self.real_process(
+                    window=window.screen,
+                    clock=None,
+                    orientation=orientation,
+                )
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         logger.debug(
             "renderer.frame",

@@ -25,7 +25,11 @@ class DisplayContext:
 
     def initialize(self) -> None:
         pygame.init()
-        self._ensure_mode(DeviceDisplayMode.FULL)
+        if self.screen is None:
+            self.screen = pygame.display.set_mode(
+                self._display_size(), DeviceDisplayMode.FULL.to_pygame_mode()
+            )
+            self.last_render_mode = DeviceDisplayMode.FULL.to_pygame_mode()
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             pygame.event.set_grab(True)
         self.clock = pygame.time.Clock()

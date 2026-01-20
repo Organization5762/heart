@@ -26,7 +26,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     ) -> None:
         super().__init__()
         self.scenes = [
-            resolve_renderer_spec(scene)
+            resolve_renderer_spec(scene, renderer_resolver)
             for scene in scenes
         ]
 

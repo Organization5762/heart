@@ -62,6 +62,7 @@ class LoopPhase(StrEnum):
 @dataclass(frozen=True)
 class SpritesheetLoopState:
     spritesheet: Any | None = None
+    gamepad: Any | None = None
     current_frame: int = 0
     loop_count: int = 0
     phase: LoopPhase = LoopPhase.LOOP

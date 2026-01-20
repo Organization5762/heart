@@ -39,7 +39,7 @@ def _render_sliding_frame(
     frame.blit(scaled_image, (-offset, 0))
     if offset:
         frame.blit(scaled_image, (width - offset, 0))
-    return frame
+    return frame.copy()
 
 
 class TestSlidingImageMarbleOutputs:
@@ -77,16 +77,17 @@ class TestSlidingImageMarbleOutputs:
             window_stream = cold("a------|", {"a": window_surface})
             tick_stream = cold(tick_pattern, tick_values)
             manager = _StubManager(window=window_stream, game_tick=tick_stream)
-            image_stream = pipe_in_background(provider.observable(manager),
+            image_stream = pipe_in_background(
+                provider.observable(manager),
                 ops.filter(lambda state: state.width > 0),
                 ops.map(lambda state: _render_sliding_frame(state, base_surface)),
                 ops.map(
                     lambda image: [
-                        image.getpixel((x, 0)) for x in range(image.size[0])
+                        image.get_at((x, 0))[:3] for x in range(image.get_width())
                     ]
                 ),
             )
-            records = start(image_stream)
+            records = start(lambda: image_stream)
 
         images = [
             record.value.value

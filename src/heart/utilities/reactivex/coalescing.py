@@ -8,7 +8,7 @@ import reactivex
 from reactivex.disposable import Disposable
 
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import coalesce_scheduler
+from heart.utilities.reactivex_threads import _COALESCE_SCHEDULER, coalesce_scheduler
 
 logger = get_logger(__name__)
 
@@ -62,7 +62,7 @@ def coalesce_latest(
                 else:
                     return
             due_time = now + window_seconds
-            timer = coalesce_scheduler().schedule_relative(
+            timer = _COALESCE_SCHEDULER.schedule_relative(
                 window_seconds,
                 lambda *_: _flush(),
             )

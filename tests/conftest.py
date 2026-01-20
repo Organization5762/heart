@@ -170,7 +170,5 @@ def resolver(device: Device) -> RuntimeContainer:
 @pytest.fixture()
 def loop(manager, device, resolver) -> GameLoop:
     loop = GameLoop(device=device, resolver=resolver)
-    # We just initialize the PyGame screen because peripherals and the fact that we expect, in practice,
-    # for this to be a singleton _shouldn't_ be that important for testing
-    loop._initialize_screen()
+    loop.ensure_screen_initialized()
     return loop

@@ -32,13 +32,16 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         self.builder = builder
         self._subscription: Disposable | None = None
         super().__init__(*args, **kwargs)
+        if state is not None:
+            self.set_state(state)
+            self.initialized = True
 
     def state_observable(
         self,
         peripheral_manager: PeripheralManager,
     ) -> Observable[StateT]:
         assert self.builder is not None
-        return self.builder.observable()
+        return self.builder.observable(peripheral_manager)
 
     def initialize(
         self,
@@ -50,8 +53,12 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             observable = self.state_observable(
                 peripheral_manager=peripheral_manager,
             )
-            self._subscription = observable.subscribe(on_next=self.set_state)
-            self.initialized = True
+            def _on_next(state: StateT) -> None:
+                self.set_state(state)
+                if not self.initialized:
+                    self.initialized = True
+
+            self._subscription = observable.subscribe(on_next=_on_next)
             return
 
         if not hasattr(self, "_create_initial_state"):
@@ -73,4 +80,6 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         if self._subscription is not None:
             self._subscription.dispose()
             self._subscription = None
+        if self.builder is not None:
+            self.initialized = False
         super().reset()

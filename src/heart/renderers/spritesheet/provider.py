@@ -88,9 +88,16 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         *,
         peripheral_manager: PeripheralManager,
     ) -> SpritesheetLoopState:
+        gamepad = None
+        if not self.disable_input:
+            try:
+                gamepad = peripheral_manager.get_gamepad()
+            except Exception:
+                gamepad = None
         return SpritesheetLoopState(
             phase=self.initial_phase,
             spritesheet=Loader.load_spirtesheet(self.file),
+            gamepad=gamepad,
         )
 
     def observable(
@@ -136,12 +143,15 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             return state
 
         duration_scale = state.duration_scale
-        last_rotation = state.last_switch_rotation or 0
+        last_rotation = state.last_switch_rotation
         current_rotation = switch_state.rotation_since_last_button_press
-        if current_rotation > last_rotation:
-            duration_scale += 0.05
-        elif current_rotation < last_rotation:
-            duration_scale -= 0.05
+        if last_rotation is None:
+            last_rotation = current_rotation
+        else:
+            if current_rotation > last_rotation:
+                duration_scale += 0.05
+            elif current_rotation < last_rotation:
+                duration_scale -= 0.05
 
         return replace(
             state,
@@ -240,7 +250,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         if self.disable_input:
             kf_duration = current_kf.duration
         else:
-            kf_duration = current_kf.duration - (current_kf.duration * state.duration_scale)
+            kf_duration = current_kf.duration * (1 - state.duration_scale)
 
         return self._next_frame(state, kf_duration=kf_duration, elapsed_ms=elapsed_ms)
 
@@ -253,6 +263,8 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             duration_scale=0.0,
             time_since_last_update=None,
             reverse_direction=False,
+            last_switch_rotation=None,
+            switch_state=None,
         )
 
     @classmethod

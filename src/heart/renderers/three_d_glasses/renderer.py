@@ -121,30 +121,31 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
     ) -> np.ndarray:
         """Convert RGB input to a red/cyan anaglyph frame."""
 
+        base = base_array.astype(np.float32)
         left_eye = (
-            base_array[..., 0] * 0.75
-            + base_array[..., 1] * 0.20
-            + base_array[..., 2] * 0.05
+            base[..., 0] * 0.75
+            + base[..., 1] * 0.20
+            + base[..., 2] * 0.05
         )
         right_eye = (
-            base_array[..., 1] * 0.55
-            + base_array[..., 2] * 0.45
+            base[..., 1] * 0.55
+            + base[..., 2] * 0.45
         )
 
-        width = base_array.shape[0]
+        width = base.shape[0]
         red_shift = self._clamp_shift(profile.red_shift, width)
         cyan_shift = self._clamp_shift(profile.cyan_shift, width)
 
         red = self._shift_channel(left_eye, red_shift) * profile.red_gain
         cyan = self._shift_channel(right_eye, cyan_shift) * profile.cyan_gain
 
-        frame = np.zeros_like(base_array)
+        frame = np.zeros_like(base)
         frame[..., 0] = red
         frame[..., 1] = cyan
         frame[..., 2] = cyan
 
-        np.clip(frame, 0.0, 1.0, out=frame)
-        return (frame * 255).astype(np.uint8)
+        np.clip(frame, 0.0, 255.0, out=frame)
+        return frame.astype(np.uint8)
 
     def real_process(
         self,
@@ -180,7 +181,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
             surface = pygame.transform.smoothscale(surface, window_size)
             self._images.append(surface)
 
-            array = pygame.surfarray.array3d(surface).astype(np.float32) / 255.0
+            array = pygame.surfarray.array3d(surface).astype(np.float32)
             self._image_arrays.append(array)
 
         self._profiles = self._generate_profiles(len(self._image_arrays))

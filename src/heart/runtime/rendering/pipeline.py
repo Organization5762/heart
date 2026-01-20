@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import pygame
 
@@ -40,9 +40,11 @@ class RenderPipeline:
             strategy_provider=Configuration.render_merge_strategy()
         )
         self._surface_collector = RenderSurfaceCollector(
-            self._renderer_processor.process_renderer,
-            self._get_render_executor
+            lambda renderer: self.process_renderer(renderer),
+            self._get_render_executor,
         )
+        self._render_surface_iterative = self._render_surface_iterative_impl
+        self._render_surfaces_binary = self._render_surfaces_binary_impl
 
         self._render_executor: ThreadPoolExecutor | None = None
 
@@ -50,9 +52,72 @@ class RenderPipeline:
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
     ) -> RenderResult:
+        render_fn = self._render_fn(renderers, None)
+        return RenderResult(surface=render_fn(renderers))
+
+    def process_renderer(
+        self, renderer: "StatefulBaseRenderer[Any]"
+    ) -> pygame.Surface | None:
+        return self._renderer_processor.process_renderer(renderer)
+
+    def _should_collect_parallel(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        *,
+        variant: RendererVariant | None = None,
+    ) -> bool:
+        resolved = variant or self.renderer_variant
+        match resolved:
+            case RendererVariant.ITERATIVE:
+                return False
+            case RendererVariant.BINARY:
+                return True
+            case RendererVariant.AUTO:
+                if len(renderers) >= Configuration.render_parallel_threshold():
+                    return True
+                estimated_cost, has_samples = self._timing_tracker.estimate_total_ms(
+                    renderers
+                )
+                return (
+                    has_samples
+                    and estimated_cost >= Configuration.render_parallel_cost_threshold_ms()
+                )
+            case _:
+                return False
+
+    def _render_surface_iterative_impl(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+    ) -> pygame.Surface | None:
         surfaces = self._surface_collector.collect(renderers, parallel=False)
-        surface = self._composition_manager.compose_serial(surfaces)
-        return RenderResult(surface=surface)
+        return self._merge_surfaces_serial(surfaces)
+
+    def _render_surfaces_binary_impl(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+    ) -> pygame.Surface | None:
+        surfaces = self._surface_collector.collect(renderers, parallel=True)
+        return self._merge_surfaces_binary(surfaces)
+
+    def _render_fn(
+        self,
+        renderers: list["StatefulBaseRenderer[Any]"],
+        variant: RendererVariant | None,
+    ) -> Callable[[list["StatefulBaseRenderer[Any]"]], pygame.Surface | None]:
+        resolved = variant or self.renderer_variant
+        match resolved:
+            case RendererVariant.BINARY:
+                return self._render_surfaces_binary
+            case RendererVariant.ITERATIVE:
+                return self._render_surface_iterative
+            case RendererVariant.AUTO:
+                return (
+                    self._render_surfaces_binary
+                    if self._should_collect_parallel(renderers, variant=resolved)
+                    else self._render_surface_iterative
+                )
+            case _:
+                return self._render_surface_iterative
 
     ###
     # Other
@@ -77,3 +142,30 @@ class RenderPipeline:
         self, surface1: pygame.Surface, surface2: pygame.Surface
     ) -> pygame.Surface:
         return self._composition_manager.merge_in_place(surface1, surface2)
+
+    def _merge_surfaces_serial(
+        self,
+        surfaces: list[pygame.Surface],
+    ) -> pygame.Surface | None:
+        if not surfaces:
+            return None
+        base = surfaces[0]
+        for surface in surfaces[1:]:
+            base = self.merge_surfaces(base, surface)
+        return base
+
+    def _merge_surfaces_binary(
+        self,
+        surfaces: list[pygame.Surface],
+    ) -> pygame.Surface | None:
+        if not surfaces:
+            return None
+        working = list(surfaces)
+        while len(working) > 1:
+            merged: list[pygame.Surface] = []
+            for index in range(0, len(working) - 1, 2):
+                merged.append(self.merge_surfaces(working[index], working[index + 1]))
+            if len(working) % 2 == 1:
+                merged.append(working[-1])
+            working = merged
+        return working[0]
