@@ -1,8 +1,5 @@
-from __future__ import annotations
-
-import time
-from threading import RLock, Timer
-from typing import Any, TypeVar
+from datetime import timedelta
+from typing import Callable
 
 import reactivex
 from reactivex.disposable import Disposable
@@ -12,120 +9,69 @@ from heart.utilities.reactivex_threads import _COALESCE_SCHEDULER, coalesce_sche
 
 logger = get_logger(__name__)
 
-T = TypeVar("T")
-_NO_PENDING: Any = object()
+CoalesceCallable = Callable[[reactivex.Observable], reactivex.Observable]
 
 
-def coalesce_latest(
-    source: reactivex.Observable[T],
-    *,
-    window_ms: int,
-    stream_name: str,
-) -> reactivex.Observable[T]:
-    if window_ms <= 0:
-        return source
+class CoalesceBuffer:
+    def __init__(self, buffer_time: float, scheduler: reactivex.scheduler.SchedulerBase):
+        self._buffer_time = buffer_time
+        self._scheduler = scheduler
 
-    def _subscribe(observer: Any, scheduler: Any = None) -> Disposable:
-        lock = RLock()
-        pending: Any = _NO_PENDING
-        timer: Any | None = None
-        fallback_timer: Timer | None = None
-        due_time: float | None = None
-        window_seconds = window_ms / 1000
+    def __call__(self, source: reactivex.Observable) -> reactivex.Observable:
+        return source.pipe(
+            reactivex.operators.buffer_with_time(
+                timedelta(milliseconds=self._buffer_time),
+                scheduler=self._scheduler,
+            ),
+            reactivex.operators.filter(lambda buffer: len(buffer) > 0),
+        )
 
-        def _cancel_timers() -> None:
-            nonlocal timer, fallback_timer
-            if timer is not None:
-                timer.dispose()
-                timer = None
-            if fallback_timer is not None:
-                fallback_timer.cancel()
-                fallback_timer = None
 
-        def _flush() -> None:
-            nonlocal pending, timer, fallback_timer, due_time
-            with lock:
-                value = pending
-                pending = _NO_PENDING
-                _cancel_timers()
-                due_time = None
-            if value is _NO_PENDING:
-                return
-            observer.on_next(value)
+def coalesce_latest(buffer_time: float) -> CoalesceCallable:
+    """Coalesce emissions within the buffer window into the last value.
 
-        def _schedule_flush(now: float) -> None:
-            nonlocal timer, fallback_timer, due_time
-            if timer is not None or fallback_timer is not None:
-                if due_time is not None and now >= due_time:
-                    _cancel_timers()
-                    due_time = None
-                else:
-                    return
-            due_time = now + window_seconds
-            timer = _COALESCE_SCHEDULER.schedule_relative(
-                window_seconds,
-                lambda *_: _flush(),
+    This ensures that downstream processing only receives the most recent value in each
+    buffer window, effectively smoothing out high-frequency input streams.
+    """
+
+    def coalesce(source: reactivex.Observable) -> reactivex.Observable:
+        return source.pipe(
+            reactivex.operators.buffer_with_time(
+                timedelta(milliseconds=buffer_time),
+                scheduler=_COALESCE_SCHEDULER,
+            ),
+            reactivex.operators.filter(lambda buffer: len(buffer) > 0),
+            reactivex.operators.map(lambda buffer: buffer[-1]),
+        )
+
+    return coalesce
+
+
+def coalesce_buffer_with_tracking(
+    buffer_time: float,
+    scheduler: reactivex.scheduler.SchedulerBase | None = None,
+) -> CoalesceCallable:
+    """Coalesce emissions within the buffer window into the last value.
+
+    This ensures that downstream processing only receives the most recent value in each
+    buffer window, effectively smoothing out high-frequency input streams.
+    """
+
+    scheduler = scheduler or coalesce_scheduler()
+
+    def coalesce(source: reactivex.Observable) -> reactivex.Observable:
+        def inner() -> tuple[reactivex.Observable, Disposable]:
+            buffer: list = []
+            buffered = source.subscribe(buffer.append)
+            report_handle = scheduler.schedule_relative(
+                timedelta(milliseconds=buffer_time),
+                lambda *_: logger.debug(
+                    "Coalescing buffer has %d entries", len(buffer)
+                ),
+                state=None,
             )
-            fallback_timer = Timer(window_seconds, _flush)
-            fallback_timer.daemon = True
-            fallback_timer.start()
+            return (source, Disposable(lambda: (buffered.dispose(), report_handle.dispose())))
 
-        def _on_next(value: Any) -> None:
-            nonlocal pending, timer, fallback_timer, due_time
-            now = time.monotonic()
-            flush_value: Any = _NO_PENDING
-            with lock:
-                if pending is not _NO_PENDING and due_time is not None and now >= due_time:
-                    flush_value = pending
-                    pending = _NO_PENDING
-                    if timer is not None:
-                        timer.dispose()
-                        timer = None
-                    if fallback_timer is not None:
-                        fallback_timer.cancel()
-                        fallback_timer = None
-                    due_time = None
-                pending = value
-                _schedule_flush(now)
-            if flush_value is not _NO_PENDING:
-                observer.on_next(flush_value)
+        return reactivex.Observable(inner)
 
-        def _on_error(err: Exception) -> None:
-            nonlocal pending, timer, fallback_timer, due_time
-            with lock:
-                _cancel_timers()
-                pending = _NO_PENDING
-                due_time = None
-            observer.on_error(err)
-
-        def _on_completed() -> None:
-            nonlocal timer, fallback_timer, due_time
-            with lock:
-                _cancel_timers()
-                due_time = None
-            _flush()
-            observer.on_completed()
-
-        subscription = source.subscribe(
-            _on_next,
-            _on_error,
-            _on_completed,
-            scheduler=coalesce_scheduler(),
-        )
-
-        def _dispose() -> None:
-            nonlocal pending, timer, fallback_timer, due_time
-            subscription.dispose()
-            with lock:
-                pending = _NO_PENDING
-                _cancel_timers()
-                due_time = None
-
-        logger.debug(
-            "Coalescing %s with window_ms=%d",
-            stream_name,
-            window_ms,
-        )
-        return Disposable(_dispose)
-
-    return reactivex.create(_subscribe)
+    return coalesce
