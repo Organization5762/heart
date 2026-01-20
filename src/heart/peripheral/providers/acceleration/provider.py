@@ -37,7 +37,6 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
         ) -> reactivex.Observable[Acceleration]:
             return pipe_in_background(
                 source,
-
                 ops.filter(is_acceleration),
                 ops.map(lambda accel: cast(Acceleration, accel)),
             )
@@ -59,5 +58,7 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
             filter_acceleration,
         )
 
-    def observable(self) -> reactivex.Observable[Acceleration]:
+    def observable(
+        self, *args: object, **kwargs: object
+    ) -> reactivex.Observable[Acceleration]:
         return self._acceleration_stream()
