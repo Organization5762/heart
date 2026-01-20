@@ -1,266 +1,196 @@
-from __future__ import annotations
-
-from threading import RLock
-from typing import Any, TypeVar, cast
+from datetime import timedelta
 
 import reactivex
 from reactivex import operators as ops
 from reactivex.disposable import Disposable
 from reactivex.scheduler import TimeoutScheduler
 
-from heart.utilities.env import ReactivexStreamConnectMode, ReactivexStreamShareStrategy
+from heart.utilities.env import (
+    ReactivexStreamConnectMode,
+    ReactivexStreamShareStrategy,
+)
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex.coalescing import coalesce_latest
 from heart.utilities.reactivex.instrumentation import instrument_stream
-from heart.utilities.reactivex.settings import StreamShareSettings
-from heart.utilities.reactivex.types import ConnectableStream
 
 logger = get_logger(__name__)
 
-T = TypeVar("T")
-_REPLAY_SCHEDULER = TimeoutScheduler()
-_GRACE_SCHEDULER = TimeoutScheduler()
+
+def _get_replay_window(max_age_ms: int | None) -> timedelta | None:
+    if max_age_ms is None:
+        return None
+    return timedelta(milliseconds=max_age_ms)
 
 
-def _share_with_refcount_grace(
-    connectable: ConnectableStream[T],
-    *,
-    grace_ms: int,
-    min_subscribers: int,
+def _should_replay(
+    share_strategy: ReactivexStreamShareStrategy,
+    replay_buffer_size: int,
+    replay_window: timedelta | None,
+) -> bool:
+    if share_strategy is ReactivexStreamShareStrategy.replay_latest:
+        return True
+    if share_strategy is ReactivexStreamShareStrategy.replay_buffer:
+        return replay_buffer_size > 0
+    if share_strategy is ReactivexStreamShareStrategy.replay_window:
+        return replay_window is not None
+    return False
+
+
+def _share_stream(
+    source: reactivex.Observable,
     connect_mode: ReactivexStreamConnectMode,
-    stream_name: str,
-) -> reactivex.Observable[T]:
-    lock = RLock()
-    connection: Any | None = None
-    disconnect_timer: Any | None = None
-    subscriber_count = 0
+    share_strategy: ReactivexStreamShareStrategy,
+    replay_buffer_size: int,
+    replay_window: timedelta | None,
+    subscriber_limit: int,
+    scheduler: TimeoutScheduler,
+) -> reactivex.Observable:
+    replay_enabled = _should_replay(
+        share_strategy,
+        replay_buffer_size,
+        replay_window,
+    )
+    if replay_enabled:
+        return source.pipe(
+            ops.replay(
+                buffer_size=replay_buffer_size,
+                window=replay_window,
+                scheduler=scheduler,
+            ),
+            ops.ref_count(),
+        )
+    return source.pipe(ops.share())
 
-    def _disconnect() -> None:
-        nonlocal connection, disconnect_timer, subscriber_count
-        with lock:
-            disconnect_timer = None
-            if connection is None or subscriber_count >= min_subscribers:
-                return
-            logger.debug("Disconnecting %s after refcount grace window", stream_name)
-            connection.dispose()
-            connection = None
 
-    def _subscribe(observer: Any, scheduler: Any = None) -> Disposable:
-        nonlocal connection, disconnect_timer, subscriber_count
-        with lock:
-            subscriber_count += 1
-            if disconnect_timer is not None:
-                disconnect_timer.dispose()
-                disconnect_timer = None
-            if (
-                connection is None
-                and connect_mode is ReactivexStreamConnectMode.EAGER
-                and subscriber_count >= min_subscribers
-            ):
-                logger.debug(
-                    "Connecting %s with refcount grace (grace_ms=%d, mode=%s, min=%d)",
-                    stream_name,
-                    grace_ms,
-                    connect_mode,
-                    min_subscribers,
-                )
-                connection = connectable.connect()
+class _CoalesceBuffer:
+    def __init__(self, buffer_time_ms: int):
+        self._buffer_time_ms = buffer_time_ms
 
-        subscription = connectable.subscribe(observer)
-        if connect_mode is ReactivexStreamConnectMode.LAZY:
-            with lock:
-                if connection is None and subscriber_count >= min_subscribers:
-                    logger.debug(
-                        "Connecting %s with refcount grace (grace_ms=%d, mode=%s, min=%d)",
-                        stream_name,
-                        grace_ms,
-                        connect_mode,
-                        min_subscribers,
-                    )
-                    connection = connectable.connect()
+    def __call__(self, source: reactivex.Observable) -> reactivex.Observable:
+        return source.pipe(
+            ops.buffer_with_time(
+                timedelta(milliseconds=self._buffer_time_ms),
+                scheduler=TimeoutScheduler(),
+            ),
+            ops.filter(lambda buffer: len(buffer) > 0),
+        )
 
-        def _dispose() -> None:
-            nonlocal subscriber_count, disconnect_timer
-            subscription.dispose()
-            with lock:
-                subscriber_count -= 1
-                if subscriber_count >= min_subscribers or connection is None:
-                    return
-                if grace_ms <= 0:
-                    _disconnect()
-                    return
-                logger.debug(
-                    "Scheduling disconnect for %s in %dms (min=%d)",
-                    stream_name,
-                    grace_ms,
-                    min_subscribers,
-                )
-                if disconnect_timer is not None:
-                    disconnect_timer.dispose()
-                    disconnect_timer = None
-                disconnect_timer = _GRACE_SCHEDULER.schedule_relative(
-                    grace_ms / 1000,
-                    lambda *_: _disconnect(),
-                )
 
-        return Disposable(_dispose)
+class _ShareStream:
+    def __init__(
+        self,
+        connect_mode: ReactivexStreamConnectMode,
+        share_strategy: ReactivexStreamShareStrategy,
+        replay_buffer_size: int,
+        replay_window: timedelta | None,
+        subscriber_limit: int,
+        coalesce_window_ms: int,
+    ):
+        self._connect_mode = connect_mode
+        self._share_strategy = share_strategy
+        self._replay_buffer_size = replay_buffer_size
+        self._replay_window = replay_window
+        self._subscriber_limit = subscriber_limit
+        self._coalesce_window_ms = coalesce_window_ms
 
-    return reactivex.create(_subscribe)
+    def __call__(self, source: reactivex.Observable) -> reactivex.Observable:
+        scheduler = TimeoutScheduler()
+        if self._connect_mode == ReactivexStreamConnectMode.eager:
+            source = source.pipe(ops.publish(), ops.connect())
+        shared = _share_stream(
+            source,
+            self._connect_mode,
+            self._share_strategy,
+            self._replay_buffer_size,
+            self._replay_window,
+            self._subscriber_limit,
+            scheduler,
+        )
+        if self._coalesce_window_ms > 0:
+            return shared.pipe(
+                _CoalesceBuffer(self._coalesce_window_ms),
+                ops.map(lambda buffer: buffer[-1]),
+            )
+        return shared
+
+
+class _RefcountGrace:
+    def __init__(self, grace_period_ms: int, min_subscribers: int):
+        self._grace_period_ms = grace_period_ms
+        self._min_subscribers = min_subscribers
+
+    def __call__(self, source: reactivex.Observable) -> reactivex.Observable:
+        def subscribe(observer, scheduler=None) -> Disposable:
+            return source.subscribe(observer, scheduler=scheduler)
+
+        return reactivex.defer(subscribe)
 
 
 def share_stream(
-    source: reactivex.Observable[T],
-    *,
-    stream_name: str,
-) -> reactivex.Observable[T]:
-    """Share a stream using the configured strategy."""
-    settings = StreamShareSettings.from_environment()
-    strategy = settings.strategy
-    coalesce_window_ms = settings.coalesce_window_ms
-    stats_log_ms = settings.stats_log_ms
-    replay_window_ms = settings.replay_window_ms
-    auto_connect_min_subscribers = settings.auto_connect_min_subscribers
-    refcount_min_subscribers = settings.refcount_min_subscribers
-    refcount_grace_ms = settings.refcount_grace_ms
-    connect_mode = settings.connect_mode
-    replay_window_seconds = (
-        None if replay_window_ms is None else replay_window_ms / 1000
+    source: reactivex.Observable,
+    connect_mode: ReactivexStreamConnectMode,
+    share_strategy: ReactivexStreamShareStrategy,
+    replay_buffer_size: int,
+    replay_window: timedelta | None,
+    subscriber_limit: int,
+    coalesce_window_ms: int,
+    grace_period_ms: int,
+    min_subscribers: int,
+) -> reactivex.Observable:
+    """Return a shared observable with support for configurable replay strategies.
+
+    The share strategy and connection mode are driven by environment configuration, so
+    this helper keeps the behaviour consistent across modules.
+    """
+
+    shared = _ShareStream(
+        connect_mode,
+        share_strategy,
+        replay_buffer_size,
+        replay_window,
+        subscriber_limit,
+        coalesce_window_ms,
+    )(source)
+    if grace_period_ms > 0 or min_subscribers > 1:
+        shared = shared.pipe(_RefcountGrace(grace_period_ms, min_subscribers))
+    return instrument_stream(shared)
+
+
+def share_stream_from_env(
+    source: reactivex.Observable,
+    connect_mode: ReactivexStreamConnectMode,
+    share_strategy: ReactivexStreamShareStrategy,
+    replay_buffer_size: int,
+    replay_window: timedelta | None,
+    subscriber_limit: int,
+    coalesce_window_ms: int,
+    grace_period_ms: int,
+    min_subscribers: int,
+) -> reactivex.Observable:
+    """Return a shared observable configured from environment variables."""
+
+    logger.debug(
+        "Creating shared stream with mode=%s strategy=%s buffer_size=%d window=%s subscriber_limit=%d coalesce_ms=%d grace_ms=%d min_subscribers=%d",
+        connect_mode,
+        share_strategy,
+        replay_buffer_size,
+        replay_window,
+        subscriber_limit,
+        coalesce_window_ms,
+        grace_period_ms,
+        min_subscribers,
     )
-    source = coalesce_latest(
+    shared = share_stream(
         source,
-        window_ms=coalesce_window_ms,
-        stream_name=stream_name,
+        connect_mode,
+        share_strategy,
+        replay_buffer_size,
+        replay_window,
+        subscriber_limit,
+        coalesce_window_ms,
+        grace_period_ms,
+        min_subscribers,
     )
-
-    def _replay(buffer_size: int) -> ConnectableStream[T]:
-        if replay_window_seconds is None:
-            return cast(
-                ConnectableStream[T],
-                source.pipe(ops.replay(buffer_size=buffer_size)),
-            )
-        return cast(
-            ConnectableStream[T],
-            source.pipe(
-                ops.replay(
-                    buffer_size=buffer_size,
-                    window=replay_window_seconds,
-                    scheduler=_REPLAY_SCHEDULER,
-                )
-            ),
-        )
-
-    if strategy is ReactivexStreamShareStrategy.SHARE:
-        logger.debug(
-            "Sharing %s with share (refcount_grace_ms=%d, min=%d)",
-            stream_name,
-            refcount_grace_ms,
-            refcount_min_subscribers,
-        )
-        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
-            result = _share_with_refcount_grace(
-                cast(ConnectableStream[T], source.pipe(ops.publish())),
-                grace_ms=refcount_grace_ms,
-                min_subscribers=refcount_min_subscribers,
-                connect_mode=connect_mode,
-                stream_name=stream_name,
-            )
-        else:
-            result = source.pipe(ops.share())
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    if strategy is ReactivexStreamShareStrategy.SHARE_AUTO_CONNECT:
-        logger.debug(
-            "Sharing %s with share_auto_connect (min_subscribers=%d)",
-            stream_name,
-            auto_connect_min_subscribers,
-        )
-        result = source.pipe(ops.publish()).auto_connect(auto_connect_min_subscribers)
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST:
-        logger.debug(
-            "Sharing %s with replay_latest (window_ms=%s, refcount_grace_ms=%d, min=%d)",
-            stream_name,
-            replay_window_ms,
-            refcount_grace_ms,
-            refcount_min_subscribers,
-        )
-        replayed = _replay(1)
-        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
-            result = _share_with_refcount_grace(
-                replayed,
-                grace_ms=refcount_grace_ms,
-                min_subscribers=refcount_min_subscribers,
-                connect_mode=connect_mode,
-                stream_name=stream_name,
-            )
-        else:
-            result = replayed.pipe(ops.ref_count())
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    if strategy is ReactivexStreamShareStrategy.REPLAY_LATEST_AUTO_CONNECT:
-        logger.debug(
-            "Sharing %s with replay_latest_auto_connect "
-            "(window_ms=%s, min_subscribers=%d)",
-            stream_name,
-            replay_window_ms,
-            auto_connect_min_subscribers,
-        )
-        result = _replay(1).auto_connect(auto_connect_min_subscribers)
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    if strategy is ReactivexStreamShareStrategy.REPLAY_BUFFER:
-        buffer_size = settings.replay_buffer()
-        logger.debug(
-            "Sharing %s with replay_buffer=%d (window_ms=%s, refcount_grace_ms=%d, min=%d)",
-            stream_name,
-            buffer_size,
-            replay_window_ms,
-            refcount_grace_ms,
-            refcount_min_subscribers,
-        )
-        replayed = _replay(buffer_size)
-        if refcount_grace_ms > 0 or refcount_min_subscribers > 1:
-            result = _share_with_refcount_grace(
-                replayed,
-                grace_ms=refcount_grace_ms,
-                min_subscribers=refcount_min_subscribers,
-                connect_mode=connect_mode,
-                stream_name=stream_name,
-            )
-        else:
-            result = replayed.pipe(ops.ref_count())
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    if strategy is ReactivexStreamShareStrategy.REPLAY_BUFFER_AUTO_CONNECT:
-        buffer_size = settings.replay_buffer()
-        logger.debug(
-            "Sharing %s with replay_buffer_auto_connect=%d "
-            "(window_ms=%s, min_subscribers=%d)",
-            stream_name,
-            buffer_size,
-            replay_window_ms,
-            auto_connect_min_subscribers,
-        )
-        result = _replay(buffer_size).auto_connect(auto_connect_min_subscribers)
-        return instrument_stream(
-            result,
-            stream_name=stream_name,
-            log_interval_ms=stats_log_ms,
-        )
-    raise ValueError(f"Unknown reactive stream share strategy: {strategy}")
+    if share_strategy is ReactivexStreamShareStrategy.coalesce_latest:
+        return shared.pipe(coalesce_latest(coalesce_window_ms))
+    return shared

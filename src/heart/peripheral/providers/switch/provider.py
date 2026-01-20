@@ -22,9 +22,11 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
             return reactivex.empty()
         result = pipe_in_background(
             reactivex.merge(*main_switches),
-            ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
+            ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral),
         )
         return result
 
-    def observable(self) -> reactivex.Observable[SwitchState]:
+    def observable(
+        self, *args: object, **kwargs: object
+    ) -> reactivex.Observable[SwitchState]:
         return self._switch_stream()

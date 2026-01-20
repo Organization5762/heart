@@ -1,119 +1,105 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import timedelta
-from functools import partial
+from collections.abc import Iterable
+from contextlib import contextmanager
 from threading import Lock, Thread
 from typing import Any, Callable, TypeVar
 
 import reactivex
-from reactivex import Observable, Subject, operators as ops, pipe
+from reactivex import Observable, Subject
+from reactivex import operators as ops
+from reactivex import pipe
 from reactivex.abc import SchedulerBase
 from reactivex.scheduler import EventLoopScheduler, NewThreadScheduler, TimeoutScheduler
 from reactivex.typing import StartableTarget
 
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
+
 T = TypeVar("T")
-DEFAULT_MAX_WORKERS: int | None = None
 
-
-@dataclass
-class _SchedulerState:
-    lock: Lock
-    scheduler: SchedulerBase | None = None
-
-    def get_scheduler(self) -> SchedulerBase:
-        assert self.scheduler is not None
-        return self.scheduler
-
-
-_BACKGROUND_SCHEDULER = _SchedulerState(lock=Lock())
-_INPUT_SCHEDULER = _SchedulerState(lock=Lock())
-_INTERVAL_SCHEDULER = _SchedulerState(lock=Lock())
+_THREAD_LOCK = Lock()
 _COALESCE_SCHEDULER = TimeoutScheduler()
-_MAIN_THREAD_SCHEDULER = TimeoutScheduler()
-
-shutdown: Subject[Any] = Subject()
 
 
-def _build_scheduler(
-    state: _SchedulerState,
-    *,
-    constructor: Callable[[], SchedulerBase],
-) -> SchedulerBase:
-    if state.scheduler is None:
-        with state.lock:
-            if state.scheduler is None:
-                state.scheduler = constructor()
-    assert state.scheduler is not None
-    return state.scheduler
-
-
-def create_default_thread_factory(name: str) -> Callable[[StartableTarget], Thread]:
-    def default_thread_factory(target: StartableTarget) -> Thread:
-        result = Thread(
-            target=target, daemon=False, name=name
+def pipe_in_background(
+    *operations: Callable[[Observable], Observable],
+) -> Callable[[Observable], Observable]:
+    def operation(source: Observable) -> Observable:
+        logger.debug("Building background pipeline.")
+        return source.pipe(
+            *operations,
         )
-        return result
-    return default_thread_factory
+
+    return operation
 
 
-def background_scheduler() -> SchedulerBase:
-    return NewThreadScheduler(
-        thread_factory=create_default_thread_factory("reactivex-background")
+@contextmanager
+def background_threaded_observable(
+    observable: Observable[T],
+    name: str,
+) -> Iterable[Observable[T]]:
+    logger.debug("Starting background stream thread %s", name)
+    subject = Subject()
+    thread = Thread(
+        name=name,
+        target=_run_background_observable,
+        args=(subject, observable),
+        daemon=True,
     )
+    thread.start()
+    yield subject
 
 
-def input_scheduler() -> SchedulerBase:
-    return _build_scheduler(
-        _INPUT_SCHEDULER,
-        constructor=partial(
-            EventLoopScheduler,
-            thread_factory=create_default_thread_factory("reactivex-input"),
-        ),
+def _run_background_observable(subject: Subject, observable: Observable) -> None:
+    observable.subscribe(subject)
+
+
+def share_sequence(sequence: Iterable[T]) -> Observable[T]:
+    shared = Observable.from_iterable(sequence).pipe(
+        ops.share(),
     )
+    return shared
 
 
-def interval_scheduler() -> SchedulerBase:
-    return _build_scheduler(
-        _INTERVAL_SCHEDULER,
-        constructor=partial(
-            EventLoopScheduler,
-            thread_factory=create_default_thread_factory("reactivex-interval"),
-        ),
-    )
-
-
-def main_thread_scheduler() -> SchedulerBase:
-    return _MAIN_THREAD_SCHEDULER
-
-
-def coalesce_scheduler() -> SchedulerBase:
+def coalesce_scheduler() -> TimeoutScheduler:
     return _COALESCE_SCHEDULER
 
 
-def interval_in_background(period: timedelta) -> Observable[Any]:
-    return reactivex.interval(period=period, scheduler=interval_scheduler()).pipe(
-        ops.take_until(shutdown),
+def replay_scheduler() -> TimeoutScheduler:
+    scheduler = TimeoutScheduler()
+    return scheduler
+
+
+def _run_on_thread(target: StartableTarget, name: str) -> Thread:
+    with _THREAD_LOCK:
+        thread = Thread(target=target, daemon=True, name=name)
+        thread.start()
+        return thread
+
+
+def pipe_to_background_event_loop(
+    name: str,
+    *operations: Callable[[Observable], Observable],
+) -> Callable[[Observable], Observable]:
+    """Pipe a stream through an event loop running on a background thread."""
+
+    scheduler = EventLoopScheduler(lambda target: _run_on_thread(target, name))
+    return pipe(
+        ops.observe_on(scheduler),
+        *operations,
     )
 
 
-def pipe_in_background(source: Observable[T], *operators: Any) -> Observable[Any]:
-    return pipe(
-        source,
-        *[
-            *operators,
-            ops.share(),
-        ],
-    )
+def pipe_to_background_thread(
+    name: str,
+    *operations: Callable[[Observable], Observable],
+) -> Callable[[Observable], Observable]:
+    """Pipe a stream through a background thread executor."""
 
-
-def pipe_in_main_thread(source: Observable[T], *operators: Any) -> Observable[Any]:
+    scheduler = NewThreadScheduler(lambda target: _run_on_thread(target, name))
     return pipe(
-        source,
-        *[
-            ops.subscribe_on(main_thread_scheduler()),
-            *operators,
-            ops.observe_on(main_thread_scheduler()),
-            ops.share(),
-        ],
+        ops.observe_on(scheduler),
+        *operations,
     )

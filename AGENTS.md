@@ -89,3 +89,8 @@ If a single file or module starts accumulating setup, orchestration, configurati
 ## Configuration Defaults
 
 Define CLI default values as module-level constants so they stay consistent across commands and are easy to review.
+
+## Validation
+
+- `make format`
+- `make test`

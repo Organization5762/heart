@@ -18,7 +18,7 @@ T = TypeVar("T")
 
 class ObservableProvider(Generic[T]):
     @abstractmethod
-    def observable(self, *args, **kwargs) -> reactivex.Observable[T]:
+    def observable(self, *args: object, **kwargs: object) -> reactivex.Observable[T]:
         raise NotImplementedError("")
 
     def inputs(self) -> tuple[InputDescriptor, ...]:
@@ -35,7 +35,7 @@ class StaticStateProvider(ObservableProvider[T]):
     def state(self) -> T:
         return self._state
 
-    def observable(self, *args, **kwargs) -> reactivex.Observable[T]:
+    def observable(self, *args: object, **kwargs: object) -> reactivex.Observable[T]:
         return pipe_in_background(
             reactivex.just(self._state),
             ops.share(),
