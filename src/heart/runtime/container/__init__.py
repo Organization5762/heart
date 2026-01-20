@@ -1,4 +1,6 @@
-from heart.runtime.container.container import RuntimeContainer
+from lagom import Container
+
+RuntimeContainer = Container
 
 container = RuntimeContainer()
 
