@@ -12,8 +12,8 @@ from heart.utilities.reactivex_threads import pipe_in_background
 
 class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
     def initial_state(self, *, width: int, height: int) -> ChannelDiffusionState:
-        grid = np.zeros((width, height, 3), dtype=np.uint8)
-        grid[width // 2, height // 2] = np.array([255, 255, 255], dtype=np.uint8)
+        grid = np.zeros((height, width, 3), dtype=np.uint8)
+        grid[height // 2, width // 2] = np.array([255, 255, 255], dtype=np.uint8)
         return ChannelDiffusionState(grid=grid)
 
     def observable(
@@ -22,7 +22,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
         *,
         initial_state: ChannelDiffusionState,
     ) -> reactivex.Observable[ChannelDiffusionState]:
-        initial_size = (initial_state.grid.shape[0], initial_state.grid.shape[1])
+        initial_size = (initial_state.grid.shape[1], initial_state.grid.shape[0])
         window_sizes = pipe_in_background(
             peripheral_manager.window,
             ops.filter(lambda window: window is not None),

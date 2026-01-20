@@ -58,10 +58,13 @@ class ScreenRecorder:
         path = Path(output_path)
         frames: list[Image.Image] = []
 
+        self._loop.ensure_screen_initialized()
+
+        pipeline = self._loop.components.render_pipeline
         for batch in inputs:
             renderers = list(batch)
-            self._loop._one_loop(renderers)  # noqa: SLF001 - exercised via tests
-            screen = self._loop.screen
+            render_result = pipeline.render_with_plan(renderers)
+            screen = render_result.surface
             if screen is None:  # pragma: no cover - defensive guard
                 raise RuntimeError("GameLoop screen not initialized")
 
@@ -76,6 +79,9 @@ class ScreenRecorder:
         # GIF durations are stored in 10 ms increments. Round to the closest
         # representable value while keeping a minimum non-zero duration.
         duration_ms = max(int(round((1000 / self._fps) / 10.0) * 10), 10)
+
+        if len(frames) == 1:
+            frames = [frames[0], frames[0].copy()]
 
         first, *rest = frames
         first.save(

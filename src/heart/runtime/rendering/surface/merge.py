@@ -26,7 +26,12 @@ class SurfaceCompositionManager:
         surface1.blit(surface2, (0, 0))
         return surface1
 
-    def compose_serial(
+    def merge_in_place(
+        self, surface1: pygame.Surface, surface2: pygame.Surface
+    ) -> pygame.Surface:
+        return self._merge_in_place(surface1, surface2)
+
+    def merge(
         self,
         surfaces: list[pygame.Surface],
     ) -> pygame.Surface | None:
@@ -38,5 +43,20 @@ class SurfaceCompositionManager:
                 for surface in surfaces[1:]:
                     base = self._merge_in_place(base, surface)
                 return base
+            case RenderMergeStrategy.BATCHED:
+                return self._composer.compose_batched(surfaces)
+            case RenderMergeStrategy.ADAPTIVE:
+                if len(surfaces) >= Configuration.render_merge_surface_threshold():
+                    return self._composer.compose_batched(surfaces)
+                base = surfaces[0]
+                for surface in surfaces[1:]:
+                    base = self._merge_in_place(base, surface)
+                return base
             case _:
                 assert_never(self._strategy_provider)
+
+    def compose_serial(
+        self,
+        surfaces: list[pygame.Surface],
+    ) -> pygame.Surface | None:
+        return self.merge(surfaces)

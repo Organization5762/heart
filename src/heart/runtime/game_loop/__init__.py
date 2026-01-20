@@ -49,16 +49,20 @@ class GameLoop:
         self.max_fps = max_fps
         self.components = self._load_components()
         self._render_pacer = self.context_container.resolve(RenderLoopPacer)
+        self.render_pipeline = self.components.render_pipeline
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
         self.edge_thresh = EDGE_THRESHOLD
-        self.components.display.initialize()
 
     def _one_loop(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
     ):
+        if self.components.display.screen is None:
+            raise RuntimeError("GameLoop screen is not initialized")
+        if self.components.display.clock is None:
+            raise RuntimeError("GameLoop clock is not initialized")
         render_result = self.components.render_pipeline.render_with_plan(
             renderers=renderers,
         )
@@ -182,6 +186,10 @@ class GameLoop:
         renderers = list(base_renderers) if base_renderers else []
         return renderers
 
+    @property
+    def peripheral_manager(self):
+        return self.components.peripheral_manager
+
     def _resolve_display_mode(
         self, renderers: list["StatefulBaseRenderer[Any]"]
     ) -> DeviceDisplayMode:
@@ -232,8 +240,20 @@ class GameLoop:
             )
 
     def _initialize_screen(self) -> None:
+        if (
+            self.components.display.screen is None
+            or self.components.display.clock is None
+        ):
+            self.components.display.initialize()
         self.set_screen(self.components.display.screen)
         self.set_clock(self.components.display.clock)
+
+    def ensure_screen_initialized(self) -> None:
+        if (
+            self.components.display.screen is None
+            or self.components.display.clock is None
+        ):
+            self._initialize_screen()
 
     def _initialize(self) -> None:
         self._set_singleton()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import pygame
@@ -28,6 +28,7 @@ DEFAULT_STATIC_MASK_STEPS = SLIDE_DEFAULT_STATIC_MASK_STEPS
 DEFAULT_GAUSSIAN_SIGMA = SLIDE_DEFAULT_GAUSSIAN_SIGMA
 
 
+@dataclass
 class GameModeState:
     title_renderers: list[StatefulBaseRenderer] = field(default_factory=list)
     renderers: list[StatefulBaseRenderer] = field(default_factory=list)

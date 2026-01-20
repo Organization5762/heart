@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Callable
 
 import pygame
@@ -11,9 +12,13 @@ from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.sliding_image.provider import (
-    SlidingImageStateProvider, SlidingRendererStateProvider)
-from heart.renderers.sliding_image.state import (SlidingImageState,
-                                                 SlidingRendererState)
+    SlidingImageStateProvider,
+    SlidingRendererStateProvider,
+)
+from heart.renderers.sliding_image.state import (
+    SlidingImageState,
+    SlidingRendererState,
+)
 from heart.runtime.display_context import DisplayContext
 
 
@@ -55,7 +60,19 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
         if self._image is None or self._image.get_size() != window.get_size():
             image = Loader.load(self._image_file)
             self._image = pygame.transform.scale(image, window.get_size())
+        if self._provider is not None and self._provider._initial_state is not None:
+            self._provider._initial_state = replace(
+                self._provider._initial_state,
+                width=window.get_width(),
+            )
         super().initialize(window, peripheral_manager, orientation)
+        if self._state is not None:
+            self.update_state(
+                offset=self._provider.advance_state(
+                    self._state, window.get_width()
+                ).offset,
+                width=window.get_width(),
+            )
 
     def real_process(
         self,

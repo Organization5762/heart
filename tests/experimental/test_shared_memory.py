@@ -14,6 +14,12 @@ def _load_experimental_classes():
     if str(EXPERIMENTAL_SRC) not in sys.path:
         sys.path.insert(0, str(EXPERIMENTAL_SRC))
 
+    if not EXPERIMENTAL_SRC.exists():
+        pytest.skip(
+            "experimental isolated_rendering sources are not available",
+            allow_module_level=True,
+        )
+
     buffer_module = importlib.import_module("isolated_rendering.buffer")
     shared_module = importlib.import_module("isolated_rendering.shared_memory")
     return (

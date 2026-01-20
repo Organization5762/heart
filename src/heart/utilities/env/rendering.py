@@ -141,13 +141,14 @@ class RenderingConfiguration:
     @classmethod
     def render_merge_strategy(cls) -> RenderMergeStrategy:
         strategy = os.environ.get(
-            "HEART_RENDER_MERGE_STRATEGY", "in_place"
+            "HEART_RENDER_MERGE_STRATEGY", RenderMergeStrategy.BATCHED.value
         ).strip().lower()
         try:
             return RenderMergeStrategy(strategy)
         except ValueError as exc:
             raise ValueError(
-                f"HEART_RENDER_MERGE_STRATEGY must be 'in_place', found: {strategy}"
+                "HEART_RENDER_MERGE_STRATEGY must be "
+                "'in_place', 'batched', or 'adaptive'"
             ) from exc
 
     @classmethod
@@ -233,7 +234,7 @@ class RenderingConfiguration:
     @classmethod
     def frame_export_strategy(cls) -> FrameExportStrategy:
         strategy = os.environ.get(
-            "HEART_FRAME_EXPORT_STRATEGY", "array"
+            "HEART_FRAME_EXPORT_STRATEGY", "buffer"
         ).strip().lower()
         try:
             return FrameExportStrategy(strategy)
