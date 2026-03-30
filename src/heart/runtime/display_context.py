@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import pygame
 
@@ -10,6 +11,7 @@ from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+
 
 @dataclass
 class DisplayContext:
@@ -56,7 +58,6 @@ class DisplayContext:
         self.screen = pygame.display.set_mode(self._display_size(), target_mode)
         self.last_render_mode = target_mode
 
-
     def _display_size(self) -> tuple[int, int]:
         return self.device.scaled_display_size()
 
@@ -75,12 +76,26 @@ class DisplayContext:
             raise RuntimeError("Screen is not initialized")
         self.screen.blit(*args, **kwargs)
 
+    def blits(self, *args, **kwargs) -> Any:
+        if self.screen is None:
+            raise RuntimeError("Screen is not initialized")
+        return self.screen.blits(*args, **kwargs)
+
+    def blit_array(self, array: Any) -> None:
+        if self.screen is None:
+            raise RuntimeError("Screen is not initialized")
+        pygame.surfarray.blit_array(self.screen, array)
+
     def fill(self, *args, **kwargs) -> None:
         if self.screen is None:
             raise RuntimeError("Screen is not initialized")
         self.screen.fill(*args, **kwargs)
 
-    def get_scratch_screen(self, orientation: Orientation, display_mode: DeviceDisplayMode) -> DisplayContext:
+    def get_scratch_screen(
+        self,
+        orientation: Orientation,
+        display_mode: DeviceDisplayMode,
+    ) -> DisplayContext:
         window_x, window_y = self.get_size()
         match display_mode:
             case DeviceDisplayMode.MIRRORED:

@@ -97,3 +97,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 - `make format`
 - `make test`
+
+## Recent Validation
+
+- `2026-03-30`: `cargo check` in `rust/heart_rust`
+- `2026-03-30`: `make format`
+- `2026-03-30`: `make test`
+- `2026-03-30`: `cargo run --bin stub_gen` in `rust/heart_rust` failed at link time because this environment still lacks a linkable Python 3.11 runtime for PyO3 stub generation.

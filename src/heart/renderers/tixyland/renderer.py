@@ -1,7 +1,6 @@
 from typing import Callable
 
 import numpy as np
-import pygame
 
 from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
@@ -44,4 +43,4 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
         # Make sure the array is shape (w, h, 3) for blit_array
         arr_for_blit = np.transpose(rgb, (1, 0, 2))
 
-        pygame.surfarray.blit_array(window.screen, arr_for_blit)
+        window.blit_array(arr_for_blit)

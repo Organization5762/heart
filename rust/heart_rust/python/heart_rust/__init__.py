@@ -2,4 +2,5 @@
 
 from ._heart_rust import SceneManagerBridge as SceneManagerBridge
 from ._heart_rust import SceneSnapshot as SceneSnapshot
+from ._heart_rust import SoftwareSceneBuffer as SoftwareSceneBuffer
 from ._heart_rust import bridge_version as bridge_version

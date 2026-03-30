@@ -337,7 +337,10 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
         frame_array = np.ascontiguousarray(frame_array)
 
         if (frame_width, frame_height) == (surface_width, surface_height):
-            pygame.surfarray.blit_array(window, frame_array)
+            if hasattr(window, "blit_array"):
+                window.blit_array(frame_array)
+            else:
+                pygame.surfarray.blit_array(window, frame_array)
         else:
             frame_surface = pygame.surfarray.make_surface(frame_array)
             scaled_surface = pygame.transform.smoothscale(
