@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -14,6 +15,7 @@ from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
     GamepadController)
 from heart.peripheral.core.input.keyboard import KeyboardController
+from heart.peripheral.switch import SwitchState
 from heart.utilities.reactivex_threads import pipe_in_background
 
 NAVIGATION_STICK_THRESHOLD = 0.6
@@ -38,10 +40,13 @@ class NavigationProfile:
         keyboard_controller: KeyboardController,
         gamepad_controller: GamepadController,
         debug_tap: InputDebugTap,
+        switch_stream_factory: Callable[[], reactivex.Observable[SwitchState]]
+        | None = None,
     ) -> None:
         self._keyboard = keyboard_controller
         self._gamepad = gamepad_controller
         self._debug_tap = debug_tap
+        self._switch_stream_factory = switch_stream_factory
 
     @cached_property
     def intents(self) -> reactivex.Observable[NavigationIntent]:
@@ -133,6 +138,7 @@ class NavigationProfile:
                 )
             ),
         )
+        switch_intents = self._switch_intents()
         stream = pipe_in_background(
             reactivex.merge(
                 keyboard_left,
@@ -143,6 +149,7 @@ class NavigationProfile:
                 stick_events,
                 button_south,
                 button_north,
+                switch_intents,
             ),
         )
         return instrument_input_stream(
@@ -160,6 +167,9 @@ class NavigationProfile:
                 "gamepad.axis.left_x",
                 "gamepad.button_tapped.south",
                 "gamepad.button_tapped.north",
+                "switch.rotational_value",
+                "switch.button_value",
+                "switch.long_button_value",
             ),
         )
 
@@ -192,4 +202,78 @@ class NavigationProfile:
         return pipe_in_background(
             self.browse,
             ops.map(lambda intent: intent.step),
+        )
+
+    def _switch_intents(self) -> reactivex.Observable[NavigationIntent]:
+        if self._switch_stream_factory is None:
+            return reactivex.empty()
+
+        switch_updates = self._switch_stream_factory()
+        return reactivex.merge(
+            self._switch_browse_intents(switch_updates),
+            self._switch_activate_intents(switch_updates),
+            self._switch_alternate_activate_intents(switch_updates),
+        )
+
+    def _switch_browse_intents(
+        self,
+        switch_updates: reactivex.Observable[SwitchState],
+    ) -> reactivex.Observable[NavigationIntent]:
+        return pipe_in_background(
+            switch_updates,
+            ops.pairwise(),
+            ops.map(
+                lambda latest: latest[1].rotational_value - latest[0].rotational_value
+            ),
+            ops.filter(lambda delta: delta != 0),
+            ops.map(
+                lambda delta: NavigationIntent(
+                    kind=NavigationIntentKind.BROWSE,
+                    source="switch.rotary",
+                    step=delta,
+                )
+            ),
+        )
+
+    def _switch_activate_intents(
+        self,
+        switch_updates: reactivex.Observable[SwitchState],
+    ) -> reactivex.Observable[NavigationIntent]:
+        return pipe_in_background(
+            switch_updates,
+            ops.pairwise(),
+            ops.map(lambda latest: latest[1].button_value - latest[0].button_value),
+            ops.filter(lambda delta: delta > 0),
+            ops.flat_map(
+                lambda delta: reactivex.from_iterable(
+                    NavigationIntent(
+                        kind=NavigationIntentKind.ACTIVATE,
+                        source="switch.button",
+                    )
+                    for _ in range(delta)
+                )
+            ),
+        )
+
+    def _switch_alternate_activate_intents(
+        self,
+        switch_updates: reactivex.Observable[SwitchState],
+    ) -> reactivex.Observable[NavigationIntent]:
+        return pipe_in_background(
+            switch_updates,
+            ops.pairwise(),
+            ops.map(
+                lambda latest: latest[1].long_button_value
+                - latest[0].long_button_value
+            ),
+            ops.filter(lambda delta: delta > 0),
+            ops.flat_map(
+                lambda delta: reactivex.from_iterable(
+                    NavigationIntent(
+                        kind=NavigationIntentKind.ALTERNATE_ACTIVATE,
+                        source="switch.long_button",
+                    )
+                    for _ in range(delta)
+                )
+            ),
         )

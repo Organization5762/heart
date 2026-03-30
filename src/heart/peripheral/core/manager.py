@@ -50,6 +50,7 @@ class PeripheralManager:
             keyboard_controller=self._keyboard_controller,
             gamepad_controller=self._gamepad_controller,
             debug_tap=self._debug_tap,
+            switch_stream_factory=self.get_physical_main_switch_subscription,
         )
         self._accelerometer_controller = AccelerometerController(
             manager=self,
@@ -113,6 +114,9 @@ class PeripheralManager:
 
     def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
         return self._streams.main_switch_subscription()
+
+    def get_physical_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+        return self._streams.physical_main_switch_subscription()
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
         for peripheral in self._peripherals:

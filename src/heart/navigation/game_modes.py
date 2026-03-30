@@ -175,7 +175,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
         if self.is_initialized() and self._init_context is not None:
-            window, clock, peripheral_manager, orientation = self._init_context
+            window, peripheral_manager, orientation = self._init_context
             title_renderer.initialize(window, peripheral_manager, orientation)
             renderers.initialize(window, peripheral_manager, orientation)
 

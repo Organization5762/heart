@@ -181,6 +181,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/isort tests/peripheral/test_input_core.py`
 - `2026-03-30`: `.venv/bin/ruff check --fix tests/peripheral/test_input_core.py`
 - `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/peripheral/core/streams.py src/heart/peripheral/core/manager.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/navigation/game_modes.py tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/peripheral/core/streams.py src/heart/peripheral/core/manager.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/navigation/game_modes.py tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
 - `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmpmtFWG0` in this sandbox.
 - `2026-03-30`: `.venv/bin/isort packages src tests`

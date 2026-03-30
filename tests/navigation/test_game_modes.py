@@ -254,6 +254,30 @@ class TestNavigationGameModes:
         assert mode_renderer.initialize_calls == 1
         assert post_processor.initialize_calls == 1
 
+    def test_add_new_pages_initializes_dynamic_renderers_after_startup(self) -> None:
+        """Verify add_new_pages reuses the stored initialization context so dynamically added pages can initialize without crashing after startup."""
+        game_modes = GameModes()
+        game_modes.set_state(GameModeState())
+        window = _make_window()
+        peripheral_manager = Mock()
+        peripheral_manager.navigation_profile.browse_delta.subscribe = Mock()
+        peripheral_manager.navigation_profile.activate.subscribe = Mock()
+        peripheral_manager.navigation_profile.alternate_activate.subscribe = Mock()
+        orientation = Mock()
+
+        game_modes.initialize(
+            window=window,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
+
+        title_renderer = DummyRenderer("title-dynamic")
+        mode_renderer = DummyRenderer("mode-dynamic")
+        game_modes.add_new_pages(title_renderer, mode_renderer)
+
+        assert title_renderer.initialize_calls == 1
+        assert mode_renderer.initialize_calls == 1
+
     def test_initialize_registered_renderers_logs_failures_with_renderer_name(
         self,
     ) -> None:

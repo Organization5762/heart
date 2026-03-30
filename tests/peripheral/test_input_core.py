@@ -19,6 +19,7 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile, FrameTick,
 from heart.peripheral.core.input.debug import instrument_input_stream
 from heart.peripheral.keyboard import KeyboardAction, KeyboardEvent, KeyState
 from heart.peripheral.sensor import Acceleration
+from heart.peripheral.switch import SwitchState
 
 
 class _StubClock:
@@ -292,6 +293,39 @@ class TestNavigationProfile:
             envelope.stream_name == "navigation.intent"
             for envelope in tap.snapshot()
         )
+
+    def test_profile_maps_switch_edges_to_logical_navigation_events(self) -> None:
+        """Verify switch rotation and button edges flow into the shared navigation profile so switch-only deployments still browse and activate scenes."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        switch_updates: Subject[SwitchState] = Subject()
+        profile = NavigationProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+            switch_stream_factory=lambda: switch_updates,
+        )
+        intents: list[tuple[str, str, int]] = []
+
+        profile.intents.subscribe(
+            lambda intent: intents.append((intent.kind.value, intent.source, intent.step))
+        )
+
+        switch_updates.on_next(SwitchState(0, 0, 0, 0, 0))
+        switch_updates.on_next(SwitchState(2, 0, 0, 2, 2))
+        switch_updates.on_next(SwitchState(2, 1, 0, 0, 2))
+        switch_updates.on_next(SwitchState(2, 1, 1, 0, 0))
+
+        assert intents == [
+            (NavigationIntentKind.BROWSE.value, "switch.rotary", 2),
+            (NavigationIntentKind.ACTIVATE.value, "switch.button", 0),
+            (
+                NavigationIntentKind.ALTERNATE_ACTIVATE.value,
+                "switch.long_button",
+                0,
+            ),
+        ]
 
 
 class TestMandelbrotControlProfile:

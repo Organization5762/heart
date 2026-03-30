@@ -8,7 +8,7 @@ from reactivex import operators as ops
 from reactivex.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
-from heart.peripheral.switch import BaseSwitch, SwitchState
+from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 from heart.utilities.reactivex_threads import pipe_in_background
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
@@ -21,10 +21,21 @@ class PeripheralStreams:
         self._peripheral_source = peripheral_source
 
     def main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+        return self._switch_subscription(include_fake_switches=True)
+
+    def physical_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+        return self._switch_subscription(include_fake_switches=False)
+
+    def _switch_subscription(
+        self,
+        *,
+        include_fake_switches: bool,
+    ) -> reactivex.Observable[SwitchState]:
         main_switches = [
             peripheral
             for peripheral in self._peripheral_source()
             if isinstance(peripheral, BaseSwitch)
+            and (include_fake_switches or not isinstance(peripheral, FakeSwitch))
         ]
         observables = [peripheral.observe for peripheral in main_switches]
 
