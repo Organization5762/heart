@@ -40,6 +40,9 @@ class BaseRenderer:
     def get_renderers(self) -> list["BaseRenderer"]:
         return [self]
 
+    def can_render_in_parallel(self) -> bool:
+        return self.device_display_mode != DeviceDisplayMode.OPENGL
+
     def _internal_process(
         self,
         window: DisplayContext,

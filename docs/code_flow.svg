@@ -79,8 +79,9 @@
       <tspan x="534.00">AppController / Mode Router</tspan>
     </text>
     <rect x="422.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
-    <text x="534.00" y="306.00" fill="#f8fafc" text-anchor="middle">
+    <text x="534.00" y="297.00" fill="#f8fafc" text-anchor="middle">
       <tspan x="534.00">Mode Services &amp; Renderers</tspan>
+      <tspan x="534.00" dy="18">(nested composed execution nodes)</tspan>
     </text>
     <rect x="422.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0f172a" stroke="#0f172a" />
     <text x="534.00" y="388.00" fill="#f8fafc" text-anchor="middle">

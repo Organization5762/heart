@@ -8,7 +8,8 @@ contributors can add or update visuals without scattering knowledge across multi
 ## Renderer Composition
 
 - `heart.renderers.BaseRenderer` and its specializations supply the core render API.
-- `heart.navigation.ComposedRenderer` stacks multiple renderers into a single frame.
+- `heart.navigation.ComposedRenderer` is a meta-renderer that can execute child renderers serially or in parallel.
+- Nested `ComposedRenderer` instances form a renderer graph, allowing configuration code to express serial barriers and parallel groups without a second graph DSL.
 - `heart.navigation.MultiScene` rotates renderer instances on a schedule.
 - `heart.renderers.stateful` classes encapsulate renderer-specific state and are loaded through
   the runtime container to keep dependencies explicit.

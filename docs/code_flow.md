@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination). Nested `ComposedRenderer` nodes now sit inside the mode-services layer, where each node can execute its child renderers serially or in parallel before handing a composed surface back to the main pipeline.
 
 ## Flow Diagram
 
@@ -42,7 +42,7 @@ flowchart LR
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
         RenderPacer["Render Loop Pacer\n(heart.runtime.render.pacing.RenderLoopPacer)"]
         AppRouter["AppController / Mode Router"]
-        ModeServices["Mode Services & Renderers"]
+        ModeServices["Mode Services & Renderers\n(nested composed execution nodes)"]
         RenderPipeline["Render Pipeline"]
         SurfaceProvider["Surface Provider\n(display mode + surface cache)"]
         RendererProcessor["Renderer Processor\n(per-renderer preparation + execution)"]

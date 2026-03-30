@@ -13,7 +13,7 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.color import RenderColor
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
-from heart.runtime.container import container
+from heart.runtime.container import RuntimeContainer, container
 from heart.runtime.display_context import DisplayContext
 
 from .composed_renderer import ComposedRenderer
@@ -27,11 +27,14 @@ class AppControllerState:
 
 
 class AppController(StatefulBaseRenderer[AppControllerState]):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        renderer_resolver: RuntimeContainer | None = None,
+    ) -> None:
         super().__init__()
         self.modes = GameModes()
         self.warmup = True
-        self._renderer_resolver = container
+        self._renderer_resolver = renderer_resolver or container
 
     def _internal_device_display_mode(self) -> DeviceDisplayMode:
         return self.modes._internal_device_display_mode()

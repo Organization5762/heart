@@ -60,6 +60,9 @@ class AtomicBaseRenderer(Generic[StateT]):
     def _real_get_renderers(self) -> list["StatefulBaseRenderer[StateT]"]:
         return [self]
 
+    def can_render_in_parallel(self) -> bool:
+        return self.device_display_mode != DeviceDisplayMode.OPENGL
+
     @final
     def process(
         self,

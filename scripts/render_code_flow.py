@@ -64,7 +64,11 @@ COLUMNS: tuple[ColumnDef, ...] = (
                 "orchestrator",
             ),
             NodeDef("app_router", "AppController / Mode Router", "orchestrator"),
-            NodeDef("mode_services", "Mode Services & Renderers", "service"),
+            NodeDef(
+                "mode_services",
+                "Mode Services & Renderers\n(nested composed execution nodes)",
+                "service",
+            ),
             NodeDef(
                 "render_pipeline",
                 "Render Pipeline",

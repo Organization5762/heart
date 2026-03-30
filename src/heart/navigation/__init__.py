@@ -8,6 +8,8 @@ from heart.renderers.slide_transition import \
 from .app_controller import AppController as AppController
 from .app_controller import AppControllerState as AppControllerState
 from .composed_renderer import ComposedRenderer as ComposedRenderer
+from .composed_renderer import \
+    ComposedRendererExecutionMode as ComposedRendererExecutionMode
 from .composed_renderer import ComposedRendererState as ComposedRendererState
 from .game_modes import GameModes as GameModes
 from .game_modes import GameModeState as GameModeState
