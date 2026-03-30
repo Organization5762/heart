@@ -71,7 +71,6 @@ buffered replay when tuning for performance and correctness.
 - `heart.utilities.env.Configuration.reactivex_stream_refcount_min_subscribers`
   gates ref-count connections for shared streams.
 - `heart.peripheral.core.Peripheral.observe` and
-  `heart.peripheral.core.manager.PeripheralManager.get_event_bus` and
   `heart.peripheral.core.manager.PeripheralManager.get_main_switch_subscription`
   now use the shared helper so configuration applies consistently across core
   event streams.

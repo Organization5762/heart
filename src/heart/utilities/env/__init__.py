@@ -11,8 +11,6 @@ from heart.utilities.env.enums import \
 from heart.utilities.env.enums import LifeRuleStrategy as LifeRuleStrategy
 from heart.utilities.env.enums import LifeUpdateStrategy as LifeUpdateStrategy
 from heart.utilities.env.enums import \
-    ReactivexEventBusScheduler as ReactivexEventBusScheduler
-from heart.utilities.env.enums import \
     ReactivexStreamConnectMode as ReactivexStreamConnectMode
 from heart.utilities.env.enums import \
     ReactivexStreamShareStrategy as ReactivexStreamShareStrategy

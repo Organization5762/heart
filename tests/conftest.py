@@ -27,11 +27,13 @@ class _StubClock:
         *times: int,
         default: int = 0,
         repeat_last: bool = True,
+        fps: float = 0.0,
     ) -> None:
         self._times: deque[int] = deque(times)
         self._last: int | None = None
         self._default = default
         self._repeat_last = repeat_last
+        self._fps = fps
 
     def get_time(self) -> int:
         if self._times:
@@ -42,6 +44,9 @@ class _StubClock:
             return self._last
 
         return self._default
+
+    def get_fps(self) -> float:
+        return self._fps
 
 
 @pytest.fixture(autouse=True)

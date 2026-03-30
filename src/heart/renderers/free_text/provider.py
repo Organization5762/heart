@@ -39,7 +39,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             ops.share(),
         )
 
-        ticks = peripheral_manager.game_tick
+        frame_ticks = peripheral_manager.frame_tick_controller.observable()
 
         def to_state(latest: tuple[object | None, tuple[int, int], str]) -> FreeTextRendererState:
             _, window_size, text = latest
@@ -56,7 +56,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             )
 
         return pipe_in_background(
-            ticks,
+            frame_ticks,
             ops.with_latest_from(windows, self._text),
             ops.map(to_state),
             ops.start_with(self.initial_state()),

@@ -50,20 +50,17 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         *,
         initial_state: ThreeDGlassesState,
     ) -> reactivex.Observable[ThreeDGlassesState]:
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         tick_updates = pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.filter(lambda tick: tick is not None),
-            ops.with_latest_from(clocks),
+            frame_ticks,
             ops.map(
-                lambda latest: lambda state: self.next_state(
+                lambda frame_tick: lambda state: self.next_state(
                     state,
-                    elapsed_ms=float(latest[1].get_time()),
+                    elapsed_ms=float(frame_tick.delta_ms),
                 )
             ),
         )

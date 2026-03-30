@@ -1,4 +1,11 @@
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile,
+                                         FrameTickController,
+                                         GamepadController, InputDebugTap,
+                                         KeyboardController,
+                                         MandelbrotControlProfile,
+                                         NavigationProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -31,6 +38,28 @@ class TestRuntimeContainer:
         assert container.resolve(RenderLoopPacer) is container.resolve(RenderLoopPacer)
         assert container.resolve(RandomnessProvider) is container.resolve(
             RandomnessProvider
+        )
+        assert container.resolve(InputDebugTap) is container.resolve(InputDebugTap)
+        assert container.resolve(FrameTickController) is container.resolve(
+            FrameTickController
+        )
+        assert container.resolve(KeyboardController) is container.resolve(
+            KeyboardController
+        )
+        assert container.resolve(GamepadController) is container.resolve(
+            GamepadController
+        )
+        assert container.resolve(NavigationProfile) is container.resolve(
+            NavigationProfile
+        )
+        assert container.resolve(AccelerometerController) is container.resolve(
+            AccelerometerController
+        )
+        assert container.resolve(AccelerometerDebugProfile) is container.resolve(
+            AccelerometerDebugProfile
+        )
+        assert container.resolve(MandelbrotControlProfile) is container.resolve(
+            MandelbrotControlProfile
         )
 
     def test_container_injects_configuration_registry(self, device) -> None:

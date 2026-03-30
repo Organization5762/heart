@@ -54,7 +54,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         )
 
         return pipe_in_background(
-            peripheral_manager.game_tick,
+            peripheral_manager.frame_tick_controller.observable(),
             ops.with_latest_from(window_stream),
             ops.map(lambda pair: pair[1]),
             ops.scan(
@@ -108,7 +108,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         )
 
         return pipe_in_background(
-            peripheral_manager.game_tick,
+            peripheral_manager.frame_tick_controller.observable(),
             ops.with_latest_from(window_stream),
             ops.map(lambda pair: pair[1]),
             ops.scan(

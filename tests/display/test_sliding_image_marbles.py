@@ -10,15 +10,24 @@ import reactivex
 from reactivex import operators as ops
 from reactivex.testing.marbles import marbles_testing
 
+from heart.peripheral.core.input import FrameTick
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider
 from heart.renderers.sliding_image.state import SlidingImageState
 from heart.utilities.reactivex_threads import pipe_in_background
 
 
 @dataclass(frozen=True)
+class _StubFrameTickController:
+    stream: reactivex.Observable[FrameTick]
+
+    def observable(self) -> reactivex.Observable[FrameTick]:
+        return self.stream
+
+
+@dataclass(frozen=True)
 class _StubManager:
     window: reactivex.Observable[pygame.Surface | None]
-    game_tick: reactivex.Observable[object]
+    frame_tick_controller: _StubFrameTickController
 
 
 def _render_sliding_frame(
@@ -59,7 +68,7 @@ class TestSlidingImageMarbleOutputs:
         tick_pattern: str,
         expected_offsets: list[int],
     ) -> None:
-        """Ensure marbled game ticks advance slide offsets so image wraps stay correct."""
+        """Ensure marbled frame ticks advance slide offsets so image wraps stay correct."""
 
         pygame.display.set_mode((1, 1))
         base_surface = pygame.Surface((4, 1), pygame.SRCALPHA)
@@ -75,8 +84,23 @@ class TestSlidingImageMarbleOutputs:
 
         with marbles_testing() as (start, cold, _hot, _exp):
             window_stream = cold("a------|", {"a": window_surface})
-            tick_stream = cold(tick_pattern, tick_values)
-            manager = _StubManager(window=window_stream, game_tick=tick_stream)
+            tick_stream = pipe_in_background(
+                cold(tick_pattern, tick_values),
+                ops.scan(lambda frame_index, _tick: frame_index + 1, seed=-1),
+                ops.map(
+                    lambda frame_index: FrameTick(
+                        frame_index=frame_index,
+                        delta_ms=0.0,
+                        delta_s=0.0,
+                        monotonic_s=float(frame_index),
+                        fps=None,
+                    )
+                ),
+            )
+            manager = _StubManager(
+                window=window_stream,
+                frame_tick_controller=_StubFrameTickController(tick_stream),
+            )
             image_stream = pipe_in_background(
                 provider.observable(manager),
                 ops.filter(lambda state: state.width > 0),

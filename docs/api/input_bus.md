@@ -1,62 +1,60 @@
-# Input Event Bus Developer Guide
+# Rx Input Services Guide
 
 ## Overview
 
-The input event bus is a synchronous in-process dispatcher for peripheral input.
-Peripherals normalise raw payloads into `heart.peripheral.core.Input` objects and
-emit them through `EventBus.emit()`. Subscribers receive events immediately and
-the shared `StateStore` captures the latest value for each `(event_type, producer_id)` pair.
+Heart input now flows through shared Rx services owned by
+`heart.peripheral.core.manager.PeripheralManager`:
 
-## Publishing events
+- `FrameTickController` emits one `FrameTick` snapshot per loop.
+- `KeyboardController` exposes shared keyboard snapshots and key views.
+- `GamepadController` exposes canonical button, axis, stick, and d-pad views.
+- Logical profiles such as `NavigationProfile`,
+  `MandelbrotControlProfile`, and `AccelerometerDebugProfile` map those
+  shared views into scene-friendly streams.
+- `InputDebugTap` records raw, view, logical, and frame emissions for tests and
+  runtime tracing.
 
-1. Inject or request an `EventBus` instance. `GameLoop` exposes the bus via
-   `GameLoop.event_bus` and propagates it to detected peripherals when
-   `ENABLE_INPUT_EVENT_BUS` is enabled.
-1. Compose payloads with the helpers in `heart.peripheral.input_payloads`. For example,
-   `AccelerometerVector(x, y, z).to_input(producer_id=...)` yields a typed input.
-1. Call `event_bus.emit(input_event)` inside the peripheral once the payload is
-   validated. Exceptions raised by subscribers are logged and do not block
-   other handlers.
+## Publishing input
 
-### Lifecycle signalling
+Peripheral implementations still publish through `Peripheral.observe`. The
+controller layer subscribes to those peripheral streams or polls the relevant
+pygame input source and exposes shared Rx observables above them. New features
+should publish through the relevant peripheral or controller, not through a
+global synchronous bus.
 
-Peripherals should emit lifecycle transitions so downstream systems can reason
-about availability. Use `HeartRateLifecycle`, `SwitchButton.long_press`, and
-similar helpers to encode `connected`, `suspected_disconnect`, `recovered`, and
-`disconnected` states. Maintain an internal status cache to avoid publishing
-unchanged lifecycle events.
+## Consuming input
 
-## Reading state snapshots
+1. Resolve the shared controller or profile from the runtime container.
+1. Subscribe to the smallest stream that matches the use case.
+1. Prefer logical profiles over device-specific views when the scene only cares
+   about intent.
 
-`EventBus.state_store` tracks the most recent event per producer. Call
-`StateStore.get_latest(event_type, producer_id)` to read a single entry or
-`StateStore.snapshot()` to clone the entire store for deterministic inspection.
-`GameLoop.latest_input()` and `GameLoop.input_snapshot()` wrap these calls for
-renderers and controllers.
+Examples:
 
-## Tracing event flow
+- Navigation scenes subscribe to `NavigationProfile.browse_delta`,
+  `activate`, and `alternate_activate`.
+- Time-driven providers subscribe to `FrameTickController.observable()`.
+- Desktop accelerometer debugging subscribes to
+  `AccelerometerDebugProfile.observable()`.
 
-Call `EventBus.enable_stdout_trace()` to print every emitted event to stdout.
-The helper subscribes to the wildcard channel, so the output includes both the
-event type and producer identifier for each payload. Use
-`EventBus.disable_stdout_trace()` once the investigation ends to remove the
-subscription. `EventBus.stdout_trace_enabled` reports whether the trace handle
-is still registered, which is helpful when multiple tools toggle tracing.
+## Tracing input flow
 
-## Visualising subscriptions
+Use `InputDebugTap.observable()` or `InputDebugTap.snapshot()` to inspect traced
+input envelopes. Each envelope records:
 
-`EventBus.snapshot_graph()` captures the current subscription topology and
-returns an `EventBusGraph`. The snapshot exposes the registered event types and
-callback labels and can render a Graphviz DOT document via `to_dot()`. The DOT
-text shows edges annotated with subscription priority and sequence so you can
-check ordering decisions before deploying changes. Pipe the DOT into Graphviz or
-another renderer to produce diagrams for incident reports.
+- `stage`
+- `stream_name`
+- `source_id`
+- `timestamp_monotonic`
+- `payload`
+- `upstream_ids`
+
+This is the supported debugging surface for following transitions such as
+`keyboard.right -> navigation.browse_delta -> GameModes`.
 
 ## Testing
 
-- Use the concrete `EventBus` in unit tests and subscribe to the event types
-  under test to assert emitted payloads.
-- The helpers in `heart.peripheral.input_payloads` return full `Input` instances, enabling
-  direct comparison in tests without constructing dictionaries manually.
-- `StateStore` objects are safe to share across threads; snapshots return
-  read-only `MappingProxyType` views so tests can verify immutability.
+- Subscribe to controller or profile observables directly in unit tests.
+- Use `InputDebugTap.snapshot()` to assert stage and lineage metadata.
+- Prefer controller/profile stubs over reconstructing pygame polling in scene
+  tests when the contract under test is logical input behaviour.

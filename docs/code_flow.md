@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, shared input controllers and profiles, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination). The input section now distinguishes interval work, blocking peripheral IO, and the explicit frame-thread handoff drained from `PeripheralRuntime.tick()` so pygame-affine delivery is visible in the architecture itself.
 
 ## Flow Diagram
 
@@ -53,10 +53,18 @@ flowchart LR
     subgraph Inputs["Peripheral & Signal Services"]
         direction TB
         PeripheralMgr["PeripheralManager\n(background threads)"]
-        RxScheduler["Reactivex Thread Pool\n(shared scheduler)"]
+        FrameTick["FrameTickController"]
+        KeyboardCtrl["KeyboardController"]
+        GamepadCtrl["GamepadController"]
+        Profiles["Navigation / Mandelbrot /\nAccelerometer Debug Profiles"]
+        DebugTap["InputDebugTap"]
+        InputScheduler["Input Scheduler\n(shared bounded pool)"]
+        BlockingScheduler["Blocking IO Scheduler\n(shared bounded pool)"]
+        IntervalScheduler["Interval Scheduler\n(shared event loop)"]
+        FrameHandoff["Frame Thread Handoff Queue\n(drained in `PeripheralRuntime.tick()`)"]
         Switch["Switch / BluetoothSwitch"]
         Gamepad["Gamepad"]
-        Sensors["Accelerometer / Phyphox"]
+        Sensors["Accelerometer"]
         HeartRate["HeartRateManager"]
         PhoneText["PhoneText"]
     end
@@ -86,16 +94,29 @@ flowchart LR
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
 
-    Loop --> PeripheralMgr --> RxScheduler
-    RxScheduler --> Switch --> AppRouter
-    RxScheduler --> Gamepad --> AppRouter
-    RxScheduler --> Sensors --> AppRouter
-    RxScheduler --> HeartRate --> AppRouter
-    RxScheduler --> PhoneText --> AppRouter
+    Loop --> PeripheralMgr --> IntervalScheduler
+    Loop --> PeripheralMgr --> InputScheduler
+    Loop --> PeripheralMgr --> BlockingScheduler
+    Loop --> PeripheralMgr --> FrameHandoff
+    Loop --> FrameTick --> ModeServices
+    BlockingScheduler --> Switch --> AppRouter
+    InputScheduler --> FrameHandoff --> KeyboardCtrl
+    InputScheduler --> FrameHandoff --> Gamepad --> GamepadCtrl
+    BlockingScheduler --> Sensors --> Profiles
+    PeripheralMgr --> HeartRate --> AppRouter
+    PeripheralMgr --> PhoneText --> AppRouter
+    KeyboardCtrl --> Profiles --> AppRouter
+    KeyboardCtrl --> ModeServices
+    GamepadCtrl --> Profiles
+    Profiles --> ModeServices
+    FrameTick --> DebugTap
+    KeyboardCtrl --> DebugTap
+    GamepadCtrl --> DebugTap
+    Profiles --> DebugTap
 
     class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter,RenderPacer orchestrator;
-    class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
+    class PeripheralMgr,FrameTick,KeyboardCtrl,GamepadCtrl,Profiles,DebugTap,InputScheduler,BlockingScheduler,IntervalScheduler,FrameHandoff,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
 

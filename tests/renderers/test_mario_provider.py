@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import reactivex
-from reactivex.subject import BehaviorSubject
+from reactivex.subject import BehaviorSubject, Subject
 
+from heart.peripheral.core.input import FrameTick
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.provider import MarioRendererProvider
 
@@ -13,7 +14,7 @@ class _StubSpritesheet:
     pass
 
 
-class _StubAccelerationProvider:
+class _StubAccelerationController:
     def __init__(self) -> None:
         self._stream: BehaviorSubject[Acceleration | None] = BehaviorSubject(None)
 
@@ -24,18 +25,29 @@ class _StubAccelerationProvider:
         self._stream.on_next(acceleration)
 
 
-class _StubClock:
-    def __init__(self, elapsed_ms: int) -> None:
-        self._elapsed_ms = elapsed_ms
+class _StubAccelerationDebugProfile(_StubAccelerationController):
+    def __init__(self, should_use_debug_input: bool) -> None:
+        super().__init__()
+        self._should_use_debug_input = should_use_debug_input
 
-    def get_time(self) -> int:
-        return self._elapsed_ms
+    def should_use_debug_input(self) -> bool:
+        return self._should_use_debug_input
+
+
+class _StubFrameTickController:
+    def __init__(self) -> None:
+        self._stream: Subject[FrameTick] = Subject()
+
+    def observable(self) -> reactivex.Observable[FrameTick]:
+        return self._stream
+
+    def emit(self, frame_tick: FrameTick) -> None:
+        self._stream.on_next(frame_tick)
 
 
 class _StubPeripheralManager:
     def __init__(self) -> None:
-        self.game_tick = BehaviorSubject(None)
-        self.clock: BehaviorSubject[_StubClock | None] = BehaviorSubject(None)
+        self.frame_tick_controller = _StubFrameTickController()
 
 
 class TestMarioRendererProvider:
@@ -46,7 +58,10 @@ class TestMarioRendererProvider:
         monkeypatch,
     ) -> None:
         """Verify `observable(peripheral_manager)` works so StatefulBaseRenderer initialization does not fail at subscription time."""
-        accel_stream = _StubAccelerationProvider()
+        accelerometer_controller = _StubAccelerationController()
+        accelerometer_debug_profile = _StubAccelerationDebugProfile(
+            should_use_debug_input=False
+        )
         spritesheet = _StubSpritesheet()
         monkeypatch.setattr(
             "heart.renderers.mario.provider.Loader.load_json",
@@ -67,15 +82,23 @@ class TestMarioRendererProvider:
         provider = MarioRendererProvider(
             metadata_file_path="mario_64.json",
             sheet_file_path="mario_64.png",
-            accel_stream=accel_stream,
+            accelerometer_controller=accelerometer_controller,
+            accelerometer_debug_profile=accelerometer_debug_profile,
         )
         peripheral_manager = _StubPeripheralManager()
         observed_states = []
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
-        accel_stream.emit(Acceleration(x=0.0, y=0.0, z=12.5))
-        peripheral_manager.clock.on_next(_StubClock(16))
-        peripheral_manager.game_tick.on_next(object())
+        accelerometer_controller.emit(Acceleration(x=0.0, y=0.0, z=12.5))
+        peripheral_manager.frame_tick_controller.emit(
+            FrameTick(
+                frame_index=0,
+                delta_ms=16.0,
+                delta_s=0.016,
+                monotonic_s=1.0,
+                fps=60.0,
+            )
+        )
 
         assert observed_states
         latest_state = observed_states[-1]
@@ -89,7 +112,10 @@ class TestMarioRendererProvider:
         monkeypatch,
     ) -> None:
         """Confirm frame advancement uses elapsed clock time so Mario animation can progress once a jump loop has started."""
-        accel_stream = _StubAccelerationProvider()
+        accelerometer_controller = _StubAccelerationController()
+        accelerometer_debug_profile = _StubAccelerationDebugProfile(
+            should_use_debug_input=False
+        )
         spritesheet = _StubSpritesheet()
         monkeypatch.setattr(
             "heart.renderers.mario.provider.Loader.load_json",
@@ -114,18 +140,19 @@ class TestMarioRendererProvider:
         provider = MarioRendererProvider(
             metadata_file_path="mario_64.json",
             sheet_file_path="mario_64.png",
-            accel_stream=accel_stream,
+            accelerometer_controller=accelerometer_controller,
+            accelerometer_debug_profile=accelerometer_debug_profile,
         )
         initial_state = provider._create_initial_state()
         started_state = provider._advance_state(
             state=initial_state,
-            clock=_StubClock(0),
+            elapsed_ms=0.0,
             acceleration=Acceleration(x=0.0, y=0.0, z=12.0),
         )
 
         advanced_state = provider._advance_state(
             state=started_state,
-            clock=_StubClock(60),
+            elapsed_ms=60.0,
             acceleration=None,
         )
 

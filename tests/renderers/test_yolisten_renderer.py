@@ -6,15 +6,31 @@ import pygame
 from reactivex.subject import BehaviorSubject
 
 from heart.device import Device, Rectangle
+from heart.peripheral.core.input import FrameTick
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.renderer import YoListenRenderer
 from heart.runtime.display_context import DisplayContext
 
 
 class _StubPeripheralManager:
+    class _StubFrameTickController:
+        def __init__(self) -> None:
+            self._stream = BehaviorSubject(
+                FrameTick(
+                    frame_index=0,
+                    delta_ms=0.0,
+                    delta_s=0.0,
+                    monotonic_s=0.0,
+                    fps=None,
+                )
+            )
+
+        def observable(self):
+            return self._stream
+
     def __init__(self, window: DisplayContext) -> None:
         self.window = BehaviorSubject(window)
-        self.game_tick = BehaviorSubject(None)
+        self.frame_tick_controller = self._StubFrameTickController()
         self._switch = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
 
     def get_main_switch_subscription(self):

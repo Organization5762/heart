@@ -197,6 +197,29 @@ class TestNavigationGameModes:
         assert result is game_modes.state.renderers[1], game_modes.state.renderers
         assert game_modes.state.previous_mode_index == 1
 
+    def test_activate_commits_selected_offset_and_enters_mode(self) -> None:
+        """Verify activate commits the current browse offset so logical navigation events still enter the selected mode without switch-specific state."""
+        game_modes = _make_game_modes(count=3)
+        game_modes.state.mode_offset = 2
+
+        game_modes._handle_activate("activate")
+
+        assert game_modes.state._active_mode_index == 2
+        assert game_modes.state.mode_offset == 0
+        assert game_modes.state.in_select_mode is False
+
+    def test_alternate_activate_resets_renderers_and_returns_to_select_mode(
+        self,
+    ) -> None:
+        """Verify alternate activate resets active renderers when leaving gameplay so navigation can back out cleanly through the logical profile."""
+        game_modes = _make_game_modes(count=2)
+        game_modes.state.in_select_mode = False
+
+        game_modes._handle_alternate_activate("alternate_activate")
+
+        assert game_modes.state.in_select_mode is True
+        assert all(renderer.reset_calls == 1 for renderer in game_modes.state.renderers)
+
     def test_initialize_registered_renderers_reports_progress(self) -> None:
         """Verify initialization reports progress for every registered renderer so startup feedback stays accurate while scenes warm up."""
         game_modes = GameModes()
@@ -230,6 +253,30 @@ class TestNavigationGameModes:
         assert title_renderer.initialize_calls == 1
         assert mode_renderer.initialize_calls == 1
         assert post_processor.initialize_calls == 1
+
+    def test_add_new_pages_initializes_dynamic_renderers_after_startup(self) -> None:
+        """Verify add_new_pages reuses the stored initialization context so dynamically added pages can initialize without crashing after startup."""
+        game_modes = GameModes()
+        game_modes.set_state(GameModeState())
+        window = _make_window()
+        peripheral_manager = Mock()
+        peripheral_manager.navigation_profile.browse_delta.subscribe = Mock()
+        peripheral_manager.navigation_profile.activate.subscribe = Mock()
+        peripheral_manager.navigation_profile.alternate_activate.subscribe = Mock()
+        orientation = Mock()
+
+        game_modes.initialize(
+            window=window,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
+
+        title_renderer = DummyRenderer("title-dynamic")
+        mode_renderer = DummyRenderer("mode-dynamic")
+        game_modes.add_new_pages(title_renderer, mode_renderer)
+
+        assert title_renderer.initialize_calls == 1
+        assert mode_renderer.initialize_calls == 1
 
     def test_initialize_registered_renderers_logs_failures_with_renderer_name(
         self,

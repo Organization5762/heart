@@ -1,7 +1,6 @@
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import StrEnum
 from functools import cache
 from typing import Any, Iterator, Self, cast
 
@@ -12,15 +11,11 @@ from reactivex import operators as ops
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (interval_in_background,
+from heart.utilities.reactivex_threads import (input_scheduler,
+                                               interval_in_background,
                                                pipe_in_main_thread)
 
 logger = get_logger(__name__)
-
-class KeyboardAction(StrEnum):
-    PRESSED = "pressed"
-    HELD = "held"
-    RELEASED = "released"
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,12 +26,29 @@ class KeyState:
 
 
 @dataclass(frozen=True, slots=True)
-class KeyboardEvent:
+class _KeyboardEvent:
     key: int
     key_name: str
-    action: KeyboardAction
     state: KeyState
     timestamp_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class KeyPressedEvent(_KeyboardEvent):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class KeyHeldEvent(_KeyboardEvent):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class KeyReleasedEvent(_KeyboardEvent):
+    pass
+
+
+KeyboardEvent = KeyPressedEvent | KeyHeldEvent | KeyReleasedEvent
 
 
 class KeyboardKey(Peripheral[KeyboardEvent]):
@@ -76,11 +88,13 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             return cast(reactivex.Observable[KeyboardEvent], reactivex.empty())
 
         return pipe_in_main_thread(
-            interval_in_background(period=timedelta(milliseconds=5)),
+            interval_in_background(
+                period=timedelta(milliseconds=5),
+                scheduler=input_scheduler(),
+            ),
             ops.map(_poll),
             ops.filter(lambda event: event is not None),
             ops.map(lambda event: cast(KeyboardEvent, event)),
-            ops.share(),
         )
 
     def _check_if_pressed(self) -> KeyboardEvent | None:
@@ -93,19 +107,17 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
         if keys[self.key]:
             if not current.pressed:
                 updated = KeyState(pressed=True, held=False, last_change_ms=now)
-                event = KeyboardEvent(
+                event = KeyPressedEvent(
                     key=self.key,
                     key_name=key_name,
-                    action=KeyboardAction.PRESSED,
                     state=updated,
                     timestamp_ms=now,
                 )
             elif not current.held:
                 updated = KeyState(pressed=True, held=True, last_change_ms=now)
-                event = KeyboardEvent(
+                event = KeyHeldEvent(
                     key=self.key,
                     key_name=key_name,
-                    action=KeyboardAction.HELD,
                     state=updated,
                     timestamp_ms=now,
                 )
@@ -116,10 +128,9 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
                 return None
             if current.pressed or current.held:
                 updated = KeyState(pressed=False, held=False, last_change_ms=now)
-                event = KeyboardEvent(
+                event = KeyReleasedEvent(
                     key=self.key,
                     key_name=key_name,
-                    action=KeyboardAction.RELEASED,
                     state=updated,
                     timestamp_ms=now,
                 )

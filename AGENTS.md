@@ -3,6 +3,7 @@
 ## Installing
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
+
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
@@ -30,6 +31,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Use `heart.utilities.logging.get_logger` for internal logging so handlers and log levels stay consistent across modules.
 - Prefer `get_logger(__name__)` so loggers include their module path and stay consistent in telemetry.
 - When starting background threads, provide a descriptive name via `threading.Thread(name=...)` to keep diagnostics readable.
+- For pygame-bound Rx delivery, use the explicit frame-thread handoff in `heart.utilities.reactivex_threads` and drain it from `PeripheralRuntime.tick()` instead of treating a scheduler as the game loop thread.
 - Prefer module-level constants for tunable loop intervals instead of embedding sleep literals in long-running loops.
 - Prefer module-level constants for retry thresholds in reconnect or recovery loops instead of inline numeric literals.
 - Use `time.monotonic()` for elapsed-time comparisons, and reserve `time.time()` for wall-clock timestamps that leave the process.
@@ -169,3 +171,46 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/hilbert_curve/provider.py tests/renderers/test_hilbert_curve_renderer.py`
 - `2026-03-30`: `.venv/bin/pytest tests/renderers/test_hilbert_curve_renderer.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmpNK8ajn` in this sandbox.
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
+- `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/peripheral/core/streams.py src/heart/peripheral/core/manager.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/navigation/game_modes.py tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/peripheral/core/streams.py src/heart/peripheral/core/manager.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/navigation/game_modes.py tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/peripheral/core/input/profiles/navigation.py src/heart/peripheral/core/input/profiles/mandelbrot.py src/heart/renderers/mandelbrot/control_mappings.py src/heart/peripheral/core/input/__init__.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/peripheral/core/input/profiles/navigation.py src/heart/peripheral/core/input/profiles/mandelbrot.py src/heart/renderers/mandelbrot/control_mappings.py src/heart/peripheral/core/input/__init__.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py tests/renderers/test_provider_signatures.py tests/runtime/test_container.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/peripheral/keyboard.py src/heart/peripheral/core/input/keyboard.py src/heart/peripheral/core/input/gamepad.py src/heart/peripheral/core/input/__init__.py src/heart/peripheral/switch.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/peripheral/keyboard.py src/heart/peripheral/core/input/keyboard.py src/heart/peripheral/core/input/gamepad.py src/heart/peripheral/core/input/__init__.py src/heart/peripheral/switch.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py tests/renderers/test_provider_signatures.py tests/runtime/test_container.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmpmtFWG0` in this sandbox.
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
+- `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py tests/runtime/test_container.py`
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/pytest tests/utilities/test_reactivex_threads.py tests/peripheral/test_switch.py tests/peripheral/test_input_core.py tests/utilities/test_env.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/utilities/reactivex_threads.py src/heart/runtime/peripheral_runtime.py src/heart/utilities/env/reactivex.py src/heart/utilities/env/enums.py src/heart/utilities/env/__init__.py src/heart/peripheral/core/input/debug.py src/heart/peripheral/core/input/frame.py src/heart/peripheral/core/input/keyboard.py src/heart/peripheral/core/input/gamepad.py src/heart/peripheral/core/input/accelerometer.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/peripheral/core/input/profiles/mandelbrot.py src/heart/peripheral/keyboard.py src/heart/peripheral/switch.py src/heart/peripheral/sensor.py src/heart/peripheral/phyphox.py tests/utilities/test_env.py tests/utilities/test_reactivex_threads.py tests/peripheral/test_switch.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/ruff check src/heart/utilities/reactivex_threads.py src/heart/runtime/peripheral_runtime.py src/heart/utilities/env/reactivex.py src/heart/utilities/env/enums.py src/heart/utilities/env/__init__.py src/heart/peripheral/core/input/debug.py src/heart/peripheral/core/input/frame.py src/heart/peripheral/core/input/keyboard.py src/heart/peripheral/core/input/gamepad.py src/heart/peripheral/core/input/accelerometer.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/peripheral/core/input/profiles/mandelbrot.py src/heart/peripheral/keyboard.py src/heart/peripheral/switch.py src/heart/peripheral/sensor.py src/heart/peripheral/phyphox.py tests/utilities/test_env.py tests/utilities/test_reactivex_threads.py tests/peripheral/test_switch.py tests/peripheral/test_input_core.py`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmp65S17D` in this sandbox.
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
+- `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`

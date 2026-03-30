@@ -1,64 +1,17 @@
-from collections.abc import Callable
-from typing import TypeGuard, cast
-
 import reactivex
-from reactivex import operators as ops
 
-from heart.peripheral.core import PeripheralMessageEnvelope
-from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.input import AccelerometerController
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.sensor import Acceleration, Accelerometer
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.peripheral.sensor import Acceleration
 
 
 class AllAccelerometersProvider(ObservableProvider[Acceleration]):
-    """Provides an observable of Acceleration readings."""
+    """Compatibility adapter over the shared accelerometer controller."""
 
-    def __init__(self, peripheral_manager: PeripheralManager):
-        self._pm = peripheral_manager
-
-    def _acceleration_stream(self) -> reactivex.Observable[Acceleration]:
-        accels = [
-            peripheral.observe
-            for peripheral in self._pm.peripherals
-            if isinstance(peripheral, Accelerometer)
-        ]
-
-        def unwrap_acceleration(
-            envelope: PeripheralMessageEnvelope[Acceleration | None],
-        ) -> Acceleration | None:
-            return envelope.data
-
-        def is_acceleration(accel: Acceleration | None) -> TypeGuard[Acceleration]:
-            return accel is not None
-
-        def filter_acceleration(
-            source: reactivex.Observable[Acceleration | None],
-        ) -> reactivex.Observable[Acceleration]:
-            return pipe_in_background(
-                source,
-                ops.filter(is_acceleration),
-                ops.map(lambda accel: cast(Acceleration, accel)),
-            )
-
-        if not accels:
-            return reactivex.empty()
-
-        merged = cast(
-            reactivex.Observable[PeripheralMessageEnvelope[Acceleration | None]],
-            reactivex.merge(*accels),
-        )
-        map_op: Callable[
-            [reactivex.Observable[PeripheralMessageEnvelope[Acceleration | None]]],
-            reactivex.Observable[Acceleration | None],
-        ] = ops.map(unwrap_acceleration)
-        return pipe_in_background(
-            merged,
-            map_op,
-            filter_acceleration,
-        )
+    def __init__(self, accelerometer_controller: AccelerometerController):
+        self._controller = accelerometer_controller
 
     def observable(
         self, *args: object, **kwargs: object
     ) -> reactivex.Observable[Acceleration]:
-        return self._acceleration_stream()
+        return self._controller.observable()
