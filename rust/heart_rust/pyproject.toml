@@ -6,7 +6,6 @@ build-backend = "maturin"
 name = "heart-rust"
 version = "0.1.0"
 description = "PyO3 scene-management bridge for the Heart runtime."
-dependencies = ["numpy"]
 readme = "README.md"
 requires-python = ">=3.11"
 

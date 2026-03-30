@@ -9,7 +9,6 @@ name = "heart_rust"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-numpy = "0.28.0"
 pyo3 = { version = "0.28.2", features = ["abi3-py311", "extension-module"] }
 pyo3-stub-gen = "0.15.0"
 safetensors = "0.7.0"

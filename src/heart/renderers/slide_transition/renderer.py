@@ -138,8 +138,8 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         offset_a = (-self.provider.direction * state.fraction_offset * image_width, 0)
         offset_b = (offset_a[0] + self.provider.direction * image_width, 0)
 
-        window.blit(window_a.screen, offset_a)
-        window.blit(window_b.screen, offset_b)
+        window.screen.blit(window_a.screen, offset_a)
+        window.screen.blit(window_b.screen, offset_b)
 
     def _render_static_transition(
         self,
@@ -151,7 +151,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         array_b = pygame.surfarray.array3d(window_b.screen)
         mask_indices = self._get_static_mask_indices(array_a.shape[:2])
         blended = self._blend_static_arrays(array_a, array_b, mask_indices)
-        window.blit_array(blended)
+        pygame.surfarray.blit_array(window.screen, blended)
 
     def _render_gaussian_transition(
         self,
@@ -163,7 +163,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         array_b = pygame.surfarray.array3d(window_b.screen)
         mask_values = self._get_gaussian_mask_values(array_a.shape[:2])
         blended = self._blend_gaussian_arrays(array_a, array_b, mask_values)
-        window.blit_array(blended)
+        pygame.surfarray.blit_array(window.screen, blended)
 
     def _get_static_mask_indices(self, shape: tuple[int, int]) -> np.ndarray:
         if self._static_mask_indices is None or self._static_mask_shape != shape:

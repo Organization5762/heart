@@ -104,3 +104,6 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `make format`
 - `2026-03-30`: `make test`
 - `2026-03-30`: `cargo run --bin stub_gen` in `rust/heart_rust` failed at link time because this environment still lacks a linkable Python 3.11 runtime for PyO3 stub generation.
+- `2026-03-30`: `uv lock`
+- `2026-03-30`: `.venv/bin/isort src tests`, `.venv/bin/ruff check --fix src tests`, `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`, and `.venv/bin/mdformat docs` after `make format` hit a sandboxed uv cache permission error.
+- `2026-03-30`: `.venv/bin/pytest` after `make test` hit the same sandboxed uv cache permission error.

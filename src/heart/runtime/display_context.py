@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import pygame
 
@@ -75,16 +74,6 @@ class DisplayContext:
         if self.screen is None:
             raise RuntimeError("Screen is not initialized")
         self.screen.blit(*args, **kwargs)
-
-    def blits(self, *args, **kwargs) -> Any:
-        if self.screen is None:
-            raise RuntimeError("Screen is not initialized")
-        return self.screen.blits(*args, **kwargs)
-
-    def blit_array(self, array: Any) -> None:
-        if self.screen is None:
-            raise RuntimeError("Screen is not initialized")
-        pygame.surfarray.blit_array(self.screen, array)
 
     def fill(self, *args, **kwargs) -> None:
         if self.screen is None:

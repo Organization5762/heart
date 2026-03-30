@@ -137,7 +137,6 @@ dependencies = [
 name = "heart_rust"
 version = "0.1.0"
 dependencies = [
- "numpy",
  "pyo3",
  "pyo3-stub-gen",
  "safetensors",
