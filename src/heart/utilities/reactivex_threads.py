@@ -3,14 +3,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from contextlib import contextmanager
 from threading import Lock, Thread
-from typing import Any, Callable, TypeVar
+from typing import Callable, TypeVar
 
-import reactivex
 from reactivex import Observable, Subject
 from reactivex import operators as ops
 from reactivex import pipe
-from reactivex.abc import SchedulerBase
-from reactivex.scheduler import EventLoopScheduler, NewThreadScheduler, TimeoutScheduler
+from reactivex.scheduler import (EventLoopScheduler, NewThreadScheduler,
+                                 TimeoutScheduler)
 from reactivex.typing import StartableTarget
 
 from heart.utilities.logging import get_logger

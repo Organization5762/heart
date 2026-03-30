@@ -5,7 +5,8 @@ import reactivex
 from reactivex.disposable import Disposable
 
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import _COALESCE_SCHEDULER, coalesce_scheduler
+from heart.utilities.reactivex_threads import (_COALESCE_SCHEDULER,
+                                               coalesce_scheduler)
 
 logger = get_logger(__name__)
 

@@ -10,10 +10,9 @@ from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.sliding_image.provider import (
-    SlidingImageStateProvider,
-    SlidingRendererStateProvider,
-)
-from heart.renderers.sliding_image.state import SlidingImageState, SlidingRendererState
+    SlidingImageStateProvider, SlidingRendererStateProvider)
+from heart.renderers.sliding_image.state import (SlidingImageState,
+                                                 SlidingRendererState)
 from heart.runtime.display_context import DisplayContext
 
 
