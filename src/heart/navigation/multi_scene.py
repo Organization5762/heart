@@ -8,6 +8,8 @@ from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
 
+from .native_scene_manager import (SceneManagerBackend,
+                                   build_scene_manager_backend)
 from .renderer_specs import (RendererResolver, RendererSpec,
                              resolve_renderer_spec)
 
@@ -23,12 +25,17 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self,
         scenes: list[RendererSpec],
         renderer_resolver: RendererResolver | None = None,
+        scene_manager_backend: SceneManagerBackend | None = None,
     ) -> None:
         super().__init__()
         self.scenes = [
             resolve_renderer_spec(scene, renderer_resolver)
             for scene in scenes
         ]
+        scene_names = [scene.name for scene in self.scenes]
+        self._scene_manager = scene_manager_backend or build_scene_manager_backend(
+            scene_names
+        )
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         index = self._active_scene_index()
@@ -58,11 +65,11 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
 
     def reset(self) -> None:
         self.state.offset_of_button_value = self.state.current_button_value
+        self._scene_manager.reset_button_offset(self.state.current_button_value)
         return super().reset()
 
     def _process_switch(self, switch_value: SwitchState) -> None:
         self.state.current_button_value = switch_value.button_value
 
     def _active_scene_index(self) -> int:
-        offset = self.state.offset_of_button_value or 0
-        return (self.state.current_button_value - offset) % len(self.scenes)
+        return self._scene_manager.active_scene_index(self.state.current_button_value)

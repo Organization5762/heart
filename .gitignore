@@ -2,6 +2,7 @@ heart.egg-info
 __pycache__
 build/
 .venv
+.cargo-home*
 **/.DS_Store
 bluetooth.log
 ant_hr.log
@@ -16,3 +17,4 @@ node_modules
 .worktrees
 .heart
 .hypothesis
+**/target
