@@ -3,6 +3,6 @@ repos:
     hooks:
       - id: make-format
         name: Run make format
-        entry: make format
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; make format'
         language: system
         pass_filenames: false
