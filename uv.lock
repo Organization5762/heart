@@ -534,6 +534,9 @@ dev = [
     { name = "types-requests" },
     { name = "types-toml" },
 ]
+native = [
+    { name = "heart-rust" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -570,6 +573,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bleak" },
+    { name = "heart-rust", marker = "extra == 'native'", directory = "rust/heart_rust" },
     { name = "lagom" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
@@ -598,7 +602,7 @@ requires-dist = [
     { name = "types-toml", marker = "extra == 'dev'" },
     { name = "websockets", specifier = ">=15.0.1" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "native"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -631,6 +635,11 @@ test = [
     { name = "pytest-benchmark", specifier = ">=5.2.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
 ]
+
+[[package]]
+name = "heart-rust"
+version = "0.1.0"
+source = { directory = "rust/heart_rust" }
 
 [[package]]
 name = "httpcore"
