@@ -23,7 +23,6 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
         from heart.renderers.three_fractal.renderer import FractalRuntime
 
         runtime = FractalRuntime(device=self.device)
-        runtime.initialize(window, peripheral_manager, orientation)
         return FractalSceneState(runtime=runtime)
 
     def observable(

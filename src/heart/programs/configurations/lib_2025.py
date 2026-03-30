@@ -221,6 +221,7 @@ def configure(loop: GameLoop) -> None:
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
             randomness=randomness,
+            fill_window=True,
         )
     )
 

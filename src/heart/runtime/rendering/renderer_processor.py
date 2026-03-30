@@ -56,6 +56,8 @@ class RendererProcessor:
             return screen
         except Exception:
             logger.exception("Error processing renderer")
+            if Configuration.render_crash_on_error():
+                raise
             return None
 
     def _render_frame_using_renderer(
@@ -87,13 +89,16 @@ class RendererProcessor:
     def _log_renderer_metrics(
         self, renderer: "StatefulBaseRenderer[Any]", duration_ms: float
     ) -> None:
+        fps_estimate = self._timing_tracker.estimate_fps(renderer.name)
+        fps_estimate_text = "n/a" if fps_estimate is None else f"{fps_estimate:.1f}"
         log_message = (
-            "render.loop renderer=%s duration_ms=%.2f queue_depth=%s "
-            "display_mode=%s uses_opengl=%s initialized=%s"
+            "render.loop renderer=%s duration_ms=%.2f fps_estimate=%s "
+            "queue_depth=%s display_mode=%s uses_opengl=%s initialized=%s"
         )
         log_args = (
             renderer.name,
             duration_ms,
+            fps_estimate_text,
             self._render_queue_depth,
             renderer.device_display_mode.name,
             renderer.device_display_mode == DeviceDisplayMode.OPENGL,
@@ -102,6 +107,7 @@ class RendererProcessor:
         log_extra = {
             "renderer": renderer.name,
             "duration_ms": duration_ms,
+            "fps_estimate": fps_estimate,
             "queue_depth": self._render_queue_depth,
             "display_mode": renderer.device_display_mode.name,
             "uses_opengl": renderer.device_display_mode == DeviceDisplayMode.OPENGL,

@@ -16,7 +16,9 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(self) -> reactivex.Observable[HeartTitleScreenState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[HeartTitleScreenState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
 

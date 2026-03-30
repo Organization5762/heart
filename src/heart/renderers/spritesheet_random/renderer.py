@@ -20,10 +20,12 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         metadata_file_path: str,
         screen_count: int,
         randomness: RandomnessProvider,
+        fill_window: bool = False,
         provider: SpritesheetLoopRandomProvider | None = None,
     ) -> None:
         self.screen_width, self.screen_height = screen_width, screen_height
         self.screen_count = screen_count
+        self.fill_window = fill_window
         self.provider = provider or SpritesheetLoopRandomProvider(
             sheet_file_path=sheet_file_path,
             metadata_file_path=metadata_file_path,
@@ -45,6 +47,11 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
 
         spritesheet = state.spritesheet
         if spritesheet is None:
+            return
+
+        if self.fill_window:
+            scaled = spritesheet.image_at_scaled(current_kf.frame, window.get_size())
+            window.blit(scaled, (0, 0))
             return
 
         scaled = spritesheet.image_at_scaled(

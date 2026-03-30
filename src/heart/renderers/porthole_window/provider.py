@@ -14,7 +14,9 @@ class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(self) -> reactivex.Observable[PortholeWindowState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[PortholeWindowState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),

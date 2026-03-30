@@ -1,6 +1,7 @@
 """Validate Lagom-backed renderer resolution in composed navigation helpers."""
 
 
+from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer
 from heart.renderers import StatefulBaseRenderer
@@ -16,6 +17,14 @@ class _ContainerRenderer(StatefulBaseRenderer[int]):
 
     def real_process(self, *_args, **_kwargs) -> None:
         return None
+
+
+class _OpenGlContainerRenderer(_ContainerRenderer):
+    """Renderer used to confirm composed renderer mode tracking updates for OpenGL children."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.device_display_mode = DeviceDisplayMode.OPENGL
 
 
 class TestComposedRendererResolution:
@@ -46,3 +55,18 @@ class TestComposedRendererResolution:
         composed.add_renderer(_ContainerRenderer)
 
         assert isinstance(composed.renderers[0], _ContainerRenderer)
+
+    def test_add_renderer_updates_display_mode_for_opengl_children(
+        self, device: Device
+    ) -> None:
+        """Verify adding an OpenGL child updates the composed renderer mode so initialization requests the right pygame display type."""
+        container = build_runtime_container(
+            device=device,
+            render_variant=RendererVariant.ITERATIVE,
+        )
+        container[_OpenGlContainerRenderer] = _OpenGlContainerRenderer
+
+        composed = container.resolve(ComposedRenderer)
+        composed.add_renderer(_OpenGlContainerRenderer)
+
+        assert composed.device_display_mode == DeviceDisplayMode.OPENGL

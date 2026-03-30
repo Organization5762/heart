@@ -1,11 +1,13 @@
 import reactivex
+from pygame.time import Clock
+from reactivex import operators as ops
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
-from heart.peripheral.uwb import ops
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import pipe_in_background
@@ -42,62 +44,80 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         image = Loader.load_spirtesheet(self.file)
         return MarioRendererState(spritesheet=image)
 
+    def _advance_state(
+        self,
+        state: MarioRendererState,
+        clock: Clock,
+        acceleration: Acceleration | None,
+    ) -> MarioRendererState:
+        current_frame = state.current_frame
+        time_since_last_update = state.time_since_last_update
+        in_loop = state.in_loop
+        highest_z = state.highest_z
+
+        current_keyframe = self.frames[current_frame]
+        keyframe_duration = current_keyframe.duration or 0
+
+        if in_loop:
+            elapsed_ms = float(clock.get_time())
+            next_time = (time_since_last_update or 0.0) + elapsed_ms
+            if next_time > keyframe_duration:
+                current_frame += 1
+                next_time = 0.0
+
+                if current_frame >= len(self.frames):
+                    current_frame = 0
+                    in_loop = False
+                    next_time = 0.0
+            time_since_last_update = next_time if in_loop else None
+        elif acceleration is not None and acceleration.z > 11.0:
+            highest_z = max(highest_z, acceleration.z)
+            logger.info(
+                "Highest accel Z updated: highest_z=%s, accel_z=%s",
+                highest_z,
+                acceleration.z,
+            )
+            in_loop = True
+            time_since_last_update = 0.0
+        else:
+            time_since_last_update = None
+
+        return MarioRendererState(
+            spritesheet=state.spritesheet,
+            current_frame=current_frame,
+            time_since_last_update=time_since_last_update,
+            in_loop=in_loop,
+            highest_z=highest_z,
+            latest_acceleration=acceleration,
+        )
+
     def observable(
         self,
+        peripheral_manager: PeripheralManager,
     ) -> reactivex.Observable[MarioRendererState]:
-        observable = self._accel_stream.observable()
-
         initial = self._create_initial_state()
-
-        def update_state(prev: MarioRendererState, acceleration: Acceleration):
-            state = prev
-            current_kf = self.frames[state.current_frame]
-            current_frame = state.current_frame
-            time_since_last_update = state.time_since_last_update
-            in_loop = state.in_loop
-            highest_z = state.highest_z
-
-            kf_duration = current_kf.duration
-
-            if in_loop:
-                if time_since_last_update is None:
-                    time_since_last_update = 0
-
-                # TODO: Stream in the clock / break this up
-                # time_since_last_update += clock.get_time()
-
-                if time_since_last_update > kf_duration:
-                    current_frame += 1
-                    time_since_last_update = 0
-
-                    if current_frame >= len(self.frames):
-                        current_frame = 0
-                        in_loop = False
-            else:
-                vector = self.state.latest_acceleration
-                if vector is not None and vector.z > 11.0:  # vibes based constants
-                    highest_z = max(highest_z, vector.z)
-                    logger.info(
-                        "Highest accel Z updated: highest_z=%s, accel_z=%s",
-                        highest_z,
-                        vector.z,
-                    )
-                    in_loop = True
-                    time_since_last_update = 0
-
-            if not in_loop:
-                time_since_last_update = None
-
-            self.update_state(
-                current_frame=current_frame,
-                time_since_last_update=time_since_last_update,
-                in_loop=in_loop,
-                highest_z=highest_z,
-            )
+        accelerations = pipe_in_background(
+            self._accel_stream.observable(),
+            ops.start_with(None),
+            ops.share(),
+        )
+        clocks = pipe_in_background(
+            peripheral_manager.clock,
+            ops.filter(lambda clock: clock is not None),
+            ops.share(),
+        )
 
         return pipe_in_background(
-            observable,
+            peripheral_manager.game_tick,
+            ops.with_latest_from(clocks, accelerations),
+            ops.scan(
+                lambda state, latest: self._advance_state(
+                    state=state,
+                    clock=latest[1],
+                    acceleration=latest[2],
+                ),
+                seed=initial,
+            ),
             ops.start_with(initial),
-            ops.scan(update_state),
             ops.share(),
         )

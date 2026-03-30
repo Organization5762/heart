@@ -20,12 +20,23 @@ from heart.renderers.slide_transition import \
     DEFAULT_STATIC_MASK_STEPS as SLIDE_DEFAULT_STATIC_MASK_STEPS
 from heart.renderers.slide_transition import SlideTransitionMode
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.renderers.slide_transition import SlideTransitionRenderer
+logger = get_logger(__name__)
 DEFAULT_TRANSITION_MODE = SlideTransitionMode.SLIDE
 DEFAULT_STATIC_MASK_STEPS = SLIDE_DEFAULT_STATIC_MASK_STEPS
 DEFAULT_GAUSSIAN_SIGMA = SLIDE_DEFAULT_GAUSSIAN_SIGMA
+INITIALIZATION_TEXT_COLOR = pygame.Color("white")
+INITIALIZATION_BACKGROUND_COLOR = pygame.Color("black")
+INITIALIZATION_TRACK_COLOR = pygame.Color(45, 45, 45)
+INITIALIZATION_PROGRESS_COLOR = pygame.Color(255, 105, 180)
+INITIALIZATION_TEXT_MARGIN_PX = 14
+INITIALIZATION_BAR_HEIGHT_PX = 10
+INITIALIZATION_BAR_MARGIN_PX = 18
+INITIALIZATION_FONT_SIZE_PX = 24
+INITIALIZATION_TERMINAL_BAR_WIDTH = 24
 
 
 @dataclass
@@ -199,16 +210,111 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> None:
-        # Renderers nmay have different display modes, so we need to initialize them all
-        for renderer in self.state.renderers:
-            window.configure_window(renderer.device_display_mode)
-            renderer.initialize(window, peripheral_manager, orientation)
-        for renderer in self.state.title_renderers:
-            window.configure_window(renderer.device_display_mode)
-            renderer.initialize(window, peripheral_manager, orientation)
-        for renderer in self.state.post_processors:
-            window.configure_window(renderer.device_display_mode)
-            renderer.initialize(window, peripheral_manager, orientation)
+        initialization_renderers = self._initialization_renderers()
+        total_renderers = len(initialization_renderers)
+        self._render_initialization_progress(window, completed=0, total=total_renderers)
+
+        # Renderers may have different display modes, so we need to initialize them all.
+        for completed, renderer in enumerate(initialization_renderers, start=1):
+            try:
+                with window.display_mode(renderer.device_display_mode):
+                    renderer.initialize(window, peripheral_manager, orientation)
+            except Exception:
+                logger.exception(
+                    "Failed to initialize renderer %s",
+                    renderer.name,
+                )
+                raise
+            self._render_initialization_progress(
+                window,
+                completed=completed,
+                total=total_renderers,
+            )
+
+    def _initialization_renderers(self) -> list[StatefulBaseRenderer]:
+        return [
+            *self.state.title_renderers,
+            *self.state.renderers,
+            *self.state.post_processors,
+        ]
+
+    def _render_initialization_progress(
+        self,
+        window: DisplayContext,
+        *,
+        completed: int,
+        total: int,
+    ) -> None:
+        if total <= 0:
+            return
+        self._log_initialization_progress(completed=completed, total=total)
+        if window.screen is None:
+            return
+        if window.screen.get_flags() & pygame.OPENGL:
+            return
+
+        screen = window.screen
+        screen_width, screen_height = screen.get_size()
+        progress_ratio = completed / total
+        bar_width = max(1, screen_width - (INITIALIZATION_BAR_MARGIN_PX * 2))
+        bar_top = screen_height - INITIALIZATION_BAR_MARGIN_PX - INITIALIZATION_BAR_HEIGHT_PX
+        progress_width = int(bar_width * progress_ratio)
+
+        screen.fill(INITIALIZATION_BACKGROUND_COLOR)
+
+        if not pygame.font.get_init():
+            pygame.font.init()
+        font = pygame.font.Font(None, INITIALIZATION_FONT_SIZE_PX)
+        label = (
+            f"Initializing app controller components ({completed} of {total})"
+        )
+        text_surface = font.render(label, True, INITIALIZATION_TEXT_COLOR)
+        text_rect = text_surface.get_rect()
+        text_rect.midbottom = (
+            screen_width // 2,
+            bar_top - INITIALIZATION_TEXT_MARGIN_PX,
+        )
+        screen.blit(text_surface, text_rect)
+
+        track_rect = pygame.Rect(
+            INITIALIZATION_BAR_MARGIN_PX,
+            bar_top,
+            bar_width,
+            INITIALIZATION_BAR_HEIGHT_PX,
+        )
+        pygame.draw.rect(screen, INITIALIZATION_TRACK_COLOR, track_rect, border_radius=4)
+
+        if progress_width > 0:
+            progress_rect = pygame.Rect(
+                INITIALIZATION_BAR_MARGIN_PX,
+                bar_top,
+                progress_width,
+                INITIALIZATION_BAR_HEIGHT_PX,
+            )
+            pygame.draw.rect(
+                screen,
+                INITIALIZATION_PROGRESS_COLOR,
+                progress_rect,
+                border_radius=4,
+            )
+
+        pygame.display.flip()
+
+    def _log_initialization_progress(self, *, completed: int, total: int) -> None:
+        progress_units = max(0, min(completed, total))
+        filled_units = int(
+            (progress_units / total) * INITIALIZATION_TERMINAL_BAR_WIDTH
+        )
+        bar = (
+            ("#" * filled_units)
+            + ("-" * (INITIALIZATION_TERMINAL_BAR_WIDTH - filled_units))
+        )
+        logger.info(
+            "Initializing app controller components (%s of %s) [%s]",
+            completed,
+            total,
+            bar,
+        )
 
     @staticmethod
     def _default_post_processors() -> list[StatefulBaseRenderer]:

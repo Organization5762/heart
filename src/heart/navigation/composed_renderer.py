@@ -32,10 +32,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             resolve_renderer_spec(renderer, self._renderer_resolver)
             for renderer in renderers
         ]
-        if any(renderer.device_display_mode == DeviceDisplayMode.OPENGL for renderer in self.renderers):
-            self.device_display_mode = DeviceDisplayMode.OPENGL
-        else:
-            self.device_display_mode = DeviceDisplayMode.FULL
+        self._sync_device_display_mode()
         self.surface_provider = surface_provider
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
@@ -69,6 +66,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             for renderer in renderers
         ]
         self.renderers.extend(resolved_renderers)
+        self._sync_device_display_mode()
         if self.is_initialized():
             for item in resolved_renderers:
                 item.initialize(
@@ -83,6 +81,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
     ) -> None:
         resolved = resolver.resolve(renderer)
         self.renderers.append(resolved)
+        self._sync_device_display_mode()
         if self.is_initialized():
             resolved.initialize(
                 self.state.window,
@@ -122,3 +121,12 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         for renderer in self.renderers:
             renderer.reset()
         super().reset()
+
+    def _sync_device_display_mode(self) -> None:
+        if any(
+            renderer.device_display_mode == DeviceDisplayMode.OPENGL
+            for renderer in self.renderers
+        ):
+            self.device_display_mode = DeviceDisplayMode.OPENGL
+            return
+        self.device_display_mode = DeviceDisplayMode.FULL

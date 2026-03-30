@@ -31,7 +31,9 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
         self._accelerometers = accelerometers
         self._rng = randomness.rng()
 
-    def observable(self) -> reactivex.Observable[LedWaveBoatState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[LedWaveBoatState]:
         window_sizes = pipe_in_background(
             self._peripheral_manager.window,
             ops.filter(lambda window: window is not None),

@@ -4,6 +4,10 @@
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
+- Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
+- `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
+- Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
+- OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
 
 ## Formatting
 
@@ -109,3 +113,59 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `uv lock`
 - `2026-03-30`: `.venv/bin/isort src tests`, `.venv/bin/ruff check --fix src tests`, `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`, and `.venv/bin/mdformat docs` after `make format` hit a sandboxed uv cache permission error.
 - `2026-03-30`: `.venv/bin/pytest` after `make test` hit the same sandboxed uv cache permission error.
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/yolisten/renderer.py tests/renderers/test_yolisten_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/yolisten/renderer.py tests/renderers/test_yolisten_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_yolisten_renderer.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/text/renderer.py tests/renderers/test_text_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/text/renderer.py tests/renderers/test_text_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_text_renderer.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/runtime/rendering/renderer_processor.py src/heart/runtime/rendering/timing.py tests/runtime/test_renderer_processor.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/runtime/rendering/renderer_processor.py src/heart/runtime/rendering/timing.py tests/runtime/test_renderer_processor.py`
+- `2026-03-30`: `.venv/bin/pytest tests/runtime/test_renderer_processor.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/spritesheet_random/renderer.py src/heart/programs/configurations/lib_2025.py tests/renderers/test_spritesheet_random_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/spritesheet_random/renderer.py src/heart/programs/configurations/lib_2025.py tests/renderers/test_spritesheet_random_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_spritesheet_random_renderer.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/navigation/game_modes.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/navigation/game_modes.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py` after preserving `FractalScene`'s OPENGL mode and nested runtime reinitialization.
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/utilities/env/rendering.py src/heart/runtime/rendering/renderer_processor.py tests/runtime/test_renderer_processor.py tests/utilities/test_env.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/utilities/env/rendering.py src/heart/runtime/rendering/renderer_processor.py tests/runtime/test_renderer_processor.py tests/utilities/test_env.py`
+- `2026-03-30`: `.venv/bin/pytest tests/runtime/test_renderer_processor.py`
+- `2026-03-30`: `.venv/bin/pytest tests/utilities/test_env.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py` after removing fractal runtime display-context reconfiguration.
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/navigation/composed_renderer.py src/heart/navigation/game_modes.py tests/navigation/test_composed_renderer_resolution.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/navigation/composed_renderer.py src/heart/navigation/game_modes.py tests/navigation/test_composed_renderer_resolution.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/pytest tests/navigation/test_composed_renderer_resolution.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/three_fractal/provider.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/provider.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/hilbert_curve/provider.py src/heart/renderers/hilbert_curve/renderer.py tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/hilbert_curve/provider.py src/heart/renderers/hilbert_curve/renderer.py tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/runtime/display_context.py src/heart/runtime/game_loop/__init__.py src/heart/navigation/game_modes.py tests/runtime/test_display_context.py tests/runtime/test_game_loop.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/runtime/display_context.py src/heart/runtime/game_loop/__init__.py src/heart/navigation/game_modes.py tests/runtime/test_display_context.py tests/runtime/test_game_loop.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `.venv/bin/pytest tests/runtime/test_display_context.py tests/runtime/test_game_loop.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make format` failed because `uv` could not write under `/Users/lampe/.local/share/uv/tools/.tmp1CLZAq` in this sandbox.
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort src/heart/renderers/hilbert_curve/provider.py tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/hilbert_curve/provider.py tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `.venv/bin/pytest tests/renderers/test_hilbert_curve_renderer.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`

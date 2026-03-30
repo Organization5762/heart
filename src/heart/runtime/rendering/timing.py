@@ -80,6 +80,12 @@ class RendererTimingTracker:
         )
         self._version += 1
 
+    def estimate_fps(self, renderer_name: str) -> float | None:
+        state = self._stats.get(renderer_name)
+        if state is None or state.average_ms <= 0.0:
+            return None
+        return 1000.0 / state.average_ms
+
     def estimate_total_ms(self, renderers: Iterable[_RendererLike]) -> tuple[float, bool]:
         total_ms = 0.0
         has_samples = False

@@ -26,6 +26,7 @@ class LifeStateProvider:
 
     def observable(
         self,
+        peripheral_manager: PeripheralManager | None = None,
     ) -> reactivex.Observable[LifeState]:
         StateOp = Callable[[LifeState], LifeState]
         life_seed = Configuration.life_random_seed()

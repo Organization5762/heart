@@ -42,7 +42,9 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
         self._peripheral_manager = peripheral_manager
         self._update_interval_ms = update_interval_ms
 
-    def observable(self) -> reactivex.Observable[LSystemState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[LSystemState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),

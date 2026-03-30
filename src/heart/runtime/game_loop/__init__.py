@@ -78,6 +78,7 @@ class GameLoop:
             screen=surface,
             clock=self.components.display.clock,
             last_render_mode=self.components.display.last_render_mode,
+            can_configure_display=False,
         )
         for renderer in post_processors:
             if not renderer.initialized:
@@ -288,9 +289,10 @@ class GameLoop:
             self.running = self.components.event_handler.handle_events()
             self._preprocess_setup()  # can't dim display each time
             renderers = self._select_renderers()
-            self.components.display.configure_window(self._resolve_display_mode(renderers))
-
-            self._one_loop(renderers=renderers)
+            with self.components.display.display_mode(
+                self._resolve_display_mode(renderers)
+            ):
+                self._one_loop(renderers=renderers)
             # self._render_pacer.pace(render_start, 20)
 
             self.components.display.clock.tick(self.max_fps)

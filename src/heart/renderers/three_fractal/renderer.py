@@ -110,6 +110,28 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.time_initialized = None
         self._auto_started = False
 
+    def is_initialized(self) -> bool:
+        if not super().is_initialized():
+            return False
+        if (
+            self.shader is None
+            or self.program is None
+            or self.clock is None
+            or self.mat is None
+            or self.prevMat is None
+            or self.window_size is None
+            or self.surface_array is None
+        ):
+            return False
+        if self.tiled_mode and (
+            self.render_size is None
+            or self.real_window_size is None
+            or getattr(self, "pixels", None) is None
+            or getattr(self, "display_texture", None) is None
+        ):
+            return False
+        return True
+
     def _init_uniforms(self):
         set_global_float(self.sphere_radius_var)
 
@@ -164,8 +186,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> FractalRuntimeState:
-        window.configure_window(DeviceDisplayMode.OPENGL)
-
         """Initialize the fractal renderer with the given window size."""
         logger.info(
             "OpenGL Version: %s",
@@ -277,6 +297,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     def render_fractal(self):
         """Render the fractal scene."""
+        assert self.program is not None
         glUseProgram(self.program)
 
         # Apply any pending uniforms
@@ -829,17 +850,38 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return min(d, dsphere) * 10.0 < 0
 
     def reset(self):
+        pygame.mouse.set_visible(True)
         self.initialized = False
         self._auto_started = False
         self.mode = "auto"
+        self.shader = None
+        self.program = None
+        self.mat = None
+        self.prevMat = None
+        self.display_texture = None
+        self.framebuffer_texture = None
+        self.pixels = None
+        self.target_surface = None
+        self.clock = None
+        self.window_size = None
+        self.real_window_size = None
+        self.render_size = None
+        self.screen_center = None
+        self.prev_mouse_pos = None
+        self.mouse_pos = None
+        self.last_frame_time = None
+        self.last_update_time = None
+        self.delta_real_time = None
+        self.surface_array = None
+        self.time_initialized = None
 
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):
     def __init__(self, provider: FractalSceneProvider) -> None:
         self.provider = provider
-        self.device_display_mode = DeviceDisplayMode.OPENGL
         self._initial_state: FractalSceneState | None = None
         super().__init__(builder=self.provider)
+        self.device_display_mode = DeviceDisplayMode.OPENGL
         self.warmup = False
         self._peripheral_manager: PeripheralManager | None = None
 
@@ -870,7 +912,21 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         orientation: Orientation,
     ) -> None:
         assert self._peripheral_manager is not None
-        self.state.runtime.real_process(
+        runtime = self.state.runtime
+        if not runtime.is_initialized():
+            runtime.initialize(
+                window=window,
+                peripheral_manager=self._peripheral_manager,
+                orientation=orientation,
+            )
+        runtime.real_process(
             window,
             orientation,
         )
+
+    def reset(self) -> None:
+        if self._state is not None:
+            self.state.runtime.reset()
+        self._initial_state = None
+        self._peripheral_manager = None
+        super().reset()

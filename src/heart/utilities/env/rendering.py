@@ -14,6 +14,7 @@ from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
                                          _env_optional_int)
 
 DEFAULT_RENDER_PLAN_REFRESH_MS = 100
+DEFAULT_RENDER_CRASH_ON_ERROR = False
 DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
 DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
 DEFAULT_RENDER_LOOP_PACING_STRATEGY = RenderLoopPacingStrategy.OFF
@@ -91,6 +92,13 @@ class RenderingConfiguration:
             "HEART_RENDER_PLAN_REFRESH_MS",
             default=DEFAULT_RENDER_PLAN_REFRESH_MS,
             minimum=0,
+        )
+
+    @classmethod
+    def render_crash_on_error(cls) -> bool:
+        return _env_flag(
+            "HEART_RENDER_CRASH_ON_ERROR",
+            default=DEFAULT_RENDER_CRASH_ON_ERROR,
         )
 
     @classmethod

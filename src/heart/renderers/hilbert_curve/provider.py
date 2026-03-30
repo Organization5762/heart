@@ -53,7 +53,9 @@ def hilbert_curve_points_numba(
 
     ymargin = ymargin or xmargin
 
-    draw_size = width - 2 * xmargin if width < height else height - 2 * ymargin
+    draw_width = width - (2 * xmargin)
+    draw_height = height - (2 * ymargin)
+    draw_size = draw_width if draw_width < draw_height else draw_height
     step = draw_size / (n - 1) if n > 1 else draw_size
 
     points = np.empty((total_points, 2), dtype=np.float64)
@@ -262,32 +264,17 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
+        *,
+        initial_state: HilbertCurveState,
     ) -> reactivex.Observable[HilbertCurveState]:
-        window_sizes = pipe_in_background(
-            peripheral_manager.window,
-            ops.filter(lambda window: window is not None),
-            ops.map(lambda window: window.get_size()),
-            ops.distinct_until_changed(),
-        )
-
-        def build_stream(
-            size: tuple[int, int],
-        ) -> reactivex.Observable[HilbertCurveState]:
-            initial_state = self.initial_state(width=size[0], height=size[1])
-            return pipe_in_background(
-                peripheral_manager.game_tick,
-                ops.filter(lambda tick: tick is not None),
-                ops.map(lambda _: time.monotonic()),
-                ops.scan(
-                    lambda state, now: self.advance(state, now=now),
-                    seed=initial_state,
-                ),
-                ops.start_with(initial_state),
-            )
-
         return pipe_in_background(
-            window_sizes,
-            ops.map(build_stream),
-            ops.switch_latest(),
+            peripheral_manager.game_tick,
+            ops.filter(lambda tick: tick is not None),
+            ops.map(lambda _: time.monotonic()),
+            ops.scan(
+                lambda state, now: self.advance(state, now=now),
+                seed=initial_state,
+            ),
+            ops.start_with(initial_state),
             ops.share(),
         )

@@ -15,14 +15,30 @@ from heart.runtime.display_context import DisplayContext
 class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
     def __init__(self, provider: HilbertCurveProvider | None = None) -> None:
         self.provider = provider or HilbertCurveProvider()
+        self._initial_state: HilbertCurveState | None = None
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.line_color = (215, 72, 148)
         super().__init__(builder=self.provider)
 
+    def initialize(
+        self,
+        window: DisplayContext,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        width, height = window.get_size()
+        self._initial_state = self.provider.initial_state(width=width, height=height)
+        super().initialize(window, peripheral_manager, orientation)
+
     def state_observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[HilbertCurveState]:
-        return self.provider.observable(peripheral_manager)
+        if self._initial_state is None:
+            raise ValueError("HilbertScene requires an initial state")
+        return self.provider.observable(
+            peripheral_manager,
+            initial_state=self._initial_state,
+        )
 
     def real_process(
         self,

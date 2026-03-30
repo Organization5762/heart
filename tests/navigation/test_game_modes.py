@@ -1,17 +1,25 @@
+from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
 import pytest
 
+from heart import DeviceDisplayMode
 from heart.navigation import GameModes, GameModeState
+from heart.navigation import game_modes as game_modes_module
 
 
 class DummyRenderer:
     def __init__(self, name: str) -> None:
         self.name = name
         self.reset_calls = 0
+        self.device_display_mode = DeviceDisplayMode.FULL
+        self.initialize_calls = 0
 
     def get_renderers(self, peripheral_manager):
         return [self]
+
+    def initialize(self, *_args, **_kwargs) -> None:
+        self.initialize_calls += 1
 
     def reset(self) -> None:
         self.reset_calls += 1
@@ -27,6 +35,13 @@ def _make_game_modes(count: int = 3) -> GameModes:
     game_modes.state.sliding_transition = None
     game_modes.state._active_mode_index = 0
     return game_modes
+
+
+def _make_window() -> Mock:
+    window = Mock()
+    window.screen = None
+    window.display_mode.side_effect = lambda _mode: nullcontext(window)
+    return window
 
 
 class TestNavigationGameModes:
@@ -181,6 +196,91 @@ class TestNavigationGameModes:
 
         assert result is game_modes.state.renderers[1], game_modes.state.renderers
         assert game_modes.state.previous_mode_index == 1
+
+    def test_initialize_registered_renderers_reports_progress(self) -> None:
+        """Verify initialization reports progress for every registered renderer so startup feedback stays accurate while scenes warm up."""
+        game_modes = GameModes()
+        title_renderer = DummyRenderer("title")
+        mode_renderer = DummyRenderer("mode")
+        post_processor = DummyRenderer("post")
+        game_modes.set_state(
+            GameModeState(
+                title_renderers=[title_renderer],
+                renderers=[mode_renderer],
+                post_processors=[post_processor],
+            )
+        )
+        window = _make_window()
+        peripheral_manager = Mock()
+        orientation = Mock()
+
+        with patch.object(game_modes, "_render_initialization_progress") as progress:
+            game_modes._initialize_registered_renderers(
+                window=window,
+                peripheral_manager=peripheral_manager,
+                orientation=orientation,
+            )
+
+        assert progress.call_args_list == [
+            ((window,), {"completed": 0, "total": 3}),
+            ((window,), {"completed": 1, "total": 3}),
+            ((window,), {"completed": 2, "total": 3}),
+            ((window,), {"completed": 3, "total": 3}),
+        ]
+        assert title_renderer.initialize_calls == 1
+        assert mode_renderer.initialize_calls == 1
+        assert post_processor.initialize_calls == 1
+
+    def test_initialize_registered_renderers_logs_failures_with_renderer_name(
+        self,
+    ) -> None:
+        """Verify initialization logs the renderer name on failure so startup crashes identify the broken scene immediately."""
+        game_modes = GameModes()
+        broken_renderer = DummyRenderer("broken")
+        broken_renderer.initialize = Mock(side_effect=RuntimeError("boom"))
+        game_modes.set_state(
+            GameModeState(
+                title_renderers=[broken_renderer],
+                renderers=[],
+                post_processors=[],
+            )
+        )
+        window = _make_window()
+        peripheral_manager = Mock()
+        orientation = Mock()
+
+        with patch.object(game_modes_module, "logger") as logger:
+            with pytest.raises(RuntimeError, match="boom"):
+                game_modes._initialize_registered_renderers(
+                    window=window,
+                    peripheral_manager=peripheral_manager,
+                    orientation=orientation,
+                )
+
+        logger.exception.assert_called_once_with(
+            "Failed to initialize renderer %s",
+            broken_renderer.name,
+        )
+
+    def test_render_initialization_progress_logs_terminal_bar(self) -> None:
+        """Verify initialization progress logs a terminal bar so startup remains observable even when the window cannot draw the progress UI."""
+        game_modes = GameModes()
+        window = Mock()
+        window.screen = None
+
+        with patch.object(game_modes_module.logger, "info") as info:
+            game_modes._render_initialization_progress(
+                window=window,
+                completed=1,
+                total=4,
+            )
+
+        info.assert_called_once_with(
+            "Initializing app controller components (%s of %s) [%s]",
+            1,
+            4,
+            "######------------------",
+        )
 
 
 if __name__ == "__main__":
