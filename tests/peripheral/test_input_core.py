@@ -6,18 +6,23 @@ import pygame
 import reactivex
 from reactivex.subject import Subject
 
-from heart.peripheral.core.input import (AccelerometerDebugProfile, FrameTick,
-                                         FrameTickController, GamepadAxis,
-                                         GamepadButton, GamepadController,
-                                         GamepadDpadValue, GamepadSnapshot,
-                                         InputDebugStage, InputDebugTap,
-                                         KeyboardController, KeyboardSnapshot,
-                                         MandelbrotCommandKind,
+from heart.peripheral.core.input import (AccelerometerDebugProfile,
+                                         BrowseIntent, CyclePaletteCommand,
+                                         FrameTick, FrameTickController,
+                                         GamepadAxis, GamepadButton,
+                                         GamepadButtonTapEvent,
+                                         GamepadController, GamepadDpadValue,
+                                         GamepadSnapshot, InputDebugStage,
+                                         InputDebugTap, KeyboardController,
+                                         KeyboardSnapshot,
                                          MandelbrotControlProfile,
-                                         NavigationIntentKind,
-                                         NavigationProfile)
+                                         NavigationProfile,
+                                         SetOrientationCommand,
+                                         ToggleDebugCommand)
 from heart.peripheral.core.input.debug import instrument_input_stream
-from heart.peripheral.keyboard import KeyboardAction, KeyboardEvent, KeyState
+from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
+                                       KeyPressedEvent, KeyReleasedEvent,
+                                       KeyState)
 from heart.peripheral.sensor import Acceleration
 from heart.peripheral.switch import SwitchState
 
@@ -155,10 +160,10 @@ class TestKeyboardController:
         )
         snapshots.on_next(KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=100.0))
 
-        assert [event.action for event in events] == [
-            KeyboardAction.PRESSED,
-            KeyboardAction.HELD,
-            KeyboardAction.RELEASED,
+        assert [type(event) for event in events] == [
+            KeyPressedEvent,
+            KeyHeldEvent,
+            KeyReleasedEvent,
         ]
         assert states[0] == KeyState()
         assert states[-1] == KeyState(pressed=False, held=False, last_change_ms=100.0)
@@ -180,7 +185,7 @@ class TestGamepadController:
         tap = InputDebugTap()
         controller = GamepadController(manager=object(), debug_tap=tap)
         snapshots: Subject[GamepadSnapshot] = Subject()
-        tapped: list[GamepadButton] = []
+        tapped: list[GamepadButtonTapEvent] = []
         sticks: list[tuple[float, float]] = []
         monkeypatch.setattr(controller, "snapshot_stream", lambda: snapshots)
 
@@ -204,7 +209,8 @@ class TestGamepadController:
             )
         )
 
-        assert tapped == [GamepadButton.SOUTH]
+        assert [event.button for event in tapped] == [GamepadButton.SOUTH]
+        assert tapped[0].timestamp_monotonic == 1.0
         assert sticks[-1] == (0.8, -0.4)
         assert any(
             envelope.stream_name == "gamepad.stick.left"
@@ -238,12 +244,18 @@ class TestNavigationProfile:
         alternate: list[str] = []
 
         profile.intents.subscribe(
-            lambda intent: intents.append((intent.kind.value, intent.source, intent.step))
+            lambda intent: intents.append(
+                (
+                    type(intent).__name__,
+                    intent.source,
+                    intent.step if isinstance(intent, BrowseIntent) else 0,
+                )
+            )
         )
         profile.browse_delta.subscribe(browse.append)
-        profile.activate.subscribe(lambda intent: activate.append(intent.kind.value))
+        profile.activate.subscribe(lambda intent: activate.append(type(intent).__name__))
         profile.alternate_activate.subscribe(
-            lambda intent: alternate.append(intent.kind.value)
+            lambda intent: alternate.append(type(intent).__name__)
         )
 
         keyboard_snapshots.on_next(_keyboard_snapshot(timestamp_ms=0.0))
@@ -278,16 +290,19 @@ class TestNavigationProfile:
         )
 
         assert browse == [-1, 1, 1]
-        assert activate == ["activate", "activate"]
-        assert alternate == ["alternate_activate", "alternate_activate"]
+        assert activate == ["ActivateIntent", "ActivateIntent"]
+        assert alternate == [
+            "AlternateActivateIntent",
+            "AlternateActivateIntent",
+        ]
         assert intents == [
-            (NavigationIntentKind.BROWSE.value, "keyboard.left", -1),
-            (NavigationIntentKind.BROWSE.value, "keyboard.right", 1),
-            (NavigationIntentKind.ACTIVATE.value, "keyboard.down", 0),
-            (NavigationIntentKind.ALTERNATE_ACTIVATE.value, "keyboard.up", 0),
-            (NavigationIntentKind.BROWSE.value, "gamepad.dpad", 1),
-            (NavigationIntentKind.ACTIVATE.value, "gamepad.south", 0),
-            (NavigationIntentKind.ALTERNATE_ACTIVATE.value, "gamepad.north", 0),
+            ("BrowseIntent", "keyboard.left", -1),
+            ("BrowseIntent", "keyboard.right", 1),
+            ("ActivateIntent", "keyboard.down", 0),
+            ("AlternateActivateIntent", "keyboard.up", 0),
+            ("BrowseIntent", "gamepad.dpad", 1),
+            ("ActivateIntent", "gamepad.south", 0),
+            ("AlternateActivateIntent", "gamepad.north", 0),
         ]
         assert any(
             envelope.stream_name == "navigation.intent"
@@ -309,7 +324,13 @@ class TestNavigationProfile:
         intents: list[tuple[str, str, int]] = []
 
         profile.intents.subscribe(
-            lambda intent: intents.append((intent.kind.value, intent.source, intent.step))
+            lambda intent: intents.append(
+                (
+                    type(intent).__name__,
+                    intent.source,
+                    intent.step if isinstance(intent, BrowseIntent) else 0,
+                )
+            )
         )
 
         switch_updates.on_next(SwitchState(0, 0, 0, 0, 0))
@@ -318,13 +339,9 @@ class TestNavigationProfile:
         switch_updates.on_next(SwitchState(2, 1, 1, 0, 0))
 
         assert intents == [
-            (NavigationIntentKind.BROWSE.value, "switch.rotary", 2),
-            (NavigationIntentKind.ACTIVATE.value, "switch.button", 0),
-            (
-                NavigationIntentKind.ALTERNATE_ACTIVATE.value,
-                "switch.long_button",
-                0,
-            ),
+            ("BrowseIntent", "switch.rotary", 2),
+            ("ActivateIntent", "switch.button", 0),
+            ("AlternateActivateIntent", "switch.long_button", 0),
         ]
 
 
@@ -364,11 +381,11 @@ class TestMandelbrotControlProfile:
         profile.command_events.subscribe(
             lambda command: commands.append(
                 (
-                    command.kind.value,
+                    type(command).__name__,
                     command.source,
-                    command.orientation_kind,
-                    command.palette_delta,
-                    )
+                    getattr(command, "orientation_kind", None),
+                    getattr(command, "palette_delta", 0),
+                )
                 )
         )
 
@@ -432,14 +449,14 @@ class TestMandelbrotControlProfile:
 
         assert motion_states[-1] == (1.0, 0.5, True, True)
         assert commands == [
-            (MandelbrotCommandKind.TOGGLE_DEBUG.value, "keyboard.i", None, 0),
+            (ToggleDebugCommand.__name__, "keyboard.i", None, 0),
             (
-                MandelbrotCommandKind.SET_ORIENTATION.value,
+                SetOrientationCommand.__name__,
                 "keyboard.0",
                 "rectangle",
                 0,
             ),
-            (MandelbrotCommandKind.CYCLE_PALETTE.value, "gamepad.north", None, 1),
+            (CyclePaletteCommand.__name__, "gamepad.north", None, 1),
         ]
         assert any(
             envelope.stream_name == "mandelbrot.motion_state"

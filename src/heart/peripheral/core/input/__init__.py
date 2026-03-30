@@ -13,6 +13,8 @@ from heart.peripheral.core.input.frame import \
 from heart.peripheral.core.input.gamepad import GamepadAxis as GamepadAxis
 from heart.peripheral.core.input.gamepad import GamepadButton as GamepadButton
 from heart.peripheral.core.input.gamepad import \
+    GamepadButtonTapEvent as GamepadButtonTapEvent
+from heart.peripheral.core.input.gamepad import \
     GamepadController as GamepadController
 from heart.peripheral.core.input.gamepad import \
     GamepadDpadValue as GamepadDpadValue
@@ -25,18 +27,41 @@ from heart.peripheral.core.input.keyboard import \
 from heart.peripheral.core.input.keyboard import \
     KeyboardSnapshot as KeyboardSnapshot
 from heart.peripheral.core.input.profiles.mandelbrot import \
-    MandelbrotCommand as MandelbrotCommand
+    CyclePaletteCommand as CyclePaletteCommand
 from heart.peripheral.core.input.profiles.mandelbrot import \
-    MandelbrotCommandKind as MandelbrotCommandKind
+    MandelbrotCommand as MandelbrotCommand
 from heart.peripheral.core.input.profiles.mandelbrot import \
     MandelbrotControlProfile as MandelbrotControlProfile
 from heart.peripheral.core.input.profiles.mandelbrot import \
     MandelbrotControlState as MandelbrotControlState
 from heart.peripheral.core.input.profiles.mandelbrot import \
     MandelbrotMotionState as MandelbrotMotionState
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    NextViewModeCommand as NextViewModeCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    PreviousViewModeCommand as PreviousViewModeCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    SetOrientationCommand as SetOrientationCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    ToggleAutoModeCommand as ToggleAutoModeCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    ToggleDebugCommand as ToggleDebugCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    ToggleFpsCommand as ToggleFpsCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    ToggleOrientationCommand as ToggleOrientationCommand
+from heart.peripheral.core.input.profiles.navigation import \
+    ActivateIntent as ActivateIntent
+from heart.peripheral.core.input.profiles.navigation import \
+    AlternateActivateIntent as AlternateActivateIntent
+from heart.peripheral.core.input.profiles.navigation import \
+    BrowseIntent as BrowseIntent
 from heart.peripheral.core.input.profiles.navigation import \
     NavigationIntent as NavigationIntent
 from heart.peripheral.core.input.profiles.navigation import \
-    NavigationIntentKind as NavigationIntentKind
-from heart.peripheral.core.input.profiles.navigation import \
     NavigationProfile as NavigationProfile
+from heart.peripheral.keyboard import KeyboardEvent as KeyboardEvent
+from heart.peripheral.keyboard import KeyHeldEvent as KeyHeldEvent
+from heart.peripheral.keyboard import KeyPressedEvent as KeyPressedEvent
+from heart.peripheral.keyboard import KeyReleasedEvent as KeyReleasedEvent
+from heart.peripheral.keyboard import KeyState as KeyState

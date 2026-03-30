@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cached_property
 
 import pygame
@@ -21,17 +20,27 @@ from heart.utilities.reactivex_threads import pipe_in_background
 NAVIGATION_STICK_THRESHOLD = 0.6
 
 
-class NavigationIntentKind(StrEnum):
-    BROWSE = "browse"
-    ACTIVATE = "activate"
-    ALTERNATE_ACTIVATE = "alternate_activate"
+@dataclass(frozen=True, slots=True)
+class _NavigationIntent:
+    source: str
 
 
 @dataclass(frozen=True, slots=True)
-class NavigationIntent:
-    kind: NavigationIntentKind
-    source: str
-    step: int = 0
+class BrowseIntent(_NavigationIntent):
+    step: int
+
+
+@dataclass(frozen=True, slots=True)
+class ActivateIntent(_NavigationIntent):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class AlternateActivateIntent(_NavigationIntent):
+    pass
+
+
+NavigationIntent = BrowseIntent | ActivateIntent | AlternateActivateIntent
 
 
 class NavigationProfile:
@@ -53,8 +62,7 @@ class NavigationProfile:
         keyboard_left = pipe_in_background(
             self._keyboard.key_pressed(pygame.K_LEFT),
             ops.map(
-                lambda _event: NavigationIntent(
-                    kind=NavigationIntentKind.BROWSE,
+                lambda _event: BrowseIntent(
                     source="keyboard.left",
                     step=-1,
                 )
@@ -63,8 +71,7 @@ class NavigationProfile:
         keyboard_right = pipe_in_background(
             self._keyboard.key_pressed(pygame.K_RIGHT),
             ops.map(
-                lambda _event: NavigationIntent(
-                    kind=NavigationIntentKind.BROWSE,
+                lambda _event: BrowseIntent(
                     source="keyboard.right",
                     step=1,
                 )
@@ -73,19 +80,13 @@ class NavigationProfile:
         keyboard_down = pipe_in_background(
             self._keyboard.key_pressed(pygame.K_DOWN),
             ops.map(
-                lambda _event: NavigationIntent(
-                    kind=NavigationIntentKind.ACTIVATE,
-                    source="keyboard.down",
-                )
+                lambda _event: ActivateIntent(source="keyboard.down")
             ),
         )
         keyboard_up = pipe_in_background(
             self._keyboard.key_pressed(pygame.K_UP),
             ops.map(
-                lambda _event: NavigationIntent(
-                    kind=NavigationIntentKind.ALTERNATE_ACTIVATE,
-                    source="keyboard.up",
-                )
+                lambda _event: AlternateActivateIntent(source="keyboard.up")
             ),
         )
         dpad_events = pipe_in_background(
@@ -93,8 +94,7 @@ class NavigationProfile:
             ops.pairwise(),
             ops.filter(lambda latest: latest[0].x != latest[1].x and latest[1].x != 0),
             ops.map(
-                lambda latest: NavigationIntent(
-                    kind=NavigationIntentKind.BROWSE,
+                lambda latest: BrowseIntent(
                     source="gamepad.dpad",
                     step=latest[1].x,
                 )
@@ -113,8 +113,7 @@ class NavigationProfile:
             ops.distinct_until_changed(),
             ops.filter(lambda direction: direction != 0),
             ops.map(
-                lambda direction: NavigationIntent(
-                    kind=NavigationIntentKind.BROWSE,
+                lambda direction: BrowseIntent(
                     source="gamepad.left_stick",
                     step=direction,
                 )
@@ -123,19 +122,13 @@ class NavigationProfile:
         button_south = pipe_in_background(
             self._gamepad.button_tapped(GamepadButton.SOUTH),
             ops.map(
-                lambda _button: NavigationIntent(
-                    kind=NavigationIntentKind.ACTIVATE,
-                    source="gamepad.south",
-                )
+                lambda _button: ActivateIntent(source="gamepad.south")
             ),
         )
         button_north = pipe_in_background(
             self._gamepad.button_tapped(GamepadButton.NORTH),
             ops.map(
-                lambda _button: NavigationIntent(
-                    kind=NavigationIntentKind.ALTERNATE_ACTIVATE,
-                    source="gamepad.north",
-                )
+                lambda _button: AlternateActivateIntent(source="gamepad.north")
             ),
         )
         switch_intents = self._switch_intents()
@@ -174,27 +167,27 @@ class NavigationProfile:
         )
 
     @cached_property
-    def browse(self) -> reactivex.Observable[NavigationIntent]:
+    def browse(self) -> reactivex.Observable[BrowseIntent]:
         return pipe_in_background(
             self.intents,
-            ops.filter(lambda intent: intent.kind is NavigationIntentKind.BROWSE),
+            ops.filter(lambda intent: isinstance(intent, BrowseIntent)),
+            ops.map(lambda intent: intent),
         )
 
     @cached_property
-    def activate(self) -> reactivex.Observable[NavigationIntent]:
+    def activate(self) -> reactivex.Observable[ActivateIntent]:
         return pipe_in_background(
             self.intents,
-            ops.filter(lambda intent: intent.kind is NavigationIntentKind.ACTIVATE),
+            ops.filter(lambda intent: isinstance(intent, ActivateIntent)),
+            ops.map(lambda intent: intent),
         )
 
     @cached_property
-    def alternate_activate(self) -> reactivex.Observable[NavigationIntent]:
+    def alternate_activate(self) -> reactivex.Observable[AlternateActivateIntent]:
         return pipe_in_background(
             self.intents,
-            ops.filter(
-                lambda intent: intent.kind
-                is NavigationIntentKind.ALTERNATE_ACTIVATE
-            ),
+            ops.filter(lambda intent: isinstance(intent, AlternateActivateIntent)),
+            ops.map(lambda intent: intent),
         )
 
     @cached_property
@@ -218,7 +211,7 @@ class NavigationProfile:
     def _switch_browse_intents(
         self,
         switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[NavigationIntent]:
+    ) -> reactivex.Observable[BrowseIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
@@ -227,8 +220,7 @@ class NavigationProfile:
             ),
             ops.filter(lambda delta: delta != 0),
             ops.map(
-                lambda delta: NavigationIntent(
-                    kind=NavigationIntentKind.BROWSE,
+                lambda delta: BrowseIntent(
                     source="switch.rotary",
                     step=delta,
                 )
@@ -238,7 +230,7 @@ class NavigationProfile:
     def _switch_activate_intents(
         self,
         switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[NavigationIntent]:
+    ) -> reactivex.Observable[ActivateIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
@@ -246,10 +238,7 @@ class NavigationProfile:
             ops.filter(lambda delta: delta > 0),
             ops.flat_map(
                 lambda delta: reactivex.from_iterable(
-                    NavigationIntent(
-                        kind=NavigationIntentKind.ACTIVATE,
-                        source="switch.button",
-                    )
+                    ActivateIntent(source="switch.button")
                     for _ in range(delta)
                 )
             ),
@@ -258,7 +247,7 @@ class NavigationProfile:
     def _switch_alternate_activate_intents(
         self,
         switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[NavigationIntent]:
+    ) -> reactivex.Observable[AlternateActivateIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
@@ -269,10 +258,7 @@ class NavigationProfile:
             ops.filter(lambda delta: delta > 0),
             ops.flat_map(
                 lambda delta: reactivex.from_iterable(
-                    NavigationIntent(
-                        kind=NavigationIntentKind.ALTERNATE_ACTIVATE,
-                        source="switch.long_button",
-                    )
+                    AlternateActivateIntent(source="switch.long_button")
                     for _ in range(delta)
                 )
             ),

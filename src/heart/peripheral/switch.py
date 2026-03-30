@@ -17,8 +17,8 @@ from reactivex.disposable import Disposable
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.keyboard import (KeyboardAction, KeyboardEvent,
-                                       KeyboardKey)
+from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
+                                       KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import (blocking_io_scheduler,
@@ -88,7 +88,7 @@ class FakeSwitch(BaseSwitch):
             return envelope.data
 
         def _is_pressed(event: KeyboardEvent) -> bool:
-            return event.action is KeyboardAction.PRESSED
+            return isinstance(event, KeyPressedEvent)
 
         result = pipe_in_background(
             KeyboardKey.get(key).observe,

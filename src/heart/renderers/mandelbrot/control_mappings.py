@@ -1,10 +1,16 @@
 from collections import deque
 
 from heart.device import Cube, Rectangle
-from heart.peripheral.core.input import (MandelbrotCommand,
-                                         MandelbrotCommandKind,
+from heart.peripheral.core.input import (CyclePaletteCommand,
+                                         MandelbrotCommand,
                                          MandelbrotControlProfile,
-                                         MandelbrotMotionState)
+                                         MandelbrotMotionState,
+                                         NextViewModeCommand,
+                                         PreviousViewModeCommand,
+                                         SetOrientationCommand,
+                                         ToggleAutoModeCommand,
+                                         ToggleDebugCommand, ToggleFpsCommand,
+                                         ToggleOrientationCommand)
 from heart.renderers.mandelbrot.controls import SceneControls
 
 
@@ -51,27 +57,27 @@ class KeyboardControls:
             self._apply_command(self._pending_commands.popleft())
 
     def _apply_command(self, command: MandelbrotCommand) -> None:
-        match command.kind:
-            case MandelbrotCommandKind.NEXT_VIEW_MODE:
+        match command:
+            case NextViewModeCommand():
                 self.scene_controls._increment_view_mode()
-            case MandelbrotCommandKind.PREVIOUS_VIEW_MODE:
+            case PreviousViewModeCommand():
                 self.scene_controls._decrement_view_mode()
-            case MandelbrotCommandKind.TOGGLE_DEBUG:
+            case ToggleDebugCommand():
                 self.scene_controls._toggle_debug()
-            case MandelbrotCommandKind.TOGGLE_FPS:
+            case ToggleFpsCommand():
                 self.scene_controls._toggle_fps()
-            case MandelbrotCommandKind.SET_ORIENTATION:
+            case SetOrientationCommand():
                 self._apply_orientation(command.orientation_kind)
-            case MandelbrotCommandKind.TOGGLE_ORIENTATION:
+            case ToggleOrientationCommand():
                 self._toggle_orientation()
-            case MandelbrotCommandKind.TOGGLE_AUTO_MODE:
+            case ToggleAutoModeCommand():
                 if self.scene_controls.state.mode == "auto":
                     self.scene_controls.state.reset()
                     self.scene_controls.state.set_mode_free()
                 else:
                     self.scene_controls.state.reset()
                     self.scene_controls.state.set_mode_auto()
-            case MandelbrotCommandKind.CYCLE_PALETTE:
+            case CyclePaletteCommand():
                 self.scene_controls.cycle_palette(forward=command.palette_delta >= 0)
 
     def _apply_orientation(self, orientation_kind: str | None) -> None:

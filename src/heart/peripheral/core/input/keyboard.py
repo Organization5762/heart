@@ -12,7 +12,9 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
-from heart.peripheral.keyboard import KeyboardAction, KeyboardEvent, KeyState
+from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
+                                       KeyPressedEvent, KeyReleasedEvent,
+                                       KeyState)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import (input_scheduler,
@@ -98,19 +100,17 @@ class KeyboardController:
             if pressed:
                 if not current.pressed:
                     updated = KeyState(pressed=True, held=False, last_change_ms=now)
-                    event = KeyboardEvent(
+                    event = KeyPressedEvent(
                         key=key,
                         key_name=key_name,
-                        action=KeyboardAction.PRESSED,
                         state=updated,
                         timestamp_ms=now,
                     )
                 elif not current.held:
                     updated = KeyState(pressed=True, held=True, last_change_ms=now)
-                    event = KeyboardEvent(
+                    event = KeyHeldEvent(
                         key=key,
                         key_name=key_name,
-                        action=KeyboardAction.HELD,
                         state=updated,
                         timestamp_ms=now,
                     )
@@ -121,10 +121,9 @@ class KeyboardController:
                     return _KeyboardTracker(state=current, event=None)
                 if current.pressed or current.held:
                     updated = KeyState(pressed=False, held=False, last_change_ms=now)
-                    event = KeyboardEvent(
+                    event = KeyReleasedEvent(
                         key=key,
                         key_name=key_name,
-                        action=KeyboardAction.RELEASED,
                         state=updated,
                         timestamp_ms=now,
                     )
@@ -150,26 +149,26 @@ class KeyboardController:
         )
 
     @cache
-    def key_pressed(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+    def key_pressed(self, key: int) -> reactivex.Observable[KeyPressedEvent]:
         return self._key_view(
             key,
-            action=KeyboardAction.PRESSED,
+            event_type=KeyPressedEvent,
             suffix="pressed",
         )
 
     @cache
-    def key_released(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+    def key_released(self, key: int) -> reactivex.Observable[KeyReleasedEvent]:
         return self._key_view(
             key,
-            action=KeyboardAction.RELEASED,
+            event_type=KeyReleasedEvent,
             suffix="released",
         )
 
     @cache
-    def key_held(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+    def key_held(self, key: int) -> reactivex.Observable[KeyHeldEvent]:
         return self._key_view(
             key,
-            action=KeyboardAction.HELD,
+            event_type=KeyHeldEvent,
             suffix="held",
         )
 
@@ -195,13 +194,14 @@ class KeyboardController:
         self,
         key: int,
         *,
-        action: KeyboardAction,
+        event_type: type[KeyPressedEvent] | type[KeyReleasedEvent] | type[KeyHeldEvent],
         suffix: str,
-    ) -> reactivex.Observable[KeyboardEvent]:
+    ) -> reactivex.Observable[KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent]:
         key_name = pygame.key.name(key)
         stream = pipe_in_background(
             self.key_events(key),
-            ops.filter(lambda event: event.action is action),
+            ops.filter(lambda event: isinstance(event, event_type)),
+            ops.map(lambda event: cast(KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent, event)),
         )
         return instrument_input_stream(
             stream,

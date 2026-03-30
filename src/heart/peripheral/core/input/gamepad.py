@@ -68,6 +68,12 @@ class GamepadDpadValue:
 
 
 @dataclass(frozen=True, slots=True)
+class GamepadButtonTapEvent:
+    button: GamepadButton
+    timestamp_monotonic: float
+
+
+@dataclass(frozen=True, slots=True)
 class GamepadSnapshot:
     connected: bool
     identifier: str | None
@@ -138,11 +144,19 @@ class GamepadController:
         )
 
     @cache
-    def button_tapped(self, button: GamepadButton) -> reactivex.Observable[GamepadButton]:
+    def button_tapped(
+        self,
+        button: GamepadButton,
+    ) -> reactivex.Observable[GamepadButtonTapEvent]:
         stream = pipe_in_background(
             self.snapshot_stream(),
             ops.filter(lambda snapshot: snapshot.button_tapped(button)),
-            ops.map(lambda _: button),
+            ops.map(
+                lambda snapshot: GamepadButtonTapEvent(
+                    button=button,
+                    timestamp_monotonic=snapshot.timestamp_monotonic,
+                )
+            ),
         )
         return instrument_input_stream(
             stream,

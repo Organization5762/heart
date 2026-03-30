@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cached_property
 
 import pygame
@@ -73,23 +72,61 @@ class MandelbrotControlState:
     palette_delta: int = 0
 
 
-class MandelbrotCommandKind(StrEnum):
-    NEXT_VIEW_MODE = "next_view_mode"
-    PREVIOUS_VIEW_MODE = "previous_view_mode"
-    TOGGLE_DEBUG = "toggle_debug"
-    TOGGLE_FPS = "toggle_fps"
-    SET_ORIENTATION = "set_orientation"
-    TOGGLE_ORIENTATION = "toggle_orientation"
-    TOGGLE_AUTO_MODE = "toggle_auto_mode"
-    CYCLE_PALETTE = "cycle_palette"
+@dataclass(frozen=True, slots=True)
+class _MandelbrotCommand:
+    source: str
 
 
 @dataclass(frozen=True, slots=True)
-class MandelbrotCommand:
-    kind: MandelbrotCommandKind
-    source: str
-    orientation_kind: str | None = None
-    palette_delta: int = 0
+class NextViewModeCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PreviousViewModeCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleDebugCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleFpsCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class SetOrientationCommand(_MandelbrotCommand):
+    orientation_kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleOrientationCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ToggleAutoModeCommand(_MandelbrotCommand):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class CyclePaletteCommand(_MandelbrotCommand):
+    palette_delta: int
+
+
+MandelbrotCommand = (
+    NextViewModeCommand
+    | PreviousViewModeCommand
+    | ToggleDebugCommand
+    | ToggleFpsCommand
+    | SetOrientationCommand
+    | ToggleOrientationCommand
+    | ToggleAutoModeCommand
+    | CyclePaletteCommand
+)
 
 
 class MandelbrotControlProfile:
@@ -188,40 +225,35 @@ class MandelbrotControlProfile:
         return reactivex.merge(
             self._keyboard.key_pressed(pygame.K_LEFTBRACKET).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.PREVIOUS_VIEW_MODE,
+                    lambda _event: PreviousViewModeCommand(
                         source="keyboard.left_bracket",
                     )
                 )
             ),
             self._keyboard.key_pressed(pygame.K_RIGHTBRACKET).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.NEXT_VIEW_MODE,
+                    lambda _event: NextViewModeCommand(
                         source="keyboard.right_bracket",
                     )
                 )
             ),
             self._keyboard.key_pressed(pygame.K_i).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.TOGGLE_DEBUG,
+                    lambda _event: ToggleDebugCommand(
                         source="keyboard.i",
                     )
                 )
             ),
             self._keyboard.key_pressed(pygame.K_p).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.TOGGLE_FPS,
+                    lambda _event: ToggleFpsCommand(
                         source="keyboard.p",
                     )
                 )
             ),
             self._keyboard.key_pressed(pygame.K_0).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.SET_ORIENTATION,
+                    lambda _event: SetOrientationCommand(
                         source="keyboard.0",
                         orientation_kind="rectangle",
                     )
@@ -229,8 +261,7 @@ class MandelbrotControlProfile:
             ),
             self._keyboard.key_pressed(pygame.K_9).pipe(
                 ops.map(
-                    lambda _event: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.SET_ORIENTATION,
+                    lambda _event: SetOrientationCommand(
                         source="keyboard.9",
                         orientation_kind="cube",
                     )
@@ -242,32 +273,28 @@ class MandelbrotControlProfile:
         return reactivex.merge(
             self._gamepad.button_tapped(GamepadButton.ZR).pipe(
                 ops.map(
-                    lambda _button: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.NEXT_VIEW_MODE,
+                    lambda _button: NextViewModeCommand(
                         source="gamepad.zr",
                     )
                 )
             ),
             self._gamepad.button_tapped(GamepadButton.ZL).pipe(
                 ops.map(
-                    lambda _button: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.PREVIOUS_VIEW_MODE,
+                    lambda _button: PreviousViewModeCommand(
                         source="gamepad.zl",
                     )
                 )
             ),
             self._gamepad.button_tapped(GamepadButton.HOME).pipe(
                 ops.map(
-                    lambda _button: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.TOGGLE_AUTO_MODE,
+                    lambda _button: ToggleAutoModeCommand(
                         source="gamepad.home",
                     )
                 )
             ),
             self._gamepad.button_tapped(GamepadButton.NORTH).pipe(
                 ops.map(
-                    lambda _button: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.CYCLE_PALETTE,
+                    lambda _button: CyclePaletteCommand(
                         source="gamepad.north",
                         palette_delta=1,
                     )
@@ -275,8 +302,7 @@ class MandelbrotControlProfile:
             ),
             self._gamepad.button_tapped(GamepadButton.WEST).pipe(
                 ops.map(
-                    lambda _button: MandelbrotCommand(
-                        kind=MandelbrotCommandKind.CYCLE_PALETTE,
+                    lambda _button: CyclePaletteCommand(
                         source="gamepad.west",
                         palette_delta=-1,
                     )
@@ -285,18 +311,12 @@ class MandelbrotControlProfile:
             self._combo_command(
                 GamepadButton.HOME,
                 GamepadButton.PLUS,
-                MandelbrotCommand(
-                    kind=MandelbrotCommandKind.TOGGLE_ORIENTATION,
-                    source="gamepad.home_plus",
-                ),
+                ToggleOrientationCommand(source="gamepad.home_plus"),
             ),
             self._combo_command(
                 GamepadButton.HOME,
                 GamepadButton.MINUS,
-                MandelbrotCommand(
-                    kind=MandelbrotCommandKind.TOGGLE_FPS,
-                    source="gamepad.home_minus",
-                ),
+                ToggleFpsCommand(source="gamepad.home_minus"),
             ),
         )
 
@@ -322,7 +342,7 @@ class MandelbrotControlProfile:
         state: MandelbrotEdgeState,
         command: MandelbrotCommand,
     ) -> MandelbrotEdgeState:
-        if command.kind is MandelbrotCommandKind.NEXT_VIEW_MODE:
+        if isinstance(command, NextViewModeCommand):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision + 1,
                 previous_view_mode_revision=state.previous_view_mode_revision,
@@ -334,7 +354,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
-        if command.kind is MandelbrotCommandKind.PREVIOUS_VIEW_MODE:
+        if isinstance(command, PreviousViewModeCommand):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision,
                 previous_view_mode_revision=state.previous_view_mode_revision + 1,
@@ -346,7 +366,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
-        if command.kind is MandelbrotCommandKind.TOGGLE_DEBUG:
+        if isinstance(command, ToggleDebugCommand):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision,
                 previous_view_mode_revision=state.previous_view_mode_revision,
@@ -358,7 +378,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
-        if command.kind is MandelbrotCommandKind.TOGGLE_FPS:
+        if isinstance(command, ToggleFpsCommand):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision,
                 previous_view_mode_revision=state.previous_view_mode_revision,
@@ -370,10 +390,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
-        if command.kind in (
-            MandelbrotCommandKind.SET_ORIENTATION,
-            MandelbrotCommandKind.TOGGLE_ORIENTATION,
-        ):
+        if isinstance(command, (SetOrientationCommand, ToggleOrientationCommand)):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision,
                 previous_view_mode_revision=state.previous_view_mode_revision,
@@ -385,7 +402,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
-        if command.kind is MandelbrotCommandKind.TOGGLE_AUTO_MODE:
+        if isinstance(command, ToggleAutoModeCommand):
             return MandelbrotEdgeState(
                 next_view_mode_revision=state.next_view_mode_revision,
                 previous_view_mode_revision=state.previous_view_mode_revision,
@@ -397,6 +414,7 @@ class MandelbrotControlProfile:
                 palette_revision=state.palette_revision,
                 palette_delta=state.palette_delta,
             )
+        assert isinstance(command, CyclePaletteCommand)
         return MandelbrotEdgeState(
             next_view_mode_revision=state.next_view_mode_revision,
             previous_view_mode_revision=state.previous_view_mode_revision,
