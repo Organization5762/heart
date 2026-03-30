@@ -47,10 +47,11 @@ dependencies = [
     "PyOpenGL>=3.1.0",
     "pygame==2.6.1",
     "pyserial",
-    "reactivex",
+    "reactivex==5.0.0a2",
     "requests",
     "scipy",
     "sounddevice",
+    "toml",
     "tqdm",
     "typer-slim",
     "websockets>=15.0.1",
@@ -66,6 +67,7 @@ dev = [
     "types-requests",
     "types-toml",
 ]
+native = ["heart-rust"]
 
 [build-system]
 requires = ["uv_build>=0.9.6,<0.10.0"]
@@ -74,6 +76,7 @@ build-backend = "uv_build"
 [tool.uv.sources]
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
+heart-rust = { path = "./rust/heart_rust" }
 
 [tool.setuptools.package-data]
 heart = ["*.png"]
