@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
@@ -25,25 +24,25 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[CombinedBpmScreenState]:
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = CombinedBpmScreenState()
 
         def advance_state(
-            state: CombinedBpmScreenState, clock: Clock
+            state: CombinedBpmScreenState,
+            frame_tick: object,
         ) -> CombinedBpmScreenState:
-            return self._advance_state(state=state, elapsed_ms=clock.get_time())
+            return self._advance_state(
+                state=state,
+                elapsed_ms=int(frame_tick.delta_ms),
+            )
 
         return (
             pipe_in_background(
-                peripheral_manager.game_tick,
-                ops.with_latest_from(clocks),
-                ops.map(lambda latest: latest[1]),
+                frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

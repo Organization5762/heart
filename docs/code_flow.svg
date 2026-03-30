@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1408" height="742" viewBox="0 0 1408 742">
+<svg xmlns="http://www.w3.org/2000/svg" width="1408" height="1070" viewBox="0 0 1408 1070">
   <defs>
     <style>text { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; }
 .column-title { font-size: 16px; font-weight: 600; }
@@ -18,7 +18,7 @@
     <text x="534.00" y="74.00" text-anchor="middle" class="column-title">GameLoop Orchestration</text>
   </g>
   <g>
-    <rect x="744.00" y="48.00" width="260.00" height="564.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <rect x="744.00" y="48.00" width="260.00" height="974.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
     <text x="874.00" y="74.00" text-anchor="middle" class="column-title">Peripheral &amp; Signal Services</text>
   </g>
   <g>
@@ -43,16 +43,27 @@
     <path d="M 1214.00 338.00 C 1214.00 347.00 1214.00 347.00 1214.00 356.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 420.00 C 1214.00 429.00 1214.00 429.00 1214.00 438.00" marker-end="url(#arrowhead)" />
     <path d="M 646.00 142.00 C 686.00 142.00 722.00 142.00 762.00 142.00" marker-end="url(#arrowhead)" />
-    <path d="M 874.00 174.00 C 874.00 183.00 874.00 183.00 874.00 192.00" marker-end="url(#arrowhead)" />
-    <path d="M 874.00 174.00 C 874.00 224.00 874.00 224.00 874.00 274.00" marker-end="url(#arrowhead)" />
-    <path d="M 874.00 174.00 C 874.00 265.00 874.00 265.00 874.00 356.00" marker-end="url(#arrowhead)" />
-    <path d="M 874.00 174.00 C 874.00 306.00 874.00 306.00 874.00 438.00" marker-end="url(#arrowhead)" />
-    <path d="M 874.00 174.00 C 874.00 347.00 874.00 347.00 874.00 520.00" marker-end="url(#arrowhead)" />
-    <path d="M 762.00 224.00 C 722.00 224.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
-    <path d="M 762.00 306.00 C 722.00 306.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
-    <path d="M 762.00 388.00 C 722.00 388.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 646.00 142.00 C 686.00 142.00 722.00 224.00 762.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 224.00 C 722.00 224.00 686.00 388.00 646.00 388.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 256.00 C 874.00 388.00 874.00 388.00 874.00 520.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 388.00 874.00 388.00 874.00 602.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 429.00 874.00 429.00 874.00 684.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 470.00 874.00 470.00 874.00 766.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 511.00 874.00 511.00 874.00 848.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 174.00 C 874.00 552.00 874.00 552.00 874.00 930.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 634.00 C 722.00 634.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 748.00 C 874.00 552.00 874.00 552.00 874.00 356.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 830.00 C 874.00 634.00 874.00 634.00 874.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 880.00 C 722.00 880.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 962.00 C 722.00 962.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 338.00 C 874.00 388.00 874.00 388.00 874.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 306.00 C 722.00 306.00 686.00 388.00 646.00 388.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 338.00 C 874.00 429.00 874.00 429.00 874.00 520.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 420.00 C 874.00 429.00 874.00 429.00 874.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 420.00 C 874.00 470.00 874.00 470.00 874.00 520.00" marker-end="url(#arrowhead)" />
     <path d="M 762.00 470.00 C 722.00 470.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
-    <path d="M 762.00 552.00 C 722.00 552.00 686.00 224.00 646.00 224.00" marker-end="url(#arrowhead)" />
+    <path d="M 762.00 470.00 C 722.00 470.00 686.00 388.00 646.00 388.00" marker-end="url(#arrowhead)" />
+    <path d="M 874.00 502.00 C 874.00 511.00 874.00 511.00 874.00 520.00" marker-end="url(#arrowhead)" />
   </g>
   <rect x="289.50" y="241.00" width="149.00" height="20.00" rx="4" fill="#ffffff" stroke="#d1d5db" opacity="0.95" />
   <text x="364.00" y="251.00" text-anchor="middle" dominant-baseline="middle" class="edge-label">adds modes &amp; scenes</text>
@@ -109,22 +120,43 @@
     </text>
     <rect x="762.00" y="192.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="224.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="874.00">Switch / BluetoothSwitch</tspan>
+      <tspan x="874.00">FrameTickController</tspan>
     </text>
     <rect x="762.00" y="274.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="306.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="874.00">Gamepad</tspan>
+      <tspan x="874.00">KeyboardController</tspan>
     </text>
     <rect x="762.00" y="356.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="388.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="874.00">Accelerometer / Phyphox</tspan>
+      <tspan x="874.00">GamepadController</tspan>
     </text>
     <rect x="762.00" y="438.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
-    <text x="874.00" y="470.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="874.00">HeartRateManager</tspan>
+    <text x="874.00" y="461.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Navigation / Mandelbrot /</tspan>
+      <tspan x="874.00" dy="18">Accelerometer Debug Profiles</tspan>
     </text>
     <rect x="762.00" y="520.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="552.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">InputDebugTap</tspan>
+    </text>
+    <rect x="762.00" y="602.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="634.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Switch / BluetoothSwitch</tspan>
+    </text>
+    <rect x="762.00" y="684.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="716.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Gamepad</tspan>
+    </text>
+    <rect x="762.00" y="766.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="798.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">Accelerometer / Phyphox</tspan>
+    </text>
+    <rect x="762.00" y="848.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="880.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="874.00">HeartRateManager</tspan>
+    </text>
+    <rect x="762.00" y="930.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
+    <text x="874.00" y="962.00" fill="#f8fafc" text-anchor="middle">
       <tspan x="874.00">PhoneText</tspan>
     </text>
     <rect x="1102.00" y="110.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />

@@ -1,4 +1,5 @@
 import time
+from threading import Thread
 from typing import Iterator, NoReturn, Self
 
 import requests
@@ -12,6 +13,7 @@ DEFAULT_PHYPOX_URL = "http://192.168.1.42"
 PHYPOX_ACCEL_ENDPOINT = "/get?accY&accX&accZ"
 REQUEST_TIMEOUT_SECONDS = 1
 REQUEST_SLEEP_SECONDS = 0.05
+PHYPOX_THREAD_NAME = "peripheral-phyphox"
 
 
 class Phyphox(Peripheral[Acceleration]):
@@ -26,7 +28,14 @@ class Phyphox(Peripheral[Acceleration]):
     def detect(cls) -> Iterator[Self]:
         yield cls(DEFAULT_PHYPOX_URL)
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
+        Thread(
+            name=PHYPOX_THREAD_NAME,
+            target=self._run_loop,
+            daemon=True,
+        ).start()
+
+    def _run_loop(self) -> NoReturn:
         while True:
             try:
                 resp = requests.get(

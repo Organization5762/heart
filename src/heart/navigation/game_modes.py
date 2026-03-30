@@ -124,8 +124,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def __init__(self) -> None:
         super().__init__()
         self._init_context: tuple[
-            pygame.Surface,
-            pygame.time.Clock,
+            DisplayContext,
             PeripheralManager,
             Orientation,
         ] | None = None
@@ -157,8 +156,14 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             state = GameModeState()
         if not state.post_processors:
             state.post_processors.extend(self._default_post_processors())
-        peripheral_manager.get_main_switch_subscription().subscribe(
-            on_next=self.handle_state,
+        peripheral_manager.navigation_profile.browse_delta.subscribe(
+            on_next=self._handle_browse_delta,
+        )
+        peripheral_manager.navigation_profile.activate.subscribe(
+            on_next=self._handle_activate,
+        )
+        peripheral_manager.navigation_profile.alternate_activate.subscribe(
+            on_next=self._handle_alternate_activate,
         )
         return state
 
@@ -203,6 +208,27 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
         if self.state.in_select_mode:
             self.state.mode_offset = input.rotation_since_last_long_button_press
+
+    def _handle_browse_delta(self, delta: int) -> None:
+        if not self.state.in_select_mode or delta == 0:
+            return
+        self.state.mode_offset += delta
+
+    def _handle_activate(self, _event: object) -> None:
+        if not self.state.in_select_mode:
+            return
+        self.state._active_mode_index += self.state.mode_offset
+        self.state.mode_offset = 0
+        self.state.in_select_mode = False
+
+    def _handle_alternate_activate(self, _event: object) -> None:
+        if self.state.in_select_mode:
+            return
+        for renderer in self.state.renderers:
+            renderer.reset()
+        for renderer in self.state.post_processors:
+            renderer.reset()
+        self.state.in_select_mode = True
 
     def _initialize_registered_renderers(
         self,

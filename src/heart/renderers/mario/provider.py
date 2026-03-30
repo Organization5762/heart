@@ -1,12 +1,12 @@
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
@@ -20,11 +20,13 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         self,
         metadata_file_path: str,
         sheet_file_path: str,
-        accel_stream: AllAccelerometersProvider,
+        accelerometer_controller: AccelerometerController,
+        accelerometer_debug_profile: AccelerometerDebugProfile,
     ):
         self.metadata_file_path = metadata_file_path
         self.file = sheet_file_path
-        self._accel_stream = accel_stream
+        self._accelerometer_controller = accelerometer_controller
+        self._accelerometer_debug_profile = accelerometer_debug_profile
 
         frame_data = Loader.load_json(self.metadata_file_path)
         self.frames = []
@@ -47,7 +49,8 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
     def _advance_state(
         self,
         state: MarioRendererState,
-        clock: Clock,
+        *,
+        elapsed_ms: float,
         acceleration: Acceleration | None,
     ) -> MarioRendererState:
         current_frame = state.current_frame
@@ -59,7 +62,6 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         keyframe_duration = current_keyframe.duration or 0
 
         if in_loop:
-            elapsed_ms = float(clock.get_time())
             next_time = (time_since_last_update or 0.0) + elapsed_ms
             if next_time > keyframe_duration:
                 current_frame += 1
@@ -96,25 +98,28 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         peripheral_manager: PeripheralManager,
     ) -> reactivex.Observable[MarioRendererState]:
         initial = self._create_initial_state()
+        if self._accelerometer_debug_profile.should_use_debug_input():
+            acceleration_source = self._accelerometer_debug_profile.observable()
+        else:
+            acceleration_source = self._accelerometer_controller.observable()
         accelerations = pipe_in_background(
-            self._accel_stream.observable(),
+            acceleration_source,
             ops.start_with(None),
             ops.share(),
         )
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         return pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.with_latest_from(clocks, accelerations),
+            frame_ticks,
+            ops.with_latest_from(accelerations),
             ops.scan(
                 lambda state, latest: self._advance_state(
                     state=state,
-                    clock=latest[1],
-                    acceleration=latest[2],
+                    elapsed_ms=float(latest[0].delta_ms),
+                    acceleration=latest[1],
                 ),
                 seed=initial,
             ),

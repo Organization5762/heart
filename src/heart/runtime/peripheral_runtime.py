@@ -3,6 +3,7 @@ from __future__ import annotations
 from heart.device.beats import WebSocket
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import drain_frame_thread_queue
 
 logger = get_logger(__name__)
 
@@ -27,9 +28,18 @@ class PeripheralRuntime:
 
     def configure_streaming(self, websocket: WebSocket | None = None) -> None:
         ws = websocket or WebSocket()
-        self._peripheral_manager.get_event_bus().subscribe(
-            on_next=lambda x: ws.send(kind="peripheral", payload=x),
+        self._peripheral_manager.debug_tap.observable().subscribe(
+            on_next=lambda envelope: ws.send(
+                kind="input",
+                payload=envelope.as_dict(),
+            ),
         )
 
     def tick(self) -> None:
+        drain_frame_thread_queue()
+        if self._peripheral_manager.clock.value is None:
+            return
+        self._peripheral_manager.frame_tick_controller.advance(
+            self._peripheral_manager.clock.value
+        )
         self._peripheral_manager.game_tick.on_next(True)
