@@ -4,7 +4,8 @@ set -euo pipefail
 DEFAULT_REMOTE_HOST="michael@totem.local"
 DEFAULT_REMOTE_DIR="~/Desktop/"
 DEFAULT_REMOTE_PASS="totemlib2024"
-
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+DEFAULT_SSH_KEY_PATH="${SCRIPT_DIR}/keys/rpi_common_ed25519"
 SCRIPT_NAME=$(basename "$0")
 
 print_usage() {
@@ -24,6 +25,7 @@ Options:
       --poll-interval SEC  Interval in seconds for polling when watcher=poll (default: 5)
       --pre-sync CMD       Command to run before each sync (runs in the source directory, may be supplied multiple times)
       --post-sync CMD      Command to run after each sync (runs in the source directory, may be supplied multiple times)
+      --ssh-key PATH       SSH private key to use for rsync transport (default: ${DEFAULT_SSH_KEY_PATH})
       --skip-noop          Skip hooks and rsync when a dry-run finds no changes
       --dry-run            Show what would be transferred without making changes
       --skip-spellcheck    Skip running spellcheck before synchronising
@@ -32,8 +34,8 @@ Options:
 Environment variables:
   SYNC_SOURCE_DIR, SYNC_DESTINATION, SYNC_IGNORE_FILE,
   SYNC_POLL_INTERVAL, SYNC_WATCHER, SYNC_DRY_RUN, SYNC_RSYNC_ARGS,
-  SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD, SYNC_SKIP_NOOP,
-  REMOTE_HOST, REMOTE_DIR, REMOTE_PASS
+  SYNC_PRE_SYNC_CMD, SYNC_POST_SYNC_CMD, SYNC_SKIP_NOOP, SYNC_SSH_KEY,
+  REMOTE_HOST, REMOTE_DIR, REMOTE_PASS, REMOTE_SSH_KEY
 
 A .syncignore file inside the source directory will be used automatically
 if present and no --ignore-from option is supplied.
@@ -54,6 +56,7 @@ POLL_INTERVAL=${SYNC_POLL_INTERVAL:-5}
 WATCH_MODE=${SYNC_WATCHER:-auto}
 DRY_RUN=${SYNC_DRY_RUN:-false}
 SKIP_NOOP=${SYNC_SKIP_NOOP:-false}
+SSH_KEY_PATH=${SYNC_SSH_KEY:-${REMOTE_SSH_KEY:-$DEFAULT_SSH_KEY_PATH}}
 declare -a PRE_SYNC_CMDS=()
 declare -a POST_SYNC_CMDS=()
 declare -a EXTRA_RSYNC_ARGS=()
@@ -114,6 +117,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --post-sync)
       POST_SYNC_CMDS+=("$2")
+      shift 2
+      ;;
+    --ssh-key)
+      SSH_KEY_PATH="$2"
       shift 2
       ;;
     --dry-run)
@@ -196,12 +203,16 @@ fi
 
 RSYNC_FLAGS=(-az --delete)
 declare -a RSYNC_PREFIX=()
-if [[ -n "$REMOTE_PASS" ]]; then
+if [[ -n "$SSH_KEY_PATH" && -f "$SSH_KEY_PATH" ]]; then
+  RSYNC_FLAGS+=(-e "ssh -i $SSH_KEY_PATH -o IdentitiesOnly=yes")
+elif [[ -n "$REMOTE_PASS" ]]; then
   if command_exists sshpass; then
     RSYNC_PREFIX=(sshpass -p "$REMOTE_PASS")
   else
     echo "Warning: REMOTE_PASS is set but sshpass is not available; continuing without password helper." >&2
   fi
+elif [[ -n "$SSH_KEY_PATH" ]]; then
+  echo "Warning: SSH key '$SSH_KEY_PATH' was not found; continuing without explicit SSH identity." >&2
 fi
 if [[ "$DRY_RUN" == true ]]; then
   RSYNC_FLAGS+=(--dry-run)
