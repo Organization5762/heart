@@ -91,8 +91,6 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             return
 
         window_width, window_height = window.get_size()
-
-
         if self.state.y_location is not None:
             y_offset = int(self.state.y_location * window_height)
         else:
@@ -103,6 +101,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             if self.state.font_name.endswith(".ttf")
             else True
         )
+        line_height = font.get_linesize()
         for line in lines:
             text_surface = font.render(
                 line,
@@ -116,6 +115,4 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             else:
                 x_offset = int(self.state.x_location * window_width)
             window.screen.blit(text_surface, (x_offset, y_offset))
-            # (x_offset, y_offset))
-            # TODO:
-            # y_offset += font.get_sized_height()
+            y_offset += line_height

@@ -19,7 +19,9 @@ class BorderStateProvider(ObservableProvider[BorderState]):
     def __init__(self, initial_color: Color | None = None) -> None:
         self._color = BehaviorSubject(initial_color or Color.random())
 
-    def observable(self) -> reactivex.Observable[BorderState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[BorderState]:
         return pipe_in_background(
             self._color,
             ops.map(lambda color: BorderState(color=color)),
@@ -45,7 +47,9 @@ class RainStateProvider(ObservableProvider[RainState]):
         self._peripheral_manager = peripheral_manager
         self._rng = rng or randomness.rng()
 
-    def observable(self) -> reactivex.Observable[RainState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[RainState]:
         initial_state = RainState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
@@ -84,7 +88,9 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
         self._peripheral_manager = peripheral_manager
         self._rng = rng or randomness.rng()
 
-    def observable(self) -> reactivex.Observable[SlinkyState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[SlinkyState]:
         initial_state = SlinkyState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),

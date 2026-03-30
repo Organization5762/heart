@@ -21,7 +21,9 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
         self._peripheral_manager = peripheral_manager
         self._wave_speed = wave_speed
 
-    def observable(self) -> reactivex.Observable[WaterTitleScreenState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[WaterTitleScreenState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),

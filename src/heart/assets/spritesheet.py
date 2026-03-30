@@ -18,12 +18,19 @@ class Spritesheet:
             raise ValueError(f"'{path}' is not a file.")
 
         with path.open("rb") as file_handle:
-            self.sheet = pygame.image.load(file_handle).convert_alpha()
+            self.sheet = pygame.image.load(file_handle)
         self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
         self._scaled_cache: dict[tuple[int, int, int, int, int, int], pygame.Surface] = {}
+        self._display_optimized = False
+
+    def _sheet_surface(self) -> pygame.Surface:
+        if (not self._display_optimized) and pygame.display.get_surface() is not None:
+            self.sheet = self.sheet.convert_alpha()
+            self._display_optimized = True
+        return self.sheet
 
     def get_size(self) -> tuple[int, int]:
-        return self.sheet.get_size()
+        return self._sheet_surface().get_size()
 
     def image_at(self, rectangle: tuple[int, int, int, int]) -> pygame.Surface:
         rect = pygame.Rect(rectangle)
@@ -38,7 +45,7 @@ class Spritesheet:
                 return cached
 
         image = pygame.Surface(rect.size, pygame.SRCALPHA)
-        image.blit(self.sheet, (0, 0), rect)
+        image.blit(self._sheet_surface(), (0, 0), rect)
         if strategy in {
             SpritesheetFrameCacheStrategy.FRAMES,
             SpritesheetFrameCacheStrategy.SCALED,

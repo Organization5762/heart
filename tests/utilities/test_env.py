@@ -253,6 +253,22 @@ class TestUtilitiesEnv:
 
         assert Configuration.render_parallel_cost_threshold_ms() == 18
 
+    def test_render_crash_on_error_defaults_disabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify renderer fail-fast defaults to disabled. This preserves the current production render-loop tolerance unless debugging is requested."""
+        _clear_env(monkeypatch, "HEART_RENDER_CRASH_ON_ERROR")
+
+        assert Configuration.render_crash_on_error() is False
+
+    def test_render_crash_on_error_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify renderer fail-fast reads the environment flag. This keeps crash-on-render-error debugging opt-in and explicit."""
+        monkeypatch.setenv("HEART_RENDER_CRASH_ON_ERROR", "true")
+
+        assert Configuration.render_crash_on_error() is True
+
     def test_render_loop_pacing_strategy_defaults_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify render loop pacing strategy defaults to off. This avoids unexpected throttling without explicit configuration."""
         _clear_env(monkeypatch, "HEART_RENDER_LOOP_PACING_STRATEGY")

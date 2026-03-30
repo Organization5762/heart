@@ -14,7 +14,9 @@ class ClothSailStateProvider(ObservableProvider[ClothSailState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(self) -> reactivex.Observable[ClothSailState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[ClothSailState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
 

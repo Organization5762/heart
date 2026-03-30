@@ -75,7 +75,9 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
             last_dt=dt,
         )
 
-    def observable(self) -> reactivex.Observable[DopplerState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[DopplerState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),

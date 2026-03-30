@@ -14,7 +14,9 @@ class MulticolorStateProvider(ObservableProvider[MulticolorState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(self) -> reactivex.Observable[MulticolorState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[MulticolorState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),

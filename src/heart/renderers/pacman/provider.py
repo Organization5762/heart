@@ -28,7 +28,9 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
         self._asset_version = 0
         self._rng = rng or randomness.rng()
 
-    def observable(self) -> reactivex.Observable[PacmanGhostState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[PacmanGhostState]:
         initial_state = self._spawn_state(
             width=self._width,
             height=self._height,

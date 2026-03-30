@@ -148,6 +148,8 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        if window.screen is None:
+            raise RuntimeError("YoListenRenderer requires an initialized display surface")
         state = self.state
 
         window_width, window_height = window.get_size()
@@ -170,7 +172,7 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
 
                     for screen in range(start_screen, end_screen):
                         screen_x = screen * screen_width
-                        screen_surface = window.subsurface(
+                        screen_surface = window.screen.subsurface(
                             pygame.Rect(screen_x, 0, screen_width, window_height)
                         )
 

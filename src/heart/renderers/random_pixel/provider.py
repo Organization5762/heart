@@ -34,7 +34,9 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         self._color = BehaviorSubject(initial_color)
         self._rng = rng or randomness.rng()
 
-    def observable(self) -> reactivex.Observable[RandomPixelState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[RandomPixelState]:
         initial_color = self._color.value or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()

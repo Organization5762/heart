@@ -14,7 +14,9 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(self) -> reactivex.Observable[TixylandState]:
+    def observable(
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> reactivex.Observable[TixylandState]:
         clocks = pipe_in_background(
             self._peripheral_manager.clock,
             ops.filter(lambda clock: clock is not None),
