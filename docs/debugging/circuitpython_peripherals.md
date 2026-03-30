@@ -25,7 +25,7 @@ Iterate on CircuitPython-based drivers that back Heart peripherals while working
 
 ## Driver Update Helper
 
-When you use `heart`'s driver update helper (`src/heart/manage/update.py`), it will:
+When you use `heart`'s driver update helper (`packages/heart-device-manager/src/heart_device_manager/update.py`), it will:
 
 - Download the configured UF2 or CircuitPython bundle and verify its SHA-256 checksum.
 - Skip optional `.mpy` bundle files that are not present in the bundle.

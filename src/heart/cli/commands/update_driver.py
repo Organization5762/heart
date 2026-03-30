@@ -1,9 +1,9 @@
 from typing import Annotated
 
 import typer
+from heart_device_manager.update import UpdateError
+from heart_device_manager.update import main as update_driver_main
 
-from heart.manage.update import UpdateError
-from heart.manage.update import main as update_driver_main
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)

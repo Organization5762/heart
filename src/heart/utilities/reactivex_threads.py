@@ -30,9 +30,9 @@ class _SchedulerState:
     scheduler: SchedulerBase | None = None
 
 
+_COALESCE_SCHEDULER = TimeoutScheduler()
 _INPUT_SCHEDULER = _SchedulerState(lock=Lock())
 _INTERVAL_SCHEDULER = _SchedulerState(lock=Lock())
-_COALESCE_SCHEDULER = TimeoutScheduler()
 _MAIN_THREAD_SCHEDULER = TimeoutScheduler()
 
 shutdown: Subject[Any] = Subject()
@@ -96,13 +96,29 @@ def coalesce_scheduler() -> SchedulerBase:
     return _COALESCE_SCHEDULER
 
 
-def interval_in_background(period: timedelta) -> Observable[int]:
-    return reactivex.interval(period=period, scheduler=interval_scheduler()).pipe(
+def replay_scheduler() -> TimeoutScheduler:
+    return TimeoutScheduler()
+
+
+def interval_in_background(
+    period: timedelta,
+    *,
+    name: str | None = None,
+) -> Observable[int]:
+    scheduler = (
+        EventLoopScheduler(
+            thread_factory=partial(_run_on_thread, name=name),
+        )
+        if name is not None
+        else interval_scheduler()
+    )
+    return reactivex.interval(period=period, scheduler=scheduler).pipe(
         ops.take_until(shutdown),
     )
 
 
 def pipe_in_background(source: Observable[T], *operators: Any) -> Observable[Any]:
+    logger.debug("Building background pipeline.")
     return pipe(
         source,
         *[
@@ -113,6 +129,7 @@ def pipe_in_background(source: Observable[T], *operators: Any) -> Observable[Any
 
 
 def pipe_in_main_thread(source: Observable[T], *operators: Any) -> Observable[Any]:
+    logger.debug("Building main-thread pipeline.")
     return pipe(
         source,
         *[

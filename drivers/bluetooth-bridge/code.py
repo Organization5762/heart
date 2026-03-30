@@ -32,7 +32,7 @@ from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
 
-from heart.firmware_io import device_id, identity
+from heart_firmware_io import device_id, identity
 
 
 class SupportsWrite(Protocol):

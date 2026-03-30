@@ -8,12 +8,12 @@ firmware I/O layer.
 
 ## Change
 
-Device ID persistence utilities now live in `heart.firmware_io.device_id`, while
-`heart.firmware_io.identity` focuses on serial identity responses and firmware
+Device ID persistence utilities now live in `heart_firmware_io.device_id`, while
+`heart_firmware_io.identity` focuses on serial identity responses and firmware
 commit detection.
 
 ## Materials
 
-- `src/heart/firmware_io/device_id.py`
-- `src/heart/firmware_io/identity.py`
+- `packages/heart-firmware-io/src/heart_firmware_io/device_id.py`
+- `packages/heart-firmware-io/src/heart_firmware_io/identity.py`
 - `tests/test_device_id.py`

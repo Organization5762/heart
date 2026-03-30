@@ -3,9 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from heart_firmware_io import constants, rotary_encoder
 from helpers.firmware_io import HandlerStep, run_handler_steps
-
-from heart.firmware_io import constants, rotary_encoder
 
 
 class TestFirmwareIoRotaryEncoderHandler:

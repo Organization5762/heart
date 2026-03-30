@@ -4,10 +4,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from heart import firmware_io
-from heart.manage.driver_update.downloads import download_file
-from heart.manage.driver_update.filesystem import copy_file
-from heart.utilities.logging import get_logger
+import heart_firmware_io
+from heart_device_manager.driver_update.downloads import download_file
+from heart_device_manager.driver_update.filesystem import copy_file
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -27,8 +27,8 @@ def load_driver_libs(libs: list[str], destination: Path) -> None:
     shutil.rmtree(destination, ignore_errors=True)
     destination.mkdir(parents=True, exist_ok=True)
     copy_file(
-        Path(firmware_io.__file__).parent,
-        destination.joinpath(*firmware_io.__package__.split(".")),
+        Path(heart_firmware_io.__file__).resolve().parent,
+        destination.joinpath(*heart_firmware_io.__package__.split(".")),
     )
 
     if not libs:

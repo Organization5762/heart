@@ -70,6 +70,7 @@ heart/
 ├── docs/                     # Architecture guides, dev logs, hardware notes
 ├── drivers/                  # Firmware flashing utilities
 ├── experimental/             # Prototypes (MQTT sidecar, broker helpers)
+├── packages/                 # Separately published helper packages
 ├── src/heart/                # Runtime, renderers, peripherals, utilities
 ├── tests/                    # Pytest suite
 ├── Makefile                  # Common developer tasks

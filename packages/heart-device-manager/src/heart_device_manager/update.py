@@ -1,15 +1,15 @@
 import sys
 
-from heart.manage.driver_update.configuration import load_driver_config
-from heart.manage.driver_update.exceptions import UpdateError
-from heart.manage.driver_update.filesystem import ensure_driver_files
-from heart.manage.driver_update.layout import DRIVER_SETTINGS_FILENAME
-from heart.manage.driver_update.mounts import (circuitpy_mounts,
-                                               install_uf2_if_available,
-                                               mount_points,
-                                               update_circuitpy_mount)
-from heart.manage.driver_update.paths import get_driver_path, media_directory
-from heart.utilities.logging import get_logger
+from heart_device_manager.driver_update.configuration import load_driver_config
+from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.driver_update.filesystem import ensure_driver_files
+from heart_device_manager.driver_update.layout import DRIVER_SETTINGS_FILENAME
+from heart_device_manager.driver_update.mounts import (
+    circuitpy_mounts, install_uf2_if_available, mount_points,
+    update_circuitpy_mount)
+from heart_device_manager.driver_update.paths import (get_driver_path,
+                                                      media_directory)
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 

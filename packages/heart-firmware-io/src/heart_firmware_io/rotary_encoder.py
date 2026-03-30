@@ -1,9 +1,13 @@
 import time
 from typing import Callable
 
-from digitalio import Pull
-
-from heart.firmware_io import constants
+try:
+    from digitalio import Pull
+except ModuleNotFoundError:  # pragma: no cover - desktop test fallback
+    class Pull:  # type: ignore[no-redef]
+        UP = "up"
+        DOWN = "down"
+from heart_firmware_io import constants
 
 LONG_PRESS_DURATION_SECONDS = 0.5
 DEFAULT_ROTARY_ENCODER_INDEX = 0

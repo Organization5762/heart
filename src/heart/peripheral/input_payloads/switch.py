@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import ClassVar
 
-from heart.firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
+from heart_firmware_io.constants import (BUTTON_LONG_PRESS, BUTTON_PRESS,
                                          SWITCH_ROTATION)
+
 from heart.peripheral.core import Input
 
 from .base import InputEventPayload, _normalize_timestamp

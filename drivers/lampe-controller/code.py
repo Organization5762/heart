@@ -16,7 +16,7 @@ import board
 import busio
 import digitalio
 
-from heart.firmware_io import bluetooth, device_id, identity, rotary_encoder
+from heart_firmware_io import bluetooth, device_id, identity, rotary_encoder
 
 MINIMUM_LIGHT_ON_SECONDS = 0.05
 DEVICE_NAME = "lampe-controller"

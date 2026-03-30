@@ -1,0 +1,18 @@
+[project]
+name = "heart-firmware-io"
+version = "0.2.0"
+description = "CircuitPython-facing firmware helpers shared by Heart device drivers."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Heart Runtime Maintainers" },
+]
+maintainers = [
+    { name = "Heart Runtime Maintainers" },
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.9.6,<0.10.0"]
+build-backend = "uv_build"
