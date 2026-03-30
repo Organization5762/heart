@@ -21,6 +21,28 @@ def compute_bounding_box(points: np.ndarray) -> BoundingBox:
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def compute_zoom_target_scale(
+    *,
+    width: int,
+    height: int,
+    xmargin: int,
+    ymargin: int,
+    bbox: BoundingBox,
+) -> float:
+    min_x, min_y, max_x, max_y = bbox
+    bbox_width = max_x - min_x
+    bbox_height = max_y - min_y
+    if bbox_width <= 0 or bbox_height <= 0:
+        return 1.0
+
+    available_width = width - (2 * xmargin)
+    available_height = height - (2 * ymargin)
+    return min(
+        available_width / bbox_width,
+        available_height / bbox_height,
+    )
+
+
 @njit
 def d2xy(n: int, d: int) -> tuple[int, int]:
     x = 0
@@ -202,10 +224,13 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             zoom_bbox = compute_bounding_box(
                 frame_curve[: len(frame_curve) // (2**self.subset_exponent)]
             )
-            draw_size = min(state.width, state.height) - (2 * state.xmargin)
-            bbox_width = zoom_bbox[2] - zoom_bbox[0]
-            bbox_height = zoom_bbox[3] - zoom_bbox[1]
-            target_scale = (draw_size * 2) / max(bbox_width, bbox_height)
+            target_scale = compute_zoom_target_scale(
+                width=state.width,
+                height=state.height,
+                xmargin=state.xmargin,
+                ymargin=state.ymargin,
+                bbox=zoom_bbox,
+            )
             return replace(
                 state,
                 transition_state="zoom",

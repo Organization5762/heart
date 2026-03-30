@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 import reactivex
 
-from heart.renderers.hilbert_curve.provider import hilbert_curve_points_numba
+from heart.renderers.hilbert_curve.provider import (compute_zoom_target_scale,
+                                                    hilbert_curve_points_numba)
 from heart.renderers.hilbert_curve.renderer import HilbertScene
 
 
@@ -63,3 +64,15 @@ class TestHilbertScene:
 
         assert provider.initial_state_calls == [(64, 64)]
         assert provider.observable_initial_states == [_StubHilbertState(64, 64)]
+
+    def test_zoom_target_scale_fits_zoom_bbox_to_available_rect(self) -> None:
+        """Verify zoom target scale is derived from the available render rect so Hilbert zoom fills the intended height without relying on a magic multiplier."""
+        scale = compute_zoom_target_scale(
+            width=1024,
+            height=256,
+            xmargin=0,
+            ymargin=0,
+            bbox=(0.0, 0.0, 5.876694756088149, 2.015748031496063),
+        )
+
+        assert np.isclose(scale, 256 / 2.015748031496063)
