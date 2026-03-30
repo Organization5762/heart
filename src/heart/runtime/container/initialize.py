@@ -150,7 +150,9 @@ def _build_peripheral_manager(
     )
 
 
-def _build_renderer_surface_provider(container: RuntimeContainer) -> RendererSurfaceProvider:
+def _build_renderer_surface_provider(
+    container: RuntimeContainer,
+) -> RendererSurfaceProvider:
     provider = RendererSurfaceProvider(container.resolve(DisplayContext))
     provider._container = container
     return provider

@@ -1,8 +1,7 @@
 import types
 
 import pytest
-
-from heart.firmware_io import device_id
+from heart_firmware_io import device_id
 
 
 @pytest.fixture(autouse=True)

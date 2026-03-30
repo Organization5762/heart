@@ -2,7 +2,7 @@
 
 ## Summary
 
-The firmware update harness in `src/heart/manage/update.py` validates driver
+The firmware update harness in `packages/heart-device-manager/src/heart_device_manager/update.py` validates driver
 settings early, accepts both list and comma-delimited formats for driver
 libraries and board IDs, and confirms the media mount root exists before
 searching for CircuitPython volumes. These checks reduce partial updates when
@@ -11,7 +11,7 @@ messages for maintenance workflows.
 
 ## Materials
 
-- `src/heart/manage/update.py`
+- `packages/heart-device-manager/src/heart_device_manager/update.py`
 
 ## Notes
 

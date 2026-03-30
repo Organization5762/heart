@@ -24,15 +24,11 @@ The renderer refactor effort focuses on:
 Use the renderer catalog in `docs/renderers/renderer_catalog.md` to locate existing
 implementations and `docs/renderers/base_class_layout.md` for inheritance layout.
 
-## Rust Renderer Integration
+## Native Scene Integration
 
-Rust renderers are loaded through the search paths configured in
-`heart.renderers.rust.loader`, which checks:
-
-- `HEART_RUST_RENDERERS_PATH` when set.
-- The default `/opt/heart/rust_renderers` path on deployment targets.
-
-The loader expects each renderer bundle to expose its metadata alongside compiled artifacts.
+Scene-management code can move into the optional `heart_rust` package, which is wired into
+`heart.navigation.native_scene_manager`. `MultiScene` uses that bridge when the extra is
+installed and falls back to the Python implementation otherwise.
 
 ## Spritesheet Cache
 

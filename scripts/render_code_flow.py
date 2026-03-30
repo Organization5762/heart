@@ -64,6 +64,11 @@ COLUMNS: tuple[ColumnDef, ...] = (
                 "orchestrator",
             ),
             NodeDef("app_router", "AppController / Mode Router", "orchestrator"),
+            NodeDef(
+                "native_scene_bridge",
+                "Native Scene Bridge\n(optional PyO3 scene manager)",
+                "service",
+            ),
             NodeDef("mode_services", "Mode Services & Renderers", "service"),
             NodeDef(
                 "render_pipeline",
@@ -116,7 +121,8 @@ EDGES: tuple[EdgeDef, ...] = (
     EdgeDef("configurer", "app_router", "adds modes & scenes"),
     EdgeDef("loop", "app_router"),
     EdgeDef("loop", "render_pipeline"),
-    EdgeDef("app_router", "mode_services"),
+    EdgeDef("app_router", "native_scene_bridge"),
+    EdgeDef("native_scene_bridge", "mode_services"),
     EdgeDef("mode_services", "render_pipeline"),
     EdgeDef("render_pipeline", "composition_manager"),
     EdgeDef("render_pipeline", "surface_provider"),

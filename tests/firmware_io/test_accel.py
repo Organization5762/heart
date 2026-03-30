@@ -35,9 +35,8 @@ if "adafruit_lsm303_accel" not in sys.modules:
     lsm303.LSM303_Accel = object
     sys.modules["adafruit_lsm303_accel"] = lsm303
 
+from heart_firmware_io import accel, constants
 from helpers.firmware_io import StubSensor
-
-from heart.firmware_io import accel, constants
 
 
 class TestFirmwareIoAccel:

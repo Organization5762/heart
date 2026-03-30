@@ -14,18 +14,18 @@ class RendererFactory(Protocol[RendererT]):
 
 
 class RendererResolver(Protocol):
-    def resolve(self, renderer_type: type[RendererT]) -> RendererT:
-        """Resolve ``renderer_type`` to an initialized renderer instance."""
+    def resolve(self, dependency: type[RendererT]) -> RendererT:
+        """Resolve renderer instances from the shared container."""
 
 
 def resolve_renderer_spec(
     renderer: RendererSpec,
     resolver: RendererResolver | None = None,
 ) -> StatefulBaseRenderer:
-    if isinstance(renderer, StatefulBaseRenderer):
-        return renderer
-    if isinstance(renderer, type) and issubclass(renderer, StatefulBaseRenderer):
+    if isinstance(renderer, type):
+        if not issubclass(renderer, StatefulBaseRenderer):
+            raise TypeError("Requires StatefulBaseRenderer subclasses")
         if resolver is None:
-            raise ValueError("A renderer resolver is required for renderer types.")
+            raise ValueError("renderer resolver is required for class specs")
         return resolver.resolve(renderer)
-    raise TypeError(f"Unsupported renderer spec: {renderer!r}")
+    return renderer

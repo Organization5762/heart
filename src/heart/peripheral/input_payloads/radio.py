@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, ClassVar, Mapping, MutableMapping, Sequence
 
-from heart.firmware_io.constants import RADIO_PACKET
+from heart_firmware_io.constants import RADIO_PACKET
+
 from heart.peripheral.core import Input
 
 from .base import InputEventPayload, _normalize_timestamp

@@ -13,3 +13,8 @@ from .game_modes import GameModes as GameModes
 from .game_modes import GameModeState as GameModeState
 from .multi_scene import MultiScene as MultiScene
 from .multi_scene import MultiSceneState as MultiSceneState
+from .native_scene_manager import \
+    PythonSceneManagerBridge as PythonSceneManagerBridge
+from .native_scene_manager import SceneManagerBackend as SceneManagerBackend
+from .native_scene_manager import \
+    build_scene_manager_backend as build_scene_manager_backend

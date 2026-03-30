@@ -119,7 +119,7 @@ Update driver firmware with the consolidated CLI:
 totem update-driver --name <driver-name>
 ```
 
-Each driver implements `heart.manage.update.main` to report success or failure through the
+Each driver implements `heart_device_manager.update.main` to report success or failure through the
 command output.
 
 ## Related References

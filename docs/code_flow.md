@@ -42,6 +42,7 @@ flowchart LR
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
         RenderPacer["Render Loop Pacer\n(heart.runtime.render.pacing.RenderLoopPacer)"]
         AppRouter["AppController / Mode Router"]
+        NativeSceneBridge["Native Scene Bridge\n(optional PyO3 scene manager)"]
         ModeServices["Mode Services & Renderers"]
         RenderPipeline["Render Pipeline"]
         SurfaceProvider["Surface Provider\n(display mode + surface cache)"]
@@ -79,7 +80,7 @@ flowchart LR
     RuntimeContainer --> RenderPipeline
     RuntimeContainer --> PeripheralMgr
     Loop --> RenderPipeline
-    AppRouter --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
+    AppRouter --> NativeSceneBridge --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
     RenderPipeline --> RendererProcessor --> SurfaceProvider
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
@@ -92,7 +93,7 @@ flowchart LR
     RxScheduler --> HeartRate --> AppRouter
     RxScheduler --> PhoneText --> AppRouter
 
-    class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
+    class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter,RenderPacer orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;

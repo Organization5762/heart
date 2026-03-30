@@ -3,6 +3,7 @@
 ## Installing
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
+- Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 
 ## Formatting
 
@@ -12,6 +13,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Define device identifiers (such as firmware `device_name` values) as module-level constants instead of inline literals.
 - Avoid building filesystem paths via string concatenation. Use `os.path.join` or `pathlib.Path` instead.
 - Prefer `pathlib.Path` over `os.path.join` when constructing paths, and ensure functions annotated to return a `Path` return a `Path` object.
+- Keep standalone distributable packages under `packages/<distribution-name>/src/<import_name>` and wire them into the root project with local `tool.uv.sources` path dependencies.
 - When CLI arguments accept file paths, parse them as `pathlib.Path` objects and ensure parent directories exist before writing.
 - Avoid using `print` for runtime diagnostics in CLI commands; use the shared logger.
 - Avoid using `print` for runtime diagnostics in peripheral modules; use the shared logger.
@@ -32,6 +34,8 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
 - When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
 - Use module-level constants for default argument values and shared string literals in firmware helpers so configuration stays consistent.
+- Keep mixed PyO3 packages in a `rust/<package>/` layout with the Rust crate in `src/`, Python shims in `python/<package>/`, and a private native submodule exposed via `tool.maturin.module-name` to avoid import ambiguity.
+- PyO3 stub-generation binaries require a linkable Python 3.11 runtime in addition to Rust; if `cargo run --bin stub_gen` fails with unresolved `Py*` symbols, install or point PyO3 at a Python 3.11 build before retrying.
 
 ## Dependency Injection (Lagom)
 

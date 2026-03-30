@@ -3,13 +3,13 @@
 import time
 from pathlib import Path
 
-from heart.manage.driver_update.configuration import DriverConfig
-from heart.manage.driver_update.downloads import download_file
-from heart.manage.driver_update.exceptions import UpdateError
-from heart.manage.driver_update.filesystem import copy_file
-from heart.manage.driver_update.layout import DRIVER_FILES
-from heart.manage.driver_update.libraries import load_driver_libs
-from heart.utilities.logging import get_logger
+from heart_device_manager.driver_update.configuration import DriverConfig
+from heart_device_manager.driver_update.downloads import download_file
+from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.driver_update.filesystem import copy_file
+from heart_device_manager.driver_update.layout import DRIVER_FILES
+from heart_device_manager.driver_update.libraries import load_driver_libs
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 UF2_INSTALL_DELAY_SECONDS = 10

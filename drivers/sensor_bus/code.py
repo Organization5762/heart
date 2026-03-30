@@ -16,7 +16,7 @@ from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
 
-from heart.firmware_io import constants, device_id, identity
+from heart_firmware_io import constants, device_id, identity
 
 WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS: float = 1.0
 DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS: float = 0.1

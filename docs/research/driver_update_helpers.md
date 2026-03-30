@@ -2,16 +2,16 @@
 
 ## Problem statement
 
-Summarize the refactor that splits the driver update workflow into focused helper modules, while keeping `src/heart/manage/update.py` as the CLI entrypoint orchestrator.
+Summarize the refactor that splits the driver update workflow into focused helper modules, while keeping `packages/heart-device-manager/src/heart_device_manager/update.py` as the CLI entrypoint orchestrator.
 
 ## Materials
 
-- `src/heart/manage/update.py`.
-- `src/heart/manage/driver_update/configuration.py`.
-- `src/heart/manage/driver_update/downloads.py`.
-- `src/heart/manage/driver_update/filesystem.py`.
-- `src/heart/manage/driver_update/mounts.py`.
-- `src/heart/manage/driver_update/paths.py`.
+- `packages/heart-device-manager/src/heart_device_manager/update.py`.
+- `packages/heart-device-manager/src/heart_device_manager/driver_update/configuration.py`.
+- `packages/heart-device-manager/src/heart_device_manager/driver_update/downloads.py`.
+- `packages/heart-device-manager/src/heart_device_manager/driver_update/filesystem.py`.
+- `packages/heart-device-manager/src/heart_device_manager/driver_update/mounts.py`.
+- `packages/heart-device-manager/src/heart_device_manager/driver_update/paths.py`.
 
 ## Notes
 
@@ -20,4 +20,4 @@ Summarize the refactor that splits the driver update workflow into focused helpe
 - Filesystem operations (driver file validation, copying, and library staging) live in `filesystem.py`.
 - Mount discovery, UF2 install orchestration, and CircuitPython volume updates are handled by `mounts.py`.
 - Path resolution for the drivers directory and removable media roots is centralized in `paths.py`.
-- `src/heart/manage/update.py` wires the helpers together, preserving the existing entrypoint and error surface.
+- `packages/heart-device-manager/src/heart_device_manager/update.py` wires the helpers together, preserving the existing entrypoint and error surface.

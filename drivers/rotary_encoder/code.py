@@ -13,7 +13,7 @@ import board
 import rotaryio
 from digitalio import DigitalInOut, Direction, Pull
 
-from heart.firmware_io import device_id, identity, rotary_encoder
+from heart_firmware_io import device_id, identity, rotary_encoder
 
 DEVICE_NAME = "rotary-encoder"
 IDENTITY = identity.Identity(

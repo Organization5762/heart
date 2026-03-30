@@ -4,9 +4,9 @@ import hashlib
 import subprocess
 from pathlib import Path
 
-from heart.manage.driver_update.exceptions import UpdateError
-from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
+from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.environment import is_pi
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -37,7 +37,7 @@ def download_file(url: str, checksum: str, *, destination_dir: Path | None = Non
 
         if not destination.exists():
             logger.info("Starting download: %s", url)
-            if Configuration.is_pi():
+            if is_pi():
                 subprocess.run(["wget", url, "-O", str(destination)], check=True)
             else:
                 subprocess.run(

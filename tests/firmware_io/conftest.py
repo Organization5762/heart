@@ -3,9 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from heart_firmware_io import rotary_encoder
 from helpers.time import DeterministicClock
-
-from heart.firmware_io import rotary_encoder
 
 
 @pytest.fixture
