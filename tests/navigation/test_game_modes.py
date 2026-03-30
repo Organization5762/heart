@@ -6,6 +6,7 @@ import pytest
 from heart import DeviceDisplayMode
 from heart.navigation import GameModes, GameModeState
 from heart.navigation import game_modes as game_modes_module
+from heart.navigation.game_modes import ModeEntry
 
 
 class DummyRenderer:
@@ -28,8 +29,13 @@ class DummyRenderer:
 def _make_game_modes(count: int = 3) -> GameModes:
     game_modes = GameModes()
     game_modes.set_state(GameModeState())
-    game_modes.state.renderers = [DummyRenderer(f"mode-{i}") for i in range(count)]
-    game_modes.state.title_renderers = [DummyRenderer(f"title-{i}") for i in range(count)]
+    game_modes.state.entries = [
+        ModeEntry(
+            title_renderer=DummyRenderer(f"title-{i}"),
+            renderer=DummyRenderer(f"mode-{i}"),
+        )
+        for i in range(count)
+    ]
     game_modes.state.in_select_mode = True
     game_modes.state.previous_mode_index = 0
     game_modes.state.sliding_transition = None
@@ -64,8 +70,8 @@ class TestNavigationGameModes:
 
         assert result is transition
         provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.title_renderers[0],
-            renderer_b=game_modes.state.title_renderers[1],
+            renderer_a=game_modes.state.entries[0].title_renderer,
+            renderer_b=game_modes.state.entries[1].title_renderer,
             direction=1,
         )
         slide_cls.assert_called_once_with(provider)
@@ -90,12 +96,12 @@ class TestNavigationGameModes:
 
         assert result is transition
         provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.title_renderers[0],
-            renderer_b=game_modes.state.title_renderers[-1],
+            renderer_a=game_modes.state.entries[0].title_renderer,
+            renderer_b=game_modes.state.entries[-1].title_renderer,
             direction=-1,
         )
         slide_cls.assert_called_once_with(provider)
-        assert game_modes.state.previous_mode_index == len(game_modes.state.renderers) - 1
+        assert game_modes.state.previous_mode_index == len(game_modes.state.entries) - 1
 
 
 
@@ -133,8 +139,8 @@ class TestNavigationGameModes:
 
         assert result is transition
         provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.title_renderers[0],
-            renderer_b=game_modes.state.title_renderers[2],
+            renderer_a=game_modes.state.entries[0].title_renderer,
+            renderer_b=game_modes.state.entries[2].title_renderer,
             direction=1,
         )
         slide_cls.assert_called_once_with(provider)
@@ -146,7 +152,7 @@ class TestNavigationGameModes:
         """Verify that active_renderer wraps in the shortest direction when the last mode is closer. This minimizes animation time so the UI responds briskly."""
         game_modes = _make_game_modes(count=4)
         game_modes.state.previous_mode_index = 0
-        game_modes.state._active_mode_index = len(game_modes.state.renderers) - 1
+        game_modes.state._active_mode_index = len(game_modes.state.entries) - 1
 
         with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
             "heart.navigation.SlideTransitionRenderer"
@@ -161,12 +167,12 @@ class TestNavigationGameModes:
 
         assert result is transition
         provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.title_renderers[0],
-            renderer_b=game_modes.state.title_renderers[-1],
+            renderer_a=game_modes.state.entries[0].title_renderer,
+            renderer_b=game_modes.state.entries[-1].title_renderer,
             direction=-1,
         )
         slide_cls.assert_called_once_with(provider)
-        assert game_modes.state.previous_mode_index == len(game_modes.state.renderers) - 1
+        assert game_modes.state.previous_mode_index == len(game_modes.state.entries) - 1
 
 
 
@@ -179,7 +185,7 @@ class TestNavigationGameModes:
         game_modes.state.mode_offset = 0
         result = game_modes.state.active_renderer()
 
-        assert result is game_modes.state.title_renderers[0]
+        assert result is game_modes.state.entries[0].title_renderer
 
 
 
@@ -194,7 +200,7 @@ class TestNavigationGameModes:
         game_modes.state.mode_offset = 0
         result = game_modes.state.active_renderer()
 
-        assert result is game_modes.state.renderers[1], game_modes.state.renderers
+        assert result is game_modes.state.entries[1].renderer, game_modes.state.entries
         assert game_modes.state.previous_mode_index == 1
 
     def test_initialize_registered_renderers_reports_progress(self) -> None:
@@ -205,8 +211,12 @@ class TestNavigationGameModes:
         post_processor = DummyRenderer("post")
         game_modes.set_state(
             GameModeState(
-                title_renderers=[title_renderer],
-                renderers=[mode_renderer],
+                entries=[
+                    ModeEntry(
+                        title_renderer=title_renderer,
+                        renderer=mode_renderer,
+                    )
+                ],
                 post_processors=[post_processor],
             )
         )
@@ -240,8 +250,12 @@ class TestNavigationGameModes:
         broken_renderer.initialize = Mock(side_effect=RuntimeError("boom"))
         game_modes.set_state(
             GameModeState(
-                title_renderers=[broken_renderer],
-                renderers=[],
+                entries=[
+                    ModeEntry(
+                        title_renderer=broken_renderer,
+                        renderer=DummyRenderer("unused"),
+                    )
+                ],
                 post_processors=[],
             )
         )
@@ -276,7 +290,7 @@ class TestNavigationGameModes:
             )
 
         info.assert_called_once_with(
-            "Initializing app controller components (%s of %s) [%s]",
+            "Initializing game mode renderers (%s of %s) [%s]",
             1,
             4,
             "######------------------",

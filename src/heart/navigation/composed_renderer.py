@@ -6,12 +6,11 @@ from typing import Sequence
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Orientation
+from heart.device import Layout, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
-from heart.utilities.env import Configuration
+from heart.utilities.env import Configuration, RenderTileStrategy
 from heart.utilities.logging import get_logger
 
 from .renderer_specs import (RendererResolver, RendererSpec,
@@ -32,7 +31,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         self,
         renderers: list[RendererSpec] | None = None,
         renderer_resolver: RendererResolver | None = None,
-        surface_provider: RendererSurfaceProvider | None = None,
     ) -> None:
         super().__init__()
         self._renderer_resolver = renderer_resolver
@@ -41,7 +39,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             for renderer in (renderers or [])
         ]
         self._sync_device_display_mode()
-        self.surface_provider = surface_provider or RendererSurfaceProvider()
 
     def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []
@@ -93,7 +90,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             window=window,
             peripheral_manager=self.state.peripheral_manager,
             orientation=orientation,
-            surface_provider=self.surface_provider,
         )
         if result is not None and window.screen is not None:
             window.screen.blit(result, (0, 0))
@@ -127,9 +123,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-        surface_provider: RendererSurfaceProvider | None = None,
     ) -> pygame.Surface | None:
-        helper = surface_provider or RendererSurfaceProvider()
         surfaces: list[pygame.Surface] = []
         for renderer in renderers:
             try:
@@ -138,7 +132,6 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
                     window=window,
                     peripheral_manager=peripheral_manager,
                     orientation=orientation,
-                    surface_provider=helper,
                 )
             except Exception:
                 logger.exception("Error processing renderer %s", renderer.name)
@@ -155,9 +148,8 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-        surface_provider: RendererSurfaceProvider,
     ) -> pygame.Surface:
-        scratch_window = window.get_scratch_screen(
+        scratch_window = window.create_scratch_context(
             orientation=orientation,
             display_mode=renderer.device_display_mode,
         )
@@ -173,7 +165,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
             orientation=orientation,
         )
         assert scratch_window.screen is not None
-        return surface_provider.postprocess_input_screen(
+        return ComposedRenderer._postprocess_surface(
             screen=scratch_window.screen,
             orientation=orientation,
             display_mode=renderer.device_display_mode,
@@ -188,6 +180,45 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         for surface in surfaces:
             base.blit(surface, (0, 0))
         return base
+
+    @staticmethod
+    def _postprocess_surface(
+        screen: pygame.Surface,
+        *,
+        orientation: Orientation,
+        display_mode: DeviceDisplayMode,
+    ) -> pygame.Surface:
+        if display_mode != DeviceDisplayMode.MIRRORED:
+            return screen
+        layout: Layout = orientation.layout
+        return ComposedRenderer._tile_surface(
+            screen=screen,
+            rows=layout.rows,
+            cols=layout.columns,
+        )
+
+    @staticmethod
+    def _tile_surface(
+        screen: pygame.Surface,
+        *,
+        rows: int,
+        cols: int,
+    ) -> pygame.Surface:
+        tile_width, tile_height = screen.get_size()
+        target_size = (tile_width * cols, tile_height * rows)
+        tiled_surface = pygame.Surface(target_size, pygame.SRCALPHA)
+        if Configuration.render_tile_strategy() == RenderTileStrategy.BLITS:
+            positions = [
+                (col * tile_width, row * tile_height)
+                for row in range(rows)
+                for col in range(cols)
+            ]
+            tiled_surface.blits([(screen, pos) for pos in positions])
+            return tiled_surface
+        for row in range(rows):
+            for col in range(cols):
+                tiled_surface.blit(screen, (col * tile_width, row * tile_height))
+        return tiled_surface
 
     def _sync_device_display_mode(self) -> None:
         self.device_display_mode = self.required_display_mode(self.renderers)

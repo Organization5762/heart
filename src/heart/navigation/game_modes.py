@@ -46,9 +46,21 @@ INITIALIZATION_TERMINAL_BAR_WIDTH = 24
 
 
 @dataclass
+class ModeEntry:
+    title_renderer: StatefulBaseRenderer
+    renderer: StatefulBaseRenderer
+
+
+@dataclass(frozen=True)
+class GameModeInitializationContext:
+    window: DisplayContext
+    peripheral_manager: PeripheralManager
+    orientation: Orientation
+
+
+@dataclass
 class GameModeState:
-    title_renderers: list[StatefulBaseRenderer] = field(default_factory=list)
-    renderers: list[StatefulBaseRenderer] = field(default_factory=list)
+    entries: list[ModeEntry] = field(default_factory=list)
     post_processors: list[StatefulBaseRenderer] = field(default_factory=list)
     in_select_mode: bool = True
     last_long_button_value: int = 0
@@ -61,10 +73,12 @@ class GameModeState:
     gaussian_sigma: float = DEFAULT_GAUSSIAN_SIGMA
 
     def active_renderer(self) -> StatefulBaseRenderer:
-        assert len(self.renderers) > 0, "Must have at least one renderer to select from"
+        assert len(self.entries) > 0, "Must have at least one renderer to select from"
         offset = self._active_mode_index + self.mode_offset
-        mode_index = offset % len(self.renderers)
+        mode_index = offset % len(self.entries)
         last_scene_index = self.previous_mode_index
+        active_entry = self.entries[mode_index]
+        previous_entry = self.entries[last_scene_index]
 
         if last_scene_index != mode_index:
             from heart.navigation import (  # avoids circular imports for patching
@@ -81,8 +95,8 @@ class GameModeState:
             if self.gaussian_sigma != DEFAULT_GAUSSIAN_SIGMA:
                 provider_kwargs["gaussian_sigma"] = self.gaussian_sigma
             provider = SlideTransitionProvider(
-                renderer_a=self.title_renderers[last_scene_index],
-                renderer_b=self.title_renderers[mode_index],
+                renderer_a=previous_entry.title_renderer,
+                renderer_b=active_entry.title_renderer,
                 direction=slide_dir,
                 **provider_kwargs,
             )
@@ -97,10 +111,10 @@ class GameModeState:
                 return self.sliding_transition
 
         if self.in_select_mode:
-            return self.title_renderers[mode_index]
+            return active_entry.title_renderer
 
         self.previous_mode_index = mode_index
-        return self.renderers[mode_index]
+        return active_entry.renderer
 
     def _resolve_slide_direction(
         self,
@@ -115,8 +129,8 @@ class GameModeState:
             return 1
         if self.mode_offset < 0:
             return -1
-        forward_steps = (mode_index - last_scene_index) % len(self.renderers)
-        backward_steps = (last_scene_index - mode_index) % len(self.renderers)
+        forward_steps = (mode_index - last_scene_index) % len(self.entries)
+        backward_steps = (last_scene_index - mode_index) % len(self.entries)
         return 1 if forward_steps <= backward_steps else -1
 
 
@@ -129,17 +143,16 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def __init__(self, renderer_resolver: "RendererResolver" | None = None) -> None:
         super().__init__()
-        self._init_context: tuple[
-            DisplayContext,
-            PeripheralManager,
-            Orientation,
-        ] | None = None
+        self._initialization_context: GameModeInitializationContext | None = None
         self._renderer_resolver = renderer_resolver
         # TODO: Fix this wonkiness
         self.device_display_mode = None
 
     def _internal_device_display_mode(self) -> DeviceDisplayMode:
-        renderers = self.state.renderers + self.state.title_renderers
+        renderers = [
+            *[entry.renderer for entry in self.state.entries],
+            *[entry.title_renderer for entry in self.state.entries],
+        ]
         if any(
             renderer.device_display_mode == DeviceDisplayMode.OPENGL
             for renderer in renderers
@@ -153,7 +166,11 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> GameModeState:
-        self._init_context = (window, peripheral_manager, orientation)
+        self._initialization_context = GameModeInitializationContext(
+            window=window,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
         if self._state is not None:
             self._initialize_registered_renderers(
                 window, peripheral_manager, orientation
@@ -168,17 +185,27 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         )
         return state
 
-    def add_new_pages(
-        self, title_renderer: StatefulBaseRenderer, renderers: StatefulBaseRenderer
+    def _register_mode(
+        self,
+        title_renderer: StatefulBaseRenderer,
+        renderer: StatefulBaseRenderer,
     ) -> None:
         if self._state is None:
             self.set_state(GameModeState())
-        self.state.renderers.append(renderers)
-        self.state.title_renderers.append(title_renderer)
-        if self.is_initialized() and self._init_context is not None:
-            window, peripheral_manager, orientation = self._init_context
-            title_renderer.initialize(window, peripheral_manager, orientation)
-            renderers.initialize(window, peripheral_manager, orientation)
+        self.state.entries.append(
+            ModeEntry(title_renderer=title_renderer, renderer=renderer)
+        )
+        if self.is_initialized() and self._initialization_context is not None:
+            title_renderer.initialize(
+                self._initialization_context.window,
+                self._initialization_context.peripheral_manager,
+                self._initialization_context.orientation,
+            )
+            renderer.initialize(
+                self._initialization_context.window,
+                self._initialization_context.peripheral_manager,
+                self._initialization_context.orientation,
+            )
 
     def add_sleep_mode(self) -> None:
         sleep_title = [
@@ -208,7 +235,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             renderer_resolver=self._renderer_resolver,
         )
         title_renderer = self._build_title_renderer("Untitled")
-        self.add_new_pages(title_renderer, new_scene)
+        self._register_mode(title_renderer, new_scene)
         return new_scene
 
     def add_mode(
@@ -229,7 +256,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             title = "Untitled"
 
         title_renderer = self._build_title_renderer(title)
-        self.add_new_pages(title_renderer, result)
+        self._register_mode(title_renderer, result)
         return result
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
@@ -240,7 +267,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         return list(self.state.post_processors)
 
     def is_empty(self) -> bool:
-        return len(self.state.renderers) == 0
+        return len(self.state.entries) == 0
 
     def real_process(
         self, window: DisplayContext, orientation: Orientation
@@ -254,8 +281,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
                 self.state._active_mode_index += self.state.mode_offset
                 self.state.mode_offset = 0
             else:
-                for renderer in self.state.renderers:
-                    renderer.reset()
+                for entry in self.state.entries:
+                    entry.renderer.reset()
                 for renderer in self.state.post_processors:
                     renderer.reset()
 
@@ -294,8 +321,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def _initialization_renderers(self) -> list[StatefulBaseRenderer]:
         return [
-            *self.state.title_renderers,
-            *self.state.renderers,
+            *[entry.title_renderer for entry in self.state.entries],
+            *[entry.renderer for entry in self.state.entries],
             *self.state.post_processors,
         ]
 
@@ -326,9 +353,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         if not pygame.font.get_init():
             pygame.font.init()
         font = pygame.font.Font(None, INITIALIZATION_FONT_SIZE_PX)
-        label = (
-            f"Initializing app controller components ({completed} of {total})"
-        )
+        label = f"Initializing game mode renderers ({completed} of {total})"
         text_surface = font.render(label, True, INITIALIZATION_TEXT_COLOR)
         text_rect = text_surface.get_rect()
         text_rect.midbottom = (
@@ -371,7 +396,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             + ("-" * (INITIALIZATION_TERMINAL_BAR_WIDTH - filled_units))
         )
         logger.info(
-            "Initializing app controller components (%s of %s) [%s]",
+            "Initializing game mode renderers (%s of %s) [%s]",
             completed,
             total,
             bar,

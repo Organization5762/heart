@@ -13,7 +13,6 @@ from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
-from heart.runtime.rendering.variants import RendererVariant
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import shutdown
 
@@ -26,7 +25,6 @@ logger = get_logger(__name__)
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 DependencyT = TypeVar("DependencyT")
 DEFAULT_MAX_FPS = 500
-DEFAULT_RENDER_VARIANT = RendererVariant.ITERATIVE
 EDGE_THRESHOLD = 1
 
 
@@ -36,12 +34,10 @@ class GameLoop:
         device: Device,
         resolver: RuntimeContainer | None = None,
         max_fps: int = DEFAULT_MAX_FPS,
-        render_variant: RendererVariant = DEFAULT_RENDER_VARIANT,
     ) -> None:
         self.context_container = self._prepare_container(
             device=device,
             resolver=resolver,
-            render_variant=render_variant,
         )
         self.initialized = False
         self.device = self.context_container.resolve(Device)
@@ -215,17 +211,12 @@ class GameLoop:
         *,
         device: Device,
         resolver: RuntimeContainer | None,
-        render_variant: RendererVariant,
     ) -> RuntimeContainer:
         if resolver is None:
-            return build_runtime_container(
-                device=device,
-                render_variant=render_variant,
-            )
+            return build_runtime_container(device=device)
         configure_runtime_container(
             container=resolver,
             device=device,
-            render_variant=render_variant,
         )
         return resolver
 

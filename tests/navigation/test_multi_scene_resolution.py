@@ -6,7 +6,6 @@ from heart.device import Device
 from heart.navigation import MultiScene
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.container import build_runtime_container
-from heart.runtime.rendering.variants import RendererVariant
 
 
 class _ContainerScene(StatefulBaseRenderer[int]):
@@ -24,10 +23,7 @@ class TestMultiSceneResolution:
 
     def test_resolves_scene_types_at_construction(self, device: Device) -> None:
         """Verify scene classes resolve via Lagom at init so multi-scene compositions stay container-aware."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.ITERATIVE,
-        )
+        container = build_runtime_container(device=device)
         container[_ContainerScene] = _ContainerScene
 
         multi_scene = MultiScene([_ContainerScene], renderer_resolver=container)

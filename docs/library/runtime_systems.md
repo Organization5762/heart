@@ -46,9 +46,6 @@ re-touching the renderers. This keeps outputs observable and enables recursive f
 
 ## Metrics and Logging
 
-- `heart.runtime.render.pacing.RenderLoopPacer` supports adaptive loop timing when
-  `HEART_RENDER_LOOP_PACING_STRATEGY=adaptive` is set, bounded by
-  `HEART_RENDER_LOOP_PACING_MIN_INTERVAL_MS` and utilization targets.
 - Log sampling is coordinated through `heart.utilities.logging_control.get_logging_controller()`
   (see `docs/library/tooling_and_configuration.md`).
 

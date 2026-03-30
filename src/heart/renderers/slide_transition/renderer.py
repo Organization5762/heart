@@ -102,11 +102,11 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         state = self.state
         new_orientation = Rectangle.with_layout(1, 1)
 
-        window_a = window.get_scratch_screen(
+        window_a = window.create_scratch_context(
             orientation=new_orientation,
             display_mode=self.provider.renderer_a.device_display_mode,
         )
-        window_b = window.get_scratch_screen(
+        window_b = window.create_scratch_context(
             orientation=new_orientation,
             display_mode=self.provider.renderer_b.device_display_mode,
         )

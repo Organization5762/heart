@@ -675,8 +675,6 @@ def main() -> None:
 
     from heart.device.local import LocalScreen
     from heart.runtime.container import build_runtime_container
-    from heart.runtime.rendering.variants import RendererVariant
-    from heart.utilities.env import Configuration
 
     profiling = os.environ.get("PROFILING", "False").lower() == "true"
     check_frames = int(os.environ.get("CHECK_FRAMES", "100"))
@@ -702,13 +700,9 @@ def main() -> None:
 
     frame_count = 0
 
-    render_variant = RendererVariant.parse(Configuration.render_variant())
     orientation = Rectangle.with_layout(1, 1)
     device = LocalScreen(width=width, height=height, orientation=orientation)
-    container = build_runtime_container(
-        device=device,
-        render_variant=render_variant,
-    )
+    container = build_runtime_container(device=device)
     manager = container.resolve(PeripheralManager)
     manager.detect()
     manager.start()

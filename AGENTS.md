@@ -135,6 +135,13 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
 - `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
+- `2026-03-30`: `.venv/bin/python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py tests/runtime/test_display_context.py tests/runtime/test_container.py tests/navigation/test_composed_renderer_resolution.py tests/navigation/test_multi_scene_resolution.py tests/renderers/test_combined_bpm_screen_resolution.py tests/utilities/test_env.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format` after removing unused rendering env knobs and the orphaned runtime timing helper.
+- `2026-03-30`: `.venv/bin/pytest tests/utilities/test_env.py tests/test_environment_core_logic.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
 - `2026-03-30`: `.venv/bin/python scripts/render_code_flow.py --output docs/code_flow.svg`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmppRsW2Z` in this sandbox.
 - `2026-03-30`: `.venv/bin/isort packages src tests`
