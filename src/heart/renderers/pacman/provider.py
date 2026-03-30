@@ -7,6 +7,7 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pacman.state import PacmanGhostState
 from heart.utilities.reactivex_threads import pipe_in_background
 
@@ -18,13 +19,14 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
         width: int,
         height: int,
         peripheral_manager: PeripheralManager,
+        randomness: RandomnessProvider,
         rng: random.Random | None = None,
     ) -> None:
         self._width = width
         self._height = height
         self._peripheral_manager = peripheral_manager
         self._asset_version = 0
-        self._rng = rng or random.Random()
+        self._rng = rng or randomness.rng()
 
     def observable(self) -> reactivex.Observable[PacmanGhostState]:
         initial_state = self._spawn_state(

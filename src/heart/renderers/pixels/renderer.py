@@ -4,6 +4,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.pixels.provider import (BorderStateProvider,
                                              RainStateProvider,
@@ -55,8 +56,10 @@ class Border(StatefulBaseRenderer[BorderState]):
 class Rain(StatefulBaseRenderer[RainState]):
     def __init__(
         self,
+        randomness: RandomnessProvider,
         provider: RainStateProvider | None = None,
     ) -> None:
+        self._randomness = randomness
         self._provider: RainStateProvider | None = provider
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -75,6 +78,7 @@ class Rain(StatefulBaseRenderer[RainState]):
                 width=width,
                 height=height,
                 peripheral_manager=peripheral_manager,
+                randomness=self._randomness,
             )
             self.builder = self._provider
         super().initialize(window, peripheral_manager, orientation)
@@ -93,7 +97,12 @@ class Rain(StatefulBaseRenderer[RainState]):
 
 
 class Slinky(StatefulBaseRenderer[SlinkyState]):
-    def __init__(self, provider: SlinkyStateProvider | None = None) -> None:
+    def __init__(
+        self,
+        randomness: RandomnessProvider,
+        provider: SlinkyStateProvider | None = None,
+    ) -> None:
+        self._randomness = randomness
         self._provider: SlinkyStateProvider | None = provider
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -112,6 +121,7 @@ class Slinky(StatefulBaseRenderer[SlinkyState]):
                 width=width,
                 height=height,
                 peripheral_manager=peripheral_manager,
+                randomness=self._randomness,
             )
             self.builder = self._provider
         super().initialize(window, peripheral_manager, orientation)

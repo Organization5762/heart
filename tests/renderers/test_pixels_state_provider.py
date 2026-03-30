@@ -9,6 +9,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pixels.provider import (RainStateProvider,
                                              SlinkyStateProvider)
 from heart.renderers.pixels.state import RainState, SlinkyState
@@ -70,6 +71,7 @@ class TestPixelStateProviderTransitions:
             width=width,
             height=height,
             peripheral_manager=PeripheralManager(),
+            randomness=RandomnessProvider(seed=1),
             rng=rng,
         )
         state = state_cls(starting_point=starting_point, current_y=current_y)
@@ -101,6 +103,7 @@ class TestPixelStateProviderTransitions:
             width=width,
             height=height,
             peripheral_manager=PeripheralManager(),
+            randomness=RandomnessProvider(seed=1),
             rng=rng,
         )
         state = state_cls(starting_point=starting_point, current_y=current_y)

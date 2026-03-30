@@ -6,6 +6,7 @@ from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.pacman.provider import PacmanGhostStateProvider
 from heart.renderers.pacman.state import PacmanGhostState
@@ -13,7 +14,12 @@ from heart.runtime.display_context import DisplayContext
 
 
 class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
-    def __init__(self, builder: PacmanGhostStateProvider | None = None) -> None:
+    def __init__(
+        self,
+        randomness: RandomnessProvider,
+        builder: PacmanGhostStateProvider | None = None,
+    ) -> None:
+        self._randomness = randomness
         self._builder = builder
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -35,6 +41,7 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
                 width=width,
                 height=height,
                 peripheral_manager=peripheral_manager,
+                randomness=self._randomness,
             )
             self.builder = self._builder
         super().initialize(window, peripheral_manager, orientation)

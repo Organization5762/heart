@@ -6,6 +6,7 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.random_pixel.provider import RandomPixelStateProvider
 from heart.renderers.random_pixel.state import RandomPixelState
@@ -18,12 +19,15 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
         num_pixels: int = 1,
         color: Color | None = None,
         brightness: float = 1.0,
+        *,
+        randomness: RandomnessProvider,
         provider: RandomPixelStateProvider | None = None,
         provider_factory: Callable[..., RandomPixelStateProvider] | None = None,
     ) -> None:
         self.num_pixels = num_pixels
         self.brightness = brightness
         self._initial_color = color
+        self._randomness = randomness
         self._provider_factory = provider_factory or RandomPixelStateProvider
         self._provider: RandomPixelStateProvider | None = provider
 
@@ -44,6 +48,7 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
                 num_pixels=self.num_pixels,
                 peripheral_manager=peripheral_manager,
                 initial_color=self._initial_color,
+                randomness=self._randomness,
             )
             self.builder = self._provider
         super().initialize(window, peripheral_manager, orientation)

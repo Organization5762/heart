@@ -4,6 +4,7 @@ import numpy as np
 
 from heart.display.color import Color
 from heart.navigation import MultiScene
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.artist import ArtistScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.renderers.heart_title_screen import HeartTitleScreen
@@ -33,6 +34,7 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 def configure(loop: GameLoop) -> None:
+    randomness = RandomnessProvider()
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.resolve_renderer_from_container(KirbyScene)
 
@@ -218,6 +220,7 @@ def configure(loop: GameLoop) -> None:
             screen_count=4,
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
+            randomness=randomness,
         )
     )
 
@@ -225,11 +228,11 @@ def configure(loop: GameLoop) -> None:
     confetti.add_renderer(
         loop.compose(
             [
-                RandomPixel(num_pixels=40000, brightness=0.05),
-                RandomPixel(num_pixels=4000, brightness=0.10),
-                RandomPixel(num_pixels=2000, brightness=0.25),
-                RandomPixel(num_pixels=500, brightness=0.50),
-                RandomPixel(num_pixels=50, brightness=1),
+                RandomPixel(num_pixels=40000, brightness=0.05, randomness=randomness),
+                RandomPixel(num_pixels=4000, brightness=0.10, randomness=randomness),
+                RandomPixel(num_pixels=2000, brightness=0.25, randomness=randomness),
+                RandomPixel(num_pixels=500, brightness=0.50, randomness=randomness),
+                RandomPixel(num_pixels=50, brightness=1, randomness=randomness),
             ]
         )
     )
