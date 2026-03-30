@@ -7,7 +7,8 @@ from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.renderers.sliding_image.state import SlidingImageState, SlidingRendererState
+from heart.renderers.sliding_image.state import (SlidingImageState,
+                                                 SlidingRendererState)
 from heart.utilities.reactivex_threads import pipe_in_background
 
 

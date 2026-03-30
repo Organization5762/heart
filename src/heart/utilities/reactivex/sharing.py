@@ -5,10 +5,8 @@ from reactivex import operators as ops
 from reactivex.disposable import Disposable
 from reactivex.scheduler import TimeoutScheduler
 
-from heart.utilities.env import (
-    ReactivexStreamConnectMode,
-    ReactivexStreamShareStrategy,
-)
+from heart.utilities.env import (ReactivexStreamConnectMode,
+                                 ReactivexStreamShareStrategy)
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex.coalescing import coalesce_latest
 from heart.utilities.reactivex.instrumentation import instrument_stream
