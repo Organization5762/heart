@@ -32,6 +32,8 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
 - When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
 - Use module-level constants for default argument values and shared string literals in firmware helpers so configuration stays consistent.
+- Keep mixed PyO3 packages in a `rust/<package>/` layout with the Rust crate in `src/`, Python shims in `python/<package>/`, and a private native submodule exposed via `tool.maturin.module-name` to avoid import ambiguity.
+- PyO3 stub-generation binaries require a linkable Python 3.11 runtime in addition to Rust; if `cargo run --bin stub_gen` fails with unresolved `Py*` symbols, install or point PyO3 at a Python 3.11 build before retrying.
 
 ## Dependency Injection (Lagom)
 
