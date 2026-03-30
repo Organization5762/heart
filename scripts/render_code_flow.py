@@ -104,7 +104,7 @@ COLUMNS: tuple[ColumnDef, ...] = (
             NodeDef("input_debug_tap", "InputDebugTap", "input"),
             NodeDef("switch", "Switch / BluetoothSwitch", "input"),
             NodeDef("gamepad", "Gamepad", "input"),
-            NodeDef("sensors", "Accelerometer / Phyphox", "input"),
+            NodeDef("sensors", "Accelerometer", "input"),
             NodeDef("heart_rate", "HeartRateManager", "input"),
             NodeDef("phone_text", "PhoneText", "input"),
         ),

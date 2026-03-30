@@ -3,6 +3,7 @@
 ## Installing
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
+
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
@@ -176,6 +177,20 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/isort tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix tests/peripheral/test_input_core.py`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmpmtFWG0` in this sandbox.
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
+- `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py tests/runtime/test_container.py`
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
 - `2026-03-30`: `.venv/bin/pytest tests/utilities/test_reactivex_threads.py tests/peripheral/test_switch.py tests/peripheral/test_input_core.py tests/utilities/test_env.py`
 - `2026-03-30`: `.venv/bin/isort src/heart/utilities/reactivex_threads.py src/heart/runtime/peripheral_runtime.py src/heart/utilities/env/reactivex.py src/heart/utilities/env/enums.py src/heart/utilities/env/__init__.py src/heart/peripheral/core/input/debug.py src/heart/peripheral/core/input/frame.py src/heart/peripheral/core/input/keyboard.py src/heart/peripheral/core/input/gamepad.py src/heart/peripheral/core/input/accelerometer.py src/heart/peripheral/core/input/profiles/navigation.py src/heart/peripheral/core/input/profiles/mandelbrot.py src/heart/peripheral/keyboard.py src/heart/peripheral/switch.py src/heart/peripheral/sensor.py src/heart/peripheral/phyphox.py tests/utilities/test_env.py tests/utilities/test_reactivex_threads.py tests/peripheral/test_switch.py tests/peripheral/test_input_core.py`

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cached_property
 
 import pygame
 import reactivex
 from reactivex import operators as ops
-from reactivex.subject import BehaviorSubject
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
@@ -30,6 +30,22 @@ class MandelbrotEdgeState:
     toggle_auto_mode_revision: int = 0
     palette_revision: int = 0
     palette_delta: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class MandelbrotMotionState:
+    move_x: float = 0.0
+    move_y: float = 0.0
+    pan_x: float = 0.0
+    pan_y: float = 0.0
+    move_multiplier: float = 1.0
+    home_modifier: bool = False
+    plus_held: bool = False
+    minus_held: bool = False
+    zoom_in: bool = False
+    zoom_out: bool = False
+    increase_iterations: bool = False
+    decrease_iterations: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +73,25 @@ class MandelbrotControlState:
     palette_delta: int = 0
 
 
+class MandelbrotCommandKind(StrEnum):
+    NEXT_VIEW_MODE = "next_view_mode"
+    PREVIOUS_VIEW_MODE = "previous_view_mode"
+    TOGGLE_DEBUG = "toggle_debug"
+    TOGGLE_FPS = "toggle_fps"
+    SET_ORIENTATION = "set_orientation"
+    TOGGLE_ORIENTATION = "toggle_orientation"
+    TOGGLE_AUTO_MODE = "toggle_auto_mode"
+    CYCLE_PALETTE = "cycle_palette"
+
+
+@dataclass(frozen=True, slots=True)
+class MandelbrotCommand:
+    kind: MandelbrotCommandKind
+    source: str
+    orientation_kind: str | None = None
+    palette_delta: int = 0
+
+
 class MandelbrotControlProfile:
     def __init__(
         self,
@@ -67,11 +102,9 @@ class MandelbrotControlProfile:
         self._keyboard = keyboard_controller
         self._gamepad = gamepad_controller
         self._debug_tap = debug_tap
-        self._edge_state = BehaviorSubject(MandelbrotEdgeState())
-        self._wire_edges()
 
     @cached_property
-    def _observable(self) -> reactivex.Observable[MandelbrotControlState]:
+    def motion_state(self) -> reactivex.Observable[MandelbrotMotionState]:
         keyboard_state = reactivex.combine_latest(
             self._keyboard.key_state(pygame.K_w),
             self._keyboard.key_state(pygame.K_s),
@@ -94,8 +127,49 @@ class MandelbrotControlProfile:
         )
 
         stream = pipe_in_background(
-            reactivex.combine_latest(keyboard_state, gamepad_state, self._edge_state),
-            ops.map(lambda latest: self._to_state(*latest)),
+            reactivex.combine_latest(keyboard_state, gamepad_state),
+            ops.map(lambda latest: self._to_motion_state(*latest)),
+            ops.distinct_until_changed(),
+        )
+        return instrument_input_stream(
+            stream,
+            tap=self._debug_tap,
+            stage=InputDebugStage.LOGICAL,
+            stream_name="mandelbrot.motion_state",
+            source_id="mandelbrot.motion",
+            upstream_ids=("keyboard", "gamepad"),
+        )
+
+    @cached_property
+    def command_events(self) -> reactivex.Observable[MandelbrotCommand]:
+        stream = pipe_in_background(
+            reactivex.merge(
+                self._keyboard_command_streams(),
+                self._gamepad_command_streams(),
+            ),
+        )
+        return instrument_input_stream(
+            stream,
+            tap=self._debug_tap,
+            stage=InputDebugStage.LOGICAL,
+            stream_name="mandelbrot.command",
+            source_id=lambda command: command.source,
+            upstream_ids=("keyboard", "gamepad"),
+        )
+
+    @cached_property
+    def _edge_state(self) -> reactivex.Observable[MandelbrotEdgeState]:
+        return pipe_in_background(
+            self.command_events,
+            ops.scan(self._apply_command, seed=MandelbrotEdgeState()),
+            ops.start_with(MandelbrotEdgeState()),
+        )
+
+    @cached_property
+    def _observable(self) -> reactivex.Observable[MandelbrotControlState]:
+        stream = pipe_in_background(
+            reactivex.combine_latest(self.motion_state, self._edge_state),
+            ops.map(lambda latest: self._to_compatibility_state(*latest)),
             ops.distinct_until_changed(),
         )
         return instrument_input_stream(
@@ -104,88 +178,242 @@ class MandelbrotControlProfile:
             stage=InputDebugStage.LOGICAL,
             stream_name="mandelbrot.controls",
             source_id="mandelbrot",
-            upstream_ids=("keyboard", "gamepad"),
+            upstream_ids=("mandelbrot.motion_state", "mandelbrot.command"),
         )
 
     def observable(self) -> reactivex.Observable[MandelbrotControlState]:
         return self._observable
 
-    def _wire_edges(self) -> None:
-        self._keyboard.key_pressed(pygame.K_LEFTBRACKET).subscribe(
-            on_next=lambda _event: self._bump(previous_view_mode_revision=1)
-        )
-        self._keyboard.key_pressed(pygame.K_RIGHTBRACKET).subscribe(
-            on_next=lambda _event: self._bump(next_view_mode_revision=1)
-        )
-        self._keyboard.key_pressed(pygame.K_i).subscribe(
-            on_next=lambda _event: self._bump(toggle_debug_revision=1)
-        )
-        self._keyboard.key_pressed(pygame.K_p).subscribe(
-            on_next=lambda _event: self._bump(toggle_fps_revision=1)
-        )
-        self._keyboard.key_pressed(pygame.K_0).subscribe(
-            on_next=lambda _event: self._bump(
-                toggle_orientation_revision=1,
-                orientation_kind="rectangle",
-            )
-        )
-        self._keyboard.key_pressed(pygame.K_9).subscribe(
-            on_next=lambda _event: self._bump(
-                toggle_orientation_revision=1,
-                orientation_kind="cube",
-            )
-        )
-        self._gamepad.button_tapped(GamepadButton.ZR).subscribe(
-            on_next=lambda _button: self._bump(next_view_mode_revision=1)
-        )
-        self._gamepad.button_tapped(GamepadButton.ZL).subscribe(
-            on_next=lambda _button: self._bump(previous_view_mode_revision=1)
-        )
-        self._gamepad.button_tapped(GamepadButton.HOME).subscribe(
-            on_next=lambda _button: self._bump(toggle_auto_mode_revision=1)
-        )
-        self._gamepad.button_tapped(GamepadButton.NORTH).subscribe(
-            on_next=lambda _button: self._bump(palette_revision=1, palette_delta=1)
-        )
-        self._gamepad.button_tapped(GamepadButton.WEST).subscribe(
-            on_next=lambda _button: self._bump(palette_revision=1, palette_delta=-1)
+    def _keyboard_command_streams(self) -> reactivex.Observable[MandelbrotCommand]:
+        return reactivex.merge(
+            self._keyboard.key_pressed(pygame.K_LEFTBRACKET).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.PREVIOUS_VIEW_MODE,
+                        source="keyboard.left_bracket",
+                    )
+                )
+            ),
+            self._keyboard.key_pressed(pygame.K_RIGHTBRACKET).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.NEXT_VIEW_MODE,
+                        source="keyboard.right_bracket",
+                    )
+                )
+            ),
+            self._keyboard.key_pressed(pygame.K_i).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.TOGGLE_DEBUG,
+                        source="keyboard.i",
+                    )
+                )
+            ),
+            self._keyboard.key_pressed(pygame.K_p).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.TOGGLE_FPS,
+                        source="keyboard.p",
+                    )
+                )
+            ),
+            self._keyboard.key_pressed(pygame.K_0).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.SET_ORIENTATION,
+                        source="keyboard.0",
+                        orientation_kind="rectangle",
+                    )
+                )
+            ),
+            self._keyboard.key_pressed(pygame.K_9).pipe(
+                ops.map(
+                    lambda _event: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.SET_ORIENTATION,
+                        source="keyboard.9",
+                        orientation_kind="cube",
+                    )
+                )
+            ),
         )
 
-    def _bump(self, **updates: int | str | None) -> None:
-        state = self._edge_state.value
-        next_state = MandelbrotEdgeState(
-            next_view_mode_revision=state.next_view_mode_revision + int(
-                updates.get("next_view_mode_revision", 0)
+    def _gamepad_command_streams(self) -> reactivex.Observable[MandelbrotCommand]:
+        return reactivex.merge(
+            self._gamepad.button_tapped(GamepadButton.ZR).pipe(
+                ops.map(
+                    lambda _button: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.NEXT_VIEW_MODE,
+                        source="gamepad.zr",
+                    )
+                )
             ),
-            previous_view_mode_revision=state.previous_view_mode_revision + int(
-                updates.get("previous_view_mode_revision", 0)
+            self._gamepad.button_tapped(GamepadButton.ZL).pipe(
+                ops.map(
+                    lambda _button: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.PREVIOUS_VIEW_MODE,
+                        source="gamepad.zl",
+                    )
+                )
             ),
-            toggle_debug_revision=state.toggle_debug_revision + int(
-                updates.get("toggle_debug_revision", 0)
+            self._gamepad.button_tapped(GamepadButton.HOME).pipe(
+                ops.map(
+                    lambda _button: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.TOGGLE_AUTO_MODE,
+                        source="gamepad.home",
+                    )
+                )
             ),
-            toggle_fps_revision=state.toggle_fps_revision + int(
-                updates.get("toggle_fps_revision", 0)
+            self._gamepad.button_tapped(GamepadButton.NORTH).pipe(
+                ops.map(
+                    lambda _button: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.CYCLE_PALETTE,
+                        source="gamepad.north",
+                        palette_delta=1,
+                    )
+                )
             ),
-            toggle_orientation_revision=state.toggle_orientation_revision + int(
-                updates.get("toggle_orientation_revision", 0)
+            self._gamepad.button_tapped(GamepadButton.WEST).pipe(
+                ops.map(
+                    lambda _button: MandelbrotCommand(
+                        kind=MandelbrotCommandKind.CYCLE_PALETTE,
+                        source="gamepad.west",
+                        palette_delta=-1,
+                    )
+                )
             ),
-            orientation_kind=updates.get("orientation_kind", state.orientation_kind),
-            toggle_auto_mode_revision=state.toggle_auto_mode_revision + int(
-                updates.get("toggle_auto_mode_revision", 0)
+            self._combo_command(
+                GamepadButton.HOME,
+                GamepadButton.PLUS,
+                MandelbrotCommand(
+                    kind=MandelbrotCommandKind.TOGGLE_ORIENTATION,
+                    source="gamepad.home_plus",
+                ),
             ),
-            palette_revision=state.palette_revision + int(
-                updates.get("palette_revision", 0)
+            self._combo_command(
+                GamepadButton.HOME,
+                GamepadButton.MINUS,
+                MandelbrotCommand(
+                    kind=MandelbrotCommandKind.TOGGLE_FPS,
+                    source="gamepad.home_minus",
+                ),
             ),
-            palette_delta=int(updates.get("palette_delta", state.palette_delta)),
         )
-        self._edge_state.on_next(next_state)
 
-    def _to_state(
+    def _combo_command(
+        self,
+        modifier: GamepadButton,
+        primary: GamepadButton,
+        command: MandelbrotCommand,
+    ) -> reactivex.Observable[MandelbrotCommand]:
+        return pipe_in_background(
+            reactivex.combine_latest(
+                self._gamepad.button_held(modifier),
+                self._gamepad.button_held(primary),
+            ),
+            ops.map(lambda latest: bool(latest[0]) and bool(latest[1])),
+            ops.distinct_until_changed(),
+            ops.filter(bool),
+            ops.map(lambda _active: command),
+        )
+
+    def _apply_command(
+        self,
+        state: MandelbrotEdgeState,
+        command: MandelbrotCommand,
+    ) -> MandelbrotEdgeState:
+        if command.kind is MandelbrotCommandKind.NEXT_VIEW_MODE:
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision + 1,
+                previous_view_mode_revision=state.previous_view_mode_revision,
+                toggle_debug_revision=state.toggle_debug_revision,
+                toggle_fps_revision=state.toggle_fps_revision,
+                toggle_orientation_revision=state.toggle_orientation_revision,
+                orientation_kind=state.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        if command.kind is MandelbrotCommandKind.PREVIOUS_VIEW_MODE:
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision,
+                previous_view_mode_revision=state.previous_view_mode_revision + 1,
+                toggle_debug_revision=state.toggle_debug_revision,
+                toggle_fps_revision=state.toggle_fps_revision,
+                toggle_orientation_revision=state.toggle_orientation_revision,
+                orientation_kind=state.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        if command.kind is MandelbrotCommandKind.TOGGLE_DEBUG:
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision,
+                previous_view_mode_revision=state.previous_view_mode_revision,
+                toggle_debug_revision=state.toggle_debug_revision + 1,
+                toggle_fps_revision=state.toggle_fps_revision,
+                toggle_orientation_revision=state.toggle_orientation_revision,
+                orientation_kind=state.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        if command.kind is MandelbrotCommandKind.TOGGLE_FPS:
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision,
+                previous_view_mode_revision=state.previous_view_mode_revision,
+                toggle_debug_revision=state.toggle_debug_revision,
+                toggle_fps_revision=state.toggle_fps_revision + 1,
+                toggle_orientation_revision=state.toggle_orientation_revision,
+                orientation_kind=state.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        if command.kind in (
+            MandelbrotCommandKind.SET_ORIENTATION,
+            MandelbrotCommandKind.TOGGLE_ORIENTATION,
+        ):
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision,
+                previous_view_mode_revision=state.previous_view_mode_revision,
+                toggle_debug_revision=state.toggle_debug_revision,
+                toggle_fps_revision=state.toggle_fps_revision,
+                toggle_orientation_revision=state.toggle_orientation_revision + 1,
+                orientation_kind=command.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        if command.kind is MandelbrotCommandKind.TOGGLE_AUTO_MODE:
+            return MandelbrotEdgeState(
+                next_view_mode_revision=state.next_view_mode_revision,
+                previous_view_mode_revision=state.previous_view_mode_revision,
+                toggle_debug_revision=state.toggle_debug_revision,
+                toggle_fps_revision=state.toggle_fps_revision,
+                toggle_orientation_revision=state.toggle_orientation_revision,
+                orientation_kind=state.orientation_kind,
+                toggle_auto_mode_revision=state.toggle_auto_mode_revision + 1,
+                palette_revision=state.palette_revision,
+                palette_delta=state.palette_delta,
+            )
+        return MandelbrotEdgeState(
+            next_view_mode_revision=state.next_view_mode_revision,
+            previous_view_mode_revision=state.previous_view_mode_revision,
+            toggle_debug_revision=state.toggle_debug_revision,
+            toggle_fps_revision=state.toggle_fps_revision,
+            toggle_orientation_revision=state.toggle_orientation_revision,
+            orientation_kind=state.orientation_kind,
+            toggle_auto_mode_revision=state.toggle_auto_mode_revision,
+            palette_revision=state.palette_revision + 1,
+            palette_delta=command.palette_delta,
+        )
+
+    def _to_motion_state(
         self,
         keyboard_state: tuple[object, ...],
         gamepad_state: tuple[object, ...],
-        edge_state: MandelbrotEdgeState,
-    ) -> MandelbrotControlState:
+    ) -> MandelbrotMotionState:
         (
             key_w,
             key_s,
@@ -219,7 +447,7 @@ class MandelbrotControlProfile:
         )
         move_multiplier = 2.0 if button_b_held else 1.0
 
-        return MandelbrotControlState(
+        return MandelbrotMotionState(
             move_x=keyboard_move_x + left_stick.x,
             move_y=keyboard_move_y - left_stick.y,
             pan_x=right_stick.x,
@@ -232,6 +460,26 @@ class MandelbrotControlProfile:
             zoom_out=zoom_out,
             increase_iterations=increase_iterations,
             decrease_iterations=decrease_iterations,
+        )
+
+    def _to_compatibility_state(
+        self,
+        motion_state: MandelbrotMotionState,
+        edge_state: MandelbrotEdgeState,
+    ) -> MandelbrotControlState:
+        return MandelbrotControlState(
+            move_x=motion_state.move_x,
+            move_y=motion_state.move_y,
+            pan_x=motion_state.pan_x,
+            pan_y=motion_state.pan_y,
+            move_multiplier=motion_state.move_multiplier,
+            home_modifier=motion_state.home_modifier,
+            plus_held=motion_state.plus_held,
+            minus_held=motion_state.minus_held,
+            zoom_in=motion_state.zoom_in,
+            zoom_out=motion_state.zoom_out,
+            increase_iterations=motion_state.increase_iterations,
+            decrease_iterations=motion_state.decrease_iterations,
             next_view_mode_revision=edge_state.next_view_mode_revision,
             previous_view_mode_revision=edge_state.previous_view_mode_revision,
             toggle_debug_revision=edge_state.toggle_debug_revision,

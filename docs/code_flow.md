@@ -64,7 +64,7 @@ flowchart LR
         FrameHandoff["Frame Thread Handoff Queue\n(drained in `PeripheralRuntime.tick()`)"]
         Switch["Switch / BluetoothSwitch"]
         Gamepad["Gamepad"]
-        Sensors["Accelerometer / Phyphox"]
+        Sensors["Accelerometer"]
         HeartRate["HeartRateManager"]
         PhoneText["PhoneText"]
     end

@@ -1,9 +1,11 @@
-from heart.device import Cube, Rectangle
-from heart.peripheral.core.input import (MandelbrotControlProfile,
-                                         MandelbrotControlState)
-from heart.renderers.mandelbrot.controls import SceneControls
+from collections import deque
 
-DEFAULT_STICK_MULTIPLIER = 1.0
+from heart.device import Cube, Rectangle
+from heart.peripheral.core.input import (MandelbrotCommand,
+                                         MandelbrotCommandKind,
+                                         MandelbrotControlProfile,
+                                         MandelbrotMotionState)
+from heart.renderers.mandelbrot.controls import SceneControls
 
 
 class KeyboardControls:
@@ -13,12 +15,13 @@ class KeyboardControls:
         profile: MandelbrotControlProfile,
     ) -> None:
         self.scene_controls = scene_controls
-        self._latest_state = MandelbrotControlState()
-        self._previous_state = MandelbrotControlState()
-        profile.observable().subscribe(on_next=self._set_latest_state)
+        self._latest_motion_state = MandelbrotMotionState()
+        self._pending_commands: deque[MandelbrotCommand] = deque()
+        profile.motion_state.subscribe(on_next=self._set_latest_motion_state)
+        profile.command_events.subscribe(on_next=self._queue_command)
 
     def update(self) -> None:
-        state = self._latest_state
+        state = self._latest_motion_state
 
         if state.move_x != 0 or state.move_y != 0:
             self.scene_controls._move(
@@ -44,50 +47,34 @@ class KeyboardControls:
         if state.decrease_iterations:
             self.scene_controls._decrease_max_iterations()
 
-        if state.next_view_mode_revision != self._previous_state.next_view_mode_revision:
-            self.scene_controls._increment_view_mode()
-        if (
-            state.previous_view_mode_revision
-            != self._previous_state.previous_view_mode_revision
-        ):
-            self.scene_controls._decrement_view_mode()
-        if state.toggle_debug_revision != self._previous_state.toggle_debug_revision:
-            self.scene_controls._toggle_debug()
-        if (
-            state.toggle_fps_revision != self._previous_state.toggle_fps_revision
-            or self._minus_combo_rising(state)
-        ):
-            self.scene_controls._toggle_fps()
+        while self._pending_commands:
+            self._apply_command(self._pending_commands.popleft())
 
-        if state.toggle_orientation_revision != self._previous_state.toggle_orientation_revision:
-            self._apply_keyboard_orientation(state.orientation_kind)
-        elif self._plus_combo_rising(state):
-            orientation = self.scene_controls.state.orientation
-            match orientation:
-                case Cube():
-                    self.scene_controls.state.orientation = Rectangle(
-                        orientation.layout
-                    )
-                case Rectangle():
-                    self.scene_controls.state.orientation = Cube(orientation.layout)
+    def _apply_command(self, command: MandelbrotCommand) -> None:
+        match command.kind:
+            case MandelbrotCommandKind.NEXT_VIEW_MODE:
+                self.scene_controls._increment_view_mode()
+            case MandelbrotCommandKind.PREVIOUS_VIEW_MODE:
+                self.scene_controls._decrement_view_mode()
+            case MandelbrotCommandKind.TOGGLE_DEBUG:
+                self.scene_controls._toggle_debug()
+            case MandelbrotCommandKind.TOGGLE_FPS:
+                self.scene_controls._toggle_fps()
+            case MandelbrotCommandKind.SET_ORIENTATION:
+                self._apply_orientation(command.orientation_kind)
+            case MandelbrotCommandKind.TOGGLE_ORIENTATION:
+                self._toggle_orientation()
+            case MandelbrotCommandKind.TOGGLE_AUTO_MODE:
+                if self.scene_controls.state.mode == "auto":
+                    self.scene_controls.state.reset()
+                    self.scene_controls.state.set_mode_free()
+                else:
+                    self.scene_controls.state.reset()
+                    self.scene_controls.state.set_mode_auto()
+            case MandelbrotCommandKind.CYCLE_PALETTE:
+                self.scene_controls.cycle_palette(forward=command.palette_delta >= 0)
 
-        if (
-            state.toggle_auto_mode_revision
-            != self._previous_state.toggle_auto_mode_revision
-        ):
-            if self.scene_controls.state.mode == "auto":
-                self.scene_controls.state.reset()
-                self.scene_controls.state.set_mode_free()
-            else:
-                self.scene_controls.state.reset()
-                self.scene_controls.state.set_mode_auto()
-
-        if state.palette_revision != self._previous_state.palette_revision:
-            self.scene_controls.cycle_palette(forward=state.palette_delta >= 0)
-
-        self._previous_state = state
-
-    def _apply_keyboard_orientation(self, orientation_kind: str | None) -> None:
+    def _apply_orientation(self, orientation_kind: str | None) -> None:
         if orientation_kind == "rectangle":
             self.scene_controls.state.orientation = Rectangle(
                 self.scene_controls.state.orientation.layout
@@ -97,17 +84,16 @@ class KeyboardControls:
                 self.scene_controls.state.orientation.layout
             )
 
-    def _plus_combo_rising(self, state: MandelbrotControlState) -> bool:
-        current = state.home_modifier and state.plus_held
-        previous = self._previous_state.home_modifier and self._previous_state.plus_held
-        return current and not previous
+    def _toggle_orientation(self) -> None:
+        orientation = self.scene_controls.state.orientation
+        match orientation:
+            case Cube():
+                self.scene_controls.state.orientation = Rectangle(orientation.layout)
+            case Rectangle():
+                self.scene_controls.state.orientation = Cube(orientation.layout)
 
-    def _minus_combo_rising(self, state: MandelbrotControlState) -> bool:
-        current = state.home_modifier and state.minus_held
-        previous = (
-            self._previous_state.home_modifier and self._previous_state.minus_held
-        )
-        return current and not previous
+    def _queue_command(self, command: MandelbrotCommand) -> None:
+        self._pending_commands.append(command)
 
-    def _set_latest_state(self, state: MandelbrotControlState) -> None:
-        self._latest_state = state
+    def _set_latest_motion_state(self, state: MandelbrotMotionState) -> None:
+        self._latest_motion_state = state

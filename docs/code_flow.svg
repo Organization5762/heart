@@ -149,7 +149,7 @@
     </text>
     <rect x="762.00" y="766.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="798.00" fill="#f8fafc" text-anchor="middle">
-      <tspan x="874.00">Accelerometer / Phyphox</tspan>
+      <tspan x="874.00">Accelerometer</tspan>
     </text>
     <rect x="762.00" y="848.00" width="224.00" height="64.00" rx="12" fill="#0369a1" stroke="#0369a1" />
     <text x="874.00" y="880.00" fill="#f8fafc" text-anchor="middle">

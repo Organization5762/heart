@@ -16,7 +16,7 @@ Document the scheduler-topology changes made for RxPy 5 so pygame-bound input de
 - Shared scheduler roles are now explicit and bounded. `background_scheduler()`, `input_scheduler()`, and `blocking_io_scheduler()` are long-lived shared schedulers whose worker counts come from `HEART_RX_BACKGROUND_MAX_WORKERS`, `HEART_RX_INPUT_MAX_WORKERS`, and `HEART_RX_BLOCKING_IO_MAX_WORKERS`.
 - The dead `HEART_RX_EVENT_BUS_SCHEDULER` path was removed from `src/heart/utilities/env/reactivex.py` and the related enum export was deleted because the repository no longer applies an event-bus scheduler branch.
 - Keyboard and gamepad polling now use the input scheduler for timer emission and the frame-thread handoff for pygame-bound sampling in `src/heart/peripheral/core/input/keyboard.py`, `src/heart/peripheral/core/input/gamepad.py`, and the compatibility layer in `src/heart/peripheral/keyboard.py`.
-- Blocking readers moved off the startup path. `src/heart/peripheral/switch.py` subscribes its serial reader on the blocking-IO scheduler, while `src/heart/peripheral/switch.py`, `src/heart/peripheral/sensor.py`, and `src/heart/peripheral/phyphox.py` now start their long-lived blocking loops on named background threads instead of pinning `PeripheralManager.start()`.
+- Blocking readers moved off the startup path. `src/heart/peripheral/switch.py` subscribes its serial reader on the blocking-IO scheduler, while `src/heart/peripheral/switch.py` and `src/heart/peripheral/sensor.py` now start their long-lived blocking loops on named background threads instead of pinning `PeripheralManager.start()`.
 - Input latency instrumentation is lightweight and local. `src/heart/peripheral/core/input/debug.py` records per-stream p50/p95/p99/max latency when payloads carry monotonic timestamps, while `src/heart/utilities/reactivex_threads.py` records frame-thread handoff delay so before-and-after comparisons can include the queue boundary itself.
 
 ## Source Map
@@ -25,5 +25,5 @@ Document the scheduler-topology changes made for RxPy 5 so pygame-bound input de
 - Runtime drain point: `src/heart/runtime/peripheral_runtime.py`
 - Input latency tracing: `src/heart/peripheral/core/input/debug.py`
 - Keyboard and gamepad polling: `src/heart/peripheral/core/input/keyboard.py`, `src/heart/peripheral/core/input/gamepad.py`, `src/heart/peripheral/keyboard.py`
-- Blocking peripherals: `src/heart/peripheral/switch.py`, `src/heart/peripheral/sensor.py`, `src/heart/peripheral/phyphox.py`
+- Blocking peripherals: `src/heart/peripheral/switch.py`, `src/heart/peripheral/sensor.py`
 - Validation: `tests/utilities/test_reactivex_threads.py`, `tests/peripheral/test_switch.py`, `tests/peripheral/test_input_core.py`, `tests/utilities/test_env.py`

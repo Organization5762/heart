@@ -25,8 +25,18 @@ from heart.peripheral.core.input.keyboard import \
 from heart.peripheral.core.input.keyboard import \
     KeyboardSnapshot as KeyboardSnapshot
 from heart.peripheral.core.input.profiles.mandelbrot import \
+    MandelbrotCommand as MandelbrotCommand
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    MandelbrotCommandKind as MandelbrotCommandKind
+from heart.peripheral.core.input.profiles.mandelbrot import \
     MandelbrotControlProfile as MandelbrotControlProfile
 from heart.peripheral.core.input.profiles.mandelbrot import \
     MandelbrotControlState as MandelbrotControlState
+from heart.peripheral.core.input.profiles.mandelbrot import \
+    MandelbrotMotionState as MandelbrotMotionState
+from heart.peripheral.core.input.profiles.navigation import \
+    NavigationIntent as NavigationIntent
+from heart.peripheral.core.input.profiles.navigation import \
+    NavigationIntentKind as NavigationIntentKind
 from heart.peripheral.core.input.profiles.navigation import \
     NavigationProfile as NavigationProfile
