@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from heart.utilities.logging import get_logger
-from heart.utilities.optional_imports import optional_import_attribute
+from heart_firmware_io.logging import get_logger
+from heart_firmware_io.optional_imports import optional_import_attribute
 
 logger = get_logger(__name__)
 
@@ -37,7 +37,7 @@ else:
 def _require_ble_dependencies() -> None:
     if ble is None or uart is None:
         raise ModuleNotFoundError(
-            "adafruit_ble is required to use heart.firmware_io.bluetooth. "
+            "adafruit_ble is required to use heart_firmware_io.bluetooth. "
             "Install the CircuitPython BLE libraries to enable Bluetooth communication."
         )
 

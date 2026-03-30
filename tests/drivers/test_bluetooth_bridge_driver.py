@@ -4,8 +4,7 @@ from collections import deque
 
 import driver_loader
 import pytest
-
-from heart.firmware_io import constants
+from heart_firmware_io import constants
 
 
 class FakeDigitalInOut:

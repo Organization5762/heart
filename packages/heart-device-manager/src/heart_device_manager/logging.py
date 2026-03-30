@@ -1,0 +1,98 @@
+"""Package-local logging helpers."""
+
+from __future__ import annotations
+
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+LOG_LEVEL_ENV_VAR = "LOG_LEVEL"
+LOG_DIR_ENV_VAR = "HEART_LOG_DIR"
+DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_LOG_SUBDIR = Path(".heart") / "logs"
+MAX_LOG_BYTES = 10 * 1024 * 1024
+BACKUP_COUNT = 5
+
+_LOGGER_CACHE: dict[str, logging.Logger] = {}
+
+
+def _resolve_log_directory() -> Path | None:
+    log_dir = os.getenv(LOG_DIR_ENV_VAR)
+    if log_dir:
+        path = Path(log_dir).expanduser()
+    else:
+        path = Path.home() / DEFAULT_LOG_SUBDIR
+
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    return path
+
+
+def _sanitize_logger_name(name: str) -> str:
+    sanitized = name.replace("/", "_").replace(os.sep, "_")
+    sanitized = sanitized.replace("..", ".")
+    return sanitized.replace(".", "_") or "root"
+
+
+def _attach_handler(
+    logger: logging.Logger,
+    handler: logging.Handler,
+    formatter: logging.Formatter,
+    level: int,
+) -> None:
+    handler.setFormatter(formatter)
+    handler.setLevel(level)
+    logger.addHandler(handler)
+
+
+def _configure_logger(logger: logging.Logger, log_level: str) -> None:
+    level = getattr(logging, log_level, logging.INFO)
+    logger.setLevel(level)
+
+    if logger.handlers:
+        return
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    stream_handler = logging.StreamHandler()
+    _attach_handler(logger, stream_handler, formatter, level)
+
+    log_dir = _resolve_log_directory()
+    if log_dir is not None:
+        log_filename = log_dir / f"{_sanitize_logger_name(logger.name)}.log"
+        try:
+            file_handler = RotatingFileHandler(
+                log_filename,
+                maxBytes=MAX_LOG_BYTES,
+                backupCount=BACKUP_COUNT,
+                encoding="utf-8",
+            )
+        except OSError:
+            file_handler = None
+        if file_handler is not None:
+            _attach_handler(logger, file_handler, formatter, level)
+    logger.propagate = False
+
+
+def _build_logger(name: str) -> logging.Logger:
+    logger_class = logging.getLoggerClass()
+    logger = logger_class(name)
+    logger.parent = logging.root
+    return logger
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Return a logger configured with stream and rolling file handlers."""
+
+    log_level = os.getenv(LOG_LEVEL_ENV_VAR, DEFAULT_LOG_LEVEL).upper()
+    logger = _LOGGER_CACHE.get(name)
+    if logger is None:
+        logger = _build_logger(name)
+        _LOGGER_CACHE[name] = logger
+    _configure_logger(logger, log_level)
+    return logger

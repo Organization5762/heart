@@ -4,8 +4,7 @@ import json
 
 import pytest
 from driver_loader import load_driver_module, make_module, temporary_modules
-
-from heart.firmware_io import constants
+from heart_firmware_io import constants
 
 
 class FakeDigitalInOut:
@@ -29,7 +28,7 @@ digitalio_stub = make_module(
 )
 
 with temporary_modules({"digitalio": digitalio_stub}):
-    rotary_encoder = importlib.import_module("heart.firmware_io.rotary_encoder")
+    rotary_encoder = importlib.import_module("heart_firmware_io.rotary_encoder")
 
 
 class StubRotaryModule:

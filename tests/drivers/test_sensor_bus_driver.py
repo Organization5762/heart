@@ -3,8 +3,7 @@ import json
 
 import pytest
 from driver_loader import load_driver_module, make_module
-
-from heart.firmware_io import constants
+from heart_firmware_io import constants
 
 
 class FakeRate:

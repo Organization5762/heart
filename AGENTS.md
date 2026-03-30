@@ -12,6 +12,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Define device identifiers (such as firmware `device_name` values) as module-level constants instead of inline literals.
 - Avoid building filesystem paths via string concatenation. Use `os.path.join` or `pathlib.Path` instead.
 - Prefer `pathlib.Path` over `os.path.join` when constructing paths, and ensure functions annotated to return a `Path` return a `Path` object.
+- Keep standalone distributable packages under `packages/<distribution-name>/src/<import_name>` and wire them into the root project with local `tool.uv.sources` path dependencies.
 - When CLI arguments accept file paths, parse them as `pathlib.Path` objects and ensure parent directories exist before writing.
 - Avoid using `print` for runtime diagnostics in CLI commands; use the shared logger.
 - Avoid using `print` for runtime diagnostics in peripheral modules; use the shared logger.

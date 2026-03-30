@@ -15,8 +15,8 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Mapping
 
-from heart.firmware_io import device_id, identity
-from heart.firmware_io.constants import RADIO_PACKET
+from heart_firmware_io import device_id, identity
+from heart_firmware_io.constants import RADIO_PACKET
 
 DEVICE_NAME = "radio-bridge"
 RADIO_BRIDGE_LOOP_INTERVAL_SECONDS = 0.1

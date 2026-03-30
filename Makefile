@@ -1,4 +1,4 @@
-PYTHON_SOURCES = src tests
+PYTHON_SOURCES = packages src tests
 DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
@@ -60,5 +60,5 @@ dev-session:
 	@uv run python scripts/devex_session.py
 
 pi_install:
-	@sudo bash src/heart/manage/install_rgb_matrix.sh
+	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_rgb_matrix.sh
 	@sudo uv pip install --system -e . --break-system-packages

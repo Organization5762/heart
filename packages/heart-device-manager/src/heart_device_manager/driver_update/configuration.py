@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import toml
-
-from heart.manage.driver_update.exceptions import UpdateError
-from heart.utilities.logging import get_logger
+from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,0 +1,24 @@
+[project]
+name = "heart-device-manager"
+version = "0.2.0"
+description = "Driver update utilities for Heart hardware deployments."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Heart Runtime Maintainers" },
+]
+maintainers = [
+    { name = "Heart Runtime Maintainers" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "heart-firmware-io",
+    "toml",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.6,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+heart-firmware-io = { path = "../heart-firmware-io" }

@@ -4,9 +4,8 @@ from adafruit_lis2mdl import LIS2MDL
 from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 from adafruit_lsm303_accel import LSM303_Accel
-
-from heart.firmware_io import constants
-from heart.utilities.logging import get_logger
+from heart_firmware_io import constants
+from heart_firmware_io.logging import get_logger
 
 logger = get_logger(__name__)
 

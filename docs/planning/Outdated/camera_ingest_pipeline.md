@@ -38,7 +38,7 @@ We will extend the Heart runtime to capture, buffer, and distribute 60 FPS RGB c
 
 - [ ] Scaffold `drivers/camera/driver.py` with DMA setup, IRQ handlers, and teardown mirroring `drivers/rotary_encoder` patterns.
 - [ ] Expose a `CameraFrameBuffer` under `src/heart/peripheral/camera/buffer.py` that manages double-buffered DMA regions and backpressure APIs.
-- [ ] Extend `src/heart/firmware_io/__init__.py` to negotiate frame formats, crop regions, and trigger rate with the capture hardware.
+- [ ] Extend `packages/heart-firmware-io/src/heart_firmware_io/__init__.py` to negotiate frame formats, crop regions, and trigger rate with the capture hardware.
 - [ ] Wire `src/heart/loop.py` to poll the camera buffer via non-blocking calls and enqueue frames on `src/heart/events/queue.py`.
 - [ ] Introduce `src/heart/programs/camera.py` with a `CameraIngestProgram` that publishes navigation-ready frame references.
 - [ ] Implement frame-drop and downsample controls in `src/heart/peripheral/__init__.py` for overloaded consumers.
@@ -54,7 +54,7 @@ We will extend the Heart runtime to capture, buffer, and distribute 60 FPS RGB c
 
 Discovery quantifies how much CSI-2 bandwidth the PiCowbell path can consume before impacting USB and I²C peripherals. Profiling in `drivers/sensor_bus` and `src/heart/environment.py` gives concrete throughput headroom numbers. We capture this data and a frame budget so the DMA configuration has explicit limits. The MLX90640 path remains a secondary ingest option that validates our ability to downsample and multiplex lower-bandwidth thermal data.
 
-Implementation starts by mirroring proven driver scaffolding. `drivers/camera/driver.py` sets up the CSI-2 interface, configures DMA descriptors, and delivers interrupts to the runtime. `CameraFrameBuffer` exposes a clean API for non-blocking frame swaps, while `src/heart/firmware_io` negotiates parameters with the hardware. Integrating with `src/heart/loop.py` ensures frame transfer occurs without blocking other event sources, and `CameraIngestProgram` maps raw buffers to downstream consumers. Finally, backpressure controls allow us to drop or downsample frames when programs fall behind, keeping the runtime responsive.
+Implementation starts by mirroring proven driver scaffolding. `drivers/camera/driver.py` sets up the CSI-2 interface, configures DMA descriptors, and delivers interrupts to the runtime. `CameraFrameBuffer` exposes a clean API for non-blocking frame swaps, while `packages/heart-firmware-io/src/heart_firmware_io` negotiates parameters with the hardware. Integrating with `src/heart/loop.py` ensures frame transfer occurs without blocking other event sources, and `CameraIngestProgram` maps raw buffers to downstream consumers. Finally, backpressure controls allow us to drop or downsample frames when programs fall behind, keeping the runtime responsive.
 
 Validation layers observability on top of the capture stack. Telemetry emitted from the driver and buffer layers surfaces frame timing, DMA overruns, and queue saturation. Synthetic tests in `tests/peripheral/test_camera_stream.py` run high frame rates while verifying that event loop latency remains in spec. Thermal camera coexistence tests confirm the pipeline handles mixed bandwidth workloads. Documentation updates teach operators how to interpret telemetry, tune frame rates, and troubleshoot hardware or firmware faults.
 
@@ -64,7 +64,7 @@ Validation layers observability on top of the capture stack. Telemetry emitted f
 | --- | --- | --- | --- |
 | Capture | `drivers/camera/driver.py` | CSI-2 lanes → DMA engine | Configures double-buffered descriptors and IRQ routing. |
 | Buffering | `src/heart/peripheral/camera/buffer.py` | Shared memory → Python bindings | Provides `acquire_frame()` / `release_frame()` APIs with latency counters. |
-| Coordination | `src/heart/firmware_io/__init__.py` | Control plane over I²C/USB | Negotiates format, triggers, and runtime parameters. |
+| Coordination | `packages/heart-firmware-io/src/heart_firmware_io/__init__.py` | Control plane over I²C/USB | Negotiates format, triggers, and runtime parameters. |
 | Scheduling | `src/heart/loop.py` + `src/heart/events/queue.py` | Async queue | Moves frames into queue without blocking tick loop. |
 | Consumption | `src/heart/programs/camera.py` | Program registry | Publishes events for navigation, display, or ML inference. |
 | Observability | `src/heart/utilities/telemetry.py` | Metrics sink | Emits timing, saturation, and error counters for dashboards. |
@@ -87,4 +87,4 @@ Validation layers observability on top of the capture stack. Telemetry emitted f
 
 ## Outcome Snapshot
 
-Once complete, the Heart runtime streams 60 FPS RGB frames from the PiCowbell camera while simultaneously handling MLX90640 thermal updates and existing peripherals. Developers can tune frame formats through `src/heart/firmware_io`, monitor real-time metrics in Grafana, and rely on automated tests to guard against regressions. The pipeline delivers frames to navigation and rendering programs without violating event loop latency budgets, and the documentation provides clear steps for operations, troubleshooting, and future scaling.
+Once complete, the Heart runtime streams 60 FPS RGB frames from the PiCowbell camera while simultaneously handling MLX90640 thermal updates and existing peripherals. Developers can tune frame formats through `packages/heart-firmware-io/src/heart_firmware_io`, monitor real-time metrics in Grafana, and rely on automated tests to guard against regressions. The pipeline delivers frames to navigation and rendering programs without violating event loop latency budgets, and the documentation provides clear steps for operations, troubleshooting, and future scaling.

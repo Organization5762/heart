@@ -33,38 +33,38 @@ requires-python = ">= 3.11"
 
 dependencies = [
     "bleak",
+    "heart-device-manager",
+    "heart-firmware-io",
     "lagom",
+    "moderngl",
     "numba",
     "numpy",
     "openant",
     "opencv-python",
+    "paho-mqtt",
     "Pillow",
     "protobuf",
+    "PyOpenGL>=3.1.0",
     "pygame==2.6.1",
     "pyserial",
     "reactivex",
     "requests",
     "scipy",
-    "toml",
+    "sounddevice",
     "tqdm",
     "typer-slim",
-    "PyOpenGL>=3.1.0",
-    "moderngl",
-    "sounddevice",
-    "paho-mqtt",
     "websockets>=15.0.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "Pillow",
-    "scipy",
     "mypy",
+    "Pillow",
+    "pre-commit",
+    "scipy",
     "types-protobuf",
     "types-requests",
     "types-toml",
-    # Git
-    "pre-commit",
 ]
 
 [build-system]
@@ -72,7 +72,8 @@ requires = ["uv_build>=0.9.6,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-heart = { path = "./src/heart" }
+heart-device-manager = { path = "./packages/heart-device-manager" }
+heart-firmware-io = { path = "./packages/heart-firmware-io" }
 
 [tool.setuptools.package-data]
 heart = ["*.png"]
@@ -169,7 +170,12 @@ module = [
 ignore_errors = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [
+    "packages/heart-device-manager/src",
+    "packages/heart-firmware-io/src",
+    "src",
+    "tests",
+]
 testpaths = ["tests"]
 addopts = "-vv -n auto --dist=loadscope"
 markers = [
@@ -178,22 +184,22 @@ markers = [
 
 [dependency-groups]
 dev = [
-  {include-group = "lint"},
-  {include-group = "test"}
+    { include-group = "lint" },
+    { include-group = "test" },
 ]
 test = [
+    "ImageHash>=4.3.2",
     "hypothesis>=6.120.0",
     "pytest>=8.4.2",
     "pytest-benchmark>=5.2.0",
     "pytest-xdist>=3.8.0",
-    "ImageHash>=4.3.2",
 ]
 lint = [
     "docformatter[tomli]>=1.7.7",
     "isort>=7.0.0",
     "mdformat>=1.0.0",
     "mypy>=1.13.0",
-    "types-protobuf",
     "ruff>=0.14.3",
     "semgrep>=1.115.0",
+    "types-protobuf",
 ]

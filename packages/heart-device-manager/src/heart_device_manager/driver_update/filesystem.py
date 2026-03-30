@@ -3,8 +3,8 @@
 import shutil
 from pathlib import Path
 
-from heart.manage.driver_update.exceptions import UpdateError
-from heart.utilities.logging import get_logger
+from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ def copy_file(source: Path, destination: Path) -> None:
 
 
 def ensure_driver_files(driver_path: Path) -> None:
-    from heart.manage.driver_update.layout import DRIVER_FILES
+    from heart_device_manager.driver_update.layout import DRIVER_FILES
 
     missing = [
         name for name in DRIVER_FILES if not (driver_path / name).exists()

@@ -502,6 +502,8 @@ version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "bleak" },
+    { name = "heart-device-manager" },
+    { name = "heart-firmware-io" },
     { name = "lagom" },
     { name = "moderngl" },
     { name = "numba" },
@@ -518,7 +520,6 @@ dependencies = [
     { name = "requests" },
     { name = "scipy" },
     { name = "sounddevice" },
-    { name = "toml" },
     { name = "tqdm" },
     { name = "typer-slim" },
     { name = "websockets" },
@@ -570,6 +571,8 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bleak" },
+    { name = "heart-device-manager", directory = "packages/heart-device-manager" },
+    { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
     { name = "lagom" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
@@ -590,7 +593,6 @@ requires-dist = [
     { name = "scipy" },
     { name = "scipy", marker = "extra == 'dev'" },
     { name = "sounddevice" },
-    { name = "toml" },
     { name = "tqdm" },
     { name = "typer-slim" },
     { name = "types-protobuf", marker = "extra == 'dev'" },
@@ -631,6 +633,26 @@ test = [
     { name = "pytest-benchmark", specifier = ">=5.2.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
 ]
+
+[[package]]
+name = "heart-device-manager"
+version = "0.2.0"
+source = { directory = "packages/heart-device-manager" }
+dependencies = [
+    { name = "heart-firmware-io" },
+    { name = "toml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
+    { name = "toml" },
+]
+
+[[package]]
+name = "heart-firmware-io"
+version = "0.2.0"
+source = { directory = "packages/heart-firmware-io" }
 
 [[package]]
 name = "httpcore"

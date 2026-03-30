@@ -17,10 +17,10 @@ fetch specific attributes from optional modules.
 
 - `src/heart/utilities/optional_imports.py` (`optional_import_attribute`)
 - `src/heart/peripheral/ir_sensor_array/solver.py` (least-squares lookup)
-- `src/heart/firmware_io/bluetooth.py` (BLE class lookups)
+- `packages/heart-firmware-io/src/heart_firmware_io/bluetooth.py` (BLE class lookups)
 
 ## Materials
 
 - `src/heart/utilities/optional_imports.py`
 - `src/heart/peripheral/ir_sensor_array/solver.py`
-- `src/heart/firmware_io/bluetooth.py`
+- `packages/heart-firmware-io/src/heart_firmware_io/bluetooth.py`

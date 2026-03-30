@@ -8,7 +8,7 @@ import sys
 from types import ModuleType
 from typing import Callable, Iterable, Mapping, TextIO
 
-from heart.firmware_io import constants
+from heart_firmware_io import constants
 
 supervisor: ModuleType | None
 if importlib.util.find_spec("supervisor") is not None:  # pragma: no cover - exercised on hardware

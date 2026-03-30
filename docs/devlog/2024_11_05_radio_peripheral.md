@@ -30,7 +30,7 @@ placeholder packets:
 {"event_type": "peripheral.radio.packet", "data": {}}
 ```
 
-The firmware keeps the identify handshake wired up via `heart.firmware_io.identity`
+The firmware keeps the identify handshake wired up via `heart_firmware_io.identity`
 so tools such as `scripts/driver_loader.py` can recognise the bridge. Replace the
 `_default_packet` helper with radio-specific reads once the FlowToys protocol is
 reverse engineered.

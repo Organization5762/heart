@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import pytest
+from heart_firmware_io import bluetooth
 from helpers.firmware_io import StubBLE, StubUART
-
-from heart.firmware_io import bluetooth
 
 
 class TestFirmwareIoBluetooth:
