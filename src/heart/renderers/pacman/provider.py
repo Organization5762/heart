@@ -6,12 +6,12 @@ import reactivex
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.pacman.state import PacmanGhostState
-from heart.renderers.state_provider import RngStateProvider
 from heart.utilities.reactivex_threads import pipe_in_background
 
 
-class PacmanGhostStateProvider(RngStateProvider[PacmanGhostState]):
+class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
     def __init__(
         self,
         *,
@@ -20,11 +20,11 @@ class PacmanGhostStateProvider(RngStateProvider[PacmanGhostState]):
         peripheral_manager: PeripheralManager,
         rng: random.Random | None = None,
     ) -> None:
-        super().__init__(rng=rng)
         self._width = width
         self._height = height
         self._peripheral_manager = peripheral_manager
         self._asset_version = 0
+        self._rng = rng or random.Random()
 
     def observable(self) -> reactivex.Observable[PacmanGhostState]:
         initial_state = self._spawn_state(
@@ -79,7 +79,7 @@ class PacmanGhostStateProvider(RngStateProvider[PacmanGhostState]):
         pacman_idx: int = 0,
         switch_pacman: bool = True,
     ) -> PacmanGhostState:
-        corner = self.rng.choice(
+        corner = self._rng.choice(
             ["top_left", "top_right", "bottom_left", "bottom_right"]
         )
         if corner == "top_left":

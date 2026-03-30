@@ -19,6 +19,7 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - Avoid wildcard imports; use explicit imports so dependencies stay clear and tooling can track usage.
 - Prefer f-strings over string concatenation when assembling Python strings so formatting stays readable.
 - Prefer mixins or composition over direct inheritance.
+- Prefer direct code over single-use wrapper layers; when a helper only forwards to one caller, inline it or delete it.
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
 - Use `heart.utilities.logging.get_logger` for internal logging so handlers and log levels stay consistent across modules.
 - Prefer `get_logger(__name__)` so loggers include their module path and stay consistent in telemetry.

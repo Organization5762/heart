@@ -9,12 +9,12 @@ from reactivex.subject import BehaviorSubject
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.random_pixel.state import RandomPixelState
-from heart.renderers.state_provider import RngStateProvider
 from heart.utilities.reactivex_threads import pipe_in_background
 
 
-class RandomPixelStateProvider(RngStateProvider[RandomPixelState]):
+class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
     def __init__(
         self,
         *,
@@ -25,12 +25,12 @@ class RandomPixelStateProvider(RngStateProvider[RandomPixelState]):
         initial_color: Color | None = None,
         rng: random.Random | None = None,
     ) -> None:
-        super().__init__(rng=rng)
         self._width = width
         self._height = height
         self._num_pixels = num_pixels
         self._peripheral_manager = peripheral_manager
         self._color = BehaviorSubject(initial_color)
+        self._rng = rng or random.Random()
 
     def observable(self) -> reactivex.Observable[RandomPixelState]:
         initial_color = self._color.value or Color.random()
@@ -69,6 +69,6 @@ class RandomPixelStateProvider(RngStateProvider[RandomPixelState]):
 
     def _random_pixels(self) -> tuple[tuple[int, int], ...]:
         return tuple(
-            (self.rng.randrange(self._width), self.rng.randrange(self._height))
+            (self._rng.randrange(self._width), self._rng.randrange(self._height))
             for _ in range(self._num_pixels)
         )

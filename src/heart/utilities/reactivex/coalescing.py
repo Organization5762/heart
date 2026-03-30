@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Callable
 
 import reactivex
+from reactivex.abc import SchedulerBase
 from reactivex.disposable import Disposable
 
 from heart.utilities.logging import get_logger
@@ -14,7 +15,7 @@ CoalesceCallable = Callable[[reactivex.Observable], reactivex.Observable]
 
 
 class CoalesceBuffer:
-    def __init__(self, buffer_time: float, scheduler: reactivex.scheduler.SchedulerBase):
+    def __init__(self, buffer_time: float, scheduler: SchedulerBase):
         self._buffer_time = buffer_time
         self._scheduler = scheduler
 
@@ -50,7 +51,7 @@ def coalesce_latest(buffer_time: float) -> CoalesceCallable:
 
 def coalesce_buffer_with_tracking(
     buffer_time: float,
-    scheduler: reactivex.scheduler.SchedulerBase | None = None,
+    scheduler: SchedulerBase | None = None,
 ) -> CoalesceCallable:
     """Coalesce emissions within the buffer window into the last value.
 
