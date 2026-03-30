@@ -3,6 +3,7 @@
 ## Installing
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
+- Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 
 ## Formatting
 
