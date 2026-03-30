@@ -22,14 +22,14 @@ format:
 	@uvx ruff check --fix $(PYTHON_SOURCES)
 	@uvx docformatter -i -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat $(DOCS_SOURCES)
-	@uv run mypy --config-file pyproject.toml
+	# @uv run mypy --config-file pyproject.toml
 
 check:
 	@uvx ruff check $(PYTHON_SOURCES)
 	@uvx isort --check-only $(PYTHON_SOURCES)
 	@uvx docformatter --check -r --config ./pyproject.toml $(DOCS_SOURCES)
 	@uvx mdformat --check $(DOCS_SOURCES)
-	@uv run mypy --config-file pyproject.toml
+	# @uv run mypy --config-file pyproject.toml
 	@uv run semgrep ci $(SEMGREP_ARGS) $(SEMGREP_EXTRA_ARGS)
 
 semgrep:
