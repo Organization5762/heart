@@ -1,3 +1,4 @@
+from heart.navigation import GameModes
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
@@ -7,7 +8,7 @@ from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop import GameLoop
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.runtime.rendering.pacing import RenderLoopPacer
-from heart.runtime.rendering.pipeline import RendererVariant, RenderPipeline
+from heart.runtime.rendering.variants import RendererVariant
 
 
 class TestRuntimeContainer:
@@ -20,14 +21,11 @@ class TestRuntimeContainer:
             render_variant=RendererVariant.BINARY,
         )
 
-        render_pipeline = container.resolve(RenderPipeline)
-
         assert container.resolve(PeripheralManager) is container.resolve(
             PeripheralManager
         )
         assert container.resolve(DisplayContext) is container.resolve(DisplayContext)
-        assert render_pipeline is container.resolve(RenderPipeline)
-        assert render_pipeline.renderer_variant is RendererVariant.BINARY
+        assert container.resolve(GameModes) is container.resolve(GameModes)
         assert container.resolve(RenderLoopPacer) is container.resolve(RenderLoopPacer)
         assert container.resolve(RandomnessProvider) is container.resolve(
             RandomnessProvider
@@ -86,7 +84,7 @@ class TestRuntimeContainer:
         components = container.resolve(GameLoopComponents)
 
         assert components.peripheral_manager is stub_manager
-        assert components.render_pipeline.renderer_variant is RendererVariant.BINARY
+        assert components.game_modes is container.resolve(GameModes)
 
     def test_game_loop_prefers_container_device(self, device) -> None:
         """Verify the GameLoop uses the container-provided Device so overrides remain consistent across services."""

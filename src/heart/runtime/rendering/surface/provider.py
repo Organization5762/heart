@@ -4,20 +4,10 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Layout, Orientation
-from heart.runtime.display_context import DisplayContext
-from heart.runtime.rendering.surface.cache import RendererSurfaceCache
 from heart.utilities.env import Configuration, RenderTileStrategy
 
 
 class RendererSurfaceProvider:
-    def __init__(
-        self,
-        display_context: DisplayContext,
-        surface_cache: RendererSurfaceCache | None = None,
-    ) -> None:
-        self._display_context = display_context
-        self._surface_cache = surface_cache or RendererSurfaceCache(display_context)
-
     def postprocess_input_screen(
         self,
         screen: pygame.Surface,

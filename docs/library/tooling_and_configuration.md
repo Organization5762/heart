@@ -25,9 +25,10 @@ Configuration modules live under `heart.programs.configurations` and expose
 Key patterns:
 
 - Register modes with `loop.add_mode(...)`.
-- Resolve renderers through `mode.resolve_renderer(loop.context_container, RendererClass)`.
+- Add container-wired default renderers with `mode.add_renderer(RendererClass)`.
+- Use `loop.resolve(RendererClass)` when you need a custom-configured instance before adding it.
 - Compose renderers with `ComposedRenderer` or schedule them with `MultiScene`.
-- Toggle a low-power fallback via `loop.app_controller.add_sleep_mode()`.
+- Toggle a low-power fallback via `loop.add_sleep_mode()`.
 
 Minimal example:
 

@@ -2,7 +2,7 @@
 
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.runtime.container import build_runtime_container
-from heart.runtime.rendering.pipeline import RendererVariant
+from heart.runtime.rendering.variants import RendererVariant
 
 
 class TestCombinedBpmScreenResolution:

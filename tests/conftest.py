@@ -12,7 +12,7 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import RuntimeContainer
 from heart.runtime.container.initialize import build_runtime_container
 from heart.runtime.game_loop import GameLoop
-from heart.runtime.rendering.pipeline import RendererVariant
+from heart.runtime.rendering.variants import RendererVariant
 
 settings.register_profile(
     "default",
@@ -110,7 +110,7 @@ class _StubMode:
         self.renderers.append(renderer)
 
 
-class _StubAppController:
+class _StubGameModes:
     def __init__(self) -> None:
         self.modes: list[_StubMode] = []
 
@@ -134,7 +134,7 @@ class _StubAppController:
 
 if "heart.navigation" not in sys.modules:
     navigation_stub = types.ModuleType("heart.navigation")
-    navigation_stub.AppController = _StubAppController
+    navigation_stub.GameModes = _StubGameModes
     navigation_stub.ComposedRenderer = object
     navigation_stub.MultiScene = object
     sys.modules["heart.navigation"] = navigation_stub

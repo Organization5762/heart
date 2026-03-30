@@ -7,9 +7,11 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
+from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
+from heart.renderers.color import RenderColor
 from heart.renderers.post_processing import (EdgePostProcessor,
                                              HueShiftPostProcessor,
                                              NullPostProcessor,
@@ -19,11 +21,15 @@ from heart.renderers.slide_transition import \
 from heart.renderers.slide_transition import \
     DEFAULT_STATIC_MASK_STEPS as SLIDE_DEFAULT_STATIC_MASK_STEPS
 from heart.renderers.slide_transition import SlideTransitionMode
+from heart.renderers.spritesheet import SpritesheetLoop
+from heart.renderers.text import TextRendering
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.renderers.slide_transition import SlideTransitionRenderer
+
+    from .renderer_specs import RendererResolver
 logger = get_logger(__name__)
 DEFAULT_TRANSITION_MODE = SlideTransitionMode.SLIDE
 DEFAULT_STATIC_MASK_STEPS = SLIDE_DEFAULT_STATIC_MASK_STEPS
@@ -121,14 +127,14 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     Navigation is built-in to this, assuming the user long-presses.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, renderer_resolver: "RendererResolver" | None = None) -> None:
         super().__init__()
         self._init_context: tuple[
-            pygame.Surface,
-            pygame.time.Clock,
+            DisplayContext,
             PeripheralManager,
             Orientation,
         ] | None = None
+        self._renderer_resolver = renderer_resolver
         # TODO: Fix this wonkiness
         self.device_display_mode = None
 
@@ -170,9 +176,61 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.state.renderers.append(renderers)
         self.state.title_renderers.append(title_renderer)
         if self.is_initialized() and self._init_context is not None:
-            window, clock, peripheral_manager, orientation = self._init_context
+            window, peripheral_manager, orientation = self._init_context
             title_renderer.initialize(window, peripheral_manager, orientation)
             renderers.initialize(window, peripheral_manager, orientation)
+
+    def add_sleep_mode(self) -> None:
+        sleep_title = [
+            SpritesheetLoop(
+                sheet_file_path="kirby_sleep_64.png",
+                metadata_file_path="kirby_sleep_64.json",
+                image_scale=0.5,
+                offset_y=-5,
+                disable_input=True,
+            ),
+            TextRendering(
+                text=["sleep"],
+                font="Grand9K Pixel.ttf",
+                font_size=16,
+                color=Color.kirby(),
+                y_location=0.55,
+            ),
+        ]
+        mode = self.add_mode(sleep_title)
+        mode.add_renderer(RenderColor(Color(0, 0, 0)))
+
+    def add_scene(self):
+        from .multi_scene import MultiScene
+
+        new_scene = MultiScene(
+            scenes=[],
+            renderer_resolver=self._renderer_resolver,
+        )
+        title_renderer = self._build_title_renderer("Untitled")
+        self.add_new_pages(title_renderer, new_scene)
+        return new_scene
+
+    def add_mode(
+        self,
+        title: str
+        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | type[StatefulBaseRenderer]
+        | StatefulBaseRenderer
+        | None = None,
+    ):
+        from .composed_renderer import ComposedRenderer
+
+        result = ComposedRenderer(
+            renderers=[],
+            renderer_resolver=self._renderer_resolver,
+        )
+        if title is None:
+            title = "Untitled"
+
+        title_renderer = self._build_title_renderer(title)
+        self.add_new_pages(title_renderer, result)
+        return result
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         active_renderer = self.state.active_renderer()
@@ -180,6 +238,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def get_post_processors(self) -> list[StatefulBaseRenderer]:
         return list(self.state.post_processors)
+
+    def is_empty(self) -> bool:
+        return len(self.state.renderers) == 0
 
     def real_process(
         self, window: DisplayContext, orientation: Orientation
@@ -324,3 +385,35 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             EdgePostProcessor(),
             NullPostProcessor(),
         ]
+
+    def _build_title_renderer(
+        self,
+        title: str
+        | list[StatefulBaseRenderer | type[StatefulBaseRenderer]]
+        | type[StatefulBaseRenderer]
+        | StatefulBaseRenderer,
+    ) -> StatefulBaseRenderer:
+        from .composed_renderer import ComposedRenderer
+
+        if isinstance(title, str):
+            return TextRendering(
+                text=[title],
+                font="Grand9K Pixel.ttf",
+                font_size=12,
+                color=Color(255, 105, 180),
+                y_location=0.5,
+            )
+        if isinstance(title, list):
+            composed = ComposedRenderer(
+                renderers=[],
+                renderer_resolver=self._renderer_resolver,
+            )
+            composed.add_renderer(*title)
+            return composed
+        if isinstance(title, type) and issubclass(title, StatefulBaseRenderer):
+            if self._renderer_resolver is None:
+                raise ValueError("GameModes requires a renderer resolver")
+            return self._renderer_resolver.resolve(title)
+        if isinstance(title, StatefulBaseRenderer):
+            return title
+        raise ValueError(f"Title must be a string or StatefulBaseRenderer, got: {title}")

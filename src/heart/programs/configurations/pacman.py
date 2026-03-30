@@ -16,5 +16,5 @@ def configure(loop: GameLoop) -> None:
             randomness=randomness,
         )
     )
-    mode.resolve_renderer_from_container(PacmanGhostRenderer)
+    mode.add_renderer(PacmanGhostRenderer)
     mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))

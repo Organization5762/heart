@@ -6,7 +6,7 @@ from heart.device import Device
 from heart.navigation import ComposedRenderer
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.container import build_runtime_container
-from heart.runtime.rendering.pipeline import RendererVariant
+from heart.runtime.rendering.variants import RendererVariant
 
 
 class _ContainerRenderer(StatefulBaseRenderer[int]):

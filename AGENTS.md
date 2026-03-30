@@ -135,6 +135,16 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/three_fractal/renderer.py tests/renderers/test_three_fractal_renderer.py`
 - `2026-03-30`: `.venv/bin/pytest tests/renderers/test_three_fractal_renderer.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format` failed because `uvx` could not write under `/Users/lampe/.local/share/uv/tools/.tmppRsW2Z` in this sandbox.
+- `2026-03-30`: `.venv/bin/isort packages src tests`
+- `2026-03-30`: `.venv/bin/ruff check --fix packages src tests`
+- `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
+- `2026-03-30`: `.venv/bin/mdformat docs`
+- `2026-03-30`: `.venv/bin/pytest tests/runtime/test_container.py tests/runtime/test_game_loop.py tests/navigation/test_composed_renderer_resolution.py tests/navigation/test_multi_scene_resolution.py tests/test_environment_core_logic.py tests/display/test_screen_recorder.py tests/renderers/test_combined_bpm_screen_resolution.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
+- `2026-03-30`: `.venv/bin/python scripts/render_code_flow.py --output docs/code_flow.svg` after updating `scripts/render_code_flow.py` for the `GameModes`/`ComposedRenderer` topology.
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test` after the final docstring-only test update.
 - `2026-03-30`: `.venv/bin/isort src/heart/utilities/env/rendering.py src/heart/runtime/rendering/renderer_processor.py tests/runtime/test_renderer_processor.py tests/utilities/test_env.py`
 - `2026-03-30`: `.venv/bin/ruff check --fix src/heart/utilities/env/rendering.py src/heart/runtime/rendering/renderer_processor.py tests/runtime/test_renderer_processor.py tests/utilities/test_env.py`
 - `2026-03-30`: `.venv/bin/pytest tests/runtime/test_renderer_processor.py`

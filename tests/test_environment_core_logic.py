@@ -5,13 +5,21 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pygame
 import pytest
 
-from heart.runtime.rendering.pipeline import RendererVariant
+from heart import DeviceDisplayMode
+from heart.navigation import ComposedRenderer
 from heart.utilities.color_conversion import (HSV_TO_BGR_CACHE,
                                               _convert_bgr_to_hsv,
                                               _convert_hsv_to_bgr)
 from heart.utilities.env import Configuration
+
+
+def _solid_surface(color: tuple[int, int, int]) -> pygame.Surface:
+    surface = pygame.Surface((8, 8), pygame.SRCALPHA)
+    surface.fill(color)
+    return surface
 
 
 @pytest.fixture(autouse=True)
@@ -147,78 +155,27 @@ class TestEnvironmentCoreLogic:
 
 
 
-    @pytest.mark.parametrize("values", [list("abcd"), list("abcde")])
-    def test_render_surfaces_binary_merges_all(
-        self,
-        loop, monkeypatch, render_merge_strategy_in_place, values: list[str]
-    ) -> None:
-        """Verify that the render pipeline binary merge combines all renderers. This validates the pairwise merge optimisation for high-FPS scenes."""
-        renderers = [SimpleNamespace(name=value) for value in values]
-        sequence = {renderer.name: f"surface-{renderer.name}" for renderer in renderers}
-        pipeline = loop.render_pipeline
+    def test_render_batch_merges_surfaces_sequentially(self, loop, monkeypatch) -> None:
+        """Verify that composed batch rendering layers child surfaces in order. This keeps the new single composition path visually stable when multiple renderers overlap."""
+        renderers = [
+            SimpleNamespace(name="r1", device_display_mode=DeviceDisplayMode.FULL),
+            SimpleNamespace(name="r2", device_display_mode=DeviceDisplayMode.FULL),
+        ]
+        surfaces = {
+            "r1": _solid_surface((255, 0, 0)),
+            "r2": _solid_surface((0, 0, 255)),
+        }
 
-        def fake_process(renderer: SimpleNamespace) -> str:
-            return sequence[renderer.name]
-
-        def fake_merge(surface1: str, surface2: str) -> str:
-            return f"merge({surface1},{surface2})"
-
-        monkeypatch.setattr(pipeline, "process_renderer", fake_process)
-        monkeypatch.setattr(pipeline, "merge_surfaces", fake_merge)
-
-        result = pipeline._render_surfaces_binary(renderers)
-        expected = _sequential_binary_merge(list(sequence.values()))
-        assert result == expected
-
-    def test_render_surface_iterative_skips_missing(
-        self, loop, monkeypatch, render_merge_strategy_in_place
-    ) -> None:
-        """Verify that the render pipeline skips missing surfaces while merging. This ensures null-producing renderers do not break composition."""
-        renderers = [SimpleNamespace(name=renderer) for renderer in ["r1", "r2", "r3"]]
-        responses = {"r1": "surface-1", "r2": None, "r3": "surface-3"}
-        merges: list[tuple[str, str]] = []
-        pipeline = loop.render_pipeline
-
-        def fake_process(renderer: SimpleNamespace) -> str | None:
-            return responses[renderer.name]
-
-        def fake_merge(surface1: str, surface2: str) -> str:
-            merges.append((surface1, surface2))
-            return f"merge({surface1},{surface2})"
-
-        monkeypatch.setattr(pipeline, "process_renderer", fake_process)
-        monkeypatch.setattr(pipeline, "merge_surfaces", fake_merge)
-
-        result = pipeline._render_surface_iterative(renderers)
-
-        assert result == "merge(surface-1,surface-3)"
-        assert merges == [("surface-1", "surface-3")]
-
-
-    def test_render_fn_selects_renderer(self, loop) -> None:
-        """Verify that the render pipeline selects the expected merge strategy. This keeps render mode selection predictable."""
-        renderers = [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")]
-        pipeline = loop.render_pipeline
-        assert (
-            pipeline._render_fn(renderers, RendererVariant.BINARY)
-            is pipeline._render_surfaces_binary
-        )
-        assert (
-            pipeline._render_fn(renderers, RendererVariant.ITERATIVE)
-            is pipeline._render_surface_iterative
+        monkeypatch.setattr(
+            ComposedRenderer,
+            "_render_renderer",
+            staticmethod(lambda renderer, **_kwargs: surfaces[renderer.name]),
         )
 
+        result = loop.render_frame(renderers)
 
-    def test_render_fn_default_uses_loop_variant(self, loop) -> None:
-        """Verify that the render pipeline respects its configured renderer variant. This keeps runtime switches effective without reconfiguring callers."""
-        renderers = [SimpleNamespace(name="r1")]
-        pipeline = loop.render_pipeline
-        pipeline.renderer_variant = RendererVariant.BINARY
-        assert pipeline._render_fn(renderers, None) is pipeline._render_surfaces_binary
-        pipeline.renderer_variant = RendererVariant.ITERATIVE
-        assert (
-            pipeline._render_fn(renderers, None) is pipeline._render_surface_iterative
-        )
+        assert isinstance(result, pygame.Surface)
+        assert result.get_at((0, 0))[:3] == (0, 0, 255)
 
 
     @pytest.mark.parametrize(
@@ -237,57 +194,46 @@ class TestEnvironmentCoreLogic:
         monkeypatch.setenv("HEART_HSV_CALIBRATION_MODE", value)
         assert Configuration.hsv_calibration_mode() == expected
 
-    def test_render_fn_auto_uses_threshold(self, loop, monkeypatch) -> None:
-        """Verify that auto rendering switches at the threshold in the pipeline. This keeps performance tuning predictable on constrained devices."""
+    def test_render_frame_skips_renderer_errors_when_fail_fast_disabled(
+        self, loop, monkeypatch
+    ) -> None:
+        """Verify that renderer failures are skipped by default in the shared composition path. This preserves the loop's tolerance for one bad renderer while keeping other visuals alive."""
+        renderers = [
+            SimpleNamespace(name="boom", device_display_mode=DeviceDisplayMode.FULL),
+            SimpleNamespace(name="ok", device_display_mode=DeviceDisplayMode.FULL),
+        ]
+
+        def _render(renderer: SimpleNamespace, **_kwargs) -> pygame.Surface:
+            if renderer.name == "boom":
+                raise RuntimeError("boom")
+            return _solid_surface((10, 20, 30))
+
+        monkeypatch.setenv("HEART_RENDER_CRASH_ON_ERROR", "false")
         monkeypatch.setattr(
-            "heart.runtime.rendering.pipeline.Configuration.render_parallel_threshold",
-            lambda: 2,
+            ComposedRenderer,
+            "_render_renderer",
+            staticmethod(_render),
         )
+
+        result = loop.render_frame(renderers)
+
+        assert isinstance(result, pygame.Surface)
+        assert result.get_at((0, 0))[:3] == (10, 20, 30)
+
+    def test_render_frame_reraises_when_fail_fast_enabled(
+        self, loop, monkeypatch
+    ) -> None:
+        """Verify that crash-on-render-error still propagates failures in the shared composition path. This keeps explicit debugging behaviour intact after removing the pipeline layer."""
+        renderers = [
+            SimpleNamespace(name="boom", device_display_mode=DeviceDisplayMode.FULL)
+        ]
+
+        monkeypatch.setenv("HEART_RENDER_CRASH_ON_ERROR", "true")
         monkeypatch.setattr(
-            "heart.runtime.rendering.pipeline.Configuration.render_parallel_cost_threshold_ms",
-            lambda: 0,
-        )
-        pipeline = loop.render_pipeline
-
-        assert (
-            pipeline._render_fn([SimpleNamespace(name="r1")], RendererVariant.AUTO)
-            is pipeline._render_surface_iterative
-        )
-        assert (
-            pipeline._render_fn(
-                [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")],
-                RendererVariant.AUTO,
-            )
-            is pipeline._render_surfaces_binary
+            ComposedRenderer,
+            "_render_renderer",
+            staticmethod(lambda _renderer, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))),
         )
 
-    def test_render_fn_auto_uses_cost_estimates(self, loop, monkeypatch) -> None:
-        """Verify auto rendering uses timing estimates to choose parallelism. This keeps scheduling overhead aligned with actual renderer costs."""
-        monkeypatch.setattr(
-            "heart.runtime.rendering.pipeline.Configuration.render_parallel_threshold",
-            lambda: 2,
-        )
-        monkeypatch.setattr(
-            "heart.runtime.rendering.pipeline.Configuration.render_parallel_cost_threshold_ms",
-            lambda: 5,
-        )
-        pipeline = loop.render_pipeline
-        renderers = [SimpleNamespace(name="r1"), SimpleNamespace(name="r2")]
-        pipeline._timing_tracker.record("r1", 4.0)
-        pipeline._timing_tracker.record("r2", 3.0)
-
-        assert (
-            pipeline._render_fn(renderers, RendererVariant.AUTO)
-            is pipeline._render_surfaces_binary
-        )
-
-
-def _sequential_binary_merge(values: list[str]) -> str:
-    surfaces = list(values)
-    while len(surfaces) > 1:
-        pairs = [(surfaces[i], surfaces[i + 1]) for i in range(0, len(surfaces) - 1, 2)]
-        merged_surfaces = [f"merge({a},{b})" for a, b in pairs]
-        if len(surfaces) % 2 == 1:
-            merged_surfaces.append(surfaces[-1])
-        surfaces = merged_surfaces
-    return surfaces[0]
+        with pytest.raises(RuntimeError, match="boom"):
+            loop.render_frame(renderers)

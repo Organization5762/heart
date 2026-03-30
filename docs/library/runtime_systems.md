@@ -11,7 +11,8 @@ engineers can extend the system without reverse engineering the control flow.
   `heart.programs.configurations` for `configure(loop: GameLoop)` callables and runs the
   selected configuration from `totem run`.
 - **Game loop**: `heart.runtime.game_loop.GameLoop` owns the pygame window, timing, and mode
-  transitions. It wires renderers through the `AppController` and bridges peripherals via
+  transitions. It delegates navigation state to `heart.navigation.GameModes`, composes frames
+  through `heart.navigation.ComposedRenderer`, and bridges peripherals via
   `heart.runtime.peripheral_runtime.PeripheralRuntime`.
 - **Device targets**: Implementations of `heart.device.Device` (such as
   `heart.device.local_screen.LocalScreen` and `heart.device.rgb_display.LEDMatrix`) translate
@@ -22,8 +23,8 @@ engineers can extend the system without reverse engineering the control flow.
 Configuration modules typically:
 
 - Call `loop.add_mode(<label or renderer>)` to register a selectable mode.
-- Use `mode.resolve_renderer(loop.context_container, RendererClass)` to construct renderers via
-  dependency injection.
+- Use `mode.add_renderer(RendererClass)` to request a container-wired default renderer.
+- Use `loop.resolve(RendererClass)` when you need a custom instance before adding it to a mode.
 - Compose renderers with `heart.navigation.ComposedRenderer` or rotate them with
   `heart.navigation.MultiScene`.
 
@@ -33,7 +34,8 @@ Configuration modules typically:
   background thread, and publishes events through the shared `EventBus`.
 - `heart.peripheral.core.event_bus` hosts virtual peripherals (for example,
   `double_tap_virtual_peripheral`) that aggregate raw inputs into higher-level events.
-- `GameLoop` subscribes to bus events and passes them to renderers via the `AppController`.
+- `GameModes` subscribes to mode-selection inputs, while renderers read the shared
+  `PeripheralManager` streams and state they need during initialization and rendering.
 
 ## Feedback Frames
 
@@ -44,7 +46,6 @@ re-touching the renderers. This keeps outputs observable and enables recursive f
 
 ## Metrics and Logging
 
-- Use `heart.runtime.render.pipeline.RenderPipeline` for render timing and pacing metadata.
 - `heart.runtime.render.pacing.RenderLoopPacer` supports adaptive loop timing when
   `HEART_RENDER_LOOP_PACING_STRATEGY=adaptive` is set, bounded by
   `HEART_RENDER_LOOP_PACING_MIN_INTERVAL_MS` and utilization targets.
