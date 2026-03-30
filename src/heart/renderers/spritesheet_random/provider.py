@@ -8,6 +8,7 @@ from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
@@ -20,9 +21,12 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         sheet_file_path: str,
         metadata_file_path: str,
         screen_count: int,
+        randomness: RandomnessProvider,
+        rng: random.Random | None = None,
     ) -> None:
         self.file = sheet_file_path
         self.screen_count = screen_count
+        self._rng = rng or randomness.rng()
         self.frames = {LoopPhase.START: [], LoopPhase.LOOP: [], LoopPhase.END: []}
         frame_data = Loader.load_json(metadata_file_path)
         for key, frame_obj in frame_data["frames"].items():
@@ -112,7 +116,7 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             next_frame = state.current_frame + 1
             if next_frame >= len(current_phase_frames):
                 next_frame = 0
-                next_screen = random.randint(0, self.screen_count - 1)
+                next_screen = self._rng.randint(0, self.screen_count - 1)
             time_since_last = 0
 
         time_since_last = (time_since_last or 0) + elapsed_ms

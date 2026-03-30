@@ -2,6 +2,7 @@
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel import RandomPixel
 from heart.runtime.game_loop import GameLoop
 
@@ -18,9 +19,12 @@ class TestEnvironment:
     ) -> None:
         """Verify that rendering many objects. This keeps rendering behaviour consistent across scenes."""
         mode = loop.add_mode("Test")
+        randomness = RandomnessProvider(seed=1)
 
         for _ in range(num_renderers):
-            mode.add_renderer(RandomPixel(num_pixels=1, brightness=1))
+            mode.add_renderer(
+                RandomPixel(num_pixels=1, brightness=1, randomness=randomness)
+            )
 
         # https://chatgpt.com/share/68056214-a5e4-8001-8fd0-ca966dbecf9b
         benchmark(

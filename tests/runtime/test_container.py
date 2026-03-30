@@ -1,5 +1,6 @@
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
@@ -28,6 +29,9 @@ class TestRuntimeContainer:
         assert render_pipeline is container.resolve(RenderPipeline)
         assert render_pipeline.renderer_variant is RendererVariant.BINARY
         assert container.resolve(RenderLoopPacer) is container.resolve(RenderLoopPacer)
+        assert container.resolve(RandomnessProvider) is container.resolve(
+            RandomnessProvider
+        )
 
     def test_container_injects_configuration_registry(self, device) -> None:
         """Confirm the container shares a registry instance so configuration overrides stay consistent at runtime."""

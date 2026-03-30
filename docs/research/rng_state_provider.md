@@ -1,23 +1,30 @@
-# RNG-aware state providers
+# Shared randomness provider
 
-State providers that need random numbers were each creating and storing their
-own `random.Random` instance. That duplicated setup logic and made it harder to
-standardize how providers accept deterministic RNGs for testing.
+The renderer providers that need randomness now depend on a shared
+`RandomnessProvider` instead of inheriting from a shared base class or
+reaching into environment configuration on their own. The old base only
+assigned one field and exposed it through a property, which added
+indirection without reducing real duplication.
 
 ## Decision
 
-Introduce `RngStateProvider` as a generic base class that stores the RNG and
-exposes it through a `rng` property. Providers that already accept an optional
-`random.Random` now inherit from the helper and call `super().__init__(rng=...)`
-to keep RNG setup consistent.
+Keep RNG setup local to each provider, but require an injected
+`RandomnessProvider` so the dependency is visible in the graph. The provider
+uses the shared project seed when one is configured, does not namespace RNGs
+by default, and still allows opt-in namespacing when a caller needs it. Each
+state provider still accepts an optional `random.Random` for deterministic
+tests, but the normal runtime path comes through `RandomnessProvider`.
 
 ## Materials
 
-- `src/heart/renderers/state_provider.py`
 - `src/heart/renderers/pacman/provider.py`
 - `src/heart/renderers/pixels/provider.py`
 - `src/heart/renderers/random_pixel/provider.py`
+- `src/heart/peripheral/providers/randomness/provider.py`
 
 ## Sources
 
-- `src/heart/renderers/state_provider.py`
+- `src/heart/peripheral/providers/randomness/provider.py`
+- `src/heart/renderers/pacman/provider.py`
+- `src/heart/renderers/pixels/provider.py`
+- `src/heart/renderers/random_pixel/provider.py`

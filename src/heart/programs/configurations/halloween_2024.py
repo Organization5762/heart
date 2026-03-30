@@ -1,4 +1,5 @@
 from heart.display.color import Color
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.pacman import PacmanGhostRenderer
@@ -10,6 +11,7 @@ from heart.runtime.game_loop import GameLoop
 
 
 def configure(loop: GameLoop) -> None:
+    randomness = RandomnessProvider()
     width = 64
     height = 64
 
@@ -33,7 +35,13 @@ def configure(loop: GameLoop) -> None:
         )
     # PacMan
     mode = loop.add_mode()
-    mode.add_renderer(RandomPixel(color=Color(187, 10, 30), num_pixels=50))
+    mode.add_renderer(
+        RandomPixel(
+            color=Color(187, 10, 30),
+            num_pixels=50,
+            randomness=randomness,
+        )
+    )
     mode.resolve_renderer_from_container(PacmanGhostRenderer)
     mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))
 
@@ -49,12 +57,13 @@ def configure(loop: GameLoop) -> None:
             screen_count=screen_count,
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
+            randomness=randomness,
         )
     )
 
     # Confetti
     mode = loop.add_mode()
-    mode.add_renderer(RandomPixel(num_pixels=200))
+    mode.add_renderer(RandomPixel(num_pixels=200, randomness=randomness))
     mode.add_renderer(Border(width=2))
 
     # Game of Life
@@ -89,7 +98,13 @@ def configure(loop: GameLoop) -> None:
         )
     # PacMan
     mode = loop.add_mode()
-    mode.add_renderer(RandomPixel(color=Color(187, 10, 30), num_pixels=50))
+    mode.add_renderer(
+        RandomPixel(
+            color=Color(187, 10, 30),
+            num_pixels=50,
+            randomness=randomness,
+        )
+    )
     mode.resolve_renderer_from_container(PacmanGhostRenderer)
     mode.add_renderer(Border(width=2, color=Color(187, 10, 30)))
 
@@ -105,16 +120,17 @@ def configure(loop: GameLoop) -> None:
             screen_count=screen_count,
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
+            randomness=randomness,
         )
     )
 
     # Confetti
     mode = loop.add_mode()
-    mode.add_renderer(RandomPixel(num_pixels=40000, brightness=0.05))
-    mode.add_renderer(RandomPixel(num_pixels=4000, brightness=0.10))
-    mode.add_renderer(RandomPixel(num_pixels=400, brightness=0.25))
-    mode.add_renderer(RandomPixel(num_pixels=40, brightness=0.50))
-    mode.add_renderer(RandomPixel(num_pixels=4, brightness=1))
+    mode.add_renderer(RandomPixel(num_pixels=40000, brightness=0.05, randomness=randomness))
+    mode.add_renderer(RandomPixel(num_pixels=4000, brightness=0.10, randomness=randomness))
+    mode.add_renderer(RandomPixel(num_pixels=400, brightness=0.25, randomness=randomness))
+    mode.add_renderer(RandomPixel(num_pixels=40, brightness=0.50, randomness=randomness))
+    mode.add_renderer(RandomPixel(num_pixels=4, brightness=1, randomness=randomness))
     mode.add_renderer(Border(width=2))
 
     # Game of Life

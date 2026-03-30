@@ -5,6 +5,7 @@ import numpy as np
 import reactivex
 
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
@@ -13,15 +14,26 @@ from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class LifeStateProvider:
-    def __init__(self, peripheral_manager: PeripheralManager, main_switch: MainSwitchProvider):
+    def __init__(
+        self,
+        peripheral_manager: PeripheralManager,
+        main_switch: MainSwitchProvider,
+        randomness: RandomnessProvider,
+    ) -> None:
         self._pm = peripheral_manager
         self._main_switch = main_switch
+        self._randomness = randomness
 
     def observable(
         self,
     ) -> reactivex.Observable[LifeState]:
         StateOp = Callable[[LifeState], LifeState]
-        rng = LifeState.resolve_rng(Configuration.life_random_seed())
+        life_seed = Configuration.life_random_seed()
+        rng = (
+            LifeState.resolve_rng(life_seed)
+            if life_seed is not None
+            else self._randomness.numpy_rng()
+        )
 
         def create_new_grid(size: tuple[int, int]) -> np.ndarray:
             return LifeState.random_grid(size, rng)

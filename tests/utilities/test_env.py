@@ -279,6 +279,20 @@ class TestUtilitiesEnv:
 
         assert Configuration.render_loop_pacing_utilization() == 0.75
 
+    def test_random_seed_defaults_to_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the shared random seed defaults to None. This keeps project RNGs non-deterministic unless callers opt in."""
+        _clear_env(monkeypatch, "HEART_RANDOM_SEED")
+
+        assert Configuration.random_seed() is None
+
+    def test_random_seed_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify the shared random seed reads the environment value. This keeps project-wide deterministic randomness configurable from one place."""
+        monkeypatch.setenv("HEART_RANDOM_SEED", "123")
+
+        assert Configuration.random_seed() == 123
+
 
     def test_render_executor_max_workers_returns_none_when_unset(
         self, monkeypatch: pytest.MonkeyPatch

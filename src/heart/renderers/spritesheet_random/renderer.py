@@ -3,6 +3,7 @@ import reactivex
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet_random.provider import \
     SpritesheetLoopRandomProvider
@@ -18,6 +19,7 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
         sheet_file_path: str,
         metadata_file_path: str,
         screen_count: int,
+        randomness: RandomnessProvider,
         provider: SpritesheetLoopRandomProvider | None = None,
     ) -> None:
         self.screen_width, self.screen_height = screen_width, screen_height
@@ -26,6 +28,7 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
             sheet_file_path=sheet_file_path,
             metadata_file_path=metadata_file_path,
             screen_count=screen_count,
+            randomness=randomness,
         )
 
         super().__init__(builder=self.provider)

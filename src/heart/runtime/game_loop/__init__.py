@@ -8,8 +8,8 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
-from heart.runtime.container.initialize import (build_runtime_container,
-                                                configure_runtime_container)
+from heart.runtime.container import (build_runtime_container,
+                                     configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.runtime.rendering.pacing import RenderLoopPacer
@@ -63,10 +63,7 @@ class GameLoop:
             raise RuntimeError("GameLoop screen is not initialized")
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
-        render_result = self.components.render_pipeline.render_with_plan(
-            renderers=renderers,
-        )
-        render_surface = render_result.surface
+        render_surface = self.components.render_pipeline.render(renderers)
         if render_surface is not None:
             self._apply_post_processors(render_surface)
             self.components.display.blit(render_surface, (0, 0))

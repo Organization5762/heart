@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
+from lagom import Container as RuntimeContainer
 from lagom import Singleton
 
 from heart.device import Device
@@ -10,76 +12,161 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.programs.registry import ConfigurationRegistry
-from heart.runtime.container import RuntimeContainer
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.runtime.rendering.pacing import RenderLoopPacer
-from heart.runtime.rendering.pipeline import RendererVariant, RenderPipeline
+from heart.runtime.rendering.pipeline import RenderPipeline
 from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
+from heart.runtime.rendering.variants import RendererVariant
 from heart.utilities.env import Configuration
-from heart.utilities.logging import get_logger
 
-logger = get_logger(__name__)
+OverrideMap = Mapping[type[Any], Any]
 
-if TYPE_CHECKING:
-    from heart.navigation import AppController
-    from heart.runtime.game_loop import GameLoop
-    from heart.runtime.game_loop.components import GameLoopComponents
+
+def build_runtime_container(
+    *,
+    device: Device,
+    render_variant: RendererVariant = RendererVariant.ITERATIVE,
+    overrides: OverrideMap | None = None,
+) -> RuntimeContainer:
+    """Create a runtime container with the core runtime bindings."""
+
+    container = RuntimeContainer()
+    configure_runtime_container(
+        container,
+        device=device,
+        render_variant=render_variant,
+        overrides=overrides,
+    )
+    return container
+
+
+def configure_runtime_container(
+    container: RuntimeContainer,
+    *,
+    device: Device,
+    render_variant: RendererVariant = RendererVariant.ITERATIVE,
+    overrides: OverrideMap | None = None,
+) -> None:
+    """Register core runtime bindings on ``container`` without clobbering overrides."""
+
+    override_keys = set(overrides or {})
+
+    _define_default(container, RuntimeContainer, container, override_keys)
+    _define_default(container, Device, device, override_keys)
+    _define_default(container, RendererVariant, render_variant, override_keys)
+    _define_default(
+        container,
+        PeripheralConfigurationRegistry,
+        Singleton(PeripheralConfigurationRegistry),
+        override_keys,
+    )
+    _define_default(
+        container,
+        PeripheralConfigurationLoader,
+        Singleton(_build_peripheral_configuration_loader),
+        override_keys,
+    )
+    _define_default(
+        container, PeripheralManager, Singleton(_build_peripheral_manager), override_keys
+    )
+    _define_default(
+        container, ConfigurationRegistry, Singleton(ConfigurationRegistry), override_keys
+    )
+    _define_default(container, DisplayContext, Singleton(DisplayContext), override_keys)
+    _define_default(
+        container,
+        RendererSurfaceProvider,
+        Singleton(_build_renderer_surface_provider),
+        override_keys,
+    )
+    _define_default(
+        container, RenderPipeline, Singleton(_build_render_pipeline), override_keys
+    )
+    _define_default(
+        container, PeripheralRuntime, Singleton(PeripheralRuntime), override_keys
+    )
+    _define_default(
+        container, RenderLoopPacer, Singleton(_build_render_loop_pacer), override_keys
+    )
+    _define_default(
+        container,
+        _event_handler_type(),
+        Singleton(_build_event_handler),
+        override_keys,
+    )
+    _define_default(
+        container,
+        _app_controller_type(),
+        Singleton(_build_app_controller),
+        override_keys,
+    )
+    _define_default(
+        container,
+        _game_loop_components_type(),
+        Singleton(_build_game_loop_components),
+        override_keys,
+    )
+    _define_default(
+        container, _composed_renderer_type(), _build_composed_renderer, override_keys
+    )
+    _define_default(container, _multi_scene_type(), _build_multi_scene, override_keys)
+
+    if overrides:
+        for key, value in overrides.items():
+            container[key] = value
+
+    apply_provider_registrations(container)
+    _define_default(
+        container, _game_loop_type(), Singleton(_build_game_loop), override_keys
+    )
+
+
+def _define_default(
+    container: RuntimeContainer,
+    key: type[Any],
+    value: Any,
+    override_keys: set[type[Any]],
+) -> None:
+    if key in override_keys:
+        return
+    if key not in container.defined_types:
+        container[key] = value
 
 
 def _build_peripheral_configuration_loader(
-    resolver: RuntimeContainer,
+    container: RuntimeContainer,
 ) -> PeripheralConfigurationLoader:
     return PeripheralConfigurationLoader(
-        registry=resolver[PeripheralConfigurationRegistry]
+        registry=container.resolve(PeripheralConfigurationRegistry)
     )
 
 
 def _build_peripheral_manager(
-    resolver: RuntimeContainer,
+    container: RuntimeContainer,
 ) -> PeripheralManager:
     return PeripheralManager(
-        configuration_loader=resolver[PeripheralConfigurationLoader]
+        configuration_loader=container.resolve(PeripheralConfigurationLoader)
     )
 
 
-def _build_display_context(resolver: RuntimeContainer) -> DisplayContext:
-    return DisplayContext(device=resolver[Device])
-
-
-def _build_render_pipeline(resolver: RuntimeContainer) -> RenderPipeline:
-    pipeline = RenderPipeline(
-        display_context=resolver[DisplayContext],
-        peripheral_manager=resolver[PeripheralManager],
-        render_variant=resolver[RendererVariant],
-    )
-    pipeline._renderer_processor._surface_provider._container = resolver
-    return pipeline
-
-
-def _build_render_surface_provider(
-    resolver: RuntimeContainer,
+def _build_renderer_surface_provider(
+    container: RuntimeContainer,
 ) -> RendererSurfaceProvider:
-    provider = RendererSurfaceProvider(
-        display_context=resolver[DisplayContext],
-    )
-    provider._container = resolver
+    provider = RendererSurfaceProvider(container.resolve(DisplayContext))
+    provider._container = container
     return provider
 
 
-def _build_peripheral_runtime(resolver: RuntimeContainer) -> PeripheralRuntime:
-    return PeripheralRuntime(resolver[PeripheralManager])
+def _build_render_pipeline(container: RuntimeContainer) -> RenderPipeline:
+    return RenderPipeline(
+        display_context=container.resolve(DisplayContext),
+        peripheral_manager=container.resolve(PeripheralManager),
+        render_variant=container.resolve(RendererVariant),
+    )
 
 
-def _build_app_controller(resolver: RuntimeContainer) -> AppController:
-    from heart.navigation import AppController
-
-    controller = AppController()
-    controller._renderer_resolver = resolver
-    return controller
-
-
-def _build_render_loop_pacer(_: RuntimeContainer) -> RenderLoopPacer:
+def _build_render_loop_pacer() -> RenderLoopPacer:
     return RenderLoopPacer(
         strategy=Configuration.render_loop_pacing_strategy(),
         min_interval_ms=Configuration.render_loop_pacing_min_interval_ms(),
@@ -87,194 +174,83 @@ def _build_render_loop_pacer(_: RuntimeContainer) -> RenderLoopPacer:
     )
 
 
+def _build_app_controller(container: RuntimeContainer) -> Any:
+    AppController = _app_controller_type()
+    app_controller = AppController()
+    app_controller._renderer_resolver = container
+    return app_controller
+
+
 def _build_game_loop_components(
-    resolver: RuntimeContainer,
-) -> GameLoopComponents:
-    from heart.navigation import AppController
-    from heart.runtime.game_loop.components import GameLoopComponents
-    from heart.runtime.game_loop.event_handler import PygameEventHandler
-
+    container: RuntimeContainer,
+) -> Any:
+    GameLoopComponents = _game_loop_components_type()
     return GameLoopComponents(
-        app_controller=resolver[AppController],
-        display=resolver[DisplayContext],
-        render_pipeline=resolver[RenderPipeline],
-        event_handler=resolver[PygameEventHandler],
-        peripheral_manager=resolver[PeripheralManager],
-        peripheral_runtime=resolver[PeripheralRuntime],
+        app_controller=container.resolve(_app_controller_type()),
+        display=container.resolve(DisplayContext),
+        render_pipeline=container.resolve(RenderPipeline),
+        event_handler=container.resolve(_event_handler_type()),
+        peripheral_manager=container.resolve(PeripheralManager),
+        peripheral_runtime=container.resolve(PeripheralRuntime),
     )
 
 
-def _build_game_loop(resolver: RuntimeContainer) -> GameLoop:
+def _build_event_handler() -> Any:
+    return _event_handler_type()()
+
+
+def _build_composed_renderer(container: RuntimeContainer) -> Any:
+    ComposedRenderer = _composed_renderer_type()
+    return ComposedRenderer([], container.resolve(RendererSurfaceProvider))
+
+
+def _build_multi_scene(container: RuntimeContainer) -> Any:
+    MultiScene = _multi_scene_type()
+    return MultiScene([], renderer_resolver=container)
+
+
+def _build_game_loop(
+    container: RuntimeContainer,
+) -> Any:
+    game_loop_type = _game_loop_type()
+    return game_loop_type(
+        device=container.resolve(Device),
+        resolver=container,
+        render_variant=container.resolve(RendererVariant),
+    )
+
+
+def _game_loop_type():
     from heart.runtime.game_loop import GameLoop
 
-    return GameLoop(
-        device=resolver[Device],
-        resolver=resolver,
-        render_variant=resolver[RendererVariant],
-    )
+    return GameLoop
 
 
-def build_runtime_container(
-    device: Device,
-    render_variant: RendererVariant,
-    overrides: Mapping[type[Any], object] | None = None,
-) -> RuntimeContainer:
-    logger.debug("Created Lagom container for runtime configuration.")
-    runtime_container = RuntimeContainer()
-    configure_runtime_container(
-        container=runtime_container,
-        device=device,
-        render_variant=render_variant,
-        overrides=overrides,
-    )
-    return runtime_container
-
-
-def configure_runtime_container(
-    *,
-    container: RuntimeContainer,
-    device: Device,
-    render_variant: RendererVariant,
-    overrides: Mapping[type[Any], object] | None = None,
-) -> None:
-    logger.debug(
-        "Configuring Lagom runtime container with overrides=%s.",
-        set(overrides.keys()) if overrides else set(),
-    )
-    _bind(container, overrides, Device, device)
-    _bind(container, overrides, RendererVariant, render_variant)
-    _configure_peripheral_bindings(container, overrides)
-    _configure_display_bindings(container, overrides)
-    _configure_render_bindings(container, overrides)
-    _configure_runtime_bindings(container, overrides)
-    _configure_game_loop_bindings(container, overrides)
-    apply_provider_registrations(container)
-
-
-def _bind(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-    key: type[Any],
-    value: object,
-) -> None:
-    if overrides and key in overrides:
-        container[key] = overrides[key]
-        logger.debug("Applied Lagom override for %s.", key)
-        return
-    if key in container.defined_types:
-        logger.debug("Lagom already defined %s; skipping registration.", key)
-        return
-    container[key] = value
-    logger.debug("Registered Lagom provider for %s.", key)
-
-
-def _configure_peripheral_bindings(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-) -> None:
-    _bind(
-        container,
-        overrides,
-        PeripheralConfigurationRegistry,
-        Singleton(PeripheralConfigurationRegistry),
-    )
-    _bind(
-        container,
-        overrides,
-        PeripheralConfigurationLoader,
-        Singleton(_build_peripheral_configuration_loader),
-    )
-    _bind(
-        container,
-        overrides,
-        PeripheralManager,
-        Singleton(_build_peripheral_manager),
-    )
-
-
-def _configure_display_bindings(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-) -> None:
-    _bind(
-        container,
-        overrides,
-        DisplayContext,
-        Singleton(_build_display_context),
-    )
-
-
-def _configure_render_bindings(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-) -> None:
-    _bind(
-        container,
-        overrides,
-        RenderPipeline,
-        Singleton(_build_render_pipeline),
-    )
-    _bind(
-        container,
-        overrides,
-        RendererSurfaceProvider,
-        Singleton(_build_render_surface_provider),
-    )
-
-
-def _configure_runtime_bindings(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-) -> None:
+def _app_controller_type():
     from heart.navigation import AppController
-    from heart.runtime.game_loop.event_handler import PygameEventHandler
 
-    _bind(
-        container,
-        overrides,
-        PeripheralRuntime,
-        Singleton(_build_peripheral_runtime),
-    )
-    _bind(
-        container,
-        overrides,
-        AppController,
-        Singleton(_build_app_controller),
-    )
-    _bind(
-        container,
-        overrides,
-        RenderLoopPacer,
-        Singleton(_build_render_loop_pacer),
-    )
-    _bind(
-        container,
-        overrides,
-        ConfigurationRegistry,
-        Singleton(ConfigurationRegistry),
-    )
-    _bind(container, overrides, PygameEventHandler, Singleton(PygameEventHandler))
+    return AppController
 
 
-def _configure_game_loop_bindings(
-    container: RuntimeContainer,
-    overrides: Mapping[type[Any], object] | None,
-) -> None:
+def _composed_renderer_type():
+    from heart.navigation import ComposedRenderer
+
+    return ComposedRenderer
+
+
+def _multi_scene_type():
+    from heart.navigation import MultiScene
+
+    return MultiScene
+
+
+def _game_loop_components_type():
     from heart.runtime.game_loop.components import GameLoopComponents
+
+    return GameLoopComponents
+
+
+def _event_handler_type():
     from heart.runtime.game_loop.event_handler import PygameEventHandler
 
-    _bind(
-        container,
-        overrides,
-        GameLoopComponents,
-        Singleton(_build_game_loop_components),
-    )
-    _bind(
-        container,
-        overrides,
-        PygameEventHandler,
-        Singleton(PygameEventHandler),
-    )
-    from heart.runtime.game_loop import GameLoop
-
-    _bind(container, overrides, GameLoop, Singleton(_build_game_loop))
+    return PygameEventHandler

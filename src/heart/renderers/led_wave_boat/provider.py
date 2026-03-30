@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import random
 from random import Random
 
 import reactivex
@@ -11,6 +10,7 @@ from reactivex import operators as ops
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.acceleration import AllAccelerometersProvider
+from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
                                                  LedWaveBoatState,
@@ -25,10 +25,11 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
         self,
         peripheral_manager: PeripheralManager,
         accelerometers: AllAccelerometersProvider,
+        randomness: RandomnessProvider,
     ) -> None:
         self._peripheral_manager = peripheral_manager
         self._accelerometers = accelerometers
-        self._rng = random.Random()
+        self._rng = randomness.rng()
 
     def observable(self) -> reactivex.Observable[LedWaveBoatState]:
         window_sizes = pipe_in_background(
