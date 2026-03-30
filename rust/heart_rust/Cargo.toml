@@ -11,3 +11,4 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 pyo3 = { version = "0.28.2", features = ["abi3-py311", "extension-module"] }
 pyo3-stub-gen = "0.15.0"
+safetensors = "0.7.0"

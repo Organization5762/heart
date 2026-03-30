@@ -11,6 +11,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 @dataclass
 class DisplayContext:
     """Track and initialize pygame display resources."""
@@ -56,7 +57,6 @@ class DisplayContext:
         self.screen = pygame.display.set_mode(self._display_size(), target_mode)
         self.last_render_mode = target_mode
 
-
     def _display_size(self) -> tuple[int, int]:
         return self.device.scaled_display_size()
 
@@ -80,7 +80,11 @@ class DisplayContext:
             raise RuntimeError("Screen is not initialized")
         self.screen.fill(*args, **kwargs)
 
-    def get_scratch_screen(self, orientation: Orientation, display_mode: DeviceDisplayMode) -> DisplayContext:
+    def get_scratch_screen(
+        self,
+        orientation: Orientation,
+        display_mode: DeviceDisplayMode,
+    ) -> DisplayContext:
         window_x, window_y = self.get_size()
         match display_mode:
             case DeviceDisplayMode.MIRRORED:
