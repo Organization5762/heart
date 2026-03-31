@@ -112,6 +112,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache .venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make test`

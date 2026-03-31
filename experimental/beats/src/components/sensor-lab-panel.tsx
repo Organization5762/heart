@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SensorCommandTerminal } from "@/components/sensor-command-terminal";
 import { SensorHistoryChart } from "@/components/sensor-history-chart";
 import {
-  SENSOR_FUNCTION_PRESETS,
   defaultSensorOverride,
   formatSensorValue,
   type ResolvedSensorChannel,
@@ -18,6 +17,7 @@ export function SensorLabPanel({
   onSelectSensor,
   onUpdateOverride,
   override,
+  overrides,
   selectedSensor,
   selectedSensorHistory,
   sensors,
@@ -28,6 +28,7 @@ export function SensorLabPanel({
   onSelectSensor: (sensorId: string) => void;
   onUpdateOverride: (sensorId: string, patch: Partial<SensorOverride>) => void;
   override: SensorOverride;
+  overrides: Record<string, SensorOverride>;
   selectedSensor: ResolvedSensorChannel | null;
   selectedSensorHistory: SensorHistoryPoint[];
   sensors: ResolvedSensorChannel[];
@@ -195,98 +196,15 @@ export function SensorLabPanel({
                     Mock Source
                   </h3>
                 </div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {(["live", "constant", "function"] as const).map((mode) => (
-                    <Button
-                      key={mode}
-                      type="button"
-                      size="sm"
-                      variant={override.mode === mode ? "default" : "outline"}
-                      onClick={() =>
-                        onUpdateOverride(selectedSensor.id, { mode })
-                      }
-                      className={
-                        override.mode === mode
-                          ? "bg-[#3b82f6] text-white hover:bg-[#2563eb]"
-                          : "border-[#404754] bg-[#171c23] text-slate-200 hover:bg-[#1f252d]"
-                      }
-                    >
-                      {mode}
-                    </Button>
-                  ))}
-                </div>
-
-                {override.mode === "constant" ? (
-                  <label className="block space-y-2">
-                    <span className="font-tomorrow text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
-                      Constant Value
-                    </span>
-                    <Input
-                      type="number"
-                      value={override.constantValue}
-                      step="0.1"
-                      className="border-[#404754] bg-[#0c1015] font-mono text-[#e3edf7]"
-                      onChange={(event) =>
-                        onUpdateOverride(selectedSensor.id, {
-                          constantValue: Number(event.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                ) : null}
-
-                {override.mode === "function" ? (
-                  <div className="space-y-3">
-                    <label className="block space-y-2">
-                      <span className="font-tomorrow text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
-                        Function of t (seconds)
-                      </span>
-                      <textarea
-                        className="min-h-[96px] w-full rounded-md border border-[#404754] bg-[#0c1015] px-3 py-2 font-mono text-sm text-[#e3edf7] transition outline-none focus-visible:border-[#6f9fff] focus-visible:ring-2 focus-visible:ring-[#6f9fff]/30"
-                        value={override.expression}
-                        onChange={(event) =>
-                          onUpdateOverride(selectedSensor.id, {
-                            expression: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {SENSOR_FUNCTION_PRESETS.map((preset) => (
-                        <Button
-                          key={preset.label}
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="border-[#404754] bg-[#171c23] text-slate-200 hover:bg-[#1f252d]"
-                          onClick={() =>
-                            onUpdateOverride(selectedSensor.id, {
-                              expression: preset.expression,
-                            })
-                          }
-                        >
-                          {preset.label}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="rounded-xl border border-[#404754] bg-[#171c23] p-3 text-xs text-[#95a2b6]">
-                      Available helpers: <span className="font-mono">sin</span>,{" "}
-                      <span className="font-mono">cos</span>,{" "}
-                      <span className="font-mono">triangle</span>,{" "}
-                      <span className="font-mono">pulse</span>,{" "}
-                      <span className="font-mono">saw</span>,{" "}
-                      <span className="font-mono">clamp</span>, and{" "}
-                      <span className="font-mono">mix</span>.
-                    </div>
-                  </div>
-                ) : null}
-
-                {override.mode === "live" ? (
-                  <div className="rounded-xl border border-[#404754] bg-[#171c23] p-3 text-sm text-[#95a2b6]">
-                    Live mode forwards the latest connected peripheral value
-                    without modification.
-                  </div>
-                ) : null}
+                <SensorCommandTerminal
+                  onClearHistory={onClearHistory}
+                  onResetOverride={onResetOverride}
+                  onSelectSensor={onSelectSensor}
+                  onUpdateOverride={onUpdateOverride}
+                  overrides={overrides}
+                  selectedSensor={selectedSensor}
+                  sensors={sensors}
+                />
               </div>
 
               <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
