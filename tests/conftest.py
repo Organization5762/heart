@@ -12,7 +12,6 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import RuntimeContainer
 from heart.runtime.container.initialize import build_runtime_container
 from heart.runtime.game_loop import GameLoop
-from heart.runtime.rendering.pipeline import RendererVariant
 
 settings.register_profile(
     "default",
@@ -56,28 +55,12 @@ def dummy_sdl_video_driver(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def default_render_merge_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set the default render merge strategy to keep tests deterministic."""
-
-    monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "batched")
-    yield
-
-
-@pytest.fixture(autouse=True)
 def default_reactivex_stream_coalesce_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Disable stream coalescing for deterministic reactive tests; mutates env vars per test."""
 
     monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "0")
-    yield
-
-
-@pytest.fixture()
-def render_merge_strategy_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Opt into in-place merge strategy for tests that assert pairwise merges."""
-
-    monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "in_place")
     yield
 
 @pytest.fixture(autouse=True)
@@ -115,7 +98,7 @@ class _StubMode:
         self.renderers.append(renderer)
 
 
-class _StubAppController:
+class _StubGameModes:
     def __init__(self) -> None:
         self.modes: list[_StubMode] = []
 
@@ -139,7 +122,7 @@ class _StubAppController:
 
 if "heart.navigation" not in sys.modules:
     navigation_stub = types.ModuleType("heart.navigation")
-    navigation_stub.AppController = _StubAppController
+    navigation_stub.GameModes = _StubGameModes
     navigation_stub.ComposedRenderer = object
     navigation_stub.MultiScene = object
     sys.modules["heart.navigation"] = navigation_stub
@@ -166,10 +149,7 @@ def manager() -> PeripheralManager:
 
 @pytest.fixture()
 def resolver(device: Device) -> RuntimeContainer:
-    return build_runtime_container(
-        device=device,
-        render_variant=RendererVariant.ITERATIVE,
-    )
+    return build_runtime_container(device=device)
 
 
 @pytest.fixture()

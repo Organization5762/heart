@@ -10,7 +10,7 @@ from heart.runtime.game_loop import GameLoop
 
 def configure(loop: GameLoop) -> None:
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
-    kirby_mode.resolve_renderer_from_container(KirbyScene)
+    kirby_mode.add_renderer(KirbyScene)
 
     modelbrot = loop.add_mode(
         loop.compose(
@@ -26,10 +26,10 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    modelbrot.resolve_renderer_from_container(MandelbrotMode)
+    modelbrot.add_renderer(MandelbrotMode)
 
     hilbert_mode = loop.add_mode("hilbert")
-    hilbert_mode.resolve_renderer_from_container(HilbertScene)
+    hilbert_mode.add_renderer(HilbertScene)
 
     mode = loop.add_mode("friend\nbeacon")
     text = ["Lost my\nfriends\nagain"]

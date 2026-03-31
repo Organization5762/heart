@@ -6,27 +6,6 @@ class RenderTileStrategy(StrEnum):
     LOOP = "loop"
 
 
-class RenderMergeStrategy(StrEnum):
-    IN_PLACE = "in_place"
-    BATCHED = "batched"
-    ADAPTIVE = "adaptive"
-
-
-class RendererTimingStrategy(StrEnum):
-    CUMULATIVE = "cumulative"
-    EMA = "ema"
-
-
-class RenderPlanSignatureStrategy(StrEnum):
-    INSTANCE = "instance"
-    TYPE = "type"
-
-
-class RenderLoopPacingStrategy(StrEnum):
-    OFF = "off"
-    ADAPTIVE = "adaptive"
-
-
 class AssetCacheStrategy(StrEnum):
     NONE = "none"
     METADATA = "metadata"

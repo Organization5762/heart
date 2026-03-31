@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, shared input controllers and profiles, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination). The input section now distinguishes interval work, blocking peripheral IO, and the explicit frame-thread handoff drained from `PeripheralRuntime.tick()` so pygame-affine delivery is visible in the architecture itself.
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, `GameModes`, shared input controllers and profiles, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition now stays in `ComposedRenderer`, which handles scratch surfaces, mirrored tiling, and child renderer merges for both nested and top-level batches. The input section distinguishes interval work, blocking peripheral IO, and the explicit frame-thread handoff drained from `PeripheralRuntime.tick()` so pygame-affine delivery is visible in the architecture itself.
 
 ## Flow Diagram
 
@@ -40,14 +40,10 @@ flowchart LR
     subgraph Runtime["GameLoop Orchestration"]
         direction TB
         Loop["GameLoop Service\n(heart.runtime.game_loop.GameLoop)"]
-        RenderPacer["Render Loop Pacer\n(heart.runtime.render.pacing.RenderLoopPacer)"]
-        AppRouter["AppController / Mode Router"]
+        ModeRouter["GameModes / Mode Router"]
         NativeSceneBridge["Native Scene Bridge\n(optional PyO3 scene manager)"]
         ModeServices["Mode Services & Renderers"]
-        RenderPipeline["Render Pipeline"]
-        SurfaceProvider["Surface Provider\n(display mode + surface cache)"]
-        RendererProcessor["Renderer Processor\n(per-renderer preparation + execution)"]
-        CompositionManager["Composition Manager\n(merge strategy + parallel loops)"]
+        CompositionManager["ComposedRenderer Batch Composition"]
     end
 
     subgraph Inputs["Peripheral & Signal Services"]
@@ -81,15 +77,12 @@ flowchart LR
     end
 
     CLI --> Registry --> ContainerBuilder --> RuntimeContainer --> Loop
-    RuntimeContainer --> RenderPacer --> Loop
-    Loop --> Configurer --> AppRouter
-    Loop --> AppRouter
-    RuntimeContainer --> AppRouter
-    RuntimeContainer --> RenderPipeline
+    Loop --> Configurer --> ModeRouter
+    Loop --> ModeRouter
+    RuntimeContainer --> ModeRouter
     RuntimeContainer --> PeripheralMgr
-    Loop --> RenderPipeline
-    AppRouter --> NativeSceneBridge --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
-    RenderPipeline --> RendererProcessor --> SurfaceProvider
+    ModeRouter --> NativeSceneBridge --> ModeServices --> CompositionManager --> DisplaySvc
+    Loop --> CompositionManager
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
@@ -99,13 +92,13 @@ flowchart LR
     Loop --> PeripheralMgr --> BlockingScheduler
     Loop --> PeripheralMgr --> FrameHandoff
     Loop --> FrameTick --> ModeServices
-    BlockingScheduler --> Switch --> AppRouter
+    BlockingScheduler --> Switch --> Profiles
     InputScheduler --> FrameHandoff --> KeyboardCtrl
     InputScheduler --> FrameHandoff --> Gamepad --> GamepadCtrl
     BlockingScheduler --> Sensors --> Profiles
-    PeripheralMgr --> HeartRate --> AppRouter
-    PeripheralMgr --> PhoneText --> AppRouter
-    KeyboardCtrl --> Profiles --> AppRouter
+    PeripheralMgr --> HeartRate --> ModeServices
+    PeripheralMgr --> PhoneText --> ModeServices
+    KeyboardCtrl --> Profiles --> ModeRouter
     KeyboardCtrl --> ModeServices
     GamepadCtrl --> Profiles
     Profiles --> ModeServices
@@ -114,8 +107,8 @@ flowchart LR
     GamepadCtrl --> DebugTap
     Profiles --> DebugTap
 
-    class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
-    class Loop,AppRouter,RenderPacer orchestrator;
+    class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,CompositionManager service;
+    class Loop,ModeRouter orchestrator;
     class PeripheralMgr,FrameTick,KeyboardCtrl,GamepadCtrl,Profiles,DebugTap,InputScheduler,BlockingScheduler,IntervalScheduler,FrameHandoff,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
@@ -125,7 +118,7 @@ flowchart LR
 Whenever the runtime architecture changes, regenerate the SVG with the helper script:
 
 ```bash
-python scripts/render_code_flow.py --output docs/code_flow.svg
+.venv/bin/python scripts/render_code_flow.py --output docs/code_flow.svg
 ```
 
 `render_code_flow.py` parses the Mermaid definition in this document and emits `docs/code_flow.svg` with consistent styling. The implementation avoids the Mermaid CLI to keep the output reproducible across development environments.

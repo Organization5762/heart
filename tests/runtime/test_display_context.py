@@ -50,7 +50,7 @@ class TestDisplayContext:
             device=device,
             screen=pygame.Surface(device.scaled_display_size()),
         )
-        scratch = display_context.get_scratch_screen(
+        scratch = display_context.create_scratch_context(
             orientation=device.orientation,
             display_mode=DeviceDisplayMode.MIRRORED,
         )

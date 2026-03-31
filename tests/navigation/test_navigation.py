@@ -9,7 +9,7 @@ class TestNavigationNavigation:
     """Group Navigation Navigation tests so navigation navigation behaviour stays reliable. This preserves confidence in navigation navigation for end-to-end scenarios."""
 
     def test_creating_(self, loop: GameLoop) -> None:
-        # Now we get automatic movement between A and B, facilitated by AppController
+        # Now we get automatic movement between A and B, facilitated by GameModes
         """Verify that a GameLoop can create modes and attach renderers without errors. This guards the core loop contract so demos can spin up basic scenes reliably."""
         a = loop.add_mode("A")
         b = loop.add_mode("B")

@@ -21,11 +21,6 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.runtime.rendering.pacing import RenderLoopPacer
-from heart.runtime.rendering.pipeline import RenderPipeline
-from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
-from heart.runtime.rendering.variants import RendererVariant
-from heart.utilities.env import Configuration
 
 OverrideMap = Mapping[type[Any], Any]
 
@@ -33,7 +28,6 @@ OverrideMap = Mapping[type[Any], Any]
 def build_runtime_container(
     *,
     device: Device,
-    render_variant: RendererVariant = RendererVariant.ITERATIVE,
     overrides: OverrideMap | None = None,
 ) -> RuntimeContainer:
     """Create a runtime container with the core runtime bindings."""
@@ -42,7 +36,6 @@ def build_runtime_container(
     configure_runtime_container(
         container,
         device=device,
-        render_variant=render_variant,
         overrides=overrides,
     )
     return container
@@ -52,7 +45,6 @@ def configure_runtime_container(
     container: RuntimeContainer,
     *,
     device: Device,
-    render_variant: RendererVariant = RendererVariant.ITERATIVE,
     overrides: OverrideMap | None = None,
 ) -> None:
     """Register core runtime bindings on ``container`` without clobbering overrides."""
@@ -61,7 +53,6 @@ def configure_runtime_container(
 
     _define_default(container, RuntimeContainer, container, override_keys)
     _define_default(container, Device, device, override_keys)
-    _define_default(container, RendererVariant, render_variant, override_keys)
     _define_default(
         container,
         PeripheralConfigurationRegistry,
@@ -127,19 +118,7 @@ def configure_runtime_container(
     )
     _define_default(container, DisplayContext, Singleton(DisplayContext), override_keys)
     _define_default(
-        container,
-        RendererSurfaceProvider,
-        Singleton(_build_renderer_surface_provider),
-        override_keys,
-    )
-    _define_default(
-        container, RenderPipeline, Singleton(_build_render_pipeline), override_keys
-    )
-    _define_default(
         container, PeripheralRuntime, Singleton(PeripheralRuntime), override_keys
-    )
-    _define_default(
-        container, RenderLoopPacer, Singleton(_build_render_loop_pacer), override_keys
     )
     _define_default(
         container,
@@ -149,8 +128,8 @@ def configure_runtime_container(
     )
     _define_default(
         container,
-        _app_controller_type(),
-        Singleton(_build_app_controller),
+        _game_modes_type(),
+        Singleton(_build_game_modes),
         override_keys,
     )
     _define_default(
@@ -202,6 +181,11 @@ def _build_peripheral_manager(
     )
 
 
+def _build_game_modes(container: RuntimeContainer) -> Any:
+    GameModes = _game_modes_type()
+    return GameModes(renderer_resolver=container)
+
+
 def _resolve_input_debug_tap(container: RuntimeContainer) -> InputDebugTap:
     return container.resolve(PeripheralManager).debug_tap
 
@@ -246,45 +230,13 @@ def _resolve_mandelbrot_control_profile(
     return container.resolve(PeripheralManager).mandelbrot_control_profile
 
 
-def _build_renderer_surface_provider(
-    container: RuntimeContainer,
-) -> RendererSurfaceProvider:
-    provider = RendererSurfaceProvider(container.resolve(DisplayContext))
-    provider._container = container
-    return provider
-
-
-def _build_render_pipeline(container: RuntimeContainer) -> RenderPipeline:
-    return RenderPipeline(
-        display_context=container.resolve(DisplayContext),
-        peripheral_manager=container.resolve(PeripheralManager),
-        render_variant=container.resolve(RendererVariant),
-    )
-
-
-def _build_render_loop_pacer() -> RenderLoopPacer:
-    return RenderLoopPacer(
-        strategy=Configuration.render_loop_pacing_strategy(),
-        min_interval_ms=Configuration.render_loop_pacing_min_interval_ms(),
-        utilization_target=Configuration.render_loop_pacing_utilization(),
-    )
-
-
-def _build_app_controller(container: RuntimeContainer) -> Any:
-    AppController = _app_controller_type()
-    app_controller = AppController()
-    app_controller._renderer_resolver = container
-    return app_controller
-
-
 def _build_game_loop_components(
     container: RuntimeContainer,
 ) -> Any:
     GameLoopComponents = _game_loop_components_type()
     return GameLoopComponents(
-        app_controller=container.resolve(_app_controller_type()),
+        game_modes=container.resolve(_game_modes_type()),
         display=container.resolve(DisplayContext),
-        render_pipeline=container.resolve(RenderPipeline),
         event_handler=container.resolve(_event_handler_type()),
         peripheral_manager=container.resolve(PeripheralManager),
         peripheral_runtime=container.resolve(PeripheralRuntime),
@@ -297,7 +249,7 @@ def _build_event_handler() -> Any:
 
 def _build_composed_renderer(container: RuntimeContainer) -> Any:
     ComposedRenderer = _composed_renderer_type()
-    return ComposedRenderer([], container.resolve(RendererSurfaceProvider))
+    return ComposedRenderer([], renderer_resolver=container)
 
 
 def _build_multi_scene(container: RuntimeContainer) -> Any:
@@ -312,7 +264,6 @@ def _build_game_loop(
     return game_loop_type(
         device=container.resolve(Device),
         resolver=container,
-        render_variant=container.resolve(RendererVariant),
     )
 
 
@@ -322,10 +273,10 @@ def _game_loop_type():
     return GameLoop
 
 
-def _app_controller_type():
-    from heart.navigation import AppController
+def _game_modes_type():
+    from heart.navigation import GameModes
 
-    return AppController
+    return GameModes
 
 
 def _composed_renderer_type():

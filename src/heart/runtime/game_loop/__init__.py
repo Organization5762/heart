@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
@@ -12,8 +13,6 @@ from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
-from heart.runtime.rendering.pacing import RenderLoopPacer
-from heart.runtime.rendering.pipeline import RendererVariant
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import shutdown
 
@@ -26,7 +25,6 @@ logger = get_logger(__name__)
 ACTIVE_GAME_LOOP: "GameLoop" | None = None
 DependencyT = TypeVar("DependencyT")
 DEFAULT_MAX_FPS = 500
-DEFAULT_RENDER_VARIANT = RendererVariant.ITERATIVE
 EDGE_THRESHOLD = 1
 
 
@@ -36,20 +34,16 @@ class GameLoop:
         device: Device,
         resolver: RuntimeContainer | None = None,
         max_fps: int = DEFAULT_MAX_FPS,
-        render_variant: RendererVariant = DEFAULT_RENDER_VARIANT,
     ) -> None:
         self.context_container = self._prepare_container(
             device=device,
             resolver=resolver,
-            render_variant=render_variant,
         )
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
         self.max_fps = max_fps
         self.components = self._load_components()
-        self._render_pacer = self.context_container.resolve(RenderLoopPacer)
-        self.render_pipeline = self.components.render_pipeline
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
@@ -63,14 +57,14 @@ class GameLoop:
             raise RuntimeError("GameLoop screen is not initialized")
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
-        render_surface = self.components.render_pipeline.render(renderers)
+        render_surface = self.render_frame(renderers)
         if render_surface is not None:
             self._apply_post_processors(render_surface)
             self.components.display.blit(render_surface, (0, 0))
             pygame.display.flip()
 
     def _apply_post_processors(self, surface: pygame.Surface) -> None:
-        post_processors = self.components.app_controller.get_post_processors()
+        post_processors = self.components.game_modes.get_post_processors()
         if not post_processors:
             return
         post_context = DisplayContext(
@@ -112,10 +106,13 @@ class GameLoop:
         | "StatefulBaseRenderer[Any]"
         | None = None,
     ) -> ComposedRenderer:
-        return self.components.app_controller.add_mode(title=title)
+        return self.components.game_modes.add_mode(title=title)
 
     def add_scene(self) -> MultiScene:
-        return self.components.app_controller.add_scene()
+        return self.components.game_modes.add_scene()
+
+    def add_sleep_mode(self) -> None:
+        self.components.game_modes.add_sleep_mode()
 
     @classmethod
     def get_game_loop(cls) -> "GameLoop" | None:
@@ -133,7 +130,7 @@ class GameLoop:
             self._ensure_initialized()
             logger.info("Finished initializing GameLoop.")
 
-        if self.components.app_controller.is_empty():
+        if self.components.game_modes.is_empty():
             raise RuntimeError("Unable to start as no GameModes were added.")
 
         # Initialize all renderers
@@ -141,8 +138,8 @@ class GameLoop:
         self.running = True
         logger.info("Entering main loop.")
 
-        logger.info("Initializing app controller.")
-        self._initialize_app_controller()
+        logger.info("Initializing game modes.")
+        self._initialize_game_modes()
         logger.info("Ensuring display is initialized.")
         self._ensure_display_initialized()
         logger.info("Configuring streaming.")
@@ -158,7 +155,6 @@ class GameLoop:
             shutdown.on_completed()
             shutdown.dispose()
 
-            self.components.render_pipeline.shutdown()
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:
@@ -168,7 +164,6 @@ class GameLoop:
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
         self.components.display.set_clock(clock)
-        self.components.render_pipeline.set_clock(clock)
         self.components.peripheral_manager.clock.on_next(self.components.display.clock)
 
     @property
@@ -180,7 +175,7 @@ class GameLoop:
         return self.components.display.clock
 
     def _select_renderers(self) -> list["StatefulBaseRenderer[Any]"]:
-        base_renderers = self.components.app_controller.get_renderers()
+        base_renderers = self.components.game_modes.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
 
@@ -189,36 +184,39 @@ class GameLoop:
         return self.components.peripheral_manager
 
     def _resolve_display_mode(
-        self, renderers: list["StatefulBaseRenderer[Any]"]
+        self, renderers: Sequence["StatefulBaseRenderer[Any]"]
     ) -> DeviceDisplayMode:
-        if any(
-            renderer.device_display_mode == DeviceDisplayMode.OPENGL
-            for renderer in renderers
+        return ComposedRenderer.required_display_mode(renderers)
+
+    def render_frame(
+        self,
+        renderers: Sequence["StatefulBaseRenderer[Any]"],
+    ) -> pygame.Surface | None:
+        if self.components.display.screen is None:
+            raise RuntimeError("GameLoop screen is not initialized")
+        if self.components.display.clock is None:
+            raise RuntimeError("GameLoop clock is not initialized")
+        with self.components.display.display_mode(
+            self._resolve_display_mode(renderers)
         ):
-            return DeviceDisplayMode.OPENGL
-        if any(
-            renderer.device_display_mode == DeviceDisplayMode.FULL
-            for renderer in renderers
-        ):
-            return DeviceDisplayMode.FULL
-        return DeviceDisplayMode.MIRRORED
+            return ComposedRenderer.render_batch(
+                renderers,
+                window=self.components.display,
+                peripheral_manager=self.components.peripheral_manager,
+                orientation=self.device.orientation,
+            )
 
     def _prepare_container(
         self,
         *,
         device: Device,
         resolver: RuntimeContainer | None,
-        render_variant: RendererVariant,
     ) -> RuntimeContainer:
         if resolver is None:
-            return build_runtime_container(
-                device=device,
-                render_variant=render_variant,
-            )
+            return build_runtime_container(device=device)
         configure_runtime_container(
             container=resolver,
             device=device,
-            render_variant=render_variant,
         )
         return resolver
 
@@ -269,10 +267,10 @@ class GameLoop:
             return
         self._initialize()
 
-    def _initialize_app_controller(self) -> None:
+    def _initialize_game_modes(self) -> None:
         self.components.display.ensure_initialized()
-        logger.info("Initializing app controller components.")
-        self.components.app_controller.initialize(
+        logger.info("Initializing game mode components.")
+        self.components.game_modes.initialize(
             window=self.components.display,
             peripheral_manager=self.components.peripheral_manager,
             orientation=self.device.orientation,
@@ -289,10 +287,7 @@ class GameLoop:
             self.running = self.components.event_handler.handle_events()
             self._preprocess_setup()  # can't dim display each time
             renderers = self._select_renderers()
-            with self.components.display.display_mode(
-                self._resolve_display_mode(renderers)
-            ):
-                self._one_loop(renderers=renderers)
+            self._one_loop(renderers=renderers)
             # self._render_pacer.pace(render_start, 20)
 
             self.components.display.clock.tick(self.max_fps)

@@ -11,9 +11,7 @@ import pytest
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
-                                 ReactivexStreamConnectMode,
-                                 RenderLoopPacingStrategy, RenderMergeStrategy,
-                                 RenderPlanSignatureStrategy, get_device_ports)
+                                 ReactivexStreamConnectMode, get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -137,13 +135,6 @@ class TestUtilitiesEnv:
         assert Configuration.is_debug_mode() is False
 
 
-    def test_render_variant_defaults_iterative(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify that render variant defaults to iterative. This keeps render behaviour stable without explicit configuration."""
-        _clear_env(monkeypatch, "HEART_RENDER_VARIANT")
-
-        assert Configuration.render_variant() == "iterative"
-
-
     def test_asset_cache_strategy_defaults_all(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify asset cache strategy defaults to all. This keeps IO reuse enabled without explicit tuning."""
         _clear_env(monkeypatch, "HEART_ASSET_CACHE_STRATEGY")
@@ -213,46 +204,6 @@ class TestUtilitiesEnv:
             Configuration.asset_cache_max_entries()
 
 
-    def test_render_parallel_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify that render parallel threshold reads the environment value. This keeps tuning deterministic across deployments."""
-        monkeypatch.setenv("HEART_RENDER_PARALLEL_THRESHOLD", "6")
-
-        assert Configuration.render_parallel_threshold() == 6
-
-    def test_render_plan_signature_strategy_defaults_instance(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify render plan signature strategy defaults to instance. This keeps caching behavior aligned with per-renderer timing."""
-        _clear_env(monkeypatch, "HEART_RENDER_PLAN_SIGNATURE_STRATEGY")
-
-        assert (
-            Configuration.render_plan_signature_strategy()
-            == RenderPlanSignatureStrategy.INSTANCE
-        )
-
-    def test_render_plan_signature_strategy_rejects_invalid_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify render plan signature strategy rejects invalid values. This prevents ambiguous render-plan caching."""
-        monkeypatch.setenv("HEART_RENDER_PLAN_SIGNATURE_STRATEGY", "nope")
-
-        with pytest.raises(ValueError):
-            Configuration.render_plan_signature_strategy()
-
-
-    def test_render_parallel_cost_threshold_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render parallel cost threshold defaults. This keeps adaptive tuning predictable without extra configuration."""
-        _clear_env(monkeypatch, "HEART_RENDER_PARALLEL_COST_THRESHOLD_MS")
-
-        assert Configuration.render_parallel_cost_threshold_ms() == 12
-
-
-    def test_render_parallel_cost_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render parallel cost threshold reads the environment value. This keeps adaptive render tuning explicit."""
-        monkeypatch.setenv("HEART_RENDER_PARALLEL_COST_THRESHOLD_MS", "18")
-
-        assert Configuration.render_parallel_cost_threshold_ms() == 18
-
     def test_render_crash_on_error_defaults_disabled(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -269,32 +220,6 @@ class TestUtilitiesEnv:
 
         assert Configuration.render_crash_on_error() is True
 
-    def test_render_loop_pacing_strategy_defaults_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render loop pacing strategy defaults to off. This avoids unexpected throttling without explicit configuration."""
-        _clear_env(monkeypatch, "HEART_RENDER_LOOP_PACING_STRATEGY")
-
-        assert (
-            Configuration.render_loop_pacing_strategy()
-            == RenderLoopPacingStrategy.OFF
-        )
-
-    def test_render_loop_pacing_strategy_rejects_invalid_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify render loop pacing strategy rejects invalid values. This keeps pacing configuration explicit."""
-        monkeypatch.setenv("HEART_RENDER_LOOP_PACING_STRATEGY", "nope")
-
-        with pytest.raises(ValueError):
-            Configuration.render_loop_pacing_strategy()
-
-    def test_render_loop_pacing_utilization_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify render loop pacing utilization reads environment value. This keeps throttling targets configurable."""
-        monkeypatch.setenv("HEART_RENDER_LOOP_PACING_UTILIZATION", "0.75")
-
-        assert Configuration.render_loop_pacing_utilization() == 0.75
-
     def test_random_seed_defaults_to_none(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -308,23 +233,6 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RANDOM_SEED", "123")
 
         assert Configuration.random_seed() == 123
-
-
-    def test_render_executor_max_workers_returns_none_when_unset(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify that render executor max workers returns None when unset. This preserves default executor sizing."""
-        _clear_env(monkeypatch, "HEART_RENDER_MAX_WORKERS")
-
-        assert Configuration.render_executor_max_workers() is None
-
-
-    def test_render_executor_max_workers_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify that render executor max workers reads the environment value. This keeps parallelism caps configurable."""
-        monkeypatch.setenv("HEART_RENDER_MAX_WORKERS", "3")
-
-        assert Configuration.render_executor_max_workers() == 3
-
 
     def test_frame_export_strategy_defaults_buffer(
         self, monkeypatch: pytest.MonkeyPatch
@@ -343,45 +251,6 @@ class TestUtilitiesEnv:
 
         with pytest.raises(ValueError):
             Configuration.frame_export_strategy()
-
-
-    def test_render_merge_strategy_defaults_batched(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render merge strategy defaults to batched. This keeps multi-renderer composition optimized without configuration."""
-        _clear_env(monkeypatch, "HEART_RENDER_MERGE_STRATEGY")
-
-        assert Configuration.render_merge_strategy() == RenderMergeStrategy.BATCHED
-
-
-    def test_render_merge_strategy_accepts_adaptive(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render merge strategy accepts adaptive mode. This keeps runtime tuning flexible for composition overhead."""
-        monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "adaptive")
-
-        assert Configuration.render_merge_strategy() == RenderMergeStrategy.ADAPTIVE
-
-
-    def test_render_merge_strategy_rejects_invalid_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify render merge strategy rejects invalid values. This keeps configuration errors visible early."""
-        monkeypatch.setenv("HEART_RENDER_MERGE_STRATEGY", "nope")
-
-        with pytest.raises(ValueError):
-            Configuration.render_merge_strategy()
-
-
-    def test_render_merge_cost_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render merge cost threshold reads the environment value. This keeps adaptive merge tuning configurable."""
-        monkeypatch.setenv("HEART_RENDER_MERGE_COST_THRESHOLD_MS", "9")
-
-        assert Configuration.render_merge_cost_threshold_ms() == 9
-
-
-    def test_render_merge_surface_threshold_reads_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Verify render merge surface threshold reads the environment value. This keeps adaptive merge decisions consistent."""
-        monkeypatch.setenv("HEART_RENDER_MERGE_SURFACE_THRESHOLD", "5")
-
-        assert Configuration.render_merge_surface_threshold() == 5
-
 
     def test_reactivex_background_max_workers_defaults_to_four(
         self, monkeypatch: pytest.MonkeyPatch

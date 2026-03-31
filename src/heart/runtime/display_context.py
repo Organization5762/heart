@@ -108,7 +108,7 @@ class DisplayContext:
             raise RuntimeError("Screen is not initialized")
         self.screen.fill(*args, **kwargs)
 
-    def get_scratch_screen(
+    def create_scratch_context(
         self,
         orientation: Orientation,
         display_mode: DeviceDisplayMode,

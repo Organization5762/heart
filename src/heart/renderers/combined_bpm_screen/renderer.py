@@ -15,7 +15,6 @@ from heart.renderers.flame.renderer import FlameRenderer
 from heart.renderers.max_bpm_screen import AvatarBpmRenderer
 from heart.renderers.metadata_screen import MetadataScreen
 from heart.runtime.display_context import DisplayContext
-from heart.runtime.rendering.surface.provider import RendererSurfaceProvider
 
 
 class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
@@ -40,13 +39,8 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
 
         self._peripheral_manager: PeripheralManager | None = None
 
-    def _build_max_bpm_screen(
-        self, window: DisplayContext
-    ) -> ComposedRenderer:
-        max_bpm_screen = ComposedRenderer(
-            renderers=[],
-            surface_provider=RendererSurfaceProvider(display_context=window),
-        )
+    def _build_max_bpm_screen(self) -> ComposedRenderer:
+        max_bpm_screen = ComposedRenderer(renderers=[])
         max_bpm_screen.add_renderer(FlameRenderer())
         max_bpm_screen.add_renderer(AvatarBpmRenderer())
         return max_bpm_screen
@@ -63,7 +57,7 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
-        self.max_bpm_screen = self._build_max_bpm_screen(window)
+        self.max_bpm_screen = self._build_max_bpm_screen()
         self.max_bpm_screen.initialize(
             window=window,
             peripheral_manager=peripheral_manager,

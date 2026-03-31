@@ -60,10 +60,9 @@ class ScreenRecorder:
 
         self._loop.ensure_screen_initialized()
 
-        pipeline = self._loop.components.render_pipeline
         for batch in inputs:
             renderers = list(batch)
-            screen = pipeline.render(renderers)
+            screen = self._loop.render_frame(renderers)
             if screen is None:  # pragma: no cover - defensive guard
                 raise RuntimeError("GameLoop screen not initialized")
 
