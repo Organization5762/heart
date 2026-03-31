@@ -110,13 +110,13 @@ export function AppSidebar() {
       className={SIDEBAR_TOP_OFFSET_CLASS}
     >
       <SidebarHeader className="gap-2 px-2.5 pt-2 pb-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pb-2">
-        <div className="border-sidebar-border bg-sidebar overflow-hidden border px-3 py-3 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-2">
+        <div className="border-sidebar-border bg-sidebar w-full min-w-0 overflow-hidden border px-3 py-3 group-data-[collapsible=icon]:hidden">
+          <div className="flex w-full min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
               <p className="font-tomorrow text-sidebar-foreground/60 text-[0.52rem] tracking-[0.3em] uppercase">
                 Beats
               </p>
-              <div>
+              <div className="min-w-0">
                 <h2 className="font-tomorrow text-sidebar-foreground text-base tracking-[0.18em]">
                   BEATS
                 </h2>
@@ -125,7 +125,9 @@ export function AppSidebar() {
                 </p>
               </div>
             </div>
-            <SpecChip className="px-2 py-0.5 text-[0.62rem]">TX-24</SpecChip>
+            <SpecChip className="shrink-0 self-start px-2 py-0.5 text-[0.62rem]">
+              TX-24
+            </SpecChip>
           </div>
           <div className="mt-4 grid gap-2 group-data-[collapsible=icon]:hidden">
             <DataRow
