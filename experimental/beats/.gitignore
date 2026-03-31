@@ -102,3 +102,4 @@ out/
 
 # Tanstack
 .tanstack/
+src/routeTree.gen.ts
