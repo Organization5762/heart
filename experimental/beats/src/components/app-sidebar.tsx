@@ -109,7 +109,7 @@ export function AppSidebar() {
       variant="floating"
       className={SIDEBAR_TOP_OFFSET_CLASS}
     >
-      <SidebarHeader className="gap-2 px-2.5 pt-2 pb-1">
+      <SidebarHeader className="gap-2 px-2.5 pt-2 pb-1 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pb-2">
         <div className="border-sidebar-border bg-sidebar w-full min-w-0 overflow-hidden border px-3 py-3 group-data-[collapsible=icon]:hidden">
           <div className="flex w-full min-w-0 items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-2">
@@ -144,8 +144,8 @@ export function AppSidebar() {
             />
           </div>
         </div>
-        <div className="border-sidebar-border bg-sidebar text-sidebar-foreground hidden h-16 items-center justify-center border group-data-[collapsible=icon]:flex">
-          <div className="font-tomorrow flex h-10 w-10 items-center justify-center border border-current/45 text-lg tracking-[0.14em]">
+        <div className="border-sidebar-border bg-sidebar text-sidebar-foreground hidden w-full items-center justify-center border px-1.5 py-2 group-data-[collapsible=icon]:flex">
+          <div className="font-tomorrow flex h-8 w-8 items-center justify-center border border-current/45 text-base tracking-[0.14em]">
             B
           </div>
         </div>
