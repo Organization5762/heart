@@ -16,7 +16,7 @@ const WSContext = createContext<WSContextValue>({
 });
 
 interface WSProviderProps {
-  url: string;
+  url: string | null;
   children: React.ReactNode;
   retryDelay?: number;
   maxRetryDelay?: number;
@@ -82,6 +82,13 @@ export function WSProvider({
       const attempt = attemptRef.current;
 
       cleanupSocket(socketRef.current);
+
+      if (!url) {
+        socketRef.current = null;
+        setSocket(null);
+        setReadyState(WebSocket.CLOSED);
+        return;
+      }
 
       const ws = new WebSocket(url);
       ws.binaryType = "arraybuffer";

@@ -12,6 +12,10 @@ import {
   SpecChip,
   TechnicalCard,
 } from "@/components/beats-shell";
+import {
+  DISABLED_WEBSOCKET_LABEL,
+  getConfiguredBeatsWebSocketUrl,
+} from "@/config/websocket";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
@@ -19,6 +23,7 @@ import { useEffect, useState, useTransition } from "react";
 const RECENT_DEVICE_LIMIT = 4;
 const RECENT_ACTIVITY_WINDOW_MS = 60_000;
 const RECENT_ACTIVITY_TICK_MS = 5_000;
+const configuredWebsocketUrl = getConfiguredBeatsWebSocketUrl();
 
 const routeCards = [
   {
@@ -272,7 +277,11 @@ function HomePage() {
             <DataRow label="Version" value={appVersion} />
             <DataRow
               label="Signal"
-              value={ws.socket?.url ?? "ws://localhost:8765"}
+              value={
+                ws.socket?.url ??
+                configuredWebsocketUrl ??
+                DISABLED_WEBSOCKET_LABEL
+              }
             />
             <DataRow label="Socket" value={readyStateLabel} />
             <DataRow label="Peripherals" value={peripheralEntries.length} />

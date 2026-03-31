@@ -4,6 +4,14 @@
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+interface ImportMetaEnv {
+  readonly VITE_BEATS_WEBSOCKET_URL?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 declare module "*.proto?raw" {
   const value: string;
   export default value;
