@@ -3,11 +3,44 @@ import type { PeripheralInfo } from "@/actions/ws/providers/PeripheralProvider";
 type PreviewMetric = {
   id: string;
   label: string;
+  groupLabel: string;
+  signalLabel: string;
   kind: "numeric" | "boolean";
   value: number | boolean;
 };
 
+type PreviewMetricGroup = {
+  id: string;
+  label: string;
+  metrics: PreviewMetric[];
+};
+
 const MAX_PREVIEW_METRICS = 6;
+const FALLBACK_GROUP_LABEL = "General";
+
+function formatMetricSegment(segment: string) {
+  return segment.replaceAll("_", " ");
+}
+
+function toTitleCase(value: string) {
+  return value.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function buildMetricLabels(path: string[]) {
+  const [groupSegment, ...signalSegments] = path;
+  const normalizedGroup = groupSegment
+    ? toTitleCase(formatMetricSegment(groupSegment))
+    : FALLBACK_GROUP_LABEL;
+  const normalizedSignal =
+    signalSegments.length > 0
+      ? signalSegments.map(formatMetricSegment).join(".")
+      : formatMetricSegment(groupSegment ?? FALLBACK_GROUP_LABEL);
+
+  return {
+    groupLabel: normalizedGroup,
+    signalLabel: normalizedSignal,
+  };
+}
 
 export function collectPreviewMetrics(payload: unknown): PreviewMetric[] {
   const metrics: PreviewMetric[] = [];
@@ -18,9 +51,12 @@ export function collectPreviewMetrics(payload: unknown): PreviewMetric[] {
     }
 
     if (typeof value === "number" && Number.isFinite(value)) {
+      const labels = buildMetricLabels(path);
       metrics.push({
         id: path.join("."),
         label: path.join("."),
+        groupLabel: labels.groupLabel,
+        signalLabel: labels.signalLabel,
         kind: "numeric",
         value,
       });
@@ -28,9 +64,12 @@ export function collectPreviewMetrics(payload: unknown): PreviewMetric[] {
     }
 
     if (typeof value === "boolean") {
+      const labels = buildMetricLabels(path);
       metrics.push({
         id: path.join("."),
         label: path.join("."),
+        groupLabel: labels.groupLabel,
+        signalLabel: labels.signalLabel,
         kind: "boolean",
         value,
       });
@@ -55,6 +94,28 @@ export function collectPreviewMetrics(payload: unknown): PreviewMetric[] {
 
   visit(payload, []);
   return metrics.filter((metric) => metric.label.length > 0);
+}
+
+export function groupPreviewMetrics(
+  metrics: PreviewMetric[],
+): PreviewMetricGroup[] {
+  const grouped = new Map<string, PreviewMetricGroup>();
+
+  metrics.forEach((metric) => {
+    const existing = grouped.get(metric.groupLabel);
+    if (existing) {
+      existing.metrics.push(metric);
+      return;
+    }
+
+    grouped.set(metric.groupLabel, {
+      id: metric.groupLabel.toLowerCase().replaceAll(/\s+/g, "-"),
+      label: metric.groupLabel,
+      metrics: [metric],
+    });
+  });
+
+  return Array.from(grouped.values());
 }
 
 function formatMetricValue(metric: PreviewMetric) {
@@ -92,6 +153,7 @@ export function GenericSensorPeripheralView({
   peripheral: PeripheralInfo;
 }) {
   const metrics = collectPreviewMetrics(lastData);
+  const metricGroups = groupPreviewMetrics(metrics);
 
   if (metrics.length === 0) {
     return (
@@ -142,31 +204,48 @@ export function GenericSensorPeripheralView({
         </span>
       </div>
 
-      <div className="grid gap-2">
-        {metrics.map((metric) => (
-          <div
-            key={metric.id}
-            className="border-border/70 bg-background/80 rounded-sm border px-3 py-2"
+      <div className="grid gap-3">
+        {metricGroups.map((group) => (
+          <section
+            key={group.id}
+            className="border-border/70 bg-background/70 space-y-2 rounded-sm border p-3"
           >
             <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground truncate font-mono text-[0.68rem] uppercase">
-                {metric.label}
+              <span className="text-muted-foreground font-mono text-[0.68rem] tracking-[0.18em] uppercase">
+                {group.label}
               </span>
-              <span className="font-mono text-sm text-slate-100">
-                {formatMetricValue(metric)}
+              <span className="text-muted-foreground font-mono text-[0.68rem] uppercase">
+                {group.metrics.length} signals
               </span>
             </div>
-            <div className="bg-border/40 mt-2 h-1.5 overflow-hidden rounded-full">
-              <div
-                className={
-                  metric.kind === "boolean"
-                    ? "h-full rounded-full bg-cyan-400"
-                    : "h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
-                }
-                style={{ width: `${metricWidth(metric)}%` }}
-              />
+            <div className="grid gap-2">
+              {group.metrics.map((metric) => (
+                <div
+                  key={metric.id}
+                  className="border-border/70 bg-background/80 rounded-sm border px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground truncate font-mono text-[0.68rem] uppercase">
+                      {metric.signalLabel}
+                    </span>
+                    <span className="font-mono text-sm text-slate-100">
+                      {formatMetricValue(metric)}
+                    </span>
+                  </div>
+                  <div className="bg-border/40 mt-2 h-1.5 overflow-hidden rounded-full">
+                    <div
+                      className={
+                        metric.kind === "boolean"
+                          ? "h-full rounded-full bg-cyan-400"
+                          : "h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
+                      }
+                      style={{ width: `${metricWidth(metric)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
     </div>
