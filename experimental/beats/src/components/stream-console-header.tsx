@@ -27,10 +27,10 @@ export function StreamConsoleHeader({
             ]}
           />
           <div>
-            <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.26em] uppercase">
+            <p className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.22em] uppercase">
               Beats Transport
             </p>
-            <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase md:text-[1.65rem]">
+            <h1 className="font-tomorrow text-lg tracking-[0.1em] text-slate-100 uppercase md:text-[1.4rem]">
               Scene Control Console
             </h1>
           </div>
