@@ -4,12 +4,10 @@ import numpy as np
 import pygame
 import pygame.surfarray as sarr
 import pygame.transform as pgt
-import reactivex
 from pygame import Surface
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.flame.provider import FlameStateProvider
 from heart.renderers.flame.state import FlameState
@@ -243,11 +241,6 @@ class FlameRenderer(StatefulBaseRenderer[FlameState]):
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self._flame_generator = FlameGenerator(64, 16)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FlameState]:
-        return self._provider.observable(peripheral_manager)
 
     def real_process(
         self,

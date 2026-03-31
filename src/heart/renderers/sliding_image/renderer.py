@@ -4,7 +4,6 @@ from dataclasses import replace
 from typing import Callable
 
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
@@ -31,21 +30,12 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
     ) -> None:
         self._image_file = image_file
         initial_state = SlidingImageState(speed=max(1, speed))
-        self._provider = (provider_factory or self._default_provider)(initial_state)
+        provider_builder = provider_factory or SlidingImageStateProvider
+        self._provider = provider_builder(initial_state)
         self._image: pygame.Surface | None = None
 
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
-
-    def _default_provider(
-        self, initial_state: SlidingImageState
-    ) -> SlidingImageStateProvider:
-        return SlidingImageStateProvider(initial_state=initial_state)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SlidingImageState]:
-        return self._provider.observable(peripheral_manager=peripheral_manager)
 
     def initialize(
         self,
@@ -101,21 +91,12 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
     ) -> None:
         self.composed = renderer
         initial_state = SlidingRendererState(speed=max(1, speed))
-        self._provider = (provider_factory or self._default_provider)(initial_state)
+        provider_builder = provider_factory or SlidingRendererStateProvider
+        self._provider = provider_builder(initial_state)
         self._peripheral_manager: PeripheralManager | None = None
 
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
-
-    def _default_provider(
-        self, initial_state: SlidingRendererState
-    ) -> SlidingRendererStateProvider:
-        return SlidingRendererStateProvider(initial_state=initial_state)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SlidingRendererState]:
-        return self._provider.observable(peripheral_manager=peripheral_manager)
 
     def initialize(
         self,

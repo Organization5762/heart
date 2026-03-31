@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.free_text.provider import FreeTextStateProvider
 from heart.renderers.free_text.state import FreeTextRendererState
@@ -22,11 +20,6 @@ class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
         self._provider = provider or FreeTextStateProvider()
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FreeTextRendererState]:
-        return self._provider.observable(peripheral_manager)
 
     def set_text(self, text: str) -> None:
         if self._provider is not None:
