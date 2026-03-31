@@ -3,13 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Iterable
 
-import reactivex
 from pygame import Rect, Surface, draw, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.heart_rates import battery_status, current_bpms
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.metadata_screen.provider import \
@@ -129,8 +127,3 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
                     window.blit(image, (pos_x, pos_y - 8))
                 self.display_number(window, current_bpm, pos_x, pos_y)
                 self.display_battery_status(window, monitor_id, pos_x, pos_y)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[MetadataScreenState]:
-        return self.provider.observable(peripheral_manager)

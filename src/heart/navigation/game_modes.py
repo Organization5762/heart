@@ -8,12 +8,10 @@ import pygame
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.color import RenderColor
 from heart.renderers.post_processing import (EdgePostProcessor,
                                              HueShiftPostProcessor,
-                                             NullPostProcessor,
                                              SaturationPostProcessor)
 from heart.renderers.slide_transition import \
     DEFAULT_GAUSSIAN_SIGMA as SLIDE_DEFAULT_GAUSSIAN_SIGMA
@@ -265,24 +263,6 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     ) -> None:
         raise NotImplementedError("GameModes.real_process is not implemented")
 
-    def handle_state(self, input: SwitchState) -> None:
-        new_long_button_value = input.long_button_value
-        if new_long_button_value != self.state.last_long_button_value:
-            if self.state.in_select_mode:
-                self.state._active_mode_index += self.state.mode_offset
-                self.state.mode_offset = 0
-            else:
-                for entry in self.state.entries:
-                    entry.renderer.reset()
-                for renderer in self.state.post_processors:
-                    renderer.reset()
-
-            self.state.in_select_mode = not self.state.in_select_mode
-            self.state.last_long_button_value = new_long_button_value
-
-        if self.state.in_select_mode:
-            self.state.mode_offset = input.rotation_since_last_long_button_press
-
     def _handle_browse_delta(self, delta: int) -> None:
         if not self.state.in_select_mode or delta == 0:
             return
@@ -420,7 +400,6 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             SaturationPostProcessor(),
             HueShiftPostProcessor(),
             EdgePostProcessor(),
-            NullPostProcessor(),
         ]
 
     def _build_title_renderer(
