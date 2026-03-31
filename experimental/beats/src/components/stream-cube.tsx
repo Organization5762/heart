@@ -25,6 +25,7 @@ const GRID_BASELINE_Y = -1.2;
 const MAX_TELEMETRY_SIGNAL = 1;
 const STREAM_TEXTURE_SIZE = 256;
 const STREAM_TEXTURE_BACKGROUND = "#020617";
+type DecodedStreamFrame = HTMLImageElement | ImageBitmap;
 
 export type StreamCubeProps = {
   imgURL: string | null;
@@ -295,16 +296,33 @@ export function StreamCube({
 
           try {
             if (nextUrl) {
-              const image = await loadStreamImage(nextUrl);
-              if (!isMountedRef.current) {
-                return;
+              const image = await decodeStreamFrame(nextUrl);
+              try {
+                if (!isMountedRef.current) {
+                  return;
+                }
+
+                const { width, height } = getDecodedFrameSize(image);
+                drawStreamImage(
+                  streamContext,
+                  streamCanvas,
+                  image,
+                  width,
+                  height,
+                );
+              } finally {
+                if (image instanceof ImageBitmap) {
+                  image.close();
+                }
               }
-              drawStreamImage(streamContext, streamCanvas, image);
             } else {
               drawFallbackTexture(streamContext, streamCanvas);
             }
           } catch (error) {
-            console.warn("Failed to load streamed texture; using fallback", error);
+            console.warn(
+              "Failed to load streamed texture; using fallback",
+              error,
+            );
             drawFallbackTexture(streamContext, streamCanvas);
           }
 
@@ -427,21 +445,37 @@ function applyTextureSettings(texture: Texture, repeat: number) {
 function drawStreamImage(
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  image: HTMLImageElement,
+  image: DecodedStreamFrame,
+  imageWidth: number,
+  imageHeight: number,
 ) {
   context.fillStyle = STREAM_TEXTURE_BACKGROUND;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   const scale = Math.min(
-    canvas.width / image.width,
-    canvas.height / image.height,
+    canvas.width / imageWidth,
+    canvas.height / imageHeight,
   );
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
+  const drawWidth = imageWidth * scale;
+  const drawHeight = imageHeight * scale;
   const offsetX = (canvas.width - drawWidth) / 2;
   const offsetY = (canvas.height - drawHeight) / 2;
 
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+async function decodeStreamFrame(url: string): Promise<DecodedStreamFrame> {
+  if (typeof createImageBitmap === "function") {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stream image: ${url}`);
+    }
+
+    const blob = await response.blob();
+    return createImageBitmap(blob);
+  }
+
+  return loadStreamImage(url);
 }
 
 function loadStreamImage(url: string) {
@@ -453,4 +487,18 @@ function loadStreamImage(url: string) {
       reject(new Error(`Failed to load stream image: ${url}`));
     image.src = url;
   });
+}
+
+function getDecodedFrameSize(image: DecodedStreamFrame) {
+  if (image instanceof ImageBitmap) {
+    return {
+      width: image.width,
+      height: image.height,
+    };
+  }
+
+  return {
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+  };
 }
