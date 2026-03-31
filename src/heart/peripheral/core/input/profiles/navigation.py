@@ -7,6 +7,8 @@ from functools import cached_property
 import pygame
 import reactivex
 from reactivex import operators as ops
+from reactivex.abc import DisposableBase
+from reactivex.disposable import CompositeDisposable
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
@@ -56,6 +58,27 @@ class NavigationProfile:
         self._gamepad = gamepad_controller
         self._debug_tap = debug_tap
         self._switch_stream_factory = switch_stream_factory
+
+    def subscribe_events(
+        self,
+        *,
+        on_browse: Callable[[BrowseIntent], None] | None = None,
+        on_browse_delta: Callable[[int], None] | None = None,
+        on_activate: Callable[[ActivateIntent], None] | None = None,
+        on_alternate_activate: Callable[[AlternateActivateIntent], None] | None = None,
+    ) -> DisposableBase:
+        subscriptions: list[DisposableBase] = []
+        if on_browse is not None:
+            subscriptions.append(self.browse.subscribe(on_next=on_browse))
+        if on_browse_delta is not None:
+            subscriptions.append(self.browse_delta.subscribe(on_next=on_browse_delta))
+        if on_activate is not None:
+            subscriptions.append(self.activate.subscribe(on_next=on_activate))
+        if on_alternate_activate is not None:
+            subscriptions.append(
+                self.alternate_activate.subscribe(on_next=on_alternate_activate)
+            )
+        return CompositeDisposable(*subscriptions)
 
     @cached_property
     def intents(self) -> reactivex.Observable[NavigationIntent]:

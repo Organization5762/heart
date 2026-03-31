@@ -32,25 +32,34 @@ export function StreamStatus({
   return (
     <div
       {...divProps}
-      className="font-tomorrow text-muted-foreground flex items-center justify-end text-[0.7rem] tracking-[0.18em] uppercase"
+      className="text-muted-foreground font-tomorrow flex items-center justify-end text-[0.7rem] tracking-[0.18em] uppercase"
     >
       <Antenna
         className={`mr-1 h-[1rem] ${getStatusClasses(streamIsActive)}`}
       />
-      <span>
-        {streamIsActive ? "Transmission Active" : "Transmission Idle"}
-      </span>
+      <span>{streamIsActive ? "Active" : "Not Active"}</span>
     </div>
   );
 }
 
 export function StreamedImage({ imgURL }: { imgURL: string | null }) {
-  if (!imgURL) return <Skeleton className="size-full" />;
+  if (!imgURL) {
+    return <Skeleton className="size-full min-h-[260px] rounded-none" />;
+  }
 
-  return <img src={imgURL} alt="stream" className="size-full object-contain" />;
+  return (
+    <div className="relative h-full min-h-[260px] w-full overflow-hidden border border-white/20 bg-[radial-gradient(circle_at_top,rgba(43,103,255,0.14),transparent_34%),linear-gradient(180deg,rgba(7,7,7,0.94),rgba(2,6,23,0.98))]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.06)_58%,rgba(2,6,23,0.72))]" />
+      <img
+        src={imgURL}
+        alt="stream"
+        className="relative size-full object-contain p-4"
+      />
+    </div>
+  );
 }
 
-function getReadyStateLabel(readyState: number) {
+function getReadyStateLabel(readyState: number | undefined) {
   switch (readyState) {
     case WebSocket.CONNECTING:
       return "Dialing";
@@ -148,7 +157,7 @@ export function Stream() {
             />
             <DataRow
               label="Renderer"
-              value={useImageFallback ? "2D PNG" : "WebGL Cube"}
+              value={useImageFallback ? "2D PNG" : "WebGL Display"}
             />
             <DataRow
               label="Signal"
@@ -181,9 +190,7 @@ export function Stream() {
               </div>
               <div className="flex-1">
                 {useImageFallback ? (
-                  <div className="h-full overflow-hidden border border-white/20 bg-black/30">
-                    <StreamedImage imgURL={imgURL} />
-                  </div>
+                  <StreamedImage imgURL={imgURL} />
                 ) : (
                   <StreamCube
                     imgURL={imgURL}
@@ -214,6 +221,16 @@ export function Stream() {
           </div>
         </TechnicalCard>
       </section>
+
+      <div className="border-border flex flex-none items-center justify-between gap-4 border-t px-1 pt-2">
+        <span className="text-muted-foreground font-tomorrow text-xs uppercase">
+          fps: <b>{isActive ? fps : 0}</b>
+        </span>
+        <div className="text-muted-foreground font-tomorrow text-xs">
+          {ws?.socket?.url}
+        </div>
+        <StreamStatus streamIsActive={isActive} />
+      </div>
     </PageFrame>
   );
 }

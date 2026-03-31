@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import reactivex
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.navigation import ComposedRenderer
@@ -64,11 +62,6 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
             orientation=orientation,
         )
         super().initialize(window, peripheral_manager, orientation)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[CombinedBpmScreenState]:
-        return self._provider.observable(peripheral_manager)
 
     def real_process(
         self,

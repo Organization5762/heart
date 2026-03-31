@@ -74,7 +74,9 @@ export function decodeStreamEvent(buffer: ArrayBuffer): StreamEvent | null {
     return {
       type: "peripheral",
       payload: {
-        peripheralInfo: normalizePeripheralInfo(envelope.peripheral.peripheral_info),
+        peripheralInfo: normalizePeripheralInfo(
+          envelope.peripheral.peripheral_info,
+        ),
         data,
         payloadEncoding,
       },
