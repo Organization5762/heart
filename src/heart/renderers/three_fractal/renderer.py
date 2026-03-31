@@ -107,7 +107,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.surface_array = None
 
         self.initialized = False
-        self.warmup = False
         self.time_initialized = None
         self._auto_started = False
         self._keyboard_snapshot = KeyboardSnapshot(
@@ -934,7 +933,6 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         self._initial_state: FractalSceneState | None = None
         super().__init__(builder=self.provider)
         self.device_display_mode = DeviceDisplayMode.OPENGL
-        self.warmup = False
         self._peripheral_manager: PeripheralManager | None = None
 
     def initialize(

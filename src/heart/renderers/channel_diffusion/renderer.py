@@ -19,7 +19,6 @@ class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
         self._initial_state: ChannelDiffusionState | None = None
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.warmup = False
 
     def initialize(
         self,

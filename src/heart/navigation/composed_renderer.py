@@ -40,7 +40,7 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
         ]
         self._sync_device_display_mode()
 
-    def _real_get_renderers(self) -> list[StatefulBaseRenderer]:
+    def get_renderers(self) -> list[StatefulBaseRenderer]:
         result: list[StatefulBaseRenderer] = []
         for renderer in self.renderers:
             result.extend(renderer.get_renderers())

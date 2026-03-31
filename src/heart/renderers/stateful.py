@@ -11,9 +11,7 @@ from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
 from heart.runtime.display_context import DisplayContext
-from heart.utilities.logging import get_logger
 
-logger = get_logger(__name__)
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def __init__(
@@ -26,10 +24,9 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         if builder is not None and state is not None:
             raise ValueError("StatefulBaseRenderer accepts a builder or state, not both")
 
-        if builder is None and state is not None:
-            builder = StaticStateProvider(state)
-
-        self.builder = builder
+        self.builder = builder or (
+            StaticStateProvider(state) if state is not None else None
+        )
         self._subscription: Disposable | None = None
         super().__init__(*args, **kwargs)
         if state is not None:
@@ -53,6 +50,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             observable = self.state_observable(
                 peripheral_manager=peripheral_manager,
             )
+
             def _on_next(state: StateT) -> None:
                 self.set_state(state)
                 if not self.initialized:
@@ -65,15 +63,12 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             msg = "StatefulBaseRenderer requires a builder or _create_initial_state"
             raise ValueError(msg)
 
-        logger.info(f"Creating initial state for {self.name}")
         state = self._create_initial_state(
             window=window,
             peripheral_manager=peripheral_manager,
             orientation=orientation,
         )
-        logger.info(f"Setting state for {self.name}")
         self.set_state(state)
-        logger.info(f"Processing for {self.name}")
         self.initialized = True
 
     def reset(self) -> None:
