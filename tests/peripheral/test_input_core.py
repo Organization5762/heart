@@ -344,6 +344,39 @@ class TestNavigationProfile:
             ("AlternateActivateIntent", "switch.long_button", 0),
         ]
 
+    def test_subscribe_events_binds_requested_navigation_handlers(self) -> None:
+        """Verify subscribe_events wires the requested logical handlers in one place so navigation consumers do not duplicate reactive subscription setup."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        switch_updates: Subject[SwitchState] = Subject()
+        profile = NavigationProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+            switch_stream_factory=lambda: switch_updates,
+        )
+        browse: list[int] = []
+        activate: list[str] = []
+        alternate: list[str] = []
+
+        subscription = profile.subscribe_events(
+            on_browse_delta=browse.append,
+            on_activate=lambda _intent: activate.append("activate"),
+            on_alternate_activate=lambda _intent: alternate.append("alternate"),
+        )
+
+        switch_updates.on_next(SwitchState(0, 0, 0, 0, 0))
+        switch_updates.on_next(SwitchState(3, 0, 0, 3, 3))
+        switch_updates.on_next(SwitchState(3, 1, 0, 0, 3))
+        switch_updates.on_next(SwitchState(3, 1, 1, 0, 0))
+
+        subscription.dispose()
+
+        assert browse == [3]
+        assert activate == ["activate"]
+        assert alternate == ["alternate"]
+
 
 class TestMandelbrotControlProfile:
     """Group Mandelbrot profile tests so consumers receive direct motion state and command events instead of decoding merged revisions."""

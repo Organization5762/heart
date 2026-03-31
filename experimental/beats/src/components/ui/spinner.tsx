@@ -1,7 +1,7 @@
-import type { ComponentProps } from "react"
-import { Loader2Icon } from "lucide-react"
+import type { ComponentProps } from "react";
+import { Loader2Icon } from "lucide-react";
 
-import { cn } from "@/utils/tailwind"
+import { cn } from "@/utils/tailwind";
 
 function Spinner({ className, ...props }: ComponentProps<"svg">) {
   return (
@@ -11,7 +11,7 @@ function Spinner({ className, ...props }: ComponentProps<"svg">) {
       className={cn("size-4 animate-spin", className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Spinner }
+export { Spinner };

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 import pygame
 
@@ -23,29 +21,35 @@ EDGE_BACKGROUND_DIM = 0.75
 EDGE_GAMMA = 0.5
 
 
-@dataclass
-class PostProcessorState:
-    peripheral_manager: PeripheralManager
-
-
 def _get_image_view(surface: pygame.Surface) -> tuple[np.ndarray, np.ndarray]:
     pixels = pygame.surfarray.pixels3d(surface)
     image = pixels.swapaxes(0, 1)
     return image, pixels
 
 
-class BasePostProcessor(StatefulBaseRenderer[PostProcessorState]):
+class BasePostProcessor(StatefulBaseRenderer[None]):
     def __init__(self) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
+        self._peripheral_manager: PeripheralManager | None = None
 
-    def _create_initial_state(
+    def initialize(
         self,
         window: DisplayContext,
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
-    ) -> PostProcessorState:
-        return PostProcessorState(peripheral_manager=peripheral_manager)
+    ) -> None:
+        self._peripheral_manager = peripheral_manager
+        self.initialized = True
+
+    def reset(self) -> None:
+        self._peripheral_manager = None
+        self.initialized = False
+
+    def _bluetooth_switch(self):
+        if self._peripheral_manager is None:
+            return None
+        return self._peripheral_manager.bluetooth_switch()
 
 
 class SaturationPostProcessor(BasePostProcessor):
@@ -54,7 +58,7 @@ class SaturationPostProcessor(BasePostProcessor):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
-        bluetooth = self.state.peripheral_manager.bluetooth_switch()
+        bluetooth = self._bluetooth_switch()
         if bluetooth is None:
             return
         if (switch_one := bluetooth.switch_one()) is None:
@@ -86,7 +90,7 @@ class HueShiftPostProcessor(BasePostProcessor):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
-        bluetooth = self.state.peripheral_manager.bluetooth_switch()
+        bluetooth = self._bluetooth_switch()
         if bluetooth is None:
             return
         hue_switch = bluetooth.switch_two()
@@ -120,7 +124,7 @@ class EdgePostProcessor(BasePostProcessor):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
-        bluetooth = self.state.peripheral_manager.bluetooth_switch()
+        bluetooth = self._bluetooth_switch()
         if bluetooth is None:
             return
         edge_switch = bluetooth.switch_three()
@@ -163,12 +167,3 @@ class EdgePostProcessor(BasePostProcessor):
         out = np.clip(base + edges, 0, 255)
         image[:] = out.astype(np.uint8)
         del pixels
-
-
-class NullPostProcessor(BasePostProcessor):
-    def real_process(
-        self,
-        window: DisplayContext,
-        orientation: Orientation,
-    ) -> None:
-        return

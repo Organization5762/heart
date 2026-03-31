@@ -12,8 +12,10 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
+    "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
+    "types": ["node", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

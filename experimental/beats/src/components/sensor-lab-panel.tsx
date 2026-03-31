@@ -9,7 +9,7 @@ import {
   type SensorHistoryPoint,
   type SensorOverride,
 } from "@/features/stream-console/sensor-simulation";
-import { Activity, Gauge, SlidersHorizontal, Waveform } from "lucide-react";
+import { Activity, Gauge, ScanLine, SlidersHorizontal } from "lucide-react";
 
 export function SensorLabPanel({
   clockSeconds,
@@ -291,7 +291,7 @@ export function SensorLabPanel({
 
               <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 <div className="mb-4 flex items-center gap-2">
-                  <Waveform className="h-4 w-4 text-amber-500" />
+                  <ScanLine className="h-4 w-4 text-amber-500" />
                   <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
                     Observed vs Reference
                   </h3>

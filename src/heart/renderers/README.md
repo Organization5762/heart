@@ -1,1 +1,1 @@
-Self-contained visual renderers and demos. Each subpackage bundles assets and logic for a specific experience (for example, Mario scenes or cellular automata) that can be scheduled by the runtime.
+Self-contained visual renderers and demos. Each subpackage bundles only the assets and logic needed for a specific experience so the shared runtime can stay small.

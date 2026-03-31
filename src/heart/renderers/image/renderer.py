@@ -1,8 +1,6 @@
 import pygame
-import reactivex
 
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.image.provider import RenderImageStateProvider
 from heart.renderers.image.state import RenderImageState
@@ -25,11 +23,6 @@ class RenderImage(StatefulBaseRenderer[RenderImageState]):
         super().__init__(builder=self._provider)
         self._scaled_image: pygame.Surface | None = None
         self._scaled_size: tuple[int, int] | None = None
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[RenderImageState]:
-        return self._provider.observable(peripheral_manager=peripheral_manager)
 
     def real_process(
         self,
