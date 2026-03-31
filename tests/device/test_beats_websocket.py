@@ -96,6 +96,26 @@ class TestInputPayloadEncoding:
         assert event.event_type == payload.event_type
         assert json.loads(event.data_json.decode("utf-8")) == payload.data
 
+    def test_encodes_input_payloads_with_frozensets(self) -> None:
+        """Verify Input payloads normalize frozensets into JSON arrays so websocket streaming does not crash on immutable input snapshots."""
+        payload = Input(
+            event_type="peripheral.keyboard.snapshot",
+            data={"pressed_keys": frozenset({3, 1, 2})},
+        )
+
+        encoded = encode_peripheral_payload(payload)
+
+        assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
+        message_class = protobuf_registry.get_message_class(
+            PeripheralPayloadType.INPUT_EVENT
+        )
+        assert message_class is not None
+        event = message_class()
+        event.ParseFromString(encoded.payload)
+        assert json.loads(event.data_json.decode("utf-8")) == {
+            "pressed_keys": [1, 2, 3]
+        }
+
 
 class TestPeripheralPayloadDecoding:
     """Validate protobuf-aware payload decoding so inbound streams round-trip correctly."""

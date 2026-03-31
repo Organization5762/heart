@@ -113,6 +113,7 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
 - `2026-03-31`: `cd experimental/beats && npm install`
 - `2026-03-31`: `cd experimental/beats && npm ci`
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
