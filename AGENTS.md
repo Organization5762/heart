@@ -11,6 +11,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
+- Vite `.mts` configs that are shared with Storybook or other native-ESM tooling must derive `__dirname` via `fileURLToPath(new URL(".", import.meta.url))` instead of relying on the CommonJS global.
 
 ## Formatting
 
@@ -112,6 +113,13 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `cd experimental/beats && npm install`
+- `2026-03-31`: `cd experimental/beats && npm ci`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npx prettier --write .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx README.md package.json tsconfig.json vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npx eslint .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `cd experimental/beats && npm run build-storybook`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache .venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make test`
