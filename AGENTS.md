@@ -113,6 +113,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `rg -n "Sitemap|siteMap|usgc-ascii-map" experimental/beats/src/routes/index.tsx` returned no matches after removing the Beats home-page sitemap.
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
