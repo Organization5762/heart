@@ -3,6 +3,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRef } from "react";
 import { frameStream } from "../streams";
 
+const ACTIVE_STATUS_POLL_INTERVAL_MS = 200;
+const STALE_URL_REVOKE_DELAY_MS = 1000;
+
 type ImageState = {
   imgURL: string | null;
   isActive: boolean;
@@ -32,6 +35,24 @@ export function ImageProvider({
 
   const lastFrameRef = useRef<number>(0);
   const frameTimesRef = useRef<number[]>([]);
+  const revokeTimeoutsRef = useRef<number[]>([]);
+
+  const clearPendingRevocations = () => {
+    revokeTimeoutsRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    revokeTimeoutsRef.current = [];
+  };
+
+  const scheduleUrlRevocation = (url: string) => {
+    const timeoutId = window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      revokeTimeoutsRef.current = revokeTimeoutsRef.current.filter(
+        (pendingId) => pendingId !== timeoutId,
+      );
+    }, STALE_URL_REVOKE_DELAY_MS);
+    revokeTimeoutsRef.current.push(timeoutId);
+  };
 
   useEffect(() => {
     const sub = frameStream.subscribe((msg) => {
@@ -69,7 +90,9 @@ export function ImageProvider({
       const newURL = URL.createObjectURL(blob);
 
       setImgURL((old) => {
-        if (old) URL.revokeObjectURL(old);
+        if (old) {
+          scheduleUrlRevocation(old);
+        }
         return newURL;
       });
 
@@ -80,14 +103,17 @@ export function ImageProvider({
     const interval = setInterval(() => {
       const now = performance.now();
       setIsActive(now - lastFrameRef.current < recentThreshold);
-    }, 200);
+    }, ACTIVE_STATUS_POLL_INTERVAL_MS);
 
     return () => {
       sub.unsubscribe();
       clearInterval(interval);
+      clearPendingRevocations();
 
       setImgURL((old) => {
-        if (old) URL.revokeObjectURL(old);
+        if (old) {
+          URL.revokeObjectURL(old);
+        }
         return null;
       });
 
