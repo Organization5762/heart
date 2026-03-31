@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import reactivex
 from pygame import Surface, font, time
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.max_bpm_screen.provider import (AVATAR_MAPPINGS,
                                                      AvatarBpmStateProvider)
@@ -60,8 +58,3 @@ class AvatarBpmRenderer(StatefulBaseRenderer[AvatarBpmRendererState]):
         window.blit(image, (center_x, center_y))
 
         self.display_number(window, state.bpm, window_width // 2, center_y)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[AvatarBpmRendererState]:
-        return self._provider.observable(peripheral_manager)
