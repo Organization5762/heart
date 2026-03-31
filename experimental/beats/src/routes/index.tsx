@@ -16,20 +16,6 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Binary, Mouse, Orbit, RadioTower, ScanLine, Tv } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
-const siteMap = `Home
-├── Mission Control
-│   ├── Playback
-│   ├── Status Matrix
-│   └── Event Console
-├── Current Stream
-│   ├── Live Viewport
-│   ├── Machine Report
-│   └── Frame Cadence
-└── Peripherals
-    ├── Connected
-    ├── Events
-    └── Snapshots`;
-
 const routeCards = [
   {
     title: "Mission Control",
@@ -178,7 +164,7 @@ function HomePage() {
         </TechnicalCard>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <section>
         <PaperCard className="flex flex-col gap-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
@@ -227,15 +213,6 @@ function HomePage() {
               </p>
             </div>
           </div>
-        </PaperCard>
-
-        <PaperCard className="flex flex-col gap-5">
-          <SectionHeader
-            eyebrow="Engineering"
-            title="Sitemap"
-            description="Everything in the Beats terminal in one place."
-          />
-          <pre className="usgc-ascii-map">{siteMap}</pre>
         </PaperCard>
       </section>
 

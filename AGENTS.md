@@ -113,6 +113,8 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `rg -n "Sitemap|siteMap|usgc-ascii-map" experimental/beats/src/routes/index.tsx` returned no matches after removing the Beats home-page sitemap.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
 - `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
