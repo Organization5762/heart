@@ -9,6 +9,8 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
+- Flowtoys Connect Bridge compatibility currently assumes the upstream ESP32 plus nRF24L01 serial bridge; do not assume nRF52 firmware is wire-compatible with that command and RF stack.
+- For a Feather-targeted FlowToy receive bridge, treat the nRF52840 as the host MCU and plan around an external nRF24L01+ frontend so the repo can match the reference bridge's 250 kbps RF24 settings.
 
 ## Formatting
 
@@ -203,6 +205,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`

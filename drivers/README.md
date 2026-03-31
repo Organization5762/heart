@@ -66,10 +66,15 @@ We have also explored Bluetooth-based bridges, which do not plug directly into t
 
 - [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062) - Driver is at [this link](../drivers/bluetooth-bridge/)
 
+## Radio Bridges
+
+We also have an experimental FlowToy bridge path for the Feather family:
+
+- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062) with an external `nRF24L01+` frontend - Driver is at [this link](../drivers/flowtoy_bridge/)
+
 ## Future Bridges
 
 - [Garmin ANT+](https://www.amazon.com/Garmin-USB-Stick-Fitness-Devices/dp/B00CM381SQ/ref=sr_1_1?ie=UTF8&qid=1475691048&sr=8-1&keywords=ant%2B+stick)
-- [Flowtoy USB Bridge](https://flowtoys.com/usb-bridge) (Note, this is just a special-case of Bluetooth and may not be required)
 
 # Development Notes
 

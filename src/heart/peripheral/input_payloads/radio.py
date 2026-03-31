@@ -17,11 +17,15 @@ from .base import InputEventPayload, _normalize_timestamp
 class RadioPacket(InputEventPayload):
     """Raw 2.4 GHz transport packet emitted by a radio bridge."""
 
+    protocol: str | None = None
     frequency_hz: float | None = None
     channel: float | None = None
+    bitrate_kbps: float | None = None
     modulation: str | None = None
+    crc_ok: bool | None = None
     rssi_dbm: float | None = None
     payload: bytes | bytearray | Sequence[int] | str | None = None
+    decoded: Mapping[str, Any] | None = None
     metadata: Mapping[str, Any] | None = None
 
     EVENT_TYPE: ClassVar[str] = RADIO_PACKET
@@ -30,16 +34,24 @@ class RadioPacket(InputEventPayload):
     def to_input(self, *, timestamp: datetime | None = None) -> Input:
         payload: MutableMapping[str, Any] = {}
 
+        if self.protocol is not None:
+            payload["protocol"] = str(self.protocol)
         if self.frequency_hz is not None:
             payload["frequency_hz"] = float(self.frequency_hz)
         if self.channel is not None:
             payload["channel"] = float(self.channel)
+        if self.bitrate_kbps is not None:
+            payload["bitrate_kbps"] = float(self.bitrate_kbps)
         if self.modulation is not None:
             payload["modulation"] = str(self.modulation)
+        if self.crc_ok is not None:
+            payload["crc_ok"] = bool(self.crc_ok)
         if self.rssi_dbm is not None:
             payload["rssi_dbm"] = float(self.rssi_dbm)
         if self.payload is not None:
             payload["payload"] = self._normalise_payload(self.payload)
+        if self.decoded:
+            payload["decoded"] = dict(self.decoded)
         if self.metadata:
             payload["metadata"] = dict(self.metadata)
 
