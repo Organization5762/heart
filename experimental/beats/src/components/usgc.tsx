@@ -48,7 +48,7 @@ export function SectionHeader({
         </p>
         <h1
           className={cn(
-            "font-tomorrow break-words text-3xl tracking-[0.06em] md:text-4xl",
+            "font-tomorrow text-3xl tracking-[0.06em] break-words md:text-4xl",
             invert ? "text-[#f6efe6]" : "text-foreground",
           )}
         >
@@ -98,15 +98,19 @@ export function DataRow({
   label,
   value,
   className,
+  labelClassName,
+  valueClassName,
 }: {
   label: string;
   value: ReactNode;
   className?: string;
+  labelClassName?: string;
+  valueClassName?: string;
 }) {
   return (
     <div className={cn("usgc-data-row", className)}>
-      <span className="usgc-data-label">{label}</span>
-      <span className="min-w-0 break-words">{value}</span>
+      <span className={cn("usgc-data-label", labelClassName)}>{label}</span>
+      <span className={cn("min-w-0 break-words", valueClassName)}>{value}</span>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import {
   Monitor,
   Mouse,
   RadioTower,
-  Rocket,
   Tv,
 } from "lucide-react";
 
@@ -46,11 +45,6 @@ const items = {
       icon: Home,
     },
     {
-      title: "Mission Control",
-      url: "/mission-control",
-      icon: Rocket,
-    },
-    {
       title: "Current Stream",
       url: "/stream",
       icon: Tv,
@@ -89,6 +83,8 @@ const items = {
   ],
 };
 
+const SIDEBAR_TOP_OFFSET_CLASS = "pt-[52px]";
+
 export function AppSidebar() {
   const [appVersion, setAppVersion] = useState("0.0.0");
   const [, startGetAppVersion] = useTransition();
@@ -108,19 +104,23 @@ export function AppSidebar() {
       : pathname === path || pathname.startsWith(`${path}/`);
 
   return (
-    <Sidebar collapsible="icon" variant="floating" className="pt-[38px]">
-      <SidebarHeader className="gap-3 p-3">
-        <div className="border-sidebar-border bg-sidebar overflow-hidden border p-3">
+    <Sidebar
+      collapsible="icon"
+      variant="floating"
+      className={SIDEBAR_TOP_OFFSET_CLASS}
+    >
+      <SidebarHeader className="gap-2 px-2.5 pt-2 pb-1">
+        <div className="border-sidebar-border bg-sidebar overflow-hidden border px-3 py-3 group-data-[collapsible=icon]:hidden">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
-              <p className="font-tomorrow text-sidebar-foreground/60 text-[0.58rem] tracking-[0.34em] uppercase">
+              <p className="font-tomorrow text-sidebar-foreground/60 text-[0.52rem] tracking-[0.3em] uppercase">
                 U.S. Graphics Company
               </p>
               <div>
-                <h2 className="font-tomorrow text-sidebar-foreground text-lg tracking-[0.2em]">
+                <h2 className="font-tomorrow text-sidebar-foreground text-base tracking-[0.18em]">
                   BEATS
                 </h2>
-                <p className="text-sidebar-foreground/70 font-mono text-[0.68rem] tracking-[0.16em] uppercase">
+                <p className="text-sidebar-foreground/70 font-mono text-[0.62rem] tracking-[0.14em] uppercase">
                   Telemetry Department
                 </p>
               </div>
@@ -131,17 +131,24 @@ export function AppSidebar() {
             <DataRow
               label="Program"
               value="Machine Report"
-              className="text-sidebar-foreground"
+              className="text-sidebar-foreground grid-cols-1 gap-1"
+              valueClassName="break-normal"
             />
             <DataRow
               label="Signal"
               value="ws://localhost:8765"
-              className="text-sidebar-foreground"
+              className="text-sidebar-foreground grid-cols-1 gap-1"
+              valueClassName="break-all"
             />
           </div>
         </div>
+        <div className="border-sidebar-border bg-sidebar text-sidebar-foreground hidden h-16 items-center justify-center border group-data-[collapsible=icon]:flex">
+          <div className="flex h-10 w-10 items-center justify-center border border-current/45 font-tomorrow text-lg tracking-[0.14em]">
+            B
+          </div>
+        </div>
       </SidebarHeader>
-      <SidebarSeparator className="mx-3" />
+      <SidebarSeparator className="mx-2.5" />
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
@@ -151,7 +158,7 @@ export function AppSidebar() {
                   asChild
                   tooltip={item.title}
                   isActive={isPathActive(item.url)}
-                  className="font-tomorrow tracking-[0.16em] uppercase"
+                  className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase"
                 >
                   <Link to={item.url}>
                     {item.icon && <item.icon />}
@@ -163,7 +170,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel className="font-tomorrow tracking-[0.18em] uppercase">
+          <SidebarGroupLabel className="font-tomorrow text-[0.68rem] tracking-[0.16em] uppercase">
             Entities
           </SidebarGroupLabel>
           <SidebarMenu>
@@ -181,7 +188,7 @@ export function AppSidebar() {
                       isActive={item.items.some((subItem) =>
                         isPathActive(subItem.url),
                       )}
-                      className="font-tomorrow tracking-[0.16em] uppercase"
+                      className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase"
                     >
                       {item.icon && <item.icon />}
                       <span>{item.title}</span>

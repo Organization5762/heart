@@ -13,17 +13,14 @@ import {
   TechnicalCard,
 } from "@/components/usgc";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Binary, Mouse, Orbit, RadioTower, ScanLine, Tv } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+
+const RECENT_DEVICE_LIMIT = 4;
+const RECENT_ACTIVITY_WINDOW_MS = 60_000;
+const RECENT_ACTIVITY_TICK_MS = 5_000;
 
 const routeCards = [
-  {
-    title: "Mission Control",
-    description:
-      "A specimen-grade rehearsal console for phase timing, subsystem health, and playback control.",
-    href: "/mission-control",
-    icon: Orbit,
-  },
   {
     title: "Current Stream",
     description:
@@ -53,24 +50,170 @@ function getReadyStateLabel(readyState: number) {
   }
 }
 
+type HomePeripheralSnapshot = ReturnType<
+  typeof useConnectedPeripherals
+>[string];
+type HomePeripheralEvent = ReturnType<typeof usePeripheralEvents>[number];
+
+export type RecentPeripheralActivity = {
+  id: string;
+  lastSeenTs: number;
+  eventCount: number;
+};
+
+export function selectStableRecentPeripheralActivity(
+  previousVisibleIds: string[],
+  activeDevices: RecentPeripheralActivity[],
+  limit = RECENT_DEVICE_LIMIT,
+): RecentPeripheralActivity[] {
+  const activeById = new Map(
+    activeDevices.map((activity) => [activity.id, activity] as const),
+  );
+  const stableVisibleDevices: RecentPeripheralActivity[] = [];
+  const seenIds = new Set<string>();
+
+  for (const id of previousVisibleIds) {
+    const activity = activeById.get(id);
+    if (!activity) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(id);
+  }
+
+  for (const activity of activeDevices) {
+    if (seenIds.has(activity.id)) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(activity.id);
+  }
+
+  return stableVisibleDevices.slice(0, limit);
+}
+
+export function summarizeRecentPeripheralActivity(
+  peripheralEntries: HomePeripheralSnapshot[],
+  events: HomePeripheralEvent[],
+  now: number,
+): RecentPeripheralActivity[] {
+  const activityById = new Map<string, RecentPeripheralActivity>();
+
+  for (const event of events) {
+    const peripheralId = event.msg.payload.peripheralInfo.id;
+    if (!peripheralId) {
+      continue;
+    }
+
+    const existing = activityById.get(peripheralId);
+    if (existing) {
+      existing.eventCount += 1;
+      existing.lastSeenTs = Math.max(existing.lastSeenTs, event.ts);
+      continue;
+    }
+
+    activityById.set(peripheralId, {
+      id: peripheralId,
+      lastSeenTs: event.ts,
+      eventCount: 1,
+    });
+  }
+
+  for (const peripheral of peripheralEntries) {
+    const peripheralId = peripheral.info.id;
+    if (!peripheralId) {
+      continue;
+    }
+
+    const existing = activityById.get(peripheralId);
+    if (existing) {
+      existing.lastSeenTs = Math.max(existing.lastSeenTs, peripheral.ts);
+      continue;
+    }
+
+    activityById.set(peripheralId, {
+      id: peripheralId,
+      lastSeenTs: peripheral.ts,
+      eventCount: 0,
+    });
+  }
+
+  return [...activityById.values()]
+    .filter(
+      (activity) => now - activity.lastSeenTs <= RECENT_ACTIVITY_WINDOW_MS,
+    )
+    .sort((left, right) => {
+      if (right.lastSeenTs !== left.lastSeenTs) {
+        return right.lastSeenTs - left.lastSeenTs;
+      }
+
+      if (right.eventCount !== left.eventCount) {
+        return right.eventCount - left.eventCount;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+}
+
+export function formatPeripheralRecency(
+  lastSeenTs: number,
+  now: number,
+): string {
+  const deltaSeconds = Math.max(0, Math.floor((now - lastSeenTs) / 1_000));
+
+  if (deltaSeconds < 5) {
+    return "Just now";
+  }
+
+  if (deltaSeconds < 60) {
+    return `${deltaSeconds}s ago`;
+  }
+
+  const deltaMinutes = Math.floor(deltaSeconds / 60);
+  return `${deltaMinutes}m ago`;
+}
+
 function HomePage() {
   const ws = useWS();
   const { fps, isActive } = useStreamedImage();
   const peripherals = useConnectedPeripherals();
   const events = usePeripheralEvents();
   const [appVersion, setAppVersion] = useState("0.0.0");
+  const [now, setNow] = useState(() => Date.now());
   const [, startGetAppVersion] = useTransition();
+  const recentPeripheralOrderRef = useRef<string[]>([]);
 
   useEffect(
     () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
     [],
   );
 
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setNow(Date.now()),
+      RECENT_ACTIVITY_TICK_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const peripheralEntries = Object.values(peripherals).sort(
     (left, right) => right.ts - left.ts,
   );
-  const latestPeripheral = peripheralEntries[0];
   const readyStateLabel = getReadyStateLabel(ws.readyState);
+  const activePeripheralActivity = summarizeRecentPeripheralActivity(
+    peripheralEntries,
+    events,
+    now,
+  );
+  const recentPeripheralActivity = selectStableRecentPeripheralActivity(
+    recentPeripheralOrderRef.current,
+    activePeripheralActivity,
+  );
+  recentPeripheralOrderRef.current = recentPeripheralActivity.map(
+    (device) => device.id,
+  );
 
   return (
     <PageFrame>
@@ -142,10 +285,40 @@ function HomePage() {
             <DataRow label="Socket" value={readyStateLabel} />
             <DataRow label="Peripherals" value={peripheralEntries.length} />
             <DataRow label="Events" value={events.length} />
-            <DataRow
-              label="Last Device"
-              value={latestPeripheral?.info.id ?? "No peripheral registered"}
-            />
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 font-mono text-[0.7rem] tracking-[0.18em] uppercase">
+              <span className="text-[#bdb3a6]">Recently Active Devices</span>
+              <span>{recentPeripheralActivity.length} Tracked</span>
+            </div>
+            {recentPeripheralActivity.length > 0 ? (
+              <div className="space-y-2">
+                {recentPeripheralActivity.map((device) => (
+                  <div
+                    key={device.id}
+                    className="border border-[#4d4238] bg-black/10 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-sm text-[#f6efe6]">
+                        {device.id}
+                      </span>
+                      <span className="font-mono text-[0.7rem] tracking-[0.16em] text-[#bdb3a6] uppercase">
+                        {formatPeripheralRecency(device.lastSeenTs, now)}
+                      </span>
+                    </div>
+                    <p className="mt-1 font-mono text-[0.72rem] tracking-[0.12em] text-[#bdb3a6] uppercase">
+                      {device.eventCount > 0
+                        ? `${device.eventCount} updates in the last minute`
+                        : "Connected, no new payload burst in the last minute"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#d8cfc1]">
+                No recently active devices in the last minute.
+              </p>
+            )}
           </div>
           <div className="grid gap-4">
             <MeterBar
