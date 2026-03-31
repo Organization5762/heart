@@ -221,6 +221,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm run lint` still fails because of pre-existing errors in `src/actions/ws/providers/PeripheralEventsProvider.tsx`, `src/actions/ws/providers/PeripheralProvider.tsx`, `src/components/ui/sidebar.tsx`, `src/hooks/use-mobile.ts`, and `src/layouts/base-layout.tsx`.
 - `2026-03-31`: `cd experimental/beats && npm run test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/generic_sensor.test.ts src/tests/unit/components/stream.test.tsx`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make test`
 - `2026-03-31`: `npm install` in `experimental/beats` to resync `package-lock.json` after `npm ci` failed because the lockfile was missing `protobufjs` and related transitive dependencies.
 - `2026-03-31`: `./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts` in `experimental/beats`
