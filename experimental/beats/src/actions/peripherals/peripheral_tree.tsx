@@ -1,4 +1,5 @@
 import { AccelerometerView } from "@/components/ui/peripherals/accelerometer";
+import { GenericSensorPeripheralView } from "@/components/ui/peripherals/generic_sensor";
 import { RotarySwitchView } from "@/components/ui/peripherals/rotary_button";
 import { UWBPositionView } from "@/components/ui/peripherals/uwb_positioning";
 import { PaperCard, SpecChip } from "@/components/usgc";
@@ -9,11 +10,18 @@ import {
   useConnectedPeripherals,
 } from "../ws/providers/PeripheralProvider";
 
+type PeripheralSnapshot = {
+  ts: number;
+  info: PeripheralInfo;
+  last_data: unknown;
+};
+
 function tagsByName(peripheral: PeripheralInfo) {
   return Object.fromEntries(peripheral.tags.map((t) => [t.name, t]));
 }
 
-const SpecialRenderer = ({ peripheral }: { peripheral: PeripheralInfo }) => {
+const SpecialRenderer = ({ snapshot }: { snapshot: PeripheralSnapshot }) => {
+  const { info: peripheral, last_data: lastData } = snapshot;
   const c = tagsByName(peripheral);
   switch (c.input_variant?.variant) {
     case "uwb_positioning":
@@ -24,9 +32,10 @@ const SpecialRenderer = ({ peripheral }: { peripheral: PeripheralInfo }) => {
       return <RotarySwitchView peripheral={peripheral} />;
     default:
       return (
-        <div className="border-border bg-background/60 border p-4 font-mono text-sm">
-          {peripheral.id ?? "Unknown peripheral"}
-        </div>
+        <GenericSensorPeripheralView
+          lastData={lastData}
+          peripheral={peripheral}
+        />
       );
   }
 };
@@ -67,7 +76,7 @@ export function PeripheralTree({
               {peripheralEntries.map((p) => (
                 <PeripheralBranch
                   key={p.info.id ?? `unknown-${p.ts}`}
-                  peripheral={p.info}
+                  snapshot={p}
                   hierarchy={h}
                 />
               ))}
@@ -80,12 +89,13 @@ export function PeripheralTree({
 }
 
 function PeripheralBranch({
-  peripheral,
+  snapshot,
   hierarchy,
 }: {
-  peripheral: PeripheralInfo;
+  snapshot: PeripheralSnapshot;
   hierarchy: string[];
 }) {
+  const peripheral = snapshot.info;
   // Tags in the desired order
   const orderedTags = [
     ...hierarchy.map((name) => tagsByName(peripheral)[name]).filter(Boolean),
@@ -114,7 +124,7 @@ function PeripheralBranch({
         </div>
         <div className="min-w-0">
           <LeafPeripheralName
-            renderAsComponent={<SpecialRenderer peripheral={peripheral} />}
+            renderAsComponent={<SpecialRenderer snapshot={snapshot} />}
           />
         </div>
       </div>
