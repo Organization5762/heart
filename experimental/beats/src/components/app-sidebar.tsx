@@ -20,6 +20,10 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, useTransition } from "react";
 import { getAppVersion } from "../actions/app";
 import {
+  DISABLED_WEBSOCKET_LABEL,
+  getConfiguredBeatsWebSocketUrl,
+} from "../config/websocket";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -35,6 +39,8 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "./ui/sidebar";
+
+const configuredWebsocketUrl = getConfiguredBeatsWebSocketUrl();
 
 // Menu items.
 const items = {
@@ -138,7 +144,7 @@ export function AppSidebar() {
             />
             <DataRow
               label="Signal"
-              value="ws://localhost:8765"
+              value={configuredWebsocketUrl ?? DISABLED_WEBSOCKET_LABEL}
               className="text-sidebar-foreground grid-cols-1 gap-1"
               valueClassName="break-all"
             />
