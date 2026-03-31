@@ -4,7 +4,6 @@ import {
   Monitor,
   Mouse,
   RadioTower,
-  Rocket,
   Tv,
 } from "lucide-react";
 
@@ -44,11 +43,6 @@ const items = {
       title: "Home",
       url: "/",
       icon: Home,
-    },
-    {
-      title: "Mission Control",
-      url: "/mission-control",
-      icon: Rocket,
     },
     {
       title: "Current Stream",

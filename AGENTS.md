@@ -302,3 +302,6 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm run test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make format`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make test`
+- `2026-03-31`: `git diff --check` after removing the Beats Mission Control / Phase Sequencer route.
+- `2026-03-31`: `rg -n "mission-control|Mission Control|Phase Sequencer|phase sequencer" experimental/beats/src docs/research` returned no matches after removing the Beats Mission Control / Phase Sequencer route and research notes.
+- `2026-03-31`: No `experimental/beats` formatter, lint, or test run after removing Mission Control / Phase Sequencer because this worktree does not currently have `experimental/beats/node_modules` installed.
