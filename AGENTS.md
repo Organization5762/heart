@@ -116,6 +116,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/ws/providers/PeripheralEventsProvider.tsx src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/actions/ws/providers/PeripheralEventsProvider.tsx src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
+- `2026-03-31`: `experimental/beats: npm run test -- --run src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/app-sidebar.tsx src/components/usgc.tsx`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/app-sidebar.tsx src/components/usgc.tsx`
 - `2026-03-31`: No tests run after restacking the Beats sidebar `Program` and `Signal` metadata rows because the change was limited to presentational layout in existing React components.
