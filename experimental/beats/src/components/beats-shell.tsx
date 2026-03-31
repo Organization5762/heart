@@ -2,11 +2,11 @@ import { cn } from "@/utils/tailwind";
 import type { ComponentProps, ReactNode } from "react";
 
 export function PageFrame({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("usgc-page", className)} {...props} />;
+  return <div className={cn("beats-page", className)} {...props} />;
 }
 
 export function PaperCard({ className, ...props }: ComponentProps<"section">) {
-  return <section className={cn("usgc-card", className)} {...props} />;
+  return <section className={cn("beats-card", className)} {...props} />;
 }
 
 export function TechnicalCard({
@@ -14,7 +14,10 @@ export function TechnicalCard({
   ...props
 }: ComponentProps<"section">) {
   return (
-    <section className={cn("usgc-card usgc-card-dark", className)} {...props} />
+    <section
+      className={cn("beats-card beats-card-dark", className)}
+      {...props}
+    />
   );
 }
 
@@ -43,7 +46,7 @@ export function SectionHeader({
       )}
     >
       <div className="min-w-0 flex-1 space-y-2">
-        <p className={cn("usgc-kicker", invert && "text-[#bdb3a6]")}>
+        <p className={cn("beats-kicker", invert && "text-[#bdb3a6]")}>
           {eyebrow}
         </p>
         <h1
@@ -84,9 +87,9 @@ export function SpecChip({
   return (
     <span
       className={cn(
-        "usgc-chip whitespace-normal",
-        tone === "muted" && "usgc-chip-muted",
-        tone === "dark" && "usgc-chip-dark",
+        "beats-chip whitespace-normal",
+        tone === "muted" && "beats-chip-muted",
+        tone === "dark" && "beats-chip-dark",
         className,
       )}
       {...props}
@@ -108,8 +111,8 @@ export function DataRow({
   valueClassName?: string;
 }) {
   return (
-    <div className={cn("usgc-data-row", className)}>
-      <span className={cn("usgc-data-label", labelClassName)}>{label}</span>
+    <div className={cn("beats-data-row", className)}>
+      <span className={cn("beats-data-label", labelClassName)}>{label}</span>
       <span className={cn("min-w-0 break-words", valueClassName)}>{value}</span>
     </div>
   );
@@ -136,8 +139,8 @@ export function MeterBar({
         <span className="text-muted-foreground">{label}</span>
         <span>{valueLabel ?? `${percent.toFixed(0)}%`}</span>
       </div>
-      <div className="usgc-meter">
-        <div className="usgc-meter-fill" style={{ width: `${percent}%` }} />
+      <div className="beats-meter">
+        <div className="beats-meter-fill" style={{ width: `${percent}%` }} />
       </div>
     </div>
   );

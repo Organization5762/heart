@@ -30,7 +30,7 @@ export default function BaseLayout({
         style={{ height: TOP_CHROME_HEIGHT }}
       >
         <div className="font-tomorrow text-muted-foreground flex min-w-0 items-center gap-3 text-[0.56rem] tracking-[0.28em] uppercase sm:text-[0.6rem]">
-          <span className="hidden sm:inline">U.S. Graphics Company</span>
+          <span className="hidden sm:inline">Beats</span>
           <span className="text-border hidden sm:inline">/</span>
           <span className="truncate">Beats Telemetry Terminal</span>
         </div>
@@ -43,7 +43,9 @@ export default function BaseLayout({
       </div>
       <AppSidebar />
       <SidebarInset className="h-svh min-h-0">
-        <div className={`flex min-h-0 flex-1 flex-col ${TOP_CHROME_OFFSET_CLASS}`}>
+        <div
+          className={`flex min-h-0 flex-1 flex-col ${TOP_CHROME_OFFSET_CLASS}`}
+        >
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </div>
       </SidebarInset>

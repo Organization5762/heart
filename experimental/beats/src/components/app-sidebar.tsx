@@ -24,7 +24,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./ui/collapsible";
-import { DataRow, SpecChip } from "./usgc";
+import { DataRow, SpecChip } from "./beats-shell";
 import {
   SidebarFooter,
   SidebarHeader,
@@ -114,7 +114,7 @@ export function AppSidebar() {
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-2">
               <p className="font-tomorrow text-sidebar-foreground/60 text-[0.52rem] tracking-[0.3em] uppercase">
-                U.S. Graphics Company
+                Beats
               </p>
               <div>
                 <h2 className="font-tomorrow text-sidebar-foreground text-base tracking-[0.18em]">
@@ -143,7 +143,7 @@ export function AppSidebar() {
           </div>
         </div>
         <div className="border-sidebar-border bg-sidebar text-sidebar-foreground hidden h-16 items-center justify-center border group-data-[collapsible=icon]:flex">
-          <div className="flex h-10 w-10 items-center justify-center border border-current/45 font-tomorrow text-lg tracking-[0.14em]">
+          <div className="font-tomorrow flex h-10 w-10 items-center justify-center border border-current/45 text-lg tracking-[0.14em]">
             B
           </div>
         </div>

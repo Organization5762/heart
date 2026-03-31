@@ -11,10 +11,10 @@ import {
   SectionHeader,
   SpecChip,
   TechnicalCard,
-} from "@/components/usgc";
+} from "@/components/beats-shell";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 const RECENT_DEVICE_LIMIT = 4;
 const RECENT_ACTIVITY_WINDOW_MS = 60_000;
@@ -183,7 +183,6 @@ function HomePage() {
   const [appVersion, setAppVersion] = useState("0.0.0");
   const [now, setNow] = useState(() => Date.now());
   const [, startGetAppVersion] = useTransition();
-  const recentPeripheralOrderRef = useRef<string[]>([]);
 
   useEffect(
     () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
@@ -207,20 +206,13 @@ function HomePage() {
     events,
     now,
   );
-  const recentPeripheralActivity = selectStableRecentPeripheralActivity(
-    recentPeripheralOrderRef.current,
-    activePeripheralActivity,
-  );
-  recentPeripheralOrderRef.current = recentPeripheralActivity.map(
-    (device) => device.id,
-  );
 
   return (
     <PageFrame>
       <section className="grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
         <PaperCard className="flex flex-col justify-between gap-8">
           <SectionHeader
-            eyebrow="U.S. Graphics Company / Beats Division"
+            eyebrow="Beats / Telemetry Division"
             title="Beats Telemetry Catalog"
             description={
               <>
@@ -240,7 +232,7 @@ function HomePage() {
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="border-border bg-background/75 border p-4">
-              <p className="usgc-kicker">Signal</p>
+              <p className="beats-kicker">Signal</p>
               <p className="font-tomorrow mt-3 text-2xl tracking-[0.14em]">
                 {readyStateLabel}
               </p>
@@ -249,7 +241,7 @@ function HomePage() {
               </p>
             </div>
             <div className="border-border bg-background/75 border p-4">
-              <p className="usgc-kicker">Cadence</p>
+              <p className="beats-kicker">Cadence</p>
               <p className="font-tomorrow mt-3 text-2xl tracking-[0.14em]">
                 {isActive ? fps : 0} FPS
               </p>
@@ -258,7 +250,7 @@ function HomePage() {
               </p>
             </div>
             <div className="border-border bg-background/75 border p-4">
-              <p className="usgc-kicker">Devices</p>
+              <p className="beats-kicker">Devices</p>
               <p className="font-tomorrow mt-3 text-2xl tracking-[0.14em]">
                 {peripheralEntries.length}
               </p>
@@ -289,11 +281,11 @@ function HomePage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 font-mono text-[0.7rem] tracking-[0.18em] uppercase">
               <span className="text-[#bdb3a6]">Recently Active Devices</span>
-              <span>{recentPeripheralActivity.length} Tracked</span>
+              <span>{activePeripheralActivity.length} Tracked</span>
             </div>
-            {recentPeripheralActivity.length > 0 ? (
+            {activePeripheralActivity.length > 0 ? (
               <div className="space-y-2">
-                {recentPeripheralActivity.map((device) => (
+                {activePeripheralActivity.map((device) => (
                   <div
                     key={device.id}
                     className="border border-[#4d4238] bg-black/10 px-3 py-2"
@@ -341,7 +333,7 @@ function HomePage() {
         <PaperCard className="flex flex-col gap-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-              <p className="usgc-kicker">Typeface / TX-24</p>
+              <p className="beats-kicker">Typeface / TX-24</p>
               <h2 className="font-tomorrow text-3xl tracking-[0.1em]">
                 Beats Monitor
               </h2>
@@ -351,7 +343,7 @@ function HomePage() {
               <SpecChip tone="muted">Machine Report</SpecChip>
             </div>
           </div>
-          <p className="usgc-copy max-w-3xl">
+          <p className="beats-copy max-w-3xl">
             Space grade, device-facing, and unapologetically procedural. Beats
             Monitor is a control-room type system for live image transport,
             sensor traffic, and synchronized playback. It treats interface
@@ -391,11 +383,11 @@ function HomePage() {
 
       <section className="grid gap-4 lg:grid-cols-3">
         {routeCards.map((card) => (
-          <Link key={card.href} to={card.href} className="usgc-link-card">
+          <Link key={card.href} to={card.href} className="beats-link-card">
             <PaperCard className="h-full">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="usgc-kicker">Open</p>
+                  <p className="beats-kicker">Open</p>
                   <h2 className="font-tomorrow mt-3 text-2xl tracking-[0.08em]">
                     {card.title}
                   </h2>

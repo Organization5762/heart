@@ -1,4 +1,4 @@
-import { TechnicalCard } from "@/components/usgc";
+import { TechnicalCard } from "@/components/beats-shell";
 import { usePeripheralEvents } from "../ws/providers/PeripheralEventsProvider";
 
 export function EventList() {
@@ -8,7 +8,7 @@ export function EventList() {
     <TechnicalCard className="flex h-full flex-col gap-5 select-none">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <p className="usgc-kicker text-[#bdb3a6]">Peripheral Events</p>
+          <p className="beats-kicker text-[#bdb3a6]">Peripheral Events</p>
           <h2 className="font-tomorrow text-2xl tracking-[0.1em] text-[#f6efe6]">
             Signal Log
           </h2>
@@ -18,8 +18,8 @@ export function EventList() {
         </p>
       </div>
 
-      <div className="usgc-scroll-panel max-h-screen overflow-y-auto border-white/20 bg-white/5">
-        <table className="usgc-table">
+      <div className="beats-scroll-panel max-h-screen overflow-y-auto border-white/20 bg-white/5">
+        <table className="beats-table">
           <thead>
             <tr>
               <th className="px-2 py-1 text-left">Timestamp</th>

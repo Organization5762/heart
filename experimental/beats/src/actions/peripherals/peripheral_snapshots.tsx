@@ -1,4 +1,4 @@
-import { PaperCard } from "@/components/usgc";
+import { PaperCard } from "@/components/beats-shell";
 import { useConnectedPeripherals } from "../ws/providers/PeripheralProvider";
 
 function formatTimestamp(timestamp: number) {
@@ -15,7 +15,7 @@ export function PeripheralSnapshots() {
     <PaperCard className="flex h-full flex-col gap-5 select-none">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <p className="usgc-kicker">Peripheral Snapshots</p>
+          <p className="beats-kicker">Peripheral Snapshots</p>
           <h2 className="font-tomorrow text-2xl tracking-[0.1em]">
             Latest Peripheral Data
           </h2>
@@ -25,13 +25,13 @@ export function PeripheralSnapshots() {
         </p>
       </div>
 
-      <div className="usgc-scroll-panel max-h-screen overflow-y-auto">
+      <div className="beats-scroll-panel max-h-screen overflow-y-auto">
         {items.length === 0 ? (
           <div className="text-muted-foreground p-4 text-xs">
             No peripheral snapshots have been captured yet.
           </div>
         ) : (
-          <table className="usgc-table">
+          <table className="beats-table">
             <thead>
               <tr>
                 <th className="px-2 py-1 text-left">Peripheral</th>
