@@ -2,6 +2,7 @@ import { cn } from "@/utils/tailwind";
 
 type StreamConsoleHeaderProps = {
   clockSeconds: number;
+  fps: number;
   isActive: boolean;
   selectedSensorLabel: string;
   useImageFallback: boolean;
@@ -9,12 +10,13 @@ type StreamConsoleHeaderProps = {
 
 export function StreamConsoleHeader({
   clockSeconds,
+  fps,
   isActive,
   selectedSensorLabel,
   useImageFallback,
 }: StreamConsoleHeaderProps) {
   return (
-    <div className="rounded-[1.4rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(26,30,38,0.96),_rgba(14,17,23,0.98))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className="beats-console-panel rounded-[1.4rem] px-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <SignalStack
@@ -25,17 +27,18 @@ export function StreamConsoleHeader({
             ]}
           />
           <div>
-            <p className="font-tomorrow text-[11px] tracking-[0.26em] text-[#7f8ea3] uppercase">
+            <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.26em] uppercase">
               Beats Transport
             </p>
-            <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase">
+            <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase md:text-[1.65rem]">
               Scene Control Console
             </h1>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid flex-1 gap-2 sm:grid-cols-2 xl:max-w-[540px] xl:grid-cols-4">
           <TransportChip label="Clock" value={`${clockSeconds.toFixed(1)}s`} />
+          <TransportChip label="FPS" value={String(fps)} />
           <TransportChip label="Sensor" value={selectedSensorLabel} />
           <TransportChip
             label="Render"
@@ -50,7 +53,7 @@ export function StreamConsoleHeader({
 
 function SignalStack({ lights }: { lights: string[] }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-[0.9rem] border border-[#3b434f] bg-[#0a0d12] p-2">
+    <div className="beats-console-card grid grid-cols-3 gap-1 rounded-[0.9rem] p-2">
       {lights.map((color, index) => (
         <span
           key={index}
@@ -64,14 +67,14 @@ function SignalStack({ lights }: { lights: string[] }) {
 
 function TransportChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[108px] rounded-[0.95rem] border border-[#3a414c] bg-[#0b0e13] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="font-tomorrow text-[10px] tracking-[0.22em] text-[#738194] uppercase">
+    <div className="beats-console-chip min-w-[108px] rounded-[0.95rem] px-3 py-2">
+      <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.22em] uppercase">
         {label}
       </div>
       <div
         className={cn(
           "mt-1 truncate font-mono text-sm",
-          value === "Unassigned" ? "text-[#94a3b8]" : "text-[#e5edf8]",
+          value === "Unassigned" ? "text-[#94a3b8]" : "beats-console-strong",
         )}
       >
         {value}

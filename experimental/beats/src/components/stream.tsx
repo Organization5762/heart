@@ -5,10 +5,10 @@ import { useSensorSimulation } from "@/features/stream-console/use-sensor-simula
 import { useCallback, useState } from "react";
 
 import { ScenePluginDock } from "./scene-plugin-dock";
+import { SensorLabPanel, getSensorOverrideForPanel } from "./sensor-lab-panel";
 import { StreamConsoleHeader } from "./stream-console-header";
 import { StreamFooterBar } from "./stream-footer-bar";
 import { StreamVisualMixerPanel } from "./stream-visual-mixer-panel";
-import { SensorLabPanel, getSensorOverrideForPanel } from "./sensor-lab-panel";
 
 export function Stream() {
   const ws = useWS();
@@ -41,9 +41,10 @@ export function Stream() {
   const activeFps = isActive ? fps : 0;
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#11151b,_#090b0f)] p-4 text-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.45)] select-none">
+    <div className="beats-console-shell flex h-full flex-col gap-4 rounded-[1.75rem] p-4 text-slate-100 select-none md:p-5">
       <StreamConsoleHeader
         clockSeconds={clockSeconds}
+        fps={activeFps}
         isActive={isActive}
         selectedSensorLabel={telemetrySensorLabel}
         useImageFallback={useImageFallback}

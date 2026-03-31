@@ -20,10 +20,10 @@ export function StreamFooterBar({
 }) {
   return (
     <>
-      <Separator className="flex-none bg-[#252b33]" />
+      <Separator className="flex-none bg-white/8" />
 
-      <div className="mb-2 flex flex-none flex-wrap items-center justify-between gap-4 rounded-[1.1rem] border border-[#2f353f] bg-[#10141a] px-3 py-2">
-        <span className="font-tomorrow text-[11px] tracking-[0.22em] text-[#7f8ea3] uppercase">
+      <div className="beats-console-card mb-2 flex flex-none flex-wrap items-center justify-between gap-4 rounded-[1.1rem] px-3 py-2">
+        <span className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.22em] uppercase">
           fps: <b className="text-slate-100">{fps}</b>
         </span>
         <div className="font-mono text-xs text-[#8d9bb0]">{socketUrl}</div>

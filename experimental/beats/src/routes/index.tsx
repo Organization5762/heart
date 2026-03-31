@@ -131,9 +131,6 @@ function HomePage() {
             eyebrow="TR-100 Machine Report"
             title="Operational Summary"
             invert
-            aside={
-              <SpecChip tone="dark">United States Graphics Company</SpecChip>
-            }
           />
           <div className="space-y-1 font-mono text-sm">
             <DataRow label="Program" value="Beats Telemetry Terminal" />
