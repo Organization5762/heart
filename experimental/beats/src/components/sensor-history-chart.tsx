@@ -37,7 +37,7 @@ export function SensorHistoryChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-[#404754] bg-[#0b0f14] text-sm text-[#95a2b6]">
+      <div className="beats-console-empty flex h-[220px] items-center justify-center rounded-xl text-sm text-[#95a2b6]">
         History will appear after the first sensor samples are collected.
       </div>
     );
@@ -54,10 +54,10 @@ export function SensorHistoryChart({
   );
 
   return (
-    <div className="rounded-xl border border-[#404754] bg-[#0b0f14] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="beats-console-card rounded-xl p-3">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-tomorrow text-[10px] tracking-[0.22em] text-[#738194] uppercase">
+          <p className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.22em] uppercase">
             Sensor Trace
           </p>
           <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
@@ -82,7 +82,7 @@ export function SensorHistoryChart({
       <div className="relative">
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          className="h-[220px] w-full rounded-lg bg-slate-950/80"
+          className="h-[220px] w-full rounded-lg bg-[linear-gradient(180deg,rgba(2,6,12,0.96),rgba(9,14,21,0.92))]"
           role="img"
           aria-label="Sensor history chart"
         >
