@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Stream } from "@/components/stream";
+import { DEFAULT_SCENE_CONFIGURATION } from "@/features/stream-console/scene-config";
 
 const streamedImageState = vi.hoisted(() => ({
   fps: 24,
@@ -14,6 +15,10 @@ const websocketState = vi.hoisted(() => ({
   socket: {
     url: "ws://localhost:8765/stream",
   },
+}));
+
+const streamCubeState = vi.hoisted(() => ({
+  lastSceneConfig: null as typeof DEFAULT_SCENE_CONFIGURATION | null,
 }));
 
 vi.mock("@/actions/ws/providers/ImageProvider", () => ({
@@ -33,8 +38,20 @@ vi.mock("@/actions/ws/websocket", () => ({
 }));
 
 vi.mock("@/components/stream-cube", () => ({
-  StreamCube: ({ onContextError }: { onContextError?: () => void }) => (
-    <button type="button" onClick={() => onContextError?.()}>
+  StreamCube: ({
+    onContextError,
+    sceneConfig,
+  }: {
+    onContextError?: () => void;
+    sceneConfig: typeof DEFAULT_SCENE_CONFIGURATION;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onContextError?.()}
+      ref={() => {
+        streamCubeState.lastSceneConfig = sceneConfig;
+      }}
+    >
       trip-webgl
     </button>
   ),
@@ -46,6 +63,7 @@ describe("Stream", () => {
     streamedImageState.imgURL = "blob:frame-texture";
     streamedImageState.isActive = true;
     websocketState.socket.url = "ws://localhost:8765/stream";
+    streamCubeState.lastSceneConfig = null;
   });
 
   it("falls back to the image viewer when the WebGL scene reports a context error", async () => {
@@ -72,5 +90,21 @@ describe("Stream", () => {
       screen.getAllByText("ws://localhost:8765/stream").length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
+  });
+
+  it("starts the current stream cube with yaw-only rotation and a small wobble", () => {
+    render(<Stream />);
+
+    expect(streamCubeState.lastSceneConfig).toMatchObject({
+      motion: {
+        autoRotate: true,
+        rotationX: 0,
+        rotationY: DEFAULT_SCENE_CONFIGURATION.motion.rotationY,
+        wobbleAmount: DEFAULT_SCENE_CONFIGURATION.motion.wobbleAmount,
+      },
+    });
+    expect(streamCubeState.lastSceneConfig?.motion.wobbleAmount).toBeLessThan(
+      0.05,
+    );
   });
 });
