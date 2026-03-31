@@ -61,11 +61,43 @@ export type RecentPeripheralActivity = {
   eventCount: number;
 };
 
+export function selectStableRecentPeripheralActivity(
+  previousVisibleIds: string[],
+  activeDevices: RecentPeripheralActivity[],
+  limit = RECENT_DEVICE_LIMIT,
+): RecentPeripheralActivity[] {
+  const activeById = new Map(
+    activeDevices.map((activity) => [activity.id, activity] as const),
+  );
+  const stableVisibleDevices: RecentPeripheralActivity[] = [];
+  const seenIds = new Set<string>();
+
+  for (const id of previousVisibleIds) {
+    const activity = activeById.get(id);
+    if (!activity) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(id);
+  }
+
+  for (const activity of activeDevices) {
+    if (seenIds.has(activity.id)) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(activity.id);
+  }
+
+  return stableVisibleDevices.slice(0, limit);
+}
+
 export function summarizeRecentPeripheralActivity(
   peripheralEntries: HomePeripheralSnapshot[],
   events: HomePeripheralEvent[],
   now: number,
-  limit = RECENT_DEVICE_LIMIT,
 ): RecentPeripheralActivity[] {
   const activityById = new Map<string, RecentPeripheralActivity>();
 
@@ -122,8 +154,7 @@ export function summarizeRecentPeripheralActivity(
       }
 
       return left.id.localeCompare(right.id);
-    })
-    .slice(0, limit);
+    });
 }
 
 export function formatPeripheralRecency(
@@ -170,7 +201,7 @@ function HomePage() {
     (left, right) => right.ts - left.ts,
   );
   const readyStateLabel = getReadyStateLabel(ws.readyState);
-  const recentPeripheralActivity = summarizeRecentPeripheralActivity(
+  const activePeripheralActivity = summarizeRecentPeripheralActivity(
     peripheralEntries,
     events,
     now,
@@ -250,11 +281,11 @@ function HomePage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 font-mono text-[0.7rem] tracking-[0.18em] uppercase">
               <span className="text-[#bdb3a6]">Recently Active Devices</span>
-              <span>{recentPeripheralActivity.length} Tracked</span>
+              <span>{activePeripheralActivity.length} Tracked</span>
             </div>
-            {recentPeripheralActivity.length > 0 ? (
+            {activePeripheralActivity.length > 0 ? (
               <div className="space-y-2">
-                {recentPeripheralActivity.map((device) => (
+                {activePeripheralActivity.map((device) => (
                   <div
                     key={device.id}
                     className="border border-[#4d4238] bg-black/10 px-3 py-2"

@@ -101,15 +101,19 @@ export function DataRow({
   label,
   value,
   className,
+  labelClassName,
+  valueClassName,
 }: {
   label: string;
   value: ReactNode;
   className?: string;
+  labelClassName?: string;
+  valueClassName?: string;
 }) {
   return (
     <div className={cn("beats-data-row", className)}>
-      <span className="beats-data-label">{label}</span>
-      <span className="min-w-0 break-words">{value}</span>
+      <span className={cn("beats-data-label", labelClassName)}>{label}</span>
+      <span className={cn("min-w-0 break-words", valueClassName)}>{value}</span>
     </div>
   );
 }
