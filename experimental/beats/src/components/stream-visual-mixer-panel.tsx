@@ -36,13 +36,13 @@ export function StreamVisualMixerPanel({
     <div className="beats-console-panel rounded-[1.5rem] p-4 md:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.24em] uppercase">
+          <p className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
             Stream Scene
           </p>
-          <h2 className="font-tomorrow text-2xl tracking-[0.12em] text-slate-100 uppercase">
+          <h2 className="font-tomorrow text-[1.55rem] tracking-[0.09em] text-slate-100 uppercase md:text-[1.65rem]">
             Visual Mixer
           </h2>
-          <p className="beats-console-copy mt-2 max-w-3xl text-sm leading-6">
+          <p className="beats-console-copy mt-2 max-w-3xl text-sm leading-5.5">
             Tune the renderer, bind telemetry-reactive plugins, and rehearse
             sensor behavior against the live stream.
           </p>
