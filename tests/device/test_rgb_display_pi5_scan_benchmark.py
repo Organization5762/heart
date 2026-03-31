@@ -68,9 +68,9 @@ class TestRgbDisplayPi5ScanBenchmark:
         assert payload["resident_loop_ms"] == 100
         assert payload["resident_first_render_ns"] > 0
         assert payload["resident_steady_window_ns"] > 0
-        assert payload["resident_steady_refresh_count"] >= 0
-        assert payload["resident_steady_refresh_hz"] > 0
-        assert payload["display_cycle_mean_ns"] > 0
-        assert payload["display_hz"] > 0
+        assert payload["resident_refresh_count"] >= 0
+        assert payload["resident_refresh_hz"] > 0
+        assert payload["distinct_frame_update_cycle_mean_ns"] > 0
+        assert payload["distinct_frame_update_hz"] > 0
         assert payload["sequential_cycle_mean_ns"] > 0
         assert payload["sequential_cycle_hz"] > 0

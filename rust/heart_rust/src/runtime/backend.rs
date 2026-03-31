@@ -1,8 +1,11 @@
-use std::fs::{self, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
+
+#[cfg(not(test))]
+use std::fs;
 
 use super::config::{MatrixConfigNative, WiringProfile};
 use super::device::describe_device_permissions;

@@ -59,7 +59,7 @@ struct heart_pi5_scan_loop_wait_args {
 };
 
 struct heart_pi5_scan_loop_stats_args {
-	/* Replay count since the last START. */
+	/* Replay count since the current replay epoch (LOAD/START reset it to 0). */
 	__u64 presentations;
     /* Sticky negative errno-style failure from the replay worker, or 0. */
     __s32 last_error;
@@ -67,6 +67,26 @@ struct heart_pi5_scan_loop_stats_args {
     __u32 frame_bytes;
     /* Boolean: replay currently enabled for this session. */
     __u32 replay_enabled;
+	/* Completed replay batches since the current replay epoch. */
+	__u64 batches_submitted;
+	/* Total packed transport words written into the FIFO since the current replay epoch. */
+	__u64 words_written;
+	/* Number of drain failures seen by the worker since the current replay epoch. */
+	__u64 drain_failures;
+	/* Number of times STOP/disable interrupted an in-flight replay batch. */
+	__u64 stop_requests_seen_during_batch;
+	/* Cumulative nanoseconds spent issuing FIFO MMIO writes since the current replay epoch. */
+	__u64 mmio_write_ns;
+	/* Cumulative nanoseconds spent in the drain completion primitive since the current replay epoch. */
+	__u64 drain_ns;
+	/* Largest replay batch count actually used since the current replay epoch. */
+	__u32 max_batch_replays;
+	/* CPU the worker thread is bound to. */
+	__u32 worker_cpu;
+	/* RT priority requested for the worker thread. */
+	__u32 worker_priority;
+	/* Boolean: worker currently has enough state to enter a replay batch. */
+	__u32 worker_runnable;
 };
 
 #define HEART_PI5_SCAN_LOOP_IOC_INIT _IOW(HEART_PI5_SCAN_LOOP_IOCTL_MAGIC, 0, struct heart_pi5_scan_loop_init_args)

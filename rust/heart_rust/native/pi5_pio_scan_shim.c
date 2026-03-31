@@ -12,7 +12,7 @@
 
 /*
  * This shim is the "honest baseline" transport for Pi 5 scanout:
- * userspace opens one RP1 PIO state machine, loads the shared 31-instruction
+ * userspace opens one RP1 PIO state machine, loads the shared 25-instruction
  * parser, and then submits entire packed frames through the stock rp1-pio
  * ioctls. It intentionally mirrors the kernel resident-loop parser so the two
  * backends can be compared without protocol differences.
@@ -27,11 +27,16 @@
  */
 
 #define HEART_PI5_PIO_SCAN_DEVICE "/dev/pio0"
-#define HEART_PI5_PIO_SCAN_PROGRAM_LENGTH 31
+#define HEART_PI5_PIO_SCAN_PROGRAM_LENGTH 25
 #define HEART_PI5_PIO_SCAN_OUTPUT_PIN_BASE 5u
 #define HEART_PI5_PIO_SCAN_OUTPUT_PIN_COUNT 23u
 #define HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS 32u
 #define HEART_PI5_PIO_SCAN_PIN_WORD_BITS 23u
+#define HEART_PI5_PIO_SCAN_LAT_SET_LOW 0u
+#define HEART_PI5_PIO_SCAN_LAT_SET_HIGH 1u
+#define HEART_PI5_PIO_SCAN_SIDESET_ACTIVE 0x0u
+#define HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW 0x2u
+#define HEART_PI5_PIO_SCAN_SIDESET_BLANK_HIGH 0x3u
 
 struct heart_pi5_pio_scan_handle {
     PIO pio;
@@ -178,14 +183,19 @@ int heart_pi5_pio_scan_open(
     handle->clock_gpio = clock_gpio;
     /*
      * The userspace transport and the kernel resident loop share the same
-     * 31-instruction parser. The Rust packer emits:
+     * 25-instruction parser. The Rust packer emits:
      *   - one blank/address word
      *   - zero or more spans:
-     *       * blank span: 0, span_len
-     *       * data span: span_len, packed 23-bit GPIO words
-     *   - a double-zero terminator
-     *   - latch word
-     *   - active-output word
+     *       * raw span: one packed control word
+     *           bit 0      => raw opcode
+     *           bits 1..8  => raw_len - 1
+     *           bits 9..31 => first 23-bit GPIO word
+     *           packed words for the remaining columns follow
+     *       * repeat span: one packed control word
+     *           bit 0      => repeat opcode
+     *           bits 1..8  => repeat_len - 1
+     *           bits 9..31 => repeated 23-bit GPIO word
+     *   - a single zero terminator
      *   - dwell counter
      *
      * Keeping the parser identical across both backends lets us benchmark the
@@ -196,45 +206,98 @@ int heart_pi5_pio_scan_open(
      * loop parser needs the same update unless the change is explicitly called
      * out as a format fork.
      *
+     * The trailer no longer ships explicit latch/active words. Instead:
+     *   - OE rides on sideset together with the clock (GPIO 17/18)
+     *   - LAT is pulsed internally via SET PINS on GPIO 21
+     *
+     * That keeps the resident payload focused on row-addressed setup, span
+     * descriptions, and dwell. The dense-path win is that both span types now
+     * inline the first/only GPIO word in the control word:
+     *   - raw spans pay packed payload words only for columns after the first
+     *   - repeat spans still collapse long constant runs to one control word
+     *
      * Instruction layout:
-     *   0..3   load/capture the row-addressed blank word
-     *   4..10  parse either a blank span or a packed data span
-     *   11..18 continue packed data spans via autopull
-     *   19..22 emit latch and post-latch blank words
-     *   23..29 emit active output, dwell, and final blank
-     *   30     wrap to the next group
+     *   0..2   load and apply the row-addressed blank word
+     *   3..11  decode one packed repeat span
+     *   12..18 decode one raw span or detect end-of-spans
+     *   19..24 pulse LAT, dwell with OE active, then blank for the next group
      */
     handle->instructions[0] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[1] = (uint16_t)pio_encode_mov(pio_isr, pio_osr);
-    handle->instructions[2] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
-    handle->instructions[3] = (uint16_t)(pio_encode_nop() | pio_encode_delay(post_addr_ticks - 1));
-    handle->instructions[4] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[5] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
-    handle->instructions[6] = (uint16_t)pio_encode_jmp_x_dec(8);
-    handle->instructions[7] = (uint16_t)pio_encode_jmp(11);
-    handle->instructions[8] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_sideset_opt(1, 0));
-    handle->instructions[9] = (uint16_t)(pio_encode_jmp_x_dec(8) | pio_encode_sideset_opt(1, 1));
-    handle->instructions[10] = (uint16_t)pio_encode_jmp(4);
-    handle->instructions[11] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[12] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
-    handle->instructions[13] = (uint16_t)pio_encode_jmp_x_dec(15);
-    handle->instructions[14] = (uint16_t)pio_encode_jmp(19);
-    handle->instructions[15] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-    handle->instructions[16] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_sideset_opt(1, 0));
-    handle->instructions[17] = (uint16_t)(pio_encode_jmp_x_dec(15) | pio_encode_sideset_opt(1, 1));
-    handle->instructions[18] = (uint16_t)pio_encode_jmp(4);
-    handle->instructions[19] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[20] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_delay(latch_ticks - 1));
-    handle->instructions[21] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-    handle->instructions[22] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_delay(post_latch_ticks - 1));
-    handle->instructions[23] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[24] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
-    handle->instructions[25] = (uint16_t)pio_encode_pull(false, true);
-    handle->instructions[26] = (uint16_t)pio_encode_out(pio_y, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
-    handle->instructions[27] = (uint16_t)pio_encode_jmp_y_dec(27);
-    handle->instructions[28] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-    handle->instructions[29] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
-    handle->instructions[30] = (uint16_t)pio_encode_jmp(0);
+    handle->instructions[1] = (uint16_t)(
+        pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[2] = (uint16_t)(
+        pio_encode_nop() |
+        pio_encode_delay(post_addr_ticks - 1) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[3] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[4] = (uint16_t)pio_encode_out(pio_x, 1);
+    handle->instructions[5] = (uint16_t)pio_encode_jmp_not_x(12);
+    handle->instructions[6] = (uint16_t)pio_encode_out(pio_y, 8);
+    handle->instructions[7] = (uint16_t)pio_encode_mov(pio_x, pio_osr);
+    handle->instructions[8] = (uint16_t)(
+        pio_encode_mov(pio_osr, pio_x) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[9] = (uint16_t)(
+        pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[10] = (uint16_t)(
+        pio_encode_jmp_y_dec(8) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_HIGH)
+    );
+    handle->instructions[11] = (uint16_t)(
+        pio_encode_jmp(3) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[12] = (uint16_t)pio_encode_out(pio_y, 8);
+    handle->instructions[13] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
+    handle->instructions[14] = (uint16_t)pio_encode_jmp_not_x(19);
+    handle->instructions[15] = (uint16_t)(
+        pio_encode_mov(pio_osr, pio_x) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[16] = (uint16_t)(
+        pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[17] = (uint16_t)(
+        pio_encode_jmp_y_dec(16) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_HIGH)
+    );
+    handle->instructions[18] = (uint16_t)(
+        pio_encode_jmp(3) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[19] = (uint16_t)(
+        pio_encode_set(pio_pins, HEART_PI5_PIO_SCAN_LAT_SET_HIGH) |
+        pio_encode_delay(latch_ticks - 1) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[20] = (uint16_t)(
+        pio_encode_set(pio_pins, HEART_PI5_PIO_SCAN_LAT_SET_LOW) |
+        pio_encode_delay(post_latch_ticks - 1) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
+    handle->instructions[21] = (uint16_t)(
+        pio_encode_pull(false, true) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_ACTIVE)
+    );
+    handle->instructions[22] = (uint16_t)(
+        pio_encode_out(pio_y, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_ACTIVE)
+    );
+    handle->instructions[23] = (uint16_t)(
+        pio_encode_jmp_y_dec(23) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_ACTIVE)
+    );
+    handle->instructions[24] = (uint16_t)(
+        pio_encode_jmp(0) |
+        pio_encode_sideset_opt(2, HEART_PI5_PIO_SCAN_SIDESET_BLANK_LOW)
+    );
     handle->program.instructions = handle->instructions;
     handle->program.length = HEART_PI5_PIO_SCAN_PROGRAM_LENGTH;
     handle->program.origin = -1;
@@ -248,11 +311,12 @@ int heart_pi5_pio_scan_open(
 
     config = pio_get_default_sm_config();
     sm_config_set_wrap(&config, handle->program_offset, handle->program_offset + HEART_PI5_PIO_SCAN_PROGRAM_LENGTH - 1);
-    sm_config_set_sideset(&config, 2, true, false);
+    sm_config_set_sideset(&config, 3, true, false);
     sm_config_set_out_shift(&config, false, true, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
     sm_config_set_clkdiv(&config, clock_divider);
     sm_config_set_out_pins(&config, HEART_PI5_PIO_SCAN_OUTPUT_PIN_BASE, HEART_PI5_PIO_SCAN_OUTPUT_PIN_COUNT);
+    sm_config_set_set_pins(&config, lat_gpio, 1);
     sm_config_set_sideset_pins(&config, clock_gpio);
 
     heart_pi5_pio_scan_pin_init(pio, (uint)sm, oe_gpio);

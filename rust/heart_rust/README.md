@@ -56,8 +56,8 @@ Two details matter for performance:
 - the Pi 5 backend owns steady-state refresh in hardware, so the generic Rust
   runtime worker should not re-submit unchanged frames in software
 - the packed scan format tries to reduce replay bytes aggressively through
-  blank-group omission, blank-span trimming/splitting, identical-plane merging,
-  and dense GPIO-word packing
+  blank-group omission, blank-span trimming/splitting, repeated-pin-word spans,
+  identical-plane merging, and dense GPIO-word packing
 
 ## Kernel Module
 
@@ -149,11 +149,6 @@ initializes `heart_rust`.
   Default: `8192`
   Packed scan jobs at or above this word count use Rayon to build row-pair /
   bitplane groups in parallel.
-
-- `HEART_PI5_SCAN_INTERNAL_BLANK_RUN_MIN_PIXELS`
-  Default: `5`
-  Internal blank spans shorter than this stay inline; longer blank regions are
-  emitted as explicit blank-span opcodes to reduce replay bytes.
 
 - `HEART_PI5_SCAN_DEFAULT_DMA_BUFFER_COUNT`
   Default: `2`

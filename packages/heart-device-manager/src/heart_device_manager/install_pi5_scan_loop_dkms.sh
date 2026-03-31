@@ -4,7 +4,7 @@ set -euo pipefail
 MODULE_NAME="heart-pi5-scan-loop"
 MODULE_VERSION="0.1.0"
 KERNEL_MODULE_NAME="heart_pi5_scan_loop"
-BATCH_TARGET_BYTES="2097152"
+BATCH_TARGET_BYTES="4194304"
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)"

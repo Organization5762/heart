@@ -2,6 +2,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/fs.h>
 #include <linux/io.h>
+#include <linux/ktime.h>
 #include <linux/kthread.h>
 #include <linux/minmax.h>
 #include <linux/miscdevice.h>
@@ -9,9 +10,11 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/pio_rp1.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
+#include <uapi/linux/sched/types.h>
 
 #include "../../native/pi5_scan_loop_ioctl.h"
 
@@ -68,7 +71,7 @@
 
 #define HEART_PI5_SCAN_LOOP_DEVICE_NAME "heart_pi5_scan_loop"
 #define HEART_PI5_SCAN_LOOP_PIO_DEVICE_NAME "1f00178000.pio"
-#define HEART_PI5_SCAN_LOOP_PROGRAM_LENGTH 31u
+#define HEART_PI5_SCAN_LOOP_PROGRAM_LENGTH 25u
 #define HEART_PI5_SCAN_LOOP_OUTPUT_PIN_BASE 5u
 #define HEART_PI5_SCAN_LOOP_OUTPUT_PIN_COUNT 23u
 #define HEART_PI5_SCAN_LOOP_CONTROL_WORD_BITS 32u
@@ -79,9 +82,29 @@
 #define HEART_PI5_SCAN_LOOP_POST_ADDR_TICKS 5u
 #define HEART_PI5_SCAN_LOOP_LATCH_TICKS 1u
 #define HEART_PI5_SCAN_LOOP_POST_LATCH_TICKS 1u
+#define HEART_PI5_SCAN_LOOP_LAT_SET_LOW 0u
+#define HEART_PI5_SCAN_LOOP_LAT_SET_HIGH 1u
+#define HEART_PI5_SCAN_LOOP_SIDESET_ACTIVE 0x0u
+#define HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW 0x2u
+#define HEART_PI5_SCAN_LOOP_SIDESET_BLANK_HIGH 0x3u
 #define HEART_PI5_SCAN_LOOP_DEFAULT_DMACTRL 0x80000104u
-#define HEART_PI5_SCAN_LOOP_DEFAULT_BATCH_TARGET_BYTES (2u * 1024u * 1024u)
+#define HEART_PI5_SCAN_LOOP_DEFAULT_BATCH_TARGET_BYTES (4u * 1024u * 1024u)
+#define HEART_PI5_SCAN_LOOP_DEFAULT_WORKER_CPU 0u
+#define HEART_PI5_SCAN_LOOP_DEFAULT_WORKER_PRIORITY 80u
 #define HEART_PI5_SCAN_LOOP_MAX_BATCH_REPLAYS 1024u
+
+struct heart_pi5_scan_loop_replay_batch {
+	/*
+	 * The resident frame is immutable while replay is enabled. The worker can
+	 * therefore snapshot just the active prefix and consume it without holding
+	 * session->lock across the MMIO burst.
+	 */
+	const uint32_t *words;
+	u32 __iomem *fifo_mmio;
+	u32 frame_bytes;
+	u32 word_count;
+	u32 replay_count;
+};
 
 struct heart_pi5_scan_loop_session {
 	struct mutex lock;
@@ -102,10 +125,25 @@ struct heart_pi5_scan_loop_session {
 	bool frame_loaded;
 	bool replay_enabled;
 	bool stop_worker;
+	/*
+	 * worker_runnable is the lock-protected "can the worker enter a replay
+	 * batch right now?" summary bit. The worker's wait predicate uses this
+	 * single flag instead of repeatedly sampling several shared booleans.
+	 */
+	bool worker_runnable;
 	/* program_loaded gates pio_remove_program() during teardown. */
 	bool program_loaded;
 	/* Number of full scan-program replays completed since the last START. */
 	atomic64_t presentations;
+	atomic64_t batches_submitted;
+	atomic64_t words_written;
+	atomic64_t drain_failures;
+	atomic64_t stop_requests_seen_during_batch;
+	atomic64_t mmio_write_ns;
+	atomic64_t drain_ns;
+	u32 max_batch_replays;
+	u32 worker_cpu;
+	u32 worker_priority;
 	int last_error;
 	uint program_offset;
 	uint16_t instructions[HEART_PI5_SCAN_LOOP_PROGRAM_LENGTH];
@@ -134,6 +172,9 @@ static struct device *heart_pi5_scan_loop_pio_device;
 static uint heart_pi5_scan_loop_dmactrl = HEART_PI5_SCAN_LOOP_DEFAULT_DMACTRL;
 static uint heart_pi5_scan_loop_batch_target_bytes =
 	HEART_PI5_SCAN_LOOP_DEFAULT_BATCH_TARGET_BYTES;
+static uint heart_pi5_scan_loop_worker_cpu = HEART_PI5_SCAN_LOOP_DEFAULT_WORKER_CPU;
+static uint heart_pi5_scan_loop_worker_priority =
+	HEART_PI5_SCAN_LOOP_DEFAULT_WORKER_PRIORITY;
 
 module_param_named(dmactrl, heart_pi5_scan_loop_dmactrl, uint, 0644);
 MODULE_PARM_DESC(dmactrl, "PIO DMACTRL value used for the resident TX FIFO pacing.");
@@ -147,13 +188,158 @@ MODULE_PARM_DESC(
 	batch_target_bytes,
 	"Target bytes per resident replay batch after the first completed presentation."
 );
+module_param_named(worker_cpu, heart_pi5_scan_loop_worker_cpu, uint, 0644);
+MODULE_PARM_DESC(
+	worker_cpu,
+	"CPU the resident replay kthread is bound to. Invalid values fall back to CPU 0."
+);
+module_param_named(worker_priority, heart_pi5_scan_loop_worker_priority, uint, 0644);
+MODULE_PARM_DESC(
+	worker_priority,
+	"SCHED_FIFO priority used for the resident replay kthread."
+);
 
 static const u32 HEART_PI5_SCAN_LOOP_RGB_GPIOS[] = {5, 13, 6, 12, 16, 23};
 static const u32 HEART_PI5_SCAN_LOOP_ADDR_GPIOS[] = {22, 26, 27, 20, 24};
 
+static int heart_pi5_scan_loop_worker(void *context);
+
 static void heart_pi5_scan_loop_pin_release(PIO pio, u32 gpio)
 {
 	pio_gpio_set_function(pio, gpio, GPIO_FUNC_NULL);
+}
+
+static bool heart_pi5_scan_loop_is_worker_runnable_locked(
+	const struct heart_pi5_scan_loop_session *session
+)
+{
+	return session->configured && session->replay_enabled && session->frame_loaded &&
+	       session->replay_bytes > 0;
+}
+
+static void heart_pi5_scan_loop_update_worker_runnable_locked(
+	struct heart_pi5_scan_loop_session *session
+)
+{
+	WRITE_ONCE(
+		session->worker_runnable,
+		heart_pi5_scan_loop_is_worker_runnable_locked(session)
+	);
+}
+
+static void heart_pi5_scan_loop_reset_stats_locked(struct heart_pi5_scan_loop_session *session)
+{
+	atomic64_set(&session->presentations, 0);
+	atomic64_set(&session->batches_submitted, 0);
+	atomic64_set(&session->words_written, 0);
+	atomic64_set(&session->drain_failures, 0);
+	atomic64_set(&session->stop_requests_seen_during_batch, 0);
+	atomic64_set(&session->mmio_write_ns, 0);
+	atomic64_set(&session->drain_ns, 0);
+	WRITE_ONCE(session->max_batch_replays, 0);
+}
+
+static u32 heart_pi5_scan_loop_compute_batch_replays(
+	u32 frame_bytes,
+	u64 completed_presentations,
+	u32 batch_target_bytes
+)
+{
+	u32 replay_batch_count = 1;
+
+	if (completed_presentations > 0 && frame_bytes > 0 && batch_target_bytes > 0) {
+		replay_batch_count = max_t(u32, 1, batch_target_bytes / frame_bytes);
+		replay_batch_count = min_t(
+			u32,
+			replay_batch_count,
+			HEART_PI5_SCAN_LOOP_MAX_BATCH_REPLAYS
+		);
+	}
+
+	return replay_batch_count;
+}
+
+static void heart_pi5_scan_loop_prepare_replay_batch_locked(
+	struct heart_pi5_scan_loop_session *session,
+	u64 completed_presentations,
+	u32 batch_target_bytes,
+	struct heart_pi5_scan_loop_replay_batch *batch
+)
+{
+	batch->frame_bytes = session->replay_bytes;
+	batch->word_count = batch->frame_bytes / sizeof(uint32_t);
+	batch->words = session->frame_cpu;
+	batch->fifo_mmio = session->fifo_mmio;
+	batch->replay_count = heart_pi5_scan_loop_compute_batch_replays(
+		batch->frame_bytes,
+		completed_presentations,
+		batch_target_bytes
+	);
+}
+
+static u32 heart_pi5_scan_loop_resolve_worker_cpu(void)
+{
+	u32 requested_cpu = READ_ONCE(heart_pi5_scan_loop_worker_cpu);
+
+	if (requested_cpu >= nr_cpu_ids || !cpu_online((int)requested_cpu)) {
+		return 0;
+	}
+
+	return requested_cpu;
+}
+
+static u32 heart_pi5_scan_loop_resolve_worker_priority(void)
+{
+	return clamp_t(
+		u32,
+		READ_ONCE(heart_pi5_scan_loop_worker_priority),
+		1,
+		MAX_RT_PRIO - 1
+	);
+}
+
+static int heart_pi5_scan_loop_start_worker(struct heart_pi5_scan_loop_session *session)
+{
+	struct sched_attr scheduler = { 0 };
+	u32 worker_cpu = heart_pi5_scan_loop_resolve_worker_cpu();
+	u32 worker_priority = heart_pi5_scan_loop_resolve_worker_priority();
+	int result;
+
+	session->worker = kthread_create(
+		heart_pi5_scan_loop_worker,
+		session,
+		"heart-pi5-scan-loop"
+	);
+	if (IS_ERR(session->worker)) {
+		result = PTR_ERR(session->worker);
+		session->worker = NULL;
+		return result;
+	}
+
+	/*
+	 * The replay loop is intentionally pinned and run as FIFO RT because the
+	 * hot path is a tight MMIO burst into the RP1 FIFO. Keeping it on one CPU
+	 * removes migration noise, and RT scheduling keeps drain latency stable.
+	 *
+	 * The worker itself remains responsive because the inner replay loop checks
+	 * stop/disable state between replays and bounds the batch size.
+	 */
+	session->worker_cpu = worker_cpu;
+	session->worker_priority = worker_priority;
+	kthread_bind(session->worker, (unsigned int)worker_cpu);
+
+	scheduler.size = sizeof(scheduler);
+	scheduler.sched_policy = SCHED_FIFO;
+	scheduler.sched_priority = worker_priority;
+	result = sched_setattr_nocheck(session->worker, &scheduler);
+	if (result) {
+		kthread_stop(session->worker);
+		session->worker = NULL;
+		return result;
+	}
+
+	wake_up_process(session->worker);
+	return 0;
 }
 
 /*
@@ -164,7 +350,7 @@ static void heart_pi5_scan_loop_pin_release(PIO pio, u32 gpio)
  * about: every call below directly becomes FIFO traffic.
  */
 static void heart_pi5_scan_loop_mmio_write_words(
-	volatile uint32_t __iomem *fifo_mmio,
+	uint32_t __iomem *fifo_mmio,
 	const uint32_t *words,
 	u32 word_count
 )
@@ -209,7 +395,8 @@ static void heart_pi5_scan_loop_teardown_locked(struct heart_pi5_scan_loop_sessi
 	session->replay_enabled = false;
 	session->last_error = 0;
 	session->replay_bytes = 0;
-	atomic64_set(&session->presentations, 0);
+	heart_pi5_scan_loop_reset_stats_locked(session);
+	heart_pi5_scan_loop_update_worker_runnable_locked(session);
 
 	if (session->fifo_mmio) {
 		iounmap(session->fifo_mmio);
@@ -268,19 +455,22 @@ static int heart_pi5_scan_loop_worker(void *context)
 	 * replay batch.
 	 */
 	while (!kthread_should_stop()) {
-		const uint32_t *words;
-		volatile uint32_t __iomem *fifo_mmio;
-		u32 frame_bytes;
-		u32 word_count;
-		u32 replay_batch_count = 1;
+		struct heart_pi5_scan_loop_replay_batch batch;
+		ktime_t write_started;
+		ktime_t write_finished;
+		ktime_t drain_finished;
+		u32 batch_target_bytes;
 		u64 completed_presentations;
+		u32 completed_replays = 0;
 		u32 replay_index;
+		bool batch_interrupted = false;
 		int transfer_result;
 
-		wait_event_interruptible(
+		wait_event(
 			session->wait_queue,
+			kthread_should_stop() ||
 			READ_ONCE(session->stop_worker) ||
-			(session->configured && session->replay_enabled && session->frame_loaded)
+			READ_ONCE(session->worker_runnable)
 		);
 		if (kthread_should_stop()) {
 			break;
@@ -291,16 +481,19 @@ static int heart_pi5_scan_loop_worker(void *context)
 			mutex_unlock(&session->lock);
 			break;
 		}
-		if (!session->configured || !session->replay_enabled || !session->frame_loaded) {
+		if (!session->worker_runnable) {
 			mutex_unlock(&session->lock);
 			continue;
 		}
 
-		frame_bytes = session->replay_bytes;
-		word_count = frame_bytes / sizeof(uint32_t);
-		words = session->frame_cpu;
-		fifo_mmio = (volatile uint32_t __iomem *)session->fifo_mmio;
 		completed_presentations = (u64)atomic64_read(&session->presentations);
+		batch_target_bytes = READ_ONCE(heart_pi5_scan_loop_batch_target_bytes);
+		heart_pi5_scan_loop_prepare_replay_batch_locked(
+			session,
+			completed_presentations,
+			batch_target_bytes,
+			&batch
+		);
 
 		/*
 		 * The first replay of a newly loaded frame is intentionally unbatched so
@@ -308,19 +501,6 @@ static int heart_pi5_scan_loop_worker(void *context)
 		 * frames can be replayed several times before the next drain to amortize
 		 * the completion bookkeeping.
 		 */
-		if (completed_presentations > 0 && frame_bytes > 0 &&
-		    heart_pi5_scan_loop_batch_target_bytes > 0) {
-			replay_batch_count = max_t(
-				u32,
-				1,
-				heart_pi5_scan_loop_batch_target_bytes / frame_bytes
-			);
-			replay_batch_count = min_t(
-				u32,
-				replay_batch_count,
-				HEART_PI5_SCAN_LOOP_MAX_BATCH_REPLAYS
-			);
-		}
 		mutex_unlock(&session->lock);
 
 		/*
@@ -333,13 +513,36 @@ static int heart_pi5_scan_loop_worker(void *context)
 		 * LOAD is forbidden while replay_enabled is true, so userspace cannot
 		 * swap out frame_cpu contents underneath the worker.
 		 */
-		for (replay_index = 0; replay_index < replay_batch_count; ++replay_index) {
-			heart_pi5_scan_loop_mmio_write_words(fifo_mmio, words, word_count);
+		write_started = ktime_get();
+		for (replay_index = 0; replay_index < batch.replay_count; ++replay_index) {
+			if (unlikely(
+				    kthread_should_stop() || READ_ONCE(session->stop_worker) ||
+				    !READ_ONCE(session->worker_runnable)
+			    )) {
+				batch_interrupted = true;
+				break;
+			}
+
+			heart_pi5_scan_loop_mmio_write_words(
+				batch.fifo_mmio,
+				batch.words,
+				batch.word_count
+			);
+			++completed_replays;
+		}
+		write_finished = ktime_get();
+
+		if (batch_interrupted) {
+			atomic64_inc(&session->stop_requests_seen_during_batch);
+		}
+		if (completed_replays == 0) {
+			continue;
 		}
 
 		/*
-		 * WC writes are posted. The barrier makes the FIFO writes visible before
-		 * pio_sm_drain_tx_fifo() becomes the completion point for this batch.
+		 * WC writes are posted. The barrier orders the MMIO write burst before
+		 * the subsequent drain/completion check; pio_sm_drain_tx_fifo() remains
+		 * the primitive that tells us the state machine has consumed the batch.
 		 *
 		 * The drain call is the synchronization primitive that matters for
 		 * correctness here: once it returns, the state machine has consumed the
@@ -354,23 +557,37 @@ static int heart_pi5_scan_loop_worker(void *context)
 		 */
 		wmb();
 		transfer_result = pio_sm_drain_tx_fifo(session->pio, (uint)session->sm);
+		drain_finished = ktime_get();
+		atomic64_add(
+			ktime_to_ns(ktime_sub(write_finished, write_started)),
+			&session->mmio_write_ns
+		);
+		atomic64_add(
+			ktime_to_ns(ktime_sub(drain_finished, write_finished)),
+			&session->drain_ns
+		);
 		if (transfer_result < 0) {
 			pr_warn(
 				"heart_pi5_scan_loop: pio_sm_drain_tx_fifo failed after MMIO replay: %d\n",
 				transfer_result
 			);
+			atomic64_inc(&session->drain_failures);
 			mutex_lock(&session->lock);
 			session->last_error = transfer_result;
 			session->replay_enabled = false;
+			heart_pi5_scan_loop_update_worker_runnable_locked(session);
 			mutex_unlock(&session->lock);
 			wake_up_all(&session->wait_queue);
 			continue;
 		}
 
-		mutex_lock(&session->lock);
-		atomic64_add(replay_batch_count, &session->presentations);
-		mutex_unlock(&session->lock);
-		wake_up_all(&session->wait_queue);
+		atomic64_inc(&session->batches_submitted);
+		atomic64_add((s64)((u64)batch.word_count * completed_replays), &session->words_written);
+		atomic64_add(completed_replays, &session->presentations);
+		if (completed_replays > READ_ONCE(session->max_batch_replays)) {
+			WRITE_ONCE(session->max_batch_replays, completed_replays);
+		}
+		wake_up(&session->wait_queue);
 	}
 
 	return 0;
@@ -418,29 +635,51 @@ static int heart_pi5_scan_loop_configure_locked(
 
 	config = pio_get_default_sm_config();
 	sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
+	/*
+	 * The resident-loop parser currently runs at the RP1 PIO base clock with a
+	 * fixed 1.0 divider. Keeping the kernel path on an invariant clock makes
+	 * the resident benchmark numbers attributable to packed payload size and
+	 * FIFO feed behavior instead of per-session timing choices. If this ever
+	 * becomes tunable, the matching userspace parser and benchmark assumptions
+	 * need the same review because dwell counts and throughput comparisons are
+	 * all interpreted against this clock.
+	 */
 	sm_config_set_clkdiv(&config, make_fp24_8(1, 1));
 
 	/*
 	 * The state machine consumes the compact span format emitted by the Rust
 	 * packer:
 	 *   - instruction 0 loads the blank/address word for this row pair
-	 *   - instructions 4..18 alternate between blank spans and packed data spans
-	 *   - instructions 19..30 emit latch, active output, dwell, and return to 0
+	 *   - instructions 3..11 decode one packed repeat span
+	 *   - instructions 12..18 decode one raw span or detect end-of-spans
+	 *   - instructions 19..24 pulse LAT, dwell with OE active, then return to 0
 	 *
-	 * Data spans stream 23-bit GPIO words via autopull. Blank spans just count
-	 * columns, so sparse content can skip large empty sections without carrying
-	 * a full per-column word for each blank pixel.
+	 * Both span types now inline the first/only 23-bit GPIO word in their
+	 * control word. That is the dense-path win:
+	 *
+	 *   - raw spans stop paying a separate packed word for their first column
+	 *   - repeat spans still collapse long constant runs to one control word
+	 *
+	 * The packed payload that follows a raw span therefore only carries the
+	 * remaining columns after the first one.
 	 *
 	 * A maintainer reading only this file should treat the protocol like this:
 	 *   word 0:
-	 *     row-addressed blank word, also cached in ISR
+	 *     row-addressed blank word
 	 *   repeated:
-	 *     x > 0  => packed data span of x columns
-	 *     x == 0 => blank span, next pull supplies the span length
+	 *     raw word     => raw span:
+	 *                       bit 0      = 0
+	 *                       bits 1..8  = raw_len - 1
+	 *                       bits 9..31 = first 23-bit GPIO word
+	 *                       packed words for the remaining columns follow
+	 *     repeat word  => repeat span:
+	 *                       bit 0      = 1
+	 *                       bits 1..8  = repeat_len - 1
+	 *                       bits 9..31 = repeated 23-bit GPIO word
 	 *   terminator:
-	 *     x == 0 followed by x == 0
+	 *     x == 0
 	 *   trailer:
-	 *     latch word, active word, dwell counter
+	 *     dwell counter
 	 *
 	 * Two maintenance rules matter here:
 	 *
@@ -450,42 +689,87 @@ static int heart_pi5_scan_loop_configure_locked(
 	 *     resident path to diverge, that should be treated as a format version
 	 *     change, not a silent local optimization.
 	 */
+	/*
+	 * OE now rides on sideset together with the clock, and LAT is generated
+	 * internally through SET PINS on GPIO 21. That keeps the trailer short even
+	 * after teaching both raw and repeat spans to inline GPIO data.
+	 */
 	session->instructions[0] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[1] = (uint16_t)pio_encode_mov(pio_isr, pio_osr);
-	session->instructions[2] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS);
-	session->instructions[3] = (uint16_t)(pio_encode_nop() |
-		pio_encode_delay(HEART_PI5_SCAN_LOOP_POST_ADDR_TICKS - 1));
-	session->instructions[4] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[5] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_SCAN_LOOP_CONTROL_WORD_BITS);
-	session->instructions[6] = (uint16_t)pio_encode_jmp_x_dec(8);
-	session->instructions[7] = (uint16_t)pio_encode_jmp(11);
-	session->instructions[8] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
-		pio_encode_sideset_opt(1, 0));
-	session->instructions[9] = (uint16_t)(pio_encode_jmp_x_dec(8) | pio_encode_sideset_opt(1, 1));
-	session->instructions[10] = (uint16_t)pio_encode_jmp(4);
-	session->instructions[11] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[12] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_SCAN_LOOP_CONTROL_WORD_BITS);
-	session->instructions[13] = (uint16_t)pio_encode_jmp_x_dec(15);
-	session->instructions[14] = (uint16_t)pio_encode_jmp(19);
-	session->instructions[15] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-	session->instructions[16] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
-		pio_encode_sideset_opt(1, 0));
-	session->instructions[17] = (uint16_t)(pio_encode_jmp_x_dec(15) | pio_encode_sideset_opt(1, 1));
-	session->instructions[18] = (uint16_t)pio_encode_jmp(4);
-	session->instructions[19] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[20] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
-		pio_encode_delay(HEART_PI5_SCAN_LOOP_LATCH_TICKS - 1));
-	session->instructions[21] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-	session->instructions[22] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
-		pio_encode_delay(HEART_PI5_SCAN_LOOP_POST_LATCH_TICKS - 1));
-	session->instructions[23] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[24] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS);
-	session->instructions[25] = (uint16_t)pio_encode_pull(false, true);
-	session->instructions[26] = (uint16_t)pio_encode_out(pio_y, HEART_PI5_SCAN_LOOP_CONTROL_WORD_BITS);
-	session->instructions[27] = (uint16_t)pio_encode_jmp_y_dec(27);
-	session->instructions[28] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
-	session->instructions[29] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS);
-	session->instructions[30] = (uint16_t)pio_encode_jmp(0);
+	session->instructions[1] = (uint16_t)(
+		pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[2] = (uint16_t)(
+		pio_encode_nop() |
+		pio_encode_delay(HEART_PI5_SCAN_LOOP_POST_ADDR_TICKS - 1) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[3] = (uint16_t)pio_encode_pull(false, true);
+	session->instructions[4] = (uint16_t)pio_encode_out(pio_x, 1);
+	session->instructions[5] = (uint16_t)pio_encode_jmp_not_x(12);
+	session->instructions[6] = (uint16_t)pio_encode_out(pio_y, 8);
+	session->instructions[7] = (uint16_t)pio_encode_mov(pio_x, pio_osr);
+	session->instructions[8] = (uint16_t)(
+		pio_encode_mov(pio_osr, pio_x) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[9] = (uint16_t)(
+		pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[10] = (uint16_t)(
+		pio_encode_jmp_y_dec(8) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_HIGH)
+	);
+	session->instructions[11] = (uint16_t)(
+		pio_encode_jmp(3) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[12] = (uint16_t)pio_encode_out(pio_y, 8);
+	session->instructions[13] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS);
+	session->instructions[14] = (uint16_t)pio_encode_jmp_not_x(19);
+	session->instructions[15] = (uint16_t)(
+		pio_encode_mov(pio_osr, pio_x) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[16] = (uint16_t)(
+		pio_encode_out(pio_pins, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[17] = (uint16_t)(
+		pio_encode_jmp_y_dec(16) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_HIGH)
+	);
+	session->instructions[18] = (uint16_t)(
+		pio_encode_jmp(3) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[19] = (uint16_t)(
+		pio_encode_set(pio_pins, HEART_PI5_SCAN_LOOP_LAT_SET_HIGH) |
+		pio_encode_delay(HEART_PI5_SCAN_LOOP_LATCH_TICKS - 1) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[20] = (uint16_t)(
+		pio_encode_set(pio_pins, HEART_PI5_SCAN_LOOP_LAT_SET_LOW) |
+		pio_encode_delay(HEART_PI5_SCAN_LOOP_POST_LATCH_TICKS - 1) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
+	session->instructions[21] = (uint16_t)(
+		pio_encode_pull(false, true) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_ACTIVE)
+	);
+	session->instructions[22] = (uint16_t)(
+		pio_encode_out(pio_y, HEART_PI5_SCAN_LOOP_CONTROL_WORD_BITS) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_ACTIVE)
+	);
+	session->instructions[23] = (uint16_t)(
+		pio_encode_jmp_y_dec(23) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_ACTIVE)
+	);
+	session->instructions[24] = (uint16_t)(
+		pio_encode_jmp(0) |
+		pio_encode_sideset_opt(2, HEART_PI5_SCAN_LOOP_SIDESET_BLANK_LOW)
+	);
 
 	session->program.instructions = session->instructions;
 	session->program.length = HEART_PI5_SCAN_LOOP_PROGRAM_LENGTH;
@@ -502,8 +786,9 @@ static int heart_pi5_scan_loop_configure_locked(
 		session->program_offset,
 		session->program_offset + HEART_PI5_SCAN_LOOP_PROGRAM_LENGTH - 1
 	);
-	sm_config_set_sideset(&config, 2, true, false);
+	sm_config_set_sideset(&config, 3, true, false);
 	sm_config_set_out_shift(&config, false, true, HEART_PI5_SCAN_LOOP_PIN_WORD_BITS);
+	sm_config_set_set_pins(&config, HEART_PI5_SCAN_LOOP_LAT_GPIO, 1);
 	sm_config_set_out_pins(
 		&config,
 		HEART_PI5_SCAN_LOOP_OUTPUT_PIN_BASE,
@@ -636,7 +921,8 @@ static int heart_pi5_scan_loop_configure_locked(
 	session->replay_enabled = false;
 	session->replay_bytes = 0;
 	session->last_error = 0;
-	atomic64_set(&session->presentations, 0);
+	heart_pi5_scan_loop_reset_stats_locked(session);
+	heart_pi5_scan_loop_update_worker_runnable_locked(session);
 	return 0;
 }
 
@@ -698,7 +984,8 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 			session->frame_loaded = true;
 			session->replay_bytes = load_args.data_bytes;
 			session->last_error = 0;
-			atomic64_set(&session->presentations, 0);
+			heart_pi5_scan_loop_reset_stats_locked(session);
+			heart_pi5_scan_loop_update_worker_runnable_locked(session);
 		}
 		mutex_unlock(&session->lock);
 		return result;
@@ -709,9 +996,10 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 			result = -EINVAL;
 		} else {
 			/* START defines presentation zero for the following WAIT/STATS run. */
-			atomic64_set(&session->presentations, 0);
+			heart_pi5_scan_loop_reset_stats_locked(session);
 			session->last_error = 0;
 			session->replay_enabled = true;
+			heart_pi5_scan_loop_update_worker_runnable_locked(session);
 		}
 		mutex_unlock(&session->lock);
 		wake_up_all(&session->wait_queue);
@@ -725,6 +1013,7 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		 * frame without paying INIT again.
 		 */
 		session->replay_enabled = false;
+		heart_pi5_scan_loop_update_worker_runnable_locked(session);
 		mutex_unlock(&session->lock);
 		wake_up_all(&session->wait_queue);
 		return 0;
@@ -775,10 +1064,22 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		 * boundary.
 		 */
 		mutex_lock(&session->lock);
+		memset(&stats_args, 0, sizeof(stats_args));
 		stats_args.presentations = (u64)atomic64_read(&session->presentations);
 		stats_args.last_error = session->last_error;
 		stats_args.frame_bytes = session->replay_bytes;
 		stats_args.replay_enabled = session->replay_enabled ? 1 : 0;
+		stats_args.batches_submitted = (u64)atomic64_read(&session->batches_submitted);
+		stats_args.words_written = (u64)atomic64_read(&session->words_written);
+		stats_args.drain_failures = (u64)atomic64_read(&session->drain_failures);
+		stats_args.stop_requests_seen_during_batch =
+			(u64)atomic64_read(&session->stop_requests_seen_during_batch);
+		stats_args.mmio_write_ns = (u64)atomic64_read(&session->mmio_write_ns);
+		stats_args.drain_ns = (u64)atomic64_read(&session->drain_ns);
+		stats_args.max_batch_replays = READ_ONCE(session->max_batch_replays);
+		stats_args.worker_cpu = session->worker_cpu;
+		stats_args.worker_priority = session->worker_priority;
+		stats_args.worker_runnable = READ_ONCE(session->worker_runnable) ? 1 : 0;
 		mutex_unlock(&session->lock);
 		if (copy_to_user(argp, &stats_args, sizeof(stats_args))) {
 			return -EFAULT;
@@ -793,6 +1094,7 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 static int heart_pi5_scan_loop_open(struct inode *inode, struct file *file)
 {
 	struct heart_pi5_scan_loop_session *session;
+	int result;
 
 	/*
 	 * One open file gets one independent session and one worker. That keeps the
@@ -806,16 +1108,11 @@ static int heart_pi5_scan_loop_open(struct inode *inode, struct file *file)
 
 	mutex_init(&session->lock);
 	init_waitqueue_head(&session->wait_queue);
-	atomic64_set(&session->presentations, 0);
 	session->sm = -1;
-	session->worker = kthread_run(
-		heart_pi5_scan_loop_worker,
-		session,
-		"heart-pi5-scan-loop"
-	);
-	if (IS_ERR(session->worker)) {
-		int result = PTR_ERR(session->worker);
-
+	heart_pi5_scan_loop_reset_stats_locked(session);
+	heart_pi5_scan_loop_update_worker_runnable_locked(session);
+	result = heart_pi5_scan_loop_start_worker(session);
+	if (result) {
 		kfree(session);
 		return result;
 	}
@@ -833,8 +1130,9 @@ static int heart_pi5_scan_loop_release(struct inode *inode, struct file *file)
 	}
 
 	mutex_lock(&session->lock);
-	session->stop_worker = true;
+	WRITE_ONCE(session->stop_worker, true);
 	session->replay_enabled = false;
+	heart_pi5_scan_loop_update_worker_runnable_locked(session);
 	mutex_unlock(&session->lock);
 	wake_up_all(&session->wait_queue);
 	/*

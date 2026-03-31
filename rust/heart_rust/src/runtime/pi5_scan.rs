@@ -26,24 +26,36 @@ const PIN_WORD_SHIFT: u32 = 5;
 // Packed group format, in transport-word order:
 //   0: row-addressed blank word
 //   repeated:
-//     0, span_len              => blank span
-//     span_len, packed words   => data span
-//   0, 0                       => end-of-spans marker
-//   latch_word
-//   active_word
+//     raw control word         => one-word raw span header:
+//                                  bit 0      = 0
+//                                  bits 1..8  = raw_len - 1
+//                                  bits 9..31 = first 23-bit pin word
+//                                  remaining pin words follow in packed form
+//     repeat control word      => one-word repeat span:
+//                                  bit 0      = 1
+//                                  bits 1..8  = repeat_len - 1
+//                                  bits 9..31 = repeated 23-bit pin word
+//   0                          => end-of-spans marker
 //   dwell_counter
 //
 // The paired C parsers in native/pi5_pio_scan_shim.c and
 // kernel/pi5_scan_loop/heart_pi5_scan_loop.c intentionally consume this exact
 // layout. Keeping the format described in one place makes it much easier to
 // check protocol changes against both transports.
-// A fully blank group never needs per-column payload. It collapses to:
-// blank word, blank sentinel, span count, blank sentinel, blank sentinel,
-// latch word, active word, dwell counter.
-const BLANK_RUN_GROUP_WORDS: usize = 8;
-const BLANK_RUN_SENTINEL: u32 = 0;
+//
+// The trailer is intentionally minimal:
+//   - LAT is pulsed by the state machine itself via SET PINS on GPIO 21
+//   - OE is driven by sideset on GPIO 18 alongside the clock on GPIO 17
+//
+// That keeps the resident payload focused on row-addressed shift data plus the
+// dwell count that actually varies per group.
+const END_OF_SPANS_MARKER: u32 = 0;
 const PIN_WORD_BITS: usize = 23;
 const PIN_WORD_MASK: u32 = (1_u32 << PIN_WORD_BITS) - 1;
+const SPAN_LEN_BITS: usize = 8;
+const RAW_SPAN_MAX_PIXELS: usize = 1 << SPAN_LEN_BITS;
+const REPEAT_SPAN_MAX_PIXELS: usize = 1 << SPAN_LEN_BITS;
+const SPAN_WORD_SHIFT: usize = 1 + SPAN_LEN_BITS;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Pi5ScanConfig {
@@ -307,7 +319,10 @@ impl PackedScanFrame {
         )?;
         let compressed_blank_groups = group_lengths
             .iter()
-            .filter(|&&group_length| group_length == BLANK_RUN_GROUP_WORDS)
+            .enumerate()
+            .filter(|(group_index, group_length)| {
+                scan_group_is_blank_run(&words, words_per_group, *group_index, **group_length)
+            })
             .count();
         let words = compact_group_words(words, &group_lengths, words_per_group)?;
         let word_count = words.len();
@@ -360,6 +375,36 @@ impl PackedScanFrame {
 pub(crate) struct Pi5KernelResidentLoop {
     #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
     handle: Pi5KernelResidentLoopHandle,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Pi5KernelResidentLoopStats {
+    // Kernel-owned presentation count since the current replay epoch.
+    pub(crate) presentations: u64,
+    // Sticky worker failure, reported as a negative errno-style value.
+    pub(crate) last_error: i32,
+    // Whether replay is currently enabled for this resident session.
+    pub(crate) replay_enabled: bool,
+    // Number of replay batches that reached the completion primitive.
+    pub(crate) batches_submitted: u64,
+    // Total transport words written into the RP1 FIFO for this replay epoch.
+    pub(crate) words_written: u64,
+    // Number of times the worker observed a drain failure.
+    pub(crate) drain_failures: u64,
+    // Number of batches interrupted early by STOP/disable requests.
+    pub(crate) stop_requests_seen_during_batch: u64,
+    // Cumulative nanoseconds spent issuing the MMIO burst.
+    pub(crate) mmio_write_ns: u64,
+    // Cumulative nanoseconds spent in the drain completion primitive.
+    pub(crate) drain_ns: u64,
+    // Largest replay batch count the worker actually completed.
+    pub(crate) max_batch_replays: u32,
+    // CPU the kernel bound the replay worker to.
+    pub(crate) worker_cpu: u32,
+    // RT priority requested for the replay worker.
+    pub(crate) worker_priority: u32,
+    // Whether the worker currently has enough state to enter a replay batch.
+    pub(crate) worker_runnable: bool,
 }
 
 impl Pi5KernelResidentLoop {
@@ -503,20 +548,30 @@ impl Pi5KernelResidentLoop {
         Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
-    // Query the current presentation counter without waiting. Benchmarks use
-    // this to measure steady-state refresh over a wall-clock window.
+    // Query the current resident-loop counters without waiting. STATS is a
+    // read-only snapshot; callers that need a frame boundary still use WAIT.
     #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn presentation_count(&self) -> Result<u64, String> {
+    pub(crate) fn stats(&self) -> Result<Pi5KernelResidentLoopStats, String> {
         let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let mut presentations = 0_u64;
-        let mut last_error = 0_i32;
+        let mut stats = Pi5KernelResidentLoopStats::default();
         let mut replay_enabled = 0_u32;
+        let mut worker_runnable = 0_u32;
         let result = unsafe {
             heart_pi5_scan_loop_stats(
                 self.handle.0,
-                &mut presentations,
-                &mut last_error,
+                &mut stats.presentations,
+                &mut stats.last_error,
                 &mut replay_enabled,
+                &mut stats.batches_submitted,
+                &mut stats.words_written,
+                &mut stats.drain_failures,
+                &mut stats.stop_requests_seen_during_batch,
+                &mut stats.mmio_write_ns,
+                &mut stats.drain_ns,
+                &mut stats.max_batch_replays,
+                &mut stats.worker_cpu,
+                &mut stats.worker_priority,
+                &mut worker_runnable,
                 error_buffer.as_mut_ptr(),
                 error_buffer.len(),
             )
@@ -526,15 +581,21 @@ impl Pi5KernelResidentLoop {
                 format!("Resident scan loop stats failed with code {result}.")
             }));
         }
-        let _ = last_error;
-        let _ = replay_enabled;
-        Ok(presentations)
+        stats.replay_enabled = replay_enabled != 0;
+        stats.worker_runnable = worker_runnable != 0;
+        Ok(stats)
     }
 
     // Unsupported-platform stub matching the Linux entrypoint above.
     #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn presentation_count(&self) -> Result<u64, String> {
+    pub(crate) fn stats(&self) -> Result<Pi5KernelResidentLoopStats, String> {
         Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
+    }
+
+    // Query just the presentation counter when the caller only needs refresh
+    // progress and not the rest of the kernel telemetry.
+    pub(crate) fn presentation_count(&self) -> Result<u64, String> {
+        Ok(self.stats()?.presentations)
     }
 }
 
@@ -1062,31 +1123,16 @@ impl Pi5ScanPinout {
         bits
     }
 
-    // Return the OE bit pattern that actively drives the display for this
-    // hardware. The active-low quirk is kept in one place so the rest of the
-    // packer can reason in terms of "active" versus "blank".
-    fn oe_active_bits(&self) -> u32 {
-        if OE_ACTIVE_LOW {
-            0
-        } else {
-            1_u32 << (self.oe_gpio - PIN_WORD_SHIFT)
-        }
-    }
-
     // Return the OE bit pattern that blanks the display while shifting or
-    // latching.
+    // latching. Even though the trailer now drives OE via sideset, the shifted
+    // data words still encode the blanked state because every shift step writes
+    // the full GPIO span.
     fn oe_inactive_bits(&self) -> u32 {
         if OE_ACTIVE_LOW {
             1_u32 << (self.oe_gpio - PIN_WORD_SHIFT)
         } else {
             0
         }
-    }
-
-    // Return the latched-control bit used for the explicit latch phase in the
-    // packed stream trailer.
-    fn lat_bits(&self) -> u32 {
-        1_u32 << (self.lat_gpio - PIN_WORD_SHIFT)
     }
 
     // Keep the default dwell policy alongside the pin mapping because the
@@ -1138,14 +1184,8 @@ fn write_scan_segment(
         return write_blank_scan_segment(words, width, control);
     }
 
-    let active_window = find_active_pin_word_window(&pin_words, control.blank_word, width)?;
-    let mut word_index = emit_scan_segment_spans(
-        words,
-        active_window.pin_words,
-        control.blank_word,
-        active_window.prefix_blank_count,
-        active_window.suffix_blank_count,
-    )?;
+    let planned_spans = plan_scan_segment_spans(&pin_words)?;
+    let mut word_index = emit_planned_scan_spans(words, &pin_words, &planned_spans)?;
     word_index = write_scan_segment_trailer(words, word_index, control);
     Ok(word_index)
 }
@@ -1154,15 +1194,27 @@ fn write_scan_segment(
 struct ScanSegmentControl {
     pinout: Pi5ScanPinout,
     blank_word: u32,
-    active_word: u32,
     dwell_ticks: u32,
     msb_first_shift: usize,
 }
 
-struct ActivePinWordWindow<'a> {
-    pin_words: &'a [u32],
-    prefix_blank_count: usize,
-    suffix_blank_count: usize,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlannedScanSpanKind {
+    Raw,
+    Repeat,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PlannedScanSpan {
+    start: usize,
+    end: usize,
+    kind: PlannedScanSpanKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PinWordRun {
+    start: usize,
+    end: usize,
 }
 
 #[inline]
@@ -1186,7 +1238,6 @@ fn build_scan_segment_control(
     Ok(ScanSegmentControl {
         pinout,
         blank_word: addr_bits | pinout.oe_inactive_bits(),
-        active_word: addr_bits | pinout.oe_active_bits(),
         dwell_ticks,
         msb_first_shift,
     })
@@ -1239,84 +1290,108 @@ fn write_blank_scan_segment(
     control: ScanSegmentControl,
 ) -> Result<usize, String> {
     // Emit the fixed blank-group encoding used when no column in this group
-    // lights a pixel. This is the cheapest possible resident replay payload.
-    // A fully blank group is the cheapest case: no shifted pixel payload,
-    // just "blank N columns" plus the fixed latch/active/dwell trailer.
-    words[1] = BLANK_RUN_SENTINEL;
-    words[2] = encode_span_count(width)?;
-    write_scan_segment_trailer(words, 3, control);
-    Ok(BLANK_RUN_GROUP_WORDS)
-}
-
-#[inline]
-fn find_active_pin_word_window<'a>(
-    pin_words: &'a [u32],
-    blank_word: u32,
-    width: usize,
-) -> Result<ActivePinWordWindow<'a>, String> {
-    // Trim leading and trailing blank columns so the later span writer only has
-    // to look for meaningful internal gaps.
-    let first_nonblank = pin_words
-        .iter()
-        .position(|&pin_word| pin_word != blank_word)
-        .ok_or_else(|| "Pi 5 scan lost the first nonblank pixel span.".to_string())?;
-    let last_nonblank = pin_words
-        .iter()
-        .rposition(|&pin_word| pin_word != blank_word)
-        .ok_or_else(|| "Pi 5 scan lost the last nonblank pixel span.".to_string())?;
-    let suffix_blank_count = width
-        .checked_sub(last_nonblank + 1)
-        .ok_or_else(|| "Pi 5 scan trailing blank span underflowed.".to_string())?;
-    Ok(ActivePinWordWindow {
-        pin_words: &pin_words[first_nonblank..last_nonblank + 1],
-        prefix_blank_count: first_nonblank,
-        suffix_blank_count,
-    })
-}
-
-fn emit_scan_segment_spans(
-    words: &mut [u32],
-    active_pin_words: &[u32],
-    blank_word: u32,
-    prefix_blank_count: usize,
-    suffix_blank_count: usize,
-) -> Result<usize, String> {
-    // Write the variable-length span section between the leading blank word and
-    // the fixed control trailer. The important optimization here is splitting
-    // large internal blank runs into their own spans instead of packing them as
-    // full data runs.
+    // lights a pixel. The parser now understands generic repeat spans, so the
+    // all-blank fast path is just one repeat span of the group blank word.
     let mut word_index = 1_usize;
-    if prefix_blank_count > 0 {
-        emit_blank_run(words, &mut word_index, prefix_blank_count)?;
+    emit_repeat_run(words, &mut word_index, width, control.blank_word)?;
+    write_scan_segment_trailer(words, word_index, control);
+    Ok(word_index + 2)
+}
+
+fn plan_scan_segment_spans(pin_words: &[u32]) -> Result<Vec<PlannedScanSpan>, String> {
+    // Choose the minimum-word span segmentation under the current parser
+    // contract using run boundaries instead of per-column heuristics.
+    //
+    // The repeat-span opcode changes the tradeoff: long constant runs no longer
+    // have to ride inside a raw packed span. Planning over exact runs gives the
+    // packer the ability to decide when one repeated pin word is cheaper than a
+    // raw packed payload, while still keeping pack-time work bounded by the
+    // number of runs rather than the full row width squared.
+    let runs = collect_pin_word_runs(pin_words);
+    let run_count = runs.len();
+    let mut best_suffix_words = vec![usize::MAX; run_count + 1];
+    let mut planned_end_run = vec![0_usize; run_count];
+    let mut planned_kind = vec![PlannedScanSpanKind::Raw; run_count];
+
+    best_suffix_words[run_count] = 0;
+    for start_run in (0..run_count).rev() {
+        let mut best_words = usize::MAX;
+        let mut best_end_run = start_run + 1;
+        let mut best_kind = PlannedScanSpanKind::Raw;
+        let repeat_len = runs[start_run].end - runs[start_run].start;
+
+        if repeat_len >= 2 {
+            let repeat_words = repeat_span_word_count(repeat_len)
+                .checked_add(best_suffix_words[start_run + 1])
+                .ok_or_else(|| "Pi 5 scan repeat span planning overflowed.".to_string())?;
+            best_words = repeat_words;
+            best_end_run = start_run + 1;
+            best_kind = PlannedScanSpanKind::Repeat;
+        }
+
+        let mut raw_len = 0_usize;
+        for end_run in start_run..run_count {
+            raw_len = raw_len
+                .checked_add(runs[end_run].end - runs[end_run].start)
+                .ok_or_else(|| "Pi 5 scan raw span length overflowed.".to_string())?;
+            let raw_words = 1_usize
+                .checked_add(packed_pin_word_count(raw_len))
+                .and_then(|words| words.checked_add(best_suffix_words[end_run + 1]))
+                .ok_or_else(|| "Pi 5 scan raw span planning overflowed.".to_string())?;
+            if raw_words < best_words {
+                best_words = raw_words;
+                best_end_run = end_run + 1;
+                best_kind = PlannedScanSpanKind::Raw;
+            }
+        }
+
+        best_suffix_words[start_run] = best_words;
+        planned_end_run[start_run] = best_end_run;
+        planned_kind[start_run] = best_kind;
     }
-    let mut data_run_start = 0_usize;
-    let mut column_index = 0_usize;
-    while column_index < active_pin_words.len() {
-        if active_pin_words[column_index] != blank_word {
-            column_index += 1;
-            continue;
+
+    let mut spans = Vec::new();
+    let mut start_run = 0_usize;
+    while start_run < run_count {
+        let end_run = planned_end_run[start_run];
+        if end_run <= start_run || end_run > run_count {
+            return Err(
+                "Pi 5 scan run-span planner produced an invalid span boundary.".to_string()
+            );
         }
-        let blank_start = column_index;
-        while column_index < active_pin_words.len() && active_pin_words[column_index] == blank_word
-        {
-            column_index += 1;
-        }
-        let blank_len = column_index - blank_start;
-        if column_index == active_pin_words.len()
-            || blank_len < runtime_tuning().pi5_scan_internal_blank_run_min_pixels
-        {
-            continue;
-        }
-        // Large internal blank gaps are worth splitting into their own spans so
-        // the resident transport does not carry a near-full packed data run for
-        // a row that only lights a few narrow islands.
-        emit_data_run(words, &mut word_index, &active_pin_words[data_run_start..blank_start])?;
-        emit_blank_run(words, &mut word_index, blank_len)?;
-        data_run_start = column_index;
+        spans.push(PlannedScanSpan {
+            start: runs[start_run].start,
+            end: runs[end_run - 1].end,
+            kind: planned_kind[start_run],
+        });
+        start_run = end_run;
     }
-    emit_data_run(words, &mut word_index, &active_pin_words[data_run_start..])?;
-    if suffix_blank_count > 0 {
-        emit_blank_run(words, &mut word_index, suffix_blank_count)?;
+    Ok(spans)
+}
+
+fn emit_planned_scan_spans(
+    words: &mut [u32],
+    pin_words: &[u32],
+    planned_spans: &[PlannedScanSpan],
+) -> Result<usize, String> {
+    // The planner above decides the cheapest sequence of raw and repeat spans.
+    // This helper just serializes that decision into the shared transport
+    // format consumed by both native C parsers.
+    let mut word_index = 1_usize;
+    for span in planned_spans {
+        match span.kind {
+            PlannedScanSpanKind::Raw => {
+                emit_raw_run(words, &mut word_index, &pin_words[span.start..span.end])?;
+            }
+            PlannedScanSpanKind::Repeat => {
+                emit_repeat_run(
+                    words,
+                    &mut word_index,
+                    span.end - span.start,
+                    pin_words[span.start],
+                )?;
+            }
+        }
     }
     Ok(word_index)
 }
@@ -1327,14 +1402,12 @@ fn write_scan_segment_trailer(
     word_index: usize,
     control: ScanSegmentControl,
 ) -> usize {
-    // Emit the fixed end-of-spans marker plus latch/active/dwell words. The C
-    // parsers rely on this exact trailer shape.
-    words[word_index] = BLANK_RUN_SENTINEL;
-    words[word_index + 1] = BLANK_RUN_SENTINEL;
-    words[word_index + 2] = control.blank_word | control.pinout.lat_bits();
-    words[word_index + 3] = control.active_word;
-    words[word_index + 4] = encode_dwell_counter(control.dwell_ticks);
-    word_index + 5
+    // Emit the fixed end-of-spans marker plus dwell word. The PIO program now
+    // synthesizes the latch pulse and active-output window internally, so the
+    // transport only carries the one control value that still varies here.
+    words[word_index] = END_OF_SPANS_MARKER;
+    words[word_index + 1] = encode_dwell_counter(control.dwell_ticks);
+    word_index + 2
 }
 
 pub(crate) fn packed_pin_word_count(pin_word_count: usize) -> usize {
@@ -1352,47 +1425,110 @@ pub(crate) fn max_group_word_count(width: usize) -> usize {
     // lit/blank/lit/... span pattern so packing never has to realloc.
     // Worst case is alternating one-pixel lit and blank spans across the row.
     // That produces roughly width span headers plus the packed payload words,
-    // then the fixed control trailer.
+    // then the fixed blank-word + terminator + dwell trailer.
     width
         .checked_mul(2)
-        .and_then(|words| words.checked_add(6))
+        .and_then(|words| words.checked_add(4))
         .unwrap_or(usize::MAX)
 }
 
-fn emit_blank_run(
-    words: &mut [u32],
-    word_index: &mut usize,
-    blank_count: usize,
-) -> Result<(), String> {
-    // Encode one blank span in-place in the transport buffer.
-    words[*word_index] = BLANK_RUN_SENTINEL;
-    words[*word_index + 1] = encode_span_count(blank_count)?;
-    *word_index += 2;
-    Ok(())
+fn repeat_span_word_count(pixel_count: usize) -> usize {
+    pixel_count.div_ceil(REPEAT_SPAN_MAX_PIXELS)
 }
 
-fn emit_data_run(
+fn emit_raw_run(
     words: &mut [u32],
     word_index: &mut usize,
     pin_words: &[u32],
 ) -> Result<(), String> {
-    // Encode one nonblank span by writing its logical length followed by the
-    // dense packed pin words consumed by the PIO parser's autopull stream.
+    // Encode one raw span by writing its logical length followed by the dense
+    // packed pin words consumed by the PIO parser's autopull stream.
+    //
+    // The first 23-bit pin word now rides inside the control word itself. That
+    // saves one transport word for every raw span, which is exactly the dense
+    // case that still matters once repeat/blank compression has already landed.
     if pin_words.is_empty() {
         return Ok(());
     }
-    words[*word_index] = encode_span_count(pin_words.len())?;
+    words[*word_index] = encode_raw_span_word(pin_words.len(), pin_words[0])?;
     *word_index += 1;
-    let packed_words = packed_pin_word_count(pin_words.len());
+    let packed_words = packed_pin_word_count(pin_words.len() - 1);
     // The state machine autopulls 23-bit pin words from a 32-bit stream. Rust
     // does the bit-packing once up front so the kernel replay loop only pushes
     // opaque transport words into the FIFO.
     pack_pin_words(
-        pin_words,
+        &pin_words[1..],
         &mut words[*word_index..*word_index + packed_words],
     )?;
     *word_index += packed_words;
     Ok(())
+}
+
+fn emit_repeat_run(
+    words: &mut [u32],
+    word_index: &mut usize,
+    repeat_count: usize,
+    repeated_word: u32,
+) -> Result<(), String> {
+    // Encode one constant run using the dedicated repeat opcode. The repeat
+    // control word carries both length and the repeated 23-bit GPIO state, so
+    // long constant runs cost one transport word per <=256 columns.
+    let mut remaining = repeat_count;
+    while remaining > 0 {
+        let chunk = remaining.min(REPEAT_SPAN_MAX_PIXELS);
+        words[*word_index] = encode_repeat_span_word(chunk, repeated_word)?;
+        *word_index += 1;
+        remaining -= chunk;
+    }
+    Ok(())
+}
+
+fn collect_pin_word_runs(pin_words: &[u32]) -> Vec<PinWordRun> {
+    // Group equal consecutive pin words so the planner can search over the real
+    // repeat opportunities instead of every individual column boundary.
+    let mut runs = Vec::new();
+    if pin_words.is_empty() {
+        return runs;
+    }
+
+    let mut run_start = 0_usize;
+    for index in 1..=pin_words.len() {
+        if index < pin_words.len() && pin_words[index] == pin_words[run_start] {
+            continue;
+        }
+        runs.push(PinWordRun {
+            start: run_start,
+            end: index,
+        });
+        run_start = index;
+    }
+    runs
+}
+
+fn scan_group_is_blank_run(
+    words: &[u32],
+    words_per_group: usize,
+    group_index: usize,
+    group_length: usize,
+) -> bool {
+    // Group length alone is no longer enough to identify a blank group because
+    // repeat spans are variable length and a nonblank group can also compress
+    // down to a very small body. A group is blank only if every span word
+    // before the terminator is a repeat span of the group's own blank word.
+    if group_length < 4 {
+        return false;
+    }
+    let start = match group_index.checked_mul(words_per_group) {
+        Some(start) => start,
+        None => return false,
+    };
+    let group_words = &words[start..start + group_length];
+    if group_words[group_length - 2] != END_OF_SPANS_MARKER {
+        return false;
+    }
+    group_words[1..group_length - 2]
+        .iter()
+        .all(|&word| decode_repeat_span_word(word) == Some(group_words[0]))
 }
 
 fn pack_pin_words(pin_words: &[u32], packed_words: &mut [u32]) -> Result<(), String> {
@@ -1456,7 +1592,7 @@ fn merge_identical_plane_groups(
                 .and_then(|base| base.checked_add(plane_index))
                 .ok_or_else(|| "Pi 5 scan group index overflowed during merge.".to_string())?;
             if group_lengths[group_index] == 0
-                || group_lengths[group_index] == BLANK_RUN_GROUP_WORDS
+                || scan_group_is_blank_run(words, words_per_group, group_index, group_lengths[group_index])
             {
                 continue;
             }
@@ -1507,7 +1643,9 @@ fn groups_are_mergeable(
         return Ok(false);
     }
     let group_length = group_lengths[first_group_index];
-    if group_length == 0 || group_length == BLANK_RUN_GROUP_WORDS {
+    if group_length == 0
+        || scan_group_is_blank_run(words, words_per_group, first_group_index, group_length)
+    {
         return Ok(false);
     }
     let first_start = first_group_index
@@ -1562,16 +1700,36 @@ fn compact_group_words(
 
     let retained_non_blank_group_count = group_lengths
         .iter()
-        .copied()
-        .filter(|&group_length| group_length != 0 && group_length != BLANK_RUN_GROUP_WORDS)
+        .enumerate()
+        .filter(|(group_index, group_length)| {
+            **group_length != 0
+                && !scan_group_is_blank_run(words.as_slice(), words_per_group, *group_index, **group_length)
+        })
         .count();
     let actual_word_count = if retained_non_blank_group_count == 0 {
-        BLANK_RUN_GROUP_WORDS
-    } else {
         group_lengths
             .iter()
             .copied()
-            .filter(|&group_length| group_length != 0 && group_length != BLANK_RUN_GROUP_WORDS)
+            .find(|&group_length| group_length != 0)
+            .unwrap_or(0)
+    } else {
+        group_lengths
+            .iter()
+            .enumerate()
+            .filter_map(|(group_index, group_length)| {
+                if *group_length == 0
+                    || scan_group_is_blank_run(
+                        words.as_slice(),
+                        words_per_group,
+                        group_index,
+                        *group_length,
+                    )
+                {
+                    None
+                } else {
+                    Some(*group_length)
+                }
+            })
             .sum()
     };
     let mut compacted = Vec::with_capacity(actual_word_count);
@@ -1579,7 +1737,9 @@ fn compact_group_words(
         if group_length == 0 {
             continue;
         }
-        if group_length == BLANK_RUN_GROUP_WORDS && retained_non_blank_group_count != 0 {
+        if scan_group_is_blank_run(words.as_slice(), words_per_group, group_index, group_length)
+            && retained_non_blank_group_count != 0
+        {
             continue;
         }
         let start = group_index
@@ -1593,14 +1753,67 @@ fn compact_group_words(
     Ok(compacted)
 }
 
-pub(crate) fn encode_span_count(pixel_count: usize) -> Result<u32, String> {
-    // The transport uses zero as the blank sentinel, so data spans encode their
-    // length as a positive control word.
+pub(crate) fn encode_raw_span_word(
+    pixel_count: usize,
+    first_word: u32,
+) -> Result<u32, String> {
+    // Raw spans use the low bit to distinguish themselves from repeat spans.
+    // The low 8 count bits store (len - 1), and the remaining 23 bits carry
+    // the first pin word. The all-zero word remains the end-of-spans marker
+    // because a real pin word is never fully zero: the blank/address word
+    // always carries at least the OE-inactive bit.
     if pixel_count == 0 {
         return Err("Pi 5 scan spans must contain at least one pixel.".to_string());
     }
-    u32::try_from(pixel_count)
-        .map_err(|_| "Pi 5 scan span count exceeds 32-bit control words.".to_string())
+    if pixel_count > RAW_SPAN_MAX_PIXELS {
+        return Err(format!(
+            "Pi 5 scan raw span length {pixel_count} exceeds the packed raw maximum {RAW_SPAN_MAX_PIXELS}."
+        ));
+    }
+
+    let raw_len = u32::try_from(pixel_count - 1)
+        .map_err(|_| "Pi 5 scan span count exceeds 32-bit control words.".to_string())?;
+    let encoded_word = (first_word & PIN_WORD_MASK)
+        .checked_shl(SPAN_WORD_SHIFT as u32)
+        .and_then(|word| word.checked_add(raw_len << 1))
+        .ok_or_else(|| "Pi 5 scan raw span control word overflowed.".to_string())?;
+    Ok(encoded_word)
+}
+
+pub(crate) fn encode_repeat_span_word(
+    pixel_count: usize,
+    repeated_word: u32,
+) -> Result<u32, String> {
+    // Repeat spans use one transport word:
+    //   bit 0      => repeat opcode tag
+    //   bits 1..8  => repeat_len - 1
+    //   bits 9..31 => repeated 23-bit pin word
+    if pixel_count == 0 {
+        return Err("Pi 5 scan repeat spans must contain at least one pixel.".to_string());
+    }
+    if pixel_count > REPEAT_SPAN_MAX_PIXELS {
+        return Err(format!(
+            "Pi 5 scan repeat span length {pixel_count} exceeds the packed repeat maximum {REPEAT_SPAN_MAX_PIXELS}."
+        ));
+    }
+
+    let repeat_len = u32::try_from(pixel_count - 1)
+        .map_err(|_| "Pi 5 scan span count exceeds 32-bit control words.".to_string())?;
+    let encoded_word = (repeated_word & PIN_WORD_MASK)
+        .checked_shl(SPAN_WORD_SHIFT as u32)
+        .and_then(|word| {
+            word.checked_add(repeat_len << 1)
+                .and_then(|word| word.checked_add(1))
+        })
+        .ok_or_else(|| "Pi 5 scan repeat span control word overflowed.".to_string())?;
+    Ok(encoded_word)
+}
+
+fn decode_repeat_span_word(word: u32) -> Option<u32> {
+    if (word & 1) == 0 {
+        return None;
+    }
+    Some((word >> SPAN_WORD_SHIFT) & PIN_WORD_MASK)
 }
 
 pub(crate) fn encode_dwell_counter(ticks: u32) -> u32 {
@@ -1784,6 +1997,16 @@ unsafe extern "C" {
         presentations: *mut u64,
         last_error: *mut i32,
         replay_enabled: *mut u32,
+        batches_submitted: *mut u64,
+        words_written: *mut u64,
+        drain_failures: *mut u64,
+        stop_requests_seen_during_batch: *mut u64,
+        mmio_write_ns: *mut u64,
+        drain_ns: *mut u64,
+        max_batch_replays: *mut u32,
+        worker_cpu: *mut u32,
+        worker_priority: *mut u32,
+        worker_runnable: *mut u32,
         error_buf: *mut c_char,
         error_buf_len: usize,
     ) -> i32;

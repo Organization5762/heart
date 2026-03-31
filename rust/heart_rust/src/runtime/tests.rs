@@ -5,6 +5,7 @@ use std::time::Duration;
 use super::config::{ColorOrder, WiringProfile};
 use super::driver::{MatrixDriverCore, MatrixDriverError};
 use super::{FrameBufferPool, PackedScanFrame, Pi5ScanConfig};
+use crate::runtime::pi5_scan::{encode_raw_span_word, encode_repeat_span_word};
 use crate::runtime::queue::WorkerState;
 
 fn frame_bytes(width: u32, height: u32, seed: u8) -> Vec<u8> {
@@ -206,7 +207,7 @@ fn pi5_scan_pack_rgba_produces_expected_word_count_for_single_panel() {
 
     assert_eq!(stats.compressed_blank_groups, 32 * 3);
     assert_eq!(stats.merged_identical_groups, 32 * 7);
-    assert_eq!(packed.word_count(), 32 * (46 + 7));
+    assert_eq!(packed.word_count(), 32 * 4);
     assert_eq!(stats.word_count, packed.word_count());
 }
 
@@ -221,16 +222,27 @@ fn pi5_scan_pack_rgba_emits_compact_group_headers_and_control_words() {
     let words = packed.as_words();
 
     assert_eq!(words[0], 1 << 13);
-    assert_eq!(words[1], 0);
-    assert_eq!(words[2], 64);
-    assert_eq!(words[3], 0);
-    assert_eq!(words[4], 0);
-    assert_eq!(words[5], (1 << 13) | (1 << 16));
-    assert_eq!(words[6], 0);
-    assert_eq!(words[7], 2047);
+    assert_eq!(
+        words[1],
+        encode_repeat_span_word(64, 1 << 13).expect("repeat span word should encode")
+    );
+    assert_eq!(words[2], 0);
+    assert_eq!(words[3], 2047);
     assert_eq!(stats.compressed_blank_groups, 32 * 11);
     assert_eq!(stats.merged_identical_groups, 0);
-    assert_eq!(stats.word_count, 8);
+    assert_eq!(stats.word_count, 4);
+}
+
+#[test]
+fn pi5_scan_raw_span_control_word_embeds_the_first_pin_word() {
+    let control =
+        encode_raw_span_word(2, 1 << 13).expect("raw span word should encode");
+
+    assert_eq!(control, (1 << 22) | (1 << 1));
+    assert!(
+        encode_raw_span_word(257, 1 << 13).is_err(),
+        "raw spans longer than 256 pixels should be rejected"
+    );
 }
 
 #[test]
@@ -249,7 +261,23 @@ fn pi5_scan_pack_rgba_merges_nonadjacent_identical_plane_payloads() {
 
     assert_eq!(stats.compressed_blank_groups, 32 * 9);
     assert_eq!(stats.merged_identical_groups, 32);
-    assert_eq!(packed.word_count(), 32 * (46 + 7));
+    assert_eq!(packed.word_count(), 32 * 4);
+}
+
+#[test]
+fn pi5_scan_pack_rgba_uses_inlined_raw_headers_for_dense_frames() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_pwm_bits(11))
+        .expect("single-panel Pi 5 scan config should be valid");
+    let frame = frame_bytes(config.width().unwrap(), config.height().unwrap(), 31);
+
+    let (packed, stats) =
+        PackedScanFrame::pack_rgba(&config, &frame).expect("scan packing should succeed");
+
+    assert_eq!(stats.compressed_blank_groups, 96);
+    assert_eq!(stats.merged_identical_groups, 0);
+    assert_eq!(packed.word_count(), 6208);
+    assert_eq!(stats.word_count, packed.word_count());
 }
 
 #[test]
@@ -278,5 +306,5 @@ fn pi5_scan_pack_rgba_splits_large_internal_blank_spans() {
 
     assert_eq!(stats.compressed_blank_groups, 32 * 3);
     assert_eq!(stats.merged_identical_groups, 32 * 7);
-    assert_eq!(packed.word_count(), 32 * 36);
+    assert_eq!(packed.word_count(), 32 * 7);
 }

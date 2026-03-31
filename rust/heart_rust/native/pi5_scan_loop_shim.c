@@ -261,6 +261,16 @@ int heart_pi5_scan_loop_stats(
     uint64_t *presentations,
     int32_t *last_error,
     uint32_t *replay_enabled,
+    uint64_t *batches_submitted,
+    uint64_t *words_written,
+    uint64_t *drain_failures,
+    uint64_t *stop_requests_seen_during_batch,
+    uint64_t *mmio_write_ns,
+    uint64_t *drain_ns,
+    uint32_t *max_batch_replays,
+    uint32_t *worker_cpu,
+    uint32_t *worker_priority,
+    uint32_t *worker_runnable,
     char *error_buf,
     size_t error_buf_len
 ) {
@@ -296,6 +306,36 @@ int heart_pi5_scan_loop_stats(
     }
     if (replay_enabled != NULL) {
         *replay_enabled = stats_args.replay_enabled;
+    }
+    if (batches_submitted != NULL) {
+        *batches_submitted = stats_args.batches_submitted;
+    }
+    if (words_written != NULL) {
+        *words_written = stats_args.words_written;
+    }
+    if (drain_failures != NULL) {
+        *drain_failures = stats_args.drain_failures;
+    }
+    if (stop_requests_seen_during_batch != NULL) {
+        *stop_requests_seen_during_batch = stats_args.stop_requests_seen_during_batch;
+    }
+    if (mmio_write_ns != NULL) {
+        *mmio_write_ns = stats_args.mmio_write_ns;
+    }
+    if (drain_ns != NULL) {
+        *drain_ns = stats_args.drain_ns;
+    }
+    if (max_batch_replays != NULL) {
+        *max_batch_replays = stats_args.max_batch_replays;
+    }
+    if (worker_cpu != NULL) {
+        *worker_cpu = stats_args.worker_cpu;
+    }
+    if (worker_priority != NULL) {
+        *worker_priority = stats_args.worker_priority;
+    }
+    if (worker_runnable != NULL) {
+        *worker_runnable = stats_args.worker_runnable;
     }
     heart_pi5_scan_loop_write_error(error_buf, error_buf_len, "");
     return 0;

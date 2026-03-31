@@ -27,13 +27,20 @@ Each row-pair / bitplane group is emitted as:
 1. one row-addressed blank word
 1. zero or more spans
 1. an end-of-spans marker
-1. latch / active / dwell trailer words
+1. one dwell trailer word
 
 Span encoding is:
 
-- `0, span_len`: blank span
-- `span_len, packed payload`: data span
-- `0, 0`: end of spans
+- `raw control word`: one-word raw span header
+  - bit `0` = raw opcode
+  - bits `1..8` = `raw_len - 1`
+  - bits `9..31` = first 23-bit GPIO word
+  - densely packed 23-bit GPIO words for the remaining columns follow
+- `repeat control word`: one-word repeat span
+  - bit `0` = repeat opcode
+  - bits `1..8` = `repeat_len - 1`
+  - bits `9..31` = repeated 23-bit GPIO word
+- `0`: end of spans
 
 The packed payload is a dense stream of 23-bit GPIO words. The word width is 23
 because the active Adafruit bonnet wiring only uses GPIO `5..27`, so the host
@@ -49,6 +56,7 @@ The Rust side owns all payload reduction:
 - prefix/suffix blank trimming
 - large internal blank-gap splitting
 - identical-bitplane merging
+- repeated-pin-word spans
 - dense 23-bit packing
 
 The Rust layer does not try to pace replay. It only decides what bytes the
@@ -58,7 +66,7 @@ transport must carry.
 
 The userspace C shim is the baseline transport:
 
-- load the shared 31-instruction parser
+- load the shared 25-instruction parser
 - configure rp1-pio transfer buffers
 - submit one packed frame with one ioctl
 - wait for TX drain with one ioctl
@@ -72,6 +80,8 @@ The kernel module keeps one packed frame resident in coherent memory and replays
 that exact buffer from a kthread:
 
 - `INIT`: allocate resident storage and configure the shared parser
+  The current parser keeps the span format intact but generates `LAT` and the
+  active `OE` window internally so the packed trailer only carries a dwell word.
 - `LOAD`: copy a new packed frame into resident storage
 - `START`: begin replay and reset presentation counting
 - `WAIT` / `STATS`: expose kernel-owned replay counts

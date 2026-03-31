@@ -20,7 +20,6 @@ const HEART_MATRIX_MAX_PENDING_FRAMES_DEFAULT: usize = 2;
 const HEART_PARALLEL_COLOR_REMAP_THRESHOLD_BYTES_DEFAULT: usize = 16_384;
 const HEART_PI5_SCAN_DEFAULT_DMA_BUFFER_COUNT_DEFAULT: u32 = 2;
 const HEART_PI5_SCAN_DEFAULT_PWM_BITS_DEFAULT: u8 = 11;
-const HEART_PI5_SCAN_INTERNAL_BLANK_RUN_MIN_PIXELS_DEFAULT: usize = 5;
 const HEART_PI5_SCAN_PACK_PARALLEL_THRESHOLD_WORDS_DEFAULT: usize = 8_192;
 const HEART_PI5_SCAN_MAX_DMA_BUFFER_BYTES_DEFAULT: usize = 22_880;
 const HEART_PI5_SCAN_RESIDENT_LOOP_RESUBMIT_PAUSE_US_DEFAULT: u64 = 100;
@@ -40,8 +39,6 @@ pub(crate) struct RuntimeTuning {
     pub(crate) pi5_scan_default_dma_buffer_count: u32,
     /* Default PWM bit depth used when building a Pi 5 scan config. */
     pub(crate) pi5_scan_default_pwm_bits: u8,
-    /* Small blank gaps stay inline; larger ones become explicit blank spans. */
-    pub(crate) pi5_scan_internal_blank_run_min_pixels: usize,
     /* Minimum packed word count before scan packing parallelizes with Rayon. */
     pub(crate) pi5_scan_pack_parallel_threshold_words: usize,
     /* Cap for the rp1-pio transfer buffer used by the raw userspace transport. */
@@ -83,11 +80,6 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             "HEART_PI5_SCAN_DEFAULT_PWM_BITS",
             HEART_PI5_SCAN_DEFAULT_PWM_BITS_DEFAULT,
             |value| (1..=16).contains(&value),
-        ),
-        pi5_scan_internal_blank_run_min_pixels: parse_env_usize(
-            "HEART_PI5_SCAN_INTERNAL_BLANK_RUN_MIN_PIXELS",
-            HEART_PI5_SCAN_INTERNAL_BLANK_RUN_MIN_PIXELS_DEFAULT,
-            |value| value > 0,
         ),
         pi5_scan_pack_parallel_threshold_words: parse_env_usize(
             "HEART_PI5_SCAN_PACK_PARALLEL_THRESHOLD_WORDS",

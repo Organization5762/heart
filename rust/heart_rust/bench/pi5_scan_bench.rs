@@ -18,6 +18,7 @@ const DEFAULT_PANEL_ROWS: u16 = 64;
 const DEFAULT_PARALLEL: u8 = 1;
 const DEFAULT_PIPELINE_DEPTH: usize = 2;
 const DEFAULT_RESIDENT_LOOP_MS: u64 = 100;
+const PI5_SCAN_SHARED_PROGRAM_LENGTH: u64 = 25;
 const DEFAULT_SCAN_TIMING: Pi5ScanTiming = Pi5ScanTiming {
     clock_divider: 1.0,
     post_addr_ticks: 5,
@@ -77,8 +78,18 @@ struct ResidentLoopBenchmarkSample {
     pack_duration: Duration,
     first_render_duration: Duration,
     steady_window_duration: Duration,
-    steady_refresh_count: u64,
-    steady_refresh_hz: f64,
+    refresh_count: u64,
+    refresh_hz: f64,
+    batches_submitted: u64,
+    words_written: u64,
+    drain_failures: u64,
+    stop_requests_seen_during_batch: u64,
+    mmio_write_ns: u64,
+    drain_ns: u64,
+    max_batch_replays: u32,
+    worker_cpu: u32,
+    worker_priority: u32,
+    worker_runnable: bool,
 }
 
 fn main() -> ExitCode {
@@ -177,10 +188,20 @@ fn run() -> Result<(), String> {
             "\"resident_loop_ms\":{resident_loop_ms},",
             "\"resident_first_render_ns\":{resident_first_render_ns},",
             "\"resident_steady_window_ns\":{resident_steady_window_ns},",
-            "\"resident_steady_refresh_count\":{resident_steady_refresh_count},",
-            "\"resident_steady_refresh_hz\":{resident_steady_refresh_hz:.3},",
-            "\"display_cycle_mean_ns\":{display_cycle_mean_ns},",
-            "\"display_hz\":{display_hz:.3},",
+            "\"resident_refresh_count\":{resident_refresh_count},",
+            "\"resident_refresh_hz\":{resident_refresh_hz:.3},",
+            "\"resident_batches_submitted\":{resident_batches_submitted},",
+            "\"resident_words_written\":{resident_words_written},",
+            "\"resident_drain_failures\":{resident_drain_failures},",
+            "\"resident_stop_requests_seen_during_batch\":{resident_stop_requests_seen_during_batch},",
+            "\"resident_mmio_write_ns\":{resident_mmio_write_ns},",
+            "\"resident_drain_ns\":{resident_drain_ns},",
+            "\"resident_max_batch_replays\":{resident_max_batch_replays},",
+            "\"resident_worker_cpu\":{resident_worker_cpu},",
+            "\"resident_worker_priority\":{resident_worker_priority},",
+            "\"resident_worker_runnable\":{resident_worker_runnable},",
+            "\"distinct_frame_update_cycle_mean_ns\":{distinct_frame_update_cycle_mean_ns},",
+            "\"distinct_frame_update_hz\":{distinct_frame_update_hz:.3},",
             "\"sequential_cycle_mean_ns\":{sequential_cycle_mean_ns},",
             "\"sequential_cycle_hz\":{sequential_cycle_hz:.3}",
             "}}"
@@ -212,10 +233,21 @@ fn run() -> Result<(), String> {
         resident_loop_ms = options.resident_loop_ms,
         resident_first_render_ns = resident.first_render_duration.as_nanos(),
         resident_steady_window_ns = resident.steady_window_duration.as_nanos(),
-        resident_steady_refresh_count = resident.steady_refresh_count,
-        resident_steady_refresh_hz = resident.steady_refresh_hz,
-        display_cycle_mean_ns = display.mean_duration.as_nanos(),
-        display_hz = display.frames_per_second,
+        resident_refresh_count = resident.refresh_count,
+        resident_refresh_hz = resident.refresh_hz,
+        resident_batches_submitted = resident.batches_submitted,
+        resident_words_written = resident.words_written,
+        resident_drain_failures = resident.drain_failures,
+        resident_stop_requests_seen_during_batch =
+            resident.stop_requests_seen_during_batch,
+        resident_mmio_write_ns = resident.mmio_write_ns,
+        resident_drain_ns = resident.drain_ns,
+        resident_max_batch_replays = resident.max_batch_replays,
+        resident_worker_cpu = resident.worker_cpu,
+        resident_worker_priority = resident.worker_priority,
+        resident_worker_runnable = if resident.worker_runnable { 1 } else { 0 },
+        distinct_frame_update_cycle_mean_ns = display.mean_duration.as_nanos(),
+        distinct_frame_update_hz = display.frames_per_second,
         sequential_cycle_mean_ns = display.mean_duration.as_nanos(),
         sequential_cycle_hz = display.frames_per_second,
     );
@@ -380,14 +412,16 @@ fn run_resident_loop_cycle(
         transport.wait_presentations(1)?;
         let first_render_duration = first_render_start.elapsed();
 
-        let baseline_count = transport.presentation_count()?;
+        let baseline_stats = transport.stats()?;
+        let baseline_count = baseline_stats.presentations;
         let steady_start = std::time::Instant::now();
         std::thread::sleep(steady_window);
         let steady_window_duration = steady_start.elapsed();
-        let steady_end_count = transport.presentation_count()?;
-        let steady_refresh_count = steady_end_count.saturating_sub(baseline_count);
-        let steady_refresh_hz =
-            steady_refresh_count as f64 / steady_window_duration.as_secs_f64().max(f64::EPSILON);
+        let steady_end_stats = transport.stats()?;
+        let steady_end_count = steady_end_stats.presentations;
+        let refresh_count = steady_end_count.saturating_sub(baseline_count);
+        let refresh_hz =
+            refresh_count as f64 / steady_window_duration.as_secs_f64().max(f64::EPSILON);
 
         Ok::<ResidentLoopBenchmarkSample, String>(ResidentLoopBenchmarkSample {
             compressed_blank_groups: stats.compressed_blank_groups,
@@ -396,8 +430,18 @@ fn run_resident_loop_cycle(
             pack_duration: stats.pack_duration,
             first_render_duration,
             steady_window_duration,
-            steady_refresh_count,
-            steady_refresh_hz,
+            refresh_count,
+            refresh_hz,
+            batches_submitted: steady_end_stats.batches_submitted,
+            words_written: steady_end_stats.words_written,
+            drain_failures: steady_end_stats.drain_failures,
+            stop_requests_seen_during_batch: steady_end_stats.stop_requests_seen_during_batch,
+            mmio_write_ns: steady_end_stats.mmio_write_ns,
+            drain_ns: steady_end_stats.drain_ns,
+            max_batch_replays: steady_end_stats.max_batch_replays,
+            worker_cpu: steady_end_stats.worker_cpu,
+            worker_priority: steady_end_stats.worker_priority,
+            worker_runnable: steady_end_stats.worker_runnable,
         })
     })();
 
@@ -459,7 +503,7 @@ fn estimate_scan_metrics(config: &Pi5ScanConfig) -> Result<ScanMetrics, String> 
         fixed_delay_ticks_per_group * u64::try_from(group_count).unwrap_or(u64::MAX);
     let estimated_cycles = u64::try_from(group_count)
         .map_err(|_| "Pi 5 scan group count exceeds 64-bit cycle estimation.".to_string())?
-        .checked_mul(24)
+        .checked_mul(PI5_SCAN_SHARED_PROGRAM_LENGTH)
         .and_then(|value| value.checked_add(2 * u64::try_from(shift_words).ok()?))
         .and_then(|value| value.checked_add(2 * dwell_ticks_total))
         .and_then(|value| value.checked_add(2 * fixed_delay_ticks_total))
