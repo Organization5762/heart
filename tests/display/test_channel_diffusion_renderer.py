@@ -27,7 +27,7 @@ class TestChannelDiffusionRenderer:
         np.testing.assert_array_equal(initial_center, np.array([255, 255, 255], dtype=np.uint8))
 
         manager.frame_tick_controller.advance(clock)
-        renderer.process(window, clock, manager, orientation)
+        renderer._internal_process(window, manager, orientation)
 
         expected = np.zeros((3, 3, 3), dtype=np.uint8)
         expected[1, 1] = np.array([128, 128, 128], dtype=np.uint8)

@@ -29,7 +29,7 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     window.fill((0, 0, 0, 0))
     offset_before = renderer.state.offset
     manager.frame_tick_controller.advance(clock)
-    renderer.process(window, clock, manager, orientation)
+    renderer._internal_process(window, manager, orientation)
     processed_state = renderer.state
     assert processed_state.offset == (
         offset_before + processed_state.speed
@@ -50,7 +50,7 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     window.fill((0, 0, 0, 0))
     offset_before_second = renderer.state.offset
     manager.frame_tick_controller.advance(clock)
-    renderer.process(window, clock, manager, orientation)
+    renderer._internal_process(window, manager, orientation)
     after_second_process_state = renderer.state
     assert after_second_process_state.offset == (
         offset_before_second + after_second_process_state.speed

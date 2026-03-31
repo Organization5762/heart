@@ -706,7 +706,7 @@ def main() -> None:
             screen.fill((0, 0, 0))
 
             # Process and render
-            mandelbrot._internal_process(screen, clock, manager, orientation)
+            mandelbrot._internal_process(screen, manager, orientation)
 
             # Update the display
             pygame.display.flip()

@@ -170,7 +170,6 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
         self._builder: ClothSailStateProvider | None = builder
         super().__init__(builder=builder)  # type: ignore[arg-type]
         self.device_display_mode = DeviceDisplayMode.OPENGL
-        self.warmup = False
         self.set_state(ClothSailState())
 
         self._program: Optional[int] = None
