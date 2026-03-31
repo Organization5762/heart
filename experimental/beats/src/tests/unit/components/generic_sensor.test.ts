@@ -1,4 +1,7 @@
-import { collectPreviewMetrics } from "@/components/ui/peripherals/generic_sensor";
+import {
+  collectPreviewMetrics,
+  groupPreviewMetrics,
+} from "@/components/ui/peripherals/generic_sensor";
 import { describe, expect, it } from "vitest";
 
 describe("collectPreviewMetrics", () => {
@@ -17,26 +20,34 @@ describe("collectPreviewMetrics", () => {
     ).toEqual([
       {
         id: "battery.charging",
+        groupLabel: "Battery",
         kind: "boolean",
         label: "battery.charging",
+        signalLabel: "charging",
         value: true,
       },
       {
         id: "battery.voltage",
+        groupLabel: "Battery",
         kind: "numeric",
         label: "battery.voltage",
+        signalLabel: "voltage",
         value: 3.71,
       },
       {
         id: "imu.x",
+        groupLabel: "Imu",
         kind: "numeric",
         label: "imu.x",
+        signalLabel: "x",
         value: 0.14,
       },
       {
         id: "imu.y",
+        groupLabel: "Imu",
         kind: "numeric",
         label: "imu.y",
+        signalLabel: "y",
         value: -0.22,
       },
     ]);
@@ -54,5 +65,56 @@ describe("collectPreviewMetrics", () => {
         g: 7,
       }),
     ).toHaveLength(6);
+  });
+});
+
+describe("groupPreviewMetrics", () => {
+  it("groups like sensor families such as dpad signals together", () => {
+    const metrics = collectPreviewMetrics({
+      dpad: {
+        down: false,
+        left: true,
+        right: false,
+        up: true,
+      },
+      trigger: {
+        pressure: 0.42,
+      },
+    });
+
+    expect(groupPreviewMetrics(metrics)).toEqual([
+      {
+        id: "dpad",
+        label: "Dpad",
+        metrics: [
+          expect.objectContaining({
+            id: "dpad.down",
+            signalLabel: "down",
+          }),
+          expect.objectContaining({
+            id: "dpad.left",
+            signalLabel: "left",
+          }),
+          expect.objectContaining({
+            id: "dpad.right",
+            signalLabel: "right",
+          }),
+          expect.objectContaining({
+            id: "dpad.up",
+            signalLabel: "up",
+          }),
+        ],
+      },
+      {
+        id: "trigger",
+        label: "Trigger",
+        metrics: [
+          expect.objectContaining({
+            id: "trigger.pressure",
+            signalLabel: "pressure",
+          }),
+        ],
+      },
+    ]);
   });
 });
