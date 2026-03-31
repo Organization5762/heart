@@ -75,16 +75,16 @@ export function ScenePluginDock({
   }
 
   return (
-    <section className="rounded-[1.5rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(29,33,40,0.96),_rgba(15,18,24,0.98))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+    <section className="beats-console-panel rounded-[1.5rem] p-4 md:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="font-tomorrow text-[11px] tracking-[0.22em] text-[#7f8ea3] uppercase">
+          <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.22em] uppercase">
             Device Rack
           </p>
           <h2 className="font-tomorrow text-lg tracking-[0.14em] text-slate-100 uppercase">
             Configurable Plugins
           </h2>
-          <p className="text-sm text-[#a4b0c2]">
+          <p className="beats-console-copy text-sm leading-6">
             Tune the stream scene like a modular effects chain.
           </p>
         </div>
@@ -99,7 +99,7 @@ export function ScenePluginDock({
         </Button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-1 xl:overflow-visible">
+      <div className="flex snap-x gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-1 xl:overflow-visible">
         <PluginCard
           icon={<Orbit className="h-4 w-4" />}
           title="Motion"
@@ -272,7 +272,7 @@ export function ScenePluginDock({
           />
           <LabeledField label="Sensor">
             <select
-              className="h-9 w-full rounded-md border border-[#404754] bg-[#0c1015] px-3 text-sm text-[#e3edf7]"
+              className="beats-console-select"
               value={sceneConfig.telemetry.sensorId ?? ""}
               onChange={(event) =>
                 updateTelemetry({
@@ -290,7 +290,7 @@ export function ScenePluginDock({
           </LabeledField>
           <LabeledField label="Target">
             <select
-              className="h-9 w-full rounded-md border border-[#404754] bg-[#0c1015] px-3 text-sm text-[#e3edf7]"
+              className="beats-console-select"
               value={sceneConfig.telemetry.target}
               onChange={(event) =>
                 updateTelemetry({
@@ -315,9 +315,9 @@ export function ScenePluginDock({
         </PluginCard>
       </div>
 
-      <div className="mt-4 rounded-xl border border-[#3a414c] bg-[#0c1015] px-3 py-2 text-xs text-[#95a2b6]">
+      <div className="beats-console-card mt-4 rounded-xl px-3 py-2 text-xs text-[#95a2b6]">
         Reset returns the scene to the default dock profile from{" "}
-        <span className="font-mono text-[#e3edf7]">
+        <span className="beats-console-strong font-mono">
           {DEFAULT_SCENE_CONFIGURATION.motion.rotationY.toFixed(3)}
         </span>{" "}
         yaw speed, a visible grid, and telemetry-driven hover.
@@ -342,7 +342,7 @@ function PluginCard({
   tone: "amber" | "emerald" | "rose" | "sky" | "violet";
 }) {
   return (
-    <section className="relative min-w-[280px] flex-1 overflow-hidden rounded-[1.25rem] border border-[#3a414c] bg-[linear-gradient(180deg,_rgba(39,44,54,0.96),_rgba(20,23,30,0.98))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] xl:min-w-0">
+    <section className="beats-console-card-raised relative min-w-[280px] flex-1 snap-start overflow-hidden rounded-[1.25rem] p-4 xl:min-w-0">
       <div
         className={cn(
           "absolute inset-y-0 left-0 w-1.5",
@@ -354,7 +354,7 @@ function PluginCard({
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
             <span
               className={cn(
-                "rounded-[0.9rem] border border-white/8 p-2",
+                "rounded-[0.9rem] border border-white/8 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
                 toneClassNames[tone],
               )}
             >
@@ -362,9 +362,9 @@ function PluginCard({
             </span>
             {title}
           </div>
-          <p className="text-xs text-[#a4b0c2]">{description}</p>
+          <p className="beats-console-copy text-xs leading-5">{description}</p>
         </div>
-        <span className="font-tomorrow rounded-full border border-[#454d59] bg-[#0d1116] px-2 py-1 text-[10px] tracking-[0.2em] text-[#9ca9bb] uppercase">
+        <span className="beats-console-chip font-tomorrow rounded-full px-2 py-1 text-[10px] tracking-[0.2em] text-[#9ca9bb] uppercase">
           {stateLabel}
         </span>
       </div>
@@ -382,7 +382,7 @@ function LabeledField({
 }) {
   return (
     <label className="block space-y-2">
-      <span className="font-tomorrow text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
+      <span className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
         {label}
       </span>
       {children}
@@ -407,9 +407,9 @@ function RangeField({
 }) {
   return (
     <label className="block space-y-2">
-      <div className="font-tomorrow flex items-center justify-between gap-2 text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
+      <div className="beats-console-kicker font-tomorrow flex items-center justify-between gap-2 text-[10px] tracking-[0.2em] uppercase">
         <span>{label}</span>
-        <span className="rounded-md bg-[#0d1116] px-2 py-1 font-mono text-[#dce6f5]">
+        <span className="beats-console-chip rounded-md px-2 py-1 font-mono text-[#dce6f5]">
           {value.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2)}
         </span>
       </div>
@@ -420,7 +420,7 @@ function RangeField({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2 cursor-ew-resize border-[#404754] bg-[#0b0f14] px-0 py-0"
+        className="h-2 cursor-ew-resize border-white/10 bg-[#0b0f14] px-0 py-0"
       />
     </label>
   );
@@ -436,7 +436,7 @@ function BooleanField({
   value: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#404754] bg-[#10141a] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="beats-console-card flex items-center justify-between gap-3 rounded-xl px-3 py-2">
       <div>
         <div className="text-sm font-medium text-slate-100">{label}</div>
         <div className="text-xs text-[#8d9bb0]">
@@ -462,11 +462,11 @@ function BooleanField({
 }
 
 const toneClassNames = {
-  amber: "bg-amber-500/12 text-amber-300",
-  emerald: "bg-emerald-500/12 text-emerald-300",
-  rose: "bg-rose-500/12 text-rose-300",
-  sky: "bg-sky-500/12 text-sky-300",
-  violet: "bg-violet-500/12 text-violet-300",
+  amber: "bg-amber-500/12 text-amber-200",
+  emerald: "bg-emerald-500/12 text-emerald-200",
+  rose: "bg-rose-500/12 text-rose-200",
+  sky: "bg-sky-500/12 text-sky-200",
+  violet: "bg-violet-500/12 text-violet-200",
 };
 
 const toneMeterClassNames = {

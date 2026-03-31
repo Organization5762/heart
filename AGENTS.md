@@ -11,6 +11,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
+- Vite `.mts` configs that are shared with Storybook or other native-ESM tooling must derive `__dirname` via `fileURLToPath(new URL(".", import.meta.url))` instead of relying on the CommonJS global.
 
 ## Formatting
 
@@ -116,6 +117,18 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
 - `2026-03-31`: `cd experimental/beats && npm run test -- src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `rg -n "Sitemap|siteMap|usgc-ascii-map" experimental/beats/src/routes/index.tsx` returned no matches after removing the Beats home-page sitemap.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
+- `2026-03-31`: `cd experimental/beats && npm install`
+- `2026-03-31`: `cd experimental/beats && npm ci`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npx prettier --write .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx README.md package.json tsconfig.json vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npx eslint .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `cd experimental/beats && npm run build-storybook`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache .venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make test`
@@ -218,6 +231,7 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `experimental/beats: npm run lint`
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/tsc --noEmit`
 - `2026-03-31`: `experimental/beats: npm run test -- --passWithNoTests` (no Vitest files matched)
+- `2026-03-31`: No validation run after updating `experimental/beats/src/features/stream-console/scene-config.ts` to keep the Current Stream cube fixed by default and slightly increase the default camera distance; these were small config-only changes.
 - `2026-03-31`: `cd experimental/beats && npm ci` failed because `experimental/beats/package-lock.json` is out of sync with `package.json`.
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && npm run format:write`
@@ -225,6 +239,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm run lint` still fails because of pre-existing errors in `src/actions/ws/providers/PeripheralEventsProvider.tsx`, `src/actions/ws/providers/PeripheralProvider.tsx`, `src/components/ui/sidebar.tsx`, `src/hooks/use-mobile.ts`, and `src/layouts/base-layout.tsx`.
 - `2026-03-31`: `cd experimental/beats && npm run test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/generic_sensor.test.ts src/tests/unit/components/stream.test.tsx`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make test`
 - `2026-03-31`: `npm install` in `experimental/beats` to resync `package-lock.json` after `npm ci` failed because the lockfile was missing `protobufjs` and related transitive dependencies.
 - `2026-03-31`: `./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts` in `experimental/beats`
@@ -232,6 +250,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `./node_modules/.bin/prettier --check src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
 - `2026-03-31`: `npm run test -- src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
 - `2026-03-31`: `./node_modules/.bin/tsc --noEmit` in `experimental/beats` still fails because of pre-existing TypeScript issues in the app and its dependencies, including `@electron-forge/plugin-vite` types, the protobuf `?raw` import declaration, existing route typing drift, and unrelated component typing errors outside the new stream-console files.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/styles/global.css`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/sensor-simulation.test.ts`
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
@@ -272,6 +294,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx src/components/stream-footer-bar.tsx`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/stream.test.tsx`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache .venv/bin/pytest tests/device/test_beats_websocket.py tests/runtime/test_peripheral_runtime.py`
 - `2026-03-31`: `npm test -- --run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because `vitest` was not installed in that workspace (`node_modules` missing).
 - `2026-03-31`: `npm exec vitest run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because the workspace dependencies were not installed, so `@vitejs/plugin-react` could not be resolved from `vitest.config.ts`.

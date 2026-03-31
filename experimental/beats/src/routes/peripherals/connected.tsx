@@ -1,4 +1,5 @@
 import { PeripheralTree } from "@/actions/peripherals/peripheral_tree";
+import { PeripheralSensorDeck } from "@/components/peripheral-sensor-deck";
 import {
   PageFrame,
   PaperCard,
@@ -22,6 +23,7 @@ function RouteComponent() {
           aside={<SpecChip tone="muted">Input Variant / Mode</SpecChip>}
         />
       </PaperCard>
+      <PeripheralSensorDeck />
       <PeripheralTree hierarchy={[["input_variant", "mode"]]} />
     </PageFrame>
   );
