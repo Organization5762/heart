@@ -110,8 +110,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
-- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e808/heart/.uv-cache make format`
-- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e808/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache .venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make format`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format` after removing `BaseRenderer`, the `AtomicBaseRenderer.process()` compatibility path, and the unused renderer `warmup` flag.
