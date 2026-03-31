@@ -181,8 +181,14 @@
 }
 
 @layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
   body {
-    @apply overflow-hidden;
+    @apply overflow-x-hidden;
     background:
       linear-gradient(
         180deg,
@@ -294,7 +300,7 @@
 
 @layer components {
   .usgc-page {
-    @apply mx-auto flex h-full max-w-[1680px] flex-col gap-6 px-2 pt-4 pb-6 md:px-4 lg:px-6;
+    @apply mx-auto flex min-h-full max-w-[1680px] flex-col gap-6 px-2 pt-4 pb-6 md:px-4 lg:px-6;
   }
 
   .usgc-card {

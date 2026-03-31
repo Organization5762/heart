@@ -41,7 +41,7 @@ export function Stream() {
   const activeFps = isActive ? fps : 0;
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#11151b,_#090b0f)] p-4 text-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.45)] select-none">
+    <div className="flex min-h-full flex-col gap-4 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#11151b,_#090b0f)] p-4 text-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.45)] select-none">
       <StreamConsoleHeader
         clockSeconds={clockSeconds}
         isActive={isActive}
@@ -50,7 +50,7 @@ export function Stream() {
       />
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,420px)]">
-        <section className="flex min-h-0 flex-col gap-4">
+        <section className="flex min-h-0 min-w-0 flex-col gap-4">
           <StreamVisualMixerPanel
             clockSeconds={clockSeconds}
             fps={activeFps}
@@ -93,7 +93,7 @@ export function Stream() {
           />
         </section>
 
-        <aside className="hidden min-h-0 xl:flex xl:flex-col xl:gap-4">
+        <aside className="hidden min-h-0 min-w-0 xl:flex xl:flex-col xl:gap-4">
           <ScenePluginDock
             sceneConfig={sceneConfig}
             sensorOptions={resolvedSensors.map((sensor) => ({

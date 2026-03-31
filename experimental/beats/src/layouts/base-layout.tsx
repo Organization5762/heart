@@ -36,8 +36,10 @@ export default function BaseLayout({
         </div>
       </div>
       <AppSidebar />
-      <SidebarInset className="mt-[38px]">
-        <div className="h-full overflow-y-auto">{children}</div>
+      <SidebarInset className="h-svh min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col pt-[38px]">
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
