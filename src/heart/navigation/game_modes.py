@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -145,20 +144,6 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         super().__init__()
         self._initialization_context: GameModeInitializationContext | None = None
         self._renderer_resolver = renderer_resolver
-        # TODO: Fix this wonkiness
-        self.device_display_mode = None
-
-    def _internal_device_display_mode(self) -> DeviceDisplayMode:
-        renderers = [
-            *[entry.renderer for entry in self.state.entries],
-            *[entry.title_renderer for entry in self.state.entries],
-        ]
-        if any(
-            renderer.device_display_mode == DeviceDisplayMode.OPENGL
-            for renderer in renderers
-        ):
-            return DeviceDisplayMode.OPENGL
-        return DeviceDisplayMode.FULL
 
     def _create_initial_state(
         self,

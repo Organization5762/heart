@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import time
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, final
+from typing import Any, Generic, TypeVar
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
-
-if TYPE_CHECKING:
-    from heart.renderers.stateful import StatefulBaseRenderer
 
 logger = get_logger(__name__)
 
@@ -28,10 +25,6 @@ class AtomicBaseRenderer(Generic[StateT]):
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
     @property
-    def _internal_device_display_mode(self) -> DeviceDisplayMode:
-        return self.device_display_mode
-
-    @property
     def state(self) -> StateT:
         assert self._state is not None
         return self._state
@@ -43,33 +36,28 @@ class AtomicBaseRenderer(Generic[StateT]):
         assert self._state is not None
         self._state = replace(self._state, **changes)
 
-    def mutate_state(self, mutator: Callable[[StateT], StateT]) -> None:
-        assert self._state is not None
-        self._state = mutator(self._state)
-
     @property
-    def name(self):
+    def name(self) -> str:
         return self.__class__.__name__
 
     def is_initialized(self) -> bool:
         return self.initialized
 
-    def get_renderers(self) -> list["StatefulBaseRenderer[StateT]"]:
-        return self._real_get_renderers()
-
-    def _real_get_renderers(self) -> list["StatefulBaseRenderer[StateT]"]:
+    def get_renderers(self) -> list["AtomicBaseRenderer[StateT]"]:
         return [self]
 
-    @final
     def process(
         self,
         window: DisplayContext,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
         *args: Any,
+        orientation: Orientation | None = None,
         **kwargs: Any,
     ) -> None:
-        return self.real_process(window=window, orientation=orientation)
+        resolved_orientation = self._resolve_orientation(
+            args=args,
+            orientation=orientation,
+        )
+        self._invoke_real_process(window=window, orientation=resolved_orientation)
 
     def real_process(
         self,
@@ -78,27 +66,52 @@ class AtomicBaseRenderer(Generic[StateT]):
     ) -> None:
         raise NotImplementedError("Please implement")
 
-    @final
     def _internal_process(
         self,
         window: DisplayContext,
-        peripheral_manager: PeripheralManager,
-        orientation: Orientation,
-    ) -> None:
-        return self._real_internal_process(
-            window=window,
-            orientation=orientation,
-        )
-
-    def _real_internal_process(
-        self,
-        window: DisplayContext,
-        orientation: Orientation,
+        peripheral_manager: PeripheralManager | None = None,
+        orientation: Orientation | None = None,
+        *args: Any,
     ) -> None:
         if not self.is_initialized():
             raise ValueError("Needs to be initialized")
 
+        resolved_orientation = self._resolve_orientation(
+            args=args,
+            orientation=orientation,
+        )
         start_ns = time.perf_counter_ns()
+        self._invoke_real_process(window=window, orientation=resolved_orientation)
+        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+        logger.debug(
+            "renderer.frame",
+            extra={
+                "renderer": self.name,
+                "duration_ms": duration_ms,
+            },
+        )
+
+    def reset(self):
+        pass
+
+    @staticmethod
+    def _resolve_orientation(
+        *,
+        args: tuple[Any, ...],
+        orientation: Orientation | None,
+    ) -> Orientation:
+        if orientation is not None:
+            return orientation
+        if not args:
+            raise TypeError("orientation is required")
+        return args[-1]
+
+    def _invoke_real_process(
+        self,
+        *,
+        window: DisplayContext,
+        orientation: Orientation,
+    ) -> None:
         try:
             self.real_process(window=window, orientation=orientation)
         except TypeError as exc:
@@ -120,14 +133,3 @@ class AtomicBaseRenderer(Generic[StateT]):
                     clock=None,
                     orientation=orientation,
                 )
-        duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
-        logger.debug(
-            "renderer.frame",
-            extra={
-                "renderer": self.name,
-                "duration_ms": duration_ms,
-            },
-        )
-
-    def reset(self):
-        pass

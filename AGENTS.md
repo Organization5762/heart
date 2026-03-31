@@ -108,6 +108,8 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make test`
 - `2026-03-30`: `cargo check` in `rust/heart_rust`
 - `2026-03-30`: `make format`
 - `2026-03-30`: `make test`

@@ -8,11 +8,6 @@ RendererT = TypeVar("RendererT", bound=StatefulBaseRenderer)
 RendererSpec = StatefulBaseRenderer | type[StatefulBaseRenderer]
 
 
-class RendererFactory(Protocol[RendererT]):
-    def __call__(self) -> RendererT:
-        """Instantiate a renderer."""
-
-
 class RendererResolver(Protocol):
     def resolve(self, dependency: type[RendererT]) -> RendererT:
         """Resolve renderer instances from the shared container."""
