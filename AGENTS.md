@@ -268,6 +268,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx src/components/stream-footer-bar.tsx`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/stream.test.tsx`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache .venv/bin/pytest tests/device/test_beats_websocket.py tests/runtime/test_peripheral_runtime.py`
 - `2026-03-31`: `npm test -- --run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because `vitest` was not installed in that workspace (`node_modules` missing).
 - `2026-03-31`: `npm exec vitest run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because the workspace dependencies were not installed, so `@vitejs/plugin-react` could not be resolved from `vitest.config.ts`.
