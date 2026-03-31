@@ -3,20 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+from typing import Final
 
-from ._heart_rust import NativeMatrixDriver, NativeMatrixStats
+from PIL import Image
 
+from ._heart_rust import ColorOrder, NativeMatrixDriver, NativeMatrixStats, WiringProfile
 
-class WiringProfile(StrEnum):
-    AdafruitHatPwm = "adafruit_hat_pwm"
-    AdafruitHat = "adafruit_hat"
-    AdafruitTripleHat = "adafruit_triple_hat"
-
-
-class ColorOrder(StrEnum):
-    RGB = "rgb"
-    GBR = "gbr"
+RGBA_IMAGE_FORMAT: Final[str] = "RGBA"
 
 
 @dataclass(frozen=True)
@@ -50,15 +43,34 @@ class MatrixStats:
         )
 
 
+class FrameCanvas:
+    """Offscreen canvas compatible with the common rgbmatrix Python calling shape."""
+
+    def __init__(self, width: int, height: int) -> None:
+        self._width = width
+        self._height = height
+        self._image = Image.new(RGBA_IMAGE_FORMAT, (width, height), (0, 0, 0, 255))
+
+    def Clear(self) -> None:
+        self._image.paste((0, 0, 0, 255), (0, 0, self._width, self._height))
+
+    def SetImage(self, image: Image.Image, offset_x: int, offset_y: int) -> None:
+        converted_image = image.convert(RGBA_IMAGE_FORMAT)
+        self._image.paste(converted_image, (offset_x, offset_y), converted_image)
+
+    def rgba_bytes(self) -> bytes:
+        return self._image.tobytes()
+
+
 class MatrixDriver:
     def __init__(self, config: MatrixConfig) -> None:
         self._driver = NativeMatrixDriver(
-            config.wiring.value,
+            config.wiring,
             config.panel_rows,
             config.panel_cols,
             config.chain_length,
             config.parallel,
-            config.color_order.value,
+            config.color_order,
         )
 
     @property
@@ -74,6 +86,13 @@ class MatrixDriver:
 
     def clear(self) -> None:
         self._driver.clear()
+
+    def CreateFrameCanvas(self) -> FrameCanvas:
+        return FrameCanvas(self.width, self.height)
+
+    def SwapOnVSync(self, frame_canvas: FrameCanvas) -> FrameCanvas:
+        self.submit_rgba(frame_canvas.rgba_bytes(), self.width, self.height)
+        return frame_canvas
 
     def stats(self) -> MatrixStats:
         return MatrixStats.from_native(self._driver.stats())

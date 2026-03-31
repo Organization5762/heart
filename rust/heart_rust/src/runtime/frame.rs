@@ -3,9 +3,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use rayon::prelude::*;
 
 use super::config::ColorOrder;
+use super::tuning::runtime_tuning;
 
-const PARALLEL_COLOR_REMAP_THRESHOLD_BYTES: usize = 16_384;
-pub(crate) const FRAME_POOL_SIZE: usize = super::queue::MAX_PENDING_FRAMES + 1;
 static NEXT_FRAME_BUFFER_ID: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Debug)]
@@ -88,7 +87,7 @@ impl FrameBufferPool {
 }
 
 fn copy_with_gbr_remap(destination: &mut [u8], source: &[u8]) {
-    if source.len() >= PARALLEL_COLOR_REMAP_THRESHOLD_BYTES {
+    if source.len() >= runtime_tuning().parallel_color_remap_threshold_bytes {
         destination
             .par_chunks_exact_mut(4)
             .zip(source.par_chunks_exact(4))

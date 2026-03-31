@@ -3,14 +3,134 @@ mod runtime;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
+#[cfg(feature = "stubgen")]
 use pyo3_stub_gen::define_stub_info_gatherer;
+#[cfg(feature = "stubgen")]
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyfunction, gen_stub_pymethods};
 
 use crate::runtime::{
-    MatrixDriverCore, MatrixDriverError, MatrixStatsCore, SceneManagerCore, SceneSnapshotCore,
+    ColorOrder, MatrixDriverCore, MatrixDriverError, MatrixStatsCore, SceneManagerCore,
+    SceneSnapshotCore, WiringProfile,
 };
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stubgen", gen_stub_pyclass)]
+#[pyclass(
+    eq,
+    frozen,
+    from_py_object,
+    module = "heart_rust",
+    name = "ColorOrder"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeColorOrder {
+    inner: ColorOrder,
+}
+
+impl From<NativeColorOrder> for ColorOrder {
+    fn from(value: NativeColorOrder) -> Self {
+        value.inner
+    }
+}
+
+#[cfg_attr(feature = "stubgen", gen_stub_pymethods)]
+#[pymethods]
+#[allow(non_snake_case)]
+impl NativeColorOrder {
+    #[classattr]
+    fn RGB() -> NativeColorOrder {
+        NativeColorOrder {
+            inner: ColorOrder::Rgb,
+        }
+    }
+
+    #[classattr]
+    fn GBR() -> NativeColorOrder {
+        NativeColorOrder {
+            inner: ColorOrder::Gbr,
+        }
+    }
+
+    #[getter]
+    fn value(&self) -> &'static str {
+        match self.inner {
+            ColorOrder::Rgb => "rgb",
+            ColorOrder::Gbr => "gbr",
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            ColorOrder::Rgb => "ColorOrder.RGB".to_string(),
+            ColorOrder::Gbr => "ColorOrder.GBR".to_string(),
+        }
+    }
+}
+
+#[cfg_attr(feature = "stubgen", gen_stub_pyclass)]
+#[pyclass(
+    eq,
+    frozen,
+    from_py_object,
+    module = "heart_rust",
+    name = "WiringProfile"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeWiringProfile {
+    inner: WiringProfile,
+}
+
+impl From<NativeWiringProfile> for WiringProfile {
+    fn from(value: NativeWiringProfile) -> Self {
+        value.inner
+    }
+}
+
+#[cfg_attr(feature = "stubgen", gen_stub_pymethods)]
+#[pymethods]
+#[allow(non_snake_case)]
+impl NativeWiringProfile {
+    #[classattr]
+    fn AdafruitHatPwm() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::AdafruitHatPwm,
+        }
+    }
+
+    #[classattr]
+    fn AdafruitHat() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::AdafruitHat,
+        }
+    }
+
+    #[classattr]
+    fn AdafruitTripleHat() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::AdafruitTripleHat,
+        }
+    }
+
+    #[getter]
+    fn value(&self) -> &'static str {
+        match self.inner {
+            WiringProfile::AdafruitHatPwm => "adafruit_hat_pwm",
+            WiringProfile::AdafruitHat => "adafruit_hat",
+            WiringProfile::AdafruitTripleHat => "adafruit_triple_hat",
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        match self.inner {
+            WiringProfile::AdafruitHatPwm => "WiringProfile.AdafruitHatPwm".to_string(),
+            WiringProfile::AdafruitHat => "WiringProfile.AdafruitHat".to_string(),
+            WiringProfile::AdafruitTripleHat => {
+                "WiringProfile.AdafruitTripleHat".to_string()
+            }
+        }
+    }
+}
+
+#[cfg_attr(feature = "stubgen", gen_stub_pyclass)]
 #[pyclass(module = "heart_rust", skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct NativeMatrixStats {
@@ -48,7 +168,7 @@ fn map_matrix_runtime_error(error: MatrixDriverError) -> PyErr {
     }
 }
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stubgen", gen_stub_pyclass)]
 #[pyclass(module = "heart_rust", skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct SceneSnapshot {
@@ -76,14 +196,14 @@ impl From<SceneSnapshotCore> for SceneSnapshot {
     }
 }
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stubgen", gen_stub_pyclass)]
 #[pyclass(module = "heart_rust", skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct SceneManagerBridge {
     core: SceneManagerCore,
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stubgen", gen_stub_pymethods)]
 #[pymethods]
 impl SceneManagerBridge {
     #[new]
@@ -132,22 +252,22 @@ impl NativeMatrixDriver {
     #[new]
     fn new(
         py: Python<'_>,
-        wiring: String,
+        wiring: NativeWiringProfile,
         panel_rows: u16,
         panel_cols: u16,
         chain_length: u16,
         parallel: u8,
-        color_order: String,
+        color_order: NativeColorOrder,
     ) -> PyResult<Self> {
         let core = py
             .detach(move || {
                 MatrixDriverCore::new(
-                    wiring,
+                    wiring.into(),
                     panel_rows,
                     panel_cols,
                     chain_length,
                     parallel,
-                    color_order,
+                    color_order.into(),
                 )
             })
             .map_err(map_matrix_runtime_error)?;
@@ -186,7 +306,7 @@ impl NativeMatrixDriver {
     }
 }
 
-#[gen_stub_pyfunction]
+#[cfg_attr(feature = "stubgen", gen_stub_pyfunction)]
 #[pyfunction]
 fn bridge_version() -> &'static str {
     runtime::MATRIX_RUNTIME_VERSION
@@ -195,12 +315,15 @@ fn bridge_version() -> &'static str {
 #[pymodule]
 #[pyo3(name = "_heart_rust")]
 fn heart_rust(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<NativeColorOrder>()?;
     module.add_class::<NativeMatrixDriver>()?;
     module.add_class::<NativeMatrixStats>()?;
+    module.add_class::<NativeWiringProfile>()?;
     module.add_class::<SceneManagerBridge>()?;
     module.add_class::<SceneSnapshot>()?;
     module.add_function(wrap_pyfunction!(bridge_version, module)?)?;
     Ok(())
 }
 
+#[cfg(feature = "stubgen")]
 define_stub_info_gatherer!(stub_info);

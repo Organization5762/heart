@@ -11,7 +11,6 @@
 - `rust/heart_rust/src/runtime/scene.rs`
 - `rust/heart_rust/src/runtime/stats.rs`
 - `rust/heart_rust/bench/matrix_transfer.rs`
-- `rust/heart_rust/bench/pi5_pio_bench.rs`
 - `rust/heart_rust/bench/pi5_scan_bench.rs`
 - `rust/heart_rust/native/pi5_pio_scan_shim.c`
 - `rust/heart_rust/src/runtime/pi5_scan.rs`
@@ -532,13 +531,13 @@ Piomatter reference decisions:
 
 Current implementation status in Heart:
 
-- `rust/heart_rust/src/runtime/pi5_dma.rs` now pre-packs `RGBA` frames into a plane-major HUB75 transport buffer for `parallel=1`.
-- `rust/heart_rust/native/pi5_pio_shim.c` opens `libpio`, claims a Pi 5 state machine, and streams those packed bytes through a DMA-backed `PIO` transfer path on real hardware.
 - `rust/heart_rust/src/runtime/pi5_scan.rs` now builds the production Pi 5 scan schedule for `parallel=1`, including row-address stepping, `LAT`, `OE`, PWM dwell scheduling, and continuous scan looping against the active frame buffer.
+- The packed scan format now uses compact row-pair / bitplane groups so the host sends one blank row word, one pixel-count word, width pixel words, one latch word, one active row word, and one dwell counter word per group instead of a longer command stream.
 - `rust/heart_rust/native/pi5_pio_scan_shim.c` now drives that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
-- `rust/heart_rust/bench/pi5_pio_bench.rs` and `rust/heart_rust/bench/matrix_transfer.rs` continue to benchmark the transport-only path for `64x64` single-panel and four-panel chain layouts.
-- `rust/heart_rust/bench/pi5_scan_bench.rs` benchmarks the full visible scan path for the production Pi 5 scheduler.
-- The current production Pi 5 scan transport is functional, but it is not yet the intended DMA-fed end state. The state machine runs the correct scan schedule, while the host currently feeds the `PIO` FIFO synchronously because `rp1-pio` rejected `pio_sm_config_xfer()` for this wider scan-program configuration during bring-up.
+- The async transport now keeps a resident packed scan buffer active on the Pi 5 path and continuously replays it until a newer packed frame arrives, so unchanged images can continue refreshing without repeated repacking or resubmission from Heart.
+- `rust/heart_rust/bench/pi5_scan_bench.rs` benchmarks the production Pi 5 scan path and reports both transport timings and derived scan-schedule metrics.
+- The current production Pi 5 scan transport is DMA-fed through the raw `rp1-pio` ioctl path, but the measured `stream` timing still tracks submission and drain completion more directly than visible panel dwell.
+- Because the Adafruit bonnet pin map is sparse, the compact format reduces per-group control overhead more than per-column payload size; the current production win is lower command overhead, not a radical reduction in pixel-shift bytes.
 
 ### Integration With Heart
 

@@ -1,1 +1,1 @@
-Utility scripts for managing Heart deployments. Use these helpers to install external display drivers, update dependencies, and run maintenance tasks on target hardware.
+Utility scripts for managing Heart deployments. Use these helpers to install external display drivers, register the Pi 5 scan loop kernel module through DKMS, update dependencies, and run maintenance tasks on target hardware.

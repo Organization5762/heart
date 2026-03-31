@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 
-use super::frame::{FrameBuffer, FrameBufferPool, FRAME_POOL_SIZE};
+use super::frame::{FrameBuffer, FrameBufferPool};
 use super::stats::{MatrixStatsCore, WorkerStats};
-
-pub(crate) const MAX_PENDING_FRAMES: usize = 2;
+use super::tuning::{frame_pool_size, runtime_tuning};
 
 #[derive(Debug)]
 pub(crate) struct WorkerState {
@@ -16,11 +15,12 @@ pub(crate) struct WorkerState {
 
 impl WorkerState {
     pub(crate) fn new(frame_len: usize) -> Self {
+        let max_pending_frames = runtime_tuning().matrix_max_pending_frames;
         Self {
             active_frame: None,
-            pending_frames: VecDeque::with_capacity(MAX_PENDING_FRAMES),
+            pending_frames: VecDeque::with_capacity(max_pending_frames),
             stats: WorkerStats::new(),
-            frame_pool: FrameBufferPool::new(frame_len, FRAME_POOL_SIZE),
+            frame_pool: FrameBufferPool::new(frame_len, frame_pool_size()),
             closed: false,
         }
     }
@@ -34,7 +34,7 @@ impl WorkerState {
     }
 
     pub(crate) fn submit_frame(&mut self, frame: FrameBuffer) {
-        if self.pending_frames.len() == MAX_PENDING_FRAMES {
+        if self.pending_frames.len() == runtime_tuning().matrix_max_pending_frames {
             if let Some(dropped_frame) = self.pending_frames.pop_front() {
                 self.recycle_frame(dropped_frame);
                 self.stats.record_drop();

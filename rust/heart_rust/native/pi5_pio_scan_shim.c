@@ -10,21 +10,37 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+/*
+ * This shim is the "honest baseline" transport for Pi 5 scanout:
+ * userspace opens one RP1 PIO state machine, loads the shared 31-instruction
+ * parser, and then submits entire packed frames through the stock rp1-pio
+ * ioctls. It intentionally mirrors the kernel resident-loop parser so the two
+ * backends can be compared without protocol differences.
+ *
+ * This file is therefore maintained with two priorities:
+ *   1. keep behavior explicit and easy to measure
+ *   2. keep its parser/protocol contract aligned with the resident-loop path
+ *
+ * It is not trying to hide transport costs. In particular, submit and drain
+ * are separate observable operations because benchmarking needs to distinguish
+ * "frame was accepted for transfer" from "TX path consumed the submitted data."
+ */
+
 #define HEART_PI5_PIO_SCAN_DEVICE "/dev/pio0"
-#define HEART_PI5_PIO_SCAN_MAX_TRANSFER_BYTES 65532u
-#define HEART_PI5_PIO_SCAN_PROGRAM_LENGTH 9
-#define HEART_PI5_PIO_SCAN_OUTPUT_PIN_BASE 0u
-#define HEART_PI5_PIO_SCAN_OUTPUT_PIN_COUNT 28u
-#define HEART_PI5_PIO_SCAN_WORD_PIN_COUNT 32u
+#define HEART_PI5_PIO_SCAN_PROGRAM_LENGTH 31
+#define HEART_PI5_PIO_SCAN_OUTPUT_PIN_BASE 5u
+#define HEART_PI5_PIO_SCAN_OUTPUT_PIN_COUNT 23u
+#define HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS 32u
+#define HEART_PI5_PIO_SCAN_PIN_WORD_BITS 23u
 
 struct heart_pi5_pio_scan_handle {
     PIO pio;
     int sm;
+    /* Raw /dev/pio0 fd used for CONFIG_XFER, XFER_DATA, and DRAIN_TX ioctls. */
     int ioctl_fd;
     uint32_t oe_gpio;
     uint32_t lat_gpio;
     uint32_t clock_gpio;
-    uint32_t dma_buffer_size;
     uint program_offset;
     uint16_t instructions[HEART_PI5_PIO_SCAN_PROGRAM_LENGTH];
     pio_program_t program;
@@ -57,6 +73,14 @@ static void heart_pi5_pio_scan_release(struct heart_pi5_pio_scan_handle *handle)
         return;
     }
 
+    /*
+     * Teardown mirrors open(): stop the SM, release GPIO ownership, close the
+     * raw ioctl fd, then drop the PIOLib PIO handle.
+     *
+     * The order matters for auditability. The raw ioctl fd is not useful once
+     * the PIO program and pin ownership are gone, and pio_close() must be last
+     * because it owns the remaining PIOLib context.
+     */
     pio_select(handle->pio);
     pio_sm_set_enabled(handle->pio, (uint)handle->sm, false);
     pio_sm_unclaim(handle->pio, (uint)handle->sm);
@@ -84,6 +108,9 @@ int heart_pi5_pio_scan_open(
     uint32_t lat_gpio,
     uint32_t clock_gpio,
     float clock_divider,
+    uint32_t post_addr_ticks,
+    uint32_t latch_ticks,
+    uint32_t post_latch_ticks,
     uint32_t dma_buffer_size,
     uint32_t dma_buffer_count,
     struct heart_pi5_pio_scan_handle **out_handle,
@@ -104,6 +131,10 @@ int heart_pi5_pio_scan_open(
         heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "PIO scan transport requires non-zero DMA buffering.");
         return -2;
     }
+    if (post_addr_ticks == 0 || post_addr_ticks > 32 || latch_ticks == 0 || latch_ticks > 32 || post_latch_ticks == 0 || post_latch_ticks > 32) {
+        heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "PIO scan transport timing ticks must be in the range 1..32.");
+        return -2;
+    }
     if (pio_init() < 0) {
         heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "pio_init failed.");
         return -3;
@@ -116,6 +147,15 @@ int heart_pi5_pio_scan_open(
     }
     pio_select(pio);
 
+    /*
+     * This path still uses PIOLib for program loading and state-machine setup,
+     * because it is the least fragile way to establish pin ownership on Pi 5.
+     * The data path itself bypasses PIOLib and goes straight to the rp1-pio
+     * ioctls below so submit/wait behavior is explicit and measurable.
+     *
+     * Said differently: PIOLib is used for control-plane setup, not for the
+     * steady-state transport benchmark.
+     */
     sm = pio_claim_unused_sm(pio, true);
     if (sm < 0) {
         pio_close(pio);
@@ -136,16 +176,65 @@ int heart_pi5_pio_scan_open(
     handle->oe_gpio = oe_gpio;
     handle->lat_gpio = lat_gpio;
     handle->clock_gpio = clock_gpio;
-    handle->dma_buffer_size = dma_buffer_size;
-    handle->instructions[0] = (uint16_t)pio_encode_out(pio_x, 1);
-    handle->instructions[1] = (uint16_t)pio_encode_out(pio_y, 31);
-    handle->instructions[2] = (uint16_t)pio_encode_jmp_not_x(6);
-    handle->instructions[3] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_WORD_PIN_COUNT) | pio_encode_sideset_opt(1, 0));
-    handle->instructions[4] = (uint16_t)(pio_encode_jmp_y_dec(3) | pio_encode_sideset_opt(1, 1));
-    handle->instructions[5] = (uint16_t)pio_encode_jmp(0);
-    handle->instructions[6] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_WORD_PIN_COUNT) | pio_encode_sideset_opt(1, 0));
-    handle->instructions[7] = (uint16_t)pio_encode_jmp_y_dec(6);
-    handle->instructions[8] = (uint16_t)pio_encode_jmp(0);
+    /*
+     * The userspace transport and the kernel resident loop share the same
+     * 31-instruction parser. The Rust packer emits:
+     *   - one blank/address word
+     *   - zero or more spans:
+     *       * blank span: 0, span_len
+     *       * data span: span_len, packed 23-bit GPIO words
+     *   - a double-zero terminator
+     *   - latch word
+     *   - active-output word
+     *   - dwell counter
+     *
+     * Keeping the parser identical across both backends lets us benchmark the
+     * same packed frame format against raw rp1-pio DMA and the custom resident
+     * loop without changing the Rust side.
+     *
+     * If this parser changes, maintainers should assume the kernel resident
+     * loop parser needs the same update unless the change is explicitly called
+     * out as a format fork.
+     *
+     * Instruction layout:
+     *   0..3   load/capture the row-addressed blank word
+     *   4..10  parse either a blank span or a packed data span
+     *   11..18 continue packed data spans via autopull
+     *   19..22 emit latch and post-latch blank words
+     *   23..29 emit active output, dwell, and final blank
+     *   30     wrap to the next group
+     */
+    handle->instructions[0] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[1] = (uint16_t)pio_encode_mov(pio_isr, pio_osr);
+    handle->instructions[2] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
+    handle->instructions[3] = (uint16_t)(pio_encode_nop() | pio_encode_delay(post_addr_ticks - 1));
+    handle->instructions[4] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[5] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
+    handle->instructions[6] = (uint16_t)pio_encode_jmp_x_dec(8);
+    handle->instructions[7] = (uint16_t)pio_encode_jmp(11);
+    handle->instructions[8] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_sideset_opt(1, 0));
+    handle->instructions[9] = (uint16_t)(pio_encode_jmp_x_dec(8) | pio_encode_sideset_opt(1, 1));
+    handle->instructions[10] = (uint16_t)pio_encode_jmp(4);
+    handle->instructions[11] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[12] = (uint16_t)pio_encode_out(pio_x, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
+    handle->instructions[13] = (uint16_t)pio_encode_jmp_x_dec(15);
+    handle->instructions[14] = (uint16_t)pio_encode_jmp(19);
+    handle->instructions[15] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
+    handle->instructions[16] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_sideset_opt(1, 0));
+    handle->instructions[17] = (uint16_t)(pio_encode_jmp_x_dec(15) | pio_encode_sideset_opt(1, 1));
+    handle->instructions[18] = (uint16_t)pio_encode_jmp(4);
+    handle->instructions[19] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[20] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_delay(latch_ticks - 1));
+    handle->instructions[21] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
+    handle->instructions[22] = (uint16_t)(pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS) | pio_encode_delay(post_latch_ticks - 1));
+    handle->instructions[23] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[24] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
+    handle->instructions[25] = (uint16_t)pio_encode_pull(false, true);
+    handle->instructions[26] = (uint16_t)pio_encode_out(pio_y, HEART_PI5_PIO_SCAN_CONTROL_WORD_BITS);
+    handle->instructions[27] = (uint16_t)pio_encode_jmp_y_dec(27);
+    handle->instructions[28] = (uint16_t)pio_encode_mov(pio_osr, pio_isr);
+    handle->instructions[29] = (uint16_t)pio_encode_out(pio_pins, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
+    handle->instructions[30] = (uint16_t)pio_encode_jmp(0);
     handle->program.instructions = handle->instructions;
     handle->program.length = HEART_PI5_PIO_SCAN_PROGRAM_LENGTH;
     handle->program.origin = -1;
@@ -160,7 +249,7 @@ int heart_pi5_pio_scan_open(
     config = pio_get_default_sm_config();
     sm_config_set_wrap(&config, handle->program_offset, handle->program_offset + HEART_PI5_PIO_SCAN_PROGRAM_LENGTH - 1);
     sm_config_set_sideset(&config, 2, true, false);
-    sm_config_set_out_shift(&config, false, true, 32);
+    sm_config_set_out_shift(&config, false, true, HEART_PI5_PIO_SCAN_PIN_WORD_BITS);
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
     sm_config_set_clkdiv(&config, clock_divider);
     sm_config_set_out_pins(&config, HEART_PI5_PIO_SCAN_OUTPUT_PIN_BASE, HEART_PI5_PIO_SCAN_OUTPUT_PIN_COUNT);
@@ -183,6 +272,15 @@ int heart_pi5_pio_scan_open(
         heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "Failed to open /dev/pio0 for raw scan DMA ioctls.");
         return -8;
     }
+    /*
+     * CONFIG_XFER programs the rp1-pio side DMA ring that backs XFER_DATA. The
+     * packed scan protocol is independent of this buffer sizing; these values
+     * only affect how the kernel moves one submitted frame into the FIFO path.
+     *
+     * This distinction matters when reading benchmarks: changing buffer sizing
+     * may alter transport throughput without implying any change in the packed
+     * protocol or the scan program itself.
+     */
     int config_xfer_result;
     if (dma_buffer_size <= UINT16_MAX && dma_buffer_count <= UINT16_MAX) {
         struct rp1_pio_sm_config_xfer_args args;
@@ -223,72 +321,98 @@ int heart_pi5_pio_scan_open(
     return 0;
 }
 
-int heart_pi5_pio_scan_stream(
+int heart_pi5_pio_scan_submit(
     struct heart_pi5_pio_scan_handle *handle,
     const uint8_t *data,
     uint32_t data_bytes,
     char *error_buf,
     size_t error_buf_len
 ) {
-    uint32_t remaining_bytes;
-    const uint8_t *cursor;
-
     if (handle == NULL || data == NULL) {
         heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "PIO scan transport handle and data are required.");
         return -1;
     }
 
     pio_select(handle->pio);
-    remaining_bytes = data_bytes;
-    cursor = data;
-    while (remaining_bytes > 0) {
-        uint32_t transfer_bytes = remaining_bytes;
-        uint32_t max_transfer_bytes = handle->dma_buffer_size;
-        if (max_transfer_bytes > HEART_PI5_PIO_SCAN_MAX_TRANSFER_BYTES) {
-            max_transfer_bytes = HEART_PI5_PIO_SCAN_MAX_TRANSFER_BYTES;
-        }
-        if (transfer_bytes > max_transfer_bytes) {
-            transfer_bytes = max_transfer_bytes;
-        }
-        int transfer_result;
-        if (transfer_bytes <= UINT16_MAX) {
-            struct rp1_pio_sm_xfer_data_args args;
-            memset(&args, 0, sizeof(args));
-            args.sm = (uint16_t)handle->sm;
-            args.dir = RP1_PIO_DIR_TO_SM;
-            args.data_bytes = (uint16_t)transfer_bytes;
-            args.data = (void *)cursor;
-            errno = 0;
-            transfer_result = ioctl(handle->ioctl_fd, PIO_IOC_SM_XFER_DATA, &args);
-        } else {
-            struct rp1_pio_sm_xfer_data32_args args;
-            memset(&args, 0, sizeof(args));
-            args.sm = (uint16_t)handle->sm;
-            args.dir = RP1_PIO_DIR_TO_SM;
-            args.data_bytes = transfer_bytes;
-            args.data = (void *)cursor;
-            errno = 0;
-            transfer_result = ioctl(handle->ioctl_fd, PIO_IOC_SM_XFER_DATA32, &args);
-        }
-        if (transfer_result < 0) {
-            int saved_errno = errno;
-            snprintf(
-                error_buf,
-                error_buf_len,
-                "PIO scan DMA transfer submission failed (code=%d, errno=%d, bytes=%u).",
-                transfer_result,
-                saved_errno,
-                transfer_bytes
-            );
-            return -2;
-        }
-        struct rp1_pio_sm_clear_fifos_args drain_args;
-        memset(&drain_args, 0, sizeof(drain_args));
-        drain_args.sm = (uint16_t)handle->sm;
-        ioctl(handle->ioctl_fd, PIO_IOC_SM_DRAIN_TX, &drain_args);
-        remaining_bytes -= transfer_bytes;
-        cursor += transfer_bytes;
+    int transfer_result;
+    /*
+     * The whole packed frame is submitted with a single ioctl. This keeps the
+     * transport cost easy to compare against the resident-loop backend: one
+     * submit to hand the buffer to rp1-pio, one wait to block until the TX path
+     * drains the frame.
+     *
+     * Nothing in this shim re-chunks the frame. If the packed payload is
+     * 43,936 words, that exact byte range is what rp1-pio sees here.
+     */
+    if (data_bytes <= UINT16_MAX) {
+        struct rp1_pio_sm_xfer_data_args args;
+        memset(&args, 0, sizeof(args));
+        args.sm = (uint16_t)handle->sm;
+        args.dir = RP1_PIO_DIR_TO_SM;
+        args.data_bytes = (uint16_t)data_bytes;
+        args.data = (void *)data;
+        errno = 0;
+        transfer_result = ioctl(handle->ioctl_fd, PIO_IOC_SM_XFER_DATA, &args);
+    } else {
+        struct rp1_pio_sm_xfer_data32_args args;
+        memset(&args, 0, sizeof(args));
+        args.sm = (uint16_t)handle->sm;
+        args.dir = RP1_PIO_DIR_TO_SM;
+        args.data_bytes = data_bytes;
+        args.data = (void *)data;
+        errno = 0;
+        transfer_result = ioctl(handle->ioctl_fd, PIO_IOC_SM_XFER_DATA32, &args);
     }
+    if (transfer_result < 0) {
+        int saved_errno = errno;
+        snprintf(
+            error_buf,
+            error_buf_len,
+            "PIO scan DMA transfer submission failed (code=%d, errno=%d, bytes=%u).",
+            transfer_result,
+            saved_errno,
+            data_bytes
+        );
+        return -2;
+    }
+    heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "");
+    return 0;
+}
+
+int heart_pi5_pio_scan_wait(
+    struct heart_pi5_pio_scan_handle *handle,
+    char *error_buf,
+    size_t error_buf_len
+) {
+    if (handle == NULL) {
+        heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "PIO scan transport handle is required.");
+        return -1;
+    }
+
+    /*
+     * The rp1-pio UAPI does not expose a DMA-channel handle we can wait on
+     * directly, so draining the TX path is the only completion primitive
+     * available here. That means "wait complete" is defined as "the state
+     * machine has consumed all submitted TX data", not as a separate IRQ from a
+     * host-visible DMA engine.
+     */
+    struct rp1_pio_sm_clear_fifos_args drain_args;
+    memset(&drain_args, 0, sizeof(drain_args));
+    drain_args.sm = (uint16_t)handle->sm;
+    errno = 0;
+    int drain_result = ioctl(handle->ioctl_fd, PIO_IOC_SM_DRAIN_TX, &drain_args);
+    if (drain_result < 0) {
+        int saved_errno = errno;
+        snprintf(
+            error_buf,
+            error_buf_len,
+            "PIO scan DMA drain failed (code=%d, errno=%d).",
+            drain_result,
+            saved_errno
+        );
+        return -2;
+    }
+
     heart_pi5_pio_scan_write_error(error_buf, error_buf_len, "");
     return 0;
 }

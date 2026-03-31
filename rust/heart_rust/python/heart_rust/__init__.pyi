@@ -6,6 +6,11 @@ import typing
 from . import _heart_rust
 
 @typing.final
+class ColorOrder:
+    RGB: typing.ClassVar[ColorOrder]
+    GBR: typing.ClassVar[ColorOrder]
+
+@typing.final
 class NativeMatrixStats:
     @property
     def width(self) -> builtins.int: ...
@@ -19,6 +24,12 @@ class NativeMatrixStats:
     def refresh_hz_estimate(self) -> builtins.float: ...
     @property
     def backend_name(self) -> builtins.str: ...
+
+@typing.final
+class WiringProfile:
+    AdafruitHatPwm: typing.ClassVar[WiringProfile]
+    AdafruitHat: typing.ClassVar[WiringProfile]
+    AdafruitTripleHat: typing.ClassVar[WiringProfile]
 
 @typing.final
 class SceneManagerBridge:
@@ -43,3 +54,22 @@ class SceneSnapshot:
     @property
     def scene_count(self) -> builtins.int: ...
 
+@typing.final
+class NativeMatrixDriver:
+    def __new__(
+        cls,
+        wiring: WiringProfile,
+        panel_rows: builtins.int,
+        panel_cols: builtins.int,
+        chain_length: builtins.int,
+        parallel: builtins.int,
+        color_order: ColorOrder,
+    ) -> NativeMatrixDriver: ...
+    @property
+    def width(self) -> builtins.int: ...
+    @property
+    def height(self) -> builtins.int: ...
+    def submit_rgba(self, data: builtins.bytes, width: builtins.int, height: builtins.int) -> None: ...
+    def clear(self) -> None: ...
+    def stats(self) -> NativeMatrixStats: ...
+    def close(self) -> None: ...

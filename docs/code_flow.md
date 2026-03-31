@@ -13,7 +13,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 ## Technical Approach
 
 Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
-The display section now distinguishes the production Pi 5 scan scheduler, which owns `LAT`, `OE`, row-address selection, PWM dwell scheduling, and continuous scan looping, from the older Pi 5 DMA/PIO transport probe, which remains a sidecar benchmark path for transport-only measurements.
+The display section highlights the production Pi 5 scan scheduler, which owns `LAT`, `OE`, row-address selection, PWM dwell scheduling, and resident scan-buffer looping while consuming compact row-pair/bitplane payloads from Rust.
 
 ## Flow Diagram
 
@@ -70,7 +70,6 @@ flowchart LR
         DeviceBridge["Device Bridge"]
         LedMatrix["LEDMatrix Driver\n(clean-room HUB75 runtime)"]
         Pi5ScanScheduler["Pi 5 Scan Scheduler\n(LAT/OE/A-E + PWM loop)"]
-        Pi5TransportProbe["Pi 5 DMA/PIO Probe\n(libpio transport bench)"]
         AverageMirror["AverageColorLED Peripheral"]
         SingleLED["Single LED Device"]
     end
@@ -87,7 +86,6 @@ flowchart LR
     RenderPipeline --> RendererProcessor --> SurfaceProvider
     DisplaySvc --> LocalScreen
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix --> Pi5ScanScheduler
-    DeviceBridge -. optional Pi 5 bench .-> Pi5TransportProbe
     Capture --> AverageMirror --> SingleLED
 
     Loop --> PeripheralMgr --> RxScheduler
@@ -100,7 +98,7 @@ flowchart LR
     class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter,RenderPacer orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
-    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,Pi5ScanScheduler,Pi5TransportProbe,AverageMirror,SingleLED output;
+    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,Pi5ScanScheduler,AverageMirror,SingleLED output;
 ```
 
 ## Rendering Procedure

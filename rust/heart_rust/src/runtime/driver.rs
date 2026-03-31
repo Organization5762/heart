@@ -3,7 +3,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use super::backend::{build_backend, MatrixBackend};
-use super::config::{expected_rgba_size, ColorOrder, MatrixConfigNative};
+use super::config::{expected_rgba_size, ColorOrder, MatrixConfigNative, WiringProfile};
 use super::queue::WorkerState;
 use super::stats::MatrixStatsCore;
 
@@ -43,12 +43,12 @@ pub struct MatrixDriverCore {
 
 impl MatrixDriverCore {
     pub fn new(
-        wiring: String,
+        wiring: WiringProfile,
         panel_rows: u16,
         panel_cols: u16,
         chain_length: u16,
         parallel: u8,
-        color_order: String,
+        color_order: ColorOrder,
     ) -> Result<Self, MatrixDriverError> {
         let config = MatrixConfigNative::new(
             wiring,
@@ -200,6 +200,7 @@ fn run_matrix_worker(
     mut backend: Box<dyn MatrixBackend>,
     refresh_interval: Duration,
 ) {
+    let backend_owns_refresh_loop = backend.owns_refresh_loop();
     loop {
         let frame = {
             let mut state = match runtime.state.lock() {
@@ -207,9 +208,21 @@ fn run_matrix_worker(
                 Err(_) => return,
             };
             while !state.is_closed() && !state.has_displayable_frame() {
-                match runtime.signal.wait_timeout(state, refresh_interval) {
-                    Ok((guard, _)) => state = guard,
-                    Err(_) => return,
+                if refresh_interval.is_zero() {
+                    // A zero refresh interval means "wait for explicit work",
+                    // not "spin on an immediate timeout". The Pi 5 resident
+                    // transport owns steady-state refresh once a frame is
+                    // submitted, so the generic worker should sleep until a
+                    // caller enqueues a replacement frame or a clear request.
+                    match runtime.signal.wait(state) {
+                        Ok(guard) => state = guard,
+                        Err(_) => return,
+                    }
+                } else {
+                    match runtime.signal.wait_timeout(state, refresh_interval) {
+                        Ok((guard, _)) => state = guard,
+                        Err(_) => return,
+                    }
                 }
             }
             if state.is_closed() {
@@ -225,7 +238,9 @@ fn run_matrix_worker(
         if backend.render(&frame).is_err() {
             return;
         }
-        thread::sleep(refresh_interval);
+        if !backend_owns_refresh_loop && !refresh_interval.is_zero() {
+            thread::sleep(refresh_interval);
+        }
 
         let mut state = match runtime.state.lock() {
             Ok(state) => state,
@@ -236,6 +251,13 @@ fn run_matrix_worker(
             return;
         }
         state.record_render();
-        state.restore_active_frame(frame);
+        if backend_owns_refresh_loop {
+            // Resident-refresh backends keep the submitted frame alive in
+            // hardware, so retaining a second copy in the runtime only
+            // creates redundant submissions and cache churn.
+            state.recycle_frame(frame);
+        } else {
+            state.restore_active_frame(frame);
+        }
     }
 }

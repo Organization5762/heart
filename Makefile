@@ -19,7 +19,10 @@ PIO_BENCH_PANEL_ROWS ?= 64
 PIO_BENCH_PARALLEL ?= 1
 PIO_BENCH_PIPELINE_DEPTH ?= 2
 PIO_BENCH_PWM_BITS ?= 11
-.PHONY: install bootstrap-native debug-matrix-pinctrl test-matrix-pinctrl bench-matrix-pio-dma bench-matrix-pio-scan test-matrix-pio-dma test-matrix-pio-scan pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
+PIO_BENCH_SCAN_CLOCK_DIVIDER ?= 1.0
+PIO_BENCH_SCAN_LSB_DWELL_TICKS ?= 2
+PI5_SCAN_LOOP_MODULE_DIR = rust/heart_rust/kernel/pi5_scan_loop
+.PHONY: install bootstrap-native debug-matrix-pinctrl test-matrix-pinctrl build-pi5-scan-loop-module install-pi5-scan-loop-module install-pi5-scan-loop-dkms unload-pi5-scan-loop-module bench-matrix-pio-scan test-matrix-pio-scan pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
 
 bootstrap-native:
 	@bash scripts/bootstrap_native_runtime.sh
@@ -34,16 +37,18 @@ debug-matrix-pinctrl:
 test-matrix-pinctrl:
 	@HEART_RUN_PI5_PINCTRL_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pinctrl_debug.py
 
-bench-matrix-pio-dma:
-	@cargo run --release --manifest-path rust/heart_rust/Cargo.toml --bin pi5_pio_bench -- \
-		--frame-count $(PIO_BENCH_FRAME_COUNT) \
-		--pipeline-depth $(PIO_BENCH_PIPELINE_DEPTH) \
-		--panel-rows $(PIO_BENCH_PANEL_ROWS) \
-		--panel-cols $(PIO_BENCH_PANEL_COLS) \
-		--chain-length $(PIO_BENCH_CHAIN_LENGTH) \
-		--parallel $(PIO_BENCH_PARALLEL) \
-		--pwm-bits $(PIO_BENCH_PWM_BITS) \
-		--iterations $(PIO_BENCH_ITERATIONS)
+build-pi5-scan-loop-module:
+	@$(MAKE) -C $(PI5_SCAN_LOOP_MODULE_DIR)
+
+install-pi5-scan-loop-module: build-pi5-scan-loop-module
+	@sudo rmmod heart_pi5_scan_loop 2>/dev/null || true
+	@sudo insmod $(PI5_SCAN_LOOP_MODULE_DIR)/heart_pi5_scan_loop.ko
+
+install-pi5-scan-loop-dkms:
+	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_pi5_scan_loop_dkms.sh
+
+unload-pi5-scan-loop-module:
+	@sudo rmmod heart_pi5_scan_loop 2>/dev/null || true
 
 bench-matrix-pio-scan:
 	@cargo run --release --manifest-path rust/heart_rust/Cargo.toml --bin pi5_scan_bench -- \
@@ -53,10 +58,10 @@ bench-matrix-pio-scan:
 		--panel-cols $(PIO_BENCH_PANEL_COLS) \
 		--chain-length $(PIO_BENCH_CHAIN_LENGTH) \
 		--parallel $(PIO_BENCH_PARALLEL) \
+		--pwm-bits $(PIO_BENCH_PWM_BITS) \
+		--lsb-dwell-ticks $(PIO_BENCH_SCAN_LSB_DWELL_TICKS) \
+		--clock-divider $(PIO_BENCH_SCAN_CLOCK_DIVIDER) \
 		--iterations $(PIO_BENCH_ITERATIONS)
-
-test-matrix-pio-dma:
-	@HEART_RUN_PI5_PIO_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pi5_dma_benchmark.py
 
 test-matrix-pio-scan:
 	@HEART_RUN_PI5_SCAN_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pi5_scan_benchmark.py
@@ -113,4 +118,5 @@ dev-session:
 
 pi_install:
 	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_rgb_matrix.sh
-	@sudo uv pip install --system -e . --break-system-packages
+	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_pi5_scan_loop_dkms.sh
+	@sudo uv pip install --system -e '.[native]' --break-system-packages

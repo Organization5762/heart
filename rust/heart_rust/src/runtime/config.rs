@@ -53,20 +53,20 @@ pub(crate) struct MatrixConfigNative {
 
 impl MatrixConfigNative {
     pub(crate) fn new(
-        wiring: String,
+        wiring: WiringProfile,
         panel_rows: u16,
         panel_cols: u16,
         chain_length: u16,
         parallel: u8,
-        color_order: String,
+        color_order: ColorOrder,
     ) -> Result<Self, String> {
         let config = Self {
-            wiring: WiringProfile::try_from(wiring.as_str())?,
+            wiring,
             panel_rows,
             panel_cols,
             chain_length,
             parallel,
-            color_order: ColorOrder::try_from(color_order.as_str())?,
+            color_order,
         };
         config.validate()?;
         Ok(config)

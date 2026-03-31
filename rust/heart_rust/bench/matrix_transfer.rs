@@ -4,9 +4,7 @@
 mod runtime;
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
-use runtime::{ColorOrder, FrameBufferPool, MatrixDriverCore};
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-use runtime::{PackedTransportFrame, Pi5PioDmaTransport, Pi5TransportConfig};
+use runtime::{ColorOrder, FrameBufferPool, MatrixDriverCore, WiringProfile};
 use std::cell::RefCell;
 use std::hint::black_box;
 use std::sync::Arc;
@@ -30,12 +28,12 @@ fn bench_submit_rgba(c: &mut Criterion) {
         ("128x64_gbr", 64_u16, 64_u16, 2_u16, 1_u8, "gbr"),
     ] {
         let driver = MatrixDriverCore::new(
-            "adafruit_hat_pwm".to_string(),
+            WiringProfile::AdafruitHatPwm,
             panel_rows,
             panel_cols,
             chain_length,
             parallel,
-            color_order.to_string(),
+            ColorOrder::try_from(color_order).expect("benchmark color order should be valid"),
         )
         .expect("benchmark driver should initialize");
         let width = driver.width();
@@ -93,12 +91,12 @@ fn bench_submit_rgba_contention(c: &mut Criterion) {
     for producers in [1_usize, 2_usize, 4_usize] {
         let driver = Arc::new(
             MatrixDriverCore::new(
-                "adafruit_hat_pwm".to_string(),
+                WiringProfile::AdafruitHatPwm,
                 64,
                 64,
                 1,
                 1,
-                "rgb".to_string(),
+                ColorOrder::Rgb,
             )
             .expect("benchmark driver should initialize"),
         );
@@ -142,74 +140,10 @@ fn bench_submit_rgba_contention(c: &mut Criterion) {
     group.finish();
 }
 
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn bench_pi5_pack_transport(c: &mut Criterion) {
-    let mut group = c.benchmark_group("pi5_pack_transport_rgba");
-
-    for (label, chain_length) in [("64x64_chain1_pwm11", 1_u16), ("64x64_chain4_pwm11", 4_u16)] {
-        let config =
-            Pi5TransportConfig::new(64, 64, chain_length, 1, 11).expect("config should be valid");
-        let frame = frame_bytes(config.width().unwrap(), config.height().unwrap(), 29);
-        group.throughput(Throughput::Bytes(frame.len() as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| {
-                let (packed, pack_duration) = PackedTransportFrame::pack_rgba(
-                    black_box(&config),
-                    black_box(frame.as_slice()),
-                )
-                .expect("packing should succeed");
-                black_box(packed.as_slice());
-                black_box(pack_duration);
-            });
-        });
-    }
-
-    group.finish();
-}
-
-#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-fn bench_pi5_pack_transport(_: &mut Criterion) {}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn bench_pi5_dma_transport(c: &mut Criterion) {
-    let mut group = c.benchmark_group("pi5_dma_transport");
-
-    for (label, chain_length) in [("64x64_chain1_pwm11", 1_u16), ("64x64_chain4_pwm11", 4_u16)] {
-        let config =
-            Pi5TransportConfig::new(64, 64, chain_length, 1, 11).expect("config should be valid");
-        let width = config.width().expect("width should be valid");
-        let height = config.height().expect("height should be valid");
-        let frame = frame_bytes(width, height, 41);
-        let (packed, _) =
-            PackedTransportFrame::pack_rgba(&config, &frame).expect("packing should succeed");
-        let mut transport =
-            Pi5PioDmaTransport::new(packed.len()).expect("Pi 5 DMA transport should initialize");
-        group.throughput(Throughput::Bytes(packed.len() as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter_custom(|iters| {
-                let start = Instant::now();
-                for _ in 0..iters {
-                    transport
-                        .stream(black_box(&packed))
-                        .expect("DMA transport should succeed");
-                }
-                start.elapsed()
-            });
-        });
-    }
-
-    group.finish();
-}
-
-#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-fn bench_pi5_dma_transport(_: &mut Criterion) {}
-
 criterion_group!(
     benches,
     bench_frame_write_rgba,
     bench_submit_rgba,
-    bench_submit_rgba_contention,
-    bench_pi5_pack_transport,
-    bench_pi5_dma_transport
+    bench_submit_rgba_contention
 );
 criterion_main!(benches);

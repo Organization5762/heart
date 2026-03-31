@@ -30,6 +30,12 @@ class MatrixDriverProtocol(Protocol):
     def clear(self) -> None:
         """Clear the active frame."""
 
+    def CreateFrameCanvas(self) -> object:
+        """Return an offscreen canvas compatible with the common rgbmatrix API."""
+
+    def SwapOnVSync(self, frame_canvas: object) -> object:
+        """Present an offscreen canvas and return the next reusable canvas."""
+
     def stats(self) -> object:
         """Return runtime stats for the active driver."""
 

@@ -1,12 +1,13 @@
 mod backend;
 mod config;
+mod device;
 mod driver;
 mod frame;
-mod pi5_dma;
 mod pi5_scan;
 mod queue;
 mod scene;
 mod stats;
+mod tuning;
 
 #[cfg(test)]
 #[allow(dead_code, unused_imports)]
@@ -19,13 +20,9 @@ pub use driver::{MatrixDriverCore, MatrixDriverError};
 #[allow(unused_imports)]
 pub(crate) use frame::{FrameBuffer, FrameBufferPool};
 #[allow(unused_imports)]
-pub(crate) use pi5_dma::{
-    PackedTransportFrame, Pi5DmaBenchmarkSample, Pi5PioDmaTransport, Pi5TransportConfig,
-};
-#[allow(unused_imports)]
 pub(crate) use pi5_scan::{
-    PackedScanFrame, PackedScanFrameStats, Pi5PioScanTransport, Pi5ScanBenchmarkSample,
-    Pi5ScanConfig,
+    PackedScanFrame, PackedScanFrameStats, Pi5KernelResidentLoop, Pi5PioScanTransport,
+    Pi5ScanConfig, Pi5ScanTiming,
 };
 #[allow(unused_imports)]
 pub use scene::{SceneManagerCore, SceneSnapshotCore};

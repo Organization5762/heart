@@ -2,12 +2,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use super::config::{ColorOrder, WiringProfile};
 use super::driver::{MatrixDriverCore, MatrixDriverError};
-use super::{
-    ColorOrder, FrameBufferPool, PackedScanFrame, PackedTransportFrame, Pi5ScanConfig,
-    Pi5TransportConfig,
-};
-use crate::runtime::config::WiringProfile;
+use super::{FrameBufferPool, PackedScanFrame, Pi5ScanConfig};
 use crate::runtime::queue::WorkerState;
 
 fn frame_bytes(width: u32, height: u32, seed: u8) -> Vec<u8> {
@@ -85,12 +82,12 @@ fn worker_state_drops_oldest_when_queue_is_full() {
 #[test]
 fn matrix_driver_submit_rgba_records_queue_pressure_stats() {
     let driver = MatrixDriverCore::new(
-        "adafruit_hat_pwm".to_string(),
+        WiringProfile::AdafruitHatPwm,
         16,
         32,
         1,
         1,
-        "rgb".to_string(),
+        ColorOrder::Rgb,
     )
     .expect("simulated matrix driver should initialize");
     let width = driver.width();
@@ -111,12 +108,12 @@ fn matrix_driver_submit_rgba_records_queue_pressure_stats() {
 #[test]
 fn matrix_driver_submit_rgba_rejects_wrong_frame_size() {
     let driver = MatrixDriverCore::new(
-        "adafruit_hat_pwm".to_string(),
+        WiringProfile::AdafruitHatPwm,
         16,
         32,
         1,
         1,
-        "rgb".to_string(),
+        ColorOrder::Rgb,
     )
     .expect("simulated matrix driver should initialize");
 
@@ -139,12 +136,12 @@ fn matrix_driver_submit_rgba_rejects_wrong_frame_size() {
 #[test]
 fn matrix_driver_worker_updates_rendered_frame_stats() {
     let driver = MatrixDriverCore::new(
-        "adafruit_hat_pwm".to_string(),
+        WiringProfile::AdafruitHatPwm,
         16,
         32,
         1,
         1,
-        "rgb".to_string(),
+        ColorOrder::Rgb,
     )
     .expect("simulated matrix driver should initialize");
     let width = driver.width();
@@ -165,12 +162,12 @@ fn matrix_driver_worker_updates_rendered_frame_stats() {
 fn matrix_driver_accepts_concurrent_submissions() {
     let driver = Arc::new(
         MatrixDriverCore::new(
-            "adafruit_hat_pwm".to_string(),
+            WiringProfile::AdafruitHatPwm,
             64,
             64,
             1,
             1,
-            "rgb".to_string(),
+            ColorOrder::Rgb,
         )
         .expect("simulated matrix driver should initialize"),
     );
@@ -199,82 +196,87 @@ fn matrix_driver_accepts_concurrent_submissions() {
 }
 
 #[test]
-fn pi5_transport_pack_rgba_produces_expected_frame_length_for_single_panel() {
-    let config = Pi5TransportConfig::new(64, 64, 1, 1, 11)
-        .expect("single-panel Pi 5 transport config should be valid");
-    let frame = frame_bytes(config.width().unwrap(), config.height().unwrap(), 5);
-
-    let (packed, _) =
-        PackedTransportFrame::pack_rgba(&config, &frame).expect("packing should succeed");
-
-    assert_eq!(packed.len(), 32 * 11 * 65);
-}
-
-#[test]
-fn pi5_transport_pack_rgba_produces_expected_frame_length_for_four_panels() {
-    let config = Pi5TransportConfig::new(64, 64, 4, 1, 11)
-        .expect("four-panel Pi 5 transport config should be valid");
-    let frame = frame_bytes(config.width().unwrap(), config.height().unwrap(), 7);
-
-    let (packed, _) =
-        PackedTransportFrame::pack_rgba(&config, &frame).expect("packing should succeed");
-
-    assert_eq!(packed.len(), 32 * 11 * 257);
-}
-
-#[test]
-fn pi5_transport_pack_rgba_sets_expected_plane_bits_for_first_pixel_pair() {
-    let config = Pi5TransportConfig::new(64, 64, 1, 1, 11)
-        .expect("single-panel Pi 5 transport config should be valid");
-    let mut frame = vec![0_u8; (config.width().unwrap() * config.height().unwrap() * 4) as usize];
-
-    frame[0] = 0xff;
-    frame[1] = 0x80;
-    frame[2] = 0x01;
-    let lower_row_offset = (64 * 32 * 4) as usize;
-    frame[lower_row_offset] = 0xff;
-    frame[lower_row_offset + 1] = 0x00;
-    frame[lower_row_offset + 2] = 0x80;
-
-    let (packed, _) =
-        PackedTransportFrame::pack_rgba(&config, &frame).expect("packing should succeed");
-    let packed_bytes = packed.as_slice();
-
-    assert_eq!(packed_bytes[0], 0);
-    assert_eq!(packed_bytes[65 * 3], 0b0000_1101);
-    assert_eq!(packed_bytes[64], 0b1100_0000);
-    assert_eq!(packed_bytes[65 * 10], 0b0010_1011);
-}
-
-#[test]
 fn pi5_scan_pack_rgba_produces_expected_word_count_for_single_panel() {
     let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
         .expect("single-panel Pi 5 scan config should be valid");
-    let frame = frame_bytes(config.width().unwrap(), config.height().unwrap(), 11);
+    let frame = vec![255_u8; (config.width().unwrap() * config.height().unwrap() * 4) as usize];
 
     let (packed, stats) =
         PackedScanFrame::pack_rgba(&config, &frame).expect("scan packing should succeed");
 
-    assert_eq!(packed.word_count(), 32 * 11 * (64 + 11));
+    assert_eq!(stats.compressed_blank_groups, 32 * 3);
+    assert_eq!(stats.merged_identical_groups, 32 * 7);
+    assert_eq!(packed.word_count(), 32 * (46 + 7));
     assert_eq!(stats.word_count, packed.word_count());
 }
 
 #[test]
-fn pi5_scan_pack_rgba_emits_blank_shift_latch_and_dwell_commands() {
+fn pi5_scan_pack_rgba_emits_compact_group_headers_and_control_words() {
     let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
         .expect("single-panel Pi 5 scan config should be valid");
     let frame = vec![0_u8; (config.width().unwrap() * config.height().unwrap() * 4) as usize];
 
-    let (packed, _) =
+    let (packed, stats) =
         PackedScanFrame::pack_rgba(&config, &frame).expect("scan packing should succeed");
     let words = packed.as_words();
 
-    assert_eq!(words[0], 4);
-    assert_eq!(words[1], 1 << 18);
-    assert_eq!(words[2], (1_u32 << 31) | 63);
-    assert_eq!(words[3], 1 << 18);
-    assert_eq!(words[67], 0);
-    assert_eq!(words[68], (1 << 18) | (1 << 21));
-    assert_eq!(words[71], 2047);
-    assert_eq!(words[72], 0);
+    assert_eq!(words[0], 1 << 13);
+    assert_eq!(words[1], 0);
+    assert_eq!(words[2], 64);
+    assert_eq!(words[3], 0);
+    assert_eq!(words[4], 0);
+    assert_eq!(words[5], (1 << 13) | (1 << 16));
+    assert_eq!(words[6], 0);
+    assert_eq!(words[7], 2047);
+    assert_eq!(stats.compressed_blank_groups, 32 * 11);
+    assert_eq!(stats.merged_identical_groups, 0);
+    assert_eq!(stats.word_count, 8);
+}
+
+#[test]
+fn pi5_scan_pack_rgba_merges_nonadjacent_identical_plane_payloads() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .expect("single-panel Pi 5 scan config should be valid");
+    let mut frame = vec![0_u8; (config.width().unwrap() * config.height().unwrap() * 4) as usize];
+
+    for pixel in frame.chunks_exact_mut(4) {
+        pixel[0] = 0b1010_0000;
+        pixel[3] = 255;
+    }
+
+    let (packed, stats) =
+        PackedScanFrame::pack_rgba(&config, &frame).expect("scan packing should succeed");
+
+    assert_eq!(stats.compressed_blank_groups, 32 * 9);
+    assert_eq!(stats.merged_identical_groups, 32);
+    assert_eq!(packed.word_count(), 32 * (46 + 7));
+}
+
+#[test]
+fn pi5_scan_pack_rgba_splits_large_internal_blank_spans() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .expect("single-panel Pi 5 scan config should be valid");
+    let width = config.width().unwrap() as usize;
+    let height = config.height().unwrap() as usize;
+    let mut frame = vec![0_u8; width * height * 4];
+
+    for row in 0..height {
+        for column in 0..width {
+            if (column / 16) % 2 != 0 {
+                continue;
+            }
+            let base = ((row * width) + column) * 4;
+            frame[base] = 255;
+            frame[base + 1] = 255;
+            frame[base + 2] = 255;
+            frame[base + 3] = 255;
+        }
+    }
+
+    let (packed, stats) =
+        PackedScanFrame::pack_rgba(&config, &frame).expect("scan packing should succeed");
+
+    assert_eq!(stats.compressed_blank_groups, 32 * 3);
+    assert_eq!(stats.merged_identical_groups, 32 * 7);
+    assert_eq!(packed.word_count(), 32 * 36);
 }
