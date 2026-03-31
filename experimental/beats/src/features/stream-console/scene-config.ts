@@ -35,10 +35,10 @@ export type SceneConfiguration = {
 
 export const DEFAULT_SCENE_CONFIGURATION: SceneConfiguration = {
   motion: {
-    autoRotate: false,
-    rotationX: 0.01,
-    rotationY: 0.015,
-    wobbleAmount: 0.12,
+    autoRotate: true,
+    rotationX: 0,
+    rotationY: 0.012,
+    wobbleAmount: 0.03,
     hoverAmount: 0.18,
   },
   camera: {
