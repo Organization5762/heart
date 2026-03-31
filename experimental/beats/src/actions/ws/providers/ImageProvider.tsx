@@ -43,7 +43,10 @@ export function ImageProvider({
 
       // Remove old frames
       const cutoff = now - fpsWindow;
-      while (frameTimesRef.current.length && frameTimesRef.current[0] < cutoff) {
+      while (
+        frameTimesRef.current.length &&
+        frameTimesRef.current[0] < cutoff
+      ) {
         frameTimesRef.current.shift();
       }
 
@@ -113,5 +116,7 @@ export function useStreamedImage() {
 
 // --- Helpers ---
 function bytesToBlob(data: Uint8Array) {
-  return new Blob([data], { type: "image/png" });
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  return new Blob([copy], { type: "image/png" });
 }

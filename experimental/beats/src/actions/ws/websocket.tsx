@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Subject } from "rxjs";
 
 import { decodeStreamEvent, StreamEvent } from "./protocol";

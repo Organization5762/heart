@@ -13,21 +13,20 @@ export default function App() {
     syncWithLocalTheme();
   }, []);
 
-  return <RouterProvider router={router} />
+  return <RouterProvider router={router} />;
 }
 
 const root = createRoot(document.getElementById("app")!);
 root.render(
   <WSProvider url="ws://localhost:8765">
     <React.StrictMode>
-        <PeripheralEventsProvider>
-            <PeripheralProvider>
-              <ImageProvider>
-                <App/>
-              </ImageProvider>
-            </PeripheralProvider>
-        </PeripheralEventsProvider>
+      <PeripheralEventsProvider>
+        <PeripheralProvider>
+          <ImageProvider>
+            <App />
+          </ImageProvider>
+        </PeripheralProvider>
+      </PeripheralEventsProvider>
     </React.StrictMode>
-  </WSProvider>
-  ,
+  </WSProvider>,
 );

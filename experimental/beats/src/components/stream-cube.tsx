@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import type { MutableRefObject } from "react";
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -72,8 +73,12 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const pointerTargetRef = useRef<PointerState>({ x: 0, y: 0 });
   const pointerOffsetRef = useRef<PointerState>({ x: 0, y: 0 });
-  const hasRenderedFrameRef = useRef(false);
-  const [isReady, setIsReady] = useState(false);
+  const textureRequestIdRef = useRef(0);
+  const latestImgUrlRef = useRef(imgURL);
+
+  useEffect(() => {
+    latestImgUrlRef.current = imgURL;
+  }, [imgURL]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -82,6 +87,8 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
     if (!container || !canvas) {
       return undefined;
     }
+
+    let isDisposed = false;
 
     const handlePointerMove = (event: PointerEvent) => {
       const bounds = container.getBoundingClientRect();
@@ -127,12 +134,12 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       rim.position.set(-3.5, 2.8, 4.5);
       const fill = new DirectionalLight(0x67e8f9, 0.9);
       fill.position.set(3.2, 1.6, 2.4);
-      const accentLight = new PointLight(0x38bdf8, 4.4, 12, 2.2);
+      const accentLight = new PointLight(0x2b67ff, 4.4, 12, 2.2);
       accentLight.position.set(2.1, 0.75, 2.8);
       scene.add(ambient, rim, fill, accentLight);
 
       const floorMaterial = new MeshBasicMaterial({
-        color: 0x0f172a,
+        color: 0x070707,
         opacity: 0.92,
         transparent: true,
       });
@@ -145,8 +152,8 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       scene.add(floor);
 
       const ringMaterial = new MeshBasicMaterial({
-        color: 0x38bdf8,
-        opacity: 0.14,
+        color: 0xf2d771,
+        opacity: 0.12,
         transparent: true,
       });
       const ring = new Mesh(
@@ -166,7 +173,7 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       const chassisMaterial = new MeshPhysicalMaterial({
         clearcoat: 1,
         clearcoatRoughness: 0.18,
-        color: 0x0f172a,
+        color: 0x111111,
         metalness: 0.72,
         roughness: 0.24,
       });
@@ -229,6 +236,17 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       ];
       fallbackTextureRef.current = fallbackTexture;
 
+      const initialTextureRequestId = ++textureRequestIdRef.current;
+      void syncScreenTexture({
+        currentTextureRef,
+        fallbackTexture,
+        isCancelled: () =>
+          isDisposed || initialTextureRequestId !== textureRequestIdRef.current,
+        materials: screenMaterialsRef.current,
+        renderer,
+        url: latestImgUrlRef.current,
+      });
+
       const handleResize = () => {
         const nextSize = getContainerSize(container);
         renderer.setSize(nextSize.width, nextSize.height, false);
@@ -290,14 +308,9 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
         accentLight.position.z = 2.6 + Math.sin(elapsedSeconds * 0.53) * 0.4;
 
         ring.material.opacity =
-          0.1 + (Math.sin(elapsedSeconds * 1.4) + 1) * 0.03;
+          0.08 + (Math.sin(elapsedSeconds * 1.4) + 1) * 0.03;
         outline.material.opacity =
           0.22 + (Math.cos(elapsedSeconds * 1.1) + 1) * 0.03;
-
-        if (!hasRenderedFrameRef.current) {
-          hasRenderedFrameRef.current = true;
-          setIsReady(true);
-        }
 
         renderer.render(scene, camera);
         animationFrameRef.current = window.requestAnimationFrame(renderFrame);
@@ -311,117 +324,89 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       container.addEventListener("pointerleave", handlePointerLeave);
 
       animationFrameRef.current = window.requestAnimationFrame(renderFrame);
-
-      return () => {
-        if (animationFrameRef.current) {
-          window.cancelAnimationFrame(animationFrameRef.current);
-        }
-
-        resizeObserver.disconnect();
-        container.removeEventListener("pointermove", handlePointerMove);
-        container.removeEventListener("pointerleave", handlePointerLeave);
-
-        currentTextureRef.current?.dispose();
-        fallbackTextureRef.current?.dispose();
-
-        outline.geometry.dispose();
-        panel.geometry.dispose();
-        floor.geometry.dispose();
-        ring.geometry.dispose();
-
-        disposableMaterialsRef.current.forEach((material) =>
-          material.dispose(),
-        );
-        renderer.dispose();
-
-        rendererRef.current = null;
-        sceneRef.current = null;
-        cameraRef.current = null;
-        stageRef.current = null;
-        panelRef.current = null;
-        floorRef.current = null;
-        ringRef.current = null;
-        outlineRef.current = null;
-        accentLightRef.current = null;
-        screenMaterialsRef.current = [];
-        disposableMaterialsRef.current = [];
-        fallbackTextureRef.current = null;
-        currentTextureRef.current = null;
-        resizeObserverRef.current = null;
-        pointerTargetRef.current = { x: 0, y: 0 };
-        pointerOffsetRef.current = { x: 0, y: 0 };
-        hasRenderedFrameRef.current = false;
-      };
     } catch (error) {
       onContextError?.();
       console.error("Failed to initialize WebGL renderer", error);
     }
 
-    return undefined;
+    return () => {
+      isDisposed = true;
+      textureRequestIdRef.current += 1;
+
+      if (animationFrameRef.current) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      resizeObserverRef.current?.disconnect();
+      container.removeEventListener("pointermove", handlePointerMove);
+      container.removeEventListener("pointerleave", handlePointerLeave);
+
+      currentTextureRef.current?.dispose();
+      fallbackTextureRef.current?.dispose();
+
+      outlineRef.current?.geometry.dispose();
+      panelRef.current?.geometry.dispose();
+      floorRef.current?.geometry.dispose();
+      ringRef.current?.geometry.dispose();
+
+      disposableMaterialsRef.current.forEach((material) => material.dispose());
+      rendererRef.current?.dispose();
+
+      rendererRef.current = null;
+      sceneRef.current = null;
+      cameraRef.current = null;
+      stageRef.current = null;
+      panelRef.current = null;
+      floorRef.current = null;
+      ringRef.current = null;
+      outlineRef.current = null;
+      accentLightRef.current = null;
+      screenMaterialsRef.current = [];
+      disposableMaterialsRef.current = [];
+      fallbackTextureRef.current = null;
+      currentTextureRef.current = null;
+      resizeObserverRef.current = null;
+      pointerTargetRef.current = { x: 0, y: 0 };
+      pointerOffsetRef.current = { x: 0, y: 0 };
+    };
   }, [onContextError]);
 
   useEffect(() => {
+    const renderer = rendererRef.current;
+    const fallbackTexture = fallbackTextureRef.current;
+    const materials = screenMaterialsRef.current;
+
+    if (!renderer || !fallbackTexture || materials.length === 0) {
+      return undefined;
+    }
+
     let isCancelled = false;
+    const requestId = ++textureRequestIdRef.current;
 
-    const applyTexture = async () => {
-      const renderer = rendererRef.current;
-      const fallbackTexture = fallbackTextureRef.current;
-      const materials = screenMaterialsRef.current;
-
-      if (!renderer || !fallbackTexture || materials.length === 0) {
-        return;
-      }
-
-      let nextTexture: Texture | null = null;
-      try {
-        nextTexture = imgURL
-          ? await loadTexture(imgURL, renderer)
-          : fallbackTexture;
-      } catch (error) {
-        console.warn("Falling back to the placeholder stream texture", error);
-        nextTexture = fallbackTexture;
-      }
-
-      if (isCancelled || !nextTexture) {
-        if (nextTexture !== fallbackTexture) {
-          nextTexture?.dispose();
-        }
-        return;
-      }
-
-      materials.forEach((material, index) => {
-        material.map = nextTexture;
-        material.emissiveIntensity = index === 0 ? 0.18 : 0.08;
-        material.needsUpdate = true;
-      });
-
-      if (
-        currentTextureRef.current &&
-        currentTextureRef.current !== nextTexture &&
-        currentTextureRef.current !== fallbackTexture
-      ) {
-        currentTextureRef.current.dispose();
-      }
-
-      currentTextureRef.current =
-        nextTexture === fallbackTexture ? null : nextTexture;
-    };
-
-    void applyTexture();
+    void syncScreenTexture({
+      currentTextureRef,
+      fallbackTexture,
+      isCancelled: () =>
+        isCancelled || requestId !== textureRequestIdRef.current,
+      materials,
+      renderer,
+      url: imgURL,
+    });
 
     return () => {
       isCancelled = true;
     };
-  }, [imgURL, isReady]);
+  }, [imgURL]);
 
   return (
     <div
       ref={containerRef}
-      className="border-border/60 relative min-h-[260px] w-full flex-1 overflow-hidden rounded-xl border bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_34%),radial-gradient(circle_at_bottom,rgba(14,165,233,0.14),transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.98))] shadow-[0_24px_80px_rgba(2,6,23,0.55)]"
+      className="relative min-h-[260px] w-full flex-1 overflow-hidden border border-white/20 bg-[radial-gradient(circle_at_top,rgba(43,103,255,0.2),transparent_34%),radial-gradient(circle_at_bottom,rgba(242,215,113,0.08),transparent_42%),linear-gradient(180deg,rgba(7,7,7,0.96),rgba(2,6,23,0.98))] shadow-[0_24px_80px_rgba(2,6,23,0.55)]"
     >
+      <Skeleton className="absolute inset-0 rounded-none" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.08)_58%,rgba(2,6,23,0.72))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(43,103,255,0.12)_0,rgba(43,103,255,0.12)_1px,transparent_1px,transparent_52px),linear-gradient(0deg,rgba(43,103,255,0.12)_0,rgba(43,103,255,0.12)_1px,transparent_1px,transparent_52px)] opacity-70" />
       <canvas ref={canvasRef} className="relative size-full" />
-      {!isReady && <Skeleton className="absolute inset-0 rounded-none" />}
     </div>
   );
 }
@@ -438,6 +423,91 @@ function configureTexture(texture: Texture, renderer: WebGLRenderer) {
   texture.colorSpace = SRGBColorSpace;
 }
 
+function commitScreenTexture({
+  currentTextureRef,
+  fallbackTexture,
+  materials,
+  nextTexture,
+}: {
+  currentTextureRef: MutableRefObject<Texture | null>;
+  fallbackTexture: Texture;
+  materials: MeshStandardMaterial[];
+  nextTexture: Texture;
+}) {
+  const staleTextures = new Set<Texture>();
+
+  materials.forEach((material, index) => {
+    const previousMap = material.map;
+    material.map = nextTexture;
+    material.emissiveIntensity = index === 0 ? 0.18 : 0.08;
+    material.needsUpdate = true;
+
+    if (
+      previousMap &&
+      previousMap !== nextTexture &&
+      previousMap !== fallbackTexture
+    ) {
+      staleTextures.add(previousMap);
+    }
+  });
+
+  staleTextures.forEach((texture) => {
+    if (texture !== currentTextureRef.current) {
+      texture.dispose();
+    }
+  });
+
+  if (
+    currentTextureRef.current &&
+    currentTextureRef.current !== nextTexture &&
+    currentTextureRef.current !== fallbackTexture
+  ) {
+    currentTextureRef.current.dispose();
+  }
+
+  currentTextureRef.current =
+    nextTexture === fallbackTexture ? null : nextTexture;
+}
+
+async function syncScreenTexture({
+  currentTextureRef,
+  fallbackTexture,
+  isCancelled,
+  materials,
+  renderer,
+  url,
+}: {
+  currentTextureRef: MutableRefObject<Texture | null>;
+  fallbackTexture: Texture;
+  isCancelled: () => boolean;
+  materials: MeshStandardMaterial[];
+  renderer: WebGLRenderer;
+  url: string | null;
+}) {
+  let nextTexture: Texture | null = null;
+
+  try {
+    nextTexture = url ? await loadTexture(url, renderer) : fallbackTexture;
+  } catch (error) {
+    console.warn("Falling back to the placeholder stream texture", error);
+    nextTexture = fallbackTexture;
+  }
+
+  if (isCancelled() || !nextTexture) {
+    if (nextTexture && nextTexture !== fallbackTexture) {
+      nextTexture.dispose();
+    }
+    return;
+  }
+
+  commitScreenTexture({
+    currentTextureRef,
+    fallbackTexture,
+    materials,
+    nextTexture,
+  });
+}
+
 function createFallbackTexture(renderer: WebGLRenderer) {
   const size = 512;
   const canvas = document.createElement("canvas");
@@ -450,13 +520,13 @@ function createFallbackTexture(renderer: WebGLRenderer) {
   }
 
   const background = context.createLinearGradient(0, 0, size, size);
-  background.addColorStop(0, "#020617");
-  background.addColorStop(0.55, "#0f172a");
-  background.addColorStop(1, "#1d4ed8");
+  background.addColorStop(0, "#070707");
+  background.addColorStop(0.58, "#0f172a");
+  background.addColorStop(1, "#173781");
   context.fillStyle = background;
   context.fillRect(0, 0, size, size);
 
-  context.strokeStyle = "rgba(148, 163, 184, 0.14)";
+  context.strokeStyle = "rgba(43, 103, 255, 0.26)";
   context.lineWidth = 1;
   const gridStep = size / 12;
   for (let line = gridStep; line < size; line += gridStep) {
@@ -471,24 +541,39 @@ function createFallbackTexture(renderer: WebGLRenderer) {
     context.stroke();
   }
 
-  context.fillStyle = "rgba(15, 23, 42, 0.72)";
-  context.fillRect(92, 116, size - 184, size - 232);
-  context.strokeStyle = "rgba(125, 211, 252, 0.72)";
-  context.lineWidth = 12;
-  context.strokeRect(92, 116, size - 184, size - 232);
+  context.fillStyle = "rgba(7, 7, 7, 0.78)";
+  context.fillRect(72, 88, size - 144, size - 176);
 
-  context.fillStyle = "#e2e8f0";
-  context.font = "700 42px sans-serif";
-  context.fillText("WAITING FOR STREAM", 118, 252);
+  context.strokeStyle = "rgba(242, 215, 113, 0.9)";
+  context.lineWidth = 10;
+  context.strokeRect(72, 88, size - 144, size - 176);
 
-  context.strokeStyle = "rgba(125, 211, 252, 0.9)";
-  context.lineWidth = 8;
+  context.strokeStyle = "rgba(255, 91, 58, 0.9)";
+  context.lineWidth = 6;
   context.beginPath();
-  context.moveTo(126, 334);
-  context.bezierCurveTo(166, 276, 216, 388, 266, 318);
-  context.bezierCurveTo(306, 272, 344, 364, 390, 326);
-  context.bezierCurveTo(426, 300, 456, 332, 486, 316);
+  context.moveTo(108, size - 122);
+  context.lineTo(size - 112, 136);
   context.stroke();
+
+  context.strokeStyle = "rgba(110, 194, 255, 0.92)";
+  context.beginPath();
+  context.moveTo(124, 152);
+  context.lineTo(size - 136, size - 118);
+  context.stroke();
+
+  context.fillStyle = "#f6efe6";
+  context.font = '700 22px "Geist Mono", monospace';
+  context.fillText("UNITED STATES GRAPHICS COMPANY", 96, 132);
+
+  context.fillStyle = "#f2d771";
+  context.font = '700 34px "Tomorrow", sans-serif';
+  context.fillText("TR-100 / WAITING FOR STREAM", 96, 204);
+
+  context.fillStyle = "#d6cec3";
+  context.font = '500 20px "Geist Mono", monospace';
+  context.fillText("Surface feed is online once a frame arrives.", 96, 252);
+  context.fillText("Fallback texture doubles as machine report.", 96, 286);
+  context.fillText("Signal path: ws://localhost:8765", 96, 320);
 
   const texture = new CanvasTexture(canvas);
   configureTexture(texture, renderer);

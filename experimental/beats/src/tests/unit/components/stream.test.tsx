@@ -20,6 +20,10 @@ vi.mock("@/actions/ws/providers/ImageProvider", () => ({
   useStreamedImage: () => streamedImageState,
 }));
 
+vi.mock("@/actions/ws/providers/PeripheralProvider", () => ({
+  useConnectedPeripherals: () => ({}),
+}));
+
 vi.mock("@/actions/ws/websocket", () => ({
   useWS: () => websocketState,
 }));
@@ -57,7 +61,9 @@ describe("Stream", () => {
     render(<Stream />);
 
     expect(screen.getByText(/fps:/i)).toHaveTextContent("fps: 24");
-    expect(screen.getByText("ws://localhost:8765/stream")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("ws://localhost:8765/stream").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
   });
 });

@@ -1,16 +1,21 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import type { StreamEvent } from "../protocol";
 import { peripheralStream } from "../streams";
 
 type PeripheralEvent = {
   ts: number;
-  msg: any;
+  msg: Extract<StreamEvent, { type: "peripheral" }>;
 };
 
 type PeripheralEventList = PeripheralEvent[];
 
 const PeripheralEventsContext = createContext<PeripheralEventList>([]);
 
-export function PeripheralEventsProvider({ children }: { children: React.ReactNode }) {
+export function PeripheralEventsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [events, setEvents] = useState<PeripheralEventList>([]);
 
   useEffect(() => {
@@ -36,8 +41,8 @@ export function usePeripheralEvents() {
 }
 
 export function useSpecificPeripheralEvents(peripheralId: string) {
-    const events = useContext(PeripheralEventsContext);
-    return events.filter(
-      (event) => event.msg.payload.peripheralInfo.id === peripheralId,
-    );
-  }
+  const events = useContext(PeripheralEventsContext);
+  return events.filter(
+    (event) => event.msg.payload.peripheralInfo.id === peripheralId,
+  );
+}

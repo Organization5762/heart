@@ -59,11 +59,7 @@ async function setupORPC() {
   });
 }
 
-app
-  .whenReady()
-  .then(createWindow)
-  .then(installExtensions)
-  .then(setupORPC);
+app.whenReady().then(createWindow).then(installExtensions).then(setupORPC);
 
 // osX only
 app.on("window-all-closed", () => {

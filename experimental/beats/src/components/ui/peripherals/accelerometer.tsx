@@ -37,14 +37,14 @@ export const AccelerometerView: React.FC<Props> = ({
     return (
       <div
         className={
-          "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+          "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
           (className ?? "")
         }
       >
-        <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+        <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
           Acceleration
         </span>
-        <p className="text-[0.7rem] text-muted-foreground font-mono">
+        <p className="text-muted-foreground font-mono text-[0.7rem]">
           No acceleration events yet for {peripheral.id ?? "accelerometer"}.
         </p>
       </div>
@@ -61,9 +61,9 @@ export const AccelerometerView: React.FC<Props> = ({
     Math.abs(acc.x),
     Math.abs(acc.y),
     Math.abs(acc.z),
-    0.1
+    0.1,
   );
-  
+
   // “Forgiving” range: don’t let it go below 1, but otherwise follow the max
   const range = maxAbs < 1 ? 1 : maxAbs;
 
@@ -76,26 +76,24 @@ export const AccelerometerView: React.FC<Props> = ({
   return (
     <div
       className={
-        "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+        "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
         (className ?? "")
       }
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col">
-          <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
             Acceleration
           </span>
           <span className="font-mono text-sm">
             {peripheral.id ?? "accelerometer"}
           </span>
         </div>
-        <div className="flex flex-col items-end text-[0.7rem] font-mono text-muted-foreground">
+        <div className="text-muted-foreground flex flex-col items-end font-mono text-[0.7rem]">
           <span>
             |a|:{" "}
-            <span className="text-foreground">
-              {formatNumber(mag)} m/s²
-            </span>
+            <span className="text-foreground">{formatNumber(mag)} m/s²</span>
           </span>
           <span className="text-muted-foreground">
             range ±{formatNumber(range)} m/s²
@@ -105,7 +103,7 @@ export const AccelerometerView: React.FC<Props> = ({
 
       <div className="flex gap-3">
         {/* Bars visualization */}
-        <div className="relative w-2/3 min-w-[220px] rounded-xl border border-border bg-muted/40 px-2 py-3">
+        <div className="border-border bg-muted/40 relative w-2/3 min-w-[220px] border px-2 py-3">
           <svg viewBox="0 0 120 60" className="h-full w-full">
             {/* center vertical line */}
             <line
@@ -124,22 +122,21 @@ export const AccelerometerView: React.FC<Props> = ({
               const centerX = 60;
               const rowY = 15 + idx * 15; // 15, 30, 45
               const maxBarHalf = 50; // max half width
-                // Raw ratio of this axis vs range
+              // Raw ratio of this axis vs range
               const rawRatio = Math.abs(value) / range;
 
-            // Eased scaling: sqrt makes small values more visible,
-            // while big values still reach near full bar length.
-            const easedRatio = Math.sqrt(Math.min(rawRatio, 1));
+              // Eased scaling: sqrt makes small values more visible,
+              // while big values still reach near full bar length.
+              const easedRatio = Math.sqrt(Math.min(rawRatio, 1));
 
-            // Final length in SVG units
-            const barLength = easedRatio * maxBarHalf;
+              // Final length in SVG units
+              const barLength = easedRatio * maxBarHalf;
 
-            // Keep a tiny minimum so non-zero values never look like a dot
-            const finalLength = value === 0 ? 0 : Math.max(barLength, 6);
+              // Keep a tiny minimum so non-zero values never look like a dot
+              const finalLength = value === 0 ? 0 : Math.max(barLength, 6);
 
-            const isPositive = value >= 0;
-            const barX =
-            centerX + (isPositive ? 0 : -finalLength); // start left or right of center
+              const isPositive = value >= 0;
+              const barX = centerX + (isPositive ? 0 : -finalLength); // start left or right of center
 
               return (
                 <g key={axis.key} className="p-4">
@@ -190,40 +187,34 @@ export const AccelerometerView: React.FC<Props> = ({
             })}
           </svg>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-1 flex select-none justify-center text-[0.6rem] font-mono text-muted-foreground">
+          <div className="text-muted-foreground pointer-events-none absolute inset-x-0 bottom-1 flex justify-center font-mono text-[0.6rem] select-none">
             <span>Negative &larr; X axis &rarr; Positive (per row)</span>
           </div>
         </div>
 
         {/* Details panel */}
         <div className="flex-1 space-y-2">
-          <div className="rounded-lg border border-border/70 bg-background/80 p-2 font-mono text-[0.7rem]">
+          <div className="border-border/70 bg-background/80 border p-2 font-mono text-[0.7rem]">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-muted-foreground">Components (m/s²)</span>
             </div>
             <div className="grid grid-cols-3 gap-1">
               <div>
                 <div className="text-muted-foreground">x</div>
-                <div className="text-foreground">
-                  {formatNumber(acc.x)}
-                </div>
+                <div className="text-foreground">{formatNumber(acc.x)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground">y</div>
-                <div className="text-foreground">
-                  {formatNumber(acc.y)}
-                </div>
+                <div className="text-foreground">{formatNumber(acc.y)}</div>
               </div>
               <div>
                 <div className="text-muted-foreground">z</div>
-                <div className="text-foreground">
-                  {formatNumber(acc.z)}
-                </div>
+                <div className="text-foreground">{formatNumber(acc.z)}</div>
               </div>
             </div>
           </div>
 
-          <p className="text-[0.6rem] font-mono text-muted-foreground">
+          <p className="text-muted-foreground font-mono text-[0.6rem]">
             Each row shows acceleration along one axis, centered at 0. Bar
             length encodes magnitude; side encodes sign.
           </p>

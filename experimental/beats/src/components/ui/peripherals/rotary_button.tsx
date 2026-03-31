@@ -33,14 +33,14 @@ export const RotarySwitchView: React.FC<Props> = ({
     return (
       <div
         className={
-          "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+          "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
           (className ?? "")
         }
       >
-        <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+        <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
           Rotary Switch
         </span>
-        <p className="text-[0.7rem] text-muted-foreground font-mono">
+        <p className="text-muted-foreground font-mono text-[0.7rem]">
           No switch events yet for {peripheral.id ?? "rotary_switch"}.
         </p>
       </div>
@@ -75,7 +75,7 @@ export const RotarySwitchView: React.FC<Props> = ({
   const maxSpan = Math.max(
     Math.abs(shortDelta),
     Math.abs(longDelta),
-    4 // minimum span so small moves are still visible
+    4, // minimum span so small moves are still visible
   );
 
   const shortRatio = clamp(Math.abs(shortDelta) / maxSpan, 0, 1);
@@ -96,20 +96,22 @@ export const RotarySwitchView: React.FC<Props> = ({
   const shortOffset = baseOffsetShort;
   const longOffset = baseOffsetLong;
 
-  const prevPayload = events[1]?.msg.payload as { data: SwitchState } | undefined;
+  const prevPayload = events[1]?.msg.payload as
+    | { data: SwitchState }
+    | undefined;
   const prevState = prevPayload?.data;
-  
+
   // how many presses happened since last event
   const buttonDelta =
     prevState != null
       ? Math.max(0, state.button_value - prevState.button_value)
       : 0;
-  
+
   const longButtonDelta =
     prevState != null
       ? Math.max(0, state.long_button_value - prevState.long_button_value)
       : 0;
-  
+
   // "pressed" now means "we saw at least one new press in this frame"
   const buttonPressed = buttonDelta > 0;
   const longPressed = longButtonDelta > 0;
@@ -117,14 +119,14 @@ export const RotarySwitchView: React.FC<Props> = ({
   return (
     <div
       className={
-        "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+        "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
         (className ?? "")
       }
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col">
-          <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
             Rotary Switch
           </span>
           <span className="font-mono text-sm">
@@ -132,7 +134,7 @@ export const RotarySwitchView: React.FC<Props> = ({
           </span>
         </div>
 
-        <div className="flex flex-col items-end text-[0.7rem] font-mono text-muted-foreground gap-1">
+        <div className="text-muted-foreground flex flex-col items-end gap-1 font-mono text-[0.7rem]">
           <span>
             step:{" "}
             <span className="text-foreground">
@@ -151,7 +153,7 @@ export const RotarySwitchView: React.FC<Props> = ({
 
       <div className="flex gap-3">
         {/* Dial */}
-        <div className="relative aspect-square w-2/3 min-w-[220px] rounded-xl border border-border bg-muted/40">
+        <div className="border-border bg-muted/40 relative aspect-square w-2/3 min-w-[220px] border">
           <svg viewBox="0 0 100 100" className="h-full w-full">
             {/* dial background */}
             <circle
@@ -167,7 +169,8 @@ export const RotarySwitchView: React.FC<Props> = ({
 
             {/* ticks */}
             {Array.from({ length: STEPS_PER_REV }).map((_, i) => {
-              const stepAngle = ((i / STEPS_PER_REV) * 360 - 90) * (Math.PI / 180);
+              const stepAngle =
+                ((i / STEPS_PER_REV) * 360 - 90) * (Math.PI / 180);
               const outerR = 30;
               const innerR = i % 4 === 0 ? 24 : 27;
               const ox = centerX + Math.cos(stepAngle) * outerR;
@@ -248,8 +251,8 @@ export const RotarySwitchView: React.FC<Props> = ({
           </svg>
 
           {/* legend labels on the dial */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-1 text-[0.6rem] font-mono text-muted-foreground">
-            <div className="flex justify-center gap-3 mt-1">
+          <div className="text-muted-foreground pointer-events-none absolute inset-0 flex flex-col justify-between p-1 font-mono text-[0.6rem]">
+            <div className="mt-1 flex justify-center gap-3">
               <span className="flex items-center gap-1">
                 <span className="inline-block h-[6px] w-[6px] rounded-full bg-emerald-400" />
                 since short press
@@ -259,7 +262,7 @@ export const RotarySwitchView: React.FC<Props> = ({
                 since long press
               </span>
             </div>
-            <div className="flex justify-center mb-1">
+            <div className="mb-1 flex justify-center">
               <span>Dial orientation follows rotational_value</span>
             </div>
           </div>
@@ -268,7 +271,7 @@ export const RotarySwitchView: React.FC<Props> = ({
         {/* Right side: button states & deltas */}
         <div className="flex-1 space-y-2">
           {/* button state */}
-          <div className="rounded-lg border border-border/70 bg-background/80 p-2 font-mono text-[0.7rem] space-y-2">
+          <div className="border-border/70 bg-background/80 space-y-2 border p-2 font-mono text-[0.7rem]">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Buttons</span>
             </div>
@@ -277,10 +280,10 @@ export const RotarySwitchView: React.FC<Props> = ({
                 <span className="text-muted-foreground">short</span>
                 <span
                   className={
-                    "px-2 py-[1px] rounded-full text-[0.65rem] uppercase tracking-wide " +
+                    "rounded-full px-2 py-[1px] text-[0.65rem] tracking-wide uppercase " +
                     (buttonPressed
-                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/40"
-                      : "bg-muted text-muted-foreground border border-border/70")
+                      ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+                      : "bg-muted text-muted-foreground border-border/70 border")
                   }
                 >
                   {buttonPressed ? `Pressed ×${buttonDelta}` : "No new press"}
@@ -290,10 +293,10 @@ export const RotarySwitchView: React.FC<Props> = ({
                 <span className="text-muted-foreground">long</span>
                 <span
                   className={
-                    "px-2 py-[1px] rounded-full text-[0.65rem] uppercase tracking-wide " +
+                    "rounded-full px-2 py-[1px] text-[0.65rem] tracking-wide uppercase " +
                     (longPressed
-                      ? "bg-indigo-500/10 text-indigo-500 border border-indigo-500/40"
-                      : "bg-muted text-muted-foreground border border-border/70")
+                      ? "border border-indigo-500/40 bg-indigo-500/10 text-indigo-500"
+                      : "bg-muted text-muted-foreground border-border/70 border")
                   }
                 >
                   {longPressed ? `Pressed ×${longButtonDelta}` : "No new press"}
@@ -303,9 +306,11 @@ export const RotarySwitchView: React.FC<Props> = ({
           </div>
 
           {/* rotation since presses */}
-          <div className="rounded-lg border border-border/70 bg-background/80 p-2 font-mono text-[0.7rem] space-y-2">
+          <div className="border-border/70 bg-background/80 space-y-2 border p-2 font-mono text-[0.7rem]">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Rotation since press</span>
+              <span className="text-muted-foreground">
+                Rotation since press
+              </span>
               <span className="text-muted-foreground">steps</span>
             </div>
             <div className="space-y-1">
@@ -317,7 +322,9 @@ export const RotarySwitchView: React.FC<Props> = ({
                 <span
                   className={
                     "text-foreground " +
-                    (shortDelta !== 0 ? "font-semibold" : "text-muted-foreground")
+                    (shortDelta !== 0
+                      ? "font-semibold"
+                      : "text-muted-foreground")
                   }
                 >
                   {shortDelta > 0 ? "+" : ""}
@@ -332,7 +339,9 @@ export const RotarySwitchView: React.FC<Props> = ({
                 <span
                   className={
                     "text-foreground " +
-                    (longDelta !== 0 ? "font-semibold" : "text-muted-foreground")
+                    (longDelta !== 0
+                      ? "font-semibold"
+                      : "text-muted-foreground")
                   }
                 >
                   {longDelta > 0 ? "+" : ""}
@@ -342,7 +351,7 @@ export const RotarySwitchView: React.FC<Props> = ({
             </div>
           </div>
 
-          <p className="text-[0.6rem] font-mono text-muted-foreground">
+          <p className="text-muted-foreground font-mono text-[0.6rem]">
             Needle shows current rotary position. Coloured rings encode how far
             you&apos;ve rotated since the last short and long button presses.
           </p>
