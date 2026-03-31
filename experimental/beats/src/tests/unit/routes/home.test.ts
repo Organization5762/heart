@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatPeripheralRecency,
+  selectStableRecentPeripheralActivity,
   summarizeRecentPeripheralActivity,
 } from "@/routes/index";
 
@@ -80,6 +81,28 @@ describe("home recent peripheral activity", () => {
     );
 
     expect(summary).toEqual([]);
+  });
+
+  it("preserves visible ordering while appending newly active devices", () => {
+    const activeDevices = [
+      { id: "delta", lastSeenTs: 99_000, eventCount: 3 },
+      { id: "alpha", lastSeenTs: 98_000, eventCount: 2 },
+      { id: "gamma", lastSeenTs: 97_000, eventCount: 1 },
+      { id: "beta", lastSeenTs: 96_000, eventCount: 1 },
+    ];
+
+    const summary = selectStableRecentPeripheralActivity(
+      ["alpha", "beta", "gamma"],
+      activeDevices,
+      4,
+    );
+
+    expect(summary.map((device) => device.id)).toEqual([
+      "alpha",
+      "beta",
+      "gamma",
+      "delta",
+    ]);
   });
 
   it("formats recency labels for fast-moving devices", () => {

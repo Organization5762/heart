@@ -12,6 +12,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
 - Vite `.mts` configs that are shared with Storybook or other native-ESM tooling must derive `__dirname` via `fileURLToPath(new URL(".", import.meta.url))` instead of relying on the CommonJS global.
+- Beats websocket protobuf decoders must accept both snake_case and camelCase field names from `protobufjs` decode output so streamed frame rendering does not depend on field-name normalization details.
 
 ## Formatting
 
@@ -117,6 +118,11 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/app-sidebar.tsx src/components/usgc.tsx`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/app-sidebar.tsx src/components/usgc.tsx`
 - `2026-03-31`: No tests run after restacking the Beats sidebar `Program` and `Signal` metadata rows because the change was limited to presentational layout in existing React components.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/peripheral-sensor-deck.tsx src/tests/unit/components/peripheral-sensor-deck.test.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/peripheral-sensor-deck.test.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/actions/ws/protocol.test.ts src/tests/unit/actions/ws/websocket.test.tsx`
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
@@ -266,6 +272,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/styles/global.css`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx`
 - `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/sensor-simulation.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`

@@ -14,7 +14,7 @@ import {
 } from "@/components/usgc";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 const RECENT_DEVICE_LIMIT = 4;
 const RECENT_ACTIVITY_WINDOW_MS = 60_000;
@@ -61,11 +61,43 @@ export type RecentPeripheralActivity = {
   eventCount: number;
 };
 
+export function selectStableRecentPeripheralActivity(
+  previousVisibleIds: string[],
+  activeDevices: RecentPeripheralActivity[],
+  limit = RECENT_DEVICE_LIMIT,
+): RecentPeripheralActivity[] {
+  const activeById = new Map(
+    activeDevices.map((activity) => [activity.id, activity] as const),
+  );
+  const stableVisibleDevices: RecentPeripheralActivity[] = [];
+  const seenIds = new Set<string>();
+
+  for (const id of previousVisibleIds) {
+    const activity = activeById.get(id);
+    if (!activity) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(id);
+  }
+
+  for (const activity of activeDevices) {
+    if (seenIds.has(activity.id)) {
+      continue;
+    }
+
+    stableVisibleDevices.push(activity);
+    seenIds.add(activity.id);
+  }
+
+  return stableVisibleDevices.slice(0, limit);
+}
+
 export function summarizeRecentPeripheralActivity(
   peripheralEntries: HomePeripheralSnapshot[],
   events: HomePeripheralEvent[],
   now: number,
-  limit = RECENT_DEVICE_LIMIT,
 ): RecentPeripheralActivity[] {
   const activityById = new Map<string, RecentPeripheralActivity>();
 
@@ -122,8 +154,7 @@ export function summarizeRecentPeripheralActivity(
       }
 
       return left.id.localeCompare(right.id);
-    })
-    .slice(0, limit);
+    });
 }
 
 export function formatPeripheralRecency(
@@ -152,6 +183,7 @@ function HomePage() {
   const [appVersion, setAppVersion] = useState("0.0.0");
   const [now, setNow] = useState(() => Date.now());
   const [, startGetAppVersion] = useTransition();
+  const recentPeripheralOrderRef = useRef<string[]>([]);
 
   useEffect(
     () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
@@ -170,10 +202,17 @@ function HomePage() {
     (left, right) => right.ts - left.ts,
   );
   const readyStateLabel = getReadyStateLabel(ws.readyState);
-  const recentPeripheralActivity = summarizeRecentPeripheralActivity(
+  const activePeripheralActivity = summarizeRecentPeripheralActivity(
     peripheralEntries,
     events,
     now,
+  );
+  const recentPeripheralActivity = selectStableRecentPeripheralActivity(
+    recentPeripheralOrderRef.current,
+    activePeripheralActivity,
+  );
+  recentPeripheralOrderRef.current = recentPeripheralActivity.map(
+    (device) => device.id,
   );
 
   return (
