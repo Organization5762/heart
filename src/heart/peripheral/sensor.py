@@ -4,6 +4,7 @@ import random
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from threading import Thread
 from typing import Any, Iterator, Mapping, NoReturn, Self, cast
 
 import reactivex
@@ -20,6 +21,7 @@ from heart.utilities.reactivex_threads import (interval_in_background,
 
 logger = get_logger(__name__)
 RECONNECT_DELAY_SECONDS = 1.0
+ACCELEROMETER_THREAD_NAME = "peripheral-accelerometer"
 
 
 @dataclass
@@ -61,7 +63,14 @@ class Accelerometer(Peripheral[Acceleration | None]):
     def _connect_to_ser(self) -> serial.Serial:
         return serial.Serial(self.port, self.baudrate, timeout=1.0)
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
+        Thread(
+            name=ACCELEROMETER_THREAD_NAME,
+            target=self._run_loop,
+            daemon=True,
+        ).start()
+
+    def _run_loop(self) -> NoReturn:
         # If it crashes, try to re-connect
         while True:
             try:

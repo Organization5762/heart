@@ -252,23 +252,53 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.frame_export_strategy()
 
-    def test_reactivex_event_bus_scheduler_defaults_inline(
+    def test_reactivex_background_max_workers_defaults_to_four(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify the event bus scheduler defaults to inline so delivery stays predictable by default."""
-        _clear_env(monkeypatch, "HEART_RX_EVENT_BUS_SCHEDULER")
+        """Verify background worker count defaults to four so shared background scheduling stays bounded without extra configuration."""
+        _clear_env(monkeypatch, "HEART_RX_BACKGROUND_MAX_WORKERS")
 
-        assert Configuration.reactivex_event_bus_scheduler() == "inline"
+        assert Configuration.reactivex_background_max_workers() == 4
 
-
-    def test_reactivex_event_bus_scheduler_rejects_invalid_value(
+    def test_reactivex_background_max_workers_reads_env(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify invalid event bus scheduler values fail fast to keep configuration errors visible."""
-        monkeypatch.setenv("HEART_RX_EVENT_BUS_SCHEDULER", "nope")
+        """Verify background worker count reads the environment so shared scheduler capacity is measurable and configurable."""
+        monkeypatch.setenv("HEART_RX_BACKGROUND_MAX_WORKERS", "6")
 
-        with pytest.raises(ValueError):
-            Configuration.reactivex_event_bus_scheduler()
+        assert Configuration.reactivex_background_max_workers() == 6
+
+    def test_reactivex_blocking_io_max_workers_defaults_to_two(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify blocking-IO worker count defaults to two so slow readers stay isolated without spawning unbounded workers."""
+        _clear_env(monkeypatch, "HEART_RX_BLOCKING_IO_MAX_WORKERS")
+
+        assert Configuration.reactivex_blocking_io_max_workers() == 2
+
+    def test_reactivex_blocking_io_max_workers_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify blocking-IO worker count reads the environment so serial and BLE isolation can be tuned deliberately."""
+        monkeypatch.setenv("HEART_RX_BLOCKING_IO_MAX_WORKERS", "3")
+
+        assert Configuration.reactivex_blocking_io_max_workers() == 3
+
+    def test_reactivex_input_max_workers_defaults_to_two(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify input worker count defaults to two so polling stays isolated without extra configuration."""
+        _clear_env(monkeypatch, "HEART_RX_INPUT_MAX_WORKERS")
+
+        assert Configuration.reactivex_input_max_workers() == 2
+
+    def test_reactivex_input_max_workers_reads_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify input worker count reads the environment so polling capacity changes affect runtime behaviour intentionally."""
+        monkeypatch.setenv("HEART_RX_INPUT_MAX_WORKERS", "5")
+
+        assert Configuration.reactivex_input_max_workers() == 5
 
     def test_reactivex_stream_refcount_grace_defaults_to_zero(
         self, monkeypatch: pytest.MonkeyPatch

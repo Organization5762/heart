@@ -58,12 +58,6 @@ class DeviceLayoutMode(StrEnum):
     RECTANGLE = "rectangle"
 
 
-class ReactivexEventBusScheduler(StrEnum):
-    INLINE = "inline"
-    BACKGROUND = "background"
-    INPUT = "input"
-
-
 class ReactivexStreamShareStrategy(StrEnum):
     SHARE = "share"
     SHARE_AUTO_CONNECT = "share_auto_connect"

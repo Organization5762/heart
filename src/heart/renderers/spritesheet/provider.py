@@ -104,10 +104,8 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[SpritesheetLoopState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
-        ticks = peripheral_manager.game_tick
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
@@ -121,12 +119,11 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             )
 
         tick_updates = pipe_in_background(
-            ticks,
-            ops.with_latest_from(clocks),
+            frame_ticks,
             ops.map(
-                lambda latest: lambda state: self.advance(
+                lambda frame_tick: lambda state: self.advance(
                     state,
-                    elapsed_ms=latest[1].get_time(),
+                    elapsed_ms=frame_tick.delta_ms,
                 )
             ),
         )

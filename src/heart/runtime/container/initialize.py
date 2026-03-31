@@ -8,6 +8,13 @@ from lagom import Singleton
 
 from heart.device import Device
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile,
+                                         FrameTickController,
+                                         GamepadController, InputDebugTap,
+                                         KeyboardController,
+                                         MandelbrotControlProfile,
+                                         NavigationProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -60,6 +67,51 @@ def configure_runtime_container(
     )
     _define_default(
         container, PeripheralManager, Singleton(_build_peripheral_manager), override_keys
+    )
+    _define_default(
+        container, InputDebugTap, Singleton(_resolve_input_debug_tap), override_keys
+    )
+    _define_default(
+        container,
+        FrameTickController,
+        Singleton(_resolve_frame_tick_controller),
+        override_keys,
+    )
+    _define_default(
+        container,
+        KeyboardController,
+        Singleton(_resolve_keyboard_controller),
+        override_keys,
+    )
+    _define_default(
+        container,
+        GamepadController,
+        Singleton(_resolve_gamepad_controller),
+        override_keys,
+    )
+    _define_default(
+        container,
+        NavigationProfile,
+        Singleton(_resolve_navigation_profile),
+        override_keys,
+    )
+    _define_default(
+        container,
+        AccelerometerController,
+        Singleton(_resolve_accelerometer_controller),
+        override_keys,
+    )
+    _define_default(
+        container,
+        AccelerometerDebugProfile,
+        Singleton(_resolve_accelerometer_debug_profile),
+        override_keys,
+    )
+    _define_default(
+        container,
+        MandelbrotControlProfile,
+        Singleton(_resolve_mandelbrot_control_profile),
+        override_keys,
     )
     _define_default(
         container, ConfigurationRegistry, Singleton(ConfigurationRegistry), override_keys
@@ -127,9 +179,55 @@ def _build_peripheral_manager(
     return PeripheralManager(
         configuration_loader=container.resolve(PeripheralConfigurationLoader)
     )
+
+
 def _build_game_modes(container: RuntimeContainer) -> Any:
     GameModes = _game_modes_type()
     return GameModes(renderer_resolver=container)
+
+
+def _resolve_input_debug_tap(container: RuntimeContainer) -> InputDebugTap:
+    return container.resolve(PeripheralManager).debug_tap
+
+
+def _resolve_frame_tick_controller(
+    container: RuntimeContainer,
+) -> FrameTickController:
+    return container.resolve(PeripheralManager).frame_tick_controller
+
+
+def _resolve_keyboard_controller(
+    container: RuntimeContainer,
+) -> KeyboardController:
+    return container.resolve(PeripheralManager).keyboard_controller
+
+
+def _resolve_gamepad_controller(
+    container: RuntimeContainer,
+) -> GamepadController:
+    return container.resolve(PeripheralManager).gamepad_controller
+
+
+def _resolve_navigation_profile(container: RuntimeContainer) -> NavigationProfile:
+    return container.resolve(PeripheralManager).navigation_profile
+
+
+def _resolve_accelerometer_controller(
+    container: RuntimeContainer,
+) -> AccelerometerController:
+    return container.resolve(PeripheralManager).accelerometer_controller
+
+
+def _resolve_accelerometer_debug_profile(
+    container: RuntimeContainer,
+) -> AccelerometerDebugProfile:
+    return container.resolve(PeripheralManager).accelerometer_debug_profile
+
+
+def _resolve_mandelbrot_control_profile(
+    container: RuntimeContainer,
+) -> MandelbrotControlProfile:
+    return container.resolve(PeripheralManager).mandelbrot_control_profile
 
 
 def _build_game_loop_components(

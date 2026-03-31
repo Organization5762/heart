@@ -1,7 +1,6 @@
 import os
 
-from heart.utilities.env.enums import (ReactivexEventBusScheduler,
-                                       ReactivexStreamConnectMode,
+from heart.utilities.env.enums import (ReactivexStreamConnectMode,
                                        ReactivexStreamShareStrategy)
 from heart.utilities.env.parsing import _env_int, _env_optional_int
 
@@ -15,18 +14,12 @@ class ReactivexConfiguration:
         return _env_int("HEART_RX_BACKGROUND_MAX_WORKERS", default=4, minimum=1)
 
     @classmethod
-    def reactivex_input_max_workers(cls) -> int:
-        return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
+    def reactivex_blocking_io_max_workers(cls) -> int:
+        return _env_int("HEART_RX_BLOCKING_IO_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
-    def reactivex_event_bus_scheduler(cls) -> ReactivexEventBusScheduler:
-        scheduler = os.environ.get("HEART_RX_EVENT_BUS_SCHEDULER", "inline").strip().lower()
-        try:
-            return ReactivexEventBusScheduler(scheduler)
-        except ValueError as exc:
-            raise ValueError(
-                "HEART_RX_EVENT_BUS_SCHEDULER must be 'inline', 'background', or 'input'"
-            ) from exc
+    def reactivex_input_max_workers(cls) -> int:
+        return _env_int("HEART_RX_INPUT_MAX_WORKERS", default=2, minimum=1)
 
     @classmethod
     def reactivex_stream_share_strategy(cls) -> ReactivexStreamShareStrategy:

@@ -20,7 +20,7 @@ Summarise how `PeripheralManager` discovers and manages devices so new periphera
 
 - Switches (`Switch`, `BluetoothSwitch`) register first, with `FakeSwitch` providing a fallback when hardware is absent.
 - Motion sensors (`Accelerometer`) and other devices (gamepads, heart-rate monitors, phone text) follow, each appended to `self._peripherals`.
-- The first switch is cached as the legacy "main switch" to support older APIs while keeping the manager authoritative.
+- Manager-owned controller services (`FrameTickController`, `KeyboardController`, `GamepadController`, and logical profiles) sit on top of the detected peripherals so downstream code consumes shared Rx services instead of a merged event bus.
 
 ## Threading Model
 
@@ -30,7 +30,7 @@ Calling `start()` launches a daemon thread per peripheral invoking its `run()` m
 
 1. Implement the `Peripheral` interface with a `detect()` classmethod returning instances.
 1. Extend `_iter_detected_peripherals()` (or a specialised helper) to yield the new devices.
-1. Provide accessors if other subsystems need direct references (for example, `get_gamepad()`).
+1. Prefer exposing new shared controller or profile services instead of adding raw manager accessors; keep direct accessors such as `get_gamepad()` only for compatibility.
 1. Supply a fake implementation for developer environments without hardware when feasible.
 
 ## Conclusion

@@ -2,35 +2,37 @@
 
 ## Summary
 
-- Reworked keyboard event payloads to carry a single `KeyState` snapshot plus the
-  key name so debug tooling can inspect a complete state transition in one
-  object.
-- Tightened input declarations for peripherals and observable providers so each
-  descriptor exposes a filtered stream of exactly the input payload it consumes.
+- Reworked keyboard handling around one shared `KeyboardController` so raw key
+  snapshots, key-state views, and logical profiles all consume the same source.
+- Moved fake-switch and accelerometer-debug keyboard mappings out of ad hoc
+  per-scene wiring and into shared logical profiles.
 
 ## Motivation
 
-Debug tooling for fake peripherals benefits when keyboard events describe their
-state transitions in a single payload, and when input descriptors already match
-what downstream consumers handle. The new keyboard event structure now bundles
-state alongside the action and key metadata, and the input descriptors for
-`DrawingPad`, `FakeSwitch`, and observable providers only emit the payloads
-those components consume.
+Debug tooling is more useful when every keyboard-derived behaviour can be traced
+back to one controller. The rewrite keeps the detailed `KeyboardEvent` payloads,
+but moves most consumers onto `KeyboardController` views so navigation,
+accelerometer debugging, and Mandelbrot controls no longer each build their own
+polling path.
 
 ## Implementation notes
 
-- `heart.peripheral.keyboard.KeyboardEvent` now includes `key_name` and a single
-  `KeyState` snapshot (`pressed`, `held`, `last_change_ms`).
-- `heart.peripheral.switch.FakeSwitch` uses a dedicated key-press stream helper
-  so input declarations and runtime subscriptions both consume pressed edges.
-- `heart.peripheral.drawing_pad.DrawingPad` input descriptors now filter the
-  event bus to the two supported event types and expose only the payloads.
-- Observable providers return input descriptors that already unwrap or filter
-  the peripheral envelopes into the payload type they advertise.
+- `heart.peripheral.core.input.keyboard.KeyboardController` owns keyboard
+  snapshots plus shared `key_pressed`, `key_released`, `key_held`, and
+  `key_state` views.
+- `heart.peripheral.core.input.profiles.navigation.NavigationProfile` maps arrow
+  keys to logical browse and activation outputs shared by `FakeSwitch`,
+  `GameModes`, and `MultiScene`.
+- `heart.peripheral.core.input.accelerometer.AccelerometerDebugProfile` maps
+  `A/D`, `W/S`, `Q/E`, and `Space` onto a synthetic accelerometer vector for
+  desktop debugging.
+- `heart.peripheral.keyboard.KeyboardEvent` remains the low-level event payload
+  for raw key edges and debug inspection.
 
 ## Materials
 
-- Pygame keyboard state polling (`pygame.key.get_pressed`) in
-  `src/heart/peripheral/keyboard.py`.
-- Input descriptor definitions in `src/heart/peripheral/core/__init__.py`.
-- Fake switch keyboard mappings in `src/heart/peripheral/switch.py`.
+- Shared keyboard controller in `src/heart/peripheral/core/input/keyboard.py`.
+- Navigation mappings in `src/heart/peripheral/core/input/profiles/navigation.py`.
+- Debug accelerometer mappings in
+  `src/heart/peripheral/core/input/accelerometer.py`.
+- Compatibility keyboard event type in `src/heart/peripheral/keyboard.py`.

@@ -1,10 +1,5 @@
-import atexit
-import threading
-import time
-
 import pygame
 import reactivex
-import requests
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -16,9 +11,6 @@ from heart.renderers.yolisten.state import YoListenState
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
-PHYPOX_URL = "http://192.168.1.50/get?accY&accX&accZ&dB"
-PHYPOX_POLL_INTERVAL_SECONDS = 0.05
-PHYPOX_LOG_POLL_INTERVAL_SECONDS = 0.1
 DEFAULT_BASE_COLOR = Color(255, 0, 0)
 logger = get_logger(__name__)
 
@@ -57,21 +49,10 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         }
         self.flash_delay = 100
         self.ascii_font_sizes: dict[str, int] = {}
-        self.phyphox_accel_x = 0.0
-        self.phyphox_accel_y = 0.0
-        self.phyphox_accel_z = 0.0
-        self.use_phyphox = False
-        if self.use_phyphox:
-            t = threading.Thread(
-                target=self._poll_phyphox_background,
-                name="YoListen phyphox poller",
-            ).start()
-            atexit.register(t.join, timeout=1)
         self.sim_accel_x = 0.0
         self.sim_accel_y = 0.0
         self.sim_accel_step = 0.1
         self.test_mode = False
-        self.phyphox_db = 50.0
         self.provider = provider or YoListenStateProvider(
             resolved_color,
             base_scroll_speed=self._base_scroll_speed,
@@ -129,19 +110,6 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                     text_surface,
                     (x_centered, y_offset + j * (self.ascii_font_sizes[word] + 1)),
                 )
-
-    def _poll_phyphox_background(self):
-        while True:
-            try:
-                resp = requests.get(PHYPOX_URL, timeout=1)
-                data = resp.json()
-                self.phyphox_accel_x = data["buffer"]["accX"]["buffer"][-1]
-                self.phyphox_accel_y = data["buffer"]["accY"]["buffer"][-1]
-                self.phyphox_accel_z = data["buffer"]["accZ"]["buffer"][-1]
-                self.phyphox_db = data["buffer"]["dB"]["buffer"][-1]
-            except Exception:
-                logger.exception("Failed to poll phyphox data")
-            time.sleep(PHYPOX_POLL_INTERVAL_SECONDS)
 
     def real_process(
         self,
@@ -262,17 +230,3 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[YoListenState]:
         return self.provider.observable(peripheral_manager)
-
-
-def poll_phyphox():
-    while True:
-        try:
-            resp = requests.get(PHYPOX_URL, timeout=1)
-            data = resp.json()
-            x = data["buffer"]["acceleration"]["x"][-1]
-            y = data["buffer"]["acceleration"]["y"][-1]
-            z = data["buffer"]["acceleration"]["z"][-1]
-            logger.info("Phyphox acceleration x=%s, y=%s, z=%s", x, y, z)
-        except Exception:
-            logger.exception("Error")
-        time.sleep(PHYPOX_LOG_POLL_INTERVAL_SECONDS)

@@ -31,18 +31,22 @@ Configuration modules typically:
 ## Peripheral Event Flow
 
 - `heart.peripheral.core.manager.PeripheralManager` discovers hardware, starts each device on a
-  background thread, and publishes events through the shared `EventBus`.
-- `heart.peripheral.core.event_bus` hosts virtual peripherals (for example,
-  `double_tap_virtual_peripheral`) that aggregate raw inputs into higher-level events.
-- `GameModes` subscribes to mode-selection inputs, while renderers read the shared
-  `PeripheralManager` streams and state they need during initialization and rendering.
+  background thread, and owns the shared input controller and profile services.
+- `heart.peripheral.core.input.frame.FrameTickController` publishes one timing snapshot per loop,
+  which renderer providers consume directly.
+- `heart.peripheral.core.input.keyboard.KeyboardController` and
+  `heart.peripheral.core.input.gamepad.GamepadController` expose reusable input views that
+  logical profiles build on.
+- `heart.peripheral.core.input.profiles.navigation.NavigationProfile` emits browse and activate
+  intents that `GameModes` subscribes to for mode selection.
+- `heart.peripheral.core.input.debug.InputDebugTap` records raw, view, logical, and frame
+  emissions so tests and runtime diagnostics can trace input flow without a synchronous event bus.
 
 ## Feedback Frames
 
-The LED matrix peripheral emits rendered frames into the same event bus (payload
-`peripheral.display.frame`) so downstream services can compute derived signals or metrics without
-re-touching the renderers. This keeps outputs observable and enables recursive feedback loops
-(e.g., ambient sampling from the current output).
+Rendered frame outputs still remain observable through runtime composition and display services,
+but input tracing is now handled through `InputDebugTap` rather than the deleted shared input
+event bus.
 
 ## Metrics and Logging
 
@@ -52,8 +56,8 @@ re-touching the renderers. This keeps outputs observable and enables recursive f
 ## ReactiveX Tuning
 
 Reactive streams can be tuned with environment variables for debounce and buffer sizes. The
-current tuning knobs live in `heart.runtime.reactive` and are surfaced by configuration modules
-that orchestrate Rx pipelines.
+current tuning knobs live in the shared Rx utilities and affect controller, profile, and provider
+pipelines that orchestrate runtime input and rendering.
 
 ## Related References
 

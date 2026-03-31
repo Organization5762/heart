@@ -6,6 +6,7 @@ from reactivex.subject import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
+from heart.peripheral.core.input import FrameTick
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription,
                                          LoopPhase, Size, SpritesheetLoop)
@@ -45,6 +46,34 @@ class _StubGamepad:
 
 
 class _StubPeripheralManager:
+    class _StubFrameTickController:
+        def __init__(self) -> None:
+            self._stream = BehaviorSubject(
+                FrameTick(
+                    frame_index=0,
+                    delta_ms=0.0,
+                    delta_s=0.0,
+                    monotonic_s=0.0,
+                    fps=None,
+                )
+            )
+            self._frame_index = 1
+
+        def observable(self):
+            return self._stream
+
+        def emit(self, *, delta_ms: float) -> None:
+            self._stream.on_next(
+                FrameTick(
+                    frame_index=self._frame_index,
+                    delta_ms=delta_ms,
+                    delta_s=delta_ms / 1000.0,
+                    monotonic_s=float(self._frame_index),
+                    fps=None,
+                )
+            )
+            self._frame_index += 1
+
     def __init__(
         self,
         *,
@@ -54,8 +83,7 @@ class _StubPeripheralManager:
         self._switch_state = switch_state or SwitchState(0, 0, 0, 0, 0)
         self._gamepad = gamepad
         self._switch_stream = BehaviorSubject(self._switch_state)
-        self.game_tick = BehaviorSubject(None)
-        self.clock = BehaviorSubject(None)
+        self.frame_tick_controller = self._StubFrameTickController()
 
     def get_main_switch_subscription(self):
         return self._switch_stream
@@ -110,8 +138,6 @@ class TestSpritesheetLoopProvider:
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
 
-        clock = stub_clock_factory(0, *([150] * 20))
-        manager.clock.on_next(clock)
         renderer = SpritesheetLoop(
             "irrelevant.png",
             disable_input=True,
@@ -122,7 +148,7 @@ class TestSpritesheetLoopProvider:
 
         history = []
         for _ in range(15):
-            manager.game_tick.on_next(True)
+            manager.frame_tick_controller.emit(delta_ms=150.0)
             history.append(renderer.state)
 
         assert all(0 <= state.current_frame < len(frame_data) for state in history)
@@ -147,8 +173,6 @@ class TestSpritesheetLoopProvider:
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
 
-        clock = stub_clock_factory(0)
-        manager.clock.on_next(clock)
         renderer = SpritesheetLoop(
             "irrelevant.png",
             disable_input=False,
@@ -156,21 +180,20 @@ class TestSpritesheetLoopProvider:
             frame_data=frame_data,
         )
         renderer.initialize(window, manager, orientation)
-        manager.game_tick.on_next(True)
+        manager.frame_tick_controller.emit(delta_ms=0.0)
 
         renderer.reset()
-        manager.clock.on_next(None)
         renderer.initialize(window, manager, orientation)
 
         state = renderer.state
 
         assert state.spritesheet is spritesheet
         assert state.gamepad is gamepad
-        assert state.current_frame == 0
+        assert state.current_frame == 1
         assert state.loop_count == 0
         assert state.phase == LoopPhase.LOOP
         assert state.duration_scale == pytest.approx(0.0)
-        assert state.time_since_last_update is None
+        assert state.time_since_last_update == 0
 
     def test_on_switch_state_updates_duration(
         self,
@@ -189,8 +212,6 @@ class TestSpritesheetLoopProvider:
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
 
-        clock = stub_clock_factory(0)
-        manager.clock.on_next(clock)
         renderer = SpritesheetLoop(
             "irrelevant.png",
             disable_input=False,
@@ -227,8 +248,6 @@ class TestSpritesheetLoopProvider:
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
 
-        clock = stub_clock_factory(0)
-        manager.clock.on_next(clock)
         renderer = SpritesheetLoop(
             "irrelevant.png",
             disable_input=True,

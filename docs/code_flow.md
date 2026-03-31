@@ -12,7 +12,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 
 ## Technical Approach
 
-Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, navigation state, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition now stays in `ComposedRenderer`, which handles scratch surfaces, mirrored tiling, and child renderer merges for both nested and top-level batches.
+Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, `GameModes`, shared input controllers and profiles, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition now stays in `ComposedRenderer`, which handles scratch surfaces, mirrored tiling, and child renderer merges for both nested and top-level batches. The input section distinguishes interval work, blocking peripheral IO, and the explicit frame-thread handoff drained from `PeripheralRuntime.tick()` so pygame-affine delivery is visible in the architecture itself.
 
 ## Flow Diagram
 
@@ -49,10 +49,18 @@ flowchart LR
     subgraph Inputs["Peripheral & Signal Services"]
         direction TB
         PeripheralMgr["PeripheralManager\n(background threads)"]
-        RxScheduler["Reactivex Thread Pool\n(shared scheduler)"]
+        FrameTick["FrameTickController"]
+        KeyboardCtrl["KeyboardController"]
+        GamepadCtrl["GamepadController"]
+        Profiles["Navigation / Mandelbrot /\nAccelerometer Debug Profiles"]
+        DebugTap["InputDebugTap"]
+        InputScheduler["Input Scheduler\n(shared bounded pool)"]
+        BlockingScheduler["Blocking IO Scheduler\n(shared bounded pool)"]
+        IntervalScheduler["Interval Scheduler\n(shared event loop)"]
+        FrameHandoff["Frame Thread Handoff Queue\n(drained in `PeripheralRuntime.tick()`)"]
         Switch["Switch / BluetoothSwitch"]
         Gamepad["Gamepad"]
-        Sensors["Accelerometer / Phyphox"]
+        Sensors["Accelerometer"]
         HeartRate["HeartRateManager"]
         PhoneText["PhoneText"]
     end
@@ -79,16 +87,29 @@ flowchart LR
     DisplaySvc --> Capture --> DeviceBridge --> LedMatrix
     Capture --> AverageMirror --> SingleLED
 
-    Loop --> PeripheralMgr --> RxScheduler
-    RxScheduler --> Switch --> ModeRouter
-    RxScheduler --> Gamepad --> ModeRouter
-    RxScheduler --> Sensors --> ModeServices
-    RxScheduler --> HeartRate --> ModeServices
-    RxScheduler --> PhoneText --> ModeServices
+    Loop --> PeripheralMgr --> IntervalScheduler
+    Loop --> PeripheralMgr --> InputScheduler
+    Loop --> PeripheralMgr --> BlockingScheduler
+    Loop --> PeripheralMgr --> FrameHandoff
+    Loop --> FrameTick --> ModeServices
+    BlockingScheduler --> Switch --> Profiles
+    InputScheduler --> FrameHandoff --> KeyboardCtrl
+    InputScheduler --> FrameHandoff --> Gamepad --> GamepadCtrl
+    BlockingScheduler --> Sensors --> Profiles
+    PeripheralMgr --> HeartRate --> ModeServices
+    PeripheralMgr --> PhoneText --> ModeServices
+    KeyboardCtrl --> Profiles --> ModeRouter
+    KeyboardCtrl --> ModeServices
+    GamepadCtrl --> Profiles
+    Profiles --> ModeServices
+    FrameTick --> DebugTap
+    KeyboardCtrl --> DebugTap
+    GamepadCtrl --> DebugTap
+    Profiles --> DebugTap
 
     class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,CompositionManager service;
     class Loop,ModeRouter orchestrator;
-    class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
+    class PeripheralMgr,FrameTick,KeyboardCtrl,GamepadCtrl,Profiles,DebugTap,InputScheduler,BlockingScheduler,IntervalScheduler,FrameHandoff,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
     class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,AverageMirror,SingleLED output;
 ```
 
