@@ -125,12 +125,14 @@ export function AppSidebar() {
             <DataRow
               label="Program"
               value="Machine Report"
-              className="text-sidebar-foreground"
+              className="text-sidebar-foreground grid-cols-1 gap-1"
+              valueClassName="break-normal"
             />
             <DataRow
               label="Signal"
               value="ws://localhost:8765"
-              className="text-sidebar-foreground"
+              className="text-sidebar-foreground grid-cols-1 gap-1"
+              valueClassName="break-all"
             />
           </div>
         </div>
