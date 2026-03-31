@@ -1,5 +1,4 @@
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -225,8 +224,3 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
                 self.word_widths[word] = text_width
 
         super().initialize(window, peripheral_manager, orientation)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[YoListenState]:
-        return self.provider.observable(peripheral_manager)

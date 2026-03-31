@@ -82,6 +82,7 @@ class BaseSwitch(Peripheral[SwitchState]):
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._navigation_subscription = None
 
     def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
         def _unwrap(envelope: PeripheralMessageEnvelope[KeyboardEvent]) -> KeyboardEvent:
@@ -128,23 +129,24 @@ class FakeSwitch(BaseSwitch):
                 return
 
             navigation = loop.peripheral_manager.navigation_profile
-
-            def handle_alternate_activate(_: Any) -> None:
-                self.button_long_press_value += 1
-                self.rotation_value_at_last_long_button_press = self.rotational_value
-
-            def handle_activate(_: Any) -> None:
-                self.button_value += 1
-                self.rotation_value_at_last_button_press = self.rotational_value
-
-            def handle_browse(delta: int) -> None:
-                self.rotational_value += delta
-
-            navigation.alternate_activate.subscribe(on_next=handle_alternate_activate)
-            navigation.activate.subscribe(on_next=handle_activate)
-            navigation.browse_delta.subscribe(on_next=handle_browse)
+            self._navigation_subscription = navigation.subscribe_events(
+                on_browse_delta=self._handle_browse,
+                on_activate=self._handle_activate,
+                on_alternate_activate=self._handle_alternate_activate,
+            )
         else:
             logger.warning("Not running FakeSwitch")
+
+    def _handle_alternate_activate(self, _: Any) -> None:
+        self.button_long_press_value += 1
+        self.rotation_value_at_last_long_button_press = self.rotational_value
+
+    def _handle_activate(self, _: Any) -> None:
+        self.button_value += 1
+        self.rotation_value_at_last_button_press = self.rotational_value
+
+    def _handle_browse(self, delta: int) -> None:
+        self.rotational_value += delta
 
     def _event_stream(
         self
