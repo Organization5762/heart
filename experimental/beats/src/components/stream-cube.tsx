@@ -22,8 +22,8 @@ const CAMERA_DISTANCE = 4;
 const ROTATION_DELTA = { x: 0.01, y: 0.015 } as const;
 const GRID_SIZE = 6;
 const GRID_DIVISIONS = 10;
-const GRID_COLOR = 0xffffff;
-const GRID_OPACITY = 0.18;
+const GRID_COLOR = 0x2b67ff;
+const GRID_OPACITY = 0.26;
 
 export type StreamCubeProps = {
   imgURL: string | null;
@@ -73,7 +73,12 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
       directional.position.set(2, 3, 4);
       scene.add(ambient, directional);
 
-      const grid = new GridHelper(GRID_SIZE, GRID_DIVISIONS, GRID_COLOR, GRID_COLOR);
+      const grid = new GridHelper(
+        GRID_SIZE,
+        GRID_DIVISIONS,
+        GRID_COLOR,
+        GRID_COLOR,
+      );
       grid.position.y = -1.2;
       const gridMaterial = grid.material;
       if (Array.isArray(gridMaterial)) {
@@ -89,8 +94,9 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
 
       const geometry = new BoxGeometry(2, 2, 2);
       const fallbackTexture = createFallbackTexture();
-      const materials = Array.from({ length: 6 }, () =>
-        new MeshStandardMaterial({ map: fallbackTexture }),
+      const materials = Array.from(
+        { length: 6 },
+        () => new MeshStandardMaterial({ map: fallbackTexture }),
       );
       const cube = new Mesh(geometry, materials);
       scene.add(cube);
@@ -180,7 +186,9 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
 
       let nextTexture: Texture | null = null;
       try {
-        nextTexture = imgURL ? await loadTexture(imgURL) : fallbackTextureRef.current;
+        nextTexture = imgURL
+          ? await loadTexture(imgURL)
+          : fallbackTextureRef.current;
       } catch (error) {
         console.warn("Failed to load streamed texture; using fallback", error);
         nextTexture = fallbackTextureRef.current;
@@ -198,7 +206,11 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
         const previousMap = material.map;
         material.map = nextTexture;
         material.needsUpdate = true;
-        if (previousMap && previousMap !== nextTexture && previousMap !== fallbackTextureRef.current) {
+        if (
+          previousMap &&
+          previousMap !== nextTexture &&
+          previousMap !== fallbackTextureRef.current
+        ) {
           previousMap.dispose();
         }
       });
@@ -207,7 +219,8 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
         lastTextureRef.current.dispose();
       }
 
-      lastTextureRef.current = nextTexture === fallbackTextureRef.current ? null : nextTexture;
+      lastTextureRef.current =
+        nextTexture === fallbackTextureRef.current ? null : nextTexture;
     };
 
     applyTexture();
@@ -218,9 +231,13 @@ export function StreamCube({ imgURL, onContextError }: StreamCubeProps) {
   }, [imgURL]);
 
   return (
-    <div ref={containerRef} className="relative flex-1 min-h-[240px] w-full rounded-md bg-muted/40">
-      <canvas ref={canvasRef} className="size-full" />
-      {!rendererRef.current && <Skeleton className="absolute inset-0" />}
+    <div
+      ref={containerRef}
+      className="relative min-h-[240px] w-full flex-1 overflow-hidden border border-white/20 bg-black/30"
+    >
+      <Skeleton className="absolute inset-0" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(43,103,255,0.12)_0,rgba(43,103,255,0.12)_1px,transparent_1px,transparent_52px),linear-gradient(0deg,rgba(43,103,255,0.12)_0,rgba(43,103,255,0.12)_1px,transparent_1px,transparent_52px)] opacity-70" />
+      <canvas ref={canvasRef} className="relative size-full" />
     </div>
   );
 }
@@ -236,21 +253,50 @@ function createFallbackTexture() {
     throw new Error("Failed to create 2D context for fallback texture");
   }
 
-  const colors = ["#111827", "#1f2937"];
-  const squareSize = size / 8;
+  context.fillStyle = "#070707";
+  context.fillRect(0, 0, size, size);
 
-  for (let y = 0; y < 8; y += 1) {
-    for (let x = 0; x < 8; x += 1) {
-      context.fillStyle = colors[(x + y) % 2];
-      context.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
-    }
+  context.strokeStyle = "rgba(43, 103, 255, 0.45)";
+  context.lineWidth = 1;
+  for (let index = 0; index <= size; index += 16) {
+    context.beginPath();
+    context.moveTo(index, 0);
+    context.lineTo(index, size);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(0, index);
+    context.lineTo(size, index);
+    context.stroke();
   }
+
+  context.strokeStyle = "#f2d771";
+  context.lineWidth = 3;
+  context.strokeRect(10, 10, size - 20, size - 20);
+
+  context.strokeStyle = "#ff5b3a";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(18, size - 30);
+  context.lineTo(size - 18, 22);
+  context.stroke();
+
+  context.strokeStyle = "#6ec2ff";
+  context.beginPath();
+  context.moveTo(24, 28);
+  context.lineTo(size - 34, size - 18);
+  context.stroke();
+
+  context.fillStyle = "#f6efe6";
+  context.font = '14px "Geist Mono", monospace';
+  context.fillText("TX-24", 18, 34);
+  context.fillText("U.S.G.C.", 18, size - 18);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
-  texture.repeat.set(2, 2);
+  texture.repeat.set(1.25, 1.25);
 
   return texture;
 }

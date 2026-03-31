@@ -1,33 +1,47 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import type { StreamEvent } from "../protocol";
 import { peripheralStream } from "../streams";
 
 export type PeripheralTag = {
-    name: string;
-    variant: string;
-    metadata?: Record<string, string>;
-  };
+  name: string;
+  variant: string;
+  metadata?: Record<string, string>;
+};
 
 export type PeripheralInfo = {
   id?: string | null;
   tags: PeripheralTag[];
 };
 
-type PeripheralMap = Record<string, { ts: number; info: PeripheralInfo, last_data: any }>;
+type PeripheralSnapshot = {
+  ts: number;
+  info: PeripheralInfo;
+  last_data: unknown;
+};
+
+type PeripheralMessage = Extract<StreamEvent, { type: "peripheral" }>;
+
+type PeripheralMap = Record<string, PeripheralSnapshot>;
 
 const PeripheralContext = createContext<PeripheralMap>({});
 
-export function PeripheralProvider({ children }: { children: React.ReactNode }) {
+export function PeripheralProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [peripherals, setPeripherals] = useState<PeripheralMap>({});
 
   useEffect(() => {
-    const sub = peripheralStream.subscribe((msg) => {
+    const sub = peripheralStream.subscribe((msg: PeripheralMessage) => {
       const info = msg.payload.peripheralInfo;
       const data = msg.payload.data;
-      if (!info.id) return;
+      const peripheralId = info.id;
+      if (!peripheralId) return;
 
       setPeripherals((prev) => ({
         ...prev,
-        [info.id]: {
+        [peripheralId]: {
           ts: Date.now(),
           info,
           last_data: data,

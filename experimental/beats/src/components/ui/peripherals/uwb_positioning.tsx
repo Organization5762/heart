@@ -27,11 +27,6 @@ type PeripheralInfo = {
   tags: PeripheralTag[];
 };
 
-type UWBPositioningPayload = {
-  data: UWBData;
-  peripheral_info: PeripheralInfo;
-};
-
 type Props = {
   peripheral: PeripheralInfo;
   className?: string;
@@ -45,14 +40,16 @@ type Point2D = {
 type Plane = "xy" | "xz" | "yz";
 
 type NormalizedStation = Station & {
+  u: number;
+  v: number;
   sx: number;
   sy: number;
 };
 
 function normalizePoints(
-  stations: Station[],
+  stations: Array<Station & Point2D>,
   target: Point2D,
-  paddingPercent = 10
+  paddingPercent = 10,
 ) {
   const us = [...stations.map((s) => s.u), target.u];
   const vs = [...stations.map((s) => s.v), target.v];
@@ -91,7 +88,10 @@ function formatNumber(n: number, digits = 2) {
   return Number.isFinite(n) ? n.toFixed(digits) : String(n);
 }
 
-function projectStation(station: Station, plane: Plane): { u: number; v: number } {
+function projectStation(
+  station: Station,
+  plane: Plane,
+): { u: number; v: number } {
   switch (plane) {
     case "xy":
       return { u: station.x, v: station.y };
@@ -102,7 +102,10 @@ function projectStation(station: Station, plane: Plane): { u: number; v: number 
   }
 }
 
-function projectTarget(target: { x: number; y: number; z: number }, plane: Plane) {
+function projectTarget(
+  target: { x: number; y: number; z: number },
+  plane: Plane,
+) {
   switch (plane) {
     case "xy":
       return { u: target.x, v: target.y };
@@ -132,22 +135,22 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
     return (
       <div
         className={
-          "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+          "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
           (className ?? "")
         }
       >
-        <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+        <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
           UWB Positioning
         </span>
-        <p className="text-[0.7rem] text-muted-foreground font-mono">
+        <p className="text-muted-foreground font-mono text-[0.7rem]">
           No UWB events yet for {peripheral.id ?? "uwb_peripheral"}.
         </p>
       </div>
     );
   }
 
-  const latest = events[0].msg.payload as UWBPositioningPayload;
-  const data = latest.data;
+  const latest = events[0].msg.payload.data as UWBData;
+  const data = latest;
   const worldTarget = { x: data.x, y: data.y, z: data.z };
 
   // Project to the chosen plane
@@ -159,7 +162,7 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
 
   const { stations: normStations, target } = normalizePoints(
     projectedStations,
-    projectedTarget
+    projectedTarget,
   );
 
   const { uLabel, vLabel } = planeAxisLabels(plane);
@@ -167,14 +170,14 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
   return (
     <div
       className={
-        "flex flex-col gap-3 rounded-2xl border border-border bg-background/60 p-3 text-xs text-foreground shadow-sm " +
+        "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
         (className ?? "")
       }
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-col">
-          <span className="font-mono text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
             UWB Positioning
           </span>
           <span className="font-mono text-sm">
@@ -182,17 +185,17 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-1 text-[0.7rem] font-mono text-muted-foreground">
+        <div className="text-muted-foreground flex flex-col items-end gap-1 font-mono text-[0.7rem]">
           <span>{peripheral.id ?? "uwb_peripheral"}</span>
           {/* Plane selector */}
-          <div className="inline-flex rounded-md border border-border bg-background/80 overflow-hidden">
+          <div className="border-border bg-background/80 inline-flex overflow-hidden rounded-md border">
             {(["xy", "xz", "yz"] as Plane[]).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPlane(p)}
                 className={
-                  "px-2 py-[2px] text-[0.65rem] uppercase tracking-wide " +
+                  "px-2 py-[2px] text-[0.65rem] tracking-wide uppercase " +
                   (plane === p
                     ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-muted/60")
@@ -207,7 +210,7 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
 
       <div className="flex gap-3">
         {/* SVG / Map */}
-        <div className="relative aspect-square w-2/3 min-w-[220px] rounded-xl border border-border bg-muted/40">
+        <div className="border-border bg-muted/40 relative aspect-square w-2/3 min-w-[220px] border">
           <svg viewBox="0 0 100 100" className="h-full w-full">
             {/* Grid */}
             {[20, 40, 60, 80].map((val) => (
@@ -300,7 +303,7 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
           </svg>
 
           {/* Axes labels */}
-          <div className="pointer-events-none absolute inset-0 flex select-none items-start justify-between p-1 text-[0.6rem] font-mono text-muted-foreground">
+          <div className="text-muted-foreground pointer-events-none absolute inset-0 flex items-start justify-between p-1 font-mono text-[0.6rem] select-none">
             <span>{uLabel}</span>
             <span>{vLabel}</span>
           </div>
@@ -308,7 +311,7 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
 
         {/* Details panel */}
         <div className="flex-1 space-y-2">
-          <div className="rounded-lg border border-border/70 bg-background/80 p-2 font-mono text-[0.7rem]">
+          <div className="border-border/70 bg-background/80 border p-2 font-mono text-[0.7rem]">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-muted-foreground">Target (solved)</span>
             </div>
@@ -334,16 +337,16 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border/70 bg-background/80 p-2 font-mono text-[0.7rem]">
+          <div className="border-border/70 bg-background/80 border p-2 font-mono text-[0.7rem]">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-muted-foreground">Base stations</span>
               <span className="text-muted-foreground">dist (m)</span>
             </div>
-            <div className="space-y-1 max-h-40 overflow-auto pr-1">
+            <div className="max-h-40 space-y-1 overflow-auto pr-1">
               {normStations.map((s) => (
                 <div
                   key={s.station_id}
-                  className="flex items-baseline justify-between gap-2 rounded-md px-1 py-0.5 hover:bg-muted/60"
+                  className="hover:bg-muted/60 flex items-baseline justify-between gap-2 rounded-md px-1 py-0.5"
                 >
                   <div className="flex flex-col">
                     <span className="text-foreground">{s.station_id}</span>
@@ -360,7 +363,7 @@ export const UWBPositionView: React.FC<Props> = ({ peripheral, className }) => {
             </div>
           </div>
 
-          <p className="text-[0.6rem] font-mono text-muted-foreground">
+          <p className="text-muted-foreground font-mono text-[0.6rem]">
             {plane.toUpperCase()} projection. Distances are measured from each
             base station to the target.
           </p>

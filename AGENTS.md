@@ -5,6 +5,7 @@
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
 
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
+- `experimental/beats` currently needs `npm install --package-lock=false` for local tool bootstrap because `npm ci` fails against the checked-in lockfile; use that flow unless you intentionally refresh `package-lock.json`.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
@@ -203,6 +204,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_snapshots.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/ws/providers/ImageProvider.tsx src/actions/ws/providers/PeripheralEventsProvider.tsx src/actions/ws/providers/PeripheralProvider.tsx src/components/app-sidebar.tsx src/components/stream-cube.tsx src/components/stream.tsx src/components/ui/button.tsx src/components/ui/input.tsx src/components/ui/peripherals/accelerometer.tsx src/components/ui/peripherals/rotary_button.tsx src/components/ui/peripherals/uwb_positioning.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/components/usgc.tsx src/hooks/use-mobile.ts src/layouts/base-layout.tsx src/renderer.ts src/routes/index.tsx src/routes/mission-control/index.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/styles/global.css src/types.d.ts tsconfig.json`
+- `2026-03-31`: `experimental/beats: npm run lint`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/tsc --noEmit`
+- `2026-03-31`: `experimental/beats: npm run test -- --passWithNoTests` (no Vitest files matched)
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
