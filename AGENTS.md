@@ -116,6 +116,9 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/layouts/base-layout.tsx src/styles/global.css src/components/usgc.tsx src/components/stream.tsx`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/layouts/base-layout.tsx src/components/usgc.tsx src/components/stream.tsx`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
 - `2026-03-31`: `cd experimental/beats && npm install`
 - `2026-03-31`: `cd experimental/beats && npm ci`
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
@@ -225,6 +228,7 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `experimental/beats: npm run lint`
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/tsc --noEmit`
 - `2026-03-31`: `experimental/beats: npm run test -- --passWithNoTests` (no Vitest files matched)
+- `2026-03-31`: No validation run after updating `experimental/beats/src/features/stream-console/scene-config.ts` to keep the Current Stream cube fixed by default and slightly increase the default camera distance; these were small config-only changes.
 - `2026-03-31`: `cd experimental/beats && npm ci` failed because `experimental/beats/package-lock.json` is out of sync with `package.json`.
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && npm run format:write`
@@ -243,6 +247,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `./node_modules/.bin/prettier --check src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
 - `2026-03-31`: `npm run test -- src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
 - `2026-03-31`: `./node_modules/.bin/tsc --noEmit` in `experimental/beats` still fails because of pre-existing TypeScript issues in the app and its dependencies, including `@electron-forge/plugin-vite` types, the protobuf `?raw` import declaration, existing route typing drift, and unrelated component typing errors outside the new stream-console files.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/styles/global.css`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/sensor-simulation.test.ts`
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`

@@ -33,33 +33,33 @@ export function SensorLabPanel({
   sensors: ResolvedSensorChannel[];
 }) {
   return (
-    <section className="rounded-[1.5rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(29,33,40,0.96),_rgba(14,17,23,0.98))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+    <section className="beats-console-panel rounded-[1.5rem] p-4 md:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-tomorrow text-[11px] tracking-[0.22em] text-[#7f8ea3] uppercase">
+          <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.22em] uppercase">
             Sensor Rack
           </p>
           <h2 className="font-tomorrow text-lg tracking-[0.14em] text-slate-100 uppercase">
             Mocking and Trace Console
           </h2>
-          <p className="text-sm text-[#a4b0c2]">
+          <p className="beats-console-copy max-w-2xl text-sm leading-6">
             Compare live values, applied overrides, and time-driven functions in
             one panel.
           </p>
         </div>
-        <div className="rounded-xl border border-[#3a414c] bg-[#0b0f14] px-3 py-2 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-          <div className="font-tomorrow text-[10px] tracking-[0.2em] text-[#738194] uppercase">
+        <div className="beats-console-card rounded-xl px-3 py-2 text-right">
+          <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
             Simulation Clock
           </div>
-          <div className="font-mono text-xl text-[#e3edf7]">
+          <div className="beats-console-strong font-mono text-xl">
             {clockSeconds.toFixed(1)}s
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(250px,280px)_minmax(0,1fr)]">
         <div className="space-y-3">
-          <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          <div className="beats-console-card rounded-xl p-3">
             <div className="mb-3 flex items-center gap-2">
               <Activity className="h-4 w-4 text-emerald-500" />
               <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
@@ -72,10 +72,10 @@ export function SensorLabPanel({
                   key={sensor.id}
                   type="button"
                   onClick={() => onSelectSensor(sensor.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                  className={`w-full rounded-xl border px-3 py-3 text-left transition duration-150 ${
                     selectedSensor?.id === sensor.id
-                      ? "border-[#5b8cff] bg-[#162235] shadow-[inset_0_0_0_1px_rgba(91,140,255,0.2)]"
-                      : "border-[#3a414c] bg-[#181d24] hover:bg-[#1d232c]"
+                      ? "border-[#5b8cff] bg-[linear-gradient(180deg,_rgba(22,34,53,0.98),_rgba(15,23,37,0.98))] shadow-[inset_0_0_0_1px_rgba(91,140,255,0.2)]"
+                      : "border-[var(--beats-chip-border)] bg-[rgba(24,29,36,0.9)] hover:border-[#526074] hover:bg-[rgba(30,36,45,0.96)]"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -114,7 +114,7 @@ export function SensorLabPanel({
         <div className="space-y-4">
           {selectedSensor ? (
             <>
-              <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <div className="beats-console-card rounded-xl p-4">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export function SensorLabPanel({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <div className="beats-console-card rounded-xl p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 text-violet-500" />
                   <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
@@ -218,14 +218,14 @@ export function SensorLabPanel({
 
                 {override.mode === "constant" ? (
                   <label className="block space-y-2">
-                    <span className="font-tomorrow text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
+                    <span className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
                       Constant Value
                     </span>
                     <Input
                       type="number"
                       value={override.constantValue}
                       step="0.1"
-                      className="border-[#404754] bg-[#0c1015] font-mono text-[#e3edf7]"
+                      className="border-white/10 bg-[#0c1015] font-mono text-[#e3edf7]"
                       onChange={(event) =>
                         onUpdateOverride(selectedSensor.id, {
                           constantValue: Number(event.target.value),
@@ -238,11 +238,11 @@ export function SensorLabPanel({
                 {override.mode === "function" ? (
                   <div className="space-y-3">
                     <label className="block space-y-2">
-                      <span className="font-tomorrow text-[10px] tracking-[0.2em] text-[#7f8ea3] uppercase">
+                      <span className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
                         Function of t (seconds)
                       </span>
                       <textarea
-                        className="min-h-[96px] w-full rounded-md border border-[#404754] bg-[#0c1015] px-3 py-2 font-mono text-sm text-[#e3edf7] transition outline-none focus-visible:border-[#6f9fff] focus-visible:ring-2 focus-visible:ring-[#6f9fff]/30"
+                        className="beats-console-textarea"
                         value={override.expression}
                         onChange={(event) =>
                           onUpdateOverride(selectedSensor.id, {
@@ -269,7 +269,7 @@ export function SensorLabPanel({
                         </Button>
                       ))}
                     </div>
-                    <div className="rounded-xl border border-[#404754] bg-[#171c23] p-3 text-xs text-[#95a2b6]">
+                    <div className="beats-console-card rounded-xl p-3 text-xs text-[#95a2b6]">
                       Available helpers: <span className="font-mono">sin</span>,{" "}
                       <span className="font-mono">cos</span>,{" "}
                       <span className="font-mono">triangle</span>,{" "}
@@ -282,14 +282,14 @@ export function SensorLabPanel({
                 ) : null}
 
                 {override.mode === "live" ? (
-                  <div className="rounded-xl border border-[#404754] bg-[#171c23] p-3 text-sm text-[#95a2b6]">
+                  <div className="beats-console-card rounded-xl p-3 text-sm text-[#95a2b6]">
                     Live mode forwards the latest connected peripheral value
                     without modification.
                   </div>
                 ) : null}
               </div>
 
-              <div className="rounded-xl border border-[#3a414c] bg-[#10141a] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <div className="beats-console-card rounded-xl p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <ScanLine className="h-4 w-4 text-amber-500" />
                   <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
@@ -300,7 +300,7 @@ export function SensorLabPanel({
               </div>
             </>
           ) : (
-            <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-[#404754] bg-[#10141a] text-sm text-[#95a2b6]">
+            <div className="beats-console-empty flex min-h-[320px] items-center justify-center rounded-xl text-sm text-[#95a2b6]">
               No sensor selected.
             </div>
           )}
@@ -322,11 +322,11 @@ function MetricTile({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#404754] bg-[#0b0f14] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="font-tomorrow text-[10px] tracking-[0.2em] text-[#738194] uppercase">
+    <div className="beats-console-card rounded-xl p-3">
+      <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
         {label}
       </div>
-      <div className="mt-1 font-mono text-2xl text-[#e3edf7] tabular-nums">
+      <div className="beats-console-strong mt-1 font-mono text-2xl tabular-nums">
         {value}
       </div>
       <div className={`mt-1 text-xs text-[#95a2b6] ${accent ?? ""}`}>

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum, StrEnum
@@ -102,7 +103,10 @@ def _decode_input_event(message: Message) -> Input:
 
 def _normalize_payload(payload: object) -> object:
     if dataclasses.is_dataclass(payload):
-        return dataclasses.asdict(payload)  # type: ignore[arg-type]
+        return {
+            field.name: _normalize_payload(getattr(payload, field.name))
+            for field in dataclasses.fields(payload)
+        }
 
     if isinstance(payload, Enum):
         return payload.value
@@ -121,6 +125,18 @@ def _normalize_payload(payload: object) -> object:
             str(key): _normalize_payload(value)
             for key, value in payload.items()
         }
+
+    if isinstance(payload, AbstractSet):
+        normalized_values = [_normalize_payload(value) for value in payload]
+        return sorted(
+            normalized_values,
+            key=lambda value: json.dumps(
+                value,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+        )
 
     if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
         return [_normalize_payload(value) for value in payload]
