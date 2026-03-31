@@ -24,6 +24,10 @@ vi.mock("@/actions/ws/providers/PeripheralProvider", () => ({
   useConnectedPeripherals: () => ({}),
 }));
 
+vi.mock("@/actions/ws/providers/PeripheralEventsProvider", () => ({
+  usePeripheralEvents: () => [],
+}));
+
 vi.mock("@/actions/ws/websocket", () => ({
   useWS: () => websocketState,
 }));
@@ -60,6 +64,9 @@ describe("Stream", () => {
   it("shows live telemetry from the websocket stream in the footer", () => {
     render(<Stream />);
 
+    expect(
+      screen.getByRole("textbox", { name: "Sensor terminal command" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/fps:/i)).toHaveTextContent("fps: 24");
     expect(
       screen.getAllByText("ws://localhost:8765/stream").length,

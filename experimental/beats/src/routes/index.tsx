@@ -13,7 +13,7 @@ import {
   TechnicalCard,
 } from "@/components/usgc";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Binary, Mouse, Orbit, RadioTower, ScanLine, Tv } from "lucide-react";
+import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 const RECENT_DEVICE_LIMIT = 4;
@@ -21,13 +21,6 @@ const RECENT_ACTIVITY_WINDOW_MS = 60_000;
 const RECENT_ACTIVITY_TICK_MS = 5_000;
 
 const routeCards = [
-  {
-    title: "Mission Control",
-    description:
-      "A specimen-grade rehearsal console for phase timing, subsystem health, and playback control.",
-    href: "/mission-control",
-    icon: Orbit,
-  },
   {
     title: "Current Stream",
     description:

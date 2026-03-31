@@ -106,7 +106,7 @@ export function DataRow({
   return (
     <div className={cn("usgc-data-row", className)}>
       <span className="usgc-data-label">{label}</span>
-      <span>{value}</span>
+      <span className="min-w-0 break-words">{value}</span>
     </div>
   );
 }

@@ -117,6 +117,14 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/ui/peripherals/generic_sensor.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/ui/peripherals/generic_sensor.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/layouts/base-layout.tsx src/styles/global.css src/components/usgc.tsx src/components/stream.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/layouts/base-layout.tsx src/components/usgc.tsx src/components/stream.tsx`
 - `2026-03-31`: `rg -n "Sitemap|siteMap|usgc-ascii-map" experimental/beats/src/routes/index.tsx` returned no matches after removing the Beats home-page sitemap.
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
@@ -306,3 +314,6 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm run test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make format`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make test`
+- `2026-03-31`: `git diff --check` after removing the Beats Mission Control / Phase Sequencer route.
+- `2026-03-31`: `rg -n "mission-control|Mission Control|Phase Sequencer|phase sequencer" experimental/beats/src docs/research` returned no matches after removing the Beats Mission Control / Phase Sequencer route and research notes.
+- `2026-03-31`: No `experimental/beats` formatter, lint, or test run after removing Mission Control / Phase Sequencer because this worktree does not currently have `experimental/beats/node_modules` installed.
