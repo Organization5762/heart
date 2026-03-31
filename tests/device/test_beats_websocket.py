@@ -1,9 +1,11 @@
 import json
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from heart.device.beats.proto import beats_streaming_pb2
-from heart.device.beats.websocket import (_encode_peripheral_message,
+from heart.device.beats.websocket import (WebSocket,
+                                          _encode_peripheral_message,
                                           decode_stream_envelope)
 from heart.peripheral.core import (Input, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
@@ -188,3 +190,55 @@ class TestStreamEnvelopeDecoding:
         assert payload.peripheral_info == source.peripheral_info
         assert isinstance(payload.data, beats_streaming_pb2.Frame)
         assert payload.data == message
+
+
+class TestWebSocketReplayCache:
+    """Verify replay caching so reconnecting Beats clients immediately recover current stream state."""
+
+    def test_replays_latest_frame_and_latest_peripheral_state(self) -> None:
+        """Verify replay keeps the newest frame and newest payload per peripheral so reconnects recover without waiting for fresh traffic."""
+        websocket = object.__new__(WebSocket)
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+
+        websocket._cache_replay_frame(
+            kind="frame",
+            payload=b"old-frame",
+            frame_bytes=b"old-frame",
+        )
+        websocket._cache_replay_frame(
+            kind="frame",
+            payload=b"latest-frame",
+            frame_bytes=b"latest-frame",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="switch-1"),
+                data={"pressed": False},
+            ),
+            frame_bytes=b"switch-1-old",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="switch-1"),
+                data={"pressed": True},
+            ),
+            frame_bytes=b"switch-1-latest",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="sensor-1"),
+                data={"x": 1},
+            ),
+            frame_bytes=b"sensor-1-latest",
+        )
+
+        assert websocket._replay_frames() == (
+            b"latest-frame",
+            b"switch-1-latest",
+            b"sensor-1-latest",
+        )
