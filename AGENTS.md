@@ -113,6 +113,8 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
 - `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
 - `2026-03-31`: `cd experimental/beats && npm install`
 - `2026-03-31`: `cd experimental/beats && npm ci`

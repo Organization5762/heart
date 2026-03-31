@@ -38,17 +38,17 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 md:flex-row md:items-end md:justify-between",
+        "flex flex-col gap-4 md:flex-row md:items-start md:justify-between",
         className,
       )}
     >
-      <div className="space-y-2">
+      <div className="min-w-0 flex-1 space-y-2">
         <p className={cn("usgc-kicker", invert && "text-[#bdb3a6]")}>
           {eyebrow}
         </p>
         <h1
           className={cn(
-            "font-tomorrow text-3xl tracking-[0.06em] md:text-4xl",
+            "font-tomorrow break-words text-3xl tracking-[0.06em] md:text-4xl",
             invert ? "text-[#f6efe6]" : "text-foreground",
           )}
         >
@@ -65,7 +65,11 @@ export function SectionHeader({
           </div>
         ) : null}
       </div>
-      {aside ? <div className="shrink-0">{aside}</div> : null}
+      {aside ? (
+        <div className="max-w-full self-start md:max-w-[40%] md:text-right">
+          {aside}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -80,7 +84,7 @@ export function SpecChip({
   return (
     <span
       className={cn(
-        "usgc-chip",
+        "usgc-chip whitespace-normal",
         tone === "muted" && "usgc-chip-muted",
         tone === "dark" && "usgc-chip-dark",
         className,
