@@ -73,11 +73,11 @@ export function Stream() {
   const telemetryValue = telemetrySensor?.effectiveValue ?? 0;
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#11151b,_#090b0f)] p-4 text-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.45)] select-none">
-      <div className="rounded-[1.4rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(26,30,38,0.96),_rgba(14,17,23,0.98))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className="beats-console-shell flex h-full flex-col gap-4 rounded-[1.75rem] p-4 text-slate-100 select-none md:p-5">
+      <div className="beats-console-panel rounded-[1.4rem] px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="grid grid-cols-3 gap-1 rounded-[0.9rem] border border-[#3b434f] bg-[#0a0d12] p-2">
+            <div className="beats-console-card grid grid-cols-3 gap-1 rounded-[0.9rem] p-2">
               {[
                 isActive ? "#34d399" : "#29303a",
                 telemetrySensor ? "#fbbf24" : "#29303a",
@@ -91,16 +91,16 @@ export function Stream() {
               ))}
             </div>
             <div>
-              <p className="font-tomorrow text-[11px] tracking-[0.26em] text-[#7f8ea3] uppercase">
+              <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.26em] uppercase">
                 Beats Transport
               </p>
-              <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase">
+              <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase md:text-[1.65rem]">
                 Scene Control Console
               </h1>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid flex-1 gap-2 sm:grid-cols-2 xl:max-w-[540px] xl:grid-cols-4">
             <TransportChip
               label="Clock"
               value={`${clockSeconds.toFixed(1)}s`}
@@ -120,21 +120,21 @@ export function Stream() {
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,420px)]">
         <section className="flex min-h-0 flex-col gap-4">
-          <div className="rounded-[1.5rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(28,32,39,0.96),_rgba(13,16,21,0.98))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+          <div className="beats-console-panel rounded-[1.5rem] p-4 md:p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="font-tomorrow text-[11px] tracking-[0.24em] text-[#7f8ea3] uppercase">
+                <p className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.24em] uppercase">
                   Stream Scene
                 </p>
                 <h2 className="font-tomorrow text-2xl tracking-[0.12em] text-slate-100 uppercase">
                   Visual Mixer
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm text-[#a4b0c2]">
+                <p className="beats-console-copy mt-2 max-w-3xl text-sm leading-6">
                   Tune the renderer, bind telemetry-reactive plugins, and
                   rehearse sensor behavior against the live stream.
                 </p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid w-full gap-2 sm:grid-cols-3 xl:w-auto">
                 <StatusChip
                   label="Telemetry Sensor"
                   value={telemetrySensor?.label ?? "None"}
@@ -151,13 +151,13 @@ export function Stream() {
             </div>
 
             <div className="mb-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-[1.2rem] border border-[#353c46] bg-[#0c1015] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="beats-console-card rounded-[1.2rem] px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-tomorrow text-[10px] tracking-[0.24em] text-[#6f7d91] uppercase">
+                    <p className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.24em] uppercase">
                       Transport
                     </p>
-                    <p className="mt-1 font-mono text-2xl text-[#e3edf7]">
+                    <p className="beats-console-strong mt-1 font-mono text-2xl">
                       {clockSeconds.toFixed(1)}s
                     </p>
                   </div>
@@ -187,14 +187,14 @@ export function Stream() {
                 </div>
               </div>
 
-              <div className="rounded-[1.2rem] border border-[#353c46] bg-[#0c1015] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                <p className="font-tomorrow text-[10px] tracking-[0.24em] text-[#6f7d91] uppercase">
+              <div className="beats-console-card rounded-[1.2rem] px-4 py-3">
+                <p className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.24em] uppercase">
                   Active Module
                 </p>
                 <p className="font-tomorrow mt-2 text-lg tracking-[0.12em] text-slate-100 uppercase">
                   {sceneConfig.telemetry.target} Reactor
                 </p>
-                <p className="mt-1 text-sm text-[#a4b0c2]">
+                <p className="beats-console-copy mt-1 text-sm">
                   Gain {sceneConfig.telemetry.gain.toFixed(2)} | Camera{" "}
                   {sceneConfig.camera.distance.toFixed(1)}u
                 </p>
@@ -203,9 +203,9 @@ export function Stream() {
 
             <div className="min-h-0">
               {useImageFallback ? (
-                <div className="relative min-h-[420px] overflow-hidden rounded-[1.5rem] border border-[#343b45] bg-[#0a0d12]">
+                <div className="beats-console-card relative min-h-[420px] overflow-hidden rounded-[1.5rem]">
                   <StreamedImage imgURL={imgURL} />
-                  <div className="font-tomorrow absolute top-4 left-4 rounded-full border border-[#3b434f] bg-[#11161d] px-3 py-1 text-[11px] tracking-[0.2em] text-[#9ba8ba] uppercase">
+                  <div className="beats-console-chip font-tomorrow absolute top-4 left-4 rounded-full px-3 py-1 text-[11px] tracking-[0.2em] text-[#9ba8ba] uppercase">
                     WebGL fallback active
                   </div>
                 </div>
@@ -260,10 +260,10 @@ export function Stream() {
         </aside>
       </div>
 
-      <Separator className="flex-none bg-[#252b33]" />
+      <Separator className="flex-none bg-white/8" />
 
-      <div className="mb-2 flex flex-none flex-wrap items-center justify-between gap-4 rounded-[1.1rem] border border-[#2f353f] bg-[#10141a] px-3 py-2">
-        <span className="font-tomorrow text-[11px] tracking-[0.22em] text-[#7f8ea3] uppercase">
+      <div className="beats-console-card mb-2 flex flex-none flex-wrap items-center justify-between gap-4 rounded-[1.1rem] px-3 py-2">
+        <span className="beats-console-kicker font-tomorrow text-[11px] tracking-[0.22em] uppercase">
           fps: <b className="text-slate-100">{isActive ? fps : 0}</b>
         </span>
         <div className="font-mono text-xs text-[#8d9bb0]">
@@ -277,11 +277,11 @@ export function Stream() {
 
 function StatusChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1rem] border border-[#343c46] bg-[#0c1015] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="font-tomorrow text-[10px] tracking-[0.2em] text-[#6f7d91] uppercase">
+    <div className="beats-console-chip rounded-[1rem] px-3 py-2">
+      <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
         {label}
       </div>
-      <div className="mt-1 max-w-[180px] truncate font-mono text-sm text-[#dce6f5]">
+      <div className="beats-console-strong mt-1 max-w-[180px] truncate font-mono text-sm">
         {value}
       </div>
     </div>
@@ -290,11 +290,11 @@ function StatusChip({ label, value }: { label: string; value: string }) {
 
 function TransportChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[108px] rounded-[0.95rem] border border-[#3a414c] bg-[#0b0e13] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="font-tomorrow text-[10px] tracking-[0.22em] text-[#738194] uppercase">
+    <div className="beats-console-chip min-w-[108px] rounded-[0.95rem] px-3 py-2">
+      <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.22em] uppercase">
         {label}
       </div>
-      <div className="mt-1 truncate font-mono text-sm text-[#e5edf8]">
+      <div className="beats-console-strong mt-1 truncate font-mono text-sm">
         {value}
       </div>
     </div>
