@@ -22,7 +22,7 @@
     <text x="874.00" y="74.00" text-anchor="middle" class="column-title">Peripheral &amp; Signal Services</text>
   </g>
   <g>
-    <rect x="1084.00" y="48.00" width="260.00" height="482.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
+    <rect x="1084.00" y="48.00" width="260.00" height="564.00" rx="18" fill="#e2e8f0" stroke="#cbd5f5" />
     <text x="1214.00" y="74.00" text-anchor="middle" class="column-title">Display &amp; Device Services</text>
   </g>
   <g fill="none" stroke="#1f2937" stroke-width="1.6">
@@ -42,6 +42,7 @@
     <path d="M 1214.00 174.00 C 1214.00 224.00 1214.00 224.00 1214.00 274.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 338.00 C 1214.00 347.00 1214.00 347.00 1214.00 356.00" marker-end="url(#arrowhead)" />
     <path d="M 1214.00 420.00 C 1214.00 429.00 1214.00 429.00 1214.00 438.00" marker-end="url(#arrowhead)" />
+    <path d="M 1214.00 502.00 C 1214.00 511.00 1214.00 511.00 1214.00 520.00" marker-end="url(#arrowhead)" />
     <path d="M 646.00 142.00 C 686.00 142.00 722.00 142.00 762.00 142.00" marker-end="url(#arrowhead)" />
     <path d="M 874.00 174.00 C 874.00 183.00 874.00 183.00 874.00 192.00" marker-end="url(#arrowhead)" />
     <path d="M 874.00 174.00 C 874.00 224.00 874.00 224.00 874.00 274.00" marker-end="url(#arrowhead)" />
@@ -148,7 +149,12 @@
     <rect x="1102.00" y="438.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
     <text x="1214.00" y="461.00" fill="#f8fafc" text-anchor="middle">
       <tspan x="1214.00">LEDMatrix Driver</tspan>
-      <tspan x="1214.00" dy="18">(rgbmatrix)</tspan>
+      <tspan x="1214.00" dy="18">(clean-room HUB75 runtime)</tspan>
+    </text>
+    <rect x="1102.00" y="520.00" width="224.00" height="64.00" rx="12" fill="#7c3aed" stroke="#7c3aed" />
+    <text x="1214.00" y="543.00" fill="#f8fafc" text-anchor="middle">
+      <tspan x="1214.00">Pi 5 Scan Scheduler</tspan>
+      <tspan x="1214.00" dy="18">(LAT/OE/A-E + PWM loop)</tspan>
     </text>
   </g>
 </svg>

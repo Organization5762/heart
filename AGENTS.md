@@ -3,6 +3,7 @@
 ## Installing
 
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
+
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
@@ -13,33 +14,71 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 
 Run `make format` before committing changes. This applies Ruff fixes, isort, Black, docformatter, and mdformat to Python sources and documentation. Documentation updates should avoid marketing language, state the technical problem in plain terms, and include a materials list when relevant.
 
+- If `make format` fails in the sandbox because `uv` cannot write under `~/.local/share/uv/tools`, run the equivalent `.venv/bin/isort`, `.venv/bin/ruff check --fix`, and `cargo fmt` commands for the touched files and record both the failure and the fallback commands in Recent Validation.
+
 - Avoid declaring module-level `__all__` exports. Prefer explicit imports at call sites instead of curating export lists.
+
 - Define device identifiers (such as firmware `device_name` values) as module-level constants instead of inline literals.
+
 - Avoid building filesystem paths via string concatenation. Use `os.path.join` or `pathlib.Path` instead.
+
 - Prefer `pathlib.Path` over `os.path.join` when constructing paths, and ensure functions annotated to return a `Path` return a `Path` object.
+
 - Keep standalone distributable packages under `packages/<distribution-name>/src/<import_name>` and wire them into the root project with local `tool.uv.sources` path dependencies.
+
 - When CLI arguments accept file paths, parse them as `pathlib.Path` objects and ensure parent directories exist before writing.
+
 - Avoid using `print` for runtime diagnostics in CLI commands; use the shared logger.
+
 - Avoid using `print` for runtime diagnostics in peripheral modules; use the shared logger.
+
 - Avoid leaving commented debug print statements in production modules; remove them once they are no longer needed.
+
 - Avoid wildcard imports; use explicit imports so dependencies stay clear and tooling can track usage.
+
 - Prefer f-strings over string concatenation when assembling Python strings so formatting stays readable.
+
 - Prefer mixins or composition over direct inheritance.
+
 - Prefer direct code over single-use wrapper layers; when a helper only forwards to one caller, inline it or delete it.
+
 - Prefer `StrEnum` values over raw strings for strategy/configuration mode selections.
+
 - Use `heart.utilities.logging.get_logger` for internal logging so handlers and log levels stay consistent across modules.
+
 - Prefer `get_logger(__name__)` so loggers include their module path and stay consistent in telemetry.
+
 - When starting background threads, provide a descriptive name via `threading.Thread(name=...)` to keep diagnostics readable.
+
 - Prefer module-level constants for tunable loop intervals instead of embedding sleep literals in long-running loops.
+
 - Prefer module-level constants for retry thresholds in reconnect or recovery loops instead of inline numeric literals.
+
 - Use `time.monotonic()` for elapsed-time comparisons, and reserve `time.time()` for wall-clock timestamps that leave the process.
+
 - Prefer `pathlib.Path.read_text`/`write_text` helpers for straightforward text file I/O.
+
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
+
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
+
 - When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
+
 - Use module-level constants for default argument values and shared string literals in firmware helpers so configuration stays consistent.
+
 - Keep mixed PyO3 packages in a `rust/<package>/` layout with the Rust crate in `src/`, Python shims in `python/<package>/`, and a private native submodule exposed via `tool.maturin.module-name` to avoid import ambiguity.
+
+- Keep PyO3 `extension-module` support behind a crate feature that Maturin enables for extension builds so `cargo test` and `cargo bench` can link without Python-extension linker behavior.
+
+- After changing exported PyO3 classes or Python shims under `rust/<package>/python/`, rerun `uv sync --extra native` before Python validation so the active virtualenv rebuilds the local extension with the matching symbols.
+
 - PyO3 stub-generation binaries require a linkable Python 3.11 runtime in addition to Rust; if `cargo run --bin stub_gen` fails with unresolved `Py*` symbols, install or point PyO3 at a Python 3.11 build before retrying.
+
+- Guard Raspberry Pi `pinctrl` integration tests behind `HEART_RUN_PI5_PINCTRL_TESTS=1` and mark them with `pytest.mark.integration` so normal desktop test runs stay hardware-free.
+
+- Pi 5 DMA/PIO benchmark work depends on `libpio-dev` being installed on the target host so the native transport shim can compile and link against `libpio`.
+
+- Keep Rust unit tests hardware-agnostic under `cfg(test)` even on Raspberry Pi hosts; validate real Pi 5 scanout and transport behavior through the Pi-only Python tests and benchmark targets instead of unit-test backend auto-detection.
 
 ## Dependency Injection (Lagom)
 
@@ -169,3 +208,105 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/ruff check --fix src/heart/renderers/hilbert_curve/provider.py tests/renderers/test_hilbert_curve_renderer.py`
 - `2026-03-30`: `.venv/bin/pytest tests/renderers/test_hilbert_curve_renderer.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/code/heart/.uv-cache make test`
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust`
+- `2026-03-30`: `.venv/bin/isort src/heart/device/rgb_display/device.py src/heart/device/rgb_display/runtime.py tests/device/test_rgb_display_runtime.py rust/heart_rust/python/heart_rust/__init__.py rust/heart_rust/python/heart_rust/matrix.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/device/rgb_display/device.py src/heart/device/rgb_display/runtime.py tests/device/test_rgb_display_runtime.py rust/heart_rust/python/heart_rust/__init__.py rust/heart_rust/python/heart_rust/matrix.py`
+- `2026-03-30`: `.venv/bin/mdformat AGENTS.md`
+- `2026-03-30`: `cargo check` in `rust/heart_rust`
+- `2026-03-30`: `python -m pytest tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/b4c5/heart/.uv-cache make format` failed because `uv` still attempted to write under `/Users/lampe/.local/share/uv/tools/.tmpwbJ6BV` in this sandbox.
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/b4c5/heart/.uv-cache make test`
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust` after splitting `lib.rs` into a thin PyO3 API and `src/runtime.rs`
+- `2026-03-30`: `cargo check` in `rust/heart_rust`
+- `2026-03-30`: `python -m pytest tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust` after adding detached PyO3 matrix calls, Rayon-backed color remapping, unit tests, and the `matrix_transfer` benchmark.
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust` after adding the Pi 5 scan scheduler, FIFO-fed scan shim, and `pi5_scan_bench`.
+- `2026-03-30`: `cargo check --tests --benches` in `rust/heart_rust`
+- `2026-03-30`: `cargo test` in `rust/heart_rust`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: remote Pi 5 `cargo test` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: remote Pi 5 `cargo bench --bench matrix_transfer -- --quick` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: remote Pi 5 `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=1 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5 PIO_BENCH_FRAME_COUNT=64 PIO_BENCH_PIPELINE_DEPTH=2`
+- `2026-03-30`: remote Pi 5 `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=4 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5 PIO_BENCH_FRAME_COUNT=64 PIO_BENCH_PIPELINE_DEPTH=2`
+- `2026-03-30`: remote Pi 5 `make bench-matrix-pio-scan PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=1 PIO_BENCH_PARALLEL=1 PIO_BENCH_ITERATIONS=1 PIO_BENCH_FRAME_COUNT=1 PIO_BENCH_PIPELINE_DEPTH=1`
+- `2026-03-30`: remote Pi 5 `make bench-matrix-pio-scan PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=4 PIO_BENCH_PARALLEL=1 PIO_BENCH_ITERATIONS=1 PIO_BENCH_FRAME_COUNT=1 PIO_BENCH_PIPELINE_DEPTH=1`
+- `2026-03-30`: remote Pi 5 `make test-matrix-pio-scan`
+- `2026-03-30`: remote Pi 5 `.venv/bin/python -m pytest -n0 tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo test` in `rust/heart_rust` failed at link time because this environment still lacks a linkable Python 3.11 runtime for PyO3 test binaries.
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo bench --bench matrix_transfer -- --quick` in `rust/heart_rust` failed at link time for the same missing Python 3.11 runtime.
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo check --tests --benches` in `rust/heart_rust`
+- `2026-03-30`: `python -m pytest tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo test` in `rust/heart_rust` after gating PyO3 `extension-module` behind the `python-extension` feature and enabling it only through Maturin.
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo bench --bench matrix_transfer -- --quick` in `rust/heart_rust` after the same PyO3 packaging fix.
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo run --bin stub_gen` in `rust/heart_rust`
+- `2026-03-30`: `python -m pytest tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust` after splitting the clean-room matrix runtime into `runtime/` submodules, adding frame-buffer pooling, and expanding the benchmark surface.
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo check --tests --benches` in `rust/heart_rust`
+- `2026-03-30`: `.venv/bin/isort src/heart/device/rgb_display/runtime.py tests/device/test_rgb_display_runtime.py tests/device/test_rgb_display_transfer_benchmark.py scripts/render_code_flow.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/device/rgb_display/runtime.py tests/device/test_rgb_display_runtime.py tests/device/test_rgb_display_transfer_benchmark.py scripts/render_code_flow.py`
+- `2026-03-30`: `.venv/bin/mdformat docs/code_flow.md docs/research/hub75_clean_room_runtime_prd.md`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `python -m py_compile /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/scripts/remote_hub75_check.py`
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo test` in `rust/heart_rust`
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo bench --bench matrix_transfer -- --quick` in `rust/heart_rust`
+- `2026-03-30`: `CARGO_HOME=/Users/lampe/.codex/worktrees/b4c5/heart/.cargo-home cargo run --bin stub_gen` in `rust/heart_rust`
+- `2026-03-30`: `python -m pytest -n0 tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/b4c5/heart/.uv-cache uv sync --extra native`
+- `2026-03-30`: `python -m pytest -n0 tests/device/test_rgb_display_transfer_benchmark.py --benchmark-min-rounds=3 --benchmark-max-time=0.02`
+- `2026-03-30`: `.venv/bin/isort src/heart/device/rgb_display/debug.py tests/device/test_rgb_display_pinctrl_debug.py`
+- `2026-03-30`: `.venv/bin/ruff check --fix src/heart/device/rgb_display/debug.py tests/device/test_rgb_display_pinctrl_debug.py`
+- `2026-03-30`: `python -m pytest -n0 tests/device/test_rgb_display_pinctrl_debug.py` (skipped on the local macOS host because `HEART_RUN_PI5_PINCTRL_TESTS` was unset and `pinctrl` is Pi-specific)
+- `2026-03-30`: `python -m py_compile /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/scripts/remote_hub75_check.py`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bootstrap-native`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo test` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo bench --bench matrix_transfer -- --quick` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --bin stub_gen` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make debug-matrix-pinctrl`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make test-matrix-pinctrl`
+- `2026-03-30`: Remote on `michael@totem1.local`: `HEART_RUN_PI5_PINCTRL_TESTS=1 .venv/bin/python -m pytest -n0 tests/device/test_rgb_display_runtime.py tests/device/test_rgb_display_pinctrl_debug.py tests/device/test_rgb_display_transfer_benchmark.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `cargo fmt` in `rust/heart_rust` after adding the Pi 5 DMA/PIO transport probe, `libpio` C shim, transport benchmark binary, and Pi-only integration coverage.
+- `2026-03-30`: `cargo check --tests --benches` in `rust/heart_rust`
+- `2026-03-30`: `cargo test` in `rust/heart_rust`
+- `2026-03-30`: `cargo bench --bench matrix_transfer -- --quick` in `rust/heart_rust`
+- `2026-03-30`: `cargo run --bin pi5_pio_bench -- --panel-rows 64 --panel-cols 64 --chain-length 1 --parallel 1 --pwm-bits 11 --iterations 1` in `rust/heart_rust` failed as expected on the local macOS host because the Pi 5 DMA/PIO transport is only supported on Linux aarch64.
+- `2026-03-30`: `python -m pytest -n0 tests/device/test_rgb_display_pi5_dma_benchmark.py tests/device/test_rgb_display_pinctrl_debug.py tests/device/test_rgb_display_runtime.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `.venv/bin/mdformat docs/code_flow.md docs/research/hub75_clean_room_runtime_prd.md AGENTS.md /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/SKILL.md`
+- `2026-03-30`: `python scripts/render_code_flow.py --output docs/code_flow.svg`
+- `2026-03-30`: `python -m py_compile /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/scripts/remote_hub75_check.py`
+- `2026-03-30`: `bash -n scripts/bootstrap_native_runtime.sh`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bootstrap-native`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo test` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo bench --bench matrix_transfer -- --quick` in `/home/michael/heart/rust/heart_rust`, including the new `pi5_pack_transport_rgba` and `pi5_dma_transport` groups
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=1 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=4 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --bin stub_gen` in `/home/michael/heart/rust/heart_rust`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make debug-matrix-pinctrl`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make test-matrix-pinctrl`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make test-matrix-pio-dma`
+- `2026-03-30`: Remote on `michael@totem1.local`: `HEART_RUN_PI5_PINCTRL_TESTS=1 HEART_RUN_PI5_PIO_TESTS=1 .venv/bin/python -m pytest -n0 tests/device/test_rgb_display_runtime.py tests/device/test_rgb_display_pinctrl_debug.py tests/device/test_rgb_display_pi5_dma_benchmark.py tests/device/test_rgb_display_transfer_benchmark.py tests/navigation/test_native_scene_manager.py`
+- `2026-03-30`: `cargo fmt` and `cargo check` in `rust/heart_rust` after adding the pipelined full-cycle Pi 5 DMA/PIO benchmark path.
+- `2026-03-30`: `python -m pytest -n0 tests/device/test_rgb_display_pi5_dma_benchmark.py` on the local macOS host (skipped because `HEART_RUN_PI5_PIO_TESTS` was unset and the benchmark is Pi-specific).
+- `2026-03-30`: `python -m py_compile /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/scripts/remote_hub75_check.py`
+- `2026-03-30`: `.venv/bin/mdformat /Users/lampe/code/settings/codex/skills/rpi5-hub75-bringup/SKILL.md AGENTS.md`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=1 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5 PIO_BENCH_FRAME_COUNT=64 PIO_BENCH_PIPELINE_DEPTH=2`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bench-matrix-pio-dma PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=4 PIO_BENCH_PARALLEL=1 PIO_BENCH_PWM_BITS=11 PIO_BENCH_ITERATIONS=5 PIO_BENCH_FRAME_COUNT=64 PIO_BENCH_PIPELINE_DEPTH=2`
+- `2026-03-30`: `cargo check --tests --benches`, `cargo test`, and `cargo bench --bench matrix_transfer -- --quick` in `rust/heart_rust` after moving the Rust benchmark sources into `rust/heart_rust/bench/` and wiring Cargo paths explicitly.
+- `2026-03-30`: `cargo check --manifest-path rust/heart_rust/Cargo.toml --bin pi5_scan_dma_probe --bin pi5_scan_bench`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release -p heart_rust --bin pi5_scan_dma_probe -- --max-transfer-words 1`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release -p heart_rust --bin pi5_scan_dma_probe -- --max-transfer-words 16`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release -p heart_rust --bin pi5_scan_dma_probe -- --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `make bench-matrix-pio-scan PIO_BENCH_PANEL_ROWS=64 PIO_BENCH_PANEL_COLS=64 PIO_BENCH_CHAIN_LENGTH=1 PIO_BENCH_PARALLEL=1 PIO_BENCH_ITERATIONS=1 PIO_BENCH_FRAME_COUNT=1 PIO_BENCH_PIPELINE_DEPTH=1`
+- `2026-03-30`: `cargo check --manifest-path rust/heart_rust/Cargo.toml --bin pi5_gpio_probe`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release -p heart_rust --bin pi5_gpio_probe -- --gpio 17 --cycles 3 --sleep-ms 50`
+- `2026-03-30`: `cargo check --manifest-path rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe`
+- `2026-03-30`: Remote on `michael@totem1.local`: `strace -o /tmp/piolib_simple_xfer.strace -f -e trace=openat,ioctl /tmp/piolib_simple_xfer`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program simple --pattern delay --word-count 2 --max-transfer-words 16`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program scan --pattern delay --word-count 2 --max-transfer-words 16`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program simple --pattern delay --word-count 5720 --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program scan --pattern delay --word-count 5720 --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program scan --pattern data --word-count 5720 --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program scan --pattern alternating --word-count 5720 --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --manifest-path /home/michael/heart/rust/heart_rust/Cargo.toml --bin pi5_pio_ioctl_probe -- --program scan --pattern segment --word-count 5720 --max-transfer-words 5720`
+- `2026-03-30`: Remote on `michael@totem1.local`: `strace -o /tmp/pi5_scan_bench.strace -f -e trace=ioctl cargo run --release --bin pi5_scan_bench -- --panel-rows 64 --panel-cols 64 --chain-length 1 --parallel 1 --iterations 1 --frame-count 1 --pipeline-depth 1`
+- `2026-03-30`: Remote on `michael@totem1.local`: `cargo run --release --bin pi5_scan_bench -- --panel-rows 64 --panel-cols 64 --chain-length 1 --parallel 1 --iterations 1 --frame-count 1 --pipeline-depth 1` is currently blocked by repeated `rustc` SIGSEGV crashes during dependency rebuild on the Pi.
+- `2026-03-30`: `cargo fmt` and `cargo check --manifest-path rust/heart_rust/Cargo.toml --bin pi5_pio_bench --bin pi5_scan_bench` after deleting the temporary Pi probe/debug binaries and removing their probe-only runtime hooks.

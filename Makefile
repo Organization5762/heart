@@ -7,7 +7,59 @@ SEMGREP_CONFIG ?= semgrep.yml
 SEMGREP_TARGETS ?= src
 SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --metrics=off --disable-version-check
 SEMGREP_EXTRA_ARGS ?=
-.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
+DEBUG_PANEL_ROWS ?= 64
+DEBUG_PANEL_COLS ?= 64
+DEBUG_CHAIN_LENGTH ?= 1
+DEBUG_PARALLEL ?= 1
+PIO_BENCH_CHAIN_LENGTH ?= 1
+PIO_BENCH_FRAME_COUNT ?= 64
+PIO_BENCH_ITERATIONS ?= 5
+PIO_BENCH_PANEL_COLS ?= 64
+PIO_BENCH_PANEL_ROWS ?= 64
+PIO_BENCH_PARALLEL ?= 1
+PIO_BENCH_PIPELINE_DEPTH ?= 2
+PIO_BENCH_PWM_BITS ?= 11
+.PHONY: install bootstrap-native debug-matrix-pinctrl test-matrix-pinctrl bench-matrix-pio-dma bench-matrix-pio-scan test-matrix-pio-dma test-matrix-pio-scan pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
+
+bootstrap-native:
+	@bash scripts/bootstrap_native_runtime.sh
+
+debug-matrix-pinctrl:
+	@uv run python -m heart.device.rgb_display.debug \
+		--panel-rows $(DEBUG_PANEL_ROWS) \
+		--panel-cols $(DEBUG_PANEL_COLS) \
+		--chain-length $(DEBUG_CHAIN_LENGTH) \
+		--parallel $(DEBUG_PARALLEL)
+
+test-matrix-pinctrl:
+	@HEART_RUN_PI5_PINCTRL_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pinctrl_debug.py
+
+bench-matrix-pio-dma:
+	@cargo run --release --manifest-path rust/heart_rust/Cargo.toml --bin pi5_pio_bench -- \
+		--frame-count $(PIO_BENCH_FRAME_COUNT) \
+		--pipeline-depth $(PIO_BENCH_PIPELINE_DEPTH) \
+		--panel-rows $(PIO_BENCH_PANEL_ROWS) \
+		--panel-cols $(PIO_BENCH_PANEL_COLS) \
+		--chain-length $(PIO_BENCH_CHAIN_LENGTH) \
+		--parallel $(PIO_BENCH_PARALLEL) \
+		--pwm-bits $(PIO_BENCH_PWM_BITS) \
+		--iterations $(PIO_BENCH_ITERATIONS)
+
+bench-matrix-pio-scan:
+	@cargo run --release --manifest-path rust/heart_rust/Cargo.toml --bin pi5_scan_bench -- \
+		--frame-count $(PIO_BENCH_FRAME_COUNT) \
+		--pipeline-depth $(PIO_BENCH_PIPELINE_DEPTH) \
+		--panel-rows $(PIO_BENCH_PANEL_ROWS) \
+		--panel-cols $(PIO_BENCH_PANEL_COLS) \
+		--chain-length $(PIO_BENCH_CHAIN_LENGTH) \
+		--parallel $(PIO_BENCH_PARALLEL) \
+		--iterations $(PIO_BENCH_ITERATIONS)
+
+test-matrix-pio-dma:
+	@HEART_RUN_PI5_PIO_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pi5_dma_benchmark.py
+
+test-matrix-pio-scan:
+	@HEART_RUN_PI5_SCAN_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pi5_scan_benchmark.py
 
 install:
 	@uv sync --all-extras --group dev

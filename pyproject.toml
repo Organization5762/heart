@@ -182,6 +182,8 @@ pythonpath = [
 testpaths = ["tests"]
 addopts = "-vv -n auto --dist=loadscope"
 markers = [
+    "integration: hardware or network integration tests that require an external host or device",
+    "slow: tests that routinely exceed one second locally",
     "timeout(duration): mark tests that should fail if they exceed the given duration",
 ]
 

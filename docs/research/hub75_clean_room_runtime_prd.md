@@ -2,10 +2,26 @@
 
 ## Materials
 
+- `rust/heart_rust/src/lib.rs`
+- `rust/heart_rust/src/runtime/backend.rs`
+- `rust/heart_rust/src/runtime/config.rs`
+- `rust/heart_rust/src/runtime/driver.rs`
+- `rust/heart_rust/src/runtime/frame.rs`
+- `rust/heart_rust/src/runtime/queue.rs`
+- `rust/heart_rust/src/runtime/scene.rs`
+- `rust/heart_rust/src/runtime/stats.rs`
+- `rust/heart_rust/bench/matrix_transfer.rs`
+- `rust/heart_rust/bench/pi5_pio_bench.rs`
+- `rust/heart_rust/bench/pi5_scan_bench.rs`
+- `rust/heart_rust/native/pi5_pio_scan_shim.c`
+- `rust/heart_rust/src/runtime/pi5_scan.rs`
 - `src/heart/device/rgb_display/device.py`
+- `src/heart/device/rgb_display/runtime.py`
 - `src/heart/device/rgb_display/worker.py`
 - `src/heart/device/selection.py`
 - `src/heart/utilities/env/config.py`
+- `tests/device/test_rgb_display_runtime.py`
+- `tests/device/test_rgb_display_transfer_benchmark.py`
 - [Adafruit RGB Matrix Bonnet for Raspberry Pi pinouts](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi/pinouts)
 - [Adafruit Triple LED Matrix Bonnet for Raspberry Pi with HUB75 pinouts](https://learn.adafruit.com/adafruit-triple-led-matrix-bonnet-for-raspberry-pi-with-hub75/pinouts)
 - [Adafruit RGB Matrix Panels With Raspberry Pi 5 overview](https://learn.adafruit.com/rgb-matrix-panels-with-raspberry-pi-5/overview)
@@ -31,6 +47,7 @@
 ### Architecture Overview
 
 - Introduce a Rust-owned HUB75 runtime with a single public package surface exposed to Python through the existing `heart_rust` pattern.
+- Split the Rust core into focused modules for config validation, frame management, queueing, stats, backend selection, and the PyO3 bridge so performance work stays isolated from the Python API layer.
 - Keep the Python side narrow:
   - create a `MatrixConfig`
   - create a `MatrixDriver`
@@ -512,6 +529,16 @@ Piomatter reference decisions:
   - one-panel bring-up
   - multiple-panel geometry concepts
   - Pi 5-specific execution model
+
+Current implementation status in Heart:
+
+- `rust/heart_rust/src/runtime/pi5_dma.rs` now pre-packs `RGBA` frames into a plane-major HUB75 transport buffer for `parallel=1`.
+- `rust/heart_rust/native/pi5_pio_shim.c` opens `libpio`, claims a Pi 5 state machine, and streams those packed bytes through a DMA-backed `PIO` transfer path on real hardware.
+- `rust/heart_rust/src/runtime/pi5_scan.rs` now builds the production Pi 5 scan schedule for `parallel=1`, including row-address stepping, `LAT`, `OE`, PWM dwell scheduling, and continuous scan looping against the active frame buffer.
+- `rust/heart_rust/native/pi5_pio_scan_shim.c` now drives that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
+- `rust/heart_rust/bench/pi5_pio_bench.rs` and `rust/heart_rust/bench/matrix_transfer.rs` continue to benchmark the transport-only path for `64x64` single-panel and four-panel chain layouts.
+- `rust/heart_rust/bench/pi5_scan_bench.rs` benchmarks the full visible scan path for the production Pi 5 scheduler.
+- The current production Pi 5 scan transport is functional, but it is not yet the intended DMA-fed end state. The state machine runs the correct scan schedule, while the host currently feeds the `PIO` FIFO synchronously because `rp1-pio` rejected `pio_sm_config_xfer()` for this wider scan-program configuration during bring-up.
 
 ### Integration With Heart
 

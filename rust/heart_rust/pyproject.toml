@@ -10,5 +10,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 [tool.maturin]
+features = ["python-extension"]
 module-name = "heart_rust._heart_rust"
 python-source = "python"

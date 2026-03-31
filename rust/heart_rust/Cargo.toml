@@ -8,7 +8,31 @@ publish = false
 name = "heart_rust"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = []
+python-extension = ["pyo3/extension-module"]
+
 [dependencies]
-pyo3 = { version = "0.28.2", features = ["abi3-py311", "extension-module"] }
+pyo3 = { version = "0.28.2", features = ["abi3-py311"] }
 pyo3-stub-gen = "0.15.0"
+rayon = "1.11.0"
 safetensors = "0.7.0"
+
+[build-dependencies]
+cc = "1.2.19"
+
+[dev-dependencies]
+criterion = "0.7.0"
+
+[[bin]]
+name = "pi5_pio_bench"
+path = "bench/pi5_pio_bench.rs"
+
+[[bin]]
+name = "pi5_scan_bench"
+path = "bench/pi5_scan_bench.rs"
+
+[[bench]]
+name = "matrix_transfer"
+harness = false
+path = "bench/matrix_transfer.rs"
