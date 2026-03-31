@@ -6,7 +6,10 @@ import { ImageProvider } from "./actions/ws/providers/ImageProvider";
 import { PeripheralEventsProvider } from "./actions/ws/providers/PeripheralEventsProvider";
 import { PeripheralProvider } from "./actions/ws/providers/PeripheralProvider";
 import { WSProvider } from "./actions/ws/websocket";
+import { getConfiguredBeatsWebSocketUrl } from "./config/websocket";
 import { router } from "./utils/routes";
+
+const websocketUrl = getConfiguredBeatsWebSocketUrl();
 
 export default function App() {
   useEffect(() => {
@@ -18,7 +21,7 @@ export default function App() {
 
 const root = createRoot(document.getElementById("app")!);
 root.render(
-  <WSProvider url="ws://localhost:8765">
+  <WSProvider url={websocketUrl}>
     <React.StrictMode>
       <PeripheralEventsProvider>
         <PeripheralProvider>

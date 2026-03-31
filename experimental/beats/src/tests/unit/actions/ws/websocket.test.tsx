@@ -90,4 +90,15 @@ describe("WSProvider", () => {
     });
     expect(FakeWebSocket.instances).toHaveLength(2);
   });
+
+  test("stays disconnected when no websocket url is configured", () => {
+    render(
+      <WSProvider url={null} retryDelay={100} maxRetryDelay={200}>
+        <ReadyStateProbe />
+      </WSProvider>,
+    );
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(screen.getByTestId("ready-state")).toHaveTextContent("3");
+  });
 });
