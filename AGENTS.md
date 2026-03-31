@@ -114,6 +114,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 ## Recent Validation
 
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/app-sidebar.tsx src/components/usgc.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/app-sidebar.tsx src/components/usgc.tsx`
+- `2026-03-31`: No tests run after restacking the Beats sidebar `Program` and `Signal` metadata rows because the change was limited to presentational layout in existing React components.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
