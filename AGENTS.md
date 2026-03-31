@@ -5,6 +5,7 @@
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
 
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
+- `experimental/beats` test and lint commands require that workspace's Node dependencies to be installed first; `npm exec` alone is not enough because the Vite/Vitest config imports project-local plugins such as `@vitejs/plugin-react`.
 - When `experimental/beats/package-lock.json` is out of sync with `package.json`, `npm ci` will fail; use `npm install --package-lock=false` for local validation unless the task explicitly includes repairing the lockfile.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
@@ -256,3 +257,7 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache make format`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache .venv/bin/pytest tests/device/test_beats_websocket.py tests/runtime/test_peripheral_runtime.py`
+- `2026-03-31`: `npm test -- --run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because `vitest` was not installed in that workspace (`node_modules` missing).
+- `2026-03-31`: `npm exec vitest run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because the workspace dependencies were not installed, so `@vitejs/plugin-react` could not be resolved from `vitest.config.ts`.
