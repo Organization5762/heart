@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 from dataclasses import dataclass
@@ -262,3 +263,31 @@ class TestWebSocketReplayCache:
             b"switch-1-latest",
             b"sensor-1-latest",
         )
+
+
+class TestWebSocketDisconnectHandling:
+    """Validate disconnect handling so expected client drops do not surface as server errors."""
+
+    def test_handler_ignores_disconnect_during_replay_send(self) -> None:
+        """Verify replay send disconnects are treated as normal closure so reconnect churn does not log handler failures."""
+        from websockets.exceptions import ConnectionClosedError
+
+        websocket = object.__new__(WebSocket)
+        websocket.clients = set()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = b"replay-frame"
+        websocket._latest_peripheral_frames = {}
+
+        class _ClosingConnection:
+            async def send(self, _frame: bytes) -> None:
+                raise ConnectionClosedError(
+                    None,
+                    None,
+                )
+
+            async def wait_closed(self) -> None:
+                raise AssertionError("wait_closed should not run after replay disconnect")
+
+        connection = _ClosingConnection()
+        asyncio.run(websocket._handle_client(connection))
+        assert connection not in websocket.clients

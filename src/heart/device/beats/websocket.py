@@ -177,13 +177,7 @@ class WebSocket:
         assert broadcast_queue is not None
 
         async def handler(ws: Any) -> None:
-            self.clients.add(ws)
-            try:
-                for frame in self._replay_frames():
-                    await ws.send(frame)
-                await ws.wait_closed()
-            finally:
-                self.clients.discard(ws)
+            await self._handle_client(ws)
 
         async def broadcast_worker() -> None:
             while True:
@@ -234,6 +228,21 @@ class WebSocket:
 
         main_task = loop.create_task(main())
         loop.run_until_complete(main_task)
+
+    async def _handle_client(self, ws: Any) -> None:
+        self.clients.add(ws)
+        try:
+            try:
+                for frame in self._replay_frames():
+                    await ws.send(frame)
+            except (ConnectionClosedOK, ConnectionClosedError):
+                logger.debug("Beats websocket client disconnected during replay send.")
+                return
+            await ws.wait_closed()
+        except (ConnectionClosedOK, ConnectionClosedError):
+            logger.debug("Beats websocket client disconnected.")
+        finally:
+            self.clients.discard(ws)
 
     def send(self, kind: str, payload: object) -> None:
         frame_bytes = self._encode_payload(kind=kind, payload=payload)
