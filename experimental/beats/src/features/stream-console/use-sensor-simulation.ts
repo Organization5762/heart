@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useConnectedPeripherals } from "@/actions/ws/providers/PeripheralProvider";
+import { getSensorCommandKey } from "@/features/stream-console/terminal-commands";
 import {
   appendSensorHistory,
   defaultSensorOverride,
@@ -12,7 +13,7 @@ import {
 const HISTORY_LIMIT = 180;
 const SENSOR_SAMPLE_INTERVAL_MS = 250;
 
-export function useSensorSimulation() {
+export function useSensorSimulation(preferredSensorKey?: string | null) {
   const peripherals = useConnectedPeripherals();
   const [clockSeconds, setClockSeconds] = useState(0);
   const [requestedSensorId, setRequestedSensorId] = useState<string | null>(
@@ -29,11 +30,16 @@ export function useSensorSimulation() {
   const sensors = extractSensorChannels(peripherals);
   const sensorsRef = useRef(sensors);
   const overridesRef = useRef(overrides);
+  const preferredSensorId = preferredSensorKey
+    ? (sensors.find(
+        (sensor) => getSensorCommandKey(sensor) === preferredSensorKey,
+      )?.id ?? null)
+    : null;
   const selectedSensorId =
     requestedSensorId &&
     sensors.some((sensor) => sensor.id === requestedSensorId)
       ? requestedSensorId
-      : (sensors[0]?.id ?? null);
+      : (preferredSensorId ?? sensors[0]?.id ?? null);
 
   useEffect(() => {
     sensorsRef.current = sensors;

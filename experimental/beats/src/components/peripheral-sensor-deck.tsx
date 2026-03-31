@@ -8,7 +8,11 @@ function uniquePeripheralCount(sensorIds: string[]) {
   return new Set(sensorIds).size;
 }
 
-export function PeripheralSensorDeck() {
+export function PeripheralSensorDeck({
+  preferredSensorKey,
+}: {
+  preferredSensorKey?: string;
+}) {
   const {
     clockSeconds,
     overrides,
@@ -19,10 +23,10 @@ export function PeripheralSensorDeck() {
     updateSensorOverride,
     resetSensorOverride,
     clearSelectedSensorHistory,
-  } = useSensorSimulation();
+  } = useSensorSimulation(preferredSensorKey);
 
   return (
-    <div className="grid gap-6">
+    <div id="sensor-deck" className="grid gap-6">
       <section className="rounded-[1.5rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(21,26,33,0.96),_rgba(11,14,19,0.99))] p-5 text-slate-100 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">

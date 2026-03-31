@@ -7,12 +7,18 @@ import {
   SpecChip,
 } from "@/components/beats-shell";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 
 export const Route = createFileRoute("/peripherals/connected")({
+  validateSearch: z.object({
+    sensor: z.string().optional(),
+  }),
   component: RouteComponent,
 });
 
 function RouteComponent() {
+  const search = Route.useSearch();
+
   return (
     <PageFrame>
       <PaperCard>
@@ -23,7 +29,7 @@ function RouteComponent() {
           aside={<SpecChip tone="muted">Input Variant / Mode</SpecChip>}
         />
       </PaperCard>
-      <PeripheralSensorDeck />
+      <PeripheralSensorDeck preferredSensorKey={search.sensor} />
       <PeripheralTree hierarchy={[["input_variant", "mode"]]} />
     </PageFrame>
   );
