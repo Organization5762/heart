@@ -134,6 +134,21 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("DEBUG_MODE", "false")
         assert Configuration.is_debug_mode() is False
 
+    def test_forward_to_beats_app_reads_expected_env_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the Beats forwarding helper reads the documented APP flag so streamed display output reaches the BEATS client."""
+
+        _clear_env(monkeypatch, "FORWARD_TO_BEATS_APP", "FORWARD_TO_BEATS_MAP")
+        assert Configuration.forward_to_beats_app() is False
+
+        monkeypatch.setenv("FORWARD_TO_BEATS_APP", "true")
+        assert Configuration.forward_to_beats_app() is True
+
+        monkeypatch.delenv("FORWARD_TO_BEATS_APP", raising=False)
+        monkeypatch.setenv("FORWARD_TO_BEATS_MAP", "true")
+        assert Configuration.forward_to_beats_app() is False
+
 
     def test_asset_cache_strategy_defaults_all(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify asset cache strategy defaults to all. This keeps IO reuse enabled without explicit tuning."""

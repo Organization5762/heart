@@ -54,6 +54,9 @@ export function StreamCube({
   const animationRef = useRef<number | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const readyFrameRef = useRef<number | null>(null);
+  const pendingImageUrlRef = useRef<string | null>(imgURL);
+  const isApplyingImageRef = useRef(false);
+  const isMountedRef = useRef(true);
   const sceneConfigRef = useRef(sceneConfig);
   const telemetryValueRef = useRef(telemetryValue);
   const [isRendererReady, setIsRendererReady] = useState(false);
@@ -65,6 +68,14 @@ export function StreamCube({
   useEffect(() => {
     telemetryValueRef.current = telemetryValue;
   }, [telemetryValue]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -261,45 +272,58 @@ export function StreamCube({
   }, [onContextError]);
 
   useEffect(() => {
-    let cancelled = false;
+    pendingImageUrlRef.current = imgURL;
 
-    const applyTexture = async () => {
-      const streamTexture = streamTextureRef.current;
-      const streamContext = streamContextRef.current;
-      const streamCanvas = streamCanvasRef.current;
-      if (!streamTexture || !streamContext || !streamCanvas) return;
-
-      try {
-        if (imgURL) {
-          const image = await loadStreamImage(imgURL);
-          if (cancelled) {
-            return;
-          }
-          drawStreamImage(streamContext, streamCanvas, image);
-        } else {
-          drawFallbackTexture(streamContext, streamCanvas);
-        }
-      } catch (error) {
-        console.warn("Failed to load streamed texture; using fallback", error);
-        drawFallbackTexture(streamContext, streamCanvas);
-      }
-
-      if (cancelled) {
+    const applyPendingTexture = async () => {
+      if (isApplyingImageRef.current) {
         return;
       }
 
-      applyTextureSettings(
-        streamTexture,
-        sceneConfigRef.current.surface.textureRepeat,
-      );
-      streamTexture.needsUpdate = true;
+      isApplyingImageRef.current = true;
+
+      try {
+        while (isMountedRef.current) {
+          const nextUrl = pendingImageUrlRef.current;
+          const streamTexture = streamTextureRef.current;
+          const streamContext = streamContextRef.current;
+          const streamCanvas = streamCanvasRef.current;
+          if (!streamTexture || !streamContext || !streamCanvas) {
+            return;
+          }
+
+          pendingImageUrlRef.current = null;
+
+          try {
+            if (nextUrl) {
+              const image = await loadStreamImage(nextUrl);
+              if (!isMountedRef.current) {
+                return;
+              }
+              drawStreamImage(streamContext, streamCanvas, image);
+            } else {
+              drawFallbackTexture(streamContext, streamCanvas);
+            }
+          } catch (error) {
+            console.warn("Failed to load streamed texture; using fallback", error);
+            drawFallbackTexture(streamContext, streamCanvas);
+          }
+
+          applyTextureSettings(
+            streamTexture,
+            sceneConfigRef.current.surface.textureRepeat,
+          );
+          streamTexture.needsUpdate = true;
+
+          if (pendingImageUrlRef.current === null) {
+            return;
+          }
+        }
+      } finally {
+        isApplyingImageRef.current = false;
+      }
     };
 
-    applyTexture();
-
-    return () => {
-      cancelled = true;
-    };
+    void applyPendingTexture();
   }, [imgURL]);
 
   const backgroundTint = Math.round(sceneConfig.stage.backgroundTint * 100);
