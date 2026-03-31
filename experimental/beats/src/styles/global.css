@@ -426,16 +426,16 @@
 }
 
 @layer components {
-  .usgc-page {
+  .beats-page {
     @apply mx-auto flex min-h-full max-w-[1680px] flex-col gap-6 px-2 pt-4 pb-6 md:px-4 lg:px-6;
   }
 
-  .usgc-card {
+  .beats-card {
     @apply border-border bg-card relative overflow-hidden border p-5;
     box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.08);
   }
 
-  .usgc-card::before {
+  .beats-card::before {
     content: "";
     pointer-events: none;
     position: absolute;
@@ -456,18 +456,18 @@
     opacity: 0.75;
   }
 
-  .usgc-card > * {
+  .beats-card > * {
     position: relative;
     z-index: 1;
   }
 
-  .usgc-card-dark {
+  .beats-card-dark {
     @apply bg-[#070707] text-[#f6efe6];
     border-color: rgba(246, 239, 230, 0.25);
     box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.14);
   }
 
-  .usgc-card-dark::before {
+  .beats-card-dark::before {
     background:
       linear-gradient(
         180deg,
@@ -491,54 +491,54 @@
     opacity: 0.72;
   }
 
-  .usgc-kicker {
+  .beats-kicker {
     @apply font-tomorrow text-muted-foreground text-[0.65rem] tracking-[0.34em] uppercase;
   }
 
-  .usgc-copy {
+  .beats-copy {
     @apply text-sm leading-7 text-[#3b3228] dark:text-[#d8cfc1];
   }
 
-  .usgc-chip {
+  .beats-chip {
     @apply border-border text-foreground inline-flex items-center gap-2 border px-3 py-1 font-mono text-[0.7rem] tracking-[0.18em] uppercase;
     background: #f4dd95;
     box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.08);
   }
 
-  .usgc-chip-muted {
+  .beats-chip-muted {
     @apply bg-background;
   }
 
-  .usgc-chip-dark {
+  .beats-chip-dark {
     border-color: rgba(246, 239, 230, 0.3);
     background: rgba(246, 239, 230, 0.08);
     box-shadow: none;
     color: #f6efe6;
   }
 
-  .usgc-data-row {
+  .beats-data-row {
     @apply grid gap-2 border-t border-dashed border-current/20 py-2 font-mono text-sm;
     grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
   }
 
-  .usgc-data-row:first-child {
+  .beats-data-row:first-child {
     @apply border-t-0 pt-0;
   }
 
-  .usgc-data-label {
+  .beats-data-label {
     @apply text-muted-foreground text-[0.68rem] tracking-[0.2em] uppercase;
   }
 
-  .usgc-card-dark .usgc-data-label {
+  .beats-card-dark .beats-data-label {
     color: rgba(246, 239, 230, 0.58);
   }
 
-  .usgc-meter {
+  .beats-meter {
     @apply border-border bg-background mt-2 overflow-hidden border;
     height: 0.85rem;
   }
 
-  .usgc-meter-fill {
+  .beats-meter-fill {
     @apply bg-primary h-full;
     background-image: linear-gradient(
       90deg,
@@ -550,57 +550,57 @@
     background-size: 18px 100%;
   }
 
-  .usgc-card-dark .usgc-meter {
+  .beats-card-dark .beats-meter {
     border-color: rgba(246, 239, 230, 0.25);
     background: rgba(246, 239, 230, 0.06);
   }
 
-  .usgc-card-dark .usgc-meter-fill {
+  .beats-card-dark .beats-meter-fill {
     background-color: #f4dd95;
   }
 
-  .usgc-link-card {
+  .beats-link-card {
     @apply block transition-transform duration-200;
   }
 
-  .usgc-link-card:hover {
+  .beats-link-card:hover {
     transform: translate(-2px, -2px);
   }
 
-  .usgc-table {
+  .beats-table {
     @apply w-full border-collapse text-left font-mono text-[0.74rem];
   }
 
-  .usgc-table thead th {
+  .beats-table thead th {
     @apply border-border text-muted-foreground border-b px-3 py-2 font-medium tracking-[0.2em] uppercase;
   }
 
-  .usgc-table tbody td {
+  .beats-table tbody td {
     @apply border-border/20 border-b px-3 py-3 align-top;
   }
 
-  .usgc-table tbody tr:hover {
+  .beats-table tbody tr:hover {
     background: rgba(0, 0, 0, 0.04);
   }
 
-  .usgc-card-dark .usgc-table thead th {
+  .beats-card-dark .beats-table thead th {
     border-color: rgba(246, 239, 230, 0.2);
     color: rgba(246, 239, 230, 0.62);
   }
 
-  .usgc-card-dark .usgc-table tbody td {
+  .beats-card-dark .beats-table tbody td {
     border-color: rgba(246, 239, 230, 0.12);
   }
 
-  .usgc-card-dark .usgc-table tbody tr:hover {
+  .beats-card-dark .beats-table tbody tr:hover {
     background: rgba(246, 239, 230, 0.05);
   }
 
-  .usgc-ascii-map {
+  .beats-ascii-map {
     @apply border-border bg-background/80 overflow-auto border p-4 font-mono text-[0.76rem] leading-6 whitespace-pre;
   }
 
-  .usgc-terminal-grid {
+  .beats-terminal-grid {
     background:
       linear-gradient(
         90deg,
@@ -624,7 +624,7 @@
       #070707;
   }
 
-  .usgc-scroll-panel {
+  .beats-scroll-panel {
     @apply border-border bg-background/70 overflow-auto border;
   }
 }

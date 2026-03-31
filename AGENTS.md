@@ -114,6 +114,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 ## Recent Validation
 
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/beats-shell.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/beats-shell.tsx src/routes/index.tsx src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/peripherals/peripheral_snapshots.tsx src/styles/global.css`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/beats-shell.tsx src/routes/index.tsx src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/peripherals/peripheral_snapshots.tsx`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`

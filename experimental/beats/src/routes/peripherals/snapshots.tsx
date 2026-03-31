@@ -4,7 +4,7 @@ import {
   PaperCard,
   SectionHeader,
   SpecChip,
-} from "@/components/usgc";
+} from "@/components/beats-shell";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/peripherals/snapshots")({

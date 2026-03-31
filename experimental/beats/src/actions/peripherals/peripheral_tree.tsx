@@ -2,7 +2,7 @@ import { AccelerometerView } from "@/components/ui/peripherals/accelerometer";
 import { GenericSensorPeripheralView } from "@/components/ui/peripherals/generic_sensor";
 import { RotarySwitchView } from "@/components/ui/peripherals/rotary_button";
 import { UWBPositionView } from "@/components/ui/peripherals/uwb_positioning";
-import { PaperCard, SpecChip } from "@/components/usgc";
+import { PaperCard, SpecChip } from "@/components/beats-shell";
 import type { ReactNode } from "react";
 import {
   PeripheralInfo,
@@ -60,7 +60,7 @@ export function PeripheralTree({
         <PaperCard key={idx} className="flex flex-col gap-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-              <p className="usgc-kicker">Connected Peripherals</p>
+              <p className="beats-kicker">Connected Peripherals</p>
               <h2 className="font-tomorrow text-2xl tracking-[0.1em]">
                 {h.join(" / ")}
               </h2>
@@ -108,7 +108,7 @@ function PeripheralBranch({
     <div className="border-border bg-background/70 border p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
-          <p className="usgc-kicker">Peripheral</p>
+          <p className="beats-kicker">Peripheral</p>
           <h3 className="font-tomorrow text-xl tracking-[0.08em]">
             {peripheral.id ?? "Unknown Unit"}
           </h3>
