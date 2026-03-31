@@ -109,6 +109,7 @@ struct heart_pi5_scan_loop_replay_batch {
 struct heart_pi5_scan_loop_session {
 	struct mutex lock;
 	wait_queue_head_t wait_queue;
+	wait_queue_head_t quiesce_wait_queue;
 	struct task_struct *worker;
 	/* Write-combined alias of the per-SM TX FIFO data register. */
 	void __iomem *fifo_mmio;
@@ -125,6 +126,37 @@ struct heart_pi5_scan_loop_session {
 	bool frame_loaded;
 	bool replay_enabled;
 	bool stop_worker;
+	/*
+	 * Lifecycle state, from userspace's point of view:
+	 *
+	 *   configured     => INIT has established the PIO program, GPIO ownership,
+	 *                     FIFO mapping, and resident coherent buffer.
+	 *   frame_loaded   => LOAD has copied a complete packed frame into the
+	 *                     resident buffer and replay_bytes describes its valid
+	 *                     prefix.
+	 *   replay_enabled => START has published that resident frame to the worker
+	 *                     as eligible for replay.
+	 *   stop_worker    => file teardown is in progress and the kthread should
+	 *                     exit permanently rather than merely stop replay.
+	 *
+	 * These flags are intentionally not a generic enum state machine because
+	 * userspace is allowed to observe or wait on several overlapping notions of
+	 * state:
+	 *   - configured vs not configured
+	 *   - has a resident frame vs does not
+	 *   - replay currently enabled vs stopped
+	 *   - kthread still owns a replay snapshot vs quiescent
+	 *
+	 * The comments and helpers below treat them as one coherent lifecycle even
+	 * though the representation is several booleans.
+	 */
+	/*
+	 * worker_active means the kthread has snapshotted frame_cpu/replay_bytes and
+	 * may still be reading from that resident buffer outside session->lock.
+	 * STOP waits for this bit to clear before LOAD is allowed to replace the
+	 * resident payload.
+	 */
+	bool worker_active;
 	/*
 	 * worker_runnable is the lock-protected "can the worker enter a replay
 	 * batch right now?" summary bit. The worker's wait predicate uses this
@@ -155,7 +187,7 @@ struct heart_pi5_scan_loop_session {
  * ------------------
  *
  * lock protects:
- *   - replay_enabled/frame_loaded/configured/stop_worker
+ *   - replay_enabled/frame_loaded/configured/stop_worker/worker_active
  *   - replay_bytes
  *   - last_error
  *   - all PIO/program/buffer lifetime transitions
@@ -213,8 +245,17 @@ static bool heart_pi5_scan_loop_is_worker_runnable_locked(
 	const struct heart_pi5_scan_loop_session *session
 )
 {
+	/*
+	 * This helper answers one narrow question only:
+	 *   "may the worker enter a new replay batch right now?"
+	 *
+	 * It deliberately excludes the "worker is already in a batch" case. That is
+	 * what lets STOP/LOAD distinguish between:
+	 *   - replay is merely enabled and could begin again
+	 *   - replay is actively consuming the resident buffer right now
+	 */
 	return session->configured && session->replay_enabled && session->frame_loaded &&
-	       session->replay_bytes > 0;
+	       session->replay_bytes > 0 && !session->worker_active;
 }
 
 static void heart_pi5_scan_loop_update_worker_runnable_locked(
@@ -229,6 +270,11 @@ static void heart_pi5_scan_loop_update_worker_runnable_locked(
 
 static void heart_pi5_scan_loop_reset_stats_locked(struct heart_pi5_scan_loop_session *session)
 {
+	/*
+	 * Reset one presentation-accounting epoch. START and LOAD both use this so
+	 * "frame N has been presented M times" always means "since the most recent
+	 * successful START of the current resident payload."
+	 */
 	atomic64_set(&session->presentations, 0);
 	atomic64_set(&session->batches_submitted, 0);
 	atomic64_set(&session->words_written, 0);
@@ -247,6 +293,18 @@ static u32 heart_pi5_scan_loop_compute_batch_replays(
 {
 	u32 replay_batch_count = 1;
 
+	/*
+	 * Batch sizing is a throughput/latency tradeoff, not just a throughput
+	 * knob. The first completed presentation is always left unbatched so the
+	 * "time to first visible frame" metric remains honest. After that, the
+	 * worker may replay the same resident payload multiple times before one
+	 * drain/completion round.
+	 *
+	 * The target is expressed in bytes rather than "replays" because payload
+	 * size changes as the Rust packer evolves. That keeps the batching policy
+	 * stable across protocol improvements: smaller packed frames naturally batch
+	 * more, larger dense frames batch less.
+	 */
 	if (completed_presentations > 0 && frame_bytes > 0 && batch_target_bytes > 0) {
 		replay_batch_count = max_t(u32, 1, batch_target_bytes / frame_bytes);
 		replay_batch_count = min_t(
@@ -266,6 +324,15 @@ static void heart_pi5_scan_loop_prepare_replay_batch_locked(
 	struct heart_pi5_scan_loop_replay_batch *batch
 )
 {
+	/*
+	 * Snapshot exactly the inputs the worker needs after dropping the lock.
+	 * This keeps the unlocked MMIO phase honest: no hidden reads back into the
+	 * mutable session state, and therefore a smaller race surface to audit.
+	 *
+	 * In particular, the worker does not look back at replay_bytes or frame_cpu
+	 * once this snapshot is taken. STOP/LOAD synchronization is built around
+	 * that property.
+	 */
 	batch->frame_bytes = session->replay_bytes;
 	batch->word_count = batch->frame_bytes / sizeof(uint32_t);
 	batch->words = session->frame_cpu;
@@ -357,6 +424,21 @@ static void heart_pi5_scan_loop_mmio_write_words(
 {
 	u32 index = 0;
 
+	/*
+	 * This is the steady-state hot loop.
+	 *
+	 * The eight-wide unroll is deliberate and empirical: it was the fastest
+	 * stable shape found for this WC FIFO mapping without resorting to harder-
+	 * to-audit raw store tricks. The goal here is not cleverness; it is to keep
+	 * the generated code close to "one relaxed MMIO store per transport word"
+	 * with minimal loop overhead.
+	 *
+	 * Two constraints are worth keeping in mind if this is revisited:
+	 *   - the transport is already pre-packed in Rust, so there is no useful
+	 *     per-word computation left to hide here
+	 *   - apparent wins from more aggressive write patterns need measurement
+	 *     against real drain completion, not just host-side store timing
+	 */
 	for (; index + 8 <= word_count; index += 8) {
 		writel_relaxed(words[index + 0], fifo_mmio);
 		writel_relaxed(words[index + 1], fifo_mmio);
@@ -494,6 +576,8 @@ static int heart_pi5_scan_loop_worker(void *context)
 			batch_target_bytes,
 			&batch
 		);
+		session->worker_active = true;
+		heart_pi5_scan_loop_update_worker_runnable_locked(session);
 
 		/*
 		 * The first replay of a newly loaded frame is intentionally unbatched so
@@ -510,14 +594,22 @@ static int heart_pi5_scan_loop_worker(void *context)
 		 *   - fifo_mmio is the mapped TX FIFO window
 		 *   - replay_batch_count is fixed for this batch
 		 *
-		 * LOAD is forbidden while replay_enabled is true, so userspace cannot
-		 * swap out frame_cpu contents underneath the worker.
+		 * LOAD is forbidden while replay_enabled is true, and STOP does not
+		 * return until worker_active drops again. That keeps frame_cpu immutable
+		 * for the full lifetime of this replay snapshot.
 		 */
 		write_started = ktime_get();
 		for (replay_index = 0; replay_index < batch.replay_count; ++replay_index) {
+			/*
+			 * Stop/disable responsiveness is checked between whole-frame
+			 * replays, not between transport words. That is intentional:
+			 * per-word checks would lengthen the hottest loop in the driver,
+			 * while per-replay checks keep STOP latency bounded by one packed
+			 * frame plus one drain.
+			 */
 			if (unlikely(
 				    kthread_should_stop() || READ_ONCE(session->stop_worker) ||
-				    !READ_ONCE(session->worker_runnable)
+				    !READ_ONCE(session->replay_enabled)
 			    )) {
 				batch_interrupted = true;
 				break;
@@ -536,6 +628,11 @@ static int heart_pi5_scan_loop_worker(void *context)
 			atomic64_inc(&session->stop_requests_seen_during_batch);
 		}
 		if (completed_replays == 0) {
+			mutex_lock(&session->lock);
+			session->worker_active = false;
+			heart_pi5_scan_loop_update_worker_runnable_locked(session);
+			mutex_unlock(&session->lock);
+			wake_up_all(&session->quiesce_wait_queue);
 			continue;
 		}
 
@@ -575,18 +672,31 @@ static int heart_pi5_scan_loop_worker(void *context)
 			mutex_lock(&session->lock);
 			session->last_error = transfer_result;
 			session->replay_enabled = false;
+			session->worker_active = false;
 			heart_pi5_scan_loop_update_worker_runnable_locked(session);
 			mutex_unlock(&session->lock);
+			wake_up_all(&session->quiesce_wait_queue);
 			wake_up_all(&session->wait_queue);
 			continue;
 		}
 
 		atomic64_inc(&session->batches_submitted);
+		/*
+		 * words_written counts actual FIFO transport words, not logical pixels
+		 * or groups. That makes it the right quantity to compare against Rust-
+		 * side packer changes: if resident_refresh_hz moves but words_written
+		 * per second stays flat, the bottleneck is still this MMIO burst path.
+		 */
 		atomic64_add((s64)((u64)batch.word_count * completed_replays), &session->words_written);
 		atomic64_add(completed_replays, &session->presentations);
 		if (completed_replays > READ_ONCE(session->max_batch_replays)) {
 			WRITE_ONCE(session->max_batch_replays, completed_replays);
 		}
+		mutex_lock(&session->lock);
+		session->worker_active = false;
+		heart_pi5_scan_loop_update_worker_runnable_locked(session);
+		mutex_unlock(&session->lock);
+		wake_up_all(&session->quiesce_wait_queue);
 		wake_up(&session->wait_queue);
 	}
 
@@ -621,6 +731,21 @@ static int heart_pi5_scan_loop_configure_locked(
 		return -EINVAL;
 	}
 
+	/*
+	 * Configuration is ordered so every later resource depends on earlier ones:
+	 *
+	 *   1. open/claim PIO + SM
+	 *   2. build and load the shared parser program
+	 *   3. claim/configure GPIOs and initialize the SM
+	 *   4. allocate the resident coherent frame buffer
+	 *   5. map the one-word FIFO aperture with WC semantics
+	 *   6. enable the SM and publish the session as configured
+	 *
+	 * This ordering keeps failure unwinding simple. Anything that fails can
+	 * fall into heart_pi5_scan_loop_teardown_locked(), which tears resources
+	 * down in the reverse order and leaves the session back in an unconfigured
+	 * state.
+	 */
 	session->pio = pio_open();
 	if (!session->pio) {
 		return -ENODEV;
@@ -795,6 +920,13 @@ static int heart_pi5_scan_loop_configure_locked(
 		HEART_PI5_SCAN_LOOP_OUTPUT_PIN_COUNT
 	);
 	sm_config_set_sideset_pins(&config, HEART_PI5_SCAN_LOOP_CLOCK_GPIO);
+	/*
+	 * The parser writes one contiguous 23-bit output window rooted at GPIO 5.
+	 * The bonnet's actual RGB/address pins are sparse within that window, but
+	 * the rebased Rust transport has already packed them into the corresponding
+	 * bit positions. That is why the state machine can treat the span data as a
+	 * plain OUT PINS stream here.
+	 */
 
 	result = pio_gpio_init(session->pio, HEART_PI5_SCAN_LOOP_OE_GPIO);
 	if (result) {
@@ -940,6 +1072,11 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 	case HEART_PI5_SCAN_LOOP_IOC_INIT: {
 		struct heart_pi5_scan_loop_init_args init_args;
 
+		/*
+		 * INIT establishes per-open-session ownership of the transport. It does
+		 * not load a frame or start replay; it only creates the fixed-capacity
+		 * resident environment into which later LOAD/START commands operate.
+		 */
 		if (copy_from_user(&init_args, argp, sizeof(init_args))) {
 			return -EFAULT;
 		}
@@ -958,11 +1095,11 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		mutex_lock(&session->lock);
 		if (!session->configured) {
 			result = -EINVAL;
-		} else if (session->replay_enabled) {
+		} else if (session->replay_enabled || session->worker_active) {
 			/*
-			 * LOAD is defined as replacing the resident frame between replay
-			 * runs. Overwriting the resident buffer mid-flight would make WAIT
-			 * and STATS semantics ambiguous, so callers must STOP first.
+			 * LOAD replaces the resident payload between replay epochs. The
+			 * worker snapshots frame_cpu outside the mutex, so STOP must reach
+			 * quiescence before LOAD is allowed to overwrite that buffer.
 			 */
 			result = -EBUSY;
 		} else if (load_args.data_bytes == 0 ||
@@ -980,6 +1117,12 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 			 * payload. There is no partial update contract here: replay_bytes
 			 * is the new authoritative frame length, presentations reset, and
 			 * the next START begins a new accounting epoch.
+			 *
+			 * The coherent buffer remains the same allocation across LOADs.
+			 * Only its valid prefix changes. That is intentional: fixed
+			 * capacity keeps the worker's replay path and teardown logic
+			 * simple, and it means LOAD has exactly one mutating operation:
+			 * overwrite the resident payload between replay epochs.
 			 */
 			session->frame_loaded = true;
 			session->replay_bytes = load_args.data_bytes;
@@ -995,7 +1138,12 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		if (!session->configured || !session->frame_loaded || session->replay_bytes == 0) {
 			result = -EINVAL;
 		} else {
-			/* START defines presentation zero for the following WAIT/STATS run. */
+			/*
+			 * START publishes the already-loaded resident frame to the worker.
+			 * It does not copy data or reset hardware state beyond the
+			 * presentation-accounting epoch. The worker begins replay lazily
+			 * after the wait queue is kicked below.
+			 */
 			heart_pi5_scan_loop_reset_stats_locked(session);
 			session->last_error = 0;
 			session->replay_enabled = true;
@@ -1005,18 +1153,30 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		wake_up_all(&session->wait_queue);
 		return result;
 	case HEART_PI5_SCAN_LOOP_IOC_STOP:
+	{
+		bool wait_for_quiesce;
+
 		mutex_lock(&session->lock);
 		/*
 		 * STOP is intentionally simple and idempotent. It does not tear down
 		 * the PIO program or resident buffer; it only stops future replay
-		 * batches. That keeps START/STOP cheap and lets userspace LOAD a new
-		 * frame without paying INIT again.
+		 * batches. STOP now waits for any in-flight replay snapshot to quiesce
+		 * before returning so a following LOAD cannot race resident-buffer
+		 * replacement against MMIO replay.
 		 */
 		session->replay_enabled = false;
 		heart_pi5_scan_loop_update_worker_runnable_locked(session);
+		wait_for_quiesce = session->worker_active;
 		mutex_unlock(&session->lock);
 		wake_up_all(&session->wait_queue);
+		if (wait_for_quiesce) {
+			wait_event(
+				session->quiesce_wait_queue,
+				READ_ONCE(session->stop_worker) || !READ_ONCE(session->worker_active)
+			);
+		}
 		return 0;
+	}
 	case HEART_PI5_SCAN_LOOP_IOC_WAIT: {
 		struct heart_pi5_scan_loop_wait_args wait_args;
 
@@ -1030,6 +1190,14 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 			atomic64_read(&session->presentations) >= wait_args.target_presentations ||
 			!READ_ONCE(session->replay_enabled)
 		);
+		/*
+		 * WAIT is level-triggered against the presentation counter. It is not a
+		 * "wait for one more interrupt" primitive; callers provide the absolute
+		 * presentation count they care about, and WAIT returns once that count
+		 * has been reached, replay has been stopped, or the worker reported an
+		 * error. That keeps the userspace contract deterministic even if batches
+		 * complete faster than the caller can round-trip through ioctl calls.
+		 */
 		if (result) {
 			return result;
 		}
@@ -1062,6 +1230,14 @@ static long heart_pi5_scan_loop_ioctl(struct file *file, unsigned int command, u
 		 * STATS is a snapshot, not a synchronization point. It returns the most
 		 * recent kernel-owned accounting state and never waits for a replay
 		 * boundary.
+		 *
+		 * This is the ioctl used by the benchmark path to separate:
+		 *   - steady-state replay throughput (presentations / words written)
+		 *   - control-path latency (first render / WAIT)
+		 *   - failure accounting (last_error / drain_failures)
+		 *
+		 * In other words, STATS exists so userspace does not have to infer
+		 * replay behavior from wall-clock timings alone.
 		 */
 		mutex_lock(&session->lock);
 		memset(&stats_args, 0, sizeof(stats_args));
@@ -1108,6 +1284,7 @@ static int heart_pi5_scan_loop_open(struct inode *inode, struct file *file)
 
 	mutex_init(&session->lock);
 	init_waitqueue_head(&session->wait_queue);
+	init_waitqueue_head(&session->quiesce_wait_queue);
 	session->sm = -1;
 	heart_pi5_scan_loop_reset_stats_locked(session);
 	heart_pi5_scan_loop_update_worker_runnable_locked(session);

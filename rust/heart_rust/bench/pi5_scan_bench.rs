@@ -18,7 +18,7 @@ const DEFAULT_PANEL_ROWS: u16 = 64;
 const DEFAULT_PARALLEL: u8 = 1;
 const DEFAULT_PIPELINE_DEPTH: usize = 2;
 const DEFAULT_RESIDENT_LOOP_MS: u64 = 100;
-const PI5_SCAN_SHARED_PROGRAM_LENGTH: u64 = 25;
+const PI5_SCAN_SHARED_PROGRAM_LENGTH: u64 = 24;
 const DEFAULT_SCAN_TIMING: Pi5ScanTiming = Pi5ScanTiming {
     clock_divider: 1.0,
     post_addr_ticks: 5,

@@ -2,13 +2,21 @@
 set -euo pipefail
 
 MODULE_NAME="heart-pi5-scan-loop"
-MODULE_VERSION="0.1.0"
 KERNEL_MODULE_NAME="heart_pi5_scan_loop"
 BATCH_TARGET_BYTES="4194304"
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)"
+RUST_CARGO_TOML="${REPO_ROOT}/rust/heart_rust/Cargo.toml"
+MODULE_VERSION="$(
+  sed -n 's/^version = \"\\([^\"]*\\)\"$/\\1/p' "${RUST_CARGO_TOML}" | head -n 1
+)"
 DKMS_ROOT="/usr/src/${MODULE_NAME}-${MODULE_VERSION}"
+
+if [[ -z "${MODULE_VERSION}" ]]; then
+  echo "Failed to determine heart_rust version from ${RUST_CARGO_TOML}." >&2
+  exit 1
+fi
 
 echo "Installing DKMS prerequisites..."
 sudo apt-get update
@@ -25,6 +33,8 @@ sudo install -m 0644 \
   "${DKMS_ROOT}/rust/heart_rust/kernel/pi5_scan_loop/Makefile"
 sudo install -m 0644 \
   "${REPO_ROOT}/rust/heart_rust/kernel/pi5_scan_loop/dkms.conf" \
+  "${DKMS_ROOT}/dkms.conf"
+sudo sed -i "s/^PACKAGE_VERSION=.*/PACKAGE_VERSION=\"${MODULE_VERSION}\"/" \
   "${DKMS_ROOT}/dkms.conf"
 sudo install -m 0644 \
   "${REPO_ROOT}/rust/heart_rust/kernel/pi5_scan_loop/heart_pi5_scan_loop.c" \

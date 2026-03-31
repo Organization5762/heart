@@ -407,6 +407,22 @@ pub(crate) struct Pi5KernelResidentLoopStats {
     pub(crate) worker_runnable: bool,
 }
 
+impl Pi5KernelResidentLoopStats {
+    // presentation_count() is only a meaningful health signal while the kernel
+    // worker is healthy. Once the worker reports a sticky errno-style failure,
+    // callers must surface that error instead of quietly treating the counter as
+    // authoritative.
+    pub(crate) fn presentation_count_result(&self) -> Result<u64, String> {
+        if self.last_error != 0 {
+            return Err(format!(
+                "Resident scan loop worker failed with code {}.",
+                self.last_error
+            ));
+        }
+        Ok(self.presentations)
+    }
+}
+
 impl Pi5KernelResidentLoop {
     // Open the kernel-owned resident replay path with enough backing storage to
     // hold one packed frame. The kernel module owns continuous refresh after
@@ -593,9 +609,11 @@ impl Pi5KernelResidentLoop {
     }
 
     // Query just the presentation counter when the caller only needs refresh
-    // progress and not the rest of the kernel telemetry.
+    // progress and not the rest of the kernel telemetry. This still propagates
+    // the sticky kernel worker error, because a stale counter is not a valid
+    // health signal once the resident loop has failed.
     pub(crate) fn presentation_count(&self) -> Result<u64, String> {
-        Ok(self.stats()?.presentations)
+        self.stats()?.presentation_count_result()
     }
 }
 
@@ -1098,13 +1116,10 @@ impl Pi5ScanPinout {
                 lat_gpio: 21,
                 clock_gpio: 17,
             }),
-            WiringProfile::AdafruitHat => Ok(Self {
-                rgb_gpios: [5, 13, 6, 12, 16, 23],
-                addr_gpios: [22, 26, 27, 20, 24],
-                oe_gpio: 4,
-                lat_gpio: 21,
-                clock_gpio: 17,
-            }),
+            WiringProfile::AdafruitHat => Err(
+                "Pi 5 scan transport does not support AdafruitHat because the packed GPIO words rebase GPIO 5..27 and require OE within that window."
+                    .to_string(),
+            ),
             WiringProfile::AdafruitTripleHat => {
                 Err("Pi 5 scanout v1 does not yet support AdafruitTripleHat.".to_string())
             }
@@ -1155,6 +1170,23 @@ fn write_scan_segment(
     // Encode one row-pair / bitplane group into the transport format described
     // at the top of this file. This is the hot path where RGBA state becomes
     // the compact span stream consumed by both native transports.
+    //
+    // The hot-path shape is deliberate:
+    //   1. build the one control bundle shared by the whole group
+    //   2. materialize one flat per-column pin-word vector
+    //   3. detect the all-blank fast path immediately
+    //   4. plan the cheapest raw/repeat segmentation over that vector
+    //   5. serialize the chosen spans once into the output scratch buffer
+    //
+    // Keeping those stages explicit makes performance tuning auditable. Each
+    // stage answers one question only:
+    //   - what should the per-column GPIO state be?
+    //   - how should it be segmented for minimum transport words?
+    //   - how should that segmentation be encoded?
+    //
+    // That separation matters because dense-frame throughput has been won and
+    // lost here before by "small" format tweaks that changed total words more
+    // than they changed CPU time.
     if row_pair >= row_pairs {
         return Err(format!(
             "Row pair {row_pair} exceeds the configured row pair count {row_pairs}."
@@ -1313,6 +1345,15 @@ fn plan_scan_segment_spans(pin_words: &[u32]) -> Result<Vec<PlannedScanSpan>, St
     let mut planned_end_run = vec![0_usize; run_count];
     let mut planned_kind = vec![PlannedScanSpanKind::Raw; run_count];
 
+    // Dynamic programming over runs, not pixels:
+    //   best_suffix_words[i] = minimum transport words needed to encode
+    //   runs[i..]
+    //
+    // This is the key pack-time compromise. Searching over every pixel
+    // boundary would give the same optimality but is needlessly expensive for
+    // wide rows. Searching over already-coalesced runs keeps the state space
+    // bounded by "number of actual value changes in this group", which is the
+    // quantity that matters for repeat-span opportunities.
     best_suffix_words[run_count] = 0;
     for start_run in (0..run_count).rev() {
         let mut best_words = usize::MAX;
@@ -1334,6 +1375,15 @@ fn plan_scan_segment_spans(pin_words: &[u32]) -> Result<Vec<PlannedScanSpan>, St
             raw_len = raw_len
                 .checked_add(runs[end_run].end - runs[end_run].start)
                 .ok_or_else(|| "Pi 5 scan raw span length overflowed.".to_string())?;
+            // A raw span pays:
+            //   1 control word carrying opcode/len/first pin word
+            //   packed transport words for the remaining pin words
+            // plus the optimal suffix after this candidate span.
+            //
+            // This exact word accounting is what lets the planner justify
+            // seemingly counterintuitive choices such as "keep a short repeat
+            // run inside a larger raw span" when the extra span header would
+            // cost more than it saves.
             let raw_words = 1_usize
                 .checked_add(packed_pin_word_count(raw_len))
                 .and_then(|words| words.checked_add(best_suffix_words[end_run + 1]))
@@ -1453,6 +1503,11 @@ fn emit_raw_run(
     words[*word_index] = encode_raw_span_word(pin_words.len(), pin_words[0])?;
     *word_index += 1;
     let packed_words = packed_pin_word_count(pin_words.len() - 1);
+    // The first pin word is intentionally inlined into the header. That
+    // seemingly small choice matters because dense scenes still emit many raw
+    // spans; saving one transport word per raw span was one of the few changes
+    // that improved the dense resident-refresh ceiling instead of only helping
+    // sparse content.
     // The state machine autopulls 23-bit pin words from a 32-bit stream. Rust
     // does the bit-packing once up front so the kernel replay loop only pushes
     // opaque transport words into the FIFO.
@@ -1551,6 +1606,13 @@ fn pack_pin_words(pin_words: &[u32], packed_words: &mut [u32]) -> Result<(), Str
         // Each logical pin word is only 23 bits wide because the Pi 5 bonnet
         // wiring lives on GPIO 5..27. Packing them densely is the transport win
         // that improved dense-frame throughput as well as sparse scenes.
+        //
+        // The bit-buffer loop is intentionally scalar and branch-light:
+        //   - append one 23-bit word at the current bit offset
+        //   - flush complete 32-bit transport words as soon as they appear
+        //
+        // This keeps the packer's CPU cost predictable while preserving the
+        // real win, which is fewer FIFO words for the replay side.
         bit_buffer |= u64::from(pin_word & PIN_WORD_MASK) << buffered_bits;
         buffered_bits += PIN_WORD_BITS;
         while buffered_bits >= 32 {
@@ -1691,6 +1753,12 @@ fn compact_group_words(
 ) -> Result<Vec<u32>, String> {
     // Collapse the fixed-size scratch buffer down to the exact resident replay
     // payload after blank-group removal and identical-plane merging.
+    //
+    // This compaction step is performance-critical even though it is not on the
+    // steady-state kernel hot path: every word removed here is a word the
+    // resident loop never has to write into the RP1 FIFO again. Historically,
+    // the biggest replay wins came from shrinking this final resident payload,
+    // not from making the kernel worker more elaborate.
     if group_lengths
         .iter()
         .all(|&group_length| group_length == words_per_group)

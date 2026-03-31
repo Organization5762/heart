@@ -5,7 +5,9 @@ use std::time::Duration;
 use super::config::{ColorOrder, WiringProfile};
 use super::driver::{MatrixDriverCore, MatrixDriverError};
 use super::{FrameBufferPool, PackedScanFrame, Pi5ScanConfig};
-use crate::runtime::pi5_scan::{encode_raw_span_word, encode_repeat_span_word};
+use crate::runtime::pi5_scan::{
+    encode_raw_span_word, encode_repeat_span_word, Pi5KernelResidentLoopStats,
+};
 use crate::runtime::queue::WorkerState;
 
 fn frame_bytes(width: u32, height: u32, seed: u8) -> Vec<u8> {
@@ -278,6 +280,29 @@ fn pi5_scan_pack_rgba_uses_inlined_raw_headers_for_dense_frames() {
     assert_eq!(stats.merged_identical_groups, 0);
     assert_eq!(packed.word_count(), 6208);
     assert_eq!(stats.word_count, packed.word_count());
+}
+
+#[test]
+fn pi5_scan_config_rejects_adafruit_hat_on_pi5() {
+    let error = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHat, 64, 64, 1, 1)
+        .expect_err("Pi 5 scan transport should reject the non-PWM Adafruit HAT wiring");
+
+    assert!(error.contains("does not support AdafruitHat"));
+}
+
+#[test]
+fn pi5_kernel_stats_surface_worker_errors_in_presentation_counts() {
+    let stats = Pi5KernelResidentLoopStats {
+        presentations: 7,
+        last_error: -5,
+        ..Default::default()
+    };
+
+    let error = stats
+        .presentation_count_result()
+        .expect_err("worker failures should not be hidden behind a presentation count");
+
+    assert!(error.contains("-5"));
 }
 
 #[test]

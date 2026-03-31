@@ -163,6 +163,12 @@ fn build_pi4_backend(
 fn build_pi5_backend(
     config: &MatrixConfigNative,
 ) -> Result<(Box<dyn MatrixBackend>, String), String> {
+    if config.wiring == WiringProfile::AdafruitHat {
+        return Err(
+            "Pi 5 backend does not support AdafruitHat because the packed GPIO words rebase GPIO 5..27 and require OE within that window."
+                .to_string(),
+        );
+    }
     let scan_config = Pi5ScanConfig::from_matrix_config(
         config.wiring,
         config.panel_rows,
