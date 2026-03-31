@@ -6,7 +6,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
 - `experimental/beats` test and lint commands require that workspace's Node dependencies to be installed first; `npm exec` alone is not enough because the Vite/Vitest config imports project-local plugins such as `@vitejs/plugin-react`.
-- When `experimental/beats/package-lock.json` is out of sync with `package.json`, `npm ci` will fail; use `npm install --package-lock=false` for local validation unless the task explicitly includes repairing the lockfile.
+- When `experimental/beats/package-lock.json` is out of sync with `package.json`, `npm ci` will fail; use `npm install --package-lock=false` for local validation unless the task explicitly includes repairing the lockfile, and use `npm install` when the task does include resyncing the lockfile.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
@@ -222,6 +222,12 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-31`: `cd experimental/beats && npm run test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make format`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make test`
+- `2026-03-31`: `npm install` in `experimental/beats` to resync `package-lock.json` after `npm ci` failed because the lockfile was missing `protobufjs` and related transitive dependencies.
+- `2026-03-31`: `./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/eslint src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/prettier --check src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `npm run test -- src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/tsc --noEmit` in `experimental/beats` still fails because of pre-existing TypeScript issues in the app and its dependencies, including `@electron-forge/plugin-vite` types, the protobuf `?raw` import declaration, existing route typing drift, and unrelated component typing errors outside the new stream-console files.
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`

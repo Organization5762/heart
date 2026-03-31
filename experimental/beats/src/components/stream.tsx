@@ -1,26 +1,21 @@
 import { useStreamedImage } from "@/actions/ws/providers/ImageProvider";
-import { useConnectedPeripherals } from "@/actions/ws/providers/PeripheralProvider";
 import { useWS } from "@/actions/ws/websocket";
-import {
-  DataRow,
-  MeterBar,
-  PageFrame,
-  PaperCard,
-  SectionHeader,
-  SpecChip,
-  TechnicalCard,
-} from "@/components/usgc";
-import { Antenna, ScanLine } from "lucide-react";
+import { DEFAULT_SCENE_CONFIGURATION } from "@/features/stream-console/scene-config";
+import { useSensorSimulation } from "@/features/stream-console/use-sensor-simulation";
+import { Antenna } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { ComponentProps } from "react";
 
+import { ScenePluginDock } from "./scene-plugin-dock";
+import { SensorLabPanel, getSensorOverrideForPanel } from "./sensor-lab-panel";
 import { StreamCube } from "./stream-cube";
+import { Separator } from "./ui/separator";
 import { Skeleton } from "./ui/skeleton";
 
 function getStatusClasses(streamIsActive: boolean) {
   return streamIsActive
-    ? "text-green-500 status-green-blink"
-    : "text-red-500 status-red-blink";
+    ? "text-green-400 status-green-blink"
+    : "text-rose-400 status-red-blink";
 }
 
 export function StreamStatus({
@@ -32,205 +27,276 @@ export function StreamStatus({
   return (
     <div
       {...divProps}
-      className="text-muted-foreground font-tomorrow flex items-center justify-end text-[0.7rem] tracking-[0.18em] uppercase"
+      className="font-tomorrow flex items-center justify-end text-[0.7rem] tracking-[0.22em] text-[#94a3b8] uppercase"
     >
       <Antenna
         className={`mr-1 h-[1rem] ${getStatusClasses(streamIsActive)}`}
       />
-      <span>{streamIsActive ? "Active" : "Not Active"}</span>
+      <span>{streamIsActive ? "Active" : "Offline"}</span>
     </div>
   );
 }
 
 export function StreamedImage({ imgURL }: { imgURL: string | null }) {
   if (!imgURL) {
-    return <Skeleton className="size-full min-h-[260px] rounded-none" />;
+    return <Skeleton className="size-full" />;
   }
 
-  return (
-    <div className="relative h-full min-h-[260px] w-full overflow-hidden border border-white/20 bg-[radial-gradient(circle_at_top,rgba(43,103,255,0.14),transparent_34%),linear-gradient(180deg,rgba(7,7,7,0.94),rgba(2,6,23,0.98))]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(14,165,233,0.06)_58%,rgba(2,6,23,0.72))]" />
-      <img
-        src={imgURL}
-        alt="stream"
-        className="relative size-full object-contain p-4"
-      />
-    </div>
-  );
-}
-
-function getReadyStateLabel(readyState: number | undefined) {
-  switch (readyState) {
-    case WebSocket.CONNECTING:
-      return "Dialing";
-    case WebSocket.OPEN:
-      return "Online";
-    case WebSocket.CLOSING:
-      return "Closing";
-    default:
-      return "Offline";
-  }
+  return <img src={imgURL} alt="stream" className="size-full object-contain" />;
 }
 
 export function Stream() {
   const ws = useWS();
   const { imgURL, isActive, fps } = useStreamedImage();
-  const peripherals = useConnectedPeripherals();
   const [useImageFallback, setUseImageFallback] = useState(false);
+  const [sceneConfig, setSceneConfig] = useState(DEFAULT_SCENE_CONFIGURATION);
+  const {
+    clockSeconds,
+    overrides,
+    resolvedSensors,
+    selectedSensor,
+    selectedSensorHistory,
+    selectedSensorId,
+    setSelectedSensorId,
+    updateSensorOverride,
+    resetSensorOverride,
+    clearSelectedSensorHistory,
+  } = useSensorSimulation();
+
   const handleContextError = useCallback(() => {
     setUseImageFallback(true);
   }, []);
-  const readyStateLabel = getReadyStateLabel(ws.readyState);
-  const peripheralCount = Object.keys(peripherals).length;
+
+  const telemetrySensorId = sceneConfig.telemetry.sensorId ?? selectedSensorId;
+  const telemetrySensor =
+    resolvedSensors.find((sensor) => sensor.id === telemetrySensorId) ?? null;
+  const telemetryValue = telemetrySensor?.effectiveValue ?? 0;
 
   return (
-    <PageFrame className="select-none">
-      <PaperCard>
-        <SectionHeader
-          eyebrow="Current Stream / Imaging Chamber"
-          title="Live Transmission Sheet"
-          description="A specimen-grade viewport for the current feed, framed with cadence, socket, and device state."
-          aside={
-            <div className="flex flex-wrap gap-2">
-              <SpecChip>{readyStateLabel}</SpecChip>
-              <SpecChip tone="muted">
-                {useImageFallback ? "Image Fallback" : "3D Viewport"}
-              </SpecChip>
+    <div className="flex h-full flex-col gap-4 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#11151b,_#090b0f)] p-4 text-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.45)] select-none">
+      <div className="rounded-[1.4rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(26,30,38,0.96),_rgba(14,17,23,0.98))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="grid grid-cols-3 gap-1 rounded-[0.9rem] border border-[#3b434f] bg-[#0a0d12] p-2">
+              {[
+                isActive ? "#34d399" : "#29303a",
+                telemetrySensor ? "#fbbf24" : "#29303a",
+                useImageFallback ? "#fb7185" : "#38bdf8",
+              ].map((color, index) => (
+                <span
+                  key={index}
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+              ))}
             </div>
-          }
-        />
-      </PaperCard>
-
-      <section className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[0.82fr_1.18fr]">
-        <PaperCard className="flex flex-col gap-6">
-          <div className="space-y-3">
-            <p className="usgc-kicker">Department Copy</p>
-            <h2 className="font-tomorrow text-2xl tracking-[0.1em]">
-              Houston Mono Signal Desk
-            </h2>
-            <p className="usgc-copy">
-              The live stream surface treats each frame as a published artifact:
-              signal quality, transport state, and render mode are exposed like
-              a machine report rather than hidden in utility chrome.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="border-border bg-background/75 border p-4">
-              <p className="usgc-kicker">Frame Cadence</p>
-              <p className="font-tomorrow mt-3 text-3xl tracking-[0.12em]">
-                {isActive ? fps : 0}
+            <div>
+              <p className="font-tomorrow text-[11px] tracking-[0.26em] text-[#7f8ea3] uppercase">
+                Beats Transport
               </p>
-              <p className="text-muted-foreground mt-2 font-mono text-[0.68rem] tracking-[0.18em] uppercase">
-                Frames per second
-              </p>
-            </div>
-            <div className="border-border bg-background/75 border p-4">
-              <p className="usgc-kicker">Input Surface</p>
-              <p className="font-tomorrow mt-3 text-3xl tracking-[0.12em]">
-                {peripheralCount}
-              </p>
-              <p className="text-muted-foreground mt-2 font-mono text-[0.68rem] tracking-[0.18em] uppercase">
-                Registered peripherals
-              </p>
+              <h1 className="font-tomorrow text-xl tracking-[0.14em] text-slate-100 uppercase">
+                Scene Control Console
+              </h1>
             </div>
           </div>
 
-          <div className="grid gap-4">
-            <MeterBar
-              label="Cadence Confidence"
-              value={Math.min(isActive ? fps : 0, 60)}
-              max={60}
-              valueLabel={`${isActive ? fps : 0} FPS`}
+          <div className="flex flex-wrap gap-2">
+            <TransportChip
+              label="Clock"
+              value={`${clockSeconds.toFixed(1)}s`}
             />
-            <MeterBar
-              label="Socket Readiness"
-              value={ws.readyState === WebSocket.OPEN ? 100 : 25}
-              valueLabel={readyStateLabel}
+            <TransportChip label="FPS" value={String(isActive ? fps : 0)} />
+            <TransportChip
+              label="Sensor"
+              value={telemetrySensor?.label ?? "Unassigned"}
             />
-          </div>
-
-          <div className="space-y-1 font-mono text-sm">
-            <DataRow
-              label="Transport"
-              value={ws?.socket?.url ?? "ws://localhost:8765"}
-            />
-            <DataRow
-              label="Renderer"
-              value={useImageFallback ? "2D PNG" : "WebGL Display"}
-            />
-            <DataRow
-              label="Signal"
-              value={isActive ? "Frames observed" : "Awaiting frames"}
+            <TransportChip
+              label="Render"
+              value={useImageFallback ? "Fallback" : "Realtime"}
             />
           </div>
-        </PaperCard>
+        </div>
+      </div>
 
-        <TechnicalCard className="flex min-h-[560px] flex-col gap-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="usgc-kicker text-[#bdb3a6]">TR-100 Live Viewport</p>
-              <h2 className="font-tomorrow text-2xl tracking-[0.12em] text-[#f6efe6]">
-                Transmission Chamber
-              </h2>
-            </div>
-            <StreamStatus streamIsActive={isActive} />
-          </div>
-
-          <div className="usgc-terminal-grid flex-1 border border-white/20 p-3">
-            <div className="flex h-full min-h-[360px] flex-col border border-white/15 bg-black/35 p-3">
-              <div className="mb-3 flex items-center justify-between font-mono text-[0.68rem] tracking-[0.18em] text-[#cfc6bb] uppercase">
-                <span className="flex items-center gap-2">
-                  <ScanLine className="size-3.5" />
-                  Surface Feed
-                </span>
-                <span>
-                  {useImageFallback ? "Fallback Raster" : "Realtime WebGL"}
-                </span>
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,420px)]">
+        <section className="flex min-h-0 flex-col gap-4">
+          <div className="rounded-[1.5rem] border border-[#2f353f] bg-[linear-gradient(180deg,_rgba(28,32,39,0.96),_rgba(13,16,21,0.98))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="font-tomorrow text-[11px] tracking-[0.24em] text-[#7f8ea3] uppercase">
+                  Stream Scene
+                </p>
+                <h2 className="font-tomorrow text-2xl tracking-[0.12em] text-slate-100 uppercase">
+                  Visual Mixer
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm text-[#a4b0c2]">
+                  Tune the renderer, bind telemetry-reactive plugins, and
+                  rehearse sensor behavior against the live stream.
+                </p>
               </div>
-              <div className="flex-1">
-                {useImageFallback ? (
+              <div className="grid gap-2 sm:grid-cols-3">
+                <StatusChip
+                  label="Telemetry Sensor"
+                  value={telemetrySensor?.label ?? "None"}
+                />
+                <StatusChip
+                  label="Renderer"
+                  value={useImageFallback ? "Image fallback" : "Three.js"}
+                />
+                <StatusChip
+                  label="WebSocket"
+                  value={ws?.socket?.url ?? "Disconnected"}
+                />
+              </div>
+            </div>
+
+            <div className="mb-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-[1.2rem] border border-[#353c46] bg-[#0c1015] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-tomorrow text-[10px] tracking-[0.24em] text-[#6f7d91] uppercase">
+                      Transport
+                    </p>
+                    <p className="mt-1 font-mono text-2xl text-[#e3edf7]">
+                      {clockSeconds.toFixed(1)}s
+                    </p>
+                  </div>
+                  <div className="flex flex-1 items-end gap-1">
+                    {Array.from({ length: 16 }).map((_, index) => {
+                      const threshold = (index + 1) / 16;
+                      const signal = Math.abs(Math.tanh(telemetryValue));
+                      const active = signal >= threshold;
+                      return (
+                        <span
+                          key={index}
+                          className="flex-1 rounded-sm"
+                          style={{
+                            height: `${index > 11 ? 38 : index > 7 ? 30 : 22}px`,
+                            backgroundColor: active
+                              ? index > 12
+                                ? "#fb7185"
+                                : index > 8
+                                  ? "#fbbf24"
+                                  : "#34d399"
+                              : "#1d242d",
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[1.2rem] border border-[#353c46] bg-[#0c1015] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <p className="font-tomorrow text-[10px] tracking-[0.24em] text-[#6f7d91] uppercase">
+                  Active Module
+                </p>
+                <p className="font-tomorrow mt-2 text-lg tracking-[0.12em] text-slate-100 uppercase">
+                  {sceneConfig.telemetry.target} Reactor
+                </p>
+                <p className="mt-1 text-sm text-[#a4b0c2]">
+                  Gain {sceneConfig.telemetry.gain.toFixed(2)} | Camera{" "}
+                  {sceneConfig.camera.distance.toFixed(1)}u
+                </p>
+              </div>
+            </div>
+
+            <div className="min-h-0">
+              {useImageFallback ? (
+                <div className="relative min-h-[420px] overflow-hidden rounded-[1.5rem] border border-[#343b45] bg-[#0a0d12]">
                   <StreamedImage imgURL={imgURL} />
-                ) : (
-                  <StreamCube
-                    imgURL={imgURL}
-                    onContextError={handleContextError}
-                  />
-                )}
-              </div>
+                  <div className="font-tomorrow absolute top-4 left-4 rounded-full border border-[#3b434f] bg-[#11161d] px-3 py-1 text-[11px] tracking-[0.2em] text-[#9ba8ba] uppercase">
+                    WebGL fallback active
+                  </div>
+                </div>
+              ) : (
+                <StreamCube
+                  imgURL={imgURL}
+                  onContextError={handleContextError}
+                  sceneConfig={sceneConfig}
+                  telemetryValue={telemetryValue}
+                />
+              )}
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <p className="usgc-kicker text-[#bdb3a6]">Socket</p>
-              <p className="mt-2 font-mono text-sm">{readyStateLabel}</p>
-            </div>
-            <div>
-              <p className="usgc-kicker text-[#bdb3a6]">Stream URL</p>
-              <p className="mt-2 font-mono text-sm">
-                {ws?.socket?.url ?? "Unavailable"}
-              </p>
-            </div>
-            <div>
-              <p className="usgc-kicker text-[#bdb3a6]">Mode</p>
-              <p className="mt-2 font-mono text-sm">
-                {useImageFallback ? "PNG" : "Three.js"}
-              </p>
-            </div>
+          <div className="xl:hidden">
+            <ScenePluginDock
+              sceneConfig={sceneConfig}
+              sensorOptions={resolvedSensors.map((sensor) => ({
+                id: sensor.id,
+                label: sensor.label,
+              }))}
+              onChange={setSceneConfig}
+              onReset={() => setSceneConfig(DEFAULT_SCENE_CONFIGURATION)}
+            />
           </div>
-        </TechnicalCard>
-      </section>
 
-      <div className="border-border flex flex-none items-center justify-between gap-4 border-t px-1 pt-2">
-        <span className="text-muted-foreground font-tomorrow text-xs uppercase">
-          fps: <b>{isActive ? fps : 0}</b>
+          <SensorLabPanel
+            clockSeconds={clockSeconds}
+            onClearHistory={clearSelectedSensorHistory}
+            onResetOverride={resetSensorOverride}
+            onSelectSensor={setSelectedSensorId}
+            onUpdateOverride={updateSensorOverride}
+            override={getSensorOverrideForPanel(
+              selectedSensor ? overrides[selectedSensor.id] : undefined,
+            )}
+            selectedSensor={selectedSensor}
+            selectedSensorHistory={selectedSensorHistory}
+            sensors={resolvedSensors}
+          />
+        </section>
+
+        <aside className="hidden min-h-0 xl:flex xl:flex-col xl:gap-4">
+          <ScenePluginDock
+            sceneConfig={sceneConfig}
+            sensorOptions={resolvedSensors.map((sensor) => ({
+              id: sensor.id,
+              label: sensor.label,
+            }))}
+            onChange={setSceneConfig}
+            onReset={() => setSceneConfig(DEFAULT_SCENE_CONFIGURATION)}
+          />
+        </aside>
+      </div>
+
+      <Separator className="flex-none bg-[#252b33]" />
+
+      <div className="mb-2 flex flex-none flex-wrap items-center justify-between gap-4 rounded-[1.1rem] border border-[#2f353f] bg-[#10141a] px-3 py-2">
+        <span className="font-tomorrow text-[11px] tracking-[0.22em] text-[#7f8ea3] uppercase">
+          fps: <b className="text-slate-100">{isActive ? fps : 0}</b>
         </span>
-        <div className="text-muted-foreground font-tomorrow text-xs">
+        <div className="font-mono text-xs text-[#8d9bb0]">
           {ws?.socket?.url}
         </div>
         <StreamStatus streamIsActive={isActive} />
       </div>
-    </PageFrame>
+    </div>
+  );
+}
+
+function StatusChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1rem] border border-[#343c46] bg-[#0c1015] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="font-tomorrow text-[10px] tracking-[0.2em] text-[#6f7d91] uppercase">
+        {label}
+      </div>
+      <div className="mt-1 max-w-[180px] truncate font-mono text-sm text-[#dce6f5]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function TransportChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[108px] rounded-[0.95rem] border border-[#3a414c] bg-[#0b0e13] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="font-tomorrow text-[10px] tracking-[0.22em] text-[#738194] uppercase">
+        {label}
+      </div>
+      <div className="mt-1 truncate font-mono text-sm text-[#e5edf8]">
+        {value}
+      </div>
+    </div>
   );
 }
