@@ -13,7 +13,6 @@ import {
   Scene,
   SRGBColorSpace,
   Texture,
-  TextureLoader,
   WebGLRenderer,
 } from "three";
 
@@ -24,6 +23,8 @@ const GRID_DIVISIONS = 10;
 const GRID_COLOR = 0xffffff;
 const GRID_BASELINE_Y = -1.2;
 const MAX_TELEMETRY_SIGNAL = 1;
+const STREAM_TEXTURE_SIZE = 256;
+const STREAM_TEXTURE_BACKGROUND = "#020617";
 
 export type StreamCubeProps = {
   imgURL: string | null;
@@ -47,8 +48,9 @@ export function StreamCube({
     null,
   );
   const gridRef = useRef<GridHelper | null>(null);
-  const fallbackTextureRef = useRef<Texture | null>(null);
-  const lastTextureRef = useRef<Texture | null>(null);
+  const streamTextureRef = useRef<CanvasTexture | null>(null);
+  const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const animationRef = useRef<number | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const readyFrameRef = useRef<number | null>(null);
@@ -113,14 +115,16 @@ export function StreamCube({
       scene.add(grid);
 
       const geometry = new BoxGeometry(2, 2, 2);
-      const fallbackTexture = createFallbackTexture(
-        sceneConfigRef.current.surface.textureRepeat,
-      );
+      const {
+        canvas: streamCanvas,
+        context: streamContext,
+        texture: streamTexture,
+      } = createStreamTexture(sceneConfigRef.current.surface.textureRepeat);
       const materials = Array.from(
         { length: 6 },
         () =>
           new MeshStandardMaterial({
-            map: fallbackTexture,
+            map: streamTexture,
             metalness: sceneConfigRef.current.surface.metalness,
             roughness: sceneConfigRef.current.surface.roughness,
           }),
@@ -134,7 +138,9 @@ export function StreamCube({
       cameraRef.current = camera;
       cubeRef.current = cube;
       gridRef.current = grid;
-      fallbackTextureRef.current = fallbackTexture;
+      streamCanvasRef.current = streamCanvas;
+      streamContextRef.current = streamContext;
+      streamTextureRef.current = streamTexture;
       readyFrameRef.current = window.requestAnimationFrame(() => {
         setIsRendererReady(true);
       });
@@ -225,9 +231,6 @@ export function StreamCube({
 
       cubeRef.current?.geometry.dispose();
       cubeRef.current?.material.forEach((material) => {
-        if (material.map && material.map !== fallbackTextureRef.current) {
-          material.map.dispose();
-        }
         material.dispose();
       });
 
@@ -241,12 +244,8 @@ export function StreamCube({
         }
       }
 
-      if (fallbackTextureRef.current) {
-        fallbackTextureRef.current.dispose();
-      }
-
-      if (lastTextureRef.current) {
-        lastTextureRef.current.dispose();
+      if (streamTextureRef.current) {
+        streamTextureRef.current.dispose();
       }
 
       rendererRef.current?.dispose();
@@ -254,8 +253,9 @@ export function StreamCube({
       cameraRef.current = null;
       cubeRef.current = null;
       gridRef.current = null;
-      fallbackTextureRef.current = null;
-      lastTextureRef.current = null;
+      streamTextureRef.current = null;
+      streamCanvasRef.current = null;
+      streamContextRef.current = null;
       resizeObserverRef.current = null;
     };
   }, [onContextError]);
@@ -264,51 +264,35 @@ export function StreamCube({
     let cancelled = false;
 
     const applyTexture = async () => {
-      if (!cubeRef.current || !fallbackTextureRef.current) return;
+      const streamTexture = streamTextureRef.current;
+      const streamContext = streamContextRef.current;
+      const streamCanvas = streamCanvasRef.current;
+      if (!streamTexture || !streamContext || !streamCanvas) return;
 
-      let nextTexture: Texture | null = null;
       try {
-        nextTexture = imgURL
-          ? await loadTexture(imgURL)
-          : fallbackTextureRef.current;
-        if (nextTexture) {
-          applyTextureSettings(
-            nextTexture,
-            sceneConfigRef.current.surface.textureRepeat,
-          );
+        if (imgURL) {
+          const image = await loadStreamImage(imgURL);
+          if (cancelled) {
+            return;
+          }
+          drawStreamImage(streamContext, streamCanvas, image);
+        } else {
+          drawFallbackTexture(streamContext, streamCanvas);
         }
       } catch (error) {
         console.warn("Failed to load streamed texture; using fallback", error);
-        nextTexture = fallbackTextureRef.current;
+        drawFallbackTexture(streamContext, streamCanvas);
       }
 
-      if (cancelled || !cubeRef.current || !nextTexture) {
-        if (nextTexture && nextTexture !== fallbackTextureRef.current) {
-          nextTexture.dispose();
-        }
+      if (cancelled) {
         return;
       }
 
-      const materials = cubeRef.current.material;
-      materials.forEach((material) => {
-        const previousMap = material.map;
-        material.map = nextTexture;
-        material.needsUpdate = true;
-        if (
-          previousMap &&
-          previousMap !== nextTexture &&
-          previousMap !== fallbackTextureRef.current
-        ) {
-          previousMap.dispose();
-        }
-      });
-
-      if (lastTextureRef.current && lastTextureRef.current !== nextTexture) {
-        lastTextureRef.current.dispose();
-      }
-
-      lastTextureRef.current =
-        nextTexture === fallbackTextureRef.current ? null : nextTexture;
+      applyTextureSettings(
+        streamTexture,
+        sceneConfigRef.current.surface.textureRepeat,
+      );
+      streamTexture.needsUpdate = true;
     };
 
     applyTexture();
@@ -338,17 +322,35 @@ export function StreamCube({
   );
 }
 
-function createFallbackTexture(repeat: number) {
-  const size = 128;
+function createStreamTexture(repeat: number): {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  texture: CanvasTexture;
+} {
   const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = STREAM_TEXTURE_SIZE;
+  canvas.height = STREAM_TEXTURE_SIZE;
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("Failed to create 2D context for fallback texture");
+    throw new Error("Failed to create 2D context for stream texture");
   }
 
+  drawFallbackTexture(context, canvas);
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  applyTextureSettings(texture, repeat);
+  return { canvas, context, texture };
+}
+
+function drawFallbackTexture(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+) {
+  const size = canvas.width;
+  context.fillStyle = STREAM_TEXTURE_BACKGROUND;
+  context.fillRect(0, 0, size, size);
   const colors = ["#111827", "#1f2937"];
   const squareSize = size / 8;
 
@@ -358,12 +360,6 @@ function createFallbackTexture(repeat: number) {
       context.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
     }
   }
-
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  applyTextureSettings(texture, repeat);
-
-  return texture;
 }
 
 function applyGridOpacity(grid: GridHelper, opacity: number) {
@@ -404,17 +400,33 @@ function applyTextureSettings(texture: Texture, repeat: number) {
   texture.needsUpdate = true;
 }
 
-function loadTexture(url: string) {
-  return new Promise<Texture>((resolve, reject) => {
-    const loader = new TextureLoader();
-    loader.load(
-      url,
-      (texture) => {
-        texture.colorSpace = SRGBColorSpace;
-        resolve(texture);
-      },
-      undefined,
-      (error) => reject(error),
-    );
+function drawStreamImage(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  image: HTMLImageElement,
+) {
+  context.fillStyle = STREAM_TEXTURE_BACKGROUND;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const scale = Math.min(
+    canvas.width / image.width,
+    canvas.height / image.height,
+  );
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  const offsetX = (canvas.width - drawWidth) / 2;
+  const offsetY = (canvas.height - drawHeight) / 2;
+
+  context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+function loadStreamImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () =>
+      reject(new Error(`Failed to load stream image: ${url}`));
+    image.src = url;
   });
 }
