@@ -40,5 +40,3 @@ class StreamedScreen(Device):
             kind="frame",
             payload=frame_bytes,
         )
-
-    
