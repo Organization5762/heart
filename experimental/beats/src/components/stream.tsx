@@ -41,7 +41,7 @@ export function Stream() {
   const activeFps = isActive ? fps : 0;
 
   return (
-    <div className="beats-console-shell flex h-full flex-col gap-4 rounded-[1.75rem] p-4 text-slate-100 select-none md:p-5">
+    <div className="beats-console-shell flex min-h-full flex-col gap-4 rounded-[1.75rem] p-4 text-slate-100 select-none md:p-5">
       <StreamConsoleHeader
         clockSeconds={clockSeconds}
         fps={activeFps}
@@ -51,7 +51,7 @@ export function Stream() {
       />
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,420px)]">
-        <section className="flex min-h-0 flex-col gap-4">
+        <section className="flex min-h-0 min-w-0 flex-col gap-4">
           <StreamVisualMixerPanel
             clockSeconds={clockSeconds}
             fps={activeFps}
@@ -88,13 +88,14 @@ export function Stream() {
             override={getSensorOverrideForPanel(
               selectedSensor ? overrides[selectedSensor.id] : undefined,
             )}
+            overrides={overrides}
             selectedSensor={selectedSensor}
             selectedSensorHistory={selectedSensorHistory}
             sensors={resolvedSensors}
           />
         </section>
 
-        <aside className="hidden min-h-0 xl:flex xl:flex-col xl:gap-4">
+        <aside className="hidden min-h-0 min-w-0 xl:flex xl:flex-col xl:gap-4">
           <ScenePluginDock
             sceneConfig={sceneConfig}
             sensorOptions={resolvedSensors.map((sensor) => ({
