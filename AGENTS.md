@@ -5,6 +5,7 @@
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
 
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
+- When `experimental/beats/package-lock.json` is out of sync with `package.json`, `npm ci` will fail; use `npm install --package-lock=false` for local validation unless the task explicitly includes repairing the lockfile.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
@@ -208,6 +209,14 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-31`: `cd experimental/beats && npm ci` failed because `experimental/beats/package-lock.json` is out of sync with `package.json`.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npm run format:write`
+- `2026-03-31`: `cd experimental/beats && npx eslint src/components/stream-cube.tsx src/components/stream.tsx src/tests/unit/components/stream.test.tsx src/tests/unit/setup.ts`
+- `2026-03-31`: `cd experimental/beats && npm run lint` still fails because of pre-existing errors in `src/actions/ws/providers/PeripheralEventsProvider.tsx`, `src/actions/ws/providers/PeripheralProvider.tsx`, `src/components/ui/sidebar.tsx`, `src/hooks/use-mobile.ts`, and `src/layouts/base-layout.tsx`.
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make format`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make test`
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
