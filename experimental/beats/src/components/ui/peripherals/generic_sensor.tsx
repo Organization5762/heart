@@ -1,4 +1,6 @@
 import type { PeripheralInfo } from "@/actions/ws/providers/PeripheralProvider";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 type PreviewMetric = {
   id: string;
@@ -13,6 +15,12 @@ type PreviewMetricGroup = {
   id: string;
   label: string;
   metrics: PreviewMetric[];
+};
+
+type SensorContextMenuState = {
+  x: number;
+  y: number;
+  metric: PreviewMetric;
 };
 
 const MAX_PREVIEW_METRICS = 6;
@@ -152,8 +160,63 @@ export function GenericSensorPeripheralView({
   lastData: unknown;
   peripheral: PeripheralInfo;
 }) {
+  const navigate = useNavigate();
   const metrics = collectPreviewMetrics(lastData);
   const metricGroups = groupPreviewMetrics(metrics);
+  const [contextMenu, setContextMenu] = useState<SensorContextMenuState | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    function dismissMenu() {
+      setContextMenu(null);
+    }
+
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setContextMenu(null);
+      }
+    }
+
+    window.addEventListener("click", dismissMenu);
+    window.addEventListener("scroll", dismissMenu, true);
+    window.addEventListener("keydown", dismissOnEscape);
+
+    return () => {
+      window.removeEventListener("click", dismissMenu);
+      window.removeEventListener("scroll", dismissMenu, true);
+      window.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [contextMenu]);
+
+  function openContextMenu(
+    event: ReactMouseEvent<HTMLDivElement>,
+    metric: PreviewMetric,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      metric,
+    });
+  }
+
+  function openSensorDeck(metric: PreviewMetric) {
+    const peripheralId = peripheral.id ?? "unknown";
+    setContextMenu(null);
+    void navigate({
+      to: "/peripherals/connected",
+      hash: "sensor-deck",
+      search: () => ({
+        sensor: `${peripheralId}:${metric.label}`,
+      }),
+    });
+  }
 
   if (metrics.length === 0) {
     return (
@@ -186,7 +249,7 @@ export function GenericSensorPeripheralView({
   return (
     <div
       className={
-        "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
+        "border-border bg-background/60 text-foreground relative flex flex-col gap-3 border p-3 text-xs " +
         (className ?? "")
       }
     >
@@ -223,6 +286,7 @@ export function GenericSensorPeripheralView({
                 <div
                   key={metric.id}
                   className="border-border/70 bg-background/80 rounded-sm border px-3 py-2"
+                  onContextMenu={(event) => openContextMenu(event, metric)}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground truncate font-mono text-[0.68rem] uppercase">
@@ -248,6 +312,28 @@ export function GenericSensorPeripheralView({
           </section>
         ))}
       </div>
+
+      {contextMenu ? (
+        <div
+          className="border-border/80 bg-background fixed z-50 min-w-56 rounded-md border p-1 shadow-[0_18px_48px_rgba(0,0,0,0.4)]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          <button
+            type="button"
+            className="hover:bg-accent hover:text-accent-foreground flex w-full flex-col rounded-sm px-3 py-2 text-left"
+            onClick={() => openSensorDeck(contextMenu.metric)}
+          >
+            <span className="text-sm font-medium">Open In Sensor Deck</span>
+            <span className="text-muted-foreground text-[0.7rem]">
+              Set a constant value or drive {contextMenu.metric.signalLabel}{" "}
+              with a function.
+            </span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

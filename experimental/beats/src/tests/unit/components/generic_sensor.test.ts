@@ -1,8 +1,17 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { createElement } from "react";
 import {
   collectPreviewMetrics,
+  GenericSensorPeripheralView,
   groupPreviewMetrics,
 } from "@/components/ui/peripherals/generic_sensor";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const navigateMock = vi.fn();
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigateMock,
+}));
 
 describe("collectPreviewMetrics", () => {
   it("collects numeric and boolean leaves from nested payloads", () => {
@@ -116,5 +125,40 @@ describe("groupPreviewMetrics", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("GenericSensorPeripheralView", () => {
+  it("opens the sensor deck for a right-clicked preview signal", () => {
+    render(
+      createElement(GenericSensorPeripheralView, {
+        peripheral: {
+          id: "imu.1",
+          tags: [],
+        },
+        lastData: {
+          imu: {
+            x: 0.14,
+            y: -0.22,
+          },
+        },
+      }),
+    );
+
+    fireEvent.contextMenu(screen.getByText("x"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /open in sensor deck/i }),
+    );
+
+    expect(navigateMock).toHaveBeenCalledWith({
+      hash: "sensor-deck",
+      search: expect.any(Function),
+      to: "/peripherals/connected",
+    });
+
+    const navigateArgs = navigateMock.mock.calls.at(-1)?.[0];
+    expect(navigateArgs.search()).toEqual({
+      sensor: "imu.1:imu.x",
+    });
   });
 });

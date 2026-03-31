@@ -41,12 +41,14 @@ const simulationState = vi.hoisted(() => {
   };
 });
 
+const useSensorSimulationMock = vi.hoisted(() => vi.fn(() => simulationState));
+
 vi.mock("@/actions/ws/providers/PeripheralEventsProvider", () => ({
   usePeripheralEvents: () => [],
 }));
 
 vi.mock("@/features/stream-console/use-sensor-simulation", () => ({
-  useSensorSimulation: () => simulationState,
+  useSensorSimulation: useSensorSimulationMock,
 }));
 
 describe("PeripheralSensorDeck", () => {
@@ -57,5 +59,11 @@ describe("PeripheralSensorDeck", () => {
       screen.getByRole("textbox", { name: "Sensor terminal command" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("dpad / payload.x").length).toBeGreaterThan(0);
+  });
+
+  it("passes a preferred sensor key into the simulation hook", () => {
+    render(<PeripheralSensorDeck preferredSensorKey="dpad:payload.x" />);
+
+    expect(useSensorSimulationMock).toHaveBeenLastCalledWith("dpad:payload.x");
   });
 });
