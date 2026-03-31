@@ -31,6 +31,19 @@ const root = parse(protoSchema, { keepCase: true }).root;
 const StreamEnvelope = root.lookupType("heart.beats.streaming.StreamEnvelope");
 const textDecoder = new TextDecoder("utf-8");
 
+type DecodedFrameEnvelope = {
+  png_data?: Uint8Array;
+  pngData?: Uint8Array;
+};
+
+type DecodedPeripheralEnvelope = {
+  peripheral_info?: unknown;
+  peripheralInfo?: unknown;
+  payload?: Uint8Array;
+  payload_encoding?: number;
+  payloadEncoding?: number;
+};
+
 function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
   if (!raw || typeof raw !== "object") {
     return { id: null, tags: [] };
@@ -42,28 +55,41 @@ function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
   };
 }
 
+function getFrameBytes(frame: DecodedFrameEnvelope | null | undefined) {
+  return frame?.pngData ?? frame?.png_data ?? null;
+}
+
+function getPeripheralInfo(
+  peripheral: DecodedPeripheralEnvelope | null | undefined,
+) {
+  return peripheral?.peripheralInfo ?? peripheral?.peripheral_info ?? null;
+}
+
+function getPayloadEncoding(
+  peripheral: DecodedPeripheralEnvelope | null | undefined,
+) {
+  return peripheral?.payloadEncoding ?? peripheral?.payload_encoding ?? null;
+}
+
 export function decodeStreamEvent(buffer: ArrayBuffer): StreamEvent | null {
   const envelope = StreamEnvelope.decode(new Uint8Array(buffer)) as {
-    frame?: { png_data?: Uint8Array } | null;
-    peripheral?: {
-      peripheral_info?: unknown;
-      payload?: Uint8Array;
-      payload_encoding?: number;
-    } | null;
+    frame?: DecodedFrameEnvelope | null;
+    peripheral?: DecodedPeripheralEnvelope | null;
   };
+  const pngData = getFrameBytes(envelope.frame);
 
-  if (envelope.frame?.png_data) {
+  if (pngData) {
     return {
       type: "frame",
       payload: {
-        pngData: envelope.frame.png_data,
+        pngData,
       },
     };
   }
 
   if (envelope.peripheral?.payload) {
     let data: unknown = null;
-    const payloadEncoding = envelope.peripheral.payload_encoding ?? null;
+    const payloadEncoding = getPayloadEncoding(envelope.peripheral);
     if (payloadEncoding === 1) {
       try {
         data = JSON.parse(textDecoder.decode(envelope.peripheral.payload));
@@ -75,7 +101,7 @@ export function decodeStreamEvent(buffer: ArrayBuffer): StreamEvent | null {
       type: "peripheral",
       payload: {
         peripheralInfo: normalizePeripheralInfo(
-          envelope.peripheral.peripheral_info,
+          getPeripheralInfo(envelope.peripheral),
         ),
         data,
         payloadEncoding,

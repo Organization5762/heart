@@ -12,6 +12,7 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
 - Vite `.mts` configs that are shared with Storybook or other native-ESM tooling must derive `__dirname` via `fileURLToPath(new URL(".", import.meta.url))` instead of relying on the CommonJS global.
+- Beats websocket protobuf decoders must accept both snake_case and camelCase field names from `protobufjs` decode output so streamed frame rendering does not depend on field-name normalization details.
 
 ## Formatting
 
@@ -113,6 +114,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/actions/ws/protocol.test.ts src/tests/unit/actions/ws/websocket.test.tsx`
 - `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
