@@ -88,6 +88,7 @@ export function Stream() {
             override={getSensorOverrideForPanel(
               selectedSensor ? overrides[selectedSensor.id] : undefined,
             )}
+            overrides={overrides}
             selectedSensor={selectedSensor}
             selectedSensorHistory={selectedSensorHistory}
             sensors={resolvedSensors}
