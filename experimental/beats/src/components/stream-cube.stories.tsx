@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { DEFAULT_SCENE_CONFIGURATION } from "@/features/stream-console/scene-config";
 import { StreamCube } from "./stream-cube";
 
 const SAMPLE_IMAGE =
@@ -9,7 +10,10 @@ const meta = {
   title: "Visuals/StreamCube",
   component: StreamCube,
   args: {
+    frameBlob: null,
     imgURL: SAMPLE_IMAGE,
+    sceneConfig: DEFAULT_SCENE_CONFIGURATION,
+    telemetryValue: 0,
   },
   parameters: {
     layout: "fullscreen",
@@ -37,6 +41,7 @@ export const WithFrame: Story = {};
 
 export const EmptyState: Story = {
   args: {
+    frameBlob: null,
     imgURL: null,
   },
 };

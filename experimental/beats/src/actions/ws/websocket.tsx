@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Subject } from "rxjs";
 
 import { decodeStreamEvent, StreamEvent } from "./protocol";
@@ -8,11 +15,18 @@ export const stream = new Subject<StreamEvent>();
 type WSContextValue = {
   socket: WebSocket | null;
   readyState: WebSocket["readyState"];
+  sendNavigationControl: (
+    command: "browse" | "activate" | "alternate_activate",
+    browseStep?: number,
+  ) => boolean;
+  sendSensorControl: (sensorKey: string, sensorValue: number | null) => boolean;
 };
 
 const WSContext = createContext<WSContextValue>({
   socket: null,
   readyState: WebSocket.CLOSED,
+  sendNavigationControl: () => false,
+  sendSensorControl: () => false,
 });
 
 interface WSProviderProps {
@@ -149,8 +163,49 @@ export function WSProvider({
     };
   }, [url, retryDelay, maxRetryDelay]);
 
+  const sendNavigationControl = useCallback<
+    WSContextValue["sendNavigationControl"]
+  >((command, browseStep = 0) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    ws.send(
+      JSON.stringify({
+        kind: "control",
+        command,
+        browse_step: browseStep,
+      }),
+    );
+    return true;
+  }, []);
+
+  const sendSensorControl = useCallback<WSContextValue["sendSensorControl"]>(
+    (sensorKey, sensorValue) => {
+      const ws = socketRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+
+      ws.send(
+        JSON.stringify({
+          kind: "control",
+          command: "sensor_update",
+          sensor_key: sensorKey,
+          sensor_value: sensorValue,
+          clear: sensorValue === null,
+        }),
+      );
+      return true;
+    },
+    [],
+  );
+
   return (
-    <WSContext.Provider value={{ socket, readyState }}>
+    <WSContext.Provider
+      value={{ socket, readyState, sendNavigationControl, sendSensorControl }}
+    >
       {children}
     </WSContext.Provider>
   );

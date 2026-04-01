@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useConnectedPeripherals } from "@/actions/ws/providers/PeripheralProvider";
+import { useWS } from "@/actions/ws/websocket";
 import { getSensorCommandKey } from "@/features/stream-console/terminal-commands";
 import {
   appendSensorHistory,
@@ -15,6 +16,7 @@ const SENSOR_SAMPLE_INTERVAL_MS = 250;
 
 export function useSensorSimulation(preferredSensorKey?: string | null) {
   const peripherals = useConnectedPeripherals();
+  const { sendSensorControl } = useWS();
   const [clockSeconds, setClockSeconds] = useState(0);
   const [requestedSensorId, setRequestedSensorId] = useState<string | null>(
     null,
@@ -30,6 +32,8 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
   const sensors = extractSensorChannels(peripherals);
   const sensorsRef = useRef(sensors);
   const overridesRef = useRef(overrides);
+  const sendSensorControlRef = useRef(sendSensorControl);
+  const activeExternalKeysRef = useRef<Set<string>>(new Set());
   const preferredSensorId = preferredSensorKey
     ? (sensors.find(
         (sensor) => getSensorCommandKey(sensor) === preferredSensorKey,
@@ -50,6 +54,10 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
   }, [overrides]);
 
   useEffect(() => {
+    sendSensorControlRef.current = sendSensorControl;
+  }, [sendSensorControl]);
+
+  useEffect(() => {
     startTimeRef.current = performance.now();
 
     const interval = window.setInterval(() => {
@@ -63,6 +71,22 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
           timeSeconds,
         ),
       );
+      const activeExternalKeys = new Set<string>();
+      for (const sensor of resolved) {
+        const override = overridesRef.current[sensor.id];
+        if (!override || override.mode === "live") {
+          continue;
+        }
+        const sensorKey = getSensorCommandKey(sensor);
+        activeExternalKeys.add(sensorKey);
+        sendSensorControlRef.current(sensorKey, sensor.effectiveValue);
+      }
+      for (const sensorKey of activeExternalKeysRef.current) {
+        if (!activeExternalKeys.has(sensorKey)) {
+          sendSensorControlRef.current(sensorKey, null);
+        }
+      }
+      activeExternalKeysRef.current = activeExternalKeys;
 
       setHistory((previous) => {
         const next: Record<string, SensorHistoryPoint[]> = {};
@@ -85,6 +109,16 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
 
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(
+    () => () => {
+      for (const sensorKey of activeExternalKeysRef.current) {
+        sendSensorControlRef.current(sensorKey, null);
+      }
+      activeExternalKeysRef.current = new Set();
+    },
+    [],
+  );
 
   const resolvedSensors = sensors.map((sensor) =>
     resolveSensorChannel(sensor, overrides[sensor.id], clockSeconds),

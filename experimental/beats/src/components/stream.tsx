@@ -8,11 +8,12 @@ import { ScenePluginDock } from "./scene-plugin-dock";
 import { SensorLabPanel, getSensorOverrideForPanel } from "./sensor-lab-panel";
 import { StreamConsoleHeader } from "./stream-console-header";
 import { StreamFooterBar } from "./stream-footer-bar";
+import { StreamNavigationPanel } from "./stream-navigation-panel";
 import { StreamVisualMixerPanel } from "./stream-visual-mixer-panel";
 
 export function Stream() {
   const ws = useWS();
-  const { imgURL, isActive, fps } = useStreamedImage();
+  const { imgURL, frameBlob, isActive, fps } = useStreamedImage();
   const [useImageFallback, setUseImageFallback] = useState(false);
   const [sceneConfig, setSceneConfig] = useState(DEFAULT_SCENE_CONFIGURATION);
   const {
@@ -55,6 +56,7 @@ export function Stream() {
           <StreamVisualMixerPanel
             clockSeconds={clockSeconds}
             fps={activeFps}
+            frameBlob={frameBlob}
             imgURL={imgURL}
             onContextError={handleContextError}
             sceneConfig={sceneConfig}
@@ -66,6 +68,10 @@ export function Stream() {
             telemetryValue={telemetryValue}
             useImageFallback={useImageFallback}
           />
+
+          <div className="xl:hidden">
+            <StreamNavigationPanel />
+          </div>
 
           <div className="xl:hidden">
             <ScenePluginDock
@@ -96,6 +102,7 @@ export function Stream() {
         </section>
 
         <aside className="hidden min-h-0 min-w-0 xl:flex xl:flex-col xl:gap-4">
+          <StreamNavigationPanel />
           <ScenePluginDock
             sceneConfig={sceneConfig}
             sensorOptions={resolvedSensors.map((sensor) => ({

@@ -8,9 +8,9 @@ from reactivex.subject import Subject
 
 from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
-                                         FrameTick, FrameTickController,
-                                         GamepadAxis, GamepadButton,
-                                         GamepadButtonTapEvent,
+                                         ExternalSensorHub, FrameTick,
+                                         FrameTickController, GamepadAxis,
+                                         GamepadButton, GamepadButtonTapEvent,
                                          GamepadController, GamepadDpadValue,
                                          GamepadSnapshot, InputDebugStage,
                                          InputDebugTap, KeyboardController,
@@ -520,8 +520,9 @@ class TestAccelerometerDebugProfile:
             keyboard_controller=keyboard,
             frame_tick_controller=frame_ticks,
             debug_tap=tap,
+            external_sensor_hub=ExternalSensorHub(tap),
         )
-        observed: list[Acceleration] = []
+        observed: list[Acceleration | None] = []
         monkeypatch.setattr(
             "heart.peripheral.core.input.accelerometer.time.monotonic",
             lambda: 10.0,
@@ -558,8 +559,9 @@ class TestAccelerometerDebugProfile:
             )
         )
 
-        assert observed[0] == Acceleration(x=1.5, y=1.5, z=13.51)
-        assert observed[1] == Acceleration(x=1.5, y=1.5, z=10.51)
+        assert observed[0] is None
+        assert observed[1] == Acceleration(x=1.5, y=1.5, z=13.51)
+        assert observed[2] == Acceleration(x=1.5, y=1.5, z=10.51)
         assert any(
             envelope.stream_name == "accelerometer.debug"
             for envelope in tap.snapshot()

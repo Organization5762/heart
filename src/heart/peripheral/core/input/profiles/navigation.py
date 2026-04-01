@@ -9,6 +9,7 @@ import reactivex
 from reactivex import operators as ops
 from reactivex.abc import DisposableBase
 from reactivex.disposable import CompositeDisposable
+from reactivex.subject import Subject
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
@@ -58,6 +59,7 @@ class NavigationProfile:
         self._gamepad = gamepad_controller
         self._debug_tap = debug_tap
         self._switch_stream_factory = switch_stream_factory
+        self._injected_intents: Subject[NavigationIntent] = Subject()
 
     def subscribe_events(
         self,
@@ -166,6 +168,7 @@ class NavigationProfile:
                 button_south,
                 button_north,
                 switch_intents,
+                pipe_in_background(self._injected_intents),
             ),
         )
         return instrument_input_stream(
@@ -219,6 +222,17 @@ class NavigationProfile:
             self.browse,
             ops.map(lambda intent: intent.step),
         )
+
+    def inject_browse(self, step: int, source: str = "beats.control") -> None:
+        if step == 0:
+            return
+        self._injected_intents.on_next(BrowseIntent(source=source, step=step))
+
+    def inject_activate(self, source: str = "beats.control") -> None:
+        self._injected_intents.on_next(ActivateIntent(source=source))
+
+    def inject_alternate_activate(self, source: str = "beats.control") -> None:
+        self._injected_intents.on_next(AlternateActivateIntent(source=source))
 
     def _switch_intents(self) -> reactivex.Observable[NavigationIntent]:
         if self._switch_stream_factory is None:

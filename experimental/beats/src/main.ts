@@ -18,6 +18,7 @@ function createWindow() {
     width: 1600,
     height: 800,
     webPreferences: {
+      backgroundThrottling: false,
       devTools: inDevelopment,
       contextIsolation: true,
       nodeIntegration: true,

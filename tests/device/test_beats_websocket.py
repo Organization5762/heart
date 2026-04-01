@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import (WebSocket,
                                           _encode_peripheral_message,
+                                          decode_control_message,
                                           decode_stream_envelope)
 from heart.peripheral.core import (Input, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
@@ -213,6 +214,49 @@ class TestStreamEnvelopeDecoding:
         assert payload.data == message
 
 
+class TestControlMessageDecoding:
+    """Validate control-message parsing so Beats can send runtime commands over the websocket."""
+
+    def test_decodes_browse_control_messages(self) -> None:
+        """Verify JSON control envelopes decode into browse commands so panel navigation can reach Heart."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "browse",
+                    "browse_step": -1,
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "browse"
+        assert decoded.browse_step == -1
+
+    def test_rejects_unknown_control_messages(self) -> None:
+        """Verify malformed or unsupported control payloads are ignored so random websocket traffic does not trigger navigation."""
+        assert decode_control_message('{"kind":"control","command":"bogus"}') is None
+
+    def test_decodes_sensor_update_control_messages(self) -> None:
+        """Verify sensor control payloads decode into keyed numeric updates so Beats can stream external sensor values into Heart."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "sensor_update",
+                    "sensor_key": "accelerometer:debug:z",
+                    "sensor_value": 12.5,
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "sensor_update"
+        assert decoded.sensor_key == "accelerometer:debug:z"
+        assert decoded.sensor_value == 12.5
+        assert decoded.clear is False
+
+
 class TestWebSocketReplayCache:
     """Verify replay caching so reconnecting Beats clients immediately recover current stream state."""
 
@@ -291,3 +335,32 @@ class TestWebSocketDisconnectHandling:
         connection = _ClosingConnection()
         asyncio.run(websocket._handle_client(connection))
         assert connection not in websocket.clients
+
+    def test_handler_dispatches_control_messages(self) -> None:
+        """Verify client websocket messages reach the registered control handler so Beats can drive navigation remotely."""
+        websocket = object.__new__(WebSocket)
+        websocket.clients = set()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+        received = []
+        websocket._control_handler = received.append
+
+        class _Connection:
+            def __aiter__(self):
+                async def iterator():
+                    yield json.dumps(
+                        {
+                            "kind": "control",
+                            "command": "activate",
+                        }
+                    )
+
+                return iterator()
+
+            async def send(self, _frame: bytes) -> None:
+                return None
+
+        asyncio.run(websocket._handle_client(_Connection()))
+
+        assert [message.command for message in received] == ["activate"]

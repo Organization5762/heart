@@ -17,6 +17,7 @@ class FakeWebSocket {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  sent: string[] = [];
 
   constructor(url: string) {
     this.url = url;
@@ -25,6 +26,10 @@ class FakeWebSocket {
 
   close() {
     this.readyState = FakeWebSocket.CLOSED;
+  }
+
+  send(message: string) {
+    this.sent.push(message);
   }
 
   triggerOpen() {
@@ -41,6 +46,19 @@ class FakeWebSocket {
 function ReadyStateProbe() {
   const { readyState } = useWS();
   return <div data-testid="ready-state">{readyState}</div>;
+}
+
+function SensorControlProbe() {
+  const { sendSensorControl } = useWS();
+
+  return (
+    <button
+      type="button"
+      onClick={() => sendSensorControl("accelerometer:debug:z", 12.5)}
+    >
+      Send Sensor Control
+    </button>
+  );
 }
 
 describe("WSProvider", () => {
@@ -100,5 +118,35 @@ describe("WSProvider", () => {
 
     expect(FakeWebSocket.instances).toHaveLength(0);
     expect(screen.getByTestId("ready-state")).toHaveTextContent("3");
+  });
+
+  test("sends sensor control envelopes over the websocket", () => {
+    render(
+      <WSProvider
+        url="ws://localhost:8765"
+        retryDelay={100}
+        maxRetryDelay={200}
+      >
+        <SensorControlProbe />
+      </WSProvider>,
+    );
+
+    act(() => {
+      FakeWebSocket.instances[0].triggerOpen();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Send Sensor Control" }).click();
+    });
+
+    expect(FakeWebSocket.instances[0].sent).toEqual([
+      JSON.stringify({
+        kind: "control",
+        command: "sensor_update",
+        sensor_key: "accelerometer:debug:z",
+        sensor_value: 12.5,
+        clear: false,
+      }),
+    ]);
   });
 });
