@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { SensorCommandTerminal } from "@/components/sensor-command-terminal";
 import { SensorHistoryChart } from "@/components/sensor-history-chart";
+import { Input } from "@/components/ui/input";
 import {
   defaultSensorOverride,
   formatSensorValue,
@@ -9,6 +10,7 @@ import {
   type SensorOverride,
 } from "@/features/stream-console/sensor-simulation";
 import { Activity, Gauge, ScanLine, SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
 
 export function SensorLabPanel({
   clockSeconds,
@@ -33,6 +35,23 @@ export function SensorLabPanel({
   selectedSensorHistory: SensorHistoryPoint[];
   sensors: ResolvedSensorChannel[];
 }) {
+  const [sensorQuery, setSensorQuery] = useState("");
+  const normalizedSensorQuery = sensorQuery.trim().toLowerCase();
+  const visibleSensors =
+    normalizedSensorQuery.length === 0
+      ? sensors
+      : sensors.filter((sensor) =>
+          [
+            sensor.label,
+            sensor.id,
+            sensor.path,
+            sensor.source,
+            sensor.peripheralId,
+          ].some((field) =>
+            field.toLowerCase().includes(normalizedSensorQuery),
+          ),
+        );
+
   return (
     <section className="beats-console-panel rounded-[1.5rem] p-4 md:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -41,11 +60,11 @@ export function SensorLabPanel({
             Sensor Rack
           </p>
           <h2 className="font-tomorrow text-lg tracking-[0.14em] text-slate-100 uppercase">
-            Mocking and Trace Console
+            External Control Console
           </h2>
           <p className="beats-console-copy max-w-2xl text-sm leading-6">
-            Compare live values, applied overrides, and time-driven functions in
-            one panel.
+            Inspect live values, stream external overrides, and compare the
+            resulting traces in one panel.
           </p>
         </div>
         <div className="beats-console-card rounded-xl px-3 py-2 text-right">
@@ -67,47 +86,65 @@ export function SensorLabPanel({
                 Detected Sensors
               </h3>
             </div>
+            <div className="mb-3">
+              <Input
+                type="search"
+                value={sensorQuery}
+                onChange={(event) => setSensorQuery(event.target.value)}
+                placeholder="Search"
+                aria-label="Search detected sensors"
+                className="border-[#404754] bg-[#171c23] text-slate-100 placeholder:text-[#6f7d91]"
+              />
+            </div>
             <div className="space-y-2">
-              {sensors.map((sensor) => (
-                <button
-                  key={sensor.id}
-                  type="button"
-                  onClick={() => onSelectSensor(sensor.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left transition duration-150 ${
-                    selectedSensor?.id === sensor.id
-                      ? "border-[#5b8cff] bg-[linear-gradient(180deg,_rgba(22,34,53,0.98),_rgba(15,23,37,0.98))] shadow-[inset_0_0_0_1px_rgba(91,140,255,0.2)]"
-                      : "border-[var(--beats-chip-border)] bg-[rgba(24,29,36,0.9)] hover:border-[#526074] hover:bg-[rgba(30,36,45,0.96)]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-100">
-                      {sensor.label}
-                    </span>
-                    <span className="font-tomorrow rounded-full border border-[#464e5b] px-2 py-0.5 text-[10px] tracking-[0.16em] text-[#96a3b7] uppercase">
-                      {sensor.source}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-3 text-xs text-[#95a2b6]">
-                    <span>Live {sensor.displayValue}</span>
-                    <span>
-                      Applied {formatSensorValue(sensor.effectiveValue, 2)}
-                    </span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#0d1116]">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
-                      style={{
-                        width: `${Math.max(
-                          8,
-                          Math.round(
-                            Math.abs(Math.tanh(sensor.effectiveValue)) * 100,
-                          ),
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </button>
-              ))}
+              {visibleSensors.length > 0 ? (
+                visibleSensors.map((sensor) => (
+                  <button
+                    key={sensor.id}
+                    type="button"
+                    onClick={() => onSelectSensor(sensor.id)}
+                    className={`w-full rounded-xl border px-3 py-3 text-left transition duration-150 ${
+                      selectedSensor?.id === sensor.id
+                        ? "border-[#5b8cff] bg-[linear-gradient(180deg,_rgba(22,34,53,0.98),_rgba(15,23,37,0.98))] shadow-[inset_0_0_0_1px_rgba(91,140,255,0.2)]"
+                        : "border-[var(--beats-chip-border)] bg-[rgba(24,29,36,0.9)] hover:border-[#526074] hover:bg-[rgba(30,36,45,0.96)]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-slate-100">
+                        {sensor.label}
+                      </span>
+                      <span className="font-tomorrow rounded-full border border-[#464e5b] px-2 py-0.5 text-[10px] tracking-[0.16em] text-[#96a3b7] uppercase">
+                        {sensor.source}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3 text-xs text-[#95a2b6]">
+                      <span>Live {sensor.displayValue}</span>
+                      <span>
+                        Applied {formatSensorValue(sensor.effectiveValue, 2)}
+                      </span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#0d1116]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400"
+                        style={{
+                          width: `${Math.max(
+                            8,
+                            Math.round(
+                              Math.abs(Math.tanh(sensor.effectiveValue)) * 100,
+                            ),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="beats-console-empty rounded-xl border border-dashed border-[#404754] px-3 py-6 text-sm text-[#95a2b6]">
+                  {normalizedSensorQuery.length > 0
+                    ? `No sensors match "${sensorQuery.trim()}".`
+                    : "Awaiting streamed sensors."}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -148,7 +185,7 @@ export function SensorLabPanel({
                       onClick={() => onResetOverride(selectedSensor.id)}
                       className="border-[#404754] bg-[#171c23] text-slate-200 hover:bg-[#1f252d]"
                     >
-                      Reset Mock
+                      Release Control
                     </Button>
                   </div>
                 </div>
@@ -193,7 +230,7 @@ export function SensorLabPanel({
                 <div className="mb-4 flex items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 text-violet-500" />
                   <h3 className="font-tomorrow text-sm tracking-[0.12em] text-slate-100 uppercase">
-                    Mock Source
+                    Control Source
                   </h3>
                 </div>
                 <SensorCommandTerminal

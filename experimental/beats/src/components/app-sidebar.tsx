@@ -94,7 +94,7 @@ const SIDEBAR_TOP_OFFSET_CLASS = "pt-[52px]";
 export function AppSidebar() {
   const [appVersion, setAppVersion] = useState("0.0.0");
   const [, startGetAppVersion] = useTransition();
-  const { open } = useSidebar();
+  const { isMobile, open, setOpenMobile } = useSidebar();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -108,6 +108,12 @@ export function AppSidebar() {
     path === "/"
       ? pathname === path
       : pathname === path || pathname.startsWith(`${path}/`);
+
+  const handleNavigate = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <Sidebar
@@ -168,7 +174,7 @@ export function AppSidebar() {
                   isActive={isPathActive(item.url)}
                   className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase"
                 >
-                  <Link to={item.url}>
+                  <Link to={item.url} onClick={handleNavigate}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                   </Link>
@@ -211,7 +217,7 @@ export function AppSidebar() {
                             asChild
                             isActive={isPathActive(subItem.url)}
                           >
-                            <Link to={subItem.url}>
+                            <Link to={subItem.url} onClick={handleNavigate}>
                               <span>{subItem.title}</span>
                             </Link>
                           </SidebarMenuSubButton>

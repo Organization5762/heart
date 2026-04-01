@@ -26,8 +26,36 @@ const MAX_TELEMETRY_SIGNAL = 1;
 const STREAM_TEXTURE_SIZE = 256;
 const STREAM_TEXTURE_BACKGROUND = "#020617";
 type DecodedStreamFrame = HTMLImageElement | ImageBitmap;
+type FaceViewport = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  usesStreamFrame: boolean;
+};
+type FaceTextureRuntime = {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  texture: CanvasTexture;
+  viewport: FaceViewport;
+};
+type NormalizedStripRect = {
+  left: number;
+  top: number;
+  size: number;
+};
+
+const CUBE_FACE_VIEWPORTS: FaceViewport[] = [
+  { left: 0, top: 0, width: 0.25, height: 1, usesStreamFrame: true },
+  { left: 0.25, top: 0, width: 0.25, height: 1, usesStreamFrame: true },
+  { left: 0, top: 0, width: 1, height: 1, usesStreamFrame: false },
+  { left: 0, top: 0, width: 1, height: 1, usesStreamFrame: false },
+  { left: 0.5, top: 0, width: 0.25, height: 1, usesStreamFrame: true },
+  { left: 0.75, top: 0, width: 0.25, height: 1, usesStreamFrame: true },
+];
 
 export type StreamCubeProps = {
+  frameBlob: Blob | null;
   imgURL: string | null;
   onContextError?: () => void;
   sceneConfig: SceneConfiguration;
@@ -35,6 +63,7 @@ export type StreamCubeProps = {
 };
 
 export function StreamCube({
+  frameBlob,
   imgURL,
   onContextError,
   sceneConfig,
@@ -49,13 +78,13 @@ export function StreamCube({
     null,
   );
   const gridRef = useRef<GridHelper | null>(null);
-  const streamTextureRef = useRef<CanvasTexture | null>(null);
-  const streamCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const faceTextureRuntimesRef = useRef<FaceTextureRuntime[] | null>(null);
   const animationRef = useRef<number | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const readyFrameRef = useRef<number | null>(null);
-  const pendingImageUrlRef = useRef<string | null>(imgURL);
+  const pendingFrameSourceRef = useRef<Blob | string | null>(
+    frameBlob ?? imgURL,
+  );
   const isApplyingImageRef = useRef(false);
   const isMountedRef = useRef(true);
   const sceneConfigRef = useRef(sceneConfig);
@@ -127,16 +156,13 @@ export function StreamCube({
       scene.add(grid);
 
       const geometry = new BoxGeometry(2, 2, 2);
-      const {
-        canvas: streamCanvas,
-        context: streamContext,
-        texture: streamTexture,
-      } = createStreamTexture(sceneConfigRef.current.surface.textureRepeat);
-      const materials = Array.from(
-        { length: 6 },
-        () =>
+      const faceTextureRuntimes = createFaceTextureRuntimes(
+        sceneConfigRef.current.surface.textureRepeat,
+      );
+      const materials = faceTextureRuntimes.map(
+        ({ texture }) =>
           new MeshStandardMaterial({
-            map: streamTexture,
+            map: texture,
             metalness: sceneConfigRef.current.surface.metalness,
             roughness: sceneConfigRef.current.surface.roughness,
           }),
@@ -150,9 +176,7 @@ export function StreamCube({
       cameraRef.current = camera;
       cubeRef.current = cube;
       gridRef.current = grid;
-      streamCanvasRef.current = streamCanvas;
-      streamContextRef.current = streamContext;
-      streamTextureRef.current = streamTexture;
+      faceTextureRuntimesRef.current = faceTextureRuntimes;
       readyFrameRef.current = window.requestAnimationFrame(() => {
         setIsRendererReady(true);
       });
@@ -256,8 +280,10 @@ export function StreamCube({
         }
       }
 
-      if (streamTextureRef.current) {
-        streamTextureRef.current.dispose();
+      if (faceTextureRuntimesRef.current) {
+        faceTextureRuntimesRef.current.forEach(({ texture }) => {
+          texture.dispose();
+        });
       }
 
       rendererRef.current?.dispose();
@@ -265,15 +291,13 @@ export function StreamCube({
       cameraRef.current = null;
       cubeRef.current = null;
       gridRef.current = null;
-      streamTextureRef.current = null;
-      streamCanvasRef.current = null;
-      streamContextRef.current = null;
+      faceTextureRuntimesRef.current = null;
       resizeObserverRef.current = null;
     };
   }, [onContextError]);
 
   useEffect(() => {
-    pendingImageUrlRef.current = imgURL;
+    pendingFrameSourceRef.current = frameBlob ?? imgURL;
 
     const applyPendingTexture = async () => {
       if (isApplyingImageRef.current) {
@@ -284,55 +308,49 @@ export function StreamCube({
 
       try {
         while (isMountedRef.current) {
-          const nextUrl = pendingImageUrlRef.current;
-          const streamTexture = streamTextureRef.current;
-          const streamContext = streamContextRef.current;
-          const streamCanvas = streamCanvasRef.current;
-          if (!streamTexture || !streamContext || !streamCanvas) {
+          const nextFrameSource = pendingFrameSourceRef.current;
+          const faceTextureRuntimes = faceTextureRuntimesRef.current;
+          if (!faceTextureRuntimes) {
             return;
           }
 
-          pendingImageUrlRef.current = null;
+          pendingFrameSourceRef.current = null;
 
           try {
-            if (nextUrl) {
-              const image = await decodeStreamFrame(nextUrl);
+            if (nextFrameSource) {
+              const image = await decodeStreamFrame(nextFrameSource);
               try {
                 if (!isMountedRef.current) {
                   return;
                 }
 
                 const { width, height } = getDecodedFrameSize(image);
-                drawStreamImage(
-                  streamContext,
-                  streamCanvas,
-                  image,
-                  width,
-                  height,
-                );
+                drawFaceTextures(faceTextureRuntimes, image, width, height);
               } finally {
                 if (image instanceof ImageBitmap) {
                   image.close();
                 }
               }
             } else {
-              drawFallbackTexture(streamContext, streamCanvas);
+              drawFallbackFaceTextures(faceTextureRuntimes);
             }
           } catch (error) {
             console.warn(
               "Failed to load streamed texture; using fallback",
               error,
             );
-            drawFallbackTexture(streamContext, streamCanvas);
+            drawFallbackFaceTextures(faceTextureRuntimes);
           }
 
-          applyTextureSettings(
-            streamTexture,
-            sceneConfigRef.current.surface.textureRepeat,
-          );
-          streamTexture.needsUpdate = true;
+          faceTextureRuntimes.forEach(({ texture }) => {
+            applyTextureSettings(
+              texture,
+              sceneConfigRef.current.surface.textureRepeat,
+            );
+            texture.needsUpdate = true;
+          });
 
-          if (pendingImageUrlRef.current === null) {
+          if (pendingFrameSourceRef.current === null) {
             return;
           }
         }
@@ -342,7 +360,7 @@ export function StreamCube({
     };
 
     void applyPendingTexture();
-  }, [imgURL]);
+  }, [frameBlob, imgURL]);
 
   const backgroundTint = Math.round(sceneConfig.stage.backgroundTint * 100);
 
@@ -364,26 +382,24 @@ export function StreamCube({
   );
 }
 
-function createStreamTexture(repeat: number): {
-  canvas: HTMLCanvasElement;
-  context: CanvasRenderingContext2D;
-  texture: CanvasTexture;
-} {
-  const canvas = document.createElement("canvas");
-  canvas.width = STREAM_TEXTURE_SIZE;
-  canvas.height = STREAM_TEXTURE_SIZE;
-  const context = canvas.getContext("2d");
+function createFaceTextureRuntimes(repeat: number): FaceTextureRuntime[] {
+  return CUBE_FACE_VIEWPORTS.map((viewport) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = STREAM_TEXTURE_SIZE;
+    canvas.height = STREAM_TEXTURE_SIZE;
+    const context = canvas.getContext("2d");
 
-  if (!context) {
-    throw new Error("Failed to create 2D context for stream texture");
-  }
+    if (!context) {
+      throw new Error("Failed to create 2D context for stream texture");
+    }
 
-  drawFallbackTexture(context, canvas);
+    drawFallbackTexture(context, canvas);
 
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  applyTextureSettings(texture, repeat);
-  return { canvas, context, texture };
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    applyTextureSettings(texture, repeat);
+    return { canvas, context, texture, viewport };
+  });
 }
 
 function drawFallbackTexture(
@@ -442,49 +458,96 @@ function applyTextureSettings(texture: Texture, repeat: number) {
   texture.needsUpdate = true;
 }
 
-function drawStreamImage(
-  context: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
+function drawFaceTextures(
+  faceTextureRuntimes: FaceTextureRuntime[],
   image: DecodedStreamFrame,
   imageWidth: number,
   imageHeight: number,
 ) {
-  context.fillStyle = STREAM_TEXTURE_BACKGROUND;
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  const normalizedStrip = getNormalizedStripRect(imageWidth, imageHeight);
 
-  const scale = Math.min(
-    canvas.width / imageWidth,
-    canvas.height / imageHeight,
-  );
-  const drawWidth = imageWidth * scale;
-  const drawHeight = imageHeight * scale;
-  const offsetX = (canvas.width - drawWidth) / 2;
-  const offsetY = (canvas.height - drawHeight) / 2;
-
-  context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
-}
-
-async function decodeStreamFrame(url: string): Promise<DecodedStreamFrame> {
-  if (typeof createImageBitmap === "function") {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stream image: ${url}`);
+  faceTextureRuntimes.forEach(({ canvas, context, viewport }) => {
+    if (!viewport.usesStreamFrame) {
+      drawFallbackTexture(context, canvas);
+      return;
     }
 
-    const blob = await response.blob();
-    return createImageBitmap(blob);
-  }
-
-  return loadStreamImage(url);
+    context.fillStyle = STREAM_TEXTURE_BACKGROUND;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      image,
+      normalizedStrip.left + normalizedStrip.size * 4 * viewport.left,
+      normalizedStrip.top + normalizedStrip.size * viewport.top,
+      normalizedStrip.size * 4 * viewport.width,
+      normalizedStrip.size * viewport.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  });
 }
 
-function loadStreamImage(url: string) {
+export function getNormalizedStripRect(
+  imageWidth: number,
+  imageHeight: number,
+): NormalizedStripRect {
+  const squareSize = Math.max(1, Math.min(imageHeight, imageWidth / 4));
+  const stripWidth = squareSize * 4;
+  const stripHeight = squareSize;
+
+  return {
+    left: Math.max(0, (imageWidth - stripWidth) / 2),
+    top: Math.max(0, (imageHeight - stripHeight) / 2),
+    size: squareSize,
+  };
+}
+
+function drawFallbackFaceTextures(faceTextureRuntimes: FaceTextureRuntime[]) {
+  faceTextureRuntimes.forEach(({ canvas, context }) => {
+    drawFallbackTexture(context, canvas);
+  });
+}
+
+async function decodeStreamFrame(
+  source: Blob | string,
+): Promise<DecodedStreamFrame> {
+  if (typeof createImageBitmap === "function") {
+    if (source instanceof Blob) {
+      return createImageBitmap(source);
+    }
+
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch stream image: ${source}`);
+    }
+
+    return createImageBitmap(await response.blob());
+  }
+
+  if (source instanceof Blob) {
+    return loadStreamImage(URL.createObjectURL(source), true);
+  }
+
+  return loadStreamImage(source);
+}
+
+function loadStreamImage(url: string, shouldRevoke = false) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () =>
+    image.onload = () => {
+      if (shouldRevoke) {
+        URL.revokeObjectURL(url);
+      }
+      resolve(image);
+    };
+    image.onerror = () => {
+      if (shouldRevoke) {
+        URL.revokeObjectURL(url);
+      }
       reject(new Error(`Failed to load stream image: ${url}`));
+    };
     image.src = url;
   });
 }

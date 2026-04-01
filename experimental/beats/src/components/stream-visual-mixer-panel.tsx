@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type StreamVisualMixerPanelProps = {
   clockSeconds: number;
+  frameBlob: Blob | null;
   imgURL: string | null;
   socketUrl: string;
   telemetrySensorLabel: string;
@@ -21,6 +22,7 @@ const SIGNAL_BAR_COUNT = 16;
 export function StreamVisualMixerPanel({
   clockSeconds,
   fps,
+  frameBlob,
   imgURL,
   onContextError,
   sceneConfig,
@@ -80,6 +82,7 @@ export function StreamVisualMixerPanel({
           </div>
         ) : (
           <StreamCube
+            frameBlob={frameBlob}
             imgURL={imgURL}
             onContextError={onContextError}
             sceneConfig={sceneConfig}

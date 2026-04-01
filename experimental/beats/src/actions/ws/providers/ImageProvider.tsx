@@ -5,6 +5,7 @@ import { frameStream } from "../streams";
 
 type ImageState = {
   imgURL: string | null;
+  frameBlob: Blob | null;
   isActive: boolean;
   fps: number;
 };
@@ -17,6 +18,7 @@ type ImageProviderProps = {
 
 const ImageContext = createContext<ImageState>({
   imgURL: null,
+  frameBlob: null,
   isActive: false,
   fps: 0,
 });
@@ -27,6 +29,7 @@ export function ImageProvider({
   children,
 }: ImageProviderProps) {
   const [imgURL, setImgURL] = useState<string | null>(null);
+  const [frameBlob, setFrameBlob] = useState<Blob | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [fps, setFps] = useState(0);
 
@@ -67,6 +70,7 @@ export function ImageProvider({
 
       const blob = bytesToBlob(msg.payload.pngData);
       const newURL = URL.createObjectURL(blob);
+      setFrameBlob(blob);
 
       setImgURL((old) => {
         if (old) URL.revokeObjectURL(old);
@@ -91,6 +95,7 @@ export function ImageProvider({
         return null;
       });
 
+      setFrameBlob(null);
       setIsActive(false);
       setFps(0);
       frameTimesRef.current = [];
@@ -101,6 +106,7 @@ export function ImageProvider({
     <ImageContext.Provider
       value={{
         imgURL,
+        frameBlob,
         isActive,
         fps,
       }}

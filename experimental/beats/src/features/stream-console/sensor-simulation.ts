@@ -3,44 +3,6 @@ import type {
   PeripheralTag,
 } from "@/actions/ws/providers/PeripheralProvider";
 
-const DEFAULT_DEMO_TIMESTAMP = 0;
-const DEMO_SENSOR_CHANNELS: SensorChannel[] = [
-  {
-    id: "demo.temperature",
-    peripheralId: "demo.temperature",
-    label: "Demo Temperature",
-    path: "value",
-    value: 21.4,
-    rawValue: 21.4,
-    displayValue: "21.40",
-    updatedAt: DEFAULT_DEMO_TIMESTAMP,
-    tags: [
-      {
-        name: "input_variant",
-        variant: "demo",
-      },
-    ],
-    source: "demo",
-  },
-  {
-    id: "demo.motion",
-    peripheralId: "demo.motion",
-    label: "Demo Motion",
-    path: "value",
-    value: 0.28,
-    rawValue: 0.28,
-    displayValue: "0.28",
-    updatedAt: DEFAULT_DEMO_TIMESTAMP,
-    tags: [
-      {
-        name: "input_variant",
-        variant: "demo",
-      },
-    ],
-    source: "demo",
-  },
-];
-
 const MATH_SCOPE = {
   PI: Math.PI,
   E: Math.E,
@@ -119,7 +81,7 @@ export type LivePeripheralSnapshot = {
   last_data: unknown;
 };
 
-export type SensorSource = "live" | "demo";
+export type SensorSource = "live";
 
 export type SensorChannel = {
   id: string;
@@ -169,10 +131,6 @@ export function extractSensorChannels(
   const channels = Object.values(peripherals).flatMap((snapshot) =>
     flattenSensorPayload(snapshot.info, snapshot.last_data, snapshot.ts),
   );
-
-  if (channels.length === 0) {
-    return DEMO_SENSOR_CHANNELS;
-  }
 
   return channels.sort((left, right) => left.label.localeCompare(right.label));
 }

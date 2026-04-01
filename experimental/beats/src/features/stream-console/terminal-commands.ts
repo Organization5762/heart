@@ -9,7 +9,7 @@ import {
 const COMMANDS = [
   {
     name: "help",
-    description: "Show the available mock-terminal commands.",
+    description: "Show the available sensor-control commands.",
   },
   {
     name: "sensors",
@@ -37,7 +37,7 @@ const COMMANDS = [
   },
   {
     name: "preset",
-    description: "Apply a named mock function preset to the active sensor.",
+    description: "Apply a named function preset to the active sensor.",
   },
   {
     name: "clear",
@@ -404,7 +404,7 @@ function handleClear(context: CommandContext): ExecuteCommandResult {
     messages: [
       {
         level: "info",
-        text: `Removed the mock override from ${context.selectedSensor.label}.`,
+        text: `Released external control for ${context.selectedSensor.label}.`,
       },
     ],
   };

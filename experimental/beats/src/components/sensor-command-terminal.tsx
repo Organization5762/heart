@@ -51,11 +51,11 @@ export function SensorCommandTerminal({
   const [sessionEntries, setSessionEntries] = useState<TerminalEntry[]>(() => [
     createTerminalEntry(
       "system",
-      "Mock terminal online. Type `help` to inspect supported commands.",
+      "Sensor control terminal online. Type `help` to inspect supported commands.",
     ),
     createTerminalEntry(
       "system",
-      "Use `sensors` to browse keys, `select <sensor-key>` to focus one, then `set`, `expr`, or `preset` to adjust the mock.",
+      "Use `sensors` to browse keys, `select <sensor-key>` to focus one, then `set`, `expr`, or `preset` to stream control values into Heart.",
     ),
   ]);
 
@@ -222,7 +222,7 @@ export function SensorCommandTerminal({
             Sensor Terminal
           </p>
           <h3 className="font-tomorrow text-sm tracking-[0.14em] text-slate-100 uppercase">
-            Logs and Mock Commands
+            Logs and Control Commands
           </h3>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -280,7 +280,7 @@ export function SensorCommandTerminal({
               autoComplete="off"
               autoCorrect="off"
               className="h-8 border-none bg-transparent px-0 py-0 text-sm text-[#e4ecf7] shadow-none focus-visible:ring-0"
-              placeholder="help, sensors, select demo.temperature:value, set 0.35"
+              placeholder="help, sensors, select accelerometer:debug:z, set 0.35"
               spellCheck={false}
               value={commandValue}
               onChange={(event) => {

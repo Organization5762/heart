@@ -37,11 +37,10 @@ describe("sensor simulation utilities", () => {
     expect(channels[2]?.value).toBe(-0.5);
   });
 
-  it("falls back to demo channels when no live numeric sensors are available", () => {
+  it("returns an empty list when no live numeric sensors are available", () => {
     const channels = extractSensorChannels({});
 
-    expect(channels).toHaveLength(2);
-    expect(channels.every((channel) => channel.source === "demo")).toBe(true);
+    expect(channels).toEqual([]);
   });
 
   it("compiles helper-based functions that depend on time", () => {
@@ -63,7 +62,7 @@ describe("sensor simulation utilities", () => {
         displayValue: "0.50",
         updatedAt: 0,
         tags: [],
-        source: "demo",
+        source: "live",
       },
       {
         mode: "function",

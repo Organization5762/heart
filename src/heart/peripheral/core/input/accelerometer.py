@@ -11,6 +11,7 @@ from reactivex import operators as ops
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
+from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.utilities.env import Configuration
@@ -71,14 +72,16 @@ class AccelerometerDebugProfile:
         keyboard_controller: "KeyboardController",
         frame_tick_controller: "FrameTickController",
         debug_tap: InputDebugTap,
+        external_sensor_hub: ExternalSensorHub,
     ) -> None:
         self._keyboard_controller = keyboard_controller
         self._frame_tick_controller = frame_tick_controller
         self._debug_tap = debug_tap
+        self._external_sensor_hub = external_sensor_hub
         self._space_impulse_until = 0.0
 
     @cached_property
-    def _observable(self) -> reactivex.Observable[Acceleration]:
+    def _observable(self) -> reactivex.Observable[Acceleration | None]:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
@@ -92,14 +95,14 @@ class AccelerometerDebugProfile:
             self._keyboard_controller.key_state(pygame.K_e),
         )
 
-        stream = pipe_in_background(
+        keyboard_stream = pipe_in_background(
             self._frame_tick_controller.observable(),
             ops.with_latest_from(key_states),
             ops.map(lambda latest: self._to_acceleration(latest[0].monotonic_s, latest[1])),
             ops.distinct_until_changed(),
         )
-        return instrument_input_stream(
-            stream,
+        instrumented_keyboard_stream = instrument_input_stream(
+            keyboard_stream,
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
             stream_name="accelerometer.debug",
@@ -114,8 +117,15 @@ class AccelerometerDebugProfile:
                 "keyboard.key_state.e",
             ),
         )
+        return pipe_in_background(
+            reactivex.merge(
+                self._external_sensor_hub.observable_acceleration(),
+                instrumented_keyboard_stream,
+            ),
+            ops.distinct_until_changed(),
+        )
 
-    def observable(self) -> reactivex.Observable[Acceleration]:
+    def observable(self) -> reactivex.Observable[Acceleration | None]:
         return self._observable
 
     def should_use_debug_input(self) -> bool:
@@ -128,10 +138,12 @@ class AccelerometerDebugProfile:
         self,
         monotonic_s: float,
         key_states: tuple[object, object, object, object, object, object],
-    ) -> Acceleration:
+    ) -> Acceleration | None:
         state_a, state_d, state_w, state_s, state_q, state_e = key_states
         x = (float(state_d.pressed) - float(state_a.pressed)) * DEBUG_ACCEL_SCALE
         y = (float(state_w.pressed) - float(state_s.pressed)) * DEBUG_ACCEL_SCALE
         z_bias = (float(state_e.pressed) - float(state_q.pressed)) * DEBUG_ACCEL_Z_BIAS
         impulse = DEBUG_ACCEL_IMPULSE if monotonic_s <= self._space_impulse_until else 0.0
+        if x == 0.0 and y == 0.0 and z_bias == 0.0 and impulse == 0.0:
+            return None
         return Acceleration(x=x, y=y, z=9.81 + z_bias + impulse)

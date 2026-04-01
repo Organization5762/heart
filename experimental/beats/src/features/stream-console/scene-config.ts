@@ -54,7 +54,7 @@ export const DEFAULT_SCENE_CONFIGURATION: SceneConfiguration = {
   },
   surface: {
     cubeScale: 1,
-    textureRepeat: 2,
+    textureRepeat: 1,
     metalness: 0.08,
     roughness: 0.72,
   },

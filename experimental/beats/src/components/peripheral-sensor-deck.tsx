@@ -38,8 +38,8 @@ export function PeripheralSensorDeck({
             </h2>
             <p className="max-w-3xl text-sm text-[#a4b0c2]">
               Inspect numeric channels discovered from connected peripherals,
-              pick a live source, and rehearse override behavior without leaving
-              the device catalog.
+              pick a live source, and stream external control values without
+              leaving the device catalog.
             </p>
           </div>
           <div className="rounded-[1rem] border border-[#39414c] bg-[#0b0f14] px-4 py-3 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">

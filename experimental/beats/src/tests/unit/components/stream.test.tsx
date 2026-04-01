@@ -7,6 +7,7 @@ import { DEFAULT_SCENE_CONFIGURATION } from "@/features/stream-console/scene-con
 
 const streamedImageState = vi.hoisted(() => ({
   fps: 24,
+  frameBlob: new Blob(["frame"]),
   imgURL: "blob:frame-texture",
   isActive: true,
 }));
@@ -39,9 +40,11 @@ vi.mock("@/actions/ws/websocket", () => ({
 
 vi.mock("@/components/stream-cube", () => ({
   StreamCube: ({
+    frameBlob,
     onContextError,
     sceneConfig,
   }: {
+    frameBlob: Blob | null;
     onContextError?: () => void;
     sceneConfig: typeof DEFAULT_SCENE_CONFIGURATION;
   }) => (
@@ -49,6 +52,7 @@ vi.mock("@/components/stream-cube", () => ({
       type="button"
       onClick={() => onContextError?.()}
       ref={() => {
+        expect(frameBlob).toBe(streamedImageState.frameBlob);
         streamCubeState.lastSceneConfig = sceneConfig;
       }}
     >
@@ -60,6 +64,7 @@ vi.mock("@/components/stream-cube", () => ({
 describe("Stream", () => {
   beforeEach(() => {
     streamedImageState.fps = 24;
+    streamedImageState.frameBlob = new Blob(["frame"]);
     streamedImageState.imgURL = "blob:frame-texture";
     streamedImageState.isActive = true;
     websocketState.socket.url = "ws://localhost:8765/stream";

@@ -11,9 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamIndexRouteImport } from './routes/stream/index'
+import { Route as PeripheralsSnapshotsRouteImport } from './routes/peripherals/snapshots'
 import { Route as PeripheralsEventsRouteImport } from './routes/peripherals/events'
 import { Route as PeripheralsConnectedRouteImport } from './routes/peripherals/connected'
-import { Route as PeripheralsSnapshotsRouteImport } from './routes/peripherals/snapshots'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,6 +25,11 @@ const StreamIndexRoute = StreamIndexRouteImport.update({
   path: '/stream/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PeripheralsSnapshotsRoute = PeripheralsSnapshotsRouteImport.update({
+  id: '/peripherals/snapshots',
+  path: '/peripherals/snapshots',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PeripheralsEventsRoute = PeripheralsEventsRouteImport.update({
   id: '/peripherals/events',
   path: '/peripherals/events',
@@ -33,11 +38,6 @@ const PeripheralsEventsRoute = PeripheralsEventsRouteImport.update({
 const PeripheralsConnectedRoute = PeripheralsConnectedRouteImport.update({
   id: '/peripherals/connected',
   path: '/peripherals/connected',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PeripheralsSnapshotsRoute = PeripheralsSnapshotsRouteImport.update({
-  id: '/peripherals/snapshots',
-  path: '/peripherals/snapshots',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -111,6 +111,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StreamIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/peripherals/snapshots': {
+      id: '/peripherals/snapshots'
+      path: '/peripherals/snapshots'
+      fullPath: '/peripherals/snapshots'
+      preLoaderRoute: typeof PeripheralsSnapshotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/peripherals/events': {
       id: '/peripherals/events'
       path: '/peripherals/events'
@@ -123,13 +130,6 @@ declare module '@tanstack/react-router' {
       path: '/peripherals/connected'
       fullPath: '/peripherals/connected'
       preLoaderRoute: typeof PeripheralsConnectedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/peripherals/snapshots': {
-      id: '/peripherals/snapshots'
-      path: '/peripherals/snapshots'
-      fullPath: '/peripherals/snapshots'
-      preLoaderRoute: typeof PeripheralsSnapshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from heart.device.beats import WebSocket
+from heart.device.beats.websocket import (CONTROL_COMMAND_ACTIVATE,
+                                          CONTROL_COMMAND_ALTERNATE,
+                                          CONTROL_COMMAND_BROWSE,
+                                          CONTROL_COMMAND_SENSOR_UPDATE,
+                                          ControlMessage)
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
@@ -35,12 +40,45 @@ class PeripheralRuntime:
 
     def configure_streaming(self, websocket: WebSocket | None = None) -> None:
         ws = websocket or WebSocket()
+        ws.set_control_handler(self._handle_control_message)
         self._peripheral_manager.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
                 kind="peripheral",
                 payload=self._streaming_envelope(envelope),
             ),
         )
+
+    def _handle_control_message(self, control_message: ControlMessage) -> None:
+        navigation = self._peripheral_manager.navigation_profile
+        if control_message.command == CONTROL_COMMAND_BROWSE:
+            navigation.inject_browse(
+                control_message.browse_step,
+                source="beats.control.browse",
+            )
+            return
+        if control_message.command == CONTROL_COMMAND_ACTIVATE:
+            navigation.inject_activate(source="beats.control.activate")
+            return
+        if control_message.command == CONTROL_COMMAND_ALTERNATE:
+            navigation.inject_alternate_activate(
+                source="beats.control.alternate",
+            )
+            return
+        if control_message.command == CONTROL_COMMAND_SENSOR_UPDATE:
+            external_sensor_hub = self._peripheral_manager.external_sensor_hub
+            sensor_key = control_message.sensor_key
+            if sensor_key is None:
+                return
+            try:
+                if control_message.clear:
+                    external_sensor_hub.clear_value(sensor_key)
+                    return
+                sensor_value = control_message.sensor_value
+                if sensor_value is None:
+                    return
+                external_sensor_hub.set_value(sensor_key, sensor_value)
+            except ValueError:
+                logger.warning("Ignoring invalid websocket sensor key: %s", sensor_key)
 
     def _streaming_envelope(
         self, envelope: InputDebugEnvelope
