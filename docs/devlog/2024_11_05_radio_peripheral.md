@@ -23,7 +23,7 @@ actual FlowToys transceiver is documented.
 
 ## Firmware stub
 
-The new `drivers/radio_bridge` bundle contains a CircuitPython runtime that emits
+The new `drivers/flowtoy_bridge` bundle contains a CircuitPython runtime that emits
 placeholder packets:
 
 ```json

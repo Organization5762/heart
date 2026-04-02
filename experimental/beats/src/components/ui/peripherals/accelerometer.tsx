@@ -1,21 +1,11 @@
 import { useSpecificPeripheralEvents } from "@/actions/ws/providers/PeripheralEventsProvider";
+import type { PeripheralInfo } from "@/actions/ws/providers/PeripheralProvider";
 import React from "react";
 
 type AccelData = {
   x: number;
   y: number;
   z: number;
-};
-
-type PeripheralTag = {
-  name: string;
-  variant: string;
-  metadata?: Record<string, string>;
-};
-
-type PeripheralInfo = {
-  id?: string | null;
-  tags: PeripheralTag[];
 };
 
 type Props = {

@@ -661,12 +661,14 @@ version = "0.2.0"
 source = { directory = "packages/heart-device-manager" }
 dependencies = [
     { name = "heart-firmware-io" },
+    { name = "pyserial" },
     { name = "toml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
+    { name = "pyserial" },
     { name = "toml" },
 ]
 

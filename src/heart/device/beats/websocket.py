@@ -4,6 +4,7 @@ import json
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, cast
 
 import websockets
@@ -13,8 +14,8 @@ from heart.device.beats.proto import \
     beats_streaming_pb2 as _beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
-from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
-                                   PeripheralTag)
+from heart.peripheral.core import (PeripheralInfo, PeripheralLocation,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadDecodingError,
                                             PeripheralPayloadEncoding,
                                             decode_peripheral_payload,
@@ -64,6 +65,16 @@ def _encode_peripheral_message(
         peripheral_info=beats_streaming_pb2.PeripheralInfo(
             id=info.id or "",
             tags=tags,
+            location=beats_streaming_pb2.PeripheralLocation(
+                x=info.location.x,
+                y=info.location.y,
+                z=info.location.z,
+                time=(
+                    info.location.time.isoformat()
+                    if info.location.time is not None
+                    else ""
+                ),
+            ),
         ),
         payload=encoded_payload.payload,
         payload_encoding=payload_encoding,
@@ -125,6 +136,12 @@ def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
             peripheral_info=PeripheralInfo(
                 id=info.id or None,
                 tags=tags,
+                location=PeripheralLocation(
+                    x=info.location.x,
+                    y=info.location.y,
+                    z=info.location.z,
+                    time=_decode_location_time(info.location.time),
+                ),
             ),
             data=decoded_payload,
         )
@@ -196,6 +213,16 @@ def _peripheral_cache_key(envelope: PeripheralMessageEnvelope[Any]) -> str:
     )
     payload_type = type(envelope.data).__name__
     return f"{payload_type}:{tag_key}"
+
+
+def _decode_location_time(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        logger.warning("Ignoring invalid peripheral location time: %s", value)
+        return None
 
 
 

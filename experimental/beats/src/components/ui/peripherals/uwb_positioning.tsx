@@ -1,4 +1,5 @@
 import { useSpecificPeripheralEvents } from "@/actions/ws/providers/PeripheralEventsProvider";
+import type { PeripheralInfo } from "@/actions/ws/providers/PeripheralProvider";
 import React, { useState } from "react";
 
 type Station = {
@@ -14,17 +15,6 @@ type UWBData = {
   x: number; // target x
   y: number; // target y
   z: number; // target z
-};
-
-type PeripheralTag = {
-  name: string;
-  variant: string;
-  metadata?: Record<string, string>;
-};
-
-type PeripheralInfo = {
-  id?: string | null;
-  tags: PeripheralTag[];
 };
 
 type Props = {

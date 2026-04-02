@@ -114,6 +114,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after adding Arduino-native `update-driver` support, FlowToy bridge Arduino metadata, and native flashing tests.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding Arduino-native `update-driver` support, FlowToy bridge Arduino metadata, and native flashing tests.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/beats-shell.tsx src/components/app-sidebar.tsx src/routes/index.tsx`
 - `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/beats-shell.tsx src/components/app-sidebar.tsx src/routes/index.tsx`
 - `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts src/tests/unit/actions/ws/protocol.test.ts src/tests/unit/components/peripheral-sensor-deck.test.tsx`
@@ -255,6 +259,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_snapshots.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/ws/providers/ImageProvider.tsx src/actions/ws/providers/PeripheralEventsProvider.tsx src/actions/ws/providers/PeripheralProvider.tsx src/components/app-sidebar.tsx src/components/stream-cube.tsx src/components/stream.tsx src/components/ui/button.tsx src/components/ui/input.tsx src/components/ui/peripherals/accelerometer.tsx src/components/ui/peripherals/rotary_button.tsx src/components/ui/peripherals/uwb_positioning.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/components/usgc.tsx src/hooks/use-mobile.ts src/layouts/base-layout.tsx src/renderer.ts src/routes/index.tsx src/routes/mission-control/index.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/styles/global.css src/types.d.ts tsconfig.json`
 - `2026-03-31`: `experimental/beats: npm run lint`
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/tsc --noEmit`
@@ -324,6 +332,8 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format`
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`
 - `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache make format`
 - `2026-03-31`: `experimental/beats: npm install --package-lock=false`
 - `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx src/components/stream-footer-bar.tsx`
