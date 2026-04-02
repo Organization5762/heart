@@ -31,6 +31,7 @@ describe("home recent peripheral activity", () => {
             payload: {
               peripheralInfo: { id: "alpha", tags: [] },
               data: {},
+              payloadEncoding: 1,
             },
           },
         },
@@ -41,6 +42,7 @@ describe("home recent peripheral activity", () => {
             payload: {
               peripheralInfo: { id: "beta", tags: [] },
               data: {},
+              payloadEncoding: 1,
             },
           },
         },
@@ -51,6 +53,7 @@ describe("home recent peripheral activity", () => {
             payload: {
               peripheralInfo: { id: "beta", tags: [] },
               data: {},
+              payloadEncoding: 1,
             },
           },
         },

@@ -26,21 +26,38 @@ describe("sensor simulation utilities", () => {
         },
       },
     });
+    const liveChannels = channels.filter(
+      (channel) => channel.source === "live",
+    );
 
-    expect(channels.map((channel) => channel.label)).toEqual([
+    expect(liveChannels.map((channel) => channel.label)).toEqual([
       "accel / ready",
       "accel / x",
       "accel / y",
     ]);
-    expect(channels[0]?.value).toBe(1);
-    expect(channels[1]?.value).toBe(0.25);
-    expect(channels[2]?.value).toBe(-0.5);
+    expect(liveChannels[0]?.value).toBe(1);
+    expect(liveChannels[1]?.value).toBe(0.25);
+    expect(liveChannels[2]?.value).toBe(-0.5);
   });
 
-  it("returns an empty list when no live numeric sensors are available", () => {
+  it("includes the default fake peripheral catalog even before live sensors connect", () => {
     const channels = extractSensorChannels({});
 
-    expect(channels).toEqual([]);
+    expect(channels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "fake",
+          commandKey: "fake.peripheral:payload.motion.accelerometer.x",
+          controlKeys: expect.arrayContaining([
+            "accelerometer:debug:x",
+            "totem.sensor:payload.motion.accelerometer.x",
+          ]),
+          displayValue: "Idle",
+          hasLiveValue: false,
+          value: null,
+        }),
+      ]),
+    );
   });
 
   it("compiles helper-based functions that depend on time", () => {
@@ -54,12 +71,18 @@ describe("sensor simulation utilities", () => {
     const resolved = resolveSensorChannel(
       {
         id: "demo.motion",
+        commandKey: "demo.motion:value",
+        controlKeys: ["demo.motion:value"],
         label: "Demo Motion",
+        leafLabel: "value",
         path: "value",
+        pathSegments: ["value"],
         peripheralId: "demo.motion",
+        peripheralLabel: "demo.motion",
         value: 0.5,
         rawValue: 0.5,
         displayValue: "0.50",
+        hasLiveValue: true,
         updatedAt: 0,
         tags: [],
         source: "live",

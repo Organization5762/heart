@@ -75,22 +75,118 @@ export const SENSOR_FUNCTION_PRESETS = [
   },
 ];
 
+const DEFAULT_FAKE_PERIPHERAL_ID = "fake.peripheral";
+const DEFAULT_FAKE_PERIPHERAL_LABEL = "Fake Peripheral";
+const TOTEM_SENSOR_PERIPHERAL_ID = "totem.sensor";
+const ACCELEROMETER_DEBUG_PERIPHERAL_ID = "accelerometer:debug";
+
+type FakeSensorDefinition = {
+  path: string;
+  tags?: PeripheralTag[];
+  controlKeys: string[];
+};
+
+const DEFAULT_FAKE_SENSOR_TAGS: PeripheralTag[] = [
+  {
+    name: "input_variant",
+    variant: "fake_peripheral",
+  },
+  {
+    name: "mode",
+    variant: "virtual",
+  },
+];
+
+const DEFAULT_FAKE_PERIPHERAL_SENSORS: FakeSensorDefinition[] = [
+  {
+    path: "payload.motion.accelerometer.x",
+    controlKeys: [
+      `${ACCELEROMETER_DEBUG_PERIPHERAL_ID}:x`,
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.motion.accelerometer.x`,
+    ],
+  },
+  {
+    path: "payload.motion.accelerometer.y",
+    controlKeys: [
+      `${ACCELEROMETER_DEBUG_PERIPHERAL_ID}:y`,
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.motion.accelerometer.y`,
+    ],
+  },
+  {
+    path: "payload.motion.accelerometer.z",
+    controlKeys: [
+      `${ACCELEROMETER_DEBUG_PERIPHERAL_ID}:z`,
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.motion.accelerometer.z`,
+    ],
+  },
+  {
+    path: "payload.gamepad.dpad.up",
+    controlKeys: [`${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.dpad.up`],
+  },
+  {
+    path: "payload.gamepad.dpad.down",
+    controlKeys: [`${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.dpad.down`],
+  },
+  {
+    path: "payload.gamepad.dpad.left",
+    controlKeys: [`${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.dpad.left`],
+  },
+  {
+    path: "payload.gamepad.dpad.right",
+    controlKeys: [`${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.dpad.right`],
+  },
+  {
+    path: "payload.gamepad.buttons.primary",
+    controlKeys: [
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.buttons.primary`,
+    ],
+  },
+  {
+    path: "payload.gamepad.buttons.secondary",
+    controlKeys: [
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.buttons.secondary`,
+    ],
+  },
+  {
+    path: "payload.gamepad.buttons.menu",
+    controlKeys: [`${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.buttons.menu`],
+  },
+  {
+    path: "payload.gamepad.triggers.left",
+    controlKeys: [
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.triggers.left`,
+    ],
+  },
+  {
+    path: "payload.gamepad.triggers.right",
+    controlKeys: [
+      `${TOTEM_SENSOR_PERIPHERAL_ID}:payload.gamepad.triggers.right`,
+    ],
+  },
+];
+
 export type LivePeripheralSnapshot = {
   ts: number;
   info: PeripheralInfo;
   last_data: unknown;
 };
 
-export type SensorSource = "live";
+export type SensorSource = "live" | "fake";
 
 export type SensorChannel = {
   id: string;
+  commandKey: string;
+  controlKeys: string[];
   peripheralId: string;
+  peripheralLabel: string;
   label: string;
+  leafLabel: string;
   path: string;
-  value: number;
-  rawValue: number | boolean;
+  pathSegments: string[];
+  value: number | null;
+  rawValue: number | boolean | null;
   displayValue: string;
+  hasLiveValue: boolean;
   updatedAt: number;
   tags: PeripheralTag[];
   source: SensorSource;
@@ -112,7 +208,7 @@ export type ResolvedSensorChannel = SensorChannel & {
 
 export type SensorHistoryPoint = {
   timeSeconds: number;
-  liveValue: number;
+  liveValue: number | null;
   effectiveValue: number;
   referenceValue: number | null;
 };
@@ -128,9 +224,11 @@ export function defaultSensorOverride(): SensorOverride {
 export function extractSensorChannels(
   peripherals: Record<string, LivePeripheralSnapshot>,
 ): SensorChannel[] {
-  const channels = Object.values(peripherals).flatMap((snapshot) =>
-    flattenSensorPayload(snapshot.info, snapshot.last_data, snapshot.ts),
+  const liveChannels = Object.values(peripherals).flatMap((snapshot) =>
+    flattenLiveSensorPayload(snapshot.info, snapshot.last_data, snapshot.ts),
   );
+  const fakeChannels = buildFakeSensorChannels();
+  const channels = mergeSensorChannels(liveChannels, fakeChannels);
 
   return channels.sort((left, right) => left.label.localeCompare(right.label));
 }
@@ -179,7 +277,7 @@ export function resolveSensorChannel(
   if (!override || override.mode === "live") {
     return {
       ...sensor,
-      effectiveValue: sensor.value,
+      effectiveValue: sensor.value ?? 0,
       referenceValue: null,
       evaluationError: null,
     };
@@ -198,7 +296,7 @@ export function resolveSensorChannel(
   if (!compiled.evaluate) {
     return {
       ...sensor,
-      effectiveValue: sensor.value,
+      effectiveValue: sensor.value ?? 0,
       referenceValue: null,
       evaluationError: compiled.error,
     };
@@ -215,7 +313,7 @@ export function resolveSensorChannel(
   } catch (error) {
     return {
       ...sensor,
-      effectiveValue: sensor.value,
+      effectiveValue: sensor.value ?? 0,
       referenceValue: null,
       evaluationError:
         error instanceof Error
@@ -244,7 +342,7 @@ export function formatSensorValue(value: number | null, digits = 3) {
   return value.toFixed(digits);
 }
 
-function flattenSensorPayload(
+function flattenLiveSensorPayload(
   peripheral: PeripheralInfo,
   value: unknown,
   timestamp: number,
@@ -253,25 +351,73 @@ function flattenSensorPayload(
   const entries = collectNumericEntries(value);
 
   return entries.map(({ path, numericValue, rawValue }) => {
-    const label =
-      path.length === 0 ? peripheralId : `${peripheralId} / ${path.join(".")}`;
+    const pathSegments = path.length === 0 ? ["value"] : path;
+    const pathLabel = pathSegments.join(".");
+    const label = `${peripheralId} / ${pathLabel}`;
 
     return {
       id: label,
+      commandKey: `${peripheralId}:${pathLabel}`,
+      controlKeys: [`${peripheralId}:${pathLabel}`],
       peripheralId,
+      peripheralLabel: peripheralId,
       label,
-      path: path.length === 0 ? "value" : path.join("."),
+      leafLabel: pathSegments[pathSegments.length - 1] ?? pathLabel,
+      path: pathLabel,
+      pathSegments,
       value: numericValue,
       rawValue,
       displayValue:
         typeof rawValue === "boolean"
           ? String(rawValue)
           : numericValue.toFixed(3),
+      hasLiveValue: true,
       updatedAt: timestamp,
       tags: peripheral.tags,
       source: "live" as const,
     };
   });
+}
+
+function buildFakeSensorChannels(): SensorChannel[] {
+  return DEFAULT_FAKE_PERIPHERAL_SENSORS.map((sensor, index) => {
+    const pathSegments = sensor.path.split(".");
+    const label = `${DEFAULT_FAKE_PERIPHERAL_LABEL} / ${sensor.path}`;
+
+    return {
+      id: `${DEFAULT_FAKE_PERIPHERAL_ID}/${sensor.path}`,
+      commandKey: `${DEFAULT_FAKE_PERIPHERAL_ID}:${sensor.path}`,
+      controlKeys: sensor.controlKeys,
+      peripheralId: DEFAULT_FAKE_PERIPHERAL_ID,
+      peripheralLabel: DEFAULT_FAKE_PERIPHERAL_LABEL,
+      label,
+      leafLabel: pathSegments[pathSegments.length - 1] ?? sensor.path,
+      path: sensor.path,
+      pathSegments,
+      value: null,
+      rawValue: null,
+      displayValue: "Idle",
+      hasLiveValue: false,
+      updatedAt: index,
+      tags: sensor.tags ?? DEFAULT_FAKE_SENSOR_TAGS,
+      source: "fake",
+    };
+  });
+}
+
+function mergeSensorChannels(
+  liveChannels: SensorChannel[],
+  fallbackChannels: SensorChannel[],
+) {
+  const byCommandKey = new Map(
+    fallbackChannels.map((channel) => [channel.commandKey, channel]),
+  );
+
+  liveChannels.forEach((channel) => {
+    byCommandKey.set(channel.commandKey, channel);
+  });
+
+  return Array.from(byCommandKey.values());
 }
 
 function collectNumericEntries(

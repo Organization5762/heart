@@ -33,7 +33,7 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
   const sensorsRef = useRef(sensors);
   const overridesRef = useRef(overrides);
   const sendSensorControlRef = useRef(sendSensorControl);
-  const activeExternalKeysRef = useRef<Set<string>>(new Set());
+  const engagedExternalKeysRef = useRef<Set<string>>(new Set());
   const preferredSensorId = preferredSensorKey
     ? (sensors.find(
         (sensor) => getSensorCommandKey(sensor) === preferredSensorKey,
@@ -72,21 +72,27 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
         ),
       );
       const activeExternalKeys = new Set<string>();
+      const nextEngagedExternalKeys = new Set(engagedExternalKeysRef.current);
       for (const sensor of resolved) {
         const override = overridesRef.current[sensor.id];
         if (!override || override.mode === "live") {
           continue;
         }
-        const sensorKey = getSensorCommandKey(sensor);
-        activeExternalKeys.add(sensorKey);
-        sendSensorControlRef.current(sensorKey, sensor.effectiveValue);
-      }
-      for (const sensorKey of activeExternalKeysRef.current) {
-        if (!activeExternalKeys.has(sensorKey)) {
-          sendSensorControlRef.current(sensorKey, null);
+        for (const sensorKey of sensor.controlKeys) {
+          activeExternalKeys.add(sensorKey);
+          if (sendSensorControlRef.current(sensorKey, sensor.effectiveValue)) {
+            nextEngagedExternalKeys.add(sensorKey);
+          }
         }
       }
-      activeExternalKeysRef.current = activeExternalKeys;
+      for (const sensorKey of engagedExternalKeysRef.current) {
+        if (!activeExternalKeys.has(sensorKey)) {
+          if (sendSensorControlRef.current(sensorKey, null)) {
+            nextEngagedExternalKeys.delete(sensorKey);
+          }
+        }
+      }
+      engagedExternalKeysRef.current = nextEngagedExternalKeys;
 
       setHistory((previous) => {
         const next: Record<string, SensorHistoryPoint[]> = {};
@@ -112,10 +118,10 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
 
   useEffect(
     () => () => {
-      for (const sensorKey of activeExternalKeysRef.current) {
+      for (const sensorKey of engagedExternalKeysRef.current) {
         sendSensorControlRef.current(sensorKey, null);
       }
-      activeExternalKeysRef.current = new Set();
+      engagedExternalKeysRef.current = new Set();
     },
     [],
   );

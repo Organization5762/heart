@@ -6,12 +6,18 @@ import { PeripheralSensorDeck } from "@/components/peripheral-sensor-deck";
 const simulationState = vi.hoisted(() => {
   const selectedSensor = {
     id: "dpad / payload.x",
+    commandKey: "dpad:payload.x",
+    controlKeys: ["dpad:payload.x"],
     peripheralId: "dpad",
+    peripheralLabel: "dpad",
     label: "dpad / payload.x",
+    leafLabel: "x",
     path: "payload.x",
+    pathSegments: ["payload", "x"],
     value: 1,
     rawValue: 1,
     displayValue: "1.000",
+    hasLiveValue: true,
     updatedAt: 0,
     tags: [],
     source: "live" as const,

@@ -91,9 +91,9 @@ type SensorMatch =
     };
 
 export function getSensorCommandKey(
-  sensor: Pick<ResolvedSensorChannel, "path" | "peripheralId">,
+  sensor: Pick<ResolvedSensorChannel, "commandKey" | "path" | "peripheralId">,
 ) {
-  return `${sensor.peripheralId}:${sensor.path}`;
+  return sensor.commandKey ?? `${sensor.peripheralId}:${sensor.path}`;
 }
 
 export function getCommandSuggestions(
