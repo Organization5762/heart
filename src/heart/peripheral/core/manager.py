@@ -7,6 +7,7 @@ from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.input import (AccelerometerController,
                                          AccelerometerDebugProfile,
+                                         ExternalSensorHub,
                                          FrameTickController,
                                          GamepadController, InputDebugTap,
                                          KeyboardController,
@@ -46,6 +47,7 @@ class PeripheralManager:
         self._frame_tick_controller = FrameTickController(self._debug_tap)
         self._keyboard_controller = KeyboardController(self._debug_tap)
         self._gamepad_controller = GamepadController(self, self._debug_tap)
+        self._external_sensor_hub = ExternalSensorHub(self._debug_tap)
         self._navigation_profile = NavigationProfile(
             keyboard_controller=self._keyboard_controller,
             gamepad_controller=self._gamepad_controller,
@@ -60,6 +62,7 @@ class PeripheralManager:
             keyboard_controller=self._keyboard_controller,
             frame_tick_controller=self._frame_tick_controller,
             debug_tap=self._debug_tap,
+            external_sensor_hub=self._external_sensor_hub,
         )
         self._mandelbrot_control_profile = MandelbrotControlProfile(
             keyboard_controller=self._keyboard_controller,
@@ -161,6 +164,10 @@ class PeripheralManager:
     @property
     def navigation_profile(self) -> NavigationProfile:
         return self._navigation_profile
+
+    @property
+    def external_sensor_hub(self) -> ExternalSensorHub:
+        return self._external_sensor_hub
 
     @property
     def accelerometer_controller(self) -> AccelerometerController:

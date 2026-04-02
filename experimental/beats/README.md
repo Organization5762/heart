@@ -5,6 +5,14 @@
 This README documents how the Beats experimental UI expresses visual hierarchy so
 contributors can make consistent layout and styling decisions.
 
+## Component previews
+
+Use Storybook to inspect components without launching the Electron shell.
+
+- Run `npm install --package-lock=false` if dependencies are not installed.
+- Run `npm run storybook` to start the preview server on port `6006`.
+- Run `npm run build-storybook` to generate a static build for review or CI.
+
 ## Visual hierarchy goals
 
 - Make primary actions and current focus obvious.

@@ -50,7 +50,12 @@ def _select_streamed_device(orientation: Orientation) -> Device | None:
         return None
     from heart.device.beats import StreamedScreen
 
-    return StreamedScreen(orientation=orientation)
+    if orientation.get_type() is not Cube:
+        logger.info(
+            "Forcing Beats streamed device layout to cube sides so the totem atlas stays 4x1. requested_layout=%s",
+            orientation.layout,
+        )
+    return StreamedScreen(orientation=Cube.sides())
 
 
 def _select_isolated_renderer_device(

@@ -62,6 +62,7 @@ class GameLoop:
             self._apply_post_processors(render_surface)
             self.components.display.blit(render_surface, (0, 0))
             pygame.display.flip()
+            self.device.set_screen(self.components.display.screen)
 
     def _apply_post_processors(self, surface: pygame.Surface) -> None:
         post_processors = self.components.game_modes.get_post_processors()

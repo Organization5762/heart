@@ -1,9 +1,13 @@
+import asyncio
 import json
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from heart.device.beats.proto import beats_streaming_pb2
-from heart.device.beats.websocket import (_encode_peripheral_message,
+from heart.device.beats.websocket import (WebSocket,
+                                          _encode_peripheral_message,
+                                          decode_control_message,
                                           decode_stream_envelope)
 from heart.peripheral.core import (Input, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
@@ -93,6 +97,26 @@ class TestInputPayloadEncoding:
         event.ParseFromString(encoded.payload)
         assert event.event_type == payload.event_type
         assert json.loads(event.data_json.decode("utf-8")) == payload.data
+
+    def test_encodes_input_payloads_with_frozensets(self) -> None:
+        """Verify Input payloads normalize frozensets into JSON arrays so websocket streaming does not crash on immutable input snapshots."""
+        payload = Input(
+            event_type="peripheral.keyboard.snapshot",
+            data={"pressed_keys": frozenset({3, 1, 2})},
+        )
+
+        encoded = encode_peripheral_payload(payload)
+
+        assert encoded.encoding == PeripheralPayloadEncoding.PROTOBUF
+        message_class = protobuf_registry.get_message_class(
+            PeripheralPayloadType.INPUT_EVENT
+        )
+        assert message_class is not None
+        event = message_class()
+        event.ParseFromString(encoded.payload)
+        assert json.loads(event.data_json.decode("utf-8")) == {
+            "pressed_keys": [1, 2, 3]
+        }
 
 
 class TestPeripheralPayloadDecoding:
@@ -188,3 +212,155 @@ class TestStreamEnvelopeDecoding:
         assert payload.peripheral_info == source.peripheral_info
         assert isinstance(payload.data, beats_streaming_pb2.Frame)
         assert payload.data == message
+
+
+class TestControlMessageDecoding:
+    """Validate control-message parsing so Beats can send runtime commands over the websocket."""
+
+    def test_decodes_browse_control_messages(self) -> None:
+        """Verify JSON control envelopes decode into browse commands so panel navigation can reach Heart."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "browse",
+                    "browse_step": -1,
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "browse"
+        assert decoded.browse_step == -1
+
+    def test_rejects_unknown_control_messages(self) -> None:
+        """Verify malformed or unsupported control payloads are ignored so random websocket traffic does not trigger navigation."""
+        assert decode_control_message('{"kind":"control","command":"bogus"}') is None
+
+    def test_decodes_sensor_update_control_messages(self) -> None:
+        """Verify sensor control payloads decode into keyed numeric updates so Beats can stream external sensor values into Heart."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "sensor_update",
+                    "sensor_key": "accelerometer:debug:z",
+                    "sensor_value": 12.5,
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "sensor_update"
+        assert decoded.sensor_key == "accelerometer:debug:z"
+        assert decoded.sensor_value == 12.5
+        assert decoded.clear is False
+
+
+class TestWebSocketReplayCache:
+    """Verify replay caching so reconnecting Beats clients immediately recover current stream state."""
+
+    def test_replays_latest_frame_and_latest_peripheral_state(self) -> None:
+        """Verify replay keeps the newest frame and newest payload per peripheral so reconnects recover without waiting for fresh traffic."""
+        websocket = object.__new__(WebSocket)
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+
+        websocket._cache_replay_frame(
+            kind="frame",
+            payload=b"old-frame",
+            frame_bytes=b"old-frame",
+        )
+        websocket._cache_replay_frame(
+            kind="frame",
+            payload=b"latest-frame",
+            frame_bytes=b"latest-frame",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="switch-1"),
+                data={"pressed": False},
+            ),
+            frame_bytes=b"switch-1-old",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="switch-1"),
+                data={"pressed": True},
+            ),
+            frame_bytes=b"switch-1-latest",
+        )
+        websocket._cache_replay_frame(
+            kind="peripheral",
+            payload=PeripheralMessageEnvelope(
+                peripheral_info=PeripheralInfo(id="sensor-1"),
+                data={"x": 1},
+            ),
+            frame_bytes=b"sensor-1-latest",
+        )
+
+        assert websocket._replay_frames() == (
+            b"latest-frame",
+            b"switch-1-latest",
+            b"sensor-1-latest",
+        )
+
+
+class TestWebSocketDisconnectHandling:
+    """Validate disconnect handling so expected client drops do not surface as server errors."""
+
+    def test_handler_ignores_disconnect_during_replay_send(self) -> None:
+        """Verify replay send disconnects are treated as normal closure so reconnect churn does not log handler failures."""
+        from websockets.exceptions import ConnectionClosedError
+
+        websocket = object.__new__(WebSocket)
+        websocket.clients = set()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = b"replay-frame"
+        websocket._latest_peripheral_frames = {}
+
+        class _ClosingConnection:
+            async def send(self, _frame: bytes) -> None:
+                raise ConnectionClosedError(
+                    None,
+                    None,
+                )
+
+            async def wait_closed(self) -> None:
+                raise AssertionError("wait_closed should not run after replay disconnect")
+
+        connection = _ClosingConnection()
+        asyncio.run(websocket._handle_client(connection))
+        assert connection not in websocket.clients
+
+    def test_handler_dispatches_control_messages(self) -> None:
+        """Verify client websocket messages reach the registered control handler so Beats can drive navigation remotely."""
+        websocket = object.__new__(WebSocket)
+        websocket.clients = set()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+        received = []
+        websocket._control_handler = received.append
+
+        class _Connection:
+            def __aiter__(self):
+                async def iterator():
+                    yield json.dumps(
+                        {
+                            "kind": "control",
+                            "command": "activate",
+                        }
+                    )
+
+                return iterator()
+
+            async def send(self, _frame: bytes) -> None:
+                return None
+
+        asyncio.run(websocket._handle_client(_Connection()))
+
+        assert [message.command for message in received] == ["activate"]

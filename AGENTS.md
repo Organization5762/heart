@@ -5,13 +5,14 @@
 Use the tooling in this repository to manage environments. Prefer `uv` for Python dependency resolution.
 
 - Pin prerelease Python dependencies with exact versions in `pyproject.toml` so `uv.lock` resolves the intended alpha or beta release.
+- `experimental/beats` test and lint commands require that workspace's Node dependencies to be installed first; `npm exec` alone is not enough because the Vite/Vitest config imports project-local plugins such as `@vitejs/plugin-react`.
+- When `experimental/beats/package-lock.json` is out of sync with `package.json`, `npm ci` will fail; use `npm install --package-lock=false` for local validation unless the task explicitly includes repairing the lockfile, and use `npm install` when the task does include resyncing the lockfile.
 - Scene and asset bootstrap can run before `pygame.display.set_mode`; avoid unconditional `convert()` or `convert_alpha()` calls in asset constructors and defer display-dependent conversion until a surface exists.
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
-- Flowtoys Connect Bridge work should treat CircuitPython on `feather_nrf52840_express` as schema-only; use native firmware for actual proprietary radio capture.
-- For Feather-targeted FlowToy receive work, prefer the internal `nRF52840` radio via `nrf_to_nrf` as the experimental hardware path, and keep the host-side serial schema compatible with the existing `flowtoy_bridge` contract.
-- When a driver needs native firmware flashing, declare the Arduino sketch metadata in `settings.toml` and use `update-driver --mode auto` with the driver's configured default mode instead of ad-hoc flashing steps.
+- Vite `.mts` configs that are shared with Storybook or other native-ESM tooling must derive `__dirname` via `fileURLToPath(new URL(".", import.meta.url))` instead of relying on the CommonJS global.
+- Beats websocket protobuf decoders must accept both snake_case and camelCase field names from `protobufjs` decode output so streamed frame rendering does not depend on field-name normalization details.
 
 ## Formatting
 
@@ -42,6 +43,8 @@ Run `make format` before committing changes. This applies Ruff fixes, isort, Bla
 - When reading or writing text files, specify an explicit encoding (prefer `utf-8`) to keep behavior consistent across platforms.
 - Use module-level constants for public constructor or function default values so shared configuration is easy to discover and adjust.
 - When parsing PATH-like environment variables, strip whitespace from each entry and ignore empty values before converting to `Path` objects.
+- When a renderer only forwards `builder.observable(peripheral_manager)`, omit the `state_observable()` override and rely on `StatefulBaseRenderer`.
+- Keep post-processors lifecycle-local; avoid provider/state dataclass scaffolding unless the post-processor actually subscribes to streams.
 - Use module-level constants for default argument values and shared string literals in firmware helpers so configuration stays consistent.
 - Keep mixed PyO3 packages in a `rust/<package>/` layout with the Rust crate in `src/`, Python shims in `python/<package>/`, and a private native submodule exposed via `tool.maturin.module-name` to avoid import ambiguity.
 - PyO3 stub-generation binaries require a linkable Python 3.11 runtime in addition to Rust; if `cargo run --bin stub_gen` fails with unresolved `Py*` symbols, install or point PyO3 at a Python 3.11 build before retrying.
@@ -115,6 +118,52 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding Arduino-native `update-driver` support, FlowToy bridge Arduino metadata, and native flashing tests.
 - `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
 - `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/beats-shell.tsx src/components/app-sidebar.tsx src/routes/index.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/beats-shell.tsx src/components/app-sidebar.tsx src/routes/index.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts src/tests/unit/actions/ws/protocol.test.ts src/tests/unit/components/peripheral-sensor-deck.test.tsx`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/beats-shell.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/beats-shell.tsx src/routes/index.tsx src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/peripherals/peripheral_snapshots.tsx src/styles/global.css`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/beats-shell.tsx src/routes/index.tsx src/layouts/base-layout.tsx src/components/app-sidebar.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/peripherals/peripheral_snapshots.tsx`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/ws/providers/PeripheralEventsProvider.tsx src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/actions/ws/providers/PeripheralEventsProvider.tsx src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
+- `2026-03-31`: `experimental/beats: npm run test -- --run src/tests/unit/actions/ws/peripheral_events_provider.test.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/app-sidebar.tsx src/components/usgc.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/app-sidebar.tsx src/components/usgc.tsx`
+- `2026-03-31`: No tests run after restacking the Beats sidebar `Program` and `Signal` metadata rows because the change was limited to presentational layout in existing React components.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/peripheral-sensor-deck.tsx src/tests/unit/components/peripheral-sensor-deck.test.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/peripheral-sensor-deck.test.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/actions/ws/protocol.ts src/tests/unit/actions/ws/protocol.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/actions/ws/protocol.test.ts src/tests/unit/actions/ws/websocket.test.tsx`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/routes/index.tsx src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/routes/index.tsx src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/components/ui/peripherals/generic_sensor.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/ui/peripherals/generic_sensor.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/sensor-command-terminal.tsx src/components/sensor-lab-panel.tsx src/components/stream.tsx src/features/stream-console/terminal-commands.ts src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm run test -- src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/terminal-commands.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/layouts/base-layout.tsx src/styles/global.css src/components/usgc.tsx src/components/stream.tsx`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/layouts/base-layout.tsx src/components/usgc.tsx src/components/stream.tsx`
+- `2026-03-31`: `rg -n "Sitemap|siteMap|usgc-ascii-map" experimental/beats/src/routes/index.tsx` returned no matches after removing the Beats home-page sitemap.
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx` could not run because this worktree does not currently have `experimental/beats/node_modules` installed.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/components/usgc.tsx src/routes/index.tsx` failed because this worktree does not currently have `experimental/beats/node_modules`.
+- `2026-03-31`: `pytest tests/device/test_beats_websocket.py`
+- `2026-03-31`: `cd experimental/beats && npm install`
+- `2026-03-31`: `cd experimental/beats && npm ci`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npx prettier --write .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx README.md package.json tsconfig.json vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npx eslint .storybook/main.ts .storybook/preview.tsx src/components/ui/button.stories.tsx src/components/stream-cube.stories.tsx vite.renderer.config.mts vite.main.config.mts`
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `cd experimental/beats && npm run build-storybook`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache .venv/bin/pytest tests/peripheral/test_input_core.py tests/navigation/test_game_modes.py`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make format`
+- `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/15a4/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format` after removing `BaseRenderer`, the `AtomicBaseRenderer.process()` compatibility path, and the unused renderer `warmup` flag.
@@ -214,6 +263,36 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding the Feather-targeted receive-only FlowToy radio bridge schema, driver harness, and manual nRF24 sketch.
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/event_list.tsx src/actions/peripherals/peripheral_snapshots.tsx src/actions/peripherals/peripheral_tree.tsx src/actions/ws/providers/ImageProvider.tsx src/actions/ws/providers/PeripheralEventsProvider.tsx src/actions/ws/providers/PeripheralProvider.tsx src/components/app-sidebar.tsx src/components/stream-cube.tsx src/components/stream.tsx src/components/ui/button.tsx src/components/ui/input.tsx src/components/ui/peripherals/accelerometer.tsx src/components/ui/peripherals/rotary_button.tsx src/components/ui/peripherals/uwb_positioning.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/components/usgc.tsx src/hooks/use-mobile.ts src/layouts/base-layout.tsx src/renderer.ts src/routes/index.tsx src/routes/mission-control/index.tsx src/routes/peripherals/connected.tsx src/routes/peripherals/events.tsx src/routes/peripherals/snapshots.tsx src/styles/global.css src/types.d.ts tsconfig.json`
+- `2026-03-31`: `experimental/beats: npm run lint`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/tsc --noEmit`
+- `2026-03-31`: `experimental/beats: npm run test -- --passWithNoTests` (no Vitest files matched)
+- `2026-03-31`: No validation run after updating `experimental/beats/src/features/stream-console/scene-config.ts` to keep the Current Stream cube fixed by default and slightly increase the default camera distance; these were small config-only changes.
+- `2026-03-31`: `cd experimental/beats && npm ci` failed because `experimental/beats/package-lock.json` is out of sync with `package.json`.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npm run format:write`
+- `2026-03-31`: `cd experimental/beats && npx eslint src/components/stream-cube.tsx src/components/stream.tsx src/tests/unit/components/stream.test.tsx src/tests/unit/setup.ts`
+- `2026-03-31`: `cd experimental/beats && npm run lint` still fails because of pre-existing errors in `src/actions/ws/providers/PeripheralEventsProvider.tsx`, `src/actions/ws/providers/PeripheralProvider.tsx`, `src/components/ui/sidebar.tsx`, `src/hooks/use-mobile.ts`, and `src/layouts/base-layout.tsx`.
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/eslint src/actions/peripherals/peripheral_tree.tsx src/components/peripheral-sensor-deck.tsx src/components/ui/peripherals/generic_sensor.tsx src/routes/peripherals/connected.tsx src/tests/unit/components/generic_sensor.test.ts`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/generic_sensor.test.ts src/tests/unit/components/stream.test.tsx`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/535d/heart/.uv-cache make test`
+- `2026-03-31`: `npm install` in `experimental/beats` to resync `package-lock.json` after `npm ci` failed because the lockfile was missing `protobufjs` and related transitive dependencies.
+- `2026-03-31`: `./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/eslint src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/prettier --check src/components/stream.tsx src/components/stream-cube.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/features/stream-console/scene-config.ts src/features/stream-console/sensor-simulation.ts src/features/stream-console/use-sensor-simulation.ts src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `npm run test -- src/tests/unit/features/stream-console/sensor-simulation.test.ts` in `experimental/beats`
+- `2026-03-31`: `./node_modules/.bin/tsc --noEmit` in `experimental/beats` still fails because of pre-existing TypeScript issues in the app and its dependencies, including `@electron-forge/plugin-vite` types, the protobuf `?raw` import declaration, existing route typing drift, and unrelated component typing errors outside the new stream-console files.
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx src/styles/global.css`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/eslint src/components/stream.tsx src/components/scene-plugin-dock.tsx src/components/sensor-lab-panel.tsx src/components/sensor-history-chart.tsx`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/components/stream.test.tsx src/tests/unit/features/stream-console/sensor-simulation.test.ts`
+- `2026-03-31`: `cd experimental/beats && npm install --package-lock=false`
+- `2026-03-31`: `cd experimental/beats && npm run test -- --run src/tests/unit/routes/home.test.ts`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/prettier --check src/routes/index.tsx src/tests/unit/routes/home.test.ts`
 - `2026-03-30`: `.venv/bin/pytest tests/navigation/test_game_modes.py`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/e46a/heart/.uv-cache make test`
@@ -255,3 +334,19 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
 - `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format`
 - `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache make format`
+- `2026-03-31`: `experimental/beats: npm install --package-lock=false`
+- `2026-03-31`: `experimental/beats: ./node_modules/.bin/prettier --write src/components/stream.tsx src/components/stream-console-header.tsx src/components/stream-visual-mixer-panel.tsx src/components/stream-footer-bar.tsx`
+- `2026-03-31`: `experimental/beats: npm run test -- src/tests/unit/components/stream.test.tsx`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/3af3/heart/.uv-cache .venv/bin/pytest tests/device/test_beats_websocket.py tests/runtime/test_peripheral_runtime.py`
+- `2026-03-31`: `npm test -- --run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because `vitest` was not installed in that workspace (`node_modules` missing).
+- `2026-03-31`: `npm exec vitest run src/tests/unit/actions/ws/websocket.test.tsx` in `experimental/beats` failed because the workspace dependencies were not installed, so `@vitejs/plugin-react` could not be resolved from `vitest.config.ts`.
+- `2026-03-31`: `cd experimental/beats && npm run format:write`
+- `2026-03-31`: `cd experimental/beats && npm run lint`
+- `2026-03-31`: `cd experimental/beats && ./node_modules/.bin/tsc --noEmit`
+- `2026-03-31`: `cd experimental/beats && npm run test`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make format`
+- `2026-03-31`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/ef33/heart/.uv-cache make test`
+- `2026-03-31`: `git diff --check` after removing the Beats Mission Control / Phase Sequencer route.
+- `2026-03-31`: `rg -n "mission-control|Mission Control|Phase Sequencer|phase sequencer" experimental/beats/src docs/research` returned no matches after removing the Beats Mission Control / Phase Sequencer route and research notes.
+- `2026-03-31`: No `experimental/beats` formatter, lint, or test run after removing Mission Control / Phase Sequencer because this worktree does not currently have `experimental/beats/node_modules` installed.

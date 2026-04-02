@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamIndexRouteImport } from './routes/stream/index'
-import { Route as MissionControlIndexRouteImport } from './routes/mission-control/index'
+import { Route as PeripheralsSnapshotsRouteImport } from './routes/peripherals/snapshots'
 import { Route as PeripheralsEventsRouteImport } from './routes/peripherals/events'
 import { Route as PeripheralsConnectedRouteImport } from './routes/peripherals/connected'
 
@@ -25,9 +25,9 @@ const StreamIndexRoute = StreamIndexRouteImport.update({
   path: '/stream/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MissionControlIndexRoute = MissionControlIndexRouteImport.update({
-  id: '/mission-control/',
-  path: '/mission-control/',
+const PeripheralsSnapshotsRoute = PeripheralsSnapshotsRouteImport.update({
+  id: '/peripherals/snapshots',
+  path: '/peripherals/snapshots',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeripheralsEventsRoute = PeripheralsEventsRouteImport.update({
@@ -43,50 +43,55 @@ const PeripheralsConnectedRoute = PeripheralsConnectedRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/mission-control': typeof MissionControlIndexRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
+  '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
   '/stream': typeof StreamIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/mission-control': typeof MissionControlIndexRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
+  '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
   '/stream': typeof StreamIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/mission-control/': typeof MissionControlIndexRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
+  '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
   '/stream/': typeof StreamIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/mission-control'
     | '/peripherals/connected'
     | '/peripherals/events'
+    | '/peripherals/snapshots'
     | '/stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mission-control' | '/peripherals/connected' | '/peripherals/events' | '/stream'
+  to:
+    | '/'
+    | '/peripherals/connected'
+    | '/peripherals/events'
+    | '/peripherals/snapshots'
+    | '/stream'
   id:
     | '__root__'
     | '/'
-    | '/mission-control/'
     | '/peripherals/connected'
     | '/peripherals/events'
+    | '/peripherals/snapshots'
     | '/stream/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  MissionControlIndexRoute: typeof MissionControlIndexRoute
   PeripheralsConnectedRoute: typeof PeripheralsConnectedRoute
   PeripheralsEventsRoute: typeof PeripheralsEventsRoute
+  PeripheralsSnapshotsRoute: typeof PeripheralsSnapshotsRoute
   StreamIndexRoute: typeof StreamIndexRoute
 }
 
@@ -99,18 +104,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/mission-control/': {
-      id: '/mission-control/'
-      path: '/mission-control'
-      fullPath: '/mission-control'
-      preLoaderRoute: typeof MissionControlIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/stream/': {
       id: '/stream/'
       path: '/stream'
       fullPath: '/stream'
       preLoaderRoute: typeof StreamIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/peripherals/snapshots': {
+      id: '/peripherals/snapshots'
+      path: '/peripherals/snapshots'
+      fullPath: '/peripherals/snapshots'
+      preLoaderRoute: typeof PeripheralsSnapshotsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/peripherals/events': {
@@ -132,9 +137,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  MissionControlIndexRoute: MissionControlIndexRoute,
   PeripheralsConnectedRoute: PeripheralsConnectedRoute,
   PeripheralsEventsRoute: PeripheralsEventsRoute,
+  PeripheralsSnapshotsRoute: PeripheralsSnapshotsRoute,
   StreamIndexRoute: StreamIndexRoute,
 }
 export const routeTree = rootRouteImport
