@@ -13,7 +13,7 @@ Describe how a `totem run` execution traverses configuration services, the runti
 ## Technical Approach
 
 Represent each execution stage as a node in a Mermaid flowchart. Colour code orchestration components, service layers, inputs, and outputs so reviewers can trace transitions. The diagram captures call sequencing between the CLI, configuration registry, dependency wiring, runtime loop, app routing, peripheral managers, and display drivers. The goal is to surface every point where the runtime crosses a service boundary or hardware interface. Frame composition is split between per-renderer processing (surface preparation, renderer initialization, and frame execution) and composition management (merge-strategy selection plus parallel merge coordination).
-The display section highlights the production Pi 5 scan scheduler, which owns `LAT`, `OE`, row-address selection, PWM dwell scheduling, and resident scan-buffer looping while consuming compact row-pair/bitplane payloads from Rust.
+The display section highlights the backend split inside the RGB device layer: production runs can use the clean-room Pi 5 scan scheduler, while Pi 5 bring-up can opt into a Piomatter-backed simple runtime that still presents the same `submit_rgba()` / canvas API to the rest of Heart.
 
 ## Flow Diagram
 
@@ -69,7 +69,9 @@ flowchart LR
         Capture["Frame Capture\n(share surface)"]
         DeviceBridge["Device Bridge"]
         LedMatrix["LEDMatrix Driver\n(clean-room HUB75 runtime)"]
+        BackendSelector["RGB Backend Selector\n(native or Piomatter)"]
         Pi5ScanScheduler["Pi 5 Scan Scheduler\n(LAT/OE/A-E + PWM loop)"]
+        PiomatterBackend["Piomatter Backend\n(known-good Pi 5 simple path)"]
         AverageMirror["AverageColorLED Peripheral"]
         SingleLED["Single LED Device"]
     end
@@ -85,7 +87,9 @@ flowchart LR
     AppRouter --> NativeSceneBridge --> ModeServices --> RenderPipeline --> CompositionManager --> DisplaySvc
     RenderPipeline --> RendererProcessor --> SurfaceProvider
     DisplaySvc --> LocalScreen
-    DisplaySvc --> Capture --> DeviceBridge --> LedMatrix --> Pi5ScanScheduler
+    DisplaySvc --> Capture --> DeviceBridge --> LedMatrix --> BackendSelector
+    BackendSelector --> Pi5ScanScheduler
+    BackendSelector --> PiomatterBackend
     Capture --> AverageMirror --> SingleLED
 
     Loop --> PeripheralMgr --> RxScheduler
@@ -98,7 +102,7 @@ flowchart LR
     class CLI,Registry,Configurer,ContainerBuilder,RuntimeContainer,NativeSceneBridge,ModeServices,RenderPipeline,RendererProcessor,SurfaceProvider,CompositionManager service;
     class Loop,AppRouter,RenderPacer orchestrator;
     class PeripheralMgr,RxScheduler,Switch,Gamepad,Sensors,HeartRate,PhoneText input;
-    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,Pi5ScanScheduler,AverageMirror,SingleLED output;
+    class DisplaySvc,LocalScreen,Capture,DeviceBridge,LedMatrix,BackendSelector,Pi5ScanScheduler,PiomatterBackend,AverageMirror,SingleLED output;
 ```
 
 ## Rendering Procedure

@@ -26,7 +26,7 @@ implementations and `docs/renderers/base_class_layout.md` for inheritance layout
 
 ## Native Scene Integration
 
-Scene-management code can move into the optional `heart_rust` package, which is wired into
+Scene-management code can move into the optional `heart_rgb_matrix_driver` package, which is wired into
 `heart.navigation.native_scene_manager`. `MultiScene` uses that bridge when the extra is
 installed and falls back to the Python implementation otherwise.
 

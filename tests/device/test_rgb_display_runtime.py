@@ -60,6 +60,32 @@ class FakeDriver:
         self.closed = True
 
 
+@dataclass
+class FakePiomatterGeometry:
+    """Capture Piomatter geometry inputs so backend tests can inspect them directly."""
+
+    width: int
+    height: int
+    n_addr_lines: int
+    rotation: str
+    n_planes: int
+    n_temporal_planes: int
+
+
+class FakePiomatterInstance:
+    """Record Piomatter show calls so backend tests can verify frame presentation plumbing."""
+
+    def __init__(self, colorspace: str, pinout: str, framebuffer: object, geometry: FakePiomatterGeometry) -> None:
+        self.colorspace = colorspace
+        self.pinout = pinout
+        self.framebuffer = framebuffer
+        self.geometry = geometry
+        self.show_calls = 0
+
+    def show(self) -> None:
+        self.show_calls += 1
+
+
 class TestRgbDisplayRuntime:
     """Validate RGB display runtime hooks so the device path can move to the clean-room matrix API safely."""
 
@@ -129,6 +155,39 @@ class TestRgbDisplayRuntime:
             parallel=1,
             color_order="rgb",
         )
+
+    def test_build_matrix_driver_can_select_piomatter_backend(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify runtime selection can build a Piomatter-backed driver explicitly. This matters because Pi 5 bring-up needs a stable known-good backend in-tree while the clean-room transport continues to converge."""
+
+        fake_piomatter_module = SimpleNamespace(
+            Colorspace=SimpleNamespace(RGB888Packed="rgb888"),
+            Geometry=FakePiomatterGeometry,
+            Orientation=SimpleNamespace(Normal="normal"),
+            Pinout=SimpleNamespace(AdafruitMatrixBonnet="bonnet"),
+            PioMatter=FakePiomatterInstance,
+        )
+
+        def fake_optional_import(module_name: str, **_kwargs: object) -> object:
+            if module_name == "adafruit_blinka_raspberry_pi5_piomatter":
+                return fake_piomatter_module
+            raise AssertionError(f"unexpected optional import: {module_name}")
+
+        monkeypatch.setenv("HEART_PANEL_ROWS", "64")
+        monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
+        monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "piomatter")
+        monkeypatch.setattr(
+            "heart.device.rgb_display.runtime.optional_import",
+            fake_optional_import,
+        )
+
+        driver = build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
+
+        assert driver.width == 64
+        assert driver.height == 64
+        stats = driver.stats()
+        assert stats.backend_name == "piomatter"
 
     def test_led_matrix_submits_rgba_surface_bytes(
         self, monkeypatch: pytest.MonkeyPatch

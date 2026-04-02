@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import os
 from types import ModuleType
 from typing import Protocol, cast
 
 from heart.device import Orientation
+from heart.device.rgb_display.piomatter_runtime import (
+    DEFAULT_PIOMATTER_PINOUT, build_piomatter_matrix_driver)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
-MATRIX_RUNTIME_MODULE = "heart_rust"
+MATRIX_RUNTIME_MODULE = "heart_rgb_matrix_driver"
+PIOMATTER_MODULE = "adafruit_blinka_raspberry_pi5_piomatter"
+BACKEND_ENV_VAR = "HEART_RGB_DISPLAY_BACKEND"
+PIOMATTER_BACKEND = "piomatter"
+PIOMATTER_PINOUT_ENV_VAR = "HEART_PIOMATTER_PINOUT"
 
 logger = get_logger(__name__)
 
@@ -44,6 +51,14 @@ class MatrixDriverProtocol(Protocol):
 
 
 def build_matrix_driver(orientation: Orientation) -> MatrixDriverProtocol:
+    backend_name = os.getenv(BACKEND_ENV_VAR, "").strip().lower()
+    if backend_name == PIOMATTER_BACKEND:
+        piomatter_module = _load_piomatter_module()
+        pinout_name = os.getenv(PIOMATTER_PINOUT_ENV_VAR, DEFAULT_PIOMATTER_PINOUT)
+        return cast(
+            MatrixDriverProtocol,
+            build_piomatter_matrix_driver(piomatter_module, orientation, pinout_name),
+        )
     native_module = _load_matrix_runtime_module()
     config = build_matrix_config(native_module, orientation)
     driver_type = getattr(native_module, "MatrixDriver", None)
@@ -77,6 +92,16 @@ def _load_matrix_runtime_module() -> ModuleType:
     if native_module is None:
         raise RuntimeError(
             "The clean-room HUB75 runtime is unavailable. Install the optional "
-            "`heart-rust` package or sync the project with `uv sync --extra native`."
+            "`heart-rgb-matrix-driver` package or sync the project with `uv sync --extra native`."
         )
     return cast(ModuleType, native_module)
+
+
+def _load_piomatter_module() -> ModuleType:
+    piomatter_module = optional_import(PIOMATTER_MODULE, logger=logger)
+    if piomatter_module is None:
+        raise RuntimeError(
+            "The Piomatter backend is unavailable. Install "
+            "`Adafruit-Blinka-Raspberry-Pi5-Piomatter` on the target Pi."
+        )
+    return cast(ModuleType, piomatter_module)

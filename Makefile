@@ -21,7 +21,7 @@ PIO_BENCH_PIPELINE_DEPTH ?= 2
 PIO_BENCH_PWM_BITS ?= 11
 PIO_BENCH_SCAN_CLOCK_DIVIDER ?= 1.0
 PIO_BENCH_SCAN_LSB_DWELL_TICKS ?= 2
-PI5_SCAN_LOOP_MODULE_DIR = rust/heart_rust/kernel/pi5_scan_loop
+PI5_SCAN_LOOP_MODULE_DIR = rust/heart_rgb_matrix_driver/kernel/pi5_scan_loop
 .PHONY: install bootstrap-native debug-matrix-pinctrl test-matrix-pinctrl build-pi5-scan-loop-module install-pi5-scan-loop-module install-pi5-scan-loop-dkms unload-pi5-scan-loop-module bench-matrix-pio-scan test-matrix-pio-scan pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
 
 bootstrap-native:
@@ -51,7 +51,7 @@ unload-pi5-scan-loop-module:
 	@sudo rmmod heart_pi5_scan_loop 2>/dev/null || true
 
 bench-matrix-pio-scan:
-	@cargo run --release --manifest-path rust/heart_rust/Cargo.toml --bin pi5_scan_bench -- \
+	@cargo run --release --manifest-path rust/heart_rgb_matrix_driver/Cargo.toml --bin pi5_scan_bench -- \
 		--frame-count $(PIO_BENCH_FRAME_COUNT) \
 		--pipeline-depth $(PIO_BENCH_PIPELINE_DEPTH) \
 		--panel-rows $(PIO_BENCH_PANEL_ROWS) \

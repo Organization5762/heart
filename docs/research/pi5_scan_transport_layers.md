@@ -14,11 +14,13 @@ from scattered comments and benchmark history.
 
 ## Materials
 
-- [`rust/heart_rust/src/runtime/pi5_scan.rs`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rust/src/runtime/pi5_scan.rs)
-- [`rust/heart_rust/native/pi5_pio_scan_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rust/native/pi5_pio_scan_shim.c)
-- [`rust/heart_rust/native/pi5_scan_loop_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rust/native/pi5_scan_loop_shim.c)
-- [`rust/heart_rust/native/pi5_scan_loop_ioctl.h`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rust/native/pi5_scan_loop_ioctl.h)
-- [`rust/heart_rust/kernel/pi5_scan_loop/heart_pi5_scan_loop.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rust/kernel/pi5_scan_loop/heart_pi5_scan_loop.c)
+- [`rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs)
+- [`rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c)
+- [`rust/heart_rgb_matrix_driver/native/pi5_scan_loop_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_scan_loop_shim.c)
+- [`rust/heart_rgb_matrix_driver/native/pi5_scan_loop_ioctl.h`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_scan_loop_ioctl.h)
+- [`rust/heart_rgb_matrix_driver/kernel/pi5_scan_loop/heart_pi5_scan_loop.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/kernel/pi5_scan_loop/heart_pi5_scan_loop.c)
+- [`src/heart/device/rgb_display/runtime.py`](/Users/lampe/.codex/worktrees/b4c5/heart/src/heart/device/rgb_display/runtime.py)
+- [`src/heart/device/rgb_display/piomatter_runtime.py`](/Users/lampe/.codex/worktrees/b4c5/heart/src/heart/device/rgb_display/piomatter_runtime.py)
 
 ## Packed Protocol
 
@@ -73,6 +75,23 @@ The userspace C shim is the baseline transport:
 
 This path is useful because its behavior is easy to compare against the kernel
 resident loop without involving a second packed format.
+
+### Piomatter simple backend
+
+The repo now also carries a Python-side Piomatter backend for Pi 5 bring-up:
+
+- it is selected explicitly with `HEART_RGB_DISPLAY_BACKEND=piomatter`
+- it preserves Heart's `submit_rgba()` plus canvas API surface
+- it uses Adafruit's known-good Piomatter stack for the actual panel replay
+
+This backend is intentionally boring. It exists so Heart can keep a working
+"simple" path in-tree while the raw rp1-pio transport is still being tuned.
+The transport ladder is therefore:
+
+1. prove behavior in Piomatter
+1. keep a repo-local Piomatter fallback for simple runs
+1. port the same behavior into the clean-room raw rp1-pio path
+1. only then add compaction or resident-loop optimizations
 
 ### Kernel resident loop
 

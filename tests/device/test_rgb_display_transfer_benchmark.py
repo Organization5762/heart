@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 import pytest
 
-heart_rust = pytest.importorskip("heart_rust")
+heart_rgb_matrix_driver = pytest.importorskip("heart_rgb_matrix_driver")
 if not all(
-    hasattr(heart_rust, attribute)
+    hasattr(heart_rgb_matrix_driver, attribute)
     for attribute in ("ColorOrder", "MatrixConfig", "MatrixDriver", "WiringProfile")
 ):
     pytest.skip(
-        "The installed heart_rust package does not expose the clean-room matrix API.",
+        "The installed heart_rgb_matrix_driver package does not expose the clean-room matrix API.",
         allow_module_level=True,
     )
 
@@ -40,7 +40,7 @@ class TestRgbDisplayTransferBenchmark:
                 panel_cols=32,
                 chain_length=1,
                 parallel=1,
-                color_order=heart_rust.ColorOrder.RGB,
+                color_order=heart_rgb_matrix_driver.ColorOrder.RGB,
             ),
             BenchmarkCase(
                 label="64x64_rgb",
@@ -48,7 +48,7 @@ class TestRgbDisplayTransferBenchmark:
                 panel_cols=64,
                 chain_length=1,
                 parallel=1,
-                color_order=heart_rust.ColorOrder.RGB,
+                color_order=heart_rgb_matrix_driver.ColorOrder.RGB,
             ),
             BenchmarkCase(
                 label="128x64_gbr",
@@ -56,7 +56,7 @@ class TestRgbDisplayTransferBenchmark:
                 panel_cols=64,
                 chain_length=2,
                 parallel=1,
-                color_order=heart_rust.ColorOrder.GBR,
+                color_order=heart_rgb_matrix_driver.ColorOrder.GBR,
             ),
         ],
         ids=lambda case: case.label,
@@ -66,15 +66,15 @@ class TestRgbDisplayTransferBenchmark:
     ) -> None:
         """Benchmark Python-to-Rust `submit_rgba` for representative panel layouts. This matters because the PyO3 bridge must stay cheap enough that frame transfer does not dominate runtime work."""
 
-        config = heart_rust.MatrixConfig(
-            wiring=heart_rust.WiringProfile.AdafruitHatPwm,
+        config = heart_rgb_matrix_driver.MatrixConfig(
+            wiring=heart_rgb_matrix_driver.WiringProfile.AdafruitHatPwm,
             panel_rows=case.panel_rows,
             panel_cols=case.panel_cols,
             chain_length=case.chain_length,
             parallel=case.parallel,
             color_order=case.color_order,
         )
-        driver = heart_rust.MatrixDriver(config)
+        driver = heart_rgb_matrix_driver.MatrixDriver(config)
         frame = bytes(index % 251 for index in range(driver.width * driver.height * 4))
 
         def submit_frame() -> None:

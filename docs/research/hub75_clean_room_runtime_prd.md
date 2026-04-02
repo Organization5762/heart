@@ -2,21 +2,20 @@
 
 ## Materials
 
-- `rust/heart_rust/src/lib.rs`
-- `rust/heart_rust/src/runtime/backend.rs`
-- `rust/heart_rust/src/runtime/config.rs`
-- `rust/heart_rust/src/runtime/driver.rs`
-- `rust/heart_rust/src/runtime/frame.rs`
-- `rust/heart_rust/src/runtime/queue.rs`
-- `rust/heart_rust/src/runtime/scene.rs`
-- `rust/heart_rust/src/runtime/stats.rs`
-- `rust/heart_rust/bench/matrix_transfer.rs`
-- `rust/heart_rust/bench/pi5_scan_bench.rs`
-- `rust/heart_rust/native/pi5_pio_scan_shim.c`
-- `rust/heart_rust/src/runtime/pi5_scan.rs`
+- `rust/heart_rgb_matrix_driver/src/lib.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/backend.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/config.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/driver.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/frame.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/queue.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/scene.rs`
+- `rust/heart_rgb_matrix_driver/src/runtime/stats.rs`
+- `rust/heart_rgb_matrix_driver/bench/matrix_transfer.rs`
+- `rust/heart_rgb_matrix_driver/bench/pi5_scan_bench.rs`
+- `rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c`
+- `rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs`
 - `src/heart/device/rgb_display/device.py`
 - `src/heart/device/rgb_display/runtime.py`
-- `src/heart/device/rgb_display/worker.py`
 - `src/heart/device/selection.py`
 - `src/heart/utilities/env/config.py`
 - `tests/device/test_rgb_display_runtime.py`
@@ -45,7 +44,7 @@
 
 ### Architecture Overview
 
-- Introduce a Rust-owned HUB75 runtime with a single public package surface exposed to Python through the existing `heart_rust` pattern.
+- Introduce a Rust-owned HUB75 runtime with a single public package surface exposed to Python through the existing `heart_rgb_matrix_driver` pattern.
 - Split the Rust core into focused modules for config validation, frame management, queueing, stats, backend selection, and the PyO3 bridge so performance work stays isolated from the Python API layer.
 - Keep the Python side narrow:
   - create a `MatrixConfig`
@@ -53,7 +52,7 @@
   - submit RGBA frames
   - close the driver
 - Move all panel scan timing, bitplane generation, row scheduling, latch timing, blanking, and hardware-specific output into Rust.
-- Replace the Python `MatrixDisplayWorker` with a Rust-owned render worker so Heart no longer depends on canvas-like methods such as `CreateFrameCanvas()` or `SwapOnVSync()`.
+- Keep production scanout out of transient Python worker wrappers so Heart does not depend on canvas-like methods such as `CreateFrameCanvas()` or `SwapOnVSync()` any more than necessary.
 
 ### Current Runtime Contract
 
@@ -301,7 +300,7 @@ Implementation rule:
 - On overflow:
   - discard the oldest queued frame
   - keep the latest submitted frame
-- This matches the current Python `MatrixDisplayWorker` behavior in `src/heart/device/rgb_display/worker.py`.
+- This matches the former Python `MatrixDisplayWorker` behavior that preceded the clean-room runtime queue.
 
 #### Internal Representation
 
@@ -531,11 +530,11 @@ Piomatter reference decisions:
 
 Current implementation status in Heart:
 
-- `rust/heart_rust/src/runtime/pi5_scan.rs` now builds the production Pi 5 scan schedule for `parallel=1`, including row-address stepping, `LAT`, `OE`, PWM dwell scheduling, and continuous scan looping against the active frame buffer.
+- `rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs` now builds the production Pi 5 scan schedule for `parallel=1`, including row-address stepping, `LAT`, `OE`, PWM dwell scheduling, and continuous scan looping against the active frame buffer.
 - The packed scan format now uses compact row-pair / bitplane groups so the host sends one blank row word, one pixel-count word, width pixel words, one latch word, one active row word, and one dwell counter word per group instead of a longer command stream.
-- `rust/heart_rust/native/pi5_pio_scan_shim.c` now drives that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
+- `rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c` now drives that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
 - The async transport now keeps a resident packed scan buffer active on the Pi 5 path and continuously replays it until a newer packed frame arrives, so unchanged images can continue refreshing without repeated repacking or resubmission from Heart.
-- `rust/heart_rust/bench/pi5_scan_bench.rs` benchmarks the production Pi 5 scan path and reports both transport timings and derived scan-schedule metrics.
+- `rust/heart_rgb_matrix_driver/bench/pi5_scan_bench.rs` benchmarks the production Pi 5 scan path and reports both transport timings and derived scan-schedule metrics.
 - The current production Pi 5 scan transport is DMA-fed through the raw `rp1-pio` ioctl path, but the measured `stream` timing still tracks submission and drain completion more directly than visible panel dwell.
 - Because the Adafruit bonnet pin map is sparse, the compact format reduces per-group control overhead more than per-column payload size; the current production win is lower command overhead, not a radical reduction in pixel-shift bytes.
 
@@ -545,11 +544,9 @@ Python integration changes:
 
 - `src/heart/device/rgb_display/device.py`
   - replace `from rgbmatrix import RGBMatrix, RGBMatrixOptions`
-  - create `heart_rust.MatrixConfig`
-  - create `heart_rust.MatrixDriver`
+  - create `heart_rgb_matrix_driver.MatrixConfig`
+  - create `heart_rgb_matrix_driver.MatrixDriver`
   - pass `pygame.image.tostring()` bytes directly into `submit_rgba()`
-- `src/heart/device/rgb_display/worker.py`
-  - remove from the production path once the Rust worker is ready
 - `src/heart/device/selection.py`
   - keep the existing Pi detection and warning behavior, but switch to selecting the Rust driver
 

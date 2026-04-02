@@ -1,0 +1,68 @@
+[package]
+name = "heart_rgb_matrix_driver"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "heart_rgb_matrix_driver"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python-extension = ["pyo3/extension-module"]
+stubgen = ["dep:pyo3-stub-gen"]
+
+[dependencies]
+heart_pio_sim = { path = "../heart_pio_sim" }
+pyo3 = { version = "0.28.2", features = ["abi3-py311"] }
+pyo3-stub-gen = { version = "0.15.0", optional = true }
+rayon = "1.11.0"
+
+[build-dependencies]
+cc = "1.2.19"
+
+[dev-dependencies]
+criterion = "0.7.0"
+
+[[bin]]
+name = "pi5_scan_bench"
+path = "bench/pi5_scan_bench.rs"
+
+[[bin]]
+name = "pi5_scan_trace_diff"
+path = "bench/pi5_scan_trace_diff.rs"
+
+[[bin]]
+name = "pi5_scan_pio_audit"
+path = "bench/pi5_scan_pio_audit.rs"
+
+[[bin]]
+name = "pi5_pio_smoke"
+path = "bench/pi5_pio_smoke.rs"
+
+[[bin]]
+name = "pi5_pio_sim_trace"
+path = "bench/pi5_pio_sim_trace.rs"
+
+[[bin]]
+name = "pi5_pio_hello"
+path = "bench/pi5_pio_hello.rs"
+
+[[bin]]
+name = "pi5_pio_hub75_probe"
+path = "bench/pi5_pio_hub75_probe.rs"
+
+[[bin]]
+name = "pi5_pio_checkpoint_demo"
+path = "bench/pi5_pio_checkpoint_demo.rs"
+
+[[bin]]
+name = "stub_gen"
+path = "src/bin/stub_gen.rs"
+required-features = ["stubgen"]
+
+[[bench]]
+name = "matrix_transfer"
+harness = false
+path = "bench/matrix_transfer.rs"

@@ -30,7 +30,7 @@ class TestRgbDisplayPi5ScanBenchmark:
                 "run",
                 "--release",
                 "--manifest-path",
-                "rust/heart_rust/Cargo.toml",
+                "rust/heart_rgb_matrix_driver/Cargo.toml",
                 "--bin",
                 "pi5_scan_bench",
                 "--",
