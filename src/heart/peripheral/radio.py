@@ -376,6 +376,9 @@ class RadioPeripheral(Peripheral[RadioPacket]):
     ) -> None:
         super().__init__()
         self._driver = driver
+        from heart.device.flowtoy import FlowToyBridgeClient
+
+        self._flowtoy_client = FlowToyBridgeClient(driver=driver)
         self._stop_event = threading.Event()
         self._latest_packet: RawRadioPacket | None = None
         self._packet_subject: Subject[RadioPacket] = Subject()
@@ -484,20 +487,22 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             self.set_flow_toy_global_config(key=key, value=value)
 
     def send_raw_command(self, command: str) -> None:
-        self._driver.send_raw_command(command)
+        self._flowtoy_client.send_raw_command(command)
 
     def sync_flow_toys(self, *, timeout_seconds: float = 0.0) -> None:
-        self.send_raw_command(f"s{timeout_seconds:g}")
+        self._flowtoy_client.sync(timeout_seconds=timeout_seconds)
 
     def stop_flow_toy_sync(self) -> None:
-        self.send_raw_command("S")
+        self._flowtoy_client.stop_sync()
 
     def reset_flow_toy_sync(self) -> None:
-        self.send_raw_command("a")
+        self._flowtoy_client.reset_sync()
 
     def wake_flow_toys(self, *, group_id: int = 0, group_is_public: bool = False) -> None:
-        prefix = "W" if group_is_public else "w"
-        self.send_raw_command(f"{prefix}{int(group_id)}")
+        self._flowtoy_client.wake(
+            group_id=group_id,
+            group_is_public=group_is_public,
+        )
 
     def power_off_flow_toys(
         self,
@@ -505,14 +510,16 @@ class RadioPeripheral(Peripheral[RadioPacket]):
         group_id: int = 0,
         group_is_public: bool = False,
     ) -> None:
-        prefix = "Z" if group_is_public else "z"
-        self.send_raw_command(f"{prefix}{int(group_id)}")
+        self._flowtoy_client.power_off(
+            group_id=group_id,
+            group_is_public=group_is_public,
+        )
 
     def set_flow_toy_pattern(self, pattern: FlowToyPattern) -> None:
-        self.send_raw_command(pattern.to_serial_command())
+        self._flowtoy_client.set_pattern(pattern)
 
     def set_flow_toy_wifi(self, *, ssid: str, password: str) -> None:
-        self.send_raw_command(f"n{ssid},{password}")
+        self._flowtoy_client.set_wifi(ssid=ssid, password=password)
 
     def set_flow_toy_global_config(self, *, key: str, value: int = 2) -> None:
-        self.send_raw_command(f"g{key},{int(value)}")
+        self._flowtoy_client.set_global_config(key=key, value=value)

@@ -13,6 +13,8 @@ run on the hardware we have: `feather_nrf52840_express`.
 
 - Host-side radio transport in [src/heart/peripheral/radio.py](../../src/heart/peripheral/radio.py)
 - Host-side FlowToy peripheral in [src/heart/peripheral/flowtoy.py](../../src/heart/peripheral/flowtoy.py)
+- FlowToy bridge client and output device in [src/heart/device/flowtoy.py](../../src/heart/device/flowtoy.py)
+- Stream-oriented output messages in [src/heart/device/output.py](../../src/heart/device/output.py)
 - FlowToy payload helper in [src/heart/peripheral/input_payloads/flowtoy.py](../../src/heart/peripheral/input_payloads/flowtoy.py)
 - Payload normalization helper in [src/heart/peripheral/input_payloads/radio.py](../../src/heart/peripheral/input_payloads/radio.py)
 - FlowToy packet matcher in [packages/heart-firmware-io/src/heart_firmware_io/flowtoy.py](../../packages/heart-firmware-io/src/heart_firmware_io/flowtoy.py)
@@ -66,10 +68,15 @@ concerns:
 | `wake_flow_toys(group_id, group_is_public)` | `w...` / `W...` | Uppercase targets public groups. |
 | `power_off_flow_toys(group_id, group_is_public)` | `z...` / `Z...` | Uppercase targets public groups. |
 | `set_flow_toy_pattern(pattern)` | `p...` / `P...` | Encodes the 13-field pattern payload expected by the bridge. |
+| `set_flow_toy_wifi(ssid, password)` | `n<ssid>,<password>` | Updates bridge Wi-Fi credentials over the serial bus. |
+| `set_flow_toy_global_config(key, value)` | `g<key>,<value>` | Updates bridge global config values exposed by the firmware. |
 
 ## Implementation note
 
 The current Heart integration deliberately stops at the serial bridge boundary.
 It does not make the host process speak raw radio. If the firmware path changes
 later, `RadioDriver` remains the seam to swap while keeping the transport and
-FlowToy peripheral APIs stable.
+FlowToy peripheral APIs stable. The host now also has a dedicated
+`FlowToyBridgeClient` so packet capture and serial writeback can share one
+canonical bridge command surface instead of scattering string assembly across
+peripherals and stream outputs.

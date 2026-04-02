@@ -7,6 +7,7 @@ from PIL import Image
 
 from heart.device import Device
 from heart.device.beats.websocket import WebSocket
+from heart.device.output import OutputMessage, dispatch_output
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 
 STREAMED_SCREEN_SCALE_FACTOR = 4
@@ -50,7 +51,4 @@ class StreamedScreen(Device):
         image.save(buf, format="PNG")
         frame_bytes = buf.getvalue()
 
-        self.websocket.send(
-            kind="frame",
-            payload=frame_bytes,
-        )
+        dispatch_output(self.websocket, OutputMessage.frame(frame_bytes))

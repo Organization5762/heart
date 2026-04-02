@@ -1,6 +1,7 @@
 import asyncio
 import atexit
 import json
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -13,6 +14,7 @@ from heart.device.beats.proto import \
     beats_streaming_pb2 as _beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
+from heart.device.output import OutputDevice, OutputMessage, OutputMessageKind
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadDecodingError,
@@ -32,6 +34,11 @@ CONTROL_COMMAND_BROWSE = "browse"
 CONTROL_COMMAND_ACTIVATE = "activate"
 CONTROL_COMMAND_ALTERNATE = "alternate_activate"
 CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
+
+
+def _logging_stream_closed() -> bool:
+    stream = sys.stderr
+    return stream is None or getattr(stream, "closed", False)
 
 
 @dataclass(frozen=True)
@@ -200,7 +207,7 @@ def _peripheral_cache_key(envelope: PeripheralMessageEnvelope[Any]) -> str:
 
 
 @dataclass
-class WebSocket:
+class WebSocket(OutputDevice):
     clients: set[Any] = field(default_factory=set, init=False)
 
     _instance = None
@@ -285,11 +292,27 @@ class WebSocket:
                     )
                     await self._server.wait_closed()
                 except OSError:
+                    if sys.is_finalizing() or _logging_stream_closed():
+                        break
                     logger.exception(
                         "Beats websocket server failed to start; retrying in %.1fs",
                         WEBSOCKET_RETRY_DELAY_SECONDS,
                     )
+                except RuntimeError as error:
+                    if "cannot schedule new futures after shutdown" in str(error):
+                        logger.debug(
+                            "Stopping Beats websocket server during interpreter shutdown."
+                        )
+                        break
+                    if sys.is_finalizing() or _logging_stream_closed():
+                        break
+                    logger.exception(
+                        "Beats websocket server stopped unexpectedly; retrying in %.1fs",
+                        WEBSOCKET_RETRY_DELAY_SECONDS,
+                    )
                 except Exception:
+                    if sys.is_finalizing() or _logging_stream_closed():
+                        break
                     logger.exception(
                         "Beats websocket server stopped unexpectedly; retrying in %.1fs",
                         WEBSOCKET_RETRY_DELAY_SECONDS,
@@ -334,11 +357,15 @@ class WebSocket:
             return
         self._control_handler(control_message)
 
-    def send(self, kind: str, payload: object) -> None:
-        frame_bytes = self._encode_payload(kind=kind, payload=payload)
+    def emit(self, message: OutputMessage) -> None:
+        frame_bytes = self._encode_message(message)
         if frame_bytes is None:
             return
-        self._cache_replay_frame(kind=kind, payload=payload, frame_bytes=frame_bytes)
+        self._cache_replay_frame(
+            kind=message.kind,
+            payload=message.payload,
+            frame_bytes=frame_bytes,
+        )
         if self._broadcast_queue is None or self._loop is None:
             return
         if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.ERROR:
@@ -357,14 +384,25 @@ class WebSocket:
                 self._enqueue_frame, frame_bytes, self._broadcast_queue
             )
 
+    def send(self, kind: str, payload: object) -> None:
+        try:
+            message_kind = OutputMessageKind(kind)
+        except ValueError:
+            logger.warning("Unknown websocket payload kind: %s.", kind)
+            return
+        self.emit(OutputMessage(kind=message_kind, payload=payload))
+
     def _cache_replay_frame(
-        self, *, kind: str, payload: object, frame_bytes: bytes
+        self, *, kind: OutputMessageKind, payload: object, frame_bytes: bytes
     ) -> None:
         with self._replay_lock:
-            if kind == "frame":
+            if kind == OutputMessageKind.FRAME:
                 self._latest_frame = frame_bytes
                 return
-            if kind == "peripheral" and isinstance(payload, PeripheralMessageEnvelope):
+            if (
+                kind == OutputMessageKind.PERIPHERAL
+                and isinstance(payload, PeripheralMessageEnvelope)
+            ):
                 self._latest_peripheral_frames[_peripheral_cache_key(payload)] = frame_bytes
 
     def _replay_frames(self) -> tuple[bytes, ...]:
@@ -400,8 +438,9 @@ class WebSocket:
     ) -> None:
         self._enqueue_frame(frame, queue)
 
-    def _encode_payload(self, kind: str, payload: object) -> bytes | None:
-        if kind == "frame":
+    def _encode_message(self, message: OutputMessage) -> bytes | None:
+        if message.kind == OutputMessageKind.FRAME:
+            payload = message.payload
             if not isinstance(payload, (bytes, bytearray, memoryview)):
                 logger.warning(
                     "Expected bytes payload for frame message, got %s.",
@@ -412,7 +451,8 @@ class WebSocket:
             envelope = beats_streaming_pb2.StreamEnvelope(frame=frame)
             return cast(bytes, envelope.SerializeToString())
 
-        if kind == "peripheral":
+        if message.kind == OutputMessageKind.PERIPHERAL:
+            payload = message.payload
             if not isinstance(payload, PeripheralMessageEnvelope):
                 logger.warning(
                     "Expected PeripheralMessageEnvelope for peripheral message, got %s.",
@@ -424,5 +464,5 @@ class WebSocket:
             )
             return cast(bytes, envelope.SerializeToString())
 
-        logger.warning("Unknown websocket payload kind: %s.", kind)
+        logger.warning("Unsupported websocket output message kind: %s.", message.kind)
         return None

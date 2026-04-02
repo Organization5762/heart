@@ -8,6 +8,7 @@ from heart.device.beats.websocket import (CONTROL_COMMAND_ACTIVATE,
                                           CONTROL_COMMAND_BROWSE,
                                           CONTROL_COMMAND_SENSOR_UPDATE,
                                           ControlMessage)
+from heart.device.output import OutputMessage, dispatch_output
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
@@ -42,9 +43,9 @@ class PeripheralRuntime:
         ws = websocket or WebSocket()
         ws.set_control_handler(self._handle_control_message)
         self._peripheral_manager.debug_tap.observable().subscribe(
-            on_next=lambda envelope: ws.send(
-                kind="peripheral",
-                payload=self._streaming_envelope(envelope),
+            on_next=lambda envelope: dispatch_output(
+                ws,
+                OutputMessage.peripheral(self._streaming_envelope(envelope)),
             ),
         )
 
