@@ -25,7 +25,11 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```bash
    uv run totem run --configuration lib_2025
    ```
-4. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
+4. Launch the default playlist with the Beats UI attached:
+   ```bash
+   uv run totem run-beats --configuration lib_2025
+   ```
+5. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
 ## Command-Line Interfaces
 | Command | Purpose |
@@ -37,6 +41,7 @@ Key `totem run` flags:
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--x11-forward` forces a pygame window even when the RGB matrix driver is active.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
+- `totem run-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
 
 ## Architecture Summary
 - `heart/environment.py` defines the `GameLoop` responsible for frame pacing and peripheral coordination.
