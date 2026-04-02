@@ -48,30 +48,26 @@ export function StreamNavigationPanel() {
       <div className="mb-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
         <NavigationActionButton
           disabled={!controlsEnabled}
-          icon={<ChevronLeft className="h-4 w-4" />}
-          label="Previous"
-          detail="Browse -1"
+          icon={<ChevronLeft className="h-5 w-5" />}
+          label="Previous Scene"
           onClick={() => sendNavigationControl("browse", -1)}
         />
         <NavigationActionButton
           disabled={!controlsEnabled}
-          icon={<ChevronRight className="h-4 w-4" />}
-          label="Next"
-          detail="Browse +1"
+          icon={<ChevronRight className="h-5 w-5" />}
+          label="Next Scene"
           onClick={() => sendNavigationControl("browse", 1)}
         />
         <NavigationActionButton
           disabled={!controlsEnabled}
-          icon={<Send className="h-4 w-4" />}
-          label="Activate"
-          detail="Primary"
+          icon={<Send className="h-5 w-5" />}
+          label="Active"
           onClick={() => sendNavigationControl("activate")}
         />
         <NavigationActionButton
           disabled={!controlsEnabled}
-          icon={<CornerDownLeft className="h-4 w-4" />}
-          label="Alternate"
-          detail="Secondary"
+          icon={<CornerDownLeft className="h-5 w-5" />}
+          label="Alternative Activate"
           onClick={() => sendNavigationControl("alternate_activate")}
         />
       </div>
@@ -184,13 +180,11 @@ function NavigationMetric({
 }
 
 function NavigationActionButton({
-  detail,
   disabled,
   icon,
   label,
   onClick,
 }: {
-  detail: string;
   disabled: boolean;
   icon: React.ReactNode;
   label: string;
@@ -206,11 +200,10 @@ function NavigationActionButton({
       <div className="rounded-full border border-[#39414c] bg-[#0b0f14] p-2.5 text-slate-100">
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="font-tomorrow text-sm tracking-[0.1em] text-slate-100 uppercase">
+      <div className="w-full min-w-0">
+        <div className="font-tomorrow text-sm leading-5 tracking-[0.08em] break-words whitespace-normal text-slate-100 uppercase">
           {label}
         </div>
-        <div className="mt-1 text-sm leading-5 text-[#95a2b6]">{detail}</div>
       </div>
     </button>
   );

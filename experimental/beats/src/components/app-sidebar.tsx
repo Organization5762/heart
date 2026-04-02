@@ -156,13 +156,12 @@ export function AppSidebar() {
             />
           </div>
         </div>
-        <div className="border-sidebar-border bg-sidebar text-sidebar-foreground hidden w-full items-center justify-center border px-1.5 py-2 group-data-[collapsible=icon]:flex">
-          <div className="font-tomorrow flex h-8 w-8 items-center justify-center border border-current/45 text-base tracking-[0.14em]">
-            B
-          </div>
-        </div>
+        <div
+          aria-hidden="true"
+          className="hidden min-h-12 w-full group-data-[collapsible=icon]:block"
+        />
       </SidebarHeader>
-      <SidebarSeparator className="mx-2.5" />
+      <SidebarSeparator className="mx-2.5 group-data-[collapsible=icon]:hidden" />
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
@@ -172,11 +171,13 @@ export function AppSidebar() {
                   asChild
                   tooltip={item.title}
                   isActive={isPathActive(item.url)}
-                  className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase"
+                  className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:text-center group-data-[collapsible=icon]:[&>svg]:mx-auto"
                 >
                   <Link to={item.url} onClick={handleNavigate}>
                     {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <span className="group-data-[collapsible=icon]:hidden">
+                      {item.title}
+                    </span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -184,7 +185,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel className="font-tomorrow text-[0.68rem] tracking-[0.16em] uppercase">
+          <SidebarGroupLabel className="font-tomorrow text-[0.68rem] tracking-[0.16em] uppercase group-data-[collapsible=icon]:hidden">
             Entities
           </SidebarGroupLabel>
           <SidebarMenu>
@@ -202,14 +203,16 @@ export function AppSidebar() {
                       isActive={item.items.some((subItem) =>
                         isPathActive(subItem.url),
                       )}
-                      className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase"
+                      className="font-tomorrow text-[0.74rem] tracking-[0.14em] uppercase group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:text-center group-data-[collapsible=icon]:[&>svg]:mx-auto"
                     >
                       {item.icon && <item.icon />}
-                      <span>{item.title}</span>
-                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      <span className="group-data-[collapsible=icon]:hidden">
+                        {item.title}
+                      </span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[collapsible=icon]:hidden group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
-                  <CollapsibleContent>
+                  <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
                       {item.items?.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>

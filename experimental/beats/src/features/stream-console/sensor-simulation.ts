@@ -381,18 +381,23 @@ function flattenLiveSensorPayload(
 
 function buildFakeSensorChannels(): SensorChannel[] {
   return DEFAULT_FAKE_PERIPHERAL_SENSORS.map((sensor, index) => {
+    const canonicalControlKey = resolveCanonicalControlKey(sensor.controlKeys);
+    const canonicalBinding = parseSensorBinding(
+      canonicalControlKey,
+      sensor.path,
+    );
     const pathSegments = sensor.path.split(".");
-    const label = `${DEFAULT_FAKE_PERIPHERAL_LABEL} / ${sensor.path}`;
+    const label = `${canonicalBinding.peripheralLabel} / ${canonicalBinding.path}`;
 
     return {
-      id: `${DEFAULT_FAKE_PERIPHERAL_ID}/${sensor.path}`,
-      commandKey: `${DEFAULT_FAKE_PERIPHERAL_ID}:${sensor.path}`,
+      id: `${canonicalBinding.peripheralId}/${canonicalBinding.path}`,
+      commandKey: canonicalControlKey,
       controlKeys: sensor.controlKeys,
-      peripheralId: DEFAULT_FAKE_PERIPHERAL_ID,
-      peripheralLabel: DEFAULT_FAKE_PERIPHERAL_LABEL,
+      peripheralId: canonicalBinding.peripheralId,
+      peripheralLabel: canonicalBinding.peripheralLabel,
       label,
       leafLabel: pathSegments[pathSegments.length - 1] ?? sensor.path,
-      path: sensor.path,
+      path: canonicalBinding.path,
       pathSegments,
       value: null,
       rawValue: null,
@@ -403,6 +408,36 @@ function buildFakeSensorChannels(): SensorChannel[] {
       source: "fake",
     };
   });
+}
+
+function resolveCanonicalControlKey(controlKeys: string[]) {
+  return (
+    controlKeys.find((controlKey) =>
+      controlKey.startsWith(`${TOTEM_SENSOR_PERIPHERAL_ID}:`),
+    ) ??
+    controlKeys[0] ??
+    `${DEFAULT_FAKE_PERIPHERAL_ID}:value`
+  );
+}
+
+function parseSensorBinding(commandKey: string, fallbackPath: string) {
+  const separatorIndex = commandKey.indexOf(":");
+  if (separatorIndex === -1) {
+    return {
+      peripheralId: DEFAULT_FAKE_PERIPHERAL_ID,
+      peripheralLabel: DEFAULT_FAKE_PERIPHERAL_LABEL,
+      path: fallbackPath,
+    };
+  }
+
+  const peripheralId = commandKey.slice(0, separatorIndex);
+  const path = commandKey.slice(separatorIndex + 1) || fallbackPath;
+
+  return {
+    peripheralId,
+    peripheralLabel: peripheralId,
+    path,
+  };
 }
 
 function mergeSensorChannels(

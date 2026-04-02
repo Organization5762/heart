@@ -25,6 +25,11 @@ const GRID_BASELINE_Y = -1.2;
 const MAX_TELEMETRY_SIGNAL = 1;
 const STREAM_TEXTURE_SIZE = 256;
 const STREAM_TEXTURE_BACKGROUND = "#020617";
+const IMAGE_BITMAP_OPTIONS: ImageBitmapOptions = {
+  imageOrientation: "none",
+  premultiplyAlpha: "none",
+  colorSpaceConversion: "none",
+};
 type DecodedStreamFrame = HTMLImageElement | ImageBitmap;
 type FaceViewport = {
   left: number;
@@ -513,16 +518,26 @@ async function decodeStreamFrame(
   source: Blob | string,
 ): Promise<DecodedStreamFrame> {
   if (typeof createImageBitmap === "function") {
-    if (source instanceof Blob) {
-      return createImageBitmap(source);
-    }
+    try {
+      if (source instanceof Blob) {
+        return await createImageBitmap(source, IMAGE_BITMAP_OPTIONS);
+      }
 
-    const response = await fetch(source);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch stream image: ${source}`);
-    }
+      const response = await fetch(source);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch stream image: ${source}`);
+      }
 
-    return createImageBitmap(await response.blob());
+      return await createImageBitmap(
+        await response.blob(),
+        IMAGE_BITMAP_OPTIONS,
+      );
+    } catch (error) {
+      if (typeof source === "string") {
+        return loadStreamImage(source);
+      }
+      throw error;
+    }
   }
 
   if (source instanceof Blob) {

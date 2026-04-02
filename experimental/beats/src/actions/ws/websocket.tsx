@@ -119,17 +119,25 @@ export function WSProvider({
 
       ws.onmessage = (ev: MessageEvent) => {
         if (socketRef.current !== ws || attemptRef.current !== attempt) return;
-        if (!(ev.data instanceof ArrayBuffer)) {
-          return;
-        }
-        try {
-          const decoded = decodeStreamEvent(ev.data);
-          if (decoded) {
-            stream.next(decoded);
-          }
-        } catch (err) {
-          console.error("WebSocket message parse error:", err, ev.data);
-        }
+
+        void decodeMessageData(ev.data)
+          .then((buffer) => {
+            if (
+              buffer === null ||
+              socketRef.current !== ws ||
+              attemptRef.current !== attempt
+            ) {
+              return;
+            }
+
+            const decoded = decodeStreamEvent(buffer);
+            if (decoded) {
+              stream.next(decoded);
+            }
+          })
+          .catch((err) => {
+            console.error("WebSocket message parse error:", err, ev.data);
+          });
       };
 
       ws.onerror = () => {
@@ -213,4 +221,36 @@ export function WSProvider({
 
 export function useWS() {
   return useContext(WSContext);
+}
+
+async function decodeMessageData(data: unknown): Promise<ArrayBuffer | null> {
+  if (data instanceof ArrayBuffer) {
+    return data;
+  }
+
+  if (data instanceof Blob) {
+    if (typeof data.arrayBuffer === "function") {
+      return data.arrayBuffer();
+    }
+    return readBlobAsArrayBuffer(data);
+  }
+
+  return null;
+}
+
+function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => {
+      reject(reader.error ?? new Error("Failed to read websocket blob"));
+    };
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Websocket blob reader returned a non-binary result"));
+    };
+    reader.readAsArrayBuffer(blob);
+  });
 }

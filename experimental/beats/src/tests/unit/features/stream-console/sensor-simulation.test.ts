@@ -47,7 +47,9 @@ describe("sensor simulation utilities", () => {
       expect.arrayContaining([
         expect.objectContaining({
           source: "fake",
-          commandKey: "fake.peripheral:payload.motion.accelerometer.x",
+          commandKey: "totem.sensor:payload.motion.accelerometer.x",
+          peripheralId: "totem.sensor",
+          peripheralLabel: "totem.sensor",
           controlKeys: expect.arrayContaining([
             "accelerometer:debug:x",
             "totem.sensor:payload.motion.accelerometer.x",

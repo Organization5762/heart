@@ -23,12 +23,10 @@ describe("StreamNavigationPanel", () => {
 
     render(<StreamNavigationPanel />);
 
-    await user.click(screen.getByRole("button", { name: /next.*browse \+1/i }));
+    await user.click(screen.getByRole("button", { name: /next scene/i }));
+    await user.click(screen.getByRole("button", { name: /active/i }));
     await user.click(
-      screen.getByRole("button", { name: /activate.*primary/i }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: /alternate.*secondary/i }),
+      screen.getByRole("button", { name: /alternative activate/i }),
     );
 
     expect(sendNavigationControl).toHaveBeenNthCalledWith(1, "browse", 1);

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { act } from "react";
 
 import { WSProvider, useWS } from "@/actions/ws/websocket";
+import * as protocol from "@/actions/ws/protocol";
 
 class FakeWebSocket {
   static CONNECTING = 0;
@@ -40,6 +41,10 @@ class FakeWebSocket {
   triggerClose() {
     this.readyState = FakeWebSocket.CLOSED;
     this.onclose?.();
+  }
+
+  triggerMessage(data: ArrayBuffer | Blob) {
+    this.onmessage?.({ data } as MessageEvent);
   }
 }
 
@@ -148,5 +153,32 @@ describe("WSProvider", () => {
         clear: false,
       }),
     ]);
+  });
+
+  test("decodes blob websocket messages so binary frames render in Electron", async () => {
+    const decodeSpy = vi
+      .spyOn(protocol, "decodeStreamEvent")
+      .mockReturnValue(null);
+
+    render(
+      <WSProvider
+        url="ws://localhost:8765"
+        retryDelay={100}
+        maxRetryDelay={200}
+      >
+        <ReadyStateProbe />
+      </WSProvider>,
+    );
+
+    act(() => {
+      FakeWebSocket.instances[0].triggerOpen();
+    });
+
+    const payload = new Uint8Array([1, 2, 3]).buffer;
+    FakeWebSocket.instances[0].triggerMessage(new Blob([payload]));
+    await vi.waitFor(() => {
+      expect(decodeSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(decodeSpy.mock.calls[0]?.[0]).toBeInstanceOf(ArrayBuffer);
   });
 });
