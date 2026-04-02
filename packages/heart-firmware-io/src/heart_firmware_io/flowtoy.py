@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 FLOWTOY_SYNC_PACKET_SIZE = 21
@@ -13,6 +16,20 @@ FLOWTOY_PAGE_OFFSET = 18
 FLOWTOY_MODE_OFFSET = 19
 FLOWTOY_COMMAND_FLAGS_OFFSET = 20
 FLOWTOY_UNKNOWN_MODE_NAME = "flowtoy-unknown"
+FLOWTOY_MODE_REFERENCE_PATH = Path(__file__).with_name("flowtoy_modes.json")
+
+
+@lru_cache(maxsize=1)
+def _documented_modes_by_key() -> dict[tuple[int, int], dict[str, Any]]:
+    """Return the documented FlowToy mode reference keyed by page and mode."""
+
+    mode_reference = json.loads(
+        FLOWTOY_MODE_REFERENCE_PATH.read_text(encoding="utf-8")
+    )
+    return {
+        (int(entry["page"]), int(entry["mode"])): dict(entry)
+        for entry in mode_reference
+    }
 
 
 def normalize_payload(
@@ -70,6 +87,17 @@ def mode_name_from_decoded(decoded: Mapping[str, Any] | None) -> str:
     return mode_name_from_values(page, mode)
 
 
+def documented_mode_metadata(
+    page: int | None,
+    mode: int | None,
+) -> Mapping[str, Any] | None:
+    """Return the documented reference entry for a FlowToy page and mode."""
+
+    if page is None or mode is None:
+        return None
+    return _documented_modes_by_key().get((int(page), int(mode)))
+
+
 def decode_sync_packet(
     payload: bytes | bytearray | memoryview | Sequence[int],
 ) -> dict[str, Any]:
@@ -108,6 +136,7 @@ def decode_sync_packet(
         "page": page,
         "mode": mode,
         "mode_name": mode_name_from_values(page, mode),
+        "mode_documentation": documented_mode_metadata(page, mode),
         "command_flags": {
             "adjust_active": bool(command_flags & (1 << 0)),
             "wakeup": bool(command_flags & (1 << 1)),

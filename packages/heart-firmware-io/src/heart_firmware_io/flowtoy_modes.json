@@ -1,0 +1,526 @@
+[
+  {
+    "page": 1,
+    "mode": 1,
+    "key": "flowtoy-page-1-mode-1",
+    "display_name": "rainbow",
+    "adjust": ["density"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["rainbow_speed"],
+    "runtime": {"static_hours": 6, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff3b30"},
+      {"t": 0.17, "hex": "#ff9500"},
+      {"t": 0.33, "hex": "#ffcc00"},
+      {"t": 0.5, "hex": "#34c759"},
+      {"t": 0.67, "hex": "#32ade6"},
+      {"t": 0.83, "hex": "#007aff"},
+      {"t": 1.0, "hex": "#af52de"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 2,
+    "key": "flowtoy-page-1-mode-2",
+    "display_name": "rainbow drops",
+    "adjust": ["density"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["rainbow_speed"],
+    "runtime": {"static_hours": 11, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff453a"},
+      {"t": 0.16, "hex": "#ff9f0a"},
+      {"t": 0.32, "hex": "#ffd60a"},
+      {"t": 0.48, "hex": "#30d158"},
+      {"t": 0.64, "hex": "#64d2ff"},
+      {"t": 0.8, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#bf5af2"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 3,
+    "key": "flowtoy-page-1-mode-3",
+    "display_name": "bold",
+    "adjust": ["hue", "saturation"],
+    "kinetic_trigger": ["variable_force", "zero_g"],
+    "kinetic_response": ["brightness"],
+    "runtime": {"static_hours": 7, "kinetic_hours": 2, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#f2f2ff"},
+      {"t": 0.5, "hex": "#c7b8ff"},
+      {"t": 1.0, "hex": "#8e7dff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 4,
+    "key": "flowtoy-page-1-mode-4",
+    "display_name": "lantern",
+    "adjust": ["hue", "brightness"],
+    "kinetic_trigger": [],
+    "kinetic_response": [],
+    "runtime": {"static_hours": 4, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#fff4d6"},
+      {"t": 0.5, "hex": "#ffd28a"},
+      {"t": 1.0, "hex": "#ffb457"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 5,
+    "key": "flowtoy-page-1-mode-5",
+    "display_name": "fire",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 4, "kinetic_hours": 6, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.2, "hex": "#ffd60a"},
+      {"t": 0.45, "hex": "#ff9f0a"},
+      {"t": 0.7, "hex": "#ff5e3a"},
+      {"t": 1.0, "hex": "#ff3b30"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 6,
+    "key": "flowtoy-page-1-mode-6",
+    "display_name": "water",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 4, "kinetic_hours": 8, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#e8f7ff"},
+      {"t": 0.35, "hex": "#64d2ff"},
+      {"t": 0.7, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#0040dd"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 7,
+    "key": "flowtoy-page-1-mode-7",
+    "display_name": "earth",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 7, "kinetic_hours": 6, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#8e5a2b"},
+      {"t": 0.25, "hex": "#c27c2c"},
+      {"t": 0.5, "hex": "#d6a73a"},
+      {"t": 0.75, "hex": "#6e8b3d"},
+      {"t": 1.0, "hex": "#3f6b2a"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 8,
+    "key": "flowtoy-page-1-mode-8",
+    "display_name": "air",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 9, "kinetic_hours": 5, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.4, "hex": "#c7f2ff"},
+      {"t": 0.75, "hex": "#78d7ff"},
+      {"t": 1.0, "hex": "#9b8cff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 9,
+    "key": "flowtoy-page-1-mode-9",
+    "display_name": "spirit",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 13, "kinetic_hours": 10, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#6e44ff"},
+      {"t": 0.33, "hex": "#7d3cff"},
+      {"t": 0.66, "hex": "#bf5af2"},
+      {"t": 1.0, "hex": "#ff4fd8"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 1,
+    "mode": 10,
+    "key": "flowtoy-page-1-mode-10",
+    "display_name": "pulse",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect_pulse"],
+    "runtime": {"static_hours": 11, "kinetic_hours": 3, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff3b30"},
+      {"t": 0.33, "hex": "#f5f5f5"},
+      {"t": 0.66, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#ff3b30"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 1,
+    "key": "flowtoy-page-2-mode-1",
+    "display_name": "candy",
+    "adjust": ["saturation"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 6, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff7edb"},
+      {"t": 0.33, "hex": "#7ee7ff"},
+      {"t": 0.66, "hex": "#b084ff"},
+      {"t": 1.0, "hex": "#ffffff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 2,
+    "key": "flowtoy-page-2-mode-2",
+    "display_name": "petals",
+    "adjust": ["saturation", "density"],
+    "kinetic_trigger": [],
+    "kinetic_response": [],
+    "runtime": {"static_hours": 14, "kinetic_hours": null, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff73c6"},
+      {"t": 0.33, "hex": "#9a7cff"},
+      {"t": 0.66, "hex": "#4da3ff"},
+      {"t": 1.0, "hex": "#6ff7d9"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 3,
+    "key": "flowtoy-page-2-mode-3",
+    "display_name": "love",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "saturation"],
+    "runtime": {"static_hours": 7, "kinetic_hours": 5, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffd7ef"},
+      {"t": 0.35, "hex": "#ff7eb6"},
+      {"t": 0.7, "hex": "#ff4f8b"},
+      {"t": 1.0, "hex": "#d63384"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 4,
+    "key": "flowtoy-page-2-mode-4",
+    "display_name": "watermelon",
+    "adjust": ["hues"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "brightness"],
+    "runtime": {"static_hours": 13, "kinetic_hours": 5, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff5f8f"},
+      {"t": 0.25, "hex": "#ffd9e2"},
+      {"t": 0.5, "hex": "#7ddc5f"},
+      {"t": 0.75, "hex": "#2fb344"},
+      {"t": 1.0, "hex": "#ff5f8f"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 5,
+    "key": "flowtoy-page-2-mode-5",
+    "display_name": "freedom",
+    "adjust": ["hues"],
+    "kinetic_trigger": ["low_force", "zero_g"],
+    "kinetic_response": ["effect", "saturation"],
+    "runtime": {"static_hours": 6, "kinetic_hours": 4, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff453a"},
+      {"t": 0.33, "hex": "#ffffff"},
+      {"t": 0.66, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#64d2ff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 6,
+    "key": "flowtoy-page-2-mode-6",
+    "display_name": "microdots",
+    "adjust": ["saturation"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 9, "kinetic_hours": 13, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff8ad8"},
+      {"t": 0.25, "hex": "#ffd95a"},
+      {"t": 0.5, "hex": "#7ee7ff"},
+      {"t": 0.75, "hex": "#b084ff"},
+      {"t": 1.0, "hex": "#4d8dff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 7,
+    "key": "flowtoy-page-2-mode-7",
+    "display_name": "unicorn",
+    "adjust": ["rainbow_brightness"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 9, "kinetic_hours": 5, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffd6f6"},
+      {"t": 0.25, "hex": "#d9c2ff"},
+      {"t": 0.5, "hex": "#9be7ff"},
+      {"t": 0.75, "hex": "#b8ffd6"},
+      {"t": 1.0, "hex": "#fffdf7"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 8,
+    "key": "flowtoy-page-2-mode-8",
+    "display_name": "blue blazer",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 6, "kinetic_hours": null, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.25, "hex": "#64d2ff"},
+      {"t": 0.5, "hex": "#0a84ff"},
+      {"t": 0.75, "hex": "#ff9f0a"},
+      {"t": 1.0, "hex": "#ff6a00"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 9,
+    "key": "flowtoy-page-2-mode-9",
+    "display_name": "solar flare",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "brightness"],
+    "runtime": {"static_hours": 10, "kinetic_hours": 3, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#fff6d5"},
+      {"t": 0.3, "hex": "#ffd60a"},
+      {"t": 0.6, "hex": "#ffb340"},
+      {"t": 1.0, "hex": "#ff7a1a"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 2,
+    "mode": 10,
+    "key": "flowtoy-page-2-mode-10",
+    "display_name": "strobe",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["variable_force"],
+    "kinetic_response": ["hue_shift"],
+    "runtime": {"static_hours": 13, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#fff0a8"},
+      {"t": 0.35, "hex": "#d7ff5a"},
+      {"t": 0.7, "hex": "#8ddf3f"},
+      {"t": 1.0, "hex": "#fff0a8"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 1,
+    "key": "flowtoy-page-3-mode-1",
+    "display_name": "flamebow",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 7, "kinetic_hours": null, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff5b3a"},
+      {"t": 0.2, "hex": "#ff9f0a"},
+      {"t": 0.4, "hex": "#ffd60a"},
+      {"t": 0.6, "hex": "#30d158"},
+      {"t": 0.8, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#bf5af2"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 2,
+    "key": "flowtoy-page-3-mode-2",
+    "display_name": "alicorn",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "brightness"],
+    "runtime": {"static_hours": 9, "kinetic_hours": 2, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.25, "hex": "#ffd8ef"},
+      {"t": 0.5, "hex": "#d9c2ff"},
+      {"t": 0.75, "hex": "#fff0b8"},
+      {"t": 1.0, "hex": "#b8d8ff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 3,
+    "key": "flowtoy-page-3-mode-3",
+    "display_name": "liquid sugar",
+    "adjust": ["saturation"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "saturation"],
+    "runtime": {"static_hours": 7, "kinetic_hours": 2, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.33, "hex": "#c8f1ff"},
+      {"t": 0.66, "hex": "#ffd2f0"},
+      {"t": 1.0, "hex": "#d2c2ff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 4,
+    "key": "flowtoy-page-3-mode-4",
+    "display_name": "rainbow dash",
+    "adjust": ["density"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 6, "kinetic_hours": 5, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff9f0a"},
+      {"t": 0.25, "hex": "#ffd60a"},
+      {"t": 0.5, "hex": "#30d158"},
+      {"t": 0.75, "hex": "#0a84ff"},
+      {"t": 1.0, "hex": "#bf5af2"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 5,
+    "key": "flowtoy-page-3-mode-5",
+    "display_name": "fireball",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "brightness"],
+    "runtime": {"static_hours": 10, "kinetic_hours": 3, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.25, "hex": "#ffd60a"},
+      {"t": 0.5, "hex": "#ff9f0a"},
+      {"t": 0.75, "hex": "#ff6b2c"},
+      {"t": 1.0, "hex": "#ff3b30"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 6,
+    "key": "flowtoy-page-3-mode-6",
+    "display_name": "froth",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "saturation"],
+    "runtime": {"static_hours": 6, "kinetic_hours": 3, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.35, "hex": "#c9f2ff"},
+      {"t": 0.7, "hex": "#71d7ff"},
+      {"t": 1.0, "hex": "#b6a2ff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 7,
+    "key": "flowtoy-page-3-mode-7",
+    "display_name": "jammin",
+    "adjust": ["hues"],
+    "kinetic_trigger": ["low_force", "high_force"],
+    "kinetic_response": ["effect", "speed"],
+    "runtime": {"static_hours": 3, "kinetic_hours": 10, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ff453a"},
+      {"t": 0.33, "hex": "#ffd60a"},
+      {"t": 0.66, "hex": "#30d158"},
+      {"t": 1.0, "hex": "#ff453a"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 8,
+    "key": "flowtoy-page-3-mode-8",
+    "display_name": "bolder",
+    "adjust": ["hue", "brightness"],
+    "kinetic_trigger": [],
+    "kinetic_response": [],
+    "runtime": {"static_hours": 5, "kinetic_hours": null, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffffff"},
+      {"t": 0.5, "hex": "#d9cfff"},
+      {"t": 1.0, "hex": "#b9a5ff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 9,
+    "key": "flowtoy-page-3-mode-9",
+    "display_name": "sunset",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["low_force"],
+    "kinetic_response": ["activate_effect"],
+    "runtime": {"static_hours": 4, "kinetic_hours": null, "qualifier": "approx"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffcc66"},
+      {"t": 0.33, "hex": "#ff9f0a"},
+      {"t": 0.66, "hex": "#ff6b2c"},
+      {"t": 1.0, "hex": "#ff453a"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  },
+  {
+    "page": 3,
+    "mode": 10,
+    "key": "flowtoy-page-3-mode-10",
+    "display_name": "daybreak",
+    "adjust": ["hue"],
+    "kinetic_trigger": ["variable_force"],
+    "kinetic_response": ["hue_shift"],
+    "runtime": {"static_hours": 8, "kinetic_hours": 4, "qualifier": "approx_plus"},
+    "color_spectrum": [
+      {"t": 0.0, "hex": "#ffb3d9"},
+      {"t": 0.33, "hex": "#ff6bb5"},
+      {"t": 0.66, "hex": "#c084ff"},
+      {"t": 1.0, "hex": "#8d5cff"}
+    ],
+    "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes"
+  }
+]
