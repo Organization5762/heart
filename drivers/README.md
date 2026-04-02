@@ -70,7 +70,7 @@ We have also explored Bluetooth-based bridges, which do not plug directly into t
 
 We also have an experimental FlowToy bridge path for the Feather family:
 
-- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062) with an external `nRF24L01+` frontend - Driver is at [this link](../drivers/flowtoy_bridge/)
+- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062) using native Arduino firmware on the internal 2.4 GHz radio - Driver is at [this link](../drivers/flowtoy_bridge/)
 
 ## Future Bridges
 

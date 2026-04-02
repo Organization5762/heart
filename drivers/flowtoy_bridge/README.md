@@ -8,21 +8,21 @@ FlowToy radio packets and forwarding them to Totem over USB serial.
 
 Totem needs a stable receive-side schema before we invest in command writes. The
 Flowtoys reference bridge uses `RF24_250KBPS`, channel `2`, 3-byte addressing,
-and 16-bit CRC. A bare nRF52840 proprietary radio is not a great fit for that
-exact link budget and data rate, so the practical Feather path is:
+and 16-bit CRC. CircuitPython on `feather_nrf52840_express` does not expose the
+needed proprietary radio controls, so the driver is split into two pieces:
 
-- `Adafruit Feather nRF52840 Express` as the USB/host microcontroller
-- external `nRF24L01+` radio frontend over SPI
+- a CircuitPython harness for the USB serial contract and CI coverage
+- a native Arduino sketch for actual packet capture on the Feather's internal
+  2.4 GHz radio via `nrf_to_nrf`
 - newline-delimited JSON packets over USB serial to Totem
 
 ## Materials
 
 - `Adafruit Feather nRF52840 Express`
-- `nRF24L01+` breakout or FeatherWing-compatible equivalent
-- 3.3 V power rail and shared ground
 - USB connection to the Pi/Totem host
 - Arduino IDE or another Adafruit nRF52-capable build environment for the
   sketch in `arduino/`
+- `nrf_to_nrf` Arduino library by TMRh20
 
 ## Repository layout
 
@@ -30,7 +30,8 @@ exact link budget and data rate, so the practical Feather path is:
 | ---- | ------- |
 | `code.py` | CircuitPython-friendly schema harness used for REPL checks and CI driver tests. |
 | `settings.toml` | Feather nRF52840 Express metadata for the standard driver tooling. |
-| `arduino/flowtoy_feather_nrf24_receiver/flowtoy_feather_nrf24_receiver.ino` | Manual receive-only firmware sketch for an external `nRF24L01+` radio. |
+| `arduino/flowtoy_feather_nrf52840_receiver/flowtoy_feather_nrf52840_receiver.ino` | Native receive-only firmware sketch that uses the Feather's internal 2.4 GHz radio. |
+| `arduino/README.md` | Native firmware flashing notes and dependency list. |
 
 ## Serial schema
 
@@ -57,22 +58,23 @@ Each received packet is emitted as one newline-delimited JSON object:
 
 Totem currently treats this as receive-only telemetry. The schema intentionally
 leaves write commands out of scope for now. The bridge runtime is expected to
-filter candidate payloads and only emit frames that match the known 21-byte
-FlowToy sync-packet shape.
+emit the known 21-byte FlowToy sync-packet payloads and let the host decode
+their full schema.
 
 ## Flashing paths
 
 ### Contract harness
 
-Use the normal `totem update-driver --name flowtoy_bridge` flow if you only want
-the CircuitPython harness on a Feather. This is useful for validating the USB
-serial schema and identity responses, but it does not talk to the FlowToy RF
-link by itself.
+Use `totem update-driver --name flowtoy_bridge --mode circuitpython` if you only
+want the CircuitPython harness on a Feather. This is useful for validating the
+USB serial schema and identity responses, but it does not talk to the FlowToy
+RF link by itself.
 
 ### Real receive firmware
 
-Use the Arduino sketch when you want actual packet capture. That path is manual
-today because the repo's `update-driver` tooling is CircuitPython-only.
+Use `totem update-driver --name flowtoy_bridge` for the default native firmware
+path. The updater now compiles and flashes the Arduino sketch under
+`arduino/flowtoy_feather_nrf52840_receiver/` with `arduino-cli`.
 
 ## Totem integration
 
@@ -82,5 +84,7 @@ Point Totem at the bridge with:
 HEART_RADIO_PORT=/dev/ttyACM0 totem run --configuration lib_2025
 ```
 
-The host-side peripheral in `src/heart/peripheral/radio.py` will ingest the
-JSON packets and publish `peripheral.radio.packet` events.
+The host-side transport in `src/heart/peripheral/radio.py` ingests the JSON
+packets, and the FlowToy peripheral in `src/heart/peripheral/flowtoy.py`
+publishes `peripheral.flowtoy.packet` events with the full JSON body plus a
+mode label derived from the decoded `page`/`mode` pair.

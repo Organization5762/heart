@@ -9,8 +9,9 @@ Use the tooling in this repository to manage environments. Prefer `uv` for Pytho
 - `DisplayContext` wraps the active `pygame.Surface`; renderers that need surface-only APIs such as `subsurface()` must use `window.screen` after confirming it is initialized instead of calling those APIs on `DisplayContext` directly.
 - Only the real display-owned `DisplayContext` may change pygame display modes; scratch or post-processing contexts must keep `can_configure_display=False` and never call `pygame.display.set_mode()`.
 - OpenGL-backed renderers must treat `reset()` as lifecycle teardown: cascade reset into nested runtimes and restore mutated UI state such as mouse visibility so mode switches can leave GPU-backed scenes cleanly.
-- Flowtoys Connect Bridge compatibility currently assumes the upstream ESP32 plus nRF24L01 serial bridge; do not assume nRF52 firmware is wire-compatible with that command and RF stack.
-- For a Feather-targeted FlowToy receive bridge, treat the nRF52840 as the host MCU and plan around an external nRF24L01+ frontend so the repo can match the reference bridge's 250 kbps RF24 settings.
+- Flowtoys Connect Bridge work should treat CircuitPython on `feather_nrf52840_express` as schema-only; use native firmware for actual proprietary radio capture.
+- For Feather-targeted FlowToy receive work, prefer the internal `nRF52840` radio via `nrf_to_nrf` as the experimental hardware path, and keep the host-side serial schema compatible with the existing `flowtoy_bridge` contract.
+- When a driver needs native firmware flashing, declare the Arduino sketch metadata in `settings.toml` and use `update-driver --mode auto` with the driver's configured default mode instead of ad-hoc flashing steps.
 
 ## Formatting
 
@@ -110,6 +111,10 @@ Define CLI default values as module-level constants so they stay consistent acro
 
 ## Recent Validation
 
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after adding Arduino-native `update-driver` support, FlowToy bridge Arduino metadata, and native flashing tests.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after adding Arduino-native `update-driver` support, FlowToy bridge Arduino metadata, and native flashing tests.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test` after replacing the external FlowToy nRF24 sketch with the internal `nrf_to_nrf` Feather nRF52840 receiver path and updating the bridge docs.
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make test`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/14cd/heart/.uv-cache make format` after removing `BaseRenderer`, the `AtomicBaseRenderer.process()` compatibility path, and the unused renderer `warmup` flag.
@@ -248,3 +253,5 @@ Define CLI default values as module-level constants so they stay consistent acro
 - `2026-03-30`: `.venv/bin/docformatter -i -r --config ./pyproject.toml docs`
 - `2026-03-30`: `.venv/bin/mdformat docs`
 - `2026-03-30`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/94af/heart/.uv-cache make test`
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make format`
+- `2026-04-01`: `UV_CACHE_DIR=/Users/lampe/.codex/worktrees/7ef8/heart/.uv-cache make test`

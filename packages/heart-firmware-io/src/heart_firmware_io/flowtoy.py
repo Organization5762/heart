@@ -6,10 +6,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 FLOWTOY_SYNC_PACKET_SIZE = 21
-FLOWTOY_GROUP_ID_MAX = 1024
-FLOWTOY_RESERVED_OFFSET = 16
+FLOWTOY_SCHEMA = "flowtoy.sync.v1"
 FLOWTOY_FLAGS_OFFSET = 15
+FLOWTOY_RESERVED_OFFSET = 16
+FLOWTOY_PAGE_OFFSET = 18
+FLOWTOY_MODE_OFFSET = 19
 FLOWTOY_COMMAND_FLAGS_OFFSET = 20
+FLOWTOY_UNKNOWN_MODE_NAME = "flowtoy-unknown"
 
 
 def normalize_payload(
@@ -34,21 +37,7 @@ def looks_like_sync_packet(
     """Return ``True`` when *payload* matches the known FlowToy packet shape."""
 
     packet = normalize_payload(payload)
-    if len(packet) != FLOWTOY_SYNC_PACKET_SIZE:
-        return False
-
-    radio_flags = packet[FLOWTOY_FLAGS_OFFSET]
-    command_flags = packet[FLOWTOY_COMMAND_FLAGS_OFFSET]
-    if radio_flags & 0b1100_0000:
-        return False
-    if command_flags & 0b1000_0000:
-        return False
-
-    if any(packet[index] != 0 for index in range(FLOWTOY_RESERVED_OFFSET, FLOWTOY_RESERVED_OFFSET + 2)):
-        return False
-
-    group_id = decode_group_id(packet)
-    return 0 < group_id <= FLOWTOY_GROUP_ID_MAX
+    return len(packet) == FLOWTOY_SYNC_PACKET_SIZE
 
 
 def decode_group_id(
@@ -59,6 +48,26 @@ def decode_group_id(
     packet = normalize_payload(payload)
     raw_group_id = int.from_bytes(packet[0:2], byteorder="little", signed=False)
     return ((raw_group_id & 0xFF) << 8) | ((raw_group_id >> 8) & 0xFF)
+
+
+def mode_name_from_values(page: int | None, mode: int | None) -> str:
+    """Build a stable mode label from FlowToy page and mode values."""
+
+    if page is None or mode is None:
+        return FLOWTOY_UNKNOWN_MODE_NAME
+    return f"flowtoy-page-{int(page)}-mode-{int(mode)}"
+
+
+def mode_name_from_decoded(decoded: Mapping[str, Any] | None) -> str:
+    """Return a mode label derived from a decoded FlowToy payload."""
+
+    if decoded is None:
+        return FLOWTOY_UNKNOWN_MODE_NAME
+    page = decoded.get("page")
+    mode = decoded.get("mode")
+    if not isinstance(page, int) or not isinstance(mode, int):
+        return FLOWTOY_UNKNOWN_MODE_NAME
+    return mode_name_from_values(page, mode)
 
 
 def decode_sync_packet(
@@ -72,9 +81,11 @@ def decode_sync_packet(
 
     radio_flags = packet[FLOWTOY_FLAGS_OFFSET]
     command_flags = packet[FLOWTOY_COMMAND_FLAGS_OFFSET]
+    page = packet[FLOWTOY_PAGE_OFFSET]
+    mode = packet[FLOWTOY_MODE_OFFSET]
 
     return {
-        "schema": "flowtoy.sync.v1",
+        "schema": FLOWTOY_SCHEMA,
         "group_id": decode_group_id(packet),
         "padding": int.from_bytes(packet[2:6], byteorder="little", signed=False),
         "lfo": [int(value) for value in packet[6:10]],
@@ -93,8 +104,10 @@ def decode_sync_packet(
             "speed": bool(radio_flags & (1 << 4)),
             "density": bool(radio_flags & (1 << 5)),
         },
-        "page": packet[18],
-        "mode": packet[19],
+        "reserved": [int(packet[FLOWTOY_RESERVED_OFFSET]), int(packet[FLOWTOY_RESERVED_OFFSET + 1])],
+        "page": page,
+        "mode": mode,
+        "mode_name": mode_name_from_values(page, mode),
         "command_flags": {
             "adjust_active": bool(command_flags & (1 << 0)),
             "wakeup": bool(command_flags & (1 << 1)),

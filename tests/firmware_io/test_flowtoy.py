@@ -58,8 +58,10 @@ class TestFirmwareIoFlowToy:
                 "speed": False,
                 "density": False,
             },
+            "reserved": [0, 0],
             "page": 2,
             "mode": 7,
+            "mode_name": "flowtoy-page-2-mode-7",
             "command_flags": {
                 "adjust_active": False,
                 "wakeup": True,
@@ -74,3 +76,44 @@ class TestFirmwareIoFlowToy:
     def test_decode_if_matching_rejects_non_matching_payload(self) -> None:
         """Ensure non-matching candidate payloads are rejected so random 2.4 GHz traffic does not masquerade as FlowToy frames."""
         assert flowtoy.decode_if_matching(b"\x01\x02\x03") is None
+
+    def test_decode_if_matching_accepts_observed_high_group_identifier(self) -> None:
+        """Verify observed live packets with large group identifiers still decode so production props remain visible to the host."""
+        decoded = flowtoy.decode_if_matching(
+            bytes([213, 88, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        )
+
+        assert decoded == {
+            "schema": "flowtoy.sync.v1",
+            "group_id": 54616,
+            "padding": 2,
+            "lfo": [0, 0, 0, 0],
+            "global": {
+                "hue": 0,
+                "saturation": 0,
+                "brightness": 0,
+                "speed": 0,
+                "density": 0,
+            },
+            "active_flags": {
+                "lfo": False,
+                "hue": False,
+                "saturation": False,
+                "brightness": False,
+                "speed": False,
+                "density": False,
+            },
+            "reserved": [0, 0],
+            "page": 0,
+            "mode": 0,
+            "mode_name": "flowtoy-page-0-mode-0",
+            "command_flags": {
+                "adjust_active": False,
+                "wakeup": False,
+                "poweroff": False,
+                "force_reload": False,
+                "save": False,
+                "delete": False,
+                "alternate": False,
+            },
+        }

@@ -90,8 +90,10 @@ class TestDriversFlowtoyBridgeDriver:
                         "speed": False,
                         "density": False,
                     },
+                    "reserved": [0, 0],
                     "page": 2,
                     "mode": 7,
+                    "mode_name": "flowtoy-page-2-mode-7",
                     "command_flags": {
                         "adjust_active": False,
                         "wakeup": True,

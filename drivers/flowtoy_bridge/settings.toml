@@ -1,8 +1,15 @@
+ARDUINO_BOARD_MANAGER_URLS="https://adafruit.github.io/arduino-board-index/package_adafruit_index.json"
+ARDUINO_CORE="adafruit:nrf52"
+ARDUINO_FQBN="adafruit:nrf52:feather52840"
+ARDUINO_LIBRARIES="nrf_to_nrf"
+ARDUINO_PORT_KEYWORDS="feather,nrf52840"
+ARDUINO_SKETCH_PATH="arduino/flowtoy_feather_nrf52840_receiver"
 # https://docs.circuitpython.org/en/stable/docs/workflows.html
 # https://docs.circuitpython.org/en/stable/docs/environment.html#core-circuitpython-keys
 CIRCUIT_PY_BOOT_NAME="FTHR840BOOT"
 CIRCUIT_PY_UF2_URL="https://downloads.circuitpython.org/bin/feather_nrf52840_express/en_US/adafruit-circuitpython-feather_nrf52840_express-en_US-9.2.7.uf2"
 CIRCUIT_PY_UF2_CHECKSUM="bc602e936683d39bb0308791b8228ce2818efda035c6fe9f99081d7bbd5b3348"
+DEFAULT_UPDATE_MODE="arduino"
 VALID_BOARD_IDS="feather_nrf52840_express"
 
 CIRCUIT_PY_DRIVER_LIBS=""

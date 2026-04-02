@@ -2,25 +2,59 @@
 
 ## Problem statement
 
-Heart needs a bidirectional radio peripheral for Flowtoys props. The repository already had a receive-only `RadioPeripheral` skeleton, but it did not publish packets onto its observable stream or encode outbound bridge commands. This note records the bridge contract and the hardware assumption used for the first read-write integration.
+Heart needs a Flowtoys-compatible radio peripheral, but the first usable cut is
+receive-only packet capture. The repository already had a receive-only
+`RadioPeripheral` transport, but it did not expose FlowToy packets as a
+first-class peripheral or reflect the real packet schema seen on hardware. This
+note records the bridge contract and the hardware path that can realistically
+run on the hardware we have: `feather_nrf52840_express`.
 
 ## Materials
 
-- Host-side peripheral implementation in [src/heart/peripheral/radio.py](../../src/heart/peripheral/radio.py)
+- Host-side radio transport in [src/heart/peripheral/radio.py](../../src/heart/peripheral/radio.py)
+- Host-side FlowToy peripheral in [src/heart/peripheral/flowtoy.py](../../src/heart/peripheral/flowtoy.py)
+- FlowToy payload helper in [src/heart/peripheral/input_payloads/flowtoy.py](../../src/heart/peripheral/input_payloads/flowtoy.py)
 - Payload normalization helper in [src/heart/peripheral/input_payloads/radio.py](../../src/heart/peripheral/input_payloads/radio.py)
+- FlowToy packet matcher in [packages/heart-firmware-io/src/heart_firmware_io/flowtoy.py](../../packages/heart-firmware-io/src/heart_firmware_io/flowtoy.py)
+- CircuitPython bridge harness in [drivers/flowtoy_bridge/code.py](../../drivers/flowtoy_bridge/code.py)
+- Native Feather sketch in [drivers/flowtoy_bridge/arduino/flowtoy_feather_nrf52840_receiver/flowtoy_feather_nrf52840_receiver.ino](../../drivers/flowtoy_bridge/arduino/flowtoy_feather_nrf52840_receiver/flowtoy_feather_nrf52840_receiver.ino)
 - Regression coverage in [tests/peripheral/test_radio_peripheral.py](../../tests/peripheral/test_radio_peripheral.py)
+- Regression coverage in [tests/peripheral/test_flowtoy_peripheral.py](../../tests/peripheral/test_flowtoy_peripheral.py)
 - Reference bridge firmware repository: [benkuper/FlowtoysConnectBridge](https://github.com/benkuper/FlowtoysConnectBridge)
+- Native nRF52 RF24-compatible library: [TMRh20/nrf_to_nrf](https://github.com/TMRh20/nrf_to_nrf)
 
 ## Findings
 
-The referenced bridge is centered on an `ESP32` host MCU paired with an `nRF24L01` 2.4 GHz transceiver, not an `nRF52840`. The upstream repository uses the `RF24` stack and exposes a serial command protocol that accepts single-letter commands plus comma-separated arguments for sync, wake, power, and pattern updates. That makes the correct first integration target a serial bridge compatible with the upstream command grammar rather than a direct Nordic BLE implementation.
+The referenced bridge is centered on an `ESP32` host MCU paired with an
+`nRF24L01` 2.4 GHz transceiver, not an `nRF52840`. The upstream repository uses
+the `RF24` stack and exposes a serial command protocol that accepts
+single-letter commands plus comma-separated arguments for sync, wake, power,
+and pattern updates. It also configures the RF side for `RF24_250KBPS`,
+channel `2`, 3-byte addressing, 16-bit CRC, and a fixed `SyncPacket` payload
+size.
 
-For the receive-only Feather path, the repository now treats the `feather_nrf52840_express` as the USB-host microcontroller and expects an external `nRF24L01+` frontend for the actual FlowToy-compatible RF link. The new driver bundle lives in `drivers/flowtoy_bridge/`, with a CircuitPython schema harness for CI plus a manual Arduino sketch for live receive tests.
+CircuitPython on `feather_nrf52840_express` does not currently expose the
+proprietary radio controls needed to reproduce that RF24-style link. The
+feasible split is:
 
-On the Heart side, the radio peripheral now models two concerns:
+1. Keep the CircuitPython driver in `drivers/flowtoy_bridge/` as the shared USB
+   serial contract and CI-tested schema harness.
+1. Use native Arduino firmware for real RF capture.
 
-1. Receive raw packets from a newline-delimited JSON serial stream and publish them as normalized `RadioPacket` events.
-1. Send Flowtoys bridge commands back over the same serial link using typed helpers for sync, wake, power, Wi-Fi, global config, and pattern updates.
+The chosen native path uses `nrf_to_nrf`, which provides an RF24-compatible API
+for nRF52 devices and explicitly supports `NRF_250KBPS`. That does not prove
+perfect wire compatibility with every upstream Flowtoys transmitter, but it is
+the most credible internal-radio path for a bare Feather nRF52840. The repo's
+`update-driver` command now supports an Arduino mode, and `flowtoy_bridge`
+defaults to that mode so a standard driver update compiles and uploads the
+native firmware instead of only copying the CircuitPython harness.
+
+On the Heart side, the transport and peripheral split now models three
+concerns:
+
+1. Receive raw packets from a newline-delimited JSON serial stream and publish them as normalized `RadioPacket` transport events.
+1. Decode the full 21-byte `SyncPacket` schema seen on hardware, including large group identifiers and zeroed default states.
+1. Expose FlowToy packets as a first-class `FlowToyPeripheral` that publishes the full bridge JSON body plus a dynamic mode tag derived from the decoded `page`/`mode` pair.
 
 ## Command mapping
 
@@ -35,4 +69,7 @@ On the Heart side, the radio peripheral now models two concerns:
 
 ## Implementation note
 
-The current Heart integration deliberately stops at the serial bridge boundary. It does not attempt direct host control of an `nRF24L01` or an `nRF52840`. If the hardware path changes later, `RadioDriver` is the seam to swap while keeping the `RadioPeripheral` receive and command APIs stable.
+The current Heart integration deliberately stops at the serial bridge boundary.
+It does not make the host process speak raw radio. If the firmware path changes
+later, `RadioDriver` remains the seam to swap while keeping the transport and
+FlowToy peripheral APIs stable.
