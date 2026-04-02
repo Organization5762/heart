@@ -1,0 +1,58 @@
+; Piomatter row-runs engine experiment.
+;
+; Command format (out-shift-right):
+;   0brrwwwwwwaaaaaaaaaaaaaaaaaaaaaa => row-runs command
+;       rr = additional run count after the first run (0..3)
+;       ww = first run width - 1
+;       aa = active hold count (logical_count - 1), 0 => short trailer
+;
+; Row payload after the command word:
+;   - first repeated GPIO word
+;   - for each extra run:
+;       repeated GPIO logical count word (logical_count - 1)
+;       repeated GPIO word
+;   - all rows:
+;       active hold GPIO word (implicit one-cycle hold when the inline count is zero)
+;       inactive hold GPIO word
+;       next-address hold GPIO word
+;
+; This variant is intentionally specialized for structured rows that collapse to
+; at most four runs. Dense literal rows should keep using row-compact instead.
+
+.side_set 1 opt
+.wrap_target
+top:
+    out x, 2                  ; X = additional run count after the first run
+    out y, 8                  ; Y = encoded first run width (count - 1)
+    out isr, 22               ; ISR = active hold count (0 => short trailer)
+    pull block                ; OSR = first repeated GPIO word
+run_loop:
+    mov pins, osr
+    jmp y-- run_loop side 1
+    jmp !x post_shift
+    pull block                ; OSR = encoded next run width (count - 1)
+    out y, 32
+    pull block                ; OSR = next repeated GPIO word
+    jmp x-- run_loop
+
+post_shift:
+    out null, 32              ; discard the final repeated GPIO word before the trailer
+    mov y, isr
+    jmp !y short_trailer
+
+row_trailer:
+    out pins, 32              ; active hold GPIO word
+active_hold:
+    jmp y-- active_hold
+
+trailer_tail:
+    out pins, 32              ; inactive hold GPIO word
+    nop                       ; baseline post-OE delay
+    set pins, 1               ; assert LAT while holding the inactive word
+    out pins, 32 [5]          ; next-address hold GPIO word
+    jmp top
+
+short_trailer:
+    out pins, 32 [1]          ; active hold GPIO word with an implicit single-cycle dwell
+    jmp trailer_tail
+.wrap

@@ -1,26 +1,25 @@
 # Pi 5 Scan Transport Layers
 
+This note describes the experimental native Pi 5 scan path and the parity tooling
+around it. Piomatter is no longer wired into the app runtime; in this repo it
+exists only as an external parity and benchmark reference.
+
 ## Problem
 
-The Pi 5 HUB75 path now spans three layers:
+The Pi 5 HUB75 parity work now spans two active layers:
 
-- Rust packer code that turns RGBA into a compact scan-program stream
-- a raw rp1-pio userspace transport
-- a kernel resident-loop transport
+- Rust packer/simulator code that turns RGBA into a compact scan-program stream
+- external Piomatter checkout tooling used for parity and benchmark runs
 
-Those layers intentionally share one packed protocol and one PIO parser. Without
-an explicit note, future maintainers are forced to reverse-engineer the format
-from scattered comments and benchmark history.
+The native `/dev/pio0` userspace transport is no longer part of the live app
+path, but the packed protocol and simulator still matter because they are the
+parity harness for any future clean-room reimplementation work.
 
 ## Materials
 
 - [`rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs)
-- [`rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c)
-- [`rust/heart_rgb_matrix_driver/native/pi5_scan_loop_shim.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_scan_loop_shim.c)
-- [`rust/heart_rgb_matrix_driver/native/pi5_scan_loop_ioctl.h`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/native/pi5_scan_loop_ioctl.h)
-- [`rust/heart_rgb_matrix_driver/kernel/pi5_scan_loop/heart_pi5_scan_loop.c`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/kernel/pi5_scan_loop/heart_pi5_scan_loop.c)
 - [`src/heart/device/rgb_display/runtime.py`](/Users/lampe/.codex/worktrees/b4c5/heart/src/heart/device/rgb_display/runtime.py)
-- [`src/heart/device/rgb_display/piomatter_runtime.py`](/Users/lampe/.codex/worktrees/b4c5/heart/src/heart/device/rgb_display/piomatter_runtime.py)
+- [`scripts/prepare_piomatter_parity_checkout.py`](/Users/lampe/.codex/worktrees/b4c5/heart/scripts/prepare_piomatter_parity_checkout.py)
 
 ## Packed Protocol
 
@@ -64,50 +63,19 @@ The Rust side owns all payload reduction:
 The Rust layer does not try to pace replay. It only decides what bytes the
 transport must carry.
 
-### Raw rp1-pio transport
+### External Piomatter parity path
 
-The userspace C shim is the baseline transport:
+The repo still carries Piomatter parity tooling for Pi 5 bring-up:
 
-- load the shared 25-instruction parser
-- configure rp1-pio transfer buffers
-- submit one packed frame with one ioctl
-- wait for TX drain with one ioctl
+- it patches an external Piomatter checkout
+- it preserves a known-good reference transport during parity experiments
+- it never becomes part of the production Python runtime surface
 
-This path is useful because its behavior is easy to compare against the kernel
-resident loop without involving a second packed format.
-
-### Piomatter simple backend
-
-The repo now also carries a Python-side Piomatter backend for Pi 5 bring-up:
-
-- it is selected explicitly with `HEART_RGB_DISPLAY_BACKEND=piomatter`
-- it preserves Heart's `submit_rgba()` plus canvas API surface
-- it uses Adafruit's known-good Piomatter stack for the actual panel replay
-
-This backend is intentionally boring. It exists so Heart can keep a working
-"simple" path in-tree while the raw rp1-pio transport is still being tuned.
 The transport ladder is therefore:
 
 1. prove behavior in Piomatter
-1. keep a repo-local Piomatter fallback for simple runs
-1. port the same behavior into the clean-room raw rp1-pio path
-1. only then add compaction or resident-loop optimizations
-
-### Kernel resident loop
-
-The kernel module keeps one packed frame resident in coherent memory and replays
-that exact buffer from a kthread:
-
-- `INIT`: allocate resident storage and configure the shared parser
-  The current parser keeps the span format intact but generates `LAT` and the
-  active `OE` window internally so the packed trailer only carries a dwell word.
-- `LOAD`: copy a new packed frame into resident storage
-- `START`: begin replay and reset presentation counting
-- `WAIT` / `STATS`: expose kernel-owned replay counts
-- `STOP`: stop replay
-
-The resident loop does not repack or reinterpret the frame. It only optimizes
-how the already-packed bytes reach the RP1 FIFO.
+1. model the equivalent protocol in the Rust simulator/audit stack
+1. only then consider another clean-room transport implementation
 
 ## Operational Invariants
 
@@ -115,29 +83,24 @@ Two invariants are worth stating explicitly because they explain most of the
 driver code:
 
 1. `LOAD` replaces the entire resident payload.
-   The kernel module does not support partial patching of the resident frame.
-   Callers must `STOP`, `LOAD` a whole new packed byte stream, then `START`
-   again. That keeps replay accounting and ownership rules simple.
+   The transport does not support partial patching of the active frame.
+   Callers must rebuild and submit a whole new packed byte stream. That keeps
+   replay accounting and ownership rules simple.
 
 1. Presentation counting is transport completion, not panel-photon accounting.
-   `WAIT` and `STATS` advance when the transport-specific completion point says
-   a replay batch has been consumed:
-   the raw transport uses TX drain, and the resident loop uses MMIO writes plus
-   drain. That is intentionally conservative and transport-oriented; it avoids
-   userspace inventing its own refresh counter.
+   `WAIT` advances when the transport-specific completion point says a replay
+   batch has been consumed. That is intentionally conservative and
+   transport-oriented; it avoids userspace inventing its own refresh counter.
 
 Those invariants are why the code prefers coherent buffers, one replay worker
 per session, and a narrow ioctl surface over a richer but harder-to-audit
 feature set.
 
-## Why The Parsers Match
+## Why The Protocol Stays Shared
 
-Keeping the raw rp1-pio transport and the kernel resident loop on the same PIO
-program is intentional:
+Keeping Piomatter parity work and the Rust packer/simulator on the same logical
+protocol is intentional:
 
-- benchmark differences stay attributable to transport changes
 - correctness fixes land once at the protocol level
-- sparse-payload optimizations in Rust benefit both paths immediately
-
-If a future change requires a protocol break, it should be treated as a shared
-format migration, not a one-off tweak in only one C transport.
+- sparse-payload optimizations in Rust remain measurable
+- panel behavior stays comparable across the fallback and any future clean-room path

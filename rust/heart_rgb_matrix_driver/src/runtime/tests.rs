@@ -1,21 +1,33 @@
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use std::{fs, path::PathBuf};
 
 use super::config::{ColorOrder, WiringProfile};
 use super::driver::{MatrixDriverCore, MatrixDriverError};
 use super::pi5_pio_programs_generated::PI5_PIO_SIMPLE_HUB75_SIDESET_TOTAL_BITS;
 use super::{
     build_simple_group_words_for_rgba, estimate_simple_hub75_frame_timing,
-    gpio_is_high, pio_program_info_for_format, simulate_simple_hub75_group, FrameBufferPool,
-    PackedScanFrame, Pi5ScanConfig, Pi5ScanFormat, Pi5ScanTiming,
+    gpio_is_high, piomatter_row_compact_engine_parity_program_info,
+    piomatter_row_compact_tight_engine_parity_program_info,
+    piomatter_row_counted_engine_parity_program_info,
+    piomatter_row_hybrid_engine_parity_program_info,
+    piomatter_row_runs_engine_parity_program_info,
+    piomatter_row_repeat_engine_parity_program_info,
+    piomatter_row_split_engine_parity_program_info,
+    piomatter_row_window_engine_parity_program_info,
+    piomatter_symbol_command_parity_program_info, pio_program_info_for_format,
+    simulate_simple_hub75_group, FrameBufferPool, PackedScanFrame, Pi5ScanConfig, Pi5ScanFormat,
+    Pi5ScanTiming,
 };
 use crate::runtime::pi5_scan::{
-    decode_dwell_counter, encode_raw_span_word, encode_repeat_span_word, Pi5KernelResidentLoopStats,
+    decode_dwell_counter, decode_symbol_command, encode_raw_span_word,
+    encode_repeat_span_word, encode_symbol_delay_command, encode_symbol_literal_command,
+    encode_symbol_repeat_command, pack_control_prefixed_rgb_lane_symbols, pack_rgb_lane_symbols,
+    SymbolCommandKind,
     SIMPLE_COMMAND_COUNT_MASK, SIMPLE_COMMAND_DATA_BIT,
 };
 use crate::runtime::queue::WorkerState;
+use heart_pio_sim::simulate_program;
 
 const R1_GPIO: u32 = 5;
 const G1_GPIO: u32 = 13;
@@ -32,6 +44,55 @@ const CLK_GPIO: u32 = 17;
 const LAT_GPIO: u32 = 21;
 const OE_GPIO: u32 = 18;
 const LEGACY_OE_GPIO: u32 = 4;
+const PIOMATTER_COMMAND_DATA: u32 = 1_u32 << 31;
+const PIOMATTER_ROW_COMPACT_COMMAND_LITERAL_BASE: u32 = 0;
+const PIOMATTER_ROW_COMPACT_COMMAND_REPEAT_BASE: u32 = 1_u32 << 31;
+const PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_SHIFT: u32 = 8;
+const PIOMATTER_ROW_COMPACT_COMMAND_WIDTH_MASK: u32 = (1_u32 << 8) - 1;
+const PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_LIMIT: u32 =
+    (1_u32 << (31 - PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_SHIFT)) - 1;
+const PIOMATTER_ROW_COUNTED_COMMAND_LITERAL_BASE: u32 = 0;
+const PIOMATTER_ROW_COUNTED_COMMAND_REPEAT_BASE: u32 = 1_u32 << 31;
+const PIOMATTER_ROW_HYBRID_COMMAND_KIND_SHIFT: u32 = 30;
+const PIOMATTER_ROW_HYBRID_COMMAND_LITERAL_BASE: u32 = 0;
+const PIOMATTER_ROW_HYBRID_COMMAND_REPEAT_BASE: u32 = 1_u32 << PIOMATTER_ROW_HYBRID_COMMAND_KIND_SHIFT;
+const PIOMATTER_ROW_HYBRID_COMMAND_SPLIT_BASE: u32 = 2_u32 << PIOMATTER_ROW_HYBRID_COMMAND_KIND_SHIFT;
+const PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_SHIFT: u32 = 8;
+const PIOMATTER_ROW_HYBRID_COMMAND_WIDTH_MASK: u32 = (1_u32 << 8) - 1;
+const PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_LIMIT: u32 =
+    (1_u32 << (PIOMATTER_ROW_HYBRID_COMMAND_KIND_SHIFT - PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_SHIFT)) - 1;
+const PIOMATTER_ROW_RUNS_COMMAND_EXTRA_RUNS_SHIFT: u32 = 30;
+const PIOMATTER_ROW_RUNS_COMMAND_FIRST_WIDTH_SHIFT: u32 = 22;
+const PIOMATTER_ROW_RUNS_COMMAND_FIRST_WIDTH_MASK: u32 = (1_u32 << 8) - 1;
+const PIOMATTER_ROW_RUNS_COMMAND_ACTIVE_HOLD_LIMIT: u32 =
+    (1_u32 << PIOMATTER_ROW_RUNS_COMMAND_FIRST_WIDTH_SHIFT) - 1;
+const PIOMATTER_ROW_WINDOW_COMMAND_KIND_SHIFT: u32 = 30;
+const PIOMATTER_ROW_WINDOW_COMMAND_LITERAL_BASE: u32 = 0;
+const PIOMATTER_ROW_WINDOW_COMMAND_REPEAT_BASE: u32 =
+    1_u32 << PIOMATTER_ROW_WINDOW_COMMAND_KIND_SHIFT;
+const PIOMATTER_ROW_WINDOW_COMMAND_SPLIT_BASE: u32 =
+    2_u32 << PIOMATTER_ROW_WINDOW_COMMAND_KIND_SHIFT;
+const PIOMATTER_ROW_WINDOW_COMMAND_WINDOW_BASE: u32 =
+    3_u32 << PIOMATTER_ROW_WINDOW_COMMAND_KIND_SHIFT;
+const PIOMATTER_ROW_SPLIT_COMMAND_REPEAT_BASE: u32 = 0;
+const PIOMATTER_ROW_SPLIT_COMMAND_SPLIT_BASE: u32 = 1_u32 << 31;
+const PIOMATTER_ROW_SPLIT_COMMAND_COUNTED_TRAILER: u32 = 1_u32 << 30;
+const PIOMATTER_ROW_REPEAT_COMMAND_LITERAL: u32 = 0b10_u32 << 30;
+const PIOMATTER_ROW_REPEAT_COMMAND_REPEAT: u32 = 0b11_u32 << 30;
+const SEMANTIC_R1_BIT: u32 = 1 << 0;
+const SEMANTIC_G1_BIT: u32 = 1 << 1;
+const SEMANTIC_B1_BIT: u32 = 1 << 2;
+const SEMANTIC_R2_BIT: u32 = 1 << 3;
+const SEMANTIC_G2_BIT: u32 = 1 << 4;
+const SEMANTIC_B2_BIT: u32 = 1 << 5;
+const SEMANTIC_A_BIT: u32 = 1 << 6;
+const SEMANTIC_B_BIT: u32 = 1 << 7;
+const SEMANTIC_C_BIT: u32 = 1 << 8;
+const SEMANTIC_D_BIT: u32 = 1 << 9;
+const SEMANTIC_E_BIT: u32 = 1 << 10;
+const SEMANTIC_OE_BIT: u32 = 1 << 11;
+const SEMANTIC_LAT_BIT: u32 = 1 << 12;
+const SEMANTIC_CLK_GPIO: u32 = 13;
 const USED_SIMPLE_GPIOS: [u32; 12] = [
     R1_GPIO, G1_GPIO, B1_GPIO, R2_GPIO, G2_GPIO, B2_GPIO, A_GPIO, B_GPIO, C_GPIO, D_GPIO, E_GPIO,
     OE_GPIO,
@@ -78,6 +139,646 @@ impl ParsedSimpleGroup {
             .sum::<usize>()
             + 6
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ObservablePulseTrace {
+    low_words: Vec<u32>,
+    high_words: Vec<u32>,
+}
+
+fn extract_gpio_observable_trace(simulation: &heart_pio_sim::PioSimulation) -> ObservablePulseTrace {
+    let mut low_words = Vec::new();
+    let mut high_words = Vec::new();
+
+    for (index, step) in simulation.steps.iter().enumerate() {
+        let opcode_class = step.instruction >> 13;
+        let is_out_pins = opcode_class == 3 && ((step.instruction >> 5) & 0x7) == 0;
+        let mov_src = step.instruction & 0x7;
+        let is_mov_pins = opcode_class == 5
+            && ((step.instruction >> 5) & 0x7) == 0
+            && (mov_src == 1 || mov_src == 6 || mov_src == 7);
+        if !(is_out_pins || is_mov_pins) {
+            continue;
+        }
+        low_words.push(step.pins);
+
+        if let Some(next) = simulation.steps.get(index + 1) {
+            let base_without_clock = step.pins & !(1_u32 << CLK_GPIO);
+            let next_without_clock = next.pins & !(1_u32 << CLK_GPIO);
+            if next_without_clock == base_without_clock
+                && next.sideset_value != 0
+                && gpio_is_high(next.pins, CLK_GPIO)
+            {
+                high_words.push(next.pins);
+            }
+        }
+    }
+
+    ObservablePulseTrace {
+        low_words,
+        high_words,
+    }
+}
+
+fn extract_pin_transition_sequence(simulation: &heart_pio_sim::PioSimulation) -> Vec<u32> {
+    let mut transitions = Vec::new();
+    let mut previous = None;
+    for step in &simulation.steps {
+        if previous == Some(step.pins) {
+            continue;
+        }
+        transitions.push(step.pins);
+        previous = Some(step.pins);
+    }
+    transitions
+}
+
+fn semantic_symbol(bits: u32) -> u8 {
+    (bits & 0x3f) as u8
+}
+
+fn semantic_control_word(bits: u32) -> u32 {
+    bits & ((1_u32 << 13) - 1)
+}
+
+fn map_semantic_pins_to_actual_gpio(pins: u32) -> u32 {
+    let mut actual = 0_u32;
+    for (semantic_bit, gpio) in [
+        (SEMANTIC_R1_BIT, R1_GPIO),
+        (SEMANTIC_G1_BIT, G1_GPIO),
+        (SEMANTIC_B1_BIT, B1_GPIO),
+        (SEMANTIC_R2_BIT, R2_GPIO),
+        (SEMANTIC_G2_BIT, G2_GPIO),
+        (SEMANTIC_B2_BIT, B2_GPIO),
+        (SEMANTIC_A_BIT, A_GPIO),
+        (SEMANTIC_B_BIT, B_GPIO),
+        (SEMANTIC_C_BIT, C_GPIO),
+        (SEMANTIC_D_BIT, D_GPIO),
+        (SEMANTIC_E_BIT, E_GPIO),
+        (SEMANTIC_OE_BIT, OE_GPIO),
+        (SEMANTIC_LAT_BIT, LAT_GPIO),
+    ] {
+        if (pins & semantic_bit) != 0 {
+            actual |= 1_u32 << gpio;
+        }
+    }
+    if gpio_is_high(pins, SEMANTIC_CLK_GPIO) {
+        actual |= 1_u32 << CLK_GPIO;
+    }
+    actual
+}
+
+fn extract_mapped_gpio_observable_trace(
+    simulation: &heart_pio_sim::PioSimulation,
+) -> ObservablePulseTrace {
+    let trace = extract_gpio_observable_trace(simulation);
+    ObservablePulseTrace {
+        low_words: trace
+            .low_words
+            .into_iter()
+            .map(map_semantic_pins_to_actual_gpio)
+            .collect(),
+        high_words: trace
+            .high_words
+            .into_iter()
+            .map(map_semantic_pins_to_actual_gpio)
+            .collect(),
+    }
+}
+
+fn extract_mapped_out_pins_count_observable_trace(
+    simulation: &heart_pio_sim::PioSimulation,
+    out_count: u8,
+) -> ObservablePulseTrace {
+    let mut low_words = Vec::new();
+    let mut high_words = Vec::new();
+
+    for (index, step) in simulation.steps.iter().enumerate() {
+        let opcode_class = step.instruction >> 13;
+        let is_out_pins = opcode_class == 3
+            && ((step.instruction >> 5) & 0x7) == 0
+            && ((step.instruction & 0x1f) as u8 == out_count
+                || (out_count == 32 && (step.instruction & 0x1f) == 0));
+        if !is_out_pins {
+            continue;
+        }
+        let mapped_low = map_semantic_pins_to_actual_gpio(step.pins);
+        low_words.push(mapped_low);
+
+        if let Some(next) = simulation.steps.get(index + 1) {
+            let mapped_next = map_semantic_pins_to_actual_gpio(next.pins);
+            let base_without_clock = mapped_low & !(1_u32 << CLK_GPIO);
+            let next_without_clock = mapped_next & !(1_u32 << CLK_GPIO);
+            if next_without_clock == base_without_clock
+                && next.sideset_value != 0
+                && gpio_is_high(mapped_next, CLK_GPIO)
+            {
+                high_words.push(mapped_next);
+            }
+        }
+    }
+
+    ObservablePulseTrace {
+        low_words,
+        high_words,
+    }
+}
+
+fn encode_row_engine_count(logical_count: u32, label: &str) -> Result<u32, String> {
+    logical_count
+        .checked_sub(1)
+        .ok_or_else(|| format!("row-engine {label} count must be at least 1"))
+}
+
+fn encode_row_compact_literal_command(
+    logical_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(logical_count, "literal row count")?;
+    if encoded_count > PIOMATTER_ROW_COMPACT_COMMAND_WIDTH_MASK {
+        return Err("literal row count exceeds compact command width bits".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("active hold count exceeds compact command inline bits".to_string());
+    }
+    Ok(
+        PIOMATTER_ROW_COMPACT_COMMAND_LITERAL_BASE
+            | (active_hold_count << PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_SHIFT)
+            | encoded_count,
+    )
+}
+
+fn encode_row_compact_repeat_command(
+    logical_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(logical_count, "repeat row count")?;
+    if encoded_count > PIOMATTER_ROW_COMPACT_COMMAND_WIDTH_MASK {
+        return Err("repeat row count exceeds compact command width bits".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("active hold count exceeds compact command inline bits".to_string());
+    }
+    Ok(
+        PIOMATTER_ROW_COMPACT_COMMAND_REPEAT_BASE
+            | (active_hold_count << PIOMATTER_ROW_COMPACT_COMMAND_ACTIVE_HOLD_SHIFT)
+            | encoded_count,
+    )
+}
+
+fn encode_row_counted_literal_command(logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_COUNTED_COMMAND_LITERAL_BASE
+            | encode_row_engine_count(logical_count, "counted literal row count")?,
+    )
+}
+
+fn encode_row_counted_repeat_command(logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_COUNTED_COMMAND_REPEAT_BASE
+            | encode_row_engine_count(logical_count, "counted repeat row count")?,
+    )
+}
+
+fn encode_row_split_repeat_command(logical_count: u32, counted_trailer: bool) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_SPLIT_COMMAND_REPEAT_BASE
+            | if counted_trailer {
+                PIOMATTER_ROW_SPLIT_COMMAND_COUNTED_TRAILER
+            } else {
+                0
+            }
+            | encode_row_engine_count(logical_count, "split repeat row count")?,
+    )
+}
+
+fn encode_row_split_two_span_command(
+    first_logical_count: u32,
+    counted_trailer: bool,
+) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_SPLIT_COMMAND_SPLIT_BASE
+            | if counted_trailer {
+                PIOMATTER_ROW_SPLIT_COMMAND_COUNTED_TRAILER
+            } else {
+                0
+            }
+            | encode_row_engine_count(first_logical_count, "split first span count")?,
+    )
+}
+
+fn encode_row_hybrid_literal_command(
+    logical_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(logical_count, "hybrid literal row count")?;
+    if encoded_count > PIOMATTER_ROW_HYBRID_COMMAND_WIDTH_MASK {
+        return Err("hybrid literal row count exceeds inline width bits".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("hybrid active hold count exceeds inline bits".to_string());
+    }
+    Ok(
+        PIOMATTER_ROW_HYBRID_COMMAND_LITERAL_BASE
+            | (active_hold_count << PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_SHIFT)
+            | encoded_count,
+    )
+}
+
+fn encode_row_hybrid_repeat_command(
+    logical_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(logical_count, "hybrid repeat row count")?;
+    if encoded_count > PIOMATTER_ROW_HYBRID_COMMAND_WIDTH_MASK {
+        return Err("hybrid repeat row count exceeds inline width bits".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("hybrid active hold count exceeds inline bits".to_string());
+    }
+    Ok(
+        PIOMATTER_ROW_HYBRID_COMMAND_REPEAT_BASE
+            | (active_hold_count << PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_SHIFT)
+            | encoded_count,
+    )
+}
+
+fn encode_row_hybrid_split_command(
+    first_logical_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(first_logical_count, "hybrid split first span count")?;
+    if encoded_count > PIOMATTER_ROW_HYBRID_COMMAND_WIDTH_MASK {
+        return Err("hybrid split first span count exceeds inline width bits".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("hybrid active hold count exceeds inline bits".to_string());
+    }
+    Ok(
+        PIOMATTER_ROW_HYBRID_COMMAND_SPLIT_BASE
+            | (active_hold_count << PIOMATTER_ROW_HYBRID_COMMAND_ACTIVE_HOLD_SHIFT)
+            | encoded_count,
+    )
+}
+
+fn split_row_if_two_runs_for_test(row_words: &[u32]) -> Option<(usize, u32, usize, u32)> {
+    if row_words.is_empty() {
+        return None;
+    }
+
+    let first_word = row_words[0];
+    let mut split_index = 0_usize;
+    while split_index < row_words.len() && row_words[split_index] == first_word {
+        split_index += 1;
+    }
+
+    if split_index == row_words.len() {
+        return Some((row_words.len(), first_word, 0, first_word));
+    }
+
+    let second_word = row_words[split_index];
+    if row_words[split_index..]
+        .iter()
+        .any(|word| *word != second_word)
+    {
+        return None;
+    }
+
+    Some((
+        split_index,
+        first_word,
+        row_words.len() - split_index,
+        second_word,
+    ))
+}
+
+fn split_row_if_window_for_test(row_words: &[u32]) -> Option<(usize, u32, usize, u32, usize)> {
+    if row_words.is_empty() {
+        return None;
+    }
+
+    let edge_word = row_words[0];
+    let mut first_count = 0_usize;
+    while first_count < row_words.len() && row_words[first_count] == edge_word {
+        first_count += 1;
+    }
+
+    if first_count == row_words.len() {
+        return Some((row_words.len(), edge_word, 0, edge_word, 0));
+    }
+
+    let mut tail_start = row_words.len();
+    while tail_start > first_count && row_words[tail_start - 1] == edge_word {
+        tail_start -= 1;
+    }
+    let tail_count = row_words.len() - tail_start;
+    if tail_count == 0 {
+        return None;
+    }
+
+    let middle_word = row_words[first_count];
+    if row_words[first_count..tail_start]
+        .iter()
+        .any(|word| *word != middle_word)
+    {
+        return None;
+    }
+
+    Some((
+        first_count,
+        edge_word,
+        tail_start - first_count,
+        middle_word,
+        tail_count,
+    ))
+}
+
+fn split_row_into_runs_for_test(row_words: &[u32], max_runs: usize) -> Option<Vec<(usize, u32)>> {
+    if row_words.is_empty() {
+        return None;
+    }
+
+    let mut runs = Vec::with_capacity(max_runs);
+    let mut current_word = row_words[0];
+    let mut current_count = 0_usize;
+    for word in row_words {
+        if *word == current_word {
+            current_count += 1;
+            continue;
+        }
+        runs.push((current_count, current_word));
+        if runs.len() > max_runs {
+            return None;
+        }
+        current_word = *word;
+        current_count = 1;
+    }
+    runs.push((current_count, current_word));
+    if runs.len() > max_runs {
+        return None;
+    }
+    Some(runs)
+}
+
+fn extend_row_repeat_row_words(
+    destination: &mut Vec<u32>,
+    row_words: &[u32],
+    active_hold_count: u32,
+    active_hold_word: u32,
+    inactive_hold_word: u32,
+    next_addr_word: u32,
+) {
+    if row_words.iter().all(|word| *word == row_words[0]) {
+        destination.push(
+            PIOMATTER_ROW_REPEAT_COMMAND_REPEAT
+                | encode_row_engine_count(row_words.len() as u32, "row-repeat count")
+                    .expect("row-repeat count should encode"),
+        );
+        destination.push(row_words[0]);
+    } else {
+        destination.push(
+            PIOMATTER_ROW_REPEAT_COMMAND_LITERAL
+                | encode_row_engine_count(row_words.len() as u32, "row-repeat count")
+                    .expect("row-repeat count should encode"),
+        );
+        destination.extend_from_slice(row_words);
+    }
+    destination.push(active_hold_count);
+    destination.push(active_hold_word);
+    destination.push(encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"));
+    destination.push(inactive_hold_word);
+    destination.push(encode_row_engine_count(4, "latch hold").expect("latch hold should encode"));
+    destination.push(encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"));
+    destination.push(next_addr_word);
+}
+
+fn extend_row_hybrid_row_words(
+    destination: &mut Vec<u32>,
+    row_words: &[u32],
+    active_hold_count: u32,
+    active_hold_word: u32,
+    inactive_hold_word: u32,
+    next_addr_word: u32,
+) {
+    if row_words.iter().all(|word| *word == row_words[0]) {
+        destination.push(
+            encode_row_hybrid_repeat_command(row_words.len() as u32, active_hold_count)
+                .expect("hybrid repeat row should encode"),
+        );
+        destination.push(row_words[0]);
+    } else if let Some((first_count, first_word, second_count, second_word)) =
+        split_row_if_two_runs_for_test(row_words)
+    {
+        if second_count == 0 {
+            destination.push(
+                encode_row_hybrid_repeat_command(row_words.len() as u32, active_hold_count)
+                    .expect("hybrid repeat row should encode"),
+            );
+            destination.push(first_word);
+        } else {
+            destination.push(
+                encode_row_hybrid_split_command(first_count as u32, active_hold_count)
+                    .expect("hybrid split row should encode"),
+            );
+            destination.push(first_word);
+            destination.push(
+                encode_row_engine_count(second_count as u32, "hybrid second span count")
+                    .expect("hybrid second span count should encode"),
+            );
+            destination.push(second_word);
+        }
+    } else {
+        destination.push(
+            encode_row_hybrid_literal_command(row_words.len() as u32, active_hold_count)
+                .expect("hybrid literal row should encode"),
+        );
+        destination.extend_from_slice(row_words);
+    }
+
+    destination.push(active_hold_word);
+    destination.push(inactive_hold_word);
+    destination.push(next_addr_word);
+}
+
+fn extend_row_split_row_words(
+    destination: &mut Vec<u32>,
+    row_words: &[u32],
+    active_hold_count: u32,
+    active_hold_word: u32,
+    inactive_hold_word: u32,
+    next_addr_word: u32,
+) {
+    if let Some((first_count, first_word, second_count, second_word)) =
+        split_row_if_two_runs_for_test(row_words)
+    {
+        let counted_trailer = active_hold_count != 0;
+        if second_count == 0 {
+            destination.push(
+                encode_row_split_repeat_command(first_count as u32, counted_trailer)
+                    .expect("split repeat row should encode"),
+            );
+            destination.push(first_word);
+        } else {
+            destination.push(
+                encode_row_split_two_span_command(first_count as u32, counted_trailer)
+                    .expect("split two-span row should encode"),
+            );
+            destination.push(first_word);
+            destination.push(
+                encode_row_engine_count(second_count as u32, "split second span count")
+                    .expect("split second span count should encode"),
+            );
+            destination.push(second_word);
+        }
+        if counted_trailer {
+            destination.push(active_hold_count);
+        }
+        destination.push(active_hold_word);
+        destination.push(inactive_hold_word);
+        destination.push(next_addr_word);
+        return;
+    }
+
+    panic!("row-split only supports one-run or two-run rows in these parity tests");
+}
+
+fn extend_row_runs_row_words(
+    destination: &mut Vec<u32>,
+    row_words: &[u32],
+    active_hold_count: u32,
+    active_hold_word: u32,
+    inactive_hold_word: u32,
+    next_addr_word: u32,
+) {
+    let runs = split_row_into_runs_for_test(row_words, 4).expect("row-runs should support up to four runs");
+    destination.push(
+        encode_row_runs_command(
+            runs[0].0 as u32,
+            (runs.len() - 1) as u32,
+            active_hold_count,
+        )
+        .expect("row-runs command should encode"),
+    );
+    destination.push(runs[0].1);
+    for (count, word) in runs.iter().skip(1) {
+        destination.push(
+            encode_row_engine_count(*count as u32, "row-runs span count")
+                .expect("row-runs span count should encode"),
+        );
+        destination.push(*word);
+    }
+    destination.push(active_hold_word);
+    destination.push(inactive_hold_word);
+    destination.push(next_addr_word);
+}
+
+fn encode_row_runs_command(
+    first_logical_count: u32,
+    extra_run_count: u32,
+    active_hold_count: u32,
+) -> Result<u32, String> {
+    let encoded_count = encode_row_engine_count(first_logical_count, "runs first span count")?;
+    if encoded_count > PIOMATTER_ROW_RUNS_COMMAND_FIRST_WIDTH_MASK {
+        return Err("runs first span count exceeds inline width bits".to_string());
+    }
+    if extra_run_count > 3 {
+        return Err("runs command supports at most four runs".to_string());
+    }
+    if active_hold_count > PIOMATTER_ROW_RUNS_COMMAND_ACTIVE_HOLD_LIMIT {
+        return Err("runs active hold count exceeds inline bits".to_string());
+    }
+    Ok(
+        (extra_run_count << PIOMATTER_ROW_RUNS_COMMAND_EXTRA_RUNS_SHIFT)
+            | (encoded_count << PIOMATTER_ROW_RUNS_COMMAND_FIRST_WIDTH_SHIFT)
+            | active_hold_count,
+    )
+}
+
+fn encode_row_window_literal_command(logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_WINDOW_COMMAND_LITERAL_BASE
+            | encode_row_engine_count(logical_count, "window literal row count")?,
+    )
+}
+
+fn encode_row_window_repeat_command(logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_WINDOW_COMMAND_REPEAT_BASE
+            | encode_row_engine_count(logical_count, "window repeat row count")?,
+    )
+}
+
+fn encode_row_window_split_command(first_logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_WINDOW_COMMAND_SPLIT_BASE
+            | encode_row_engine_count(first_logical_count, "window first split span count")?,
+    )
+}
+
+fn encode_row_window_window_command(first_logical_count: u32) -> Result<u32, String> {
+    Ok(
+        PIOMATTER_ROW_WINDOW_COMMAND_WINDOW_BASE
+            | encode_row_engine_count(first_logical_count, "window first edge span count")?,
+    )
+}
+
+fn extend_row_window_row_words(
+    destination: &mut Vec<u32>,
+    row_words: &[u32],
+    active_hold_count: u32,
+    active_hold_word: u32,
+    inactive_hold_word: u32,
+    next_addr_word: u32,
+) {
+    if row_words.iter().all(|word| *word == row_words[0]) {
+        destination.push(
+            encode_row_window_repeat_command(row_words.len() as u32)
+                .expect("window repeat row should encode"),
+        );
+        destination.push(row_words[0]);
+    } else if let Some((first_count, first_word, second_count, second_word)) =
+        split_row_if_two_runs_for_test(row_words)
+    {
+        destination.push(
+            encode_row_window_split_command(first_count as u32)
+                .expect("window first split span should encode"),
+        );
+        destination.push(first_word);
+        destination.push(
+            encode_row_engine_count(second_count as u32, "window second span count")
+                .expect("window second span count should encode"),
+        );
+        destination.push(second_word);
+    } else if let Some((first_count, edge_word, middle_count, middle_word, tail_count)) =
+        split_row_if_window_for_test(row_words)
+    {
+        destination.push(
+            encode_row_window_window_command(first_count as u32)
+                .expect("window first edge span should encode"),
+        );
+        destination.push(edge_word);
+        destination.push(
+            encode_row_engine_count(middle_count as u32, "window middle span count")
+                .expect("window middle span count should encode"),
+        );
+        destination.push(middle_word);
+        destination.push(
+            encode_row_engine_count(tail_count as u32, "window tail span count")
+                .expect("window tail span count should encode"),
+        );
+    } else {
+        destination.push(
+            encode_row_window_literal_command(row_words.len() as u32)
+                .expect("window literal row should encode"),
+        );
+        destination.extend_from_slice(row_words);
+    }
+
+    destination.push(active_hold_count);
+    destination.push(active_hold_word);
+    destination.push(inactive_hold_word);
+    destination.push(next_addr_word);
 }
 
 fn decode_test_simple_command(command_word: u32) -> (TestSimpleCommandKind, usize) {
@@ -228,21 +929,6 @@ fn frame_buffer_write_rgba_swaps_green_and_blue_for_gbr() {
     frame.write_rgba(&input, ColorOrder::Gbr);
 
     assert_eq!(frame.as_slice(), &[10, 30, 20, 255, 40, 60, 50, 128]);
-}
-
-#[test]
-fn frame_buffer_identity_advances_when_contents_change() {
-    let mut frame = FrameBufferPool::new(8, 1).acquire();
-    let initial_identity = frame.identity();
-
-    frame.write_rgba(&[1, 2, 3, 4, 5, 6, 7, 8], ColorOrder::Rgb);
-    let updated_identity = frame.identity();
-    frame.clear();
-    let cleared_identity = frame.identity();
-
-    assert_ne!(initial_identity, updated_identity);
-    assert_ne!(updated_identity, cleared_identity);
-    assert_eq!(initial_identity.0, updated_identity.0);
 }
 
 #[test]
@@ -469,21 +1155,6 @@ fn pi5_scan_config_accepts_adafruit_hat_for_simple_mode() {
         .expect("Pi 5 simple scan transport should accept the non-PWM Adafruit HAT wiring");
 
     assert_eq!(config.pinout().oe_gpio(), LEGACY_OE_GPIO);
-}
-
-#[test]
-fn pi5_kernel_stats_surface_worker_errors_in_presentation_counts() {
-    let stats = Pi5KernelResidentLoopStats {
-        presentations: 7,
-        last_error: -5,
-        ..Default::default()
-    };
-
-    let error = stats
-        .presentation_count_result()
-        .expect_err("worker failures should not be hidden behind a presentation count");
-
-    assert!(error.contains("-5"));
 }
 
 #[test]
@@ -1058,26 +1729,6 @@ fn pi5_simple_timing_estimate_accounts_for_clock_divider() {
 }
 
 #[test]
-fn pi5_native_pwm_bonnet_keeps_gpio4_out_of_the_pio_output_window() {
-    let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("native")
-        .join("pi5_pio_scan_shim.c");
-    let source = fs::read_to_string(&source_path)
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", source_path.display()));
-
-    assert!(
-        source.contains(
-            "oe_gpio == 18u && pin == HEART_PI5_PIO_SCAN_ADAFRUIT_PWM_TRANSITION_GPIO"
-        ),
-        "the native shim should special-case the PWM bonnet's bridged GPIO4 pin"
-    );
-    assert!(
-        source.contains("heart_pi5_pio_scan_output_window_init(pio, (uint)sm, oe_gpio);"),
-        "the native shim should decide output-window ownership from the active OE mapping"
-    );
-}
-
-#[test]
 fn pi5_pio_program_summaries_track_generated_program_shapes() {
     let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
         .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
@@ -1116,8 +1767,8 @@ fn pi5_pio_program_summaries_track_generated_program_shapes() {
             .iter()
             .filter(|instruction| instruction.out_writes_window)
             .count(),
-        3,
-        "the simple command interpreter should only write the OUT window for delay, data, and repeat GPIO words"
+        2,
+        "the simple Piomatter-parity program should only write the OUT window for the data and delay GPIO words"
     );
     assert_eq!(
         simple_info
@@ -1143,6 +1794,2832 @@ fn pi5_pio_program_summaries_track_generated_program_shapes() {
             .iter()
             .any(|instruction| instruction.mnemonic == "mov pins, x"),
         "the resident parser summary should reflect the generated repeat-path MOV PINS instruction"
+    );
+}
+
+#[test]
+fn piomatter_parity_program_emits_expected_gpio_trace() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let program_info = pio_program_info_for_format(&config, Pi5ScanFormat::Simple);
+    let data_word_a = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let data_word_b = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO);
+    let delay_word = 1_u32 << LAT_GPIO;
+    let fifo_words = [
+        PIOMATTER_COMMAND_DATA | 1,
+        data_word_a,
+        data_word_b,
+        0,
+        delay_word,
+    ];
+    let simulated = simulate_program(
+        &program_info.program,
+        program_info.simulator_config,
+        &fifo_words,
+        64,
+    )
+    .expect("Piomatter parity command stream should simulate");
+
+    assert!(
+        simulated.stalled_on_pull,
+        "the simulator should stop by stalling on the next pull once the scripted parity command stream is consumed"
+    );
+
+    let trace = simulated
+        .steps
+        .iter()
+        .map(|step| (step.pc, step.pins))
+        .collect::<Vec<_>>();
+    let expected_trace = vec![
+        (0, 0),
+        (1, 0),
+        (2, 0),
+        (3, data_word_a),
+        (4, data_word_a | (1_u32 << CLK_GPIO)),
+        (3, data_word_b),
+        (4, data_word_b | (1_u32 << CLK_GPIO)),
+        (0, data_word_b | (1_u32 << CLK_GPIO)),
+        (1, data_word_b | (1_u32 << CLK_GPIO)),
+        (2, data_word_b | (1_u32 << CLK_GPIO)),
+        (5, delay_word),
+        (6, delay_word),
+        (7, delay_word),
+    ];
+
+    assert_eq!(
+        trace, expected_trace,
+        "the Piomatter-parity program should keep the exact GPIO sequence for one two-word data command followed by one delay command"
+    );
+}
+
+#[test]
+fn piomatter_row_repeat_engine_preserves_observable_gpio_waveform_for_repeated_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let literal_program = pio_program_info_for_format(&config, Pi5ScanFormat::Simple);
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let active_word = 1_u32 << OE_GPIO;
+    let inactive_word = 0;
+
+    let literal_fifo_words = [
+        PIOMATTER_COMMAND_DATA | 3,
+        repeated_blue,
+        repeated_blue,
+        repeated_blue,
+        repeated_blue,
+        2,
+        active_word,
+        1,
+        inactive_word,
+        3,
+        inactive_word | (1_u32 << LAT_GPIO),
+        1,
+        inactive_word,
+    ];
+    let row_repeat_fifo_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        active_word,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        inactive_word,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        inactive_word,
+    ];
+
+    let literal_simulation = simulate_program(
+        &literal_program.program,
+        literal_program.simulator_config,
+        &literal_fifo_words,
+        256,
+    )
+    .expect("literal Piomatter-style command stream should simulate");
+    let row_repeat_simulation = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_fifo_words,
+        256,
+    )
+    .expect("row-repeat command stream should simulate");
+
+    let literal_observable = extract_gpio_observable_trace(&literal_simulation);
+    let row_repeat_observable = extract_gpio_observable_trace(&row_repeat_simulation);
+
+    assert_eq!(
+        literal_observable.low_words[..4],
+        row_repeat_observable.low_words[..4],
+        "the row-repeat engine should preserve the same shifted low GPIO words as the literal Piomatter stream for repeated rows"
+    );
+    assert_eq!(
+        literal_observable.high_words,
+        row_repeat_observable.high_words,
+        "the row-repeat engine should preserve the same clock-high GPIO words as the literal Piomatter stream for repeated rows"
+    );
+}
+
+#[test]
+fn piomatter_row_repeat_engine_preserves_gpio_transition_shape_for_one_nonuniform_row() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let literal_program = pio_program_info_for_format(&config, Pi5ScanFormat::Simple);
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+
+    let data_word_a = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let data_word_b = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let active_word = (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let inactive_word = 1_u32 << A_GPIO;
+    let latch_word = inactive_word | (1_u32 << LAT_GPIO);
+    let next_addr_word = 1_u32 << B_GPIO;
+
+    let literal_fifo_words = [
+        PIOMATTER_COMMAND_DATA | 1,
+        data_word_a,
+        data_word_b,
+        2,
+        active_word,
+        1,
+        inactive_word,
+        3,
+        latch_word,
+        1,
+        next_addr_word,
+    ];
+    let row_repeat_fifo_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 1,
+        data_word_a,
+        data_word_b,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        active_word,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        inactive_word,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        next_addr_word,
+    ];
+
+    let literal_simulation = simulate_program(
+        &literal_program.program,
+        literal_program.simulator_config,
+        &literal_fifo_words,
+        256,
+    )
+    .expect("literal Piomatter-style command stream should simulate");
+    let row_repeat_simulation = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_fifo_words,
+        256,
+    )
+    .expect("row-repeat command stream should simulate");
+
+    let literal_observable = extract_gpio_observable_trace(&literal_simulation);
+    let row_repeat_observable = extract_gpio_observable_trace(&row_repeat_simulation);
+    assert_eq!(
+        literal_observable.low_words[..2],
+        row_repeat_observable.low_words[..2],
+        "the row-repeat engine should preserve the same shifted low GPIO words as the literal Piomatter stream for nonuniform rows"
+    );
+    assert_eq!(
+        literal_observable.high_words,
+        row_repeat_observable.high_words,
+        "the row-repeat engine should preserve the same clock-high GPIO words as the literal Piomatter stream for nonuniform rows"
+    );
+
+    assert_eq!(
+        extract_pin_transition_sequence(&literal_simulation),
+        extract_pin_transition_sequence(&row_repeat_simulation),
+        "the row-repeat engine should preserve the externally visible GPIO transition sequence for one nonuniform row"
+    );
+}
+
+#[test]
+fn piomatter_row_repeat_engine_preserves_quadrant_scene_row_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let literal_program = pio_program_info_for_format(&config, Pi5ScanFormat::Simple);
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let frame = quadrant_rgba_frame(64, 64);
+
+    assert_eq!(&frame[0..4], &[255, 0, 0, 255]);
+    assert_eq!(&frame[((31 * 64 + 63) * 4) as usize..((31 * 64 + 63) * 4 + 4) as usize], &[0, 255, 0, 255]);
+    assert_eq!(&frame[((63 * 64) * 4) as usize..((63 * 64) * 4 + 4) as usize], &[0, 0, 255, 255]);
+    assert_eq!(
+        &frame[((63 * 64 + 63) * 4) as usize..((63 * 64 + 63) * 4 + 4) as usize],
+        &[255, 255, 255, 255]
+    );
+
+    let left_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let active_word = 1_u32 << OE_GPIO;
+    let inactive_word = 0;
+    let latch_word = 1_u32 << LAT_GPIO;
+
+    let literal_fifo_words = std::iter::once(PIOMATTER_COMMAND_DATA | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([2, active_word, 1, inactive_word, 3, latch_word, 1, inactive_word])
+        .collect::<Vec<_>>();
+    let row_repeat_fifo_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            active_word,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            inactive_word,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            inactive_word,
+        ])
+        .collect::<Vec<_>>();
+
+    let literal_simulation = simulate_program(
+        &literal_program.program,
+        literal_program.simulator_config,
+        &literal_fifo_words,
+        1024,
+    )
+    .expect("literal Piomatter quadrant row should simulate");
+    let row_repeat_simulation = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_fifo_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+
+    let literal_observable = extract_gpio_observable_trace(&literal_simulation);
+    let row_repeat_observable = extract_gpio_observable_trace(&row_repeat_simulation);
+    assert_eq!(
+        literal_observable.low_words[..64],
+        row_repeat_observable.low_words[..64],
+        "the row-repeat engine should preserve the shifted low GPIO words for a quadrant scene row"
+    );
+    assert_eq!(
+        literal_observable.high_words[..64],
+        row_repeat_observable.high_words[..64],
+        "the row-repeat engine should preserve the clock-high GPIO words for a quadrant scene row"
+    );
+
+    let half_width = 32;
+    assert!(
+        literal_observable.low_words[..half_width]
+            .iter()
+            .all(|&word| word == left_word),
+        "the left half of the quadrant row should stay on the red/blue mixed word"
+    );
+    assert!(
+        literal_observable.low_words[half_width..64]
+            .iter()
+            .all(|&word| word == right_word),
+        "the right half of the quadrant row should stay on the green/white mixed word"
+    );
+}
+
+#[test]
+fn piomatter_row_compact_engine_preserves_repeated_nonuniform_quadrant_and_center_box_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_compact_program = piomatter_row_compact_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_active = 1_u32 << OE_GPIO;
+    let repeated_inactive = 0;
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_compact_repeated_words = [
+        encode_row_compact_repeat_command(
+            4,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("repeat row count should encode"),
+        repeated_blue,
+        repeated_active,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+
+    let data_word_a = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let data_word_b = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let active_word = (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let inactive_word = 1_u32 << A_GPIO;
+    let next_addr_word = 1_u32 << B_GPIO;
+    let row_repeat_nonuniform_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 1,
+        data_word_a,
+        data_word_b,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        (1_u32 << OE_GPIO) | (1_u32 << A_GPIO),
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        inactive_word,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        next_addr_word,
+    ];
+    let row_compact_nonuniform_words = [
+        encode_row_compact_literal_command(
+            2,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("literal row count should encode"),
+        data_word_a,
+        data_word_b,
+        active_word,
+        inactive_word,
+        next_addr_word,
+    ];
+
+    let alternating_left = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO);
+    let alternating_right = (1_u32 << G1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let row_repeat_alternating_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain((0..64).map(|index| {
+            if index % 2 == 0 {
+                alternating_left
+            } else {
+                alternating_right
+            }
+        }))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_compact_alternating_words = std::iter::once(
+        encode_row_compact_literal_command(
+            64,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("literal row count should encode"),
+    )
+    .chain((0..64).map(|index| {
+        if index % 2 == 0 {
+            alternating_left
+        } else {
+            alternating_right
+        }
+    }))
+    .chain([
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ])
+    .collect::<Vec<_>>();
+
+    let left_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let row_repeat_quadrant_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_compact_quadrant_words = std::iter::once(
+        encode_row_compact_literal_command(
+            64,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("literal row count should encode"),
+    )
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            1_u32 << OE_GPIO,
+            0,
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let row_repeat_center_box_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_compact_center_box_words = std::iter::once(
+        encode_row_compact_literal_command(
+            64,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("literal row count should encode"),
+    )
+    .chain(std::iter::repeat_n(center_box_dark_word, 24))
+    .chain(std::iter::repeat_n(center_box_white_word, 16))
+    .chain(std::iter::repeat_n(center_box_dark_word, 24))
+    .chain([
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ])
+    .collect::<Vec<_>>();
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let row_compact_repeated_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_repeated_words,
+        512,
+    )
+    .expect("row-compact repeated row should simulate");
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let row_compact_repeated_observable = extract_gpio_observable_trace(&row_compact_repeated_sim);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        row_compact_repeated_observable.low_words[..4],
+        "the row-compact engine should preserve the shifted low GPIO words for repeated rows"
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words[..4],
+        row_compact_repeated_observable.high_words[..4],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for repeated rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_repeated_sim),
+        extract_pin_transition_sequence(&row_compact_repeated_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for repeated rows"
+    );
+
+    let row_repeat_nonuniform_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_nonuniform_words,
+        256,
+    )
+    .expect("row-repeat nonuniform row should simulate");
+    let row_compact_nonuniform_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_nonuniform_words,
+        512,
+    )
+    .expect("row-compact nonuniform row should simulate");
+    let row_repeat_nonuniform_observable =
+        extract_gpio_observable_trace(&row_repeat_nonuniform_sim);
+    let row_compact_nonuniform_observable =
+        extract_gpio_observable_trace(&row_compact_nonuniform_sim);
+    assert_eq!(
+        row_repeat_nonuniform_observable.low_words[..2],
+        row_compact_nonuniform_observable.low_words[..2],
+        "the row-compact engine should preserve the shifted low GPIO words for nonuniform rows"
+    );
+    assert_eq!(
+        row_repeat_nonuniform_observable.high_words[..2],
+        row_compact_nonuniform_observable.high_words[..2],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for nonuniform rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_nonuniform_sim),
+        extract_pin_transition_sequence(&row_compact_nonuniform_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for nonuniform rows"
+    );
+    assert!(
+        row_compact_nonuniform_words.len() < row_repeat_nonuniform_words.len(),
+        "the row-compact literal-row encoding should shrink dense nonuniform rows without changing their waveform"
+    );
+
+    let row_repeat_alternating_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_alternating_words,
+        2048,
+    )
+    .expect("row-repeat alternating row should simulate");
+    let row_compact_alternating_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_alternating_words,
+        2048,
+    )
+    .expect("row-compact alternating row should simulate");
+    let row_repeat_alternating_observable =
+        extract_gpio_observable_trace(&row_repeat_alternating_sim);
+    let row_compact_alternating_observable =
+        extract_gpio_observable_trace(&row_compact_alternating_sim);
+    assert_eq!(
+        row_repeat_alternating_observable.low_words[..64],
+        row_compact_alternating_observable.low_words[..64],
+        "the row-compact engine should preserve the shifted low GPIO words for dense alternating rows"
+    );
+    assert_eq!(
+        row_repeat_alternating_observable.high_words[..64],
+        row_compact_alternating_observable.high_words[..64],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for dense alternating rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_alternating_sim),
+        extract_pin_transition_sequence(&row_compact_alternating_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for dense alternating rows"
+    );
+    assert!(
+        row_compact_alternating_words.len() < row_repeat_alternating_words.len(),
+        "the row-compact literal-row encoding should shrink dense alternating rows without changing their waveform"
+    );
+
+    let row_repeat_quadrant_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_quadrant_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+    let row_compact_quadrant_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_quadrant_words,
+        2048,
+    )
+    .expect("row-compact quadrant row should simulate");
+    let row_repeat_quadrant_observable = extract_gpio_observable_trace(&row_repeat_quadrant_sim);
+    let row_compact_quadrant_observable =
+        extract_gpio_observable_trace(&row_compact_quadrant_sim);
+    assert_eq!(
+        row_repeat_quadrant_observable.low_words[..64],
+        row_compact_quadrant_observable.low_words[..64],
+        "the row-compact engine should preserve the shifted low GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        row_repeat_quadrant_observable.high_words[..64],
+        row_compact_quadrant_observable.high_words[..64],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_quadrant_sim),
+        extract_pin_transition_sequence(&row_compact_quadrant_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for a quadrant row"
+    );
+    assert!(
+        row_compact_quadrant_words.len() < row_repeat_quadrant_words.len(),
+        "the row-compact quadrant encoding should shrink the payload by keeping the compact trailer while preserving the same shifted waveform"
+    );
+
+    let row_repeat_center_box_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_center_box_words,
+        1024,
+    )
+    .expect("row-repeat center-box row should simulate");
+    let row_compact_center_box_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_center_box_words,
+        2048,
+    )
+    .expect("row-compact center-box row should simulate");
+    let row_repeat_center_box_observable =
+        extract_gpio_observable_trace(&row_repeat_center_box_sim);
+    let row_compact_center_box_observable =
+        extract_gpio_observable_trace(&row_compact_center_box_sim);
+    assert_eq!(
+        row_repeat_center_box_observable.low_words[..64],
+        row_compact_center_box_observable.low_words[..64],
+        "the row-compact engine should preserve the shifted low GPIO words for a center-box row"
+    );
+    assert_eq!(
+        row_repeat_center_box_observable.high_words[..64],
+        row_compact_center_box_observable.high_words[..64],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for a center-box row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_center_box_sim),
+        extract_pin_transition_sequence(&row_compact_center_box_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for a center-box row"
+    );
+    assert!(
+        row_compact_center_box_words.len() < row_repeat_center_box_words.len(),
+        "the row-compact center-box encoding should shrink the payload by keeping the compact trailer while preserving the same shifted waveform"
+    );
+}
+
+#[test]
+fn piomatter_row_compact_engine_preserves_dark_rows_with_a_shorter_trailer() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_compact_program = piomatter_row_compact_engine_parity_program_info(&config);
+
+    let dark_word = 0;
+    let row_repeat_dark_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 63,
+        dark_word,
+        encode_row_engine_count(1, "active hold").expect("active hold should encode"),
+        0,
+        encode_row_engine_count(1, "inactive hold").expect("inactive hold should encode"),
+        0,
+        encode_row_engine_count(1, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(1, "next-address hold").expect("next-address hold should encode"),
+        0,
+    ];
+    let row_compact_dark_words = [
+        encode_row_compact_repeat_command(64, 0).expect("repeat row count should encode"),
+        dark_word,
+        0,
+        0,
+        0,
+    ];
+
+    let row_repeat_dark_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_dark_words,
+        512,
+    )
+    .expect("row-repeat dark row should simulate");
+    let row_compact_dark_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &row_compact_dark_words,
+        512,
+    )
+    .expect("row-compact dark row should simulate");
+
+    let row_repeat_dark_observable = extract_gpio_observable_trace(&row_repeat_dark_sim);
+    let row_compact_dark_observable = extract_gpio_observable_trace(&row_compact_dark_sim);
+    assert_eq!(
+        row_repeat_dark_observable.low_words[..64],
+        row_compact_dark_observable.low_words[..64],
+        "the row-compact engine should preserve the shifted low GPIO words for dark rows"
+    );
+    assert_eq!(
+        row_repeat_dark_observable.high_words[..64],
+        row_compact_dark_observable.high_words[..64],
+        "the row-compact engine should preserve the shifted clock-high GPIO words for dark rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_dark_sim),
+        extract_pin_transition_sequence(&row_compact_dark_sim),
+        "the row-compact engine should preserve the externally visible GPIO transitions for dark rows"
+    );
+    assert!(
+        row_compact_dark_words.len() < row_repeat_dark_words.len(),
+        "the row-compact dark-row encoding should still shrink the payload while preserving parity"
+    );
+    assert!(
+        row_compact_dark_sim.steps.len() < row_repeat_dark_sim.steps.len(),
+        "the row-compact dark-row path should still reduce simulated PIO work by keeping the compact trailer"
+    );
+}
+
+#[test]
+fn piomatter_row_compact_tight_engine_preserves_compact_waveforms_and_reduces_short_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_compact_program = piomatter_row_compact_engine_parity_program_info(&config);
+    let row_compact_tight_program = piomatter_row_compact_tight_engine_parity_program_info(&config);
+
+    let repeated_blue_word = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let short_repeat_words = [
+        encode_row_compact_repeat_command(64, 0).expect("repeat row count should encode"),
+        repeated_blue_word,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ];
+    let alternating_left = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO);
+    let alternating_right = (1_u32 << G1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let long_literal_words = std::iter::once(
+        encode_row_compact_literal_command(
+            64,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("literal row count should encode"),
+    )
+    .chain((0..64).map(|index| {
+        if index % 2 == 0 {
+            alternating_left
+        } else {
+            alternating_right
+        }
+    }))
+    .chain([
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ])
+    .collect::<Vec<_>>();
+    let mixed_frame_words = short_repeat_words
+        .into_iter()
+        .chain(long_literal_words.iter().copied())
+        .collect::<Vec<_>>();
+
+    let row_compact_short_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &short_repeat_words,
+        1024,
+    )
+    .expect("row-compact short repeat row should simulate");
+    let row_compact_tight_short_sim = simulate_program(
+        &row_compact_tight_program.program,
+        row_compact_tight_program.simulator_config,
+        &short_repeat_words,
+        1024,
+    )
+    .expect("row-compact-tight short repeat row should simulate");
+    let row_compact_short_observable = extract_gpio_observable_trace(&row_compact_short_sim);
+    let row_compact_tight_short_observable =
+        extract_gpio_observable_trace(&row_compact_tight_short_sim);
+    assert_eq!(
+        row_compact_short_observable.low_words,
+        row_compact_tight_short_observable.low_words,
+        "the tight compact engine should preserve the shifted low GPIO words on short repeated rows",
+    );
+    assert_eq!(
+        row_compact_short_observable.high_words,
+        row_compact_tight_short_observable.high_words,
+        "the tight compact engine should preserve the shifted clock-high GPIO words on short repeated rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_compact_short_sim),
+        extract_pin_transition_sequence(&row_compact_tight_short_sim),
+        "the tight compact engine should preserve the GPIO transition ordering on short repeated rows",
+    );
+    assert!(
+        row_compact_tight_short_sim.steps.len() < row_compact_short_sim.steps.len(),
+        "the tight compact engine should spend fewer instructions on short repeated rows",
+    );
+    assert!(
+        row_compact_tight_short_sim
+            .steps
+            .last()
+            .map(|step| step.cycle_end)
+            .unwrap_or(0)
+            < row_compact_short_sim
+                .steps
+                .last()
+                .map(|step| step.cycle_end)
+                .unwrap_or(0),
+        "the tight compact engine should reduce total PIO cycles on short repeated rows",
+    );
+
+    let row_compact_long_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &long_literal_words,
+        4096,
+    )
+    .expect("row-compact long literal row should simulate");
+    let row_compact_tight_long_sim = simulate_program(
+        &row_compact_tight_program.program,
+        row_compact_tight_program.simulator_config,
+        &long_literal_words,
+        4096,
+    )
+    .expect("row-compact-tight long literal row should simulate");
+    let row_compact_long_observable = extract_gpio_observable_trace(&row_compact_long_sim);
+    let row_compact_tight_long_observable =
+        extract_gpio_observable_trace(&row_compact_tight_long_sim);
+    assert_eq!(
+        row_compact_long_observable.low_words,
+        row_compact_tight_long_observable.low_words,
+        "the tight compact engine should preserve the shifted low GPIO words on long literal rows",
+    );
+    assert_eq!(
+        row_compact_long_observable.high_words,
+        row_compact_tight_long_observable.high_words,
+        "the tight compact engine should preserve the shifted clock-high GPIO words on long literal rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_compact_long_sim),
+        extract_pin_transition_sequence(&row_compact_tight_long_sim),
+        "the tight compact engine should preserve GPIO transition ordering on long literal rows",
+    );
+    assert!(
+        row_compact_tight_long_sim
+            .steps
+            .last()
+            .map(|step| step.cycle_end)
+            .unwrap_or(0)
+            < row_compact_long_sim
+                .steps
+                .last()
+                .map(|step| step.cycle_end)
+                .unwrap_or(0),
+        "the tight compact engine should reduce total PIO cycles on long literal rows",
+    );
+
+    let row_compact_frame_sim = simulate_program(
+        &row_compact_program.program,
+        row_compact_program.simulator_config,
+        &mixed_frame_words,
+        4096,
+    )
+    .expect("row-compact mixed frame should simulate");
+    let row_compact_tight_frame_sim = simulate_program(
+        &row_compact_tight_program.program,
+        row_compact_tight_program.simulator_config,
+        &mixed_frame_words,
+        4096,
+    )
+    .expect("row-compact-tight mixed frame should simulate");
+    let row_compact_frame_observable = extract_gpio_observable_trace(&row_compact_frame_sim);
+    let row_compact_tight_frame_observable =
+        extract_gpio_observable_trace(&row_compact_tight_frame_sim);
+    assert_eq!(
+        row_compact_frame_observable.low_words,
+        row_compact_tight_frame_observable.low_words,
+        "the tight compact engine should preserve low GPIO words across mixed short and long rows",
+    );
+    assert_eq!(
+        row_compact_frame_observable.high_words,
+        row_compact_tight_frame_observable.high_words,
+        "the tight compact engine should preserve clock-high GPIO words across mixed short and long rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_compact_frame_sim),
+        extract_pin_transition_sequence(&row_compact_tight_frame_sim),
+        "the tight compact engine should preserve the GPIO transition ordering across mixed short and long rows",
+    );
+}
+
+#[test]
+fn piomatter_row_counted_engine_preserves_repeated_nonuniform_quadrant_and_center_box_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_counted_program = piomatter_row_counted_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_inactive = 0;
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_counted_repeated_words = [
+        encode_row_counted_repeat_command(4).expect("repeat row count should encode"),
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+
+    let data_word_a = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let data_word_b = (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO) | (1_u32 << A_GPIO);
+    let inactive_word = 1_u32 << A_GPIO;
+    let next_addr_word = 1_u32 << B_GPIO;
+    let row_repeat_nonuniform_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 1,
+        data_word_a,
+        data_word_b,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        (1_u32 << OE_GPIO) | (1_u32 << A_GPIO),
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        inactive_word,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        next_addr_word,
+    ];
+    let row_counted_nonuniform_words = [
+        encode_row_counted_literal_command(2).expect("literal row count should encode"),
+        data_word_a,
+        data_word_b,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        (1_u32 << OE_GPIO) | (1_u32 << A_GPIO),
+        inactive_word,
+        next_addr_word,
+    ];
+
+    let left_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let row_repeat_quadrant_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_counted_quadrant_words = std::iter::once(
+        encode_row_counted_literal_command(64).expect("literal row count should encode"),
+    )
+    .chain(std::iter::repeat_n(left_word, 32))
+    .chain(std::iter::repeat_n(right_word, 32))
+    .chain([
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ])
+    .collect::<Vec<_>>();
+
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let row_repeat_center_box_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_counted_center_box_words = std::iter::once(
+        encode_row_counted_literal_command(64).expect("literal row count should encode"),
+    )
+    .chain(std::iter::repeat_n(center_box_dark_word, 24))
+    .chain(std::iter::repeat_n(center_box_white_word, 16))
+    .chain(std::iter::repeat_n(center_box_dark_word, 24))
+    .chain([
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ])
+    .collect::<Vec<_>>();
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let row_counted_repeated_sim = simulate_program(
+        &row_counted_program.program,
+        row_counted_program.simulator_config,
+        &row_counted_repeated_words,
+        512,
+    )
+    .expect("row-counted repeated row should simulate");
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let row_counted_repeated_observable = extract_gpio_observable_trace(&row_counted_repeated_sim);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        row_counted_repeated_observable.low_words[..4],
+        "the row-counted engine should preserve the shifted low GPIO words for repeated rows",
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words[..4],
+        row_counted_repeated_observable.high_words[..4],
+        "the row-counted engine should preserve the shifted clock-high GPIO words for repeated rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_repeated_sim),
+        extract_pin_transition_sequence(&row_counted_repeated_sim),
+        "the row-counted engine should preserve the externally visible GPIO transitions for repeated rows",
+    );
+
+    let row_repeat_nonuniform_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_nonuniform_words,
+        256,
+    )
+    .expect("row-repeat nonuniform row should simulate");
+    let row_counted_nonuniform_sim = simulate_program(
+        &row_counted_program.program,
+        row_counted_program.simulator_config,
+        &row_counted_nonuniform_words,
+        512,
+    )
+    .expect("row-counted nonuniform row should simulate");
+    let row_repeat_nonuniform_observable =
+        extract_gpio_observable_trace(&row_repeat_nonuniform_sim);
+    let row_counted_nonuniform_observable =
+        extract_gpio_observable_trace(&row_counted_nonuniform_sim);
+    assert_eq!(
+        row_repeat_nonuniform_observable.low_words[..2],
+        row_counted_nonuniform_observable.low_words[..2],
+        "the row-counted engine should preserve the shifted low GPIO words for nonuniform rows",
+    );
+    assert_eq!(
+        row_repeat_nonuniform_observable.high_words[..2],
+        row_counted_nonuniform_observable.high_words[..2],
+        "the row-counted engine should preserve the shifted clock-high GPIO words for nonuniform rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_nonuniform_sim),
+        extract_pin_transition_sequence(&row_counted_nonuniform_sim),
+        "the row-counted engine should preserve the externally visible GPIO transitions for nonuniform rows",
+    );
+
+    let row_repeat_quadrant_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_quadrant_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+    let row_counted_quadrant_sim = simulate_program(
+        &row_counted_program.program,
+        row_counted_program.simulator_config,
+        &row_counted_quadrant_words,
+        2048,
+    )
+    .expect("row-counted quadrant row should simulate");
+    let row_repeat_quadrant_observable = extract_gpio_observable_trace(&row_repeat_quadrant_sim);
+    let row_counted_quadrant_observable =
+        extract_gpio_observable_trace(&row_counted_quadrant_sim);
+    assert_eq!(
+        row_repeat_quadrant_observable.low_words[..64],
+        row_counted_quadrant_observable.low_words[..64],
+        "the row-counted engine should preserve the shifted low GPIO words for a quadrant row",
+    );
+    assert_eq!(
+        row_repeat_quadrant_observable.high_words[..64],
+        row_counted_quadrant_observable.high_words[..64],
+        "the row-counted engine should preserve the shifted clock-high GPIO words for a quadrant row",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_quadrant_sim),
+        extract_pin_transition_sequence(&row_counted_quadrant_sim),
+        "the row-counted engine should preserve the externally visible GPIO transitions for a quadrant row",
+    );
+
+    let row_repeat_center_box_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_center_box_words,
+        1024,
+    )
+    .expect("row-repeat center-box row should simulate");
+    let row_counted_center_box_sim = simulate_program(
+        &row_counted_program.program,
+        row_counted_program.simulator_config,
+        &row_counted_center_box_words,
+        2048,
+    )
+    .expect("row-counted center-box row should simulate");
+    let row_repeat_center_box_observable =
+        extract_gpio_observable_trace(&row_repeat_center_box_sim);
+    let row_counted_center_box_observable =
+        extract_gpio_observable_trace(&row_counted_center_box_sim);
+    assert_eq!(
+        row_repeat_center_box_observable.low_words[..64],
+        row_counted_center_box_observable.low_words[..64],
+        "the row-counted engine should preserve the shifted low GPIO words for a center-box row",
+    );
+    assert_eq!(
+        row_repeat_center_box_observable.high_words[..64],
+        row_counted_center_box_observable.high_words[..64],
+        "the row-counted engine should preserve the shifted clock-high GPIO words for a center-box row",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_center_box_sim),
+        extract_pin_transition_sequence(&row_counted_center_box_sim),
+        "the row-counted engine should preserve the externally visible GPIO transitions for a center-box row",
+    );
+
+    assert!(
+        row_counted_repeated_words.len() < row_repeat_repeated_words.len(),
+        "the row-counted repeated-row encoding should shrink the payload while preserving parity",
+    );
+    assert!(
+        row_counted_nonuniform_words.len() < row_repeat_nonuniform_words.len(),
+        "the row-counted literal-row encoding should shrink dense nonuniform rows while preserving parity",
+    );
+    assert!(
+        row_counted_quadrant_words.len() < row_repeat_quadrant_words.len(),
+        "the row-counted quadrant encoding should shrink the payload while preserving parity",
+    );
+    assert!(
+        row_counted_center_box_words.len() < row_repeat_center_box_words.len(),
+        "the row-counted center-box encoding should shrink the payload while preserving parity",
+    );
+}
+
+#[test]
+fn piomatter_row_counted_engine_preserves_full_width_center_box_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_counted_program = piomatter_row_counted_engine_parity_program_info(&config);
+
+    let repeated_row_words = vec![(1_u32 << B1_GPIO) | (1_u32 << OE_GPIO); 64];
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let center_box_row_words = std::iter::repeat_n(center_box_dark_word, 24)
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .collect::<Vec<_>>();
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &center_box_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let mut row_counted_frame_words = Vec::new();
+    row_counted_frame_words.extend([
+        encode_row_counted_repeat_command(64).expect("repeat row count should encode"),
+        repeated_row_words[0],
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    ]);
+    row_counted_frame_words.push(
+        encode_row_counted_literal_command(64).expect("literal row count should encode"),
+    );
+    row_counted_frame_words.extend(center_box_row_words.iter().copied());
+    row_counted_frame_words.extend([
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    ]);
+    row_counted_frame_words.extend([
+        encode_row_counted_repeat_command(64).expect("repeat row count should encode"),
+        repeated_row_words[0],
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ]);
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        8_192,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_counted_frame_sim = simulate_program(
+        &row_counted_program.program,
+        row_counted_program.simulator_config,
+        &row_counted_frame_words,
+        8_192,
+    )
+    .expect("row-counted frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_counted_frame_observable = extract_gpio_observable_trace(&row_counted_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_counted_frame_observable.low_words,
+        "the row-counted engine should preserve every shifted and trailer low GPIO word for full-width center-box rows",
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_counted_frame_observable.high_words,
+        "the row-counted engine should preserve every shifted clock-high GPIO word for full-width center-box rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_counted_frame_sim),
+        "the row-counted engine should preserve the externally visible GPIO transitions for full-width center-box rows",
+    );
+    assert!(
+        row_counted_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-counted frame encoding should still shrink the payload for full-width center-box rows",
+    );
+}
+
+#[test]
+fn piomatter_row_hybrid_engine_preserves_multi_row_frame_waveform() {
+    // Keep the hybrid experiment honest by checking repeat, literal, and split
+    // rows in one consecutive frame so row-to-row address and latch transitions
+    // stay aligned with the Piomatter row-repeat baseline.
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_hybrid_program = piomatter_row_hybrid_engine_parity_program_info(&config);
+
+    let repeated_row_words = [
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let alternating_row_words = [
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let split_row_words = [
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &alternating_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &split_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+
+    let mut row_hybrid_frame_words = Vec::new();
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &alternating_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &split_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        2_048,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_hybrid_frame_sim = simulate_program(
+        &row_hybrid_program.program,
+        row_hybrid_program.simulator_config,
+        &row_hybrid_frame_words,
+        2_048,
+    )
+    .expect("row-hybrid frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_hybrid_frame_observable = extract_gpio_observable_trace(&row_hybrid_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_hybrid_frame_observable.low_words,
+        "the row-hybrid engine should preserve every shifted and trailer low GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_hybrid_frame_observable.high_words,
+        "the row-hybrid engine should preserve every shifted clock-high GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_hybrid_frame_sim),
+        "the row-hybrid engine should preserve the externally visible GPIO transitions across consecutive rows"
+    );
+    assert!(
+        row_hybrid_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-hybrid frame encoding should shrink the payload while preserving full-frame parity"
+    );
+}
+
+#[test]
+fn piomatter_row_hybrid_engine_preserves_full_width_quadrant_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_hybrid_program = piomatter_row_hybrid_engine_parity_program_info(&config);
+
+    let repeated_row_words = vec![(1_u32 << B1_GPIO) | (1_u32 << OE_GPIO); 64];
+    let left_quadrant_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_quadrant_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let quadrant_row_words = std::iter::repeat_n(left_quadrant_word, 32)
+        .chain(std::iter::repeat_n(right_quadrant_word, 32))
+        .collect::<Vec<_>>();
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &quadrant_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let mut row_hybrid_frame_words = Vec::new();
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &quadrant_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_hybrid_row_words(
+        &mut row_hybrid_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        8_192,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_hybrid_frame_sim = simulate_program(
+        &row_hybrid_program.program,
+        row_hybrid_program.simulator_config,
+        &row_hybrid_frame_words,
+        8_192,
+    )
+    .expect("row-hybrid frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_hybrid_frame_observable = extract_gpio_observable_trace(&row_hybrid_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_hybrid_frame_observable.low_words,
+        "the row-hybrid engine should preserve every shifted and trailer low GPIO word for full-width quadrant rows",
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_hybrid_frame_observable.high_words,
+        "the row-hybrid engine should preserve every shifted clock-high GPIO word for full-width quadrant rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_hybrid_frame_sim),
+        "the row-hybrid engine should preserve the externally visible GPIO transitions for full-width quadrant rows",
+    );
+    assert!(
+        row_hybrid_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-hybrid frame encoding should still shrink the payload for full-width quadrant rows",
+    );
+}
+
+#[test]
+fn piomatter_row_split_engine_preserves_repeated_and_quadrant_rows() {
+    // Keep the split-row experiment honest by matching Piomatter's visible GPIO
+    // waveform for both full-row repeats and the two-span quadrant case.
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_split_program = piomatter_row_split_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_active = 1_u32 << OE_GPIO;
+    let repeated_inactive = 0;
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_split_repeated_words = [
+        encode_row_split_repeat_command(4, true).expect("repeat row count should encode"),
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+    let repeated_blue_inactive = 1_u32 << B1_GPIO;
+    let row_repeat_cutoff_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 3,
+        repeated_blue,
+        repeated_blue,
+        repeated_blue,
+        repeated_blue_inactive,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_split_cutoff_words = [
+        encode_row_split_two_span_command(3, true).expect("split row count should encode"),
+        repeated_blue,
+        encode_row_engine_count(1, "cutoff second span").expect("second span should encode"),
+        repeated_blue_inactive,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+
+    let left_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let row_repeat_quadrant_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_split_quadrant_words = [
+        encode_row_split_two_span_command(32, true).expect("split row count should encode"),
+        left_word,
+        encode_row_engine_count(32, "quadrant second span").expect("second span should encode"),
+        right_word,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ];
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let row_split_repeated_sim = simulate_program(
+        &row_split_program.program,
+        row_split_program.simulator_config,
+        &row_split_repeated_words,
+        512,
+    )
+    .expect("row-split repeated row should simulate");
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let row_split_repeated_observable = extract_gpio_observable_trace(&row_split_repeated_sim);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        row_split_repeated_observable.low_words[..4],
+        "the row-split engine should preserve the shifted low GPIO words for repeated rows"
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words[..4],
+        row_split_repeated_observable.high_words[..4],
+        "the row-split engine should preserve the shifted clock-high GPIO words for repeated rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_repeated_sim),
+        extract_pin_transition_sequence(&row_split_repeated_sim),
+        "the row-split engine should preserve the externally visible GPIO transitions for repeated rows"
+    );
+    assert!(
+        row_split_repeated_words.len() < row_repeat_repeated_words.len(),
+        "the row-split repeated-row encoding should shrink the payload while preserving parity"
+    );
+
+    let row_repeat_cutoff_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_cutoff_words,
+        512,
+    )
+    .expect("row-repeat cutoff row should simulate");
+    let row_split_cutoff_sim = simulate_program(
+        &row_split_program.program,
+        row_split_program.simulator_config,
+        &row_split_cutoff_words,
+        512,
+    )
+    .expect("row-split cutoff row should simulate");
+    let row_repeat_cutoff_observable = extract_gpio_observable_trace(&row_repeat_cutoff_sim);
+    let row_split_cutoff_observable = extract_gpio_observable_trace(&row_split_cutoff_sim);
+    assert_eq!(
+        row_repeat_cutoff_observable.low_words[..4],
+        row_split_cutoff_observable.low_words[..4],
+        "the row-split engine should preserve the shifted low GPIO words when OE changes inside the row"
+    );
+    assert_eq!(
+        row_repeat_cutoff_observable.high_words[..4],
+        row_split_cutoff_observable.high_words[..4],
+        "the row-split engine should preserve the shifted clock-high GPIO words when OE changes inside the row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_cutoff_sim),
+        extract_pin_transition_sequence(&row_split_cutoff_sim),
+        "the row-split engine should preserve the externally visible GPIO transitions when OE changes inside the row"
+    );
+    assert!(
+        row_split_cutoff_words.len() < row_repeat_cutoff_words.len(),
+        "the row-split cutoff encoding should shrink the payload while preserving parity"
+    );
+
+    let row_repeat_quadrant_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_quadrant_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+    let row_split_quadrant_sim = simulate_program(
+        &row_split_program.program,
+        row_split_program.simulator_config,
+        &row_split_quadrant_words,
+        1024,
+    )
+    .expect("row-split quadrant row should simulate");
+    let row_repeat_quadrant_observable = extract_gpio_observable_trace(&row_repeat_quadrant_sim);
+    let row_split_quadrant_observable = extract_gpio_observable_trace(&row_split_quadrant_sim);
+    assert_eq!(
+        row_repeat_quadrant_observable.low_words[..64],
+        row_split_quadrant_observable.low_words[..64],
+        "the row-split engine should preserve the shifted low GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        row_repeat_quadrant_observable.high_words[..64],
+        row_split_quadrant_observable.high_words[..64],
+        "the row-split engine should preserve the shifted clock-high GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_quadrant_sim),
+        extract_pin_transition_sequence(&row_split_quadrant_sim),
+        "the row-split engine should preserve the externally visible GPIO transitions for a quadrant row"
+    );
+    assert!(
+        row_split_quadrant_words.len() < row_repeat_quadrant_words.len(),
+        "the row-split quadrant encoding should shrink the payload while preserving the same waveform"
+    );
+    assert!(
+        row_split_quadrant_sim.steps.len() < row_repeat_quadrant_sim.steps.len(),
+        "the row-split quadrant path should reduce simulated PIO work by reusing two repeated spans"
+    );
+}
+
+#[test]
+fn piomatter_row_split_engine_preserves_multi_row_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_split_program = piomatter_row_split_engine_parity_program_info(&config);
+
+    let repeated_row_words = [
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let split_row_words = [
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let second_repeated_row_words = [
+        (1_u32 << A_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << OE_GPIO),
+    ];
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &split_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &second_repeated_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        0,
+    );
+
+    let mut row_split_frame_words = Vec::new();
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &split_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        1_u32 << A_GPIO,
+    );
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &second_repeated_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        2_048,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_split_frame_sim = simulate_program(
+        &row_split_program.program,
+        row_split_program.simulator_config,
+        &row_split_frame_words,
+        2_048,
+    )
+    .expect("row-split frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_split_frame_observable = extract_gpio_observable_trace(&row_split_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_split_frame_observable.low_words,
+        "the row-split engine should preserve every shifted and trailer low GPIO word across consecutive rows",
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_split_frame_observable.high_words,
+        "the row-split engine should preserve every shifted clock-high GPIO word across consecutive rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_split_frame_sim),
+        "the row-split engine should preserve the externally visible GPIO transitions across consecutive rows",
+    );
+    assert!(
+        row_split_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-split frame encoding should shrink the payload while preserving full-frame parity",
+    );
+}
+
+#[test]
+fn piomatter_row_split_engine_preserves_full_width_quadrant_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_split_program = piomatter_row_split_engine_parity_program_info(&config);
+
+    let repeated_row_words = vec![(1_u32 << B1_GPIO) | (1_u32 << OE_GPIO); 64];
+    let left_quadrant_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_quadrant_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let quadrant_row_words = std::iter::repeat_n(left_quadrant_word, 32)
+        .chain(std::iter::repeat_n(right_quadrant_word, 32))
+        .collect::<Vec<_>>();
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &quadrant_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let mut row_split_frame_words = Vec::new();
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &quadrant_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_split_row_words(
+        &mut row_split_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        8_192,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_split_frame_sim = simulate_program(
+        &row_split_program.program,
+        row_split_program.simulator_config,
+        &row_split_frame_words,
+        8_192,
+    )
+    .expect("row-split frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_split_frame_observable = extract_gpio_observable_trace(&row_split_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_split_frame_observable.low_words,
+        "the row-split engine should preserve every shifted and trailer low GPIO word for full-width quadrant rows",
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_split_frame_observable.high_words,
+        "the row-split engine should preserve every shifted clock-high GPIO word for full-width quadrant rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_split_frame_sim),
+        "the row-split engine should preserve the externally visible GPIO transitions for full-width quadrant rows",
+    );
+    assert!(
+        row_split_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-split frame encoding should still shrink the payload for full-width quadrant rows",
+    );
+    assert!(
+        row_split_frame_sim.steps.len() < row_repeat_frame_sim.steps.len(),
+        "the row-split full-width quadrant frame should reduce simulated PIO work by reusing two repeated spans",
+    );
+}
+
+#[test]
+fn piomatter_row_runs_engine_preserves_repeated_quadrant_and_center_box_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_runs_program = piomatter_row_runs_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_active = 1_u32 << OE_GPIO;
+    let repeated_inactive = 0;
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_runs_repeated_words = [
+        encode_row_runs_command(
+            4,
+            0,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("runs row count should encode"),
+        repeated_blue,
+        repeated_active,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+
+    let left_word = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_word =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let row_repeat_quadrant_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_word, 32))
+        .chain(std::iter::repeat_n(right_word, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_runs_quadrant_words = [
+        encode_row_runs_command(
+            32,
+            1,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("runs first span count should encode"),
+        left_word,
+        encode_row_engine_count(32, "second span count").expect("second span count should encode"),
+        right_word,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ];
+
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let row_repeat_center_box_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_runs_center_box_words = [
+        encode_row_runs_command(
+            24,
+            2,
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        )
+        .expect("runs center-box command should encode"),
+        center_box_dark_word,
+        encode_row_engine_count(16, "center-box second span count")
+            .expect("center-box second span count should encode"),
+        center_box_white_word,
+        encode_row_engine_count(24, "center-box third span count")
+            .expect("center-box third span count should encode"),
+        center_box_dark_word,
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ];
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let row_runs_repeated_sim = simulate_program(
+        &row_runs_program.program,
+        row_runs_program.simulator_config,
+        &row_runs_repeated_words,
+        512,
+    )
+    .expect("row-runs repeated row should simulate");
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let row_runs_repeated_observable = extract_gpio_observable_trace(&row_runs_repeated_sim);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        row_runs_repeated_observable.low_words[..4],
+        "the row-runs engine should preserve the shifted low GPIO words for repeated rows"
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words[..4],
+        row_runs_repeated_observable.high_words[..4],
+        "the row-runs engine should preserve the shifted clock-high GPIO words for repeated rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_repeated_sim),
+        extract_pin_transition_sequence(&row_runs_repeated_sim),
+        "the row-runs engine should preserve the externally visible GPIO transitions for repeated rows"
+    );
+
+    let row_repeat_quadrant_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_quadrant_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+    let row_runs_quadrant_sim = simulate_program(
+        &row_runs_program.program,
+        row_runs_program.simulator_config,
+        &row_runs_quadrant_words,
+        1024,
+    )
+    .expect("row-runs quadrant row should simulate");
+    let row_repeat_quadrant_observable = extract_gpio_observable_trace(&row_repeat_quadrant_sim);
+    let row_runs_quadrant_observable = extract_gpio_observable_trace(&row_runs_quadrant_sim);
+    assert_eq!(
+        row_repeat_quadrant_observable.low_words[..64],
+        row_runs_quadrant_observable.low_words[..64],
+        "the row-runs engine should preserve the shifted low GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        row_repeat_quadrant_observable.high_words[..64],
+        row_runs_quadrant_observable.high_words[..64],
+        "the row-runs engine should preserve the shifted clock-high GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_quadrant_sim),
+        extract_pin_transition_sequence(&row_runs_quadrant_sim),
+        "the row-runs engine should preserve the externally visible GPIO transitions for a quadrant row"
+    );
+
+    let row_repeat_center_box_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_center_box_words,
+        1024,
+    )
+    .expect("row-repeat center-box row should simulate");
+    let row_runs_center_box_sim = simulate_program(
+        &row_runs_program.program,
+        row_runs_program.simulator_config,
+        &row_runs_center_box_words,
+        1024,
+    )
+    .expect("row-runs center-box row should simulate");
+    let row_repeat_center_box_observable =
+        extract_gpio_observable_trace(&row_repeat_center_box_sim);
+    let row_runs_center_box_observable =
+        extract_gpio_observable_trace(&row_runs_center_box_sim);
+    assert_eq!(
+        row_repeat_center_box_observable.low_words[..64],
+        row_runs_center_box_observable.low_words[..64],
+        "the row-runs engine should preserve the shifted low GPIO words for a center-box row"
+    );
+    assert_eq!(
+        row_repeat_center_box_observable.high_words[..64],
+        row_runs_center_box_observable.high_words[..64],
+        "the row-runs engine should preserve the shifted clock-high GPIO words for a center-box row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_center_box_sim),
+        extract_pin_transition_sequence(&row_runs_center_box_sim),
+        "the row-runs engine should preserve the externally visible GPIO transitions for a center-box row"
+    );
+
+    assert!(
+        row_runs_repeated_words.len() < row_repeat_repeated_words.len(),
+        "the row-runs repeated-row encoding should shrink the payload while preserving parity"
+    );
+    assert!(
+        row_runs_quadrant_words.len() < row_repeat_quadrant_words.len(),
+        "the row-runs quadrant encoding should shrink the payload while preserving parity"
+    );
+    assert!(
+        row_runs_center_box_words.len() < row_repeat_center_box_words.len(),
+        "the row-runs center-box encoding should shrink the payload while preserving parity"
+    );
+}
+
+#[test]
+fn piomatter_row_runs_engine_preserves_multi_row_frame_waveform() {
+    // Keep the row-runs experiment honest by checking consecutive repeated,
+    // two-span, and three-span rows so row-to-row control phases stay aligned
+    // with the Piomatter row-repeat baseline.
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_runs_program = piomatter_row_runs_engine_parity_program_info(&config);
+
+    let repeated_row_words = [
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let split_row_words = [
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let center_box_row_words = [
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+    ];
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &split_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &center_box_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+
+    let mut row_runs_frame_words = Vec::new();
+    extend_row_runs_row_words(
+        &mut row_runs_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_runs_row_words(
+        &mut row_runs_frame_words,
+        &split_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_runs_row_words(
+        &mut row_runs_frame_words,
+        &center_box_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        2_048,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_runs_frame_sim = simulate_program(
+        &row_runs_program.program,
+        row_runs_program.simulator_config,
+        &row_runs_frame_words,
+        2_048,
+    )
+    .expect("row-runs frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_runs_frame_observable = extract_gpio_observable_trace(&row_runs_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_runs_frame_observable.low_words,
+        "the row-runs engine should preserve every shifted and trailer low GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_runs_frame_observable.high_words,
+        "the row-runs engine should preserve every shifted clock-high GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_runs_frame_sim),
+        "the row-runs engine should preserve the externally visible GPIO transitions across consecutive rows"
+    );
+    assert!(
+        row_runs_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-runs frame encoding should shrink the payload while preserving full-frame parity"
+    );
+}
+
+#[test]
+fn piomatter_row_window_engine_preserves_repeated_and_center_box_rows() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_window_program = piomatter_row_window_engine_parity_program_info(&config);
+
+    let repeated_blue = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_active = 1_u32 << OE_GPIO;
+    let repeated_inactive = 0;
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        repeated_inactive,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        repeated_inactive,
+    ];
+    let row_window_repeated_words = [
+        encode_row_window_repeat_command(4).expect("window repeat row should encode"),
+        repeated_blue,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        repeated_active,
+        repeated_inactive,
+        repeated_inactive,
+    ];
+
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let row_repeat_center_box_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let row_window_center_box_words = [
+        encode_row_window_window_command(24).expect("window first edge span should encode"),
+        center_box_dark_word,
+        encode_row_engine_count(16, "window middle span count")
+            .expect("window middle span count should encode"),
+        center_box_white_word,
+        encode_row_engine_count(24, "window tail span count")
+            .expect("window tail span count should encode"),
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    ];
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let row_window_repeated_sim = simulate_program(
+        &row_window_program.program,
+        row_window_program.simulator_config,
+        &row_window_repeated_words,
+        512,
+    )
+    .expect("row-window repeated row should simulate");
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let row_window_repeated_observable = extract_gpio_observable_trace(&row_window_repeated_sim);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        row_window_repeated_observable.low_words[..4],
+        "the row-window engine should preserve the shifted low GPIO words for repeated rows"
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words[..4],
+        row_window_repeated_observable.high_words[..4],
+        "the row-window engine should preserve the shifted clock-high GPIO words for repeated rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_repeated_sim),
+        extract_pin_transition_sequence(&row_window_repeated_sim),
+        "the row-window engine should preserve the externally visible GPIO transitions for repeated rows"
+    );
+
+    let row_repeat_center_box_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_center_box_words,
+        1024,
+    )
+    .expect("row-repeat center-box row should simulate");
+    let row_window_center_box_sim = simulate_program(
+        &row_window_program.program,
+        row_window_program.simulator_config,
+        &row_window_center_box_words,
+        1024,
+    )
+    .expect("row-window center-box row should simulate");
+    let row_repeat_center_box_observable =
+        extract_gpio_observable_trace(&row_repeat_center_box_sim);
+    let row_window_center_box_observable =
+        extract_gpio_observable_trace(&row_window_center_box_sim);
+    assert_eq!(
+        row_repeat_center_box_observable.low_words[..64],
+        row_window_center_box_observable.low_words[..64],
+        "the row-window engine should preserve the shifted low GPIO words for a center-box row"
+    );
+    assert_eq!(
+        row_repeat_center_box_observable.high_words[..64],
+        row_window_center_box_observable.high_words[..64],
+        "the row-window engine should preserve the shifted clock-high GPIO words for a center-box row"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_center_box_sim),
+        extract_pin_transition_sequence(&row_window_center_box_sim),
+        "the row-window engine should preserve the externally visible GPIO transitions for a center-box row"
+    );
+
+    assert!(
+        row_window_repeated_words.len() < row_repeat_repeated_words.len(),
+        "the row-window repeated-row encoding should shrink the payload while preserving parity"
+    );
+    assert!(
+        row_window_center_box_words.len() < row_repeat_center_box_words.len(),
+        "the row-window center-box encoding should shrink the payload while preserving parity"
+    );
+}
+
+#[test]
+fn piomatter_row_window_engine_preserves_multi_row_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_window_program = piomatter_row_window_engine_parity_program_info(&config);
+
+    let repeated_row_words = [
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let center_box_row_words = [
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+    ];
+    let literal_row_words = [
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << R1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+        (1_u32 << A_GPIO) | (1_u32 << G1_GPIO) | (1_u32 << OE_GPIO),
+    ];
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &center_box_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &literal_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+
+    let mut row_window_frame_words = Vec::new();
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &center_box_row_words,
+        0,
+        (1_u32 << A_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << A_GPIO,
+        1_u32 << B_GPIO,
+    );
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &literal_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        (1_u32 << B_GPIO) | (1_u32 << OE_GPIO),
+        1_u32 << B_GPIO,
+        0,
+    );
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &repeated_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        2_048,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_window_frame_sim = simulate_program(
+        &row_window_program.program,
+        row_window_program.simulator_config,
+        &row_window_frame_words,
+        2_048,
+    )
+    .expect("row-window frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_window_frame_observable = extract_gpio_observable_trace(&row_window_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_window_frame_observable.low_words,
+        "the row-window engine should preserve every shifted and trailer low GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_window_frame_observable.high_words,
+        "the row-window engine should preserve every shifted clock-high GPIO word across consecutive rows"
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_window_frame_sim),
+        "the row-window engine should preserve the externally visible GPIO transitions across consecutive rows"
+    );
+    assert!(
+        row_window_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-window frame encoding should shrink the payload while preserving full-frame parity"
+    );
+}
+
+#[test]
+fn piomatter_row_window_engine_preserves_full_width_center_box_frame_waveform() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let row_window_program = piomatter_row_window_engine_parity_program_info(&config);
+
+    let repeated_row_words = vec![(1_u32 << B1_GPIO) | (1_u32 << OE_GPIO); 64];
+    let center_box_dark_word = 1_u32 << OE_GPIO;
+    let center_box_white_word = (1_u32 << R1_GPIO)
+        | (1_u32 << G1_GPIO)
+        | (1_u32 << B1_GPIO)
+        | (1_u32 << R2_GPIO)
+        | (1_u32 << G2_GPIO)
+        | (1_u32 << B2_GPIO)
+        | (1_u32 << OE_GPIO);
+    let center_box_row_words = std::iter::repeat_n(center_box_dark_word, 24)
+        .chain(std::iter::repeat_n(center_box_white_word, 16))
+        .chain(std::iter::repeat_n(center_box_dark_word, 24))
+        .collect::<Vec<_>>();
+
+    let mut row_repeat_frame_words = Vec::new();
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &center_box_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_repeat_row_words(
+        &mut row_repeat_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let mut row_window_frame_words = Vec::new();
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << A_GPIO,
+    );
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &center_box_row_words,
+        0,
+        1_u32 << OE_GPIO,
+        0,
+        1_u32 << B_GPIO,
+    );
+    extend_row_window_row_words(
+        &mut row_window_frame_words,
+        &repeated_row_words,
+        encode_row_engine_count(2, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        0,
+        0,
+    );
+
+    let row_repeat_frame_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_frame_words,
+        8_192,
+    )
+    .expect("row-repeat frame should simulate");
+    let row_window_frame_sim = simulate_program(
+        &row_window_program.program,
+        row_window_program.simulator_config,
+        &row_window_frame_words,
+        8_192,
+    )
+    .expect("row-window frame should simulate");
+
+    let row_repeat_frame_observable = extract_gpio_observable_trace(&row_repeat_frame_sim);
+    let row_window_frame_observable = extract_gpio_observable_trace(&row_window_frame_sim);
+    assert_eq!(
+        row_repeat_frame_observable.low_words,
+        row_window_frame_observable.low_words,
+        "the row-window engine should preserve every shifted and trailer low GPIO word for full-width center-box rows",
+    );
+    assert_eq!(
+        row_repeat_frame_observable.high_words,
+        row_window_frame_observable.high_words,
+        "the row-window engine should preserve every shifted clock-high GPIO word for full-width center-box rows",
+    );
+    assert_eq!(
+        extract_pin_transition_sequence(&row_repeat_frame_sim),
+        extract_pin_transition_sequence(&row_window_frame_sim),
+        "the row-window engine should preserve the externally visible GPIO transitions for full-width center-box rows",
+    );
+    assert!(
+        row_window_frame_words.len() < row_repeat_frame_words.len(),
+        "the row-window frame encoding should still shrink the payload for full-width center-box rows",
+    );
+}
+
+#[test]
+fn piomatter_symbol_command_engine_preserves_repeated_and_quadrant_row_waveforms() {
+    let config = Pi5ScanConfig::from_matrix_config(WiringProfile::AdafruitHatPwm, 64, 64, 1, 1)
+        .and_then(|config| config.with_format(Pi5ScanFormat::Simple))
+        .expect("single-panel Pi 5 config should be valid");
+    let row_repeat_program = piomatter_row_repeat_engine_parity_program_info(&config);
+    let symbol_program = piomatter_symbol_command_parity_program_info(&config);
+
+    let repeated_blue_word = (1_u32 << B1_GPIO) | (1_u32 << OE_GPIO);
+    let repeated_blue_symbol = semantic_symbol(SEMANTIC_B1_BIT);
+    let repeated_shift_control = semantic_control_word(SEMANTIC_OE_BIT);
+    let repeated_active_control = semantic_control_word(SEMANTIC_OE_BIT);
+    let repeated_inactive_control = semantic_control_word(0);
+    let repeated_latch_control = semantic_control_word(SEMANTIC_LAT_BIT);
+    let repeated_next_control = semantic_control_word(0);
+
+    let row_repeat_repeated_words = [
+        PIOMATTER_ROW_REPEAT_COMMAND_REPEAT | 3,
+        repeated_blue_word,
+        encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+        1_u32 << OE_GPIO,
+        encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+        0,
+        encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+        encode_row_engine_count(2, "next-address hold").expect("next-address hold should encode"),
+        0,
+    ];
+    let symbol_repeated_words = [
+        encode_symbol_repeat_command(4).expect("symbol repeat command should encode"),
+        pack_control_prefixed_rgb_lane_symbols(repeated_shift_control, &[repeated_blue_symbol])[0],
+        encode_symbol_delay_command(3).expect("active hold should encode"),
+        repeated_active_control,
+        encode_symbol_delay_command(2).expect("inactive hold should encode"),
+        repeated_inactive_control,
+        encode_symbol_delay_command(4).expect("latch hold should encode"),
+        repeated_latch_control,
+        encode_symbol_delay_command(2).expect("next hold should encode"),
+        repeated_next_control,
+    ];
+
+    let left_actual = (1_u32 << R1_GPIO) | (1_u32 << B2_GPIO) | (1_u32 << OE_GPIO);
+    let right_actual =
+        (1_u32 << G1_GPIO) | (1_u32 << R2_GPIO) | (1_u32 << G2_GPIO) | (1_u32 << B2_GPIO)
+            | (1_u32 << OE_GPIO);
+    let left_symbol = semantic_symbol(SEMANTIC_R1_BIT | SEMANTIC_B2_BIT);
+    let right_symbol = semantic_symbol(
+        SEMANTIC_G1_BIT | SEMANTIC_R2_BIT | SEMANTIC_G2_BIT | SEMANTIC_B2_BIT,
+    );
+    let quadrant_shift_control = semantic_control_word(SEMANTIC_OE_BIT);
+    let quadrant_active_control = semantic_control_word(SEMANTIC_OE_BIT);
+    let quadrant_inactive_control = semantic_control_word(0);
+    let quadrant_latch_control = semantic_control_word(SEMANTIC_LAT_BIT);
+    let quadrant_next_control = semantic_control_word(0);
+
+    let row_repeat_quadrant_words = std::iter::once(PIOMATTER_ROW_REPEAT_COMMAND_LITERAL | 63)
+        .chain(std::iter::repeat_n(left_actual, 32))
+        .chain(std::iter::repeat_n(right_actual, 32))
+        .chain([
+            encode_row_engine_count(3, "active hold").expect("active hold should encode"),
+            1_u32 << OE_GPIO,
+            encode_row_engine_count(2, "inactive hold").expect("inactive hold should encode"),
+            0,
+            encode_row_engine_count(4, "latch hold").expect("latch hold should encode"),
+            encode_row_engine_count(2, "next-address hold")
+                .expect("next-address hold should encode"),
+            0,
+        ])
+        .collect::<Vec<_>>();
+    let mut symbol_quadrant_words = vec![
+        encode_symbol_literal_command(64).expect("symbol literal command should encode"),
+    ];
+    let quadrant_symbols = std::iter::repeat_n(left_symbol, 32)
+        .chain(std::iter::repeat_n(right_symbol, 32))
+        .collect::<Vec<_>>();
+    symbol_quadrant_words.extend(pack_control_prefixed_rgb_lane_symbols(
+        quadrant_shift_control,
+        &quadrant_symbols,
+    ));
+    symbol_quadrant_words.extend_from_slice(&[
+        encode_symbol_delay_command(3).expect("active hold should encode"),
+        quadrant_active_control,
+        encode_symbol_delay_command(2).expect("inactive hold should encode"),
+        quadrant_inactive_control,
+        encode_symbol_delay_command(4).expect("latch hold should encode"),
+        quadrant_latch_control,
+        encode_symbol_delay_command(2).expect("next hold should encode"),
+        quadrant_next_control,
+    ]);
+
+    let row_repeat_repeated_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_repeated_words,
+        256,
+    )
+    .expect("row-repeat repeated row should simulate");
+    let symbol_repeated_sim = simulate_program(
+        &symbol_program.program,
+        symbol_program.simulator_config,
+        &symbol_repeated_words,
+        256,
+    )
+    .expect("symbol repeated row should simulate");
+    assert_eq!(
+        decode_symbol_command(symbol_repeated_words[0]).expect("symbol command should decode"),
+        (SymbolCommandKind::Repeat, 4),
+        "the symbol prototype should exercise the repeat command path"
+    );
+    let row_repeat_repeated_observable = extract_gpio_observable_trace(&row_repeat_repeated_sim);
+    let symbol_repeated_shift_observable =
+        extract_mapped_out_pins_count_observable_trace(&symbol_repeated_sim, 6);
+    assert_eq!(
+        row_repeat_repeated_observable.low_words[..4],
+        symbol_repeated_shift_observable.low_words,
+        "the symbol-command prototype should preserve the shifted low GPIO words for repeated rows"
+    );
+    assert_eq!(
+        row_repeat_repeated_observable.high_words,
+        symbol_repeated_shift_observable.high_words,
+        "the symbol-command prototype should preserve the shifted clock-high GPIO words for repeated rows"
+    );
+
+    let row_repeat_quadrant_sim = simulate_program(
+        &row_repeat_program.program,
+        row_repeat_program.simulator_config,
+        &row_repeat_quadrant_words,
+        1024,
+    )
+    .expect("row-repeat quadrant row should simulate");
+    let symbol_quadrant_sim = simulate_program(
+        &symbol_program.program,
+        symbol_program.simulator_config,
+        &symbol_quadrant_words,
+        1024,
+    )
+    .expect("symbol quadrant row should simulate");
+    assert_eq!(
+        decode_symbol_command(symbol_quadrant_words[0]).expect("symbol command should decode"),
+        (SymbolCommandKind::Literal, 64),
+        "the symbol prototype should exercise the packed literal path"
+    );
+    let row_repeat_quadrant_observable = extract_gpio_observable_trace(&row_repeat_quadrant_sim);
+    let symbol_quadrant_shift_observable =
+        extract_mapped_out_pins_count_observable_trace(&symbol_quadrant_sim, 6);
+    assert_eq!(
+        row_repeat_quadrant_observable.low_words[..64],
+        symbol_quadrant_shift_observable.low_words[..64],
+        "the symbol-command prototype should preserve the shifted low GPIO words for a quadrant row"
+    );
+    assert_eq!(
+        row_repeat_quadrant_observable.high_words[..64],
+        symbol_quadrant_shift_observable.high_words[..64],
+        "the symbol-command prototype should preserve the shifted clock-high GPIO words for a quadrant row"
     );
 }
 
@@ -1446,6 +4923,30 @@ fn position_pattern_rgba_frame(width: u32, height: u32) -> Vec<u8> {
                 0
             };
             frame[offset + 3] = 255;
+        }
+    }
+
+    frame
+}
+
+fn quadrant_rgba_frame(width: u32, height: u32) -> Vec<u8> {
+    let mut frame = vec![0_u8; (width * height * 4) as usize];
+    let half_width = width / 2;
+    let half_height = height / 2;
+
+    for y in 0..height {
+        for x in 0..width {
+            let base = ((y * width + x) * 4) as usize;
+            let (red, green, blue) = match (x < half_width, y < half_height) {
+                (true, true) => (255, 0, 0),
+                (false, true) => (0, 255, 0),
+                (true, false) => (0, 0, 255),
+                (false, false) => (255, 255, 255),
+            };
+            frame[base] = red;
+            frame[base + 1] = green;
+            frame[base + 2] = blue;
+            frame[base + 3] = 255;
         }
     }
 

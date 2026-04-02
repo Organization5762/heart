@@ -3,6 +3,8 @@ pub enum PioOutDest {
     Pins = 0,
     X = 1,
     Y = 2,
+    Null = 3,
+    Isr = 6,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -15,6 +17,8 @@ pub enum PioMovDest {
     Pins = 0,
     X = 1,
     Y = 2,
+    Isr = 6,
+    Osr = 7,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,6 +26,8 @@ pub enum PioMovSrc {
     Pins = 0,
     X = 1,
     Y = 2,
+    Isr = 6,
+    Osr = 7,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -90,6 +96,7 @@ pub fn simulate_program(
     let mut y = 0_u32;
     let mut osr = 0_u32;
     let mut osr_bits_available = 0_u8;
+    let mut isr = 0_u32;
     let mut tx_index = 0_usize;
     let mut cycle = 0_u64;
     let mut steps = Vec::new();
@@ -117,6 +124,7 @@ pub fn simulate_program(
                         x = x.wrapping_sub(1);
                         initial != 0
                     }
+                    3 => y == 0,
                     4 => {
                         let initial = y;
                         y = y.wrapping_sub(1);
@@ -154,14 +162,14 @@ pub fn simulate_program(
                     config.out_shift_right,
                 );
                 match dest {
-                    out_dest if out_dest == PioOutDest::Pins as u8 => write_consecutive_pins(
-                        &mut pins,
-                        config.out_pin_base,
-                        config.out_pin_count,
-                        value,
-                    ),
+                    out_dest if out_dest == PioOutDest::Pins as u8 => {
+                        let pin_count = count.min(config.out_pin_count);
+                        write_consecutive_pins(&mut pins, config.out_pin_base, pin_count, value)
+                    }
                     out_dest if out_dest == PioOutDest::X as u8 => x = value,
                     out_dest if out_dest == PioOutDest::Y as u8 => y = value,
+                    out_dest if out_dest == PioOutDest::Null as u8 => {}
+                    out_dest if out_dest == PioOutDest::Isr as u8 => isr = value,
                     _ => {
                         return Err(format!(
                             "PIO simulation does not support OUT destination {dest} in opcode 0x{instruction:04x}."
@@ -205,6 +213,15 @@ pub fn simulate_program(
                 }
                 match (dest, src) {
                     (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Y as u8 => {}
+                    (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Isr as u8 => {
+                        y = isr;
+                    }
+                    (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Osr as u8 => {
+                        y = osr;
+                    }
+                    (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
+                        isr = y;
+                    }
                     (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::X as u8 => {
                         write_consecutive_pins(
                             &mut pins,
@@ -212,6 +229,44 @@ pub fn simulate_program(
                             config.out_pin_count,
                             x,
                         );
+                    }
+                    (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Isr as u8 => {
+                        write_consecutive_pins(
+                            &mut pins,
+                            config.out_pin_base,
+                            config.out_pin_count,
+                            isr,
+                        );
+                    }
+                    (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Osr as u8 => {
+                        write_consecutive_pins(
+                            &mut pins,
+                            config.out_pin_base,
+                            config.out_pin_count,
+                            osr,
+                        );
+                    }
+                    (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Isr as u8 => {
+                        write_consecutive_pins(
+                            &mut pins,
+                            config.out_pin_base,
+                            config.out_pin_count,
+                            isr,
+                        );
+                    }
+                    (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::X as u8 => {
+                        isr = x;
+                    }
+                    (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
+                        isr = y;
+                    }
+                    (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::Y as u8 => {
+                        osr = y;
+                        osr_bits_available = 32;
+                    }
+                    (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::X as u8 => {
+                        osr = x;
+                        osr_bits_available = 32;
                     }
                     _ => {
                         return Err(format!(

@@ -11,8 +11,8 @@
 - `rust/heart_rgb_matrix_driver/src/runtime/scene.rs`
 - `rust/heart_rgb_matrix_driver/src/runtime/stats.rs`
 - `rust/heart_rgb_matrix_driver/bench/matrix_transfer.rs`
-- `rust/heart_rgb_matrix_driver/bench/pi5_scan_bench.rs`
-- `rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c`
+- deleted Pi 5 scan benchmark binary (historical reference only)
+- deleted Pi 5 userspace C shim (historical reference only)
 - `rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs`
 - `src/heart/device/rgb_display/device.py`
 - `src/heart/device/rgb_display/runtime.py`
@@ -532,9 +532,9 @@ Current implementation status in Heart:
 
 - `rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs` now builds the production Pi 5 scan schedule for `parallel=1`, including row-address stepping, `LAT`, `OE`, PWM dwell scheduling, and continuous scan looping against the active frame buffer.
 - The packed scan format now uses compact row-pair / bitplane groups so the host sends one blank row word, one pixel-count word, width pixel words, one latch word, one active row word, and one dwell counter word per group instead of a longer command stream.
-- `rust/heart_rgb_matrix_driver/native/pi5_pio_scan_shim.c` now drives that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
+- The deleted Pi 5 userspace C shim previously drove that packed scan program through a Pi 5 `PIO` state machine on the real bonnet pin map.
 - The async transport now keeps a resident packed scan buffer active on the Pi 5 path and continuously replays it until a newer packed frame arrives, so unchanged images can continue refreshing without repeated repacking or resubmission from Heart.
-- `rust/heart_rgb_matrix_driver/bench/pi5_scan_bench.rs` benchmarks the production Pi 5 scan path and reports both transport timings and derived scan-schedule metrics.
+- The deleted Pi 5 scan benchmark binary previously measured the production Pi 5 scan path and reported both transport timings and derived scan-schedule metrics.
 - The current production Pi 5 scan transport is DMA-fed through the raw `rp1-pio` ioctl path, but the measured `stream` timing still tracks submission and drain completion more directly than visible panel dwell.
 - Because the Adafruit bonnet pin map is sparse, the compact format reduces per-group control overhead more than per-column payload size; the current production win is lower command overhead, not a radical reduction in pixel-shift bytes.
 

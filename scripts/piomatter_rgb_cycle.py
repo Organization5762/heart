@@ -9,6 +9,7 @@ working implementation before porting the same behavior into
 from __future__ import annotations
 
 import argparse
+import gc
 import time
 from dataclasses import dataclass
 from typing import Final
@@ -35,7 +36,9 @@ DEFAULT_N_ADDR_LINES: Final[int] = 5
 DEFAULT_N_PLANES: Final[int] = 10
 DEFAULT_N_TEMPORAL_PLANES: Final[int] = 2
 DEFAULT_PINOUT: Final[str] = "adafruit-matrix-bonnet"
+DEFAULT_PATTERN: Final[str] = "rgb-cycle"
 DEFAULT_WIDTH: Final[int] = 64
+PATTERN_CHOICES: Final[tuple[str, ...]] = ("rgb-cycle", "quadrants", "center-box")
 PINOUT_CHOICES: Final[tuple[str, ...]] = (
     "adafruit-matrix-bonnet",
     "adafruit-matrix-bonnet-bgr",
@@ -96,13 +99,19 @@ def main() -> int:
         "infinite" if args.iterations == 0 else args.iterations,
     )
 
-    run_rgb_cycle(
-        matrix=matrix,
-        framebuffer=framebuffer,
-        hold_seconds=args.hold_seconds,
-        color_interval_seconds=args.color_interval_seconds,
-        iterations=args.iterations,
-    )
+    try:
+        run_rgb_cycle(
+            matrix=matrix,
+            framebuffer=framebuffer,
+            hold_seconds=args.hold_seconds,
+            color_interval_seconds=args.color_interval_seconds,
+            iterations=args.iterations,
+            pattern=args.pattern,
+        )
+    finally:
+        del matrix
+        gc.collect()
+        time.sleep(0.2)
     return 0
 
 
@@ -128,6 +137,12 @@ def parse_args() -> argparse.Namespace:
         choices=PINOUT_CHOICES,
     )
     parser.add_argument(
+        "--pattern",
+        type=str,
+        default=DEFAULT_PATTERN,
+        choices=PATTERN_CHOICES,
+    )
+    parser.add_argument(
         "--color-interval-seconds",
         type=float,
         default=DEFAULT_COLOR_INTERVAL_SECONDS,
@@ -148,8 +163,26 @@ def run_rgb_cycle(
     hold_seconds: float,
     color_interval_seconds: float,
     iterations: int,
+    pattern: str,
 ) -> None:
     """Display RGB primaries in sequence for the configured duration."""
+
+    if pattern == "quadrants":
+        run_quadrant_scene(
+            matrix=matrix,
+            framebuffer=framebuffer,
+            hold_seconds=hold_seconds,
+            iterations=iterations,
+        )
+        return
+    if pattern == "center-box":
+        run_center_box_scene(
+            matrix=matrix,
+            framebuffer=framebuffer,
+            hold_seconds=hold_seconds,
+            iterations=iterations,
+        )
+        return
 
     total_cycles = iterations if iterations > 0 else None
     completed_cycles = 0
@@ -170,12 +203,82 @@ def run_rgb_cycle(
         logger.info("Stopping Piomatter RGB cycle on keyboard interrupt.")
 
 
+def run_quadrant_scene(
+    matrix: piomatter.PioMatter,
+    framebuffer: np.ndarray,
+    hold_seconds: float,
+    iterations: int,
+) -> None:
+    """Display a static 4-quadrant correctness scene for the configured duration."""
+
+    total_cycles = iterations if iterations > 0 else None
+    completed_cycles = 0
+
+    try:
+        while total_cycles is None or completed_cycles < total_cycles:
+            fill_quadrant_framebuffer(framebuffer)
+            matrix.show()
+            logger.info("Displayed Piomatter quadrants frame")
+            time.sleep(hold_seconds)
+            completed_cycles += 1
+    except KeyboardInterrupt:
+        logger.info("Stopping Piomatter quadrants scene on keyboard interrupt.")
+
+
 def fill_framebuffer(framebuffer: np.ndarray, rgb: tuple[int, int, int]) -> None:
     """Fill the framebuffer with one solid RGB color."""
 
     framebuffer[:, :, 0] = rgb[0]
     framebuffer[:, :, 1] = rgb[1]
     framebuffer[:, :, 2] = rgb[2]
+
+
+def fill_quadrant_framebuffer(framebuffer: np.ndarray) -> None:
+    """Fill the framebuffer with red/green/blue/white quadrant blocks."""
+
+    half_height = framebuffer.shape[0] // 2
+    half_width = framebuffer.shape[1] // 2
+    framebuffer[:half_height, :half_width, :] = (255, 0, 0)
+    framebuffer[:half_height, half_width:, :] = (0, 255, 0)
+    framebuffer[half_height:, :half_width, :] = (0, 0, 255)
+    framebuffer[half_height:, half_width:, :] = (255, 255, 255)
+
+
+def run_center_box_scene(
+    matrix: piomatter.PioMatter,
+    framebuffer: np.ndarray,
+    hold_seconds: float,
+    iterations: int,
+) -> None:
+    """Display a sparse centered white box scene for the configured duration."""
+
+    total_cycles = iterations if iterations > 0 else None
+    completed_cycles = 0
+
+    try:
+        while total_cycles is None or completed_cycles < total_cycles:
+            fill_center_box_framebuffer(framebuffer)
+            matrix.show()
+            logger.info("Displayed Piomatter center-box frame")
+            time.sleep(hold_seconds)
+            completed_cycles += 1
+    except KeyboardInterrupt:
+        logger.info("Stopping Piomatter center-box scene on keyboard interrupt.")
+
+
+def fill_center_box_framebuffer(framebuffer: np.ndarray) -> None:
+    """Fill the framebuffer with a small centered white box on a black background."""
+
+    box_height = max(4, framebuffer.shape[0] // 4)
+    box_width = max(4, framebuffer.shape[1] // 8)
+    start_y = (framebuffer.shape[0] - box_height) // 2
+    start_x = (framebuffer.shape[1] - box_width) // 2
+    framebuffer[:, :, :] = (0, 0, 0)
+    framebuffer[start_y : start_y + box_height, start_x : start_x + box_width, :] = (
+        255,
+        255,
+        255,
+    )
 
 
 if __name__ == "__main__":

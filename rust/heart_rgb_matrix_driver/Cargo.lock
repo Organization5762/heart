@@ -270,7 +270,6 @@ version = "0.1.0"
 name = "heart_rgb_matrix_driver"
 version = "0.1.0"
 dependencies = [
- "cc",
  "criterion",
  "heart_pio_sim",
  "pyo3",

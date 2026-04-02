@@ -19,6 +19,111 @@ use super::pi5_pio_programs_generated::{
     PI5_PIO_SIMPLE_HUB75_SIDESET_OPTIONAL, PI5_PIO_SIMPLE_HUB75_SIDESET_PIN_COUNT,
     PI5_PIO_SIMPLE_HUB75_SIDESET_TOTAL_BITS, PI5_PIO_SIMPLE_HUB75_WRAP,
     PI5_PIO_SIMPLE_HUB75_WRAP_TARGET,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_AUTO_PULL, PIOMATTER_SYMBOL_COMMAND_PARITY_BASE_PROGRAM,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_DELAY_PATCH_INDICES,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_PIN_BASE, PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_PULL_THRESHOLD,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_TOTAL_BITS, PIOMATTER_SYMBOL_COMMAND_PARITY_WRAP,
+    PIOMATTER_SYMBOL_COMMAND_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_DELAY_PATCH_INDICES,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_REPEAT_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_AUTO_PULL, PIOMATTER_ROW_SPLIT_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_AUTO_PULL, PIOMATTER_ROW_RUNS_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_WRAP_TARGET,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_AUTO_PULL,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_BASE_PROGRAM,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_PIN_BASE,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_PIN_COUNT,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_PROGRAM_LENGTH,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_PULL_THRESHOLD,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_OPTIONAL,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_PIN_COUNT,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_WRAP,
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_WRAP_TARGET,
 };
 use super::pi5_scan::{
     build_simple_group_words_for_rgba, Pi5ScanConfig, Pi5ScanFormat, Pi5ScanTiming,
@@ -45,6 +150,15 @@ pub(crate) use heart_pio_sim::gpio_is_high;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Pi5PioProgramKind {
     SimpleHub75,
+    PiomatterSymbolCommandParity,
+    PiomatterRowCompactEngineParity,
+    PiomatterRowCompactTightEngineParity,
+    PiomatterRowCountedEngineParity,
+    PiomatterRowHybridEngineParity,
+    PiomatterRowRunsEngineParity,
+    PiomatterRowWindowEngineParity,
+    PiomatterRowSplitEngineParity,
+    PiomatterRowRepeatEngineParity,
     ResidentParser,
 }
 
@@ -81,6 +195,68 @@ pub(crate) fn build_simple_hub75_program_opcodes(
     let _ = timing.latch_ticks;
     let _ = timing.post_latch_ticks;
     for &index in &PI5_PIO_SIMPLE_HUB75_DELAY_PATCH_INDICES {
+        program[index] = with_delay_bits(program[index], timing.simple_clock_hold_ticks);
+    }
+    program
+}
+
+pub(crate) fn build_piomatter_row_repeat_engine_parity_program_opcodes(
+    timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_REPEAT_ENGINE_PARITY_PROGRAM_LENGTH] {
+    let mut program = PIOMATTER_ROW_REPEAT_ENGINE_PARITY_BASE_PROGRAM;
+    for &index in &PIOMATTER_ROW_REPEAT_ENGINE_PARITY_DELAY_PATCH_INDICES {
+        program[index] = with_delay_bits(program[index], timing.simple_clock_hold_ticks);
+    }
+    program
+}
+
+pub(crate) fn build_piomatter_row_compact_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_COMPACT_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_COMPACT_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_compact_tight_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_counted_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_COUNTED_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_COUNTED_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_hybrid_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_HYBRID_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_HYBRID_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_split_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_SPLIT_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_SPLIT_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_runs_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_RUNS_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_RUNS_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_row_window_engine_parity_program_opcodes(
+    _timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_ROW_WINDOW_ENGINE_PARITY_PROGRAM_LENGTH] {
+    PIOMATTER_ROW_WINDOW_ENGINE_PARITY_BASE_PROGRAM
+}
+
+pub(crate) fn build_piomatter_symbol_command_parity_program_opcodes(
+    timing: Pi5ScanTiming,
+) -> [u16; PIOMATTER_SYMBOL_COMMAND_PARITY_PROGRAM_LENGTH] {
+    let mut program = PIOMATTER_SYMBOL_COMMAND_PARITY_BASE_PROGRAM;
+    for &index in &PIOMATTER_SYMBOL_COMMAND_PARITY_DELAY_PATCH_INDICES {
         program[index] = with_delay_bits(program[index], timing.simple_clock_hold_ticks);
     }
     program
@@ -166,6 +342,222 @@ pub(crate) fn simulate_simple_hub75_group(
     );
     let program = build_simple_hub75_program_opcodes(config.timing()).to_vec();
     simulate_program(&program, sim_config, words, 1_000_000)
+}
+
+pub(crate) fn piomatter_row_repeat_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowRepeatEngineParity,
+        build_piomatter_row_repeat_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_REPEAT_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_compact_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowCompactEngineParity,
+        build_piomatter_row_compact_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_COMPACT_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_compact_tight_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowCompactTightEngineParity,
+        build_piomatter_row_compact_tight_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_COMPACT_TIGHT_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_counted_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowCountedEngineParity,
+        build_piomatter_row_counted_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_COUNTED_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_hybrid_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowHybridEngineParity,
+        build_piomatter_row_hybrid_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_HYBRID_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_split_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowSplitEngineParity,
+        build_piomatter_row_split_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_SPLIT_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_runs_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowRunsEngineParity,
+        build_piomatter_row_runs_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_RUNS_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_RUNS_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_RUNS_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_RUNS_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_RUNS_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_RUNS_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_row_window_engine_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterRowWindowEngineParity,
+        build_piomatter_row_window_engine_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_WRAP,
+            out_pin_base: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_PIN_COUNT,
+            set_pin_base: config.pinout().lat_gpio() as u8,
+            set_pin_count: 1,
+            sideset_pin_base: config.pinout().clock_gpio() as u8,
+            sideset_count: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_ROW_WINDOW_ENGINE_PARITY_PULL_THRESHOLD,
+        },
+    )
+}
+
+pub(crate) fn piomatter_symbol_command_parity_program_info(
+    config: &Pi5ScanConfig,
+) -> Pi5PioProgramInfo {
+    build_program_info(
+        Pi5PioProgramKind::PiomatterSymbolCommandParity,
+        build_piomatter_symbol_command_parity_program_opcodes(config.timing()).to_vec(),
+        PioSimulatorConfig {
+            wrap_target: PIOMATTER_SYMBOL_COMMAND_PARITY_WRAP_TARGET,
+            wrap: PIOMATTER_SYMBOL_COMMAND_PARITY_WRAP,
+            out_pin_base: PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_PIN_BASE,
+            out_pin_count: PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_PIN_COUNT,
+            set_pin_base: 0,
+            set_pin_count: 0,
+            sideset_pin_base: 13,
+            sideset_count: PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_PIN_COUNT,
+            sideset_total_bits: PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_TOTAL_BITS,
+            sideset_optional: PIOMATTER_SYMBOL_COMMAND_PARITY_SIDESET_OPTIONAL,
+            out_shift_right: PIOMATTER_SYMBOL_COMMAND_PARITY_OUT_SHIFT_RIGHT,
+            auto_pull: PIOMATTER_SYMBOL_COMMAND_PARITY_AUTO_PULL,
+            pull_threshold: PIOMATTER_SYMBOL_COMMAND_PARITY_PULL_THRESHOLD,
+        },
+    )
 }
 
 pub(crate) fn pio_program_info_for_format(

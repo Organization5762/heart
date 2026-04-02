@@ -1,14 +1,8 @@
 #![allow(dead_code)]
 
-use std::ffi::c_char;
 use std::slice;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-use std::sync::{Condvar, Mutex};
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-use std::thread::{self, JoinHandle};
 
 use rayon::prelude::*;
 
@@ -18,9 +12,8 @@ use super::tuning::runtime_tuning;
 
 const OE_ACTIVE_LOW: bool = true;
 const LEGACY_OE_SYNC_GPIO: u32 = 4;
-const PIO_ERROR_BUFFER_BYTES: usize = 256;
 const PI5_SCAN_UNSUPPORTED_MESSAGE: &str =
-    "Pi 5 scan transport is only supported on Linux aarch64 builds.";
+    "The custom Pi 5 scan transport is unavailable in this build. Piomatter remains bench/parity tooling only.";
 // The optimized parser still rebases GPIO 5..27 into a dense 23-bit stream.
 // The simple host-driven transport now mirrors Piomatter and writes literal
 // GPIO words in the real GPIO0..27 space.
@@ -71,11 +64,35 @@ const SPAN_WORD_SHIFT: usize = 1 + SPAN_LEN_BITS;
 const SIMPLE_GROUP_FIXED_WORDS: usize = 9;
 pub(crate) const SIMPLE_COMMAND_DATA_BIT: u32 = 1_u32 << 31;
 pub(crate) const SIMPLE_COMMAND_COUNT_MASK: u32 = !SIMPLE_COMMAND_DATA_BIT;
+pub(crate) const REPEAT_EXPERIMENT_COMMAND_KIND_SHIFT: u32 = 30;
+pub(crate) const REPEAT_EXPERIMENT_COMMAND_COUNT_MASK: u32 =
+    (1_u32 << REPEAT_EXPERIMENT_COMMAND_KIND_SHIFT) - 1;
+pub(crate) const REPEAT_EXPERIMENT_COMMAND_DATA: u32 = 0b10_u32 << REPEAT_EXPERIMENT_COMMAND_KIND_SHIFT;
+pub(crate) const REPEAT_EXPERIMENT_COMMAND_REPEAT: u32 =
+    0b11_u32 << REPEAT_EXPERIMENT_COMMAND_KIND_SHIFT;
+pub(crate) const SYMBOL_COMMAND_ROW_BIT: u32 = 1_u32 << 0;
+pub(crate) const SYMBOL_COMMAND_REPEAT_BIT: u32 = 1_u32 << 1;
+pub(crate) const SYMBOL_COMMAND_DELAY_COUNT_SHIFT: u32 = 1;
+pub(crate) const SYMBOL_COMMAND_ROW_COUNT_SHIFT: u32 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SimpleCommandKind {
     Delay,
     Data,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RepeatExperimentCommandKind {
+    Delay,
+    Data,
+    Repeat,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SymbolCommandKind {
+    Delay,
+    Literal,
+    Repeat,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -567,282 +584,7 @@ impl PackedScanFrame {
 }
 
 #[derive(Debug)]
-pub(crate) struct Pi5KernelResidentLoop {
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    handle: Pi5KernelResidentLoopHandle,
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-unsafe impl Send for Pi5KernelResidentLoop {}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct Pi5KernelResidentLoopStats {
-    // Kernel-owned presentation count since the current replay epoch.
-    pub(crate) presentations: u64,
-    // Sticky worker failure, reported as a negative errno-style value.
-    pub(crate) last_error: i32,
-    // Whether replay is currently enabled for this resident session.
-    pub(crate) replay_enabled: bool,
-    // Number of replay batches that reached the completion primitive.
-    pub(crate) batches_submitted: u64,
-    // Total transport words written into the RP1 FIFO for this replay epoch.
-    pub(crate) words_written: u64,
-    // Number of times the worker observed a drain failure.
-    pub(crate) drain_failures: u64,
-    // Number of batches interrupted early by STOP/disable requests.
-    pub(crate) stop_requests_seen_during_batch: u64,
-    // Cumulative nanoseconds spent issuing the MMIO burst.
-    pub(crate) mmio_write_ns: u64,
-    // Cumulative nanoseconds spent in the drain completion primitive.
-    pub(crate) drain_ns: u64,
-    // Largest replay batch count the worker actually completed.
-    pub(crate) max_batch_replays: u32,
-    // CPU the kernel bound the replay worker to.
-    pub(crate) worker_cpu: u32,
-    // RT priority requested for the replay worker.
-    pub(crate) worker_priority: u32,
-    // Whether the worker currently has enough state to enter a replay batch.
-    pub(crate) worker_runnable: bool,
-}
-
-impl Pi5KernelResidentLoopStats {
-    // presentation_count() is only a meaningful health signal while the kernel
-    // worker is healthy. Once the worker reports a sticky errno-style failure,
-    // callers must surface that error instead of quietly treating the counter as
-    // authoritative.
-    pub(crate) fn presentation_count_result(&self) -> Result<u64, String> {
-        if self.last_error != 0 {
-            return Err(format!(
-                "Resident scan loop worker failed with code {}.",
-                self.last_error
-            ));
-        }
-        Ok(self.presentations)
-    }
-}
-
-impl Pi5KernelResidentLoop {
-    // Open the kernel-owned resident replay path with enough backing storage to
-    // hold one packed frame. The kernel module owns continuous refresh after
-    // load/start succeeds; userspace only replaces the resident buffer.
-    pub(crate) fn new(frame_bytes: usize) -> Result<Self, String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-            let mut handle: *mut ffi::HeartPi5KernelResidentLoopHandle = std::ptr::null_mut();
-            let frame_bytes = u32::try_from(frame_bytes)
-                .map_err(|_| "Resident scan loop frame exceeds 32-bit size limits.".to_string())?;
-            let result = unsafe {
-                heart_pi5_scan_loop_open(
-                    frame_bytes,
-                    &mut handle,
-                    error_buffer.as_mut_ptr(),
-                    error_buffer.len(),
-                )
-            };
-            if result != 0 || handle.is_null() {
-                return Err(read_error_buffer(&error_buffer).unwrap_or_else(|| {
-                    format!("Resident scan loop initialization failed with code {result}.")
-                }));
-            }
-            return Ok(Self {
-                handle: Pi5KernelResidentLoopHandle(handle),
-            });
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame_bytes;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
-    }
-
-    // Copy one packed frame into the resident kernel buffer. This is the
-    // changed-frame cost for the resident loop path.
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn load_frame(&self, frame: &PackedScanFrame) -> Result<(), String> {
-        let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let data_bytes = u32::try_from(frame.as_bytes().len())
-            .map_err(|_| "Resident scan loop frame exceeds 32-bit size limits.".to_string())?;
-        let result = unsafe {
-            heart_pi5_scan_loop_load(
-                self.handle.0,
-                frame.as_bytes().as_ptr(),
-                data_bytes,
-                error_buffer.as_mut_ptr(),
-                error_buffer.len(),
-            )
-        };
-        if result != 0 {
-            return Err(read_error_buffer(&error_buffer).unwrap_or_else(|| {
-                format!("Resident scan loop frame load failed with code {result}.")
-            }));
-        }
-        Ok(())
-    }
-
-    // Non-Linux or non-aarch64 builds expose the same API but fail fast so the
-    // higher layers can report "unsupported" uniformly.
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn load_frame(&self, frame: &PackedScanFrame) -> Result<(), String> {
-        let _ = frame;
-        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-    }
-
-    // Begin replay of the resident packed frame. The kernel module will keep
-    // cycling that frame until userspace stops it or replaces it.
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn start(&self) -> Result<(), String> {
-        let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let result = unsafe {
-            heart_pi5_scan_loop_start(self.handle.0, error_buffer.as_mut_ptr(), error_buffer.len())
-        };
-        if result != 0 {
-            return Err(read_error_buffer(&error_buffer).unwrap_or_else(|| {
-                format!("Resident scan loop start failed with code {result}.")
-            }));
-        }
-        Ok(())
-    }
-
-    // Unsupported-platform stub matching the Linux entrypoint above.
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn start(&self) -> Result<(), String> {
-        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-    }
-
-    // Stop resident replay so the caller can safely load a new frame or shut
-    // the transport down without the kernel continuing to touch the old buffer.
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn stop(&self) -> Result<(), String> {
-        let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let result = unsafe {
-            heart_pi5_scan_loop_stop(self.handle.0, error_buffer.as_mut_ptr(), error_buffer.len())
-        };
-        if result != 0 {
-            return Err(read_error_buffer(&error_buffer)
-                .unwrap_or_else(|| format!("Resident scan loop stop failed with code {result}.")));
-        }
-        Ok(())
-    }
-
-    // Unsupported-platform stub matching the Linux entrypoint above.
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn stop(&self) -> Result<(), String> {
-        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-    }
-
-    // Block until the kernel module reports at least the requested presentation
-    // count. This is the primitive needed for true "wait for next full frame"
-    // semantics on the resident path.
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn wait_presentations(&self, target_presentations: u64) -> Result<u64, String> {
-        let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let mut completed_presentations = 0_u64;
-        let result = unsafe {
-            heart_pi5_scan_loop_wait_presentations(
-                self.handle.0,
-                target_presentations,
-                &mut completed_presentations,
-                error_buffer.as_mut_ptr(),
-                error_buffer.len(),
-            )
-        };
-        if result != 0 {
-            return Err(read_error_buffer(&error_buffer)
-                .unwrap_or_else(|| format!("Resident scan loop wait failed with code {result}.")));
-        }
-        Ok(completed_presentations)
-    }
-
-    // Unsupported-platform stub matching the Linux entrypoint above.
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn wait_presentations(&self, target_presentations: u64) -> Result<u64, String> {
-        let _ = target_presentations;
-        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-    }
-
-    // Query the current resident-loop counters without waiting. STATS is a
-    // read-only snapshot; callers that need a frame boundary still use WAIT.
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    pub(crate) fn stats(&self) -> Result<Pi5KernelResidentLoopStats, String> {
-        let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-        let mut stats = Pi5KernelResidentLoopStats::default();
-        let mut replay_enabled = 0_u32;
-        let mut worker_runnable = 0_u32;
-        let result = unsafe {
-            heart_pi5_scan_loop_stats(
-                self.handle.0,
-                &mut stats.presentations,
-                &mut stats.last_error,
-                &mut replay_enabled,
-                &mut stats.batches_submitted,
-                &mut stats.words_written,
-                &mut stats.drain_failures,
-                &mut stats.stop_requests_seen_during_batch,
-                &mut stats.mmio_write_ns,
-                &mut stats.drain_ns,
-                &mut stats.max_batch_replays,
-                &mut stats.worker_cpu,
-                &mut stats.worker_priority,
-                &mut worker_runnable,
-                error_buffer.as_mut_ptr(),
-                error_buffer.len(),
-            )
-        };
-        if result != 0 {
-            return Err(read_error_buffer(&error_buffer).unwrap_or_else(|| {
-                format!("Resident scan loop stats failed with code {result}.")
-            }));
-        }
-        stats.replay_enabled = replay_enabled != 0;
-        stats.worker_runnable = worker_runnable != 0;
-        Ok(stats)
-    }
-
-    // Unsupported-platform stub matching the Linux entrypoint above.
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-    pub(crate) fn stats(&self) -> Result<Pi5KernelResidentLoopStats, String> {
-        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-    }
-
-    // Query just the presentation counter when the caller only needs refresh
-    // progress and not the rest of the kernel telemetry. This still propagates
-    // the sticky kernel worker error, because a stale counter is not a valid
-    // health signal once the resident loop has failed.
-    pub(crate) fn presentation_count(&self) -> Result<u64, String> {
-        self.stats()?.presentation_count_result()
-    }
-}
-
-impl Drop for Pi5KernelResidentLoop {
-    // Always close the native handle on drop so the kernel module can release
-    // its resident buffers even if higher layers forget to stop explicitly.
-    fn drop(&mut self) {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        unsafe {
-            if !self.handle.0.is_null() {
-                heart_pi5_scan_loop_close(self.handle.0);
-                self.handle.0 = std::ptr::null_mut();
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Pi5PioScanTransport {
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    handle: Pi5PioScanHandle,
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    shared: Arc<Pi5PioScanAsyncShared>,
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    hardware_lock: Arc<Mutex<()>>,
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-    worker: Option<JoinHandle<()>>,
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-unsafe impl Send for Pi5PioScanTransport {}
+pub(crate) struct Pi5PioScanTransport;
 
 impl Pi5PioScanTransport {
     // Open the raw rp1-pio transport and start the worker that serializes all
@@ -852,86 +594,13 @@ impl Pi5PioScanTransport {
         max_transfer_words: usize,
         pinout: Pi5ScanPinout,
         timing: Pi5ScanTiming,
-        _format: Pi5ScanFormat,
+        format: Pi5ScanFormat,
     ) -> Result<Self, String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            if max_transfer_words == 0 {
-                return Err("Pi 5 scan transport requires a non-zero transfer buffer.".to_string());
-            }
-            if !timing.clock_divider.is_finite() || timing.clock_divider <= 0.0 {
-                return Err(
-                    "Pi 5 scan transport requires a positive finite clock divider.".to_string(),
-                );
-            }
-            let tuning = runtime_tuning();
-            if tuning.pi5_scan_default_dma_buffer_count == 0 {
-                return Err("Pi 5 scan transport requires at least one DMA buffer.".to_string());
-            }
-            let max_transfer_bytes = max_transfer_words
-                .checked_mul(std::mem::size_of::<u32>())
-                .ok_or_else(|| {
-                    "Pi 5 scan transport buffer size overflowed while converting to bytes."
-                        .to_string()
-                })?;
-            let dma_buffer_size =
-                u32::try_from(max_transfer_bytes.min(tuning.pi5_scan_max_dma_buffer_bytes))
-                    .map_err(|_| {
-                        "Pi 5 scan transport buffer exceeds 32-bit DMA limits.".to_string()
-                    })?;
-            let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-            let mut handle: *mut ffi::HeartPi5PioScanHandle = std::ptr::null_mut();
-            let result = unsafe {
-                heart_pi5_pio_scan_open(
-                    pinout.oe_gpio,
-                    pinout.lat_gpio,
-                    pinout.clock_gpio,
-                    timing.clock_divider,
-                    timing.simple_clock_hold_ticks,
-                    timing.post_addr_ticks,
-                    timing.latch_ticks,
-                    timing.post_latch_ticks,
-                    dma_buffer_size,
-                    tuning.pi5_scan_default_dma_buffer_count,
-                    &mut handle,
-                    error_buffer.as_mut_ptr(),
-                    error_buffer.len(),
-                )
-            };
-            if result != 0 || handle.is_null() {
-                return Err(read_error_buffer(&error_buffer).unwrap_or_else(|| {
-                    format!("Pi 5 scan transport initialization failed with code {result}.")
-                }));
-            }
-            let handle = Pi5PioScanHandle(handle);
-            let shared = Arc::new(Pi5PioScanAsyncShared {
-                state: Mutex::new(Pi5PioScanAsyncState::default()),
-                signal: Condvar::new(),
-            });
-            let hardware_lock = Arc::new(Mutex::new(()));
-            let repeat_pause = tuning.pi5_scan_resident_loop_resubmit_pause;
-            let worker = spawn_scan_transport_worker(
-                handle,
-                Arc::clone(&shared),
-                Arc::clone(&hardware_lock),
-                repeat_pause,
-            )?;
-            return Ok(Self {
-                handle,
-                shared,
-                hardware_lock,
-                worker: Some(worker),
-            });
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = max_transfer_words;
-            let _ = pinout;
-            let _ = timing;
-            let _ = _format;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = max_transfer_words;
+        let _ = pinout;
+        let _ = timing;
+        let _ = format;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Queue the newest packed frame for transport without blocking on the
@@ -942,105 +611,23 @@ impl Pi5PioScanTransport {
         frame_identity: (usize, u64),
         frame: Arc<PackedScanFrame>,
     ) -> Result<(), String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let mut state = self
-                .shared
-                .state
-                .lock()
-                .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            if let Some(error) = state.error.clone() {
-                return Err(error);
-            }
-            if state.closed {
-                return Err("Pi 5 scan transport is already closed.".to_string());
-            }
-            if state.transfer_in_flight
-                && state.active_identity == Some(frame_identity)
-                && state.pending_frame.is_none()
-            {
-                return Ok(());
-            }
-            if state.pending_identity == Some(frame_identity) {
-                return Ok(());
-            }
-            state.pending_frame = Some(frame);
-            state.pending_identity = Some(frame_identity);
-            self.shared.signal.notify_one();
-            Ok(())
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame_identity;
-            let _ = frame;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = frame_identity;
+        let _ = frame;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Bypass the async queue and drive one synchronous submit/wait cycle
     // directly. This is used only by bring-up smoke tools where we want to
     // test the raw RP1 PIO path without any higher-level scheduling behavior.
     pub(crate) fn submit_blocking(&self, frame: &PackedScanFrame) -> Result<(), String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let state = self
-                .shared
-                .state
-                .lock()
-                .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            if let Some(error) = state.error.clone() {
-                return Err(error);
-            }
-            if state.closed {
-                return Err("Pi 5 scan transport is already closed.".to_string());
-            }
-            drop(state);
-
-            let _hardware_guard = self
-                .hardware_lock
-                .lock()
-                .map_err(|_| "Pi 5 scan hardware lock poisoned.".to_string())?;
-            submit_scan_frame(self.handle, frame)?;
-            wait_for_scan_completion(self.handle)
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = frame;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Wait until the transport has no active submission and no queued
     // replacement frame. This is the safe point for benchmarks and shutdown.
     pub(crate) fn wait_complete(&self) -> Result<(), String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let mut state = self
-                .shared
-                .state
-                .lock()
-                .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            loop {
-                if let Some(error) = state.error.clone() {
-                    return Err(error);
-                }
-                if !state.transfer_in_flight && state.pending_frame.is_none() {
-                    return Ok(());
-                }
-                state = self
-                    .shared
-                    .signal
-                    .wait(state)
-                    .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            }
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Wait until the named frame has been presented the requested number of
@@ -1051,36 +638,9 @@ impl Pi5PioScanTransport {
         frame_identity: (usize, u64),
         target_presentations: u64,
     ) -> Result<(), String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let mut state = self
-                .shared
-                .state
-                .lock()
-                .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            loop {
-                if let Some(error) = state.error.clone() {
-                    return Err(error);
-                }
-                if state.active_identity == Some(frame_identity)
-                    && state.active_presentation_count >= target_presentations
-                {
-                    return Ok(());
-                }
-                state = self
-                    .shared
-                    .signal
-                    .wait(state)
-                    .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            }
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame_identity;
-            let _ = target_presentations;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = frame_identity;
+        let _ = target_presentations;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Read the current presentation count for the named active frame without
@@ -1089,247 +649,20 @@ impl Pi5PioScanTransport {
         &self,
         frame_identity: (usize, u64),
     ) -> Result<u64, String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            let state = self
-                .shared
-                .state
-                .lock()
-                .map_err(|_| "Pi 5 scan transport state lock poisoned.".to_string())?;
-            if let Some(error) = state.error.clone() {
-                return Err(error);
-            }
-            if state.active_identity == Some(frame_identity) {
-                return Ok(state.active_presentation_count);
-            }
-            Ok(0)
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame_identity;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = frame_identity;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 
     // Synchronous helper kept for benchmarks and bring-up. Production code uses
     // `submit_async()` so packing and application work can overlap transport.
     pub(crate) fn stream(&self, frame: &PackedScanFrame) -> Result<Duration, String> {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            self.wait_complete()?;
-            let start = Instant::now();
-            let _hardware_guard = self
-                .hardware_lock
-                .lock()
-                .map_err(|_| "Pi 5 scan hardware lock poisoned.".to_string())?;
-            submit_scan_frame(self.handle, frame)?;
-            wait_for_scan_completion(self.handle)?;
-            Ok(start.elapsed())
-        }
-
-        #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
-        {
-            let _ = frame;
-            Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
-        }
+        let _ = frame;
+        Err(PI5_SCAN_UNSUPPORTED_MESSAGE.to_string())
     }
 }
 
 impl Drop for Pi5PioScanTransport {
-    // Stop the worker before closing the native handle so nothing can issue one
-    // final submit against a freed rp1-pio context during teardown.
-    fn drop(&mut self) {
-        #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-        {
-            if let Ok(mut state) = self.shared.state.lock() {
-                state.closed = true;
-            }
-            self.shared.signal.notify_all();
-            if let Some(worker) = self.worker.take() {
-                let _ = worker.join();
-            }
-            let _ = self.wait_complete();
-            unsafe {
-                if !self.handle.0.is_null() {
-                    heart_pi5_pio_scan_close(self.handle.0);
-                    self.handle.0 = std::ptr::null_mut();
-                }
-            }
-        }
-    }
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[derive(Clone, Copy, Debug)]
-struct Pi5PioScanHandle(*mut ffi::HeartPi5PioScanHandle);
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-unsafe impl Send for Pi5PioScanHandle {}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[derive(Clone, Copy, Debug)]
-struct Pi5KernelResidentLoopHandle(*mut ffi::HeartPi5KernelResidentLoopHandle);
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[derive(Debug, Default)]
-struct Pi5PioScanAsyncState {
-    pending_frame: Option<Arc<PackedScanFrame>>,
-    pending_identity: Option<(usize, u64)>,
-    active_frame: Option<Arc<PackedScanFrame>>,
-    active_identity: Option<(usize, u64)>,
-    active_presentation_count: u64,
-    transfer_in_flight: bool,
-    closed: bool,
-    error: Option<String>,
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[derive(Debug)]
-struct Pi5PioScanAsyncShared {
-    state: Mutex<Pi5PioScanAsyncState>,
-    signal: Condvar,
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn spawn_scan_transport_worker(
-    handle: Pi5PioScanHandle,
-    shared: Arc<Pi5PioScanAsyncShared>,
-    hardware_lock: Arc<Mutex<()>>,
-    repeat_pause: Duration,
-) -> Result<JoinHandle<()>, String> {
-    // Name the thread because this transport frequently shows up in profiles,
-    // crash logs, and shutdown diagnostics when tuning scanout behavior.
-    thread::Builder::new()
-        .name("heart-pi5-scan-transport".to_string())
-        .spawn(move || run_scan_transport_worker(handle, shared, hardware_lock, repeat_pause))
-        .map_err(|error| error.to_string())
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn run_scan_transport_worker(
-    handle: Pi5PioScanHandle,
-    shared: Arc<Pi5PioScanAsyncShared>,
-    hardware_lock: Arc<Mutex<()>>,
-    repeat_pause: Duration,
-) {
-    // The caller is allowed to keep producing frames while the hardware is busy,
-    // but only one transfer is ever allowed to touch the state machine at a
-    // time. The worker owns that serialization point and coalesces queued work
-    // down to "the newest pending frame".
-    loop {
-        let (frame, frame_identity, is_resident_repeat) = {
-            let mut state = match shared.state.lock() {
-                Ok(state) => state,
-                Err(_) => return,
-            };
-            while !state.closed && state.pending_frame.is_none() && state.active_frame.is_none() {
-                match shared.signal.wait(state) {
-                    Ok(wait_state) => state = wait_state,
-                    Err(_) => return,
-                }
-            }
-            if state.closed && state.pending_frame.is_none() && state.active_frame.is_none() {
-                return;
-            }
-            let (frame, frame_identity, is_resident_repeat) =
-                if let Some(frame) = state.pending_frame.take() {
-                    let Some(frame_identity) = state.pending_identity.take() else {
-                        continue;
-                    };
-                    state.active_frame = Some(Arc::clone(&frame));
-                    state.active_identity = Some(frame_identity);
-                    state.active_presentation_count = 0;
-                    (frame, frame_identity, false)
-                } else {
-                    let Some(frame) = state.active_frame.as_ref().map(Arc::clone) else {
-                        continue;
-                    };
-                    let Some(frame_identity) = state.active_identity else {
-                        continue;
-                    };
-                    (frame, frame_identity, true)
-                };
-            state.transfer_in_flight = true;
-            (frame, frame_identity, is_resident_repeat)
-        };
-
-        if is_resident_repeat && !repeat_pause.is_zero() {
-            // Give the resident-loop path a short breather so repeated refreshes
-            // do not starve the producer side when the displayed frame is static.
-            thread::sleep(repeat_pause);
-        }
-
-        let transfer_result = (|| -> Result<(), String> {
-            // Both the raw rp1-pio path and the kernel resident-loop path expose
-            // synchronous "submit then wait" primitives at the FFI boundary. The
-            // worker keeps that boundary serialized so higher-level Python and
-            // Rust callers can submit asynchronously without ever overlapping
-            // hardware access.
-            let _hardware_guard = hardware_lock
-                .lock()
-                .map_err(|_| "Pi 5 scan hardware lock poisoned.".to_string())?;
-            submit_scan_frame(handle, frame.as_ref())?;
-            wait_for_scan_completion(handle)?;
-            Ok(())
-        })();
-
-        let mut state = match shared.state.lock() {
-            Ok(state) => state,
-            Err(_) => return,
-        };
-        state.transfer_in_flight = false;
-        if state.active_identity == Some(frame_identity) {
-            state.active_presentation_count = state.active_presentation_count.saturating_add(1);
-        }
-        if let Err(error) = transfer_result {
-            state.error = Some(error);
-            state.closed = true;
-        }
-        shared.signal.notify_all();
-        if state.closed {
-            return;
-        }
-    }
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn submit_scan_frame(handle: Pi5PioScanHandle, frame: &PackedScanFrame) -> Result<(), String> {
-    // Submit the already-packed transport bytes to rp1-pio exactly as-is. Any
-    // compaction work must happen before this point because the native layer and
-    // PIO parser both consume an opaque stream here.
-    let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-    let data_bytes = u32::try_from(frame.as_bytes().len())
-        .map_err(|_| "Pi 5 scan frame exceeds 32-bit DMA limits.".to_string())?;
-    let result = unsafe {
-        heart_pi5_pio_scan_submit(
-            handle.0,
-            frame.as_bytes().as_ptr(),
-            data_bytes,
-            error_buffer.as_mut_ptr(),
-            error_buffer.len(),
-        )
-    };
-    if result != 0 {
-        return Err(read_error_buffer(&error_buffer)
-            .unwrap_or_else(|| format!("Pi 5 scan submit failed with code {result}.")));
-    }
-    Ok(())
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-fn wait_for_scan_completion(handle: Pi5PioScanHandle) -> Result<(), String> {
-    // Wait for the current rp1-pio submission to drain. This is the transport's
-    // serialization point: no subsequent frame may touch the state machine
-    // until this returns.
-    let mut error_buffer = [0 as c_char; PIO_ERROR_BUFFER_BYTES];
-    let result =
-        unsafe { heart_pi5_pio_scan_wait(handle.0, error_buffer.as_mut_ptr(), error_buffer.len()) };
-    if result != 0 {
-        return Err(read_error_buffer(&error_buffer)
-            .unwrap_or_else(|| format!("Pi 5 scan wait failed with code {result}.")));
-    }
-    Ok(())
+    fn drop(&mut self) {}
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1956,6 +1289,155 @@ fn decode_simple_delay_command(command_word: u32) -> Result<u32, String> {
         ));
     }
     Ok(logical_count)
+}
+
+fn encode_repeat_experiment_count(
+    logical_count: u32,
+    kind: RepeatExperimentCommandKind,
+    label: &str,
+) -> Result<u32, String> {
+    let encoded = logical_count.checked_sub(1).ok_or_else(|| {
+        format!("Pi 5 repeat experiment {label} count must be at least 1.")
+    })?;
+    if encoded > REPEAT_EXPERIMENT_COMMAND_COUNT_MASK {
+        return Err(format!(
+            "Pi 5 repeat experiment {label} count exceeds the 30-bit command payload."
+        ));
+    }
+    Ok(match kind {
+        RepeatExperimentCommandKind::Delay => encoded,
+        RepeatExperimentCommandKind::Data => REPEAT_EXPERIMENT_COMMAND_DATA | encoded,
+        RepeatExperimentCommandKind::Repeat => REPEAT_EXPERIMENT_COMMAND_REPEAT | encoded,
+    })
+}
+
+pub(crate) fn encode_repeat_experiment_data_command(logical_count: usize) -> Result<u32, String> {
+    let logical_count = u32::try_from(logical_count).map_err(|_| {
+        "Pi 5 repeat experiment data count exceeds 32-bit transport words.".to_string()
+    })?;
+    encode_repeat_experiment_count(logical_count, RepeatExperimentCommandKind::Data, "data")
+}
+
+pub(crate) fn encode_repeat_experiment_delay_command(ticks: u32) -> Result<u32, String> {
+    encode_repeat_experiment_count(ticks, RepeatExperimentCommandKind::Delay, "delay")
+}
+
+pub(crate) fn encode_repeat_experiment_repeat_command(
+    logical_count: usize,
+) -> Result<u32, String> {
+    let logical_count = u32::try_from(logical_count).map_err(|_| {
+        "Pi 5 repeat experiment repeat count exceeds 32-bit transport words.".to_string()
+    })?;
+    encode_repeat_experiment_count(logical_count, RepeatExperimentCommandKind::Repeat, "repeat")
+}
+
+pub(crate) fn decode_repeat_experiment_command(
+    command_word: u32,
+) -> Result<(RepeatExperimentCommandKind, u32), String> {
+    let logical_count = (command_word & REPEAT_EXPERIMENT_COMMAND_COUNT_MASK)
+        .checked_add(1)
+        .ok_or_else(|| "Pi 5 repeat experiment command count overflowed.".to_string())?;
+    let kind = match command_word >> REPEAT_EXPERIMENT_COMMAND_KIND_SHIFT {
+        0b00 => RepeatExperimentCommandKind::Delay,
+        0b10 => RepeatExperimentCommandKind::Data,
+        0b11 => RepeatExperimentCommandKind::Repeat,
+        tag => {
+            return Err(format!(
+                "Pi 5 repeat experiment command 0x{command_word:08x} used unsupported tag {tag:02b}."
+            ))
+        }
+    };
+    Ok((kind, logical_count))
+}
+
+pub(crate) fn encode_symbol_delay_command(logical_count: usize) -> Result<u32, String> {
+    let encoded = logical_count
+        .checked_sub(1)
+        .ok_or_else(|| "symbol delay commands must repeat at least one cycle.".to_string())?;
+    let encoded = u32::try_from(encoded)
+        .map_err(|_| "symbol delay command count exceeds 32-bit transport.".to_string())?;
+    if (encoded >> 31) != 0 {
+        return Err("symbol delay command count exceeds the 30-bit command payload.".to_string());
+    }
+    Ok(encoded << SYMBOL_COMMAND_DELAY_COUNT_SHIFT)
+}
+
+pub(crate) fn encode_symbol_literal_command(logical_count: usize) -> Result<u32, String> {
+    let encoded = logical_count
+        .checked_sub(1)
+        .ok_or_else(|| "symbol literal commands must cover at least one symbol.".to_string())?;
+    let encoded = u32::try_from(encoded)
+        .map_err(|_| "symbol literal command count exceeds 32-bit transport.".to_string())?;
+    if (encoded >> 30) != 0 {
+        return Err("symbol literal command count exceeds the 30-bit command payload.".to_string());
+    }
+    Ok(SYMBOL_COMMAND_ROW_BIT | (encoded << SYMBOL_COMMAND_ROW_COUNT_SHIFT))
+}
+
+pub(crate) fn encode_symbol_repeat_command(logical_count: usize) -> Result<u32, String> {
+    let encoded = logical_count
+        .checked_sub(1)
+        .ok_or_else(|| "symbol repeat commands must cover at least one symbol.".to_string())?;
+    let encoded = u32::try_from(encoded)
+        .map_err(|_| "symbol repeat command count exceeds 32-bit transport.".to_string())?;
+    if (encoded >> 30) != 0 {
+        return Err("symbol repeat command count exceeds the 30-bit command payload.".to_string());
+    }
+    Ok(SYMBOL_COMMAND_ROW_BIT | SYMBOL_COMMAND_REPEAT_BIT | (encoded << SYMBOL_COMMAND_ROW_COUNT_SHIFT))
+}
+
+pub(crate) fn decode_symbol_command(command_word: u32) -> Result<(SymbolCommandKind, u32), String> {
+    let kind = if (command_word & SYMBOL_COMMAND_ROW_BIT) == 0 {
+        SymbolCommandKind::Delay
+    } else if (command_word & SYMBOL_COMMAND_REPEAT_BIT) == 0 {
+        SymbolCommandKind::Literal
+    } else {
+        SymbolCommandKind::Repeat
+    };
+    let shifted = match kind {
+        SymbolCommandKind::Delay => command_word >> SYMBOL_COMMAND_DELAY_COUNT_SHIFT,
+        SymbolCommandKind::Literal | SymbolCommandKind::Repeat => {
+            command_word >> SYMBOL_COMMAND_ROW_COUNT_SHIFT
+        }
+    };
+    let logical_count = shifted
+        .checked_add(1)
+        .ok_or_else(|| "symbol command count overflowed.".to_string())?;
+    Ok((kind, logical_count))
+}
+
+pub(crate) fn pack_rgb_lane_symbols(symbols: &[u8]) -> Vec<u32> {
+    let mut words = Vec::with_capacity(symbols.len().div_ceil(5));
+    let mut index = 0_usize;
+    while index < symbols.len() {
+        let mut word = 0_u32;
+        for offset in 0..5 {
+            let Some(&symbol) = symbols.get(index + offset) else {
+                break;
+            };
+            word |= u32::from(symbol & 0x3f) << (offset * 6);
+        }
+        words.push(word);
+        index += 5;
+    }
+    words
+}
+
+pub(crate) fn pack_control_prefixed_rgb_lane_symbols(
+    control_word: u32,
+    symbols: &[u8],
+) -> Vec<u32> {
+    let mut words = Vec::with_capacity(1 + symbols.len().div_ceil(5));
+    let mut first_word = control_word & ((1_u32 << 13) - 1);
+    let leading_symbol_count = symbols.len().min(3);
+    for (index, symbol) in symbols.iter().take(leading_symbol_count).enumerate() {
+        first_word |= u32::from(symbol & 0x3f) << (13 + index * 6);
+    }
+    words.push(first_word);
+    if symbols.len() > leading_symbol_count {
+        words.extend(pack_rgb_lane_symbols(&symbols[leading_symbol_count..]));
+    }
+    words
 }
 
 fn decode_simple_shift_counter(encoded_width: u32) -> Result<usize, String> {
@@ -2790,20 +2272,6 @@ fn expand_channel_to_pwm_bits(value: u8, pwm_bits: u8) -> u16 {
     }
 }
 
-fn read_error_buffer(buffer: &[c_char]) -> Option<String> {
-    // Native shims report errors through fixed C buffers. Convert that into the
-    // normal Rust `String` path while tolerating empty buffers.
-    let length = buffer
-        .iter()
-        .position(|&byte| byte == 0)
-        .unwrap_or(buffer.len());
-    if length == 0 {
-        return None;
-    }
-    let bytes: Vec<u8> = buffer[..length].iter().map(|byte| *byte as u8).collect();
-    Some(String::from_utf8_lossy(&bytes).into_owned())
-}
-
 impl Pi5ScanConfig {
     // Estimate the worst-case packed word count for one logical width. The
     // transports use this to size DMA buffers and resident storage up front.
@@ -2823,115 +2291,5 @@ impl Pi5ScanConfig {
         let width = usize::try_from(self.width()?)
             .map_err(|_| "Pi 5 scan width exceeds host usize.".to_string())?;
         self.estimated_word_count_for_width(width)
-    }
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[link(name = "heart_pi5_pio_scan_shim", kind = "static")]
-unsafe extern "C" {
-    // Raw rp1-pio userspace transport entrypoints. These operate on one
-    // synchronous submit/wait cycle at a time; the Rust worker above provides
-    // the higher-level async semantics.
-    fn heart_pi5_pio_scan_open(
-        oe_gpio: u32,
-        lat_gpio: u32,
-        clock_gpio: u32,
-        clock_divider: f32,
-        simple_clock_hold_ticks: u32,
-        post_addr_ticks: u32,
-        latch_ticks: u32,
-        post_latch_ticks: u32,
-        dma_buffer_size: u32,
-        dma_buffer_count: u32,
-        out_handle: *mut *mut ffi::HeartPi5PioScanHandle,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_pio_scan_submit(
-        handle: *mut ffi::HeartPi5PioScanHandle,
-        data: *const u8,
-        data_bytes: u32,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_pio_scan_wait(
-        handle: *mut ffi::HeartPi5PioScanHandle,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_pio_scan_close(handle: *mut ffi::HeartPi5PioScanHandle);
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[link(name = "heart_pi5_scan_loop_shim", kind = "static")]
-unsafe extern "C" {
-    // Resident-loop transport entrypoints backed by the kernel module. The
-    // kernel owns continuous replay once `start` succeeds; userspace mostly
-    // loads frames, waits, and samples counters.
-    fn heart_pi5_scan_loop_open(
-        frame_bytes: u32,
-        out_handle: *mut *mut ffi::HeartPi5KernelResidentLoopHandle,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_load(
-        handle: *mut ffi::HeartPi5KernelResidentLoopHandle,
-        data: *const u8,
-        data_bytes: u32,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_start(
-        handle: *mut ffi::HeartPi5KernelResidentLoopHandle,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_stop(
-        handle: *mut ffi::HeartPi5KernelResidentLoopHandle,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_wait_presentations(
-        handle: *mut ffi::HeartPi5KernelResidentLoopHandle,
-        target_presentations: u64,
-        completed_presentations: *mut u64,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_stats(
-        handle: *mut ffi::HeartPi5KernelResidentLoopHandle,
-        presentations: *mut u64,
-        last_error: *mut i32,
-        replay_enabled: *mut u32,
-        batches_submitted: *mut u64,
-        words_written: *mut u64,
-        drain_failures: *mut u64,
-        stop_requests_seen_during_batch: *mut u64,
-        mmio_write_ns: *mut u64,
-        drain_ns: *mut u64,
-        max_batch_replays: *mut u32,
-        worker_cpu: *mut u32,
-        worker_priority: *mut u32,
-        worker_runnable: *mut u32,
-        error_buf: *mut c_char,
-        error_buf_len: usize,
-    ) -> i32;
-    fn heart_pi5_scan_loop_close(handle: *mut ffi::HeartPi5KernelResidentLoopHandle);
-}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-#[link(name = "pio")]
-unsafe extern "C" {}
-
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-mod ffi {
-    #[repr(C)]
-    pub(crate) struct HeartPi5PioScanHandle {
-        _private: [u8; 0],
-    }
-
-    #[repr(C)]
-    pub(crate) struct HeartPi5KernelResidentLoopHandle {
-        _private: [u8; 0],
     }
 }

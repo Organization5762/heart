@@ -1,26 +1,16 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use rayon::prelude::*;
 
 use super::config::ColorOrder;
 use super::tuning::runtime_tuning;
 
-static NEXT_FRAME_BUFFER_ID: AtomicUsize = AtomicUsize::new(1);
-
 #[derive(Debug)]
 pub(crate) struct FrameBuffer {
     data: Vec<u8>,
-    buffer_id: usize,
-    revision: u64,
 }
 
 impl FrameBuffer {
     pub(crate) fn new(frame_len: usize) -> Self {
-        Self {
-            data: vec![0_u8; frame_len],
-            buffer_id: NEXT_FRAME_BUFFER_ID.fetch_add(1, Ordering::Relaxed),
-            revision: 0,
-        }
+        Self { data: vec![0_u8; frame_len] }
     }
 
     pub(crate) fn as_slice(&self) -> &[u8] {
@@ -33,7 +23,6 @@ impl FrameBuffer {
 
     pub(crate) fn clear(&mut self) {
         self.data.fill(0);
-        self.revision = self.revision.wrapping_add(1);
     }
 
     pub(crate) fn write_rgba(&mut self, source: &[u8], color_order: ColorOrder) {
@@ -42,11 +31,6 @@ impl FrameBuffer {
             ColorOrder::Rgb => self.data.copy_from_slice(source),
             ColorOrder::Gbr => copy_with_gbr_remap(&mut self.data, source),
         }
-        self.revision = self.revision.wrapping_add(1);
-    }
-
-    pub(crate) fn identity(&self) -> (usize, u64) {
-        (self.buffer_id, self.revision)
     }
 }
 

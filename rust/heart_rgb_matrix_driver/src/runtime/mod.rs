@@ -1,6 +1,5 @@
 mod backend;
 mod config;
-mod device;
 mod driver;
 mod frame;
 mod pi5_pio_programs_generated;
@@ -23,16 +22,33 @@ pub use driver::{MatrixDriverCore, MatrixDriverError};
 pub(crate) use frame::{FrameBuffer, FrameBufferPool};
 #[allow(unused_imports)]
 pub(crate) use pi5_pio_sim::{
-    build_simple_hub75_program_opcodes, estimate_simple_hub75_frame_timing, gpio_is_high,
-    pio_program_info_for_format,
+    build_piomatter_row_compact_engine_parity_program_opcodes,
+    build_piomatter_row_compact_tight_engine_parity_program_opcodes,
+    build_piomatter_row_counted_engine_parity_program_opcodes,
+    build_piomatter_row_hybrid_engine_parity_program_opcodes,
+    build_piomatter_row_runs_engine_parity_program_opcodes,
+    build_piomatter_row_window_engine_parity_program_opcodes,
+    build_piomatter_row_split_engine_parity_program_opcodes,
+    build_piomatter_row_repeat_engine_parity_program_opcodes,
+    build_piomatter_symbol_command_parity_program_opcodes, build_simple_hub75_program_opcodes,
+    estimate_simple_hub75_frame_timing, gpio_is_high,
+    piomatter_row_compact_engine_parity_program_info,
+    piomatter_row_compact_tight_engine_parity_program_info,
+    piomatter_row_counted_engine_parity_program_info,
+    piomatter_row_hybrid_engine_parity_program_info,
+    piomatter_row_runs_engine_parity_program_info,
+    piomatter_row_window_engine_parity_program_info,
+    piomatter_row_split_engine_parity_program_info,
+    piomatter_symbol_command_parity_program_info,
+    piomatter_row_repeat_engine_parity_program_info, pio_program_info_for_format,
     simulate_simple_hub75_group, Pi5PioInstructionSummary, Pi5PioProgramInfo, Pi5PioProgramKind,
     Pi5PioSimulation, Pi5PioTimingEstimate, Pi5PioTraceStep,
 };
 #[allow(unused_imports)]
 pub(crate) use pi5_scan::{
     build_simple_group_words_for_rgba, build_simple_smoke_group_words, PackedScanFrame,
-    PackedScanFrameStats, Pi5PioScanTransport, Pi5ScanConfig, Pi5ScanFormat,
-    Pi5ScanGroupTrace, Pi5ScanTiming,
+    PackedScanFrameStats, Pi5PioScanTransport, Pi5ScanConfig, Pi5ScanFormat, Pi5ScanGroupTrace,
+    Pi5ScanTiming,
 };
 #[allow(unused_imports)]
 pub use scene::{SceneManagerCore, SceneSnapshotCore};

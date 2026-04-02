@@ -1,0 +1,70 @@
+; Piomatter row-repeat engine experiment.
+;
+; Command format (out-shift-right):
+;   0b0 ddddddddddddddddddddddddddddddd => delay command, 31-bit logical_count - 1
+;   0b10 cccccccccccccccccccccccccccccc => row-engine literal command, 30-bit row width - 1
+;   0b11 rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr => row-engine repeat command, 30-bit row width - 1
+;
+; Row-engine payload after the command word:
+;   - literal rows:
+;       logical_count literal GPIO words for the row shift loop
+;   - repeat rows:
+;       one repeated GPIO word for the row shift loop
+;   - common trailer:
+;       active hold count word (logical_count - 1)
+;       active hold GPIO word
+;       inactive hold count word (logical_count - 1)
+;       inactive hold GPIO word
+;       latch-high hold count word (logical_count - 1)
+;       next-address hold count word (logical_count - 1)
+;       next-address GPIO word
+
+.side_set 1 opt
+.wrap_target
+top:
+    out x, 1                  ; X = 0 => delay, 1 => row-engine
+    jmp !x delay_count
+    out x, 1                  ; X = 0 => literal row, 1 => repeated row
+    out y, 30                 ; Y = encoded row width (count - 1)
+    jmp !x row_shift_loop
+
+repeat_setup:
+    out x, 32                 ; X = repeated literal GPIO word
+repeat_shift_loop:
+    mov pins, x
+    jmp y-- repeat_shift_loop side 1
+    jmp row_trailer
+
+row_shift_loop:
+    out pins, 32
+    jmp y-- row_shift_loop side 1
+
+row_trailer:
+    out y, 32                 ; active hold count
+    out pins, 32              ; active hold GPIO word
+active_hold:
+    jmp y-- active_hold
+
+    out y, 32                 ; inactive hold count
+    out pins, 32              ; inactive hold GPIO word
+inactive_hold:
+    jmp y-- inactive_hold
+
+    set pins, 1               ; assert LAT while holding the inactive word
+    out y, 32                 ; latch-high hold count
+latch_hold:
+    jmp y-- latch_hold
+
+    out y, 32                 ; next-address hold count
+    out pins, 32              ; next-address GPIO word
+next_addr_hold:
+    jmp y-- next_addr_hold
+    jmp top
+
+delay_count:
+    out y, 31
+do_delay:
+    out pins, 32
+delay_loop:
+    jmp y-- delay_loop
+.wrap

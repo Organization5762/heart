@@ -1,0 +1,75 @@
+; Piomatter row-split engine experiment.
+;
+; Command format (out-shift-right):
+;   0b0t cccccccccccccccccccccccccccccc => repeated row command
+;   0b1t cccccccccccccccccccccccccccccc => split row command
+;       t = 0 => short trailer, t = 1 => counted active-hold trailer
+;       remaining bits = repeat count - 1, or first split span count - 1
+;
+; Row payload after the command word:
+;   - repeated rows:
+;       repeated GPIO word
+;   - split rows:
+;       first repeated GPIO word
+;       second repeated GPIO logical count word (logical_count - 1)
+;       second repeated GPIO word
+;   - short trailer rows:
+;       active hold GPIO word (implicit one-cycle hold)
+;       inactive hold GPIO word
+;       next-address hold GPIO word
+;   - counted trailer rows:
+;       active hold count word (logical_count - 1)
+;       active hold GPIO word
+;       inactive hold GPIO word
+;       next-address hold GPIO word
+;
+; Fixed post-OE, latch-high, and post-address delays are encoded directly in the
+; instruction delay bits using the current baseline timing values.
+
+.side_set 1 opt
+.wrap_target
+top:
+    out x, 1                  ; X = 0 => repeated row, 1 => split row
+    out y, 1                  ; Y = 0 => short trailer, 1 => counted trailer
+    mov isr, y                ; save the trailer flag while Y becomes the repeat count
+    out y, 30                 ; Y = encoded repeat count (count - 1)
+    jmp !x repeat_row_setup
+
+    out x, 32                 ; X = first split GPIO word
+split_first_loop:
+    mov pins, x
+    jmp y-- split_first_loop side 1
+    out y, 32                 ; Y = encoded second split count (count - 1)
+    out x, 32                 ; X = second split GPIO word
+split_second_loop:
+    mov pins, x
+    jmp y-- split_second_loop side 1
+    mov y, isr
+    jmp !y short_trailer
+    jmp row_trailer
+
+repeat_row_setup:
+    out x, 32                 ; X = repeated GPIO word
+repeat_row_loop:
+    mov pins, x
+    jmp y-- repeat_row_loop side 1
+    mov y, isr
+    jmp !y short_trailer
+
+row_trailer:
+    out y, 32                 ; active hold count
+    out pins, 32              ; active hold GPIO word
+active_hold:
+    jmp y-- active_hold
+
+trailer_tail:
+    out pins, 32              ; inactive hold GPIO word
+    nop                       ; baseline post-OE delay
+    set pins, 1               ; assert LAT while holding the inactive word
+    out pins, 32 [5]          ; next-address hold GPIO word
+    jmp top
+
+short_trailer:
+    out pins, 32 [1]          ; active hold GPIO word with an implicit single-cycle dwell
+    jmp trailer_tail
+.wrap

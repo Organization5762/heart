@@ -60,32 +60,6 @@ class FakeDriver:
         self.closed = True
 
 
-@dataclass
-class FakePiomatterGeometry:
-    """Capture Piomatter geometry inputs so backend tests can inspect them directly."""
-
-    width: int
-    height: int
-    n_addr_lines: int
-    rotation: str
-    n_planes: int
-    n_temporal_planes: int
-
-
-class FakePiomatterInstance:
-    """Record Piomatter show calls so backend tests can verify frame presentation plumbing."""
-
-    def __init__(self, colorspace: str, pinout: str, framebuffer: object, geometry: FakePiomatterGeometry) -> None:
-        self.colorspace = colorspace
-        self.pinout = pinout
-        self.framebuffer = framebuffer
-        self.geometry = geometry
-        self.show_calls = 0
-
-    def show(self) -> None:
-        self.show_calls += 1
-
-
 class TestRgbDisplayRuntime:
     """Validate RGB display runtime hooks so the device path can move to the clean-room matrix API safely."""
 
@@ -113,10 +87,10 @@ class TestRgbDisplayRuntime:
             color_order="rgb",
         )
 
-    def test_build_matrix_driver_requires_native_runtime(
+    def test_build_matrix_driver_requires_native_runtime_by_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify driver construction fails clearly when the native package is unavailable. This matters because deployments need a direct signal that the clean-room runtime has not been installed."""
+        """Verify driver construction fails clearly when the native runtime is unavailable by default. This matters because production should not silently depend on parity-only tooling."""
 
         monkeypatch.setattr(
             "heart.device.rgb_display.runtime.optional_import",
@@ -126,10 +100,10 @@ class TestRgbDisplayRuntime:
         with pytest.raises(RuntimeError, match="clean-room HUB75 runtime is unavailable"):
             build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
 
-    def test_build_matrix_driver_uses_native_public_api(
+    def test_build_matrix_driver_uses_native_public_api_by_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify driver creation flows through the reduced native API surface. This matters because the RGB device should stop depending on legacy rgbmatrix option objects."""
+        """Verify driver creation flows through the reduced native API surface by default. This matters because the production runtime should stay on the clean-room backend only."""
 
         fake_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
@@ -156,38 +130,47 @@ class TestRgbDisplayRuntime:
             color_order="rgb",
         )
 
-    def test_build_matrix_driver_can_select_piomatter_backend(
+    def test_build_matrix_driver_uses_native_public_api_when_requested(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify runtime selection can build a Piomatter-backed driver explicitly. This matters because Pi 5 bring-up needs a stable known-good backend in-tree while the clean-room transport continues to converge."""
+        """Verify the explicit native backend selector still resolves the clean-room runtime. This matters because the env var should remain a harmless explicit alias for the default path."""
 
-        fake_piomatter_module = SimpleNamespace(
-            Colorspace=SimpleNamespace(RGB888Packed="rgb888"),
-            Geometry=FakePiomatterGeometry,
-            Orientation=SimpleNamespace(Normal="normal"),
-            Pinout=SimpleNamespace(AdafruitMatrixBonnet="bonnet"),
-            PioMatter=FakePiomatterInstance,
+        fake_module = SimpleNamespace(
+            MatrixConfig=FakeMatrixConfig,
+            MatrixDriver=FakeDriver,
+            WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
+            ColorOrder=SimpleNamespace(RGB="rgb"),
         )
-
-        def fake_optional_import(module_name: str, **_kwargs: object) -> object:
-            if module_name == "adafruit_blinka_raspberry_pi5_piomatter":
-                return fake_piomatter_module
-            raise AssertionError(f"unexpected optional import: {module_name}")
-
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
-        monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "piomatter")
+        monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "native")
         monkeypatch.setattr(
             "heart.device.rgb_display.runtime.optional_import",
-            fake_optional_import,
+            lambda *_args, **_kwargs: fake_module,
         )
 
         driver = build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
 
         assert driver.width == 64
         assert driver.height == 64
-        stats = driver.stats()
-        assert stats.backend_name == "piomatter"
+        assert driver.config == FakeMatrixConfig(
+            wiring="hat-pwm",
+            panel_rows=64,
+            panel_cols=64,
+            chain_length=1,
+            parallel=1,
+            color_order="rgb",
+        )
+
+    def test_build_matrix_driver_rejects_piomatter_backend_selection(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify legacy Piomatter backend selection fails clearly. This matters because parity tooling should not stay wired into the app runtime by accident."""
+
+        monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "piomatter")
+
+        with pytest.raises(RuntimeError, match="Unsupported RGB display backend 'piomatter'"):
+            build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
 
     def test_led_matrix_submits_rgba_surface_bytes(
         self, monkeypatch: pytest.MonkeyPatch
