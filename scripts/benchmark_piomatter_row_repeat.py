@@ -46,6 +46,8 @@ DEFAULT_VARIANT = "all"
 DEFAULT_WARMUP_SECONDS = 1.0
 DEFAULT_WIDTH = 64
 DEFAULT_RP1_PIO_PARAM_ROOT = Path("/sys/module/rp1_pio/parameters")
+DEFAULT_BASELINE_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
+DEFAULT_EXPERIMENT_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
 PINOUT_CHOICES = (
     "adafruit-matrix-bonnet",
     "adafruit-matrix-bonnet-bgr",
@@ -200,14 +202,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--baseline-rp1-pio-param",
         action="append",
-        default=[],
-        help="RP1 PIO module parameter override for baseline runs, in NAME=VALUE form.",
+        default=list(DEFAULT_BASELINE_RP1_PIO_PARAMS),
+        help="RP1 PIO module parameter override for baseline runs, in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
     )
     parser.add_argument(
         "--experiment-rp1-pio-param",
         action="append",
-        default=[],
-        help="RP1 PIO module parameter override for experiment runs, in NAME=VALUE form.",
+        default=list(DEFAULT_EXPERIMENT_RP1_PIO_PARAMS),
+        help="RP1 PIO module parameter override for experiment runs, in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
     )
     return parser.parse_args()
 
@@ -497,6 +499,8 @@ def uses_row_window_variant(variant: str, baseline_variant: str) -> bool:
 def resolve_effective_variant(variant: str, pattern: str) -> str:
     if variant != BEST_KNOWN_VARIANT:
         return variant
+    if pattern == "center-box":
+        return "row-window"
     return "row-compact"
 
 

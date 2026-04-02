@@ -1,4 +1,4 @@
-"""Prepare a Piomatter checkout with a compact row-engine variant and run the RGB cycle demo."""
+"""Prepare a Piomatter checkout with a stable parity variant and run the RGB cycle demo."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 from heart.utilities.logging import get_logger
@@ -18,13 +19,15 @@ DEFAULT_COLOR_INTERVAL_SECONDS = 3.0
 DEFAULT_HEIGHT = 64
 DEFAULT_HOLD_SECONDS = 9.0
 DEFAULT_ITERATIONS = 1
+DEFAULT_MAX_XFER_BYTES = 262_140
 DEFAULT_N_ADDR_LINES = 5
 DEFAULT_N_PLANES = 10
 DEFAULT_N_TEMPORAL_PLANES = 2
-DEFAULT_MAX_XFER_BYTES = 262_140
-DEFAULT_PINOUT = "adafruit-matrix-bonnet"
 DEFAULT_PATTERN = "rgb-cycle"
+DEFAULT_PINOUT = "adafruit-matrix-bonnet"
 DEFAULT_RESCALE_MODE = "stock"
+DEFAULT_RP1_PIO_PARAM_ROOT = Path("/sys/module/rp1_pio/parameters")
+DEFAULT_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
 DEFAULT_TARGET_FREQ_HZ = 27_000_000
 DEFAULT_VARIANT = "row-repeat"
 DEFAULT_WIDTH = 64
@@ -37,21 +40,11 @@ ROW_REPEAT_RENDER_OVERRIDE = (
 ROW_COMPACT_RENDER_OVERRIDE = (
     REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_compact_engine.h"
 )
-ROW_COUNTED_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_counted_engine.h"
-)
-ROW_HYBRID_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_hybrid_engine.h"
-)
-ROW_RUNS_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_runs_engine.h"
-)
-ROW_SPLIT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_split_engine.h"
-)
 ROW_WINDOW_RENDER_OVERRIDE = (
     REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_window_engine.h"
 )
+RP1_PIO_PARAM_ROOT = DEFAULT_RP1_PIO_PARAM_ROOT
+
 
 def row_repeat_pio_source_path() -> Path:
     candidates = (
@@ -75,61 +68,6 @@ def row_compact_pio_source_path() -> Path:
     return candidates[0]
 
 
-def row_compact_tight_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_compact_tight_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_compact_tight_engine_parity.pio",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
-def row_hybrid_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_hybrid_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_hybrid_engine_parity.pio",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
-def row_counted_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_counted_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_counted_engine_parity.pio",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
-def row_runs_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_runs_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_runs_engine_parity.pio",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
-def row_split_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_split_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_split_engine_parity.pio",
-    )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
-
-
 def row_window_pio_source_path() -> Path:
     candidates = (
         REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_window_engine_parity.pio",
@@ -143,7 +81,7 @@ def row_window_pio_source_path() -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Optionally patch/reinstall Piomatter with a compact row-engine experiment, then run the RGB cycle demo."
+        description="Optionally patch/reinstall Piomatter with a stable parity variant, then run the RGB cycle demo."
     )
     parser.add_argument("--checkout", type=Path, default=DEFAULT_CHECKOUT)
     parser.add_argument("--skip-prepare", action="store_true")
@@ -152,28 +90,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=DEFAULT_HEIGHT)
     parser.add_argument("--n-addr-lines", type=int, default=DEFAULT_N_ADDR_LINES)
     parser.add_argument("--n-planes", type=int, default=DEFAULT_N_PLANES)
-    parser.add_argument(
-        "--n-temporal-planes",
-        type=int,
-        default=DEFAULT_N_TEMPORAL_PLANES,
-    )
+    parser.add_argument("--n-temporal-planes", type=int, default=DEFAULT_N_TEMPORAL_PLANES)
     parser.add_argument("--pinout", type=str, default=DEFAULT_PINOUT)
     parser.add_argument("--pattern", type=str, default=DEFAULT_PATTERN)
     parser.add_argument(
         "--variant",
         type=str,
         default=DEFAULT_VARIANT,
-        choices=(
-            "row-repeat",
-            "row-compact",
-            "row-compact-tight",
-            "row-counted",
-            "row-hybrid",
-            "row-runs",
-            "row-split",
-            "row-window",
-            BEST_KNOWN_VARIANT,
-        ),
+        choices=("row-repeat", "row-compact", "row-window", BEST_KNOWN_VARIANT),
     )
     parser.add_argument("--max-xfer-bytes", type=int, default=DEFAULT_MAX_XFER_BYTES)
     parser.add_argument("--target-freq-hz", type=int, default=DEFAULT_TARGET_FREQ_HZ)
@@ -190,6 +114,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Pass Debian's PEP 668 override when reinstalling Piomatter.",
     )
+    parser.add_argument(
+        "--rp1-pio-param",
+        action="append",
+        default=list(DEFAULT_RP1_PIO_PARAMS),
+        help="RP1 PIO module parameter override in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
+    )
     return parser.parse_args()
 
 
@@ -202,30 +132,13 @@ def main() -> int:
     elif resolved_variant == "row-compact":
         pio_source = row_compact_pio_source_path()
         render_override = ROW_COMPACT_RENDER_OVERRIDE
-    elif resolved_variant == "row-compact-tight":
-        pio_source = row_compact_tight_pio_source_path()
-        render_override = ROW_COMPACT_RENDER_OVERRIDE
-    elif resolved_variant == "row-counted":
-        pio_source = row_counted_pio_source_path()
-        render_override = ROW_COUNTED_RENDER_OVERRIDE
-    elif resolved_variant == "row-hybrid":
-        pio_source = row_hybrid_pio_source_path()
-        render_override = ROW_HYBRID_RENDER_OVERRIDE
-    elif resolved_variant == "row-runs":
-        if args.pattern not in {"rgb-cycle", "quadrants", "center-box"}:
-            raise ValueError("row-runs only supports rgb-cycle, quadrants, and center-box patterns")
-        pio_source = row_runs_pio_source_path()
-        render_override = ROW_RUNS_RENDER_OVERRIDE
-    elif resolved_variant == "row-window":
-        if args.pattern not in {"rgb-cycle", "quadrants", "center-box"}:
-            raise ValueError("row-window only supports rgb-cycle, quadrants, and center-box patterns")
+    else:
+        if args.pattern not in {"rgb-cycle", "center-box"}:
+            raise ValueError("row-window only supports rgb-cycle and center-box patterns")
         pio_source = row_window_pio_source_path()
         render_override = ROW_WINDOW_RENDER_OVERRIDE
-    else:
-        if args.pattern not in {"rgb-cycle", "quadrants"}:
-            raise ValueError("row-split only supports rgb-cycle and quadrants patterns")
-        pio_source = row_split_pio_source_path()
-        render_override = ROW_SPLIT_RENDER_OVERRIDE
+
+    rp1_pio_param_overrides = parse_rp1_pio_param_overrides(args.rp1_pio_param)
     if not args.skip_prepare:
         run_command(
             [
@@ -253,39 +166,99 @@ def main() -> int:
         install_command.append(str(args.checkout))
         run_command(install_command)
 
-    run_command(
-        [
-            sys.executable,
-            str(RGB_CYCLE_SCRIPT),
-            "--width",
-            str(args.width),
-            "--height",
-            str(args.height),
-            "--n-addr-lines",
-            str(args.n_addr_lines),
-            "--n-planes",
-            str(args.n_planes),
-            "--n-temporal-planes",
-            str(args.n_temporal_planes),
-            "--pinout",
-            args.pinout,
-            "--pattern",
-            args.pattern,
-            "--hold-seconds",
-            str(args.hold_seconds),
-            "--color-interval-seconds",
-            str(args.color_interval_seconds),
-            "--iterations",
-            str(args.iterations),
-        ]
-    )
+    with temporary_rp1_pio_param_overrides(rp1_pio_param_overrides):
+        run_command(
+            [
+                sys.executable,
+                str(RGB_CYCLE_SCRIPT),
+                "--width",
+                str(args.width),
+                "--height",
+                str(args.height),
+                "--n-addr-lines",
+                str(args.n_addr_lines),
+                "--n-planes",
+                str(args.n_planes),
+                "--n-temporal-planes",
+                str(args.n_temporal_planes),
+                "--pinout",
+                args.pinout,
+                "--pattern",
+                args.pattern,
+                "--hold-seconds",
+                str(args.hold_seconds),
+                "--color-interval-seconds",
+                str(args.color_interval_seconds),
+                "--iterations",
+                str(args.iterations),
+            ]
+        )
     return 0
 
 
 def resolve_effective_variant(variant: str, pattern: str) -> str:
     if variant != BEST_KNOWN_VARIANT:
         return variant
+    if pattern == "center-box":
+        return "row-window"
     return "row-compact"
+
+
+def parse_rp1_pio_param_overrides(raw_values: list[str]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for raw_value in raw_values:
+        if "=" not in raw_value:
+            raise ValueError(
+                f"RP1 PIO parameter override {raw_value!r} must use NAME=VALUE syntax"
+            )
+        name, value = raw_value.split("=", 1)
+        name = name.strip()
+        value = value.strip()
+        if not name or not value:
+            raise ValueError(
+                f"RP1 PIO parameter override {raw_value!r} must include both name and value"
+            )
+        overrides[name] = value
+    return overrides
+
+
+def read_rp1_pio_parameter(name: str) -> str:
+    parameter_path = RP1_PIO_PARAM_ROOT / name
+    if not parameter_path.exists():
+        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+    return parameter_path.read_text(encoding="utf-8").strip()
+
+
+def write_rp1_pio_parameter(name: str, value: str) -> None:
+    parameter_path = RP1_PIO_PARAM_ROOT / name
+    if not parameter_path.exists():
+        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+    LOGGER.info("Setting RP1 PIO parameter %s=%s", name, value)
+    subprocess.run(
+        ["sudo", "/usr/bin/tee", str(parameter_path)],
+        input=f"{value}\n",
+        text=True,
+        stdout=subprocess.DEVNULL,
+        check=True,
+    )
+
+
+@contextmanager
+def temporary_rp1_pio_param_overrides(overrides: dict[str, str]):
+    if not overrides:
+        yield
+        return
+
+    original_values = {name: read_rp1_pio_parameter(name) for name in overrides}
+    try:
+        for name, value in overrides.items():
+            if original_values[name] != value:
+                write_rp1_pio_parameter(name, value)
+        yield
+    finally:
+        for name, value in original_values.items():
+            if read_rp1_pio_parameter(name) != value:
+                write_rp1_pio_parameter(name, value)
 
 
 def run_command(command: list[str]) -> None:

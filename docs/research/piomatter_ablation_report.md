@@ -313,6 +313,7 @@ If the goal is a practical “best known” parity setup today:
 
 - use `row-compact` as the default experimental protocol
 - use `row-window` only for center-box-like sparse scenes
+- default RP1 PIO parity runs to MMIO (`tx_use_mmio=Y`)
 - leave MMIO enabled
 - keep `MAX_XFER=262140`
 - treat `5 planes, 0 temporal, 100 MHz` as the current quality/performance
