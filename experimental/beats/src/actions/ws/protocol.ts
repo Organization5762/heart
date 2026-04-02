@@ -8,9 +8,15 @@ type PeripheralTag = {
   metadata?: Record<string, string>;
 };
 
+type PeripheralLocation = {
+  x: number;
+  y: number;
+};
+
 type PeripheralInfo = {
   id?: string | null;
   tags: PeripheralTag[];
+  location: PeripheralLocation;
 };
 
 type PeripheralPayload = {
@@ -46,12 +52,21 @@ type DecodedPeripheralEnvelope = {
 
 function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
   if (!raw || typeof raw !== "object") {
-    return { id: null, tags: [] };
+    return { id: null, tags: [], location: { x: 0, y: 0 } };
   }
-  const info = raw as { id?: string; tags?: PeripheralTag[] };
+  const info = raw as {
+    id?: string;
+    tags?: PeripheralTag[];
+    location?: { x?: unknown; y?: unknown };
+  };
+  const location = info.location;
   return {
     id: info.id || null,
     tags: info.tags ?? [],
+    location: {
+      x: typeof location?.x === "number" ? location.x : 0,
+      y: typeof location?.y === "number" ? location.y : 0,
+    },
   };
 }
 

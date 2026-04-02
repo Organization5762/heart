@@ -56,4 +56,32 @@ describe("decodeStreamEvent", () => {
       },
     });
   });
+
+  it("defaults peripheral locations to the display origin so older payloads stay spatially valid", async () => {
+    const { decodeStreamEvent } = await importProtocolWithDecodedEnvelope({
+      peripheral: {
+        peripheralInfo: {
+          id: "sensor-1",
+          tags: [],
+        },
+        payload: new TextEncoder().encode("{}"),
+        payloadEncoding: 1,
+      },
+    });
+
+    const decoded = decodeStreamEvent(new ArrayBuffer(0));
+
+    expect(decoded).toEqual({
+      type: "peripheral",
+      payload: {
+        peripheralInfo: {
+          id: "sensor-1",
+          tags: [],
+          location: { x: 0, y: 0 },
+        },
+        data: {},
+        payloadEncoding: 1,
+      },
+    });
+  });
 });

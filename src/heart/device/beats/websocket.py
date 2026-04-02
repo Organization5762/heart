@@ -13,8 +13,8 @@ from heart.device.beats.proto import \
     beats_streaming_pb2 as _beats_streaming_pb2
 from heart.device.beats.streaming_config import (BeatsStreamingConfiguration,
                                                  QueueOverflowStrategy)
-from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
-                                   PeripheralTag)
+from heart.peripheral.core import (PeripheralInfo, PeripheralLocation,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadDecodingError,
                                             PeripheralPayloadEncoding,
                                             decode_peripheral_payload,
@@ -64,6 +64,10 @@ def _encode_peripheral_message(
         peripheral_info=beats_streaming_pb2.PeripheralInfo(
             id=info.id or "",
             tags=tags,
+            location=beats_streaming_pb2.PeripheralLocation(
+                x=info.location.x,
+                y=info.location.y,
+            ),
         ),
         payload=encoded_payload.payload,
         payload_encoding=payload_encoding,
@@ -125,6 +129,10 @@ def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
             peripheral_info=PeripheralInfo(
                 id=info.id or None,
                 tags=tags,
+                location=PeripheralLocation(
+                    x=info.location.x,
+                    y=info.location.y,
+                ),
             ),
             data=decoded_payload,
         )

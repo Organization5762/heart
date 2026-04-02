@@ -47,10 +47,20 @@ class PeripheralTag:
     variant: str
     metadata: dict[str, str] = field(default_factory=dict)
 
+
+@dataclass(frozen=True, slots=True)
+class PeripheralLocation:
+    """Physical-space coordinate for a peripheral relative to the display."""
+
+    x: float = 0.0
+    y: float = 0.0
+
+
 @dataclass
 class PeripheralInfo:
     id: str | None = None
     tags: Sequence[PeripheralTag] = field(default_factory=list)
+    location: PeripheralLocation = field(default_factory=PeripheralLocation)
 
 @dataclass
 class PeripheralMessageEnvelope(Generic[A]):
