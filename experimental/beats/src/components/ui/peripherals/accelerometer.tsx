@@ -27,6 +27,22 @@ function formatNumber(n: number, digits = 2) {
   return Number.isFinite(n) ? n.toFixed(digits) : String(n);
 }
 
+function resolveAccelerationData(payload: unknown): AccelData | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  if ("x" in payload && "y" in payload && "z" in payload) {
+    return payload as AccelData;
+  }
+
+  if ("data" in payload) {
+    return resolveAccelerationData((payload as { data?: unknown }).data);
+  }
+
+  return null;
+}
+
 export const AccelerometerView: React.FC<Props> = ({
   peripheral,
   className,
@@ -51,8 +67,11 @@ export const AccelerometerView: React.FC<Props> = ({
     );
   }
 
-  const latest = events[0].msg.payload as { data: AccelData };
-  const acc = latest.data ?? { x: 0, y: 0, z: 0 };
+  const acc = resolveAccelerationData(events[0]?.msg.payload.data) ?? {
+    x: 0,
+    y: 0,
+    z: 0,
+  };
 
   const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
 

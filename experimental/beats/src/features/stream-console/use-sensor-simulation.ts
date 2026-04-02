@@ -77,9 +77,10 @@ export function useSensorSimulation(preferredSensorKey?: string | null) {
         if (!override || override.mode === "live") {
           continue;
         }
-        const sensorKey = getSensorCommandKey(sensor);
-        activeExternalKeys.add(sensorKey);
-        sendSensorControlRef.current(sensorKey, sensor.effectiveValue);
+        for (const sensorKey of sensor.controlKeys) {
+          activeExternalKeys.add(sensorKey);
+          sendSensorControlRef.current(sensorKey, sensor.effectiveValue);
+        }
       }
       for (const sensorKey of activeExternalKeysRef.current) {
         if (!activeExternalKeys.has(sensorKey)) {

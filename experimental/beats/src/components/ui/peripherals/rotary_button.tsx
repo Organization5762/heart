@@ -23,6 +23,22 @@ function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
 }
 
+function resolveSwitchState(payload: unknown): SwitchState | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  if ("rotational_value" in payload) {
+    return payload as SwitchState;
+  }
+
+  if ("data" in payload) {
+    return resolveSwitchState((payload as { data?: unknown }).data);
+  }
+
+  return null;
+}
+
 export const RotarySwitchView: React.FC<Props> = ({
   peripheral,
   className,
@@ -47,8 +63,25 @@ export const RotarySwitchView: React.FC<Props> = ({
     );
   }
 
-  const latest = events[0].msg.payload as { data: SwitchState };
-  const state: SwitchState = latest.data;
+  const state = resolveSwitchState(events[0]?.msg.payload.data);
+  if (!state) {
+    return (
+      <div
+        className={
+          "border-border bg-background/60 text-foreground flex flex-col gap-3 border p-3 text-xs " +
+          (className ?? "")
+        }
+      >
+        <span className="text-muted-foreground font-mono text-[0.7rem] tracking-wide uppercase">
+          Rotary Switch
+        </span>
+        <p className="text-muted-foreground font-mono text-[0.7rem]">
+          Latest switch payload for {peripheral.id ?? "rotary_switch"} could not
+          be decoded.
+        </p>
+      </div>
+    );
+  }
 
   // --- Rotary geometry -------------------------------------------------------
 
@@ -96,10 +129,7 @@ export const RotarySwitchView: React.FC<Props> = ({
   const shortOffset = baseOffsetShort;
   const longOffset = baseOffsetLong;
 
-  const prevPayload = events[1]?.msg.payload as
-    | { data: SwitchState }
-    | undefined;
-  const prevState = prevPayload?.data;
+  const prevState = resolveSwitchState(events[1]?.msg.payload.data);
 
   // how many presses happened since last event
   const buttonDelta =
