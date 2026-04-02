@@ -11,6 +11,8 @@ message PeripheralTag {
 message PeripheralLocation {
   double x = 1;
   double y = 2;
+  double z = 3;
+  string time = 4;
 }
 
 message PeripheralInfo {

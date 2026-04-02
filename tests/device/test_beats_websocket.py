@@ -35,6 +35,8 @@ class TestPeripheralEnvelopeEncoding:
         assert json.loads(encoded.payload.decode("utf-8")) == {"level": 3}
         assert encoded.peripheral_info.location.x == 0
         assert encoded.peripheral_info.location.y == 0
+        assert encoded.peripheral_info.location.z == 0
+        assert encoded.peripheral_info.location.time == ""
 
     def test_encodes_protobuf_payloads_with_message_name(self) -> None:
         """Verify protobuf payloads serialize to bytes with a declared type so typed clients can decode them safely."""
@@ -198,7 +200,12 @@ class TestStreamEnvelopeDecoding:
                         metadata={"version": "v1"},
                     )
                 ],
-                location=PeripheralLocation(x=12.5, y=-3.25),
+                location=PeripheralLocation(
+                    x=12.5,
+                    y=-3.25,
+                    z=8.0,
+                    time=datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
+                ),
             ),
             data=message,
         )

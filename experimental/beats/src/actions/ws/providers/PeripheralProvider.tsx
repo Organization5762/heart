@@ -11,6 +11,8 @@ export type PeripheralTag = {
 export type PeripheralLocation = {
   x: number;
   y: number;
+  z: number;
+  time: string | null;
 };
 
 export type PeripheralInfo = {

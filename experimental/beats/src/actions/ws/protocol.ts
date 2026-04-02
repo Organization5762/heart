@@ -11,6 +11,8 @@ type PeripheralTag = {
 type PeripheralLocation = {
   x: number;
   y: number;
+  z: number;
+  time: string | null;
 };
 
 type PeripheralInfo = {
@@ -52,12 +54,12 @@ type DecodedPeripheralEnvelope = {
 
 function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
   if (!raw || typeof raw !== "object") {
-    return { id: null, tags: [], location: { x: 0, y: 0 } };
+    return { id: null, tags: [], location: { x: 0, y: 0, z: 0, time: null } };
   }
   const info = raw as {
     id?: string;
     tags?: PeripheralTag[];
-    location?: { x?: unknown; y?: unknown };
+    location?: { x?: unknown; y?: unknown; z?: unknown; time?: unknown };
   };
   const location = info.location;
   return {
@@ -66,6 +68,11 @@ function normalizePeripheralInfo(raw: unknown): PeripheralInfo {
     location: {
       x: typeof location?.x === "number" ? location.x : 0,
       y: typeof location?.y === "number" ? location.y : 0,
+      z: typeof location?.z === "number" ? location.z : 0,
+      time:
+        typeof location?.time === "string" && location.time
+          ? location.time
+          : null,
     },
   };
 }

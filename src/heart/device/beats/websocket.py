@@ -4,6 +4,7 @@ import json
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, cast
 
 import websockets
@@ -67,6 +68,12 @@ def _encode_peripheral_message(
             location=beats_streaming_pb2.PeripheralLocation(
                 x=info.location.x,
                 y=info.location.y,
+                z=info.location.z,
+                time=(
+                    info.location.time.isoformat()
+                    if info.location.time is not None
+                    else ""
+                ),
             ),
         ),
         payload=encoded_payload.payload,
@@ -132,6 +139,8 @@ def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
                 location=PeripheralLocation(
                     x=info.location.x,
                     y=info.location.y,
+                    z=info.location.z,
+                    time=_decode_location_time(info.location.time),
                 ),
             ),
             data=decoded_payload,
@@ -204,6 +213,16 @@ def _peripheral_cache_key(envelope: PeripheralMessageEnvelope[Any]) -> str:
     )
     payload_type = type(envelope.data).__name__
     return f"{payload_type}:{tag_key}"
+
+
+def _decode_location_time(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        logger.warning("Ignoring invalid peripheral location time: %s", value)
+        return None
 
 
 
