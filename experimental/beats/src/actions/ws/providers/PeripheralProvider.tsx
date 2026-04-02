@@ -8,9 +8,17 @@ export type PeripheralTag = {
   metadata?: Record<string, string>;
 };
 
+export type PeripheralLocation = {
+  x: number;
+  y: number;
+  z: number;
+  time: string | null;
+};
+
 export type PeripheralInfo = {
   id?: string | null;
   tags: PeripheralTag[];
+  location: PeripheralLocation;
 };
 
 type PeripheralSnapshot = {
