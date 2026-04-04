@@ -136,6 +136,86 @@ class TestFrameTickController:
 class TestKeyboardController:
     """Group keyboard controller tests so shared key views stay stable for every consumer built on them."""
 
+    def test_snapshot_stream_preserves_arrow_key_constants(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify keyboard snapshots preserve arrow-key constants so navigation can detect keys whose pygame codes are outside the base pressed-array index range."""
+
+        tap = InputDebugTap()
+        controller = KeyboardController(tap)
+
+        class _KeyStateStub:
+            def __len__(self) -> int:
+                return 8
+
+            def __getitem__(self, key: int) -> bool:
+                return key == pygame.K_LEFT
+
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.interval_in_background",
+            lambda period, scheduler: reactivex.from_iterable([0]),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
+            lambda source, *operators: source.pipe(*operators),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.event.pump",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
+            lambda: _KeyStateStub(),
+        )
+
+        snapshots: list[KeyboardSnapshot] = []
+        controller.snapshot_stream().subscribe(snapshots.append)
+
+        assert snapshots[0].pressed_keys == frozenset({pygame.K_LEFT})
+
+    def test_snapshot_stream_pumps_pygame_events_before_reading_pressed_keys(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify keyboard snapshots pump the Pygame event queue before sampling pressed keys so arrow-key navigation sees fresh input state each frame."""
+
+        tap = InputDebugTap()
+        controller = KeyboardController(tap)
+        call_order: list[str] = []
+
+        class _KeyStateStub:
+            def __len__(self) -> int:
+                return 8
+
+            def __getitem__(self, key: int) -> bool:
+                call_order.append("get_pressed")
+                return False
+
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.interval_in_background",
+            lambda period, scheduler: reactivex.from_iterable([0]),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
+            lambda source, *operators: source.pipe(*operators),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.event.pump",
+            lambda: call_order.append("pump"),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
+            lambda: _KeyStateStub(),
+        )
+
+        snapshots: list[KeyboardSnapshot] = []
+        controller.snapshot_stream().subscribe(snapshots.append)
+
+        assert len(snapshots) == 1
+        assert call_order[0] == "pump"
+        assert "get_pressed" in call_order[1:]
+
     def test_key_events_emit_pressed_held_and_released_transitions(
         self,
         monkeypatch,

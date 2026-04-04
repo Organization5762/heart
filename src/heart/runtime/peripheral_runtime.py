@@ -2,22 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from heart.device.beats import WebSocket
-from heart.device.beats.websocket import (CONTROL_COMMAND_ACTIVATE,
-                                          CONTROL_COMMAND_ALTERNATE,
-                                          CONTROL_COMMAND_BROWSE,
-                                          CONTROL_COMMAND_SENSOR_UPDATE,
-                                          ControlMessage)
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
 from heart.peripheral.core.manager import PeripheralManager
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.reactivex_threads import drain_frame_thread_queue
 
 logger = get_logger(__name__)
 INPUT_DEBUG_STAGE_TAG = "input_debug_stage"
 INPUT_DEBUG_STREAM_TAG = "input_debug_stream"
+CONTROL_COMMAND_BROWSE = "browse"
+CONTROL_COMMAND_ACTIVATE = "activate"
+CONTROL_COMMAND_ALTERNATE = "alternate_activate"
+CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
 
 
 class PeripheralRuntime:
@@ -38,8 +37,12 @@ class PeripheralRuntime:
         logger.info("Starting all peripherals")
         self._peripheral_manager.start()
 
-    def configure_streaming(self, websocket: WebSocket | None = None) -> None:
-        ws = websocket or WebSocket()
+    def configure_streaming(self, websocket: Any | None = None) -> None:
+        if websocket is None and not Configuration.forward_to_beats_app():
+            logger.debug("Beats streaming disabled; skipping websocket startup")
+            return
+
+        ws = websocket or _build_websocket()
         ws.set_control_handler(self._handle_control_message)
         self._peripheral_manager.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
@@ -48,7 +51,7 @@ class PeripheralRuntime:
             ),
         )
 
-    def _handle_control_message(self, control_message: ControlMessage) -> None:
+    def _handle_control_message(self, control_message: Any) -> None:
         navigation = self._peripheral_manager.navigation_profile
         if control_message.command == CONTROL_COMMAND_BROWSE:
             navigation.inject_browse(
@@ -108,3 +111,11 @@ class PeripheralRuntime:
             self._peripheral_manager.clock.value
         )
         self._peripheral_manager.game_tick.on_next(True)
+
+
+def _build_websocket() -> Any:
+    """Construct the Beats websocket only when streaming is enabled."""
+
+    from heart.device.beats import WebSocket
+
+    return WebSocket()

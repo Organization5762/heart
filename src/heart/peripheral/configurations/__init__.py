@@ -6,7 +6,6 @@ from typing import Any, Iterator
 from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.drawing_pad import DrawingPad
-from heart.peripheral.flowtoy import FlowToyPeripheral
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.microphone import Microphone
@@ -60,6 +59,8 @@ def _detect_drawing_pads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(DrawingPad.detect())
 
 def _detect_radios() -> Iterator[Peripheral[Any]]:
+    from heart.peripheral.flowtoy import FlowToyPeripheral
+
     yield from itertools.chain(FlowToyPeripheral.detect())
 
 def _detect_uwb_position() -> Iterator[Peripheral[Any]]:

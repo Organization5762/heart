@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Iterable
 
-from pygame import Rect, Surface, draw, time
+from pygame import Rect, Surface, draw
 
 from heart import DeviceDisplayMode
 from heart.assets.loader import Loader
@@ -14,6 +14,7 @@ from heart.renderers.metadata_screen.provider import \
     MetadataScreenStateProvider
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    MetadataScreenState)
+from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -77,10 +78,13 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
 
     def real_process(
         self,
-        window: Surface,
-        clock: time.Clock,
+        window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        screen = window.screen
+        if screen is None:
+            raise RuntimeError("MetadataScreen requires an initialized display surface")
+
         active_monitors = list(current_bpms.keys())
         state = self.state
         heart_states = state.heart_states
@@ -122,8 +126,8 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
 
             for pos_x, pos_y in repeat_positions:
                 if use_avatar:
-                    window.blit(image, (pos_x + 8, pos_y + 4))
+                    screen.blit(image, (pos_x + 8, pos_y + 4))
                 else:
-                    window.blit(image, (pos_x, pos_y - 8))
-                self.display_number(window, current_bpm, pos_x, pos_y)
-                self.display_battery_status(window, monitor_id, pos_x, pos_y)
+                    screen.blit(image, (pos_x, pos_y - 8))
+                self.display_number(screen, current_bpm, pos_x, pos_y)
+                self.display_battery_status(screen, monitor_id, pos_x, pos_y)

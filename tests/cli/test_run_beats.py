@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 import typer
+from typer.testing import CliRunner
 
+from heart import loop
+from heart.cli.commands import run as run_module
 from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
                                           FORWARD_TO_BEATS_ENV_VAR,
                                           build_beats_env,
@@ -15,6 +18,8 @@ from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
                                           build_totem_run_command,
                                           ensure_beats_dependencies,
                                           resolve_beats_workspace)
+
+runner = CliRunner()
 
 
 class TestRunBeatsCommandBuilders:
@@ -124,3 +129,127 @@ class TestEnsureBeatsDependencies:
             ensure_beats_dependencies(beats_workspace)
 
         assert error.value.exit_code == 7
+
+
+class TestRunCommandWithBeats:
+    """Validate the opt-in Beats CLI path so default runtime startup stays independent from the UI bundle."""
+
+    def test_run_command_dispatches_to_beats_only_when_requested(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify `--with-beats` delegates into the Beats launcher so the UI starts only for explicitly requested sessions."""
+
+        recorded_call: dict[str, object] = {}
+
+        def _fake_run_beats_command(
+            *,
+            configuration: str,
+            add_low_power_mode: bool,
+            x11_forward: bool,
+            install_beats_deps: bool,
+            beats_workspace: Path,
+        ) -> None:
+            recorded_call.update(
+                {
+                    "configuration": configuration,
+                    "add_low_power_mode": add_low_power_mode,
+                    "x11_forward": x11_forward,
+                    "install_beats_deps": install_beats_deps,
+                    "beats_workspace": beats_workspace,
+                }
+            )
+
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_beats_command",
+            _fake_run_beats_command,
+        )
+
+        result = runner.invoke(
+            loop.app,
+            [
+                "run",
+                "--with-beats",
+                "--configuration",
+                "lib_2025",
+                "--no-add-low-power-mode",
+                "--x11-forward",
+                "--no-install-beats-deps",
+                "--beats-workspace",
+                "/tmp/beats",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert recorded_call == {
+            "configuration": "lib_2025",
+            "add_low_power_mode": False,
+            "x11_forward": True,
+            "install_beats_deps": False,
+            "beats_workspace": Path("/tmp/beats"),
+        }
+
+    def test_cli_hides_run_beats_subcommand(self) -> None:
+        """Verify the top-level CLI no longer advertises a separate Beats command so opt-in flows consistently use `run --with-beats`."""
+
+        result = runner.invoke(loop.app, ["--help"])
+
+        assert result.exit_code == 0
+        assert "run-beats" not in result.stdout
+
+    def test_run_command_skips_beats_launcher_by_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify plain `run` stays on the core runtime path so default sessions avoid Beats-only dependencies and side effects."""
+
+        monkeypatch.setattr(
+            run_module,
+            "build_game_loop_container",
+            lambda *, x11_forward: _FakeResolver(),
+        )
+
+        def _unexpected_run_beats_command(**kwargs: object) -> None:
+            raise AssertionError("run_beats_command should not execute without --with-beats")
+
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_beats_command",
+            _unexpected_run_beats_command,
+        )
+
+        run_module.run_command()
+
+
+class _FakeResolver:
+    """Stub runtime resolver used to exercise the non-Beats command path without booting the full game loop."""
+
+    def __init__(self) -> None:
+        self._loop = _FakeGameLoop()
+        self._registry = _FakeConfigurationRegistry()
+
+    def resolve(self, dependency: type[object]) -> object:
+        if dependency.__name__ == "ConfigurationRegistry":
+            return self._registry
+        if dependency.__name__ == "GameLoop":
+            return self._loop
+        raise AssertionError(f"Unexpected dependency: {dependency}")
+
+
+class _FakeConfigurationRegistry:
+    """Stub configuration registry that returns a no-op configuration callback."""
+
+    def get(self, configuration: str) -> object:
+        assert configuration == "lib_2025"
+        return lambda loop: None
+
+
+class _FakeGameLoop:
+    """Stub game loop that records low-power handling and start calls for command-path validation."""
+
+    def __init__(self) -> None:
+        self.add_sleep_mode_called = False
+        self.start_called = False
+
+    def add_sleep_mode(self) -> None:
+        self.add_sleep_mode_called = True
+
+    def start(self) -> None:
+        self.start_called = True
