@@ -174,6 +174,32 @@ class TestNavigationGameModes:
         slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == len(game_modes.state.entries) - 1
 
+    def test_active_renderer_reverses_direction_after_mixed_browse_inputs(self) -> None:
+        """Verify preview transitions reverse direction when browse inputs change sign mid-scroll so alternating left and right presses stay visually accurate during selection."""
+        game_modes = _make_game_modes(count=5)
+
+        with patch("heart.navigation.SlideTransitionProvider") as provider_cls, patch(
+            "heart.navigation.SlideTransitionRenderer"
+        ) as slide_cls:
+            provider_cls.side_effect = [Mock(), Mock(), Mock()]
+            slide_cls.side_effect = [Mock(), Mock(), Mock()]
+
+            game_modes.state.mode_offset = 1
+            game_modes.state.active_renderer()
+            game_modes.state.sliding_transition = None
+
+            game_modes.state.mode_offset = 2
+            game_modes.state.active_renderer()
+            game_modes.state.sliding_transition = None
+
+            game_modes.state.mode_offset = 1
+            game_modes.state.active_renderer()
+
+        assert provider_cls.call_args_list[0].kwargs["direction"] == 1
+        assert provider_cls.call_args_list[1].kwargs["direction"] == 1
+        assert provider_cls.call_args_list[2].kwargs["direction"] == -1
+        assert game_modes.state.previous_mode_index == 1
+
 
 
     def test_active_renderer_returns_title_renderer_in_select_mode(self) -> None:

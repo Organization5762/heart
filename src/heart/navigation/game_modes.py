@@ -122,10 +122,6 @@ class GameModeState:
     ) -> int:
         if transition_mode in (SlideTransitionMode.STATIC, SlideTransitionMode.GAUSSIAN):
             return 0
-        if self.mode_offset > 0:
-            return 1
-        if self.mode_offset < 0:
-            return -1
         forward_steps = (mode_index - last_scene_index) % len(self.entries)
         backward_steps = (last_scene_index - mode_index) % len(self.entries)
         return 1 if forward_steps <= backward_steps else -1
