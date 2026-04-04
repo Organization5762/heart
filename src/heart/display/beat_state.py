@@ -15,6 +15,7 @@ class BeatState:
     # Beat timing
     interval: float | None = None  # Seconds between beats (e.g., 0.5s for 120 BPM)
     phase: float = 0.0  # Wall time of last confirmed beat
+    paused: bool = False  # Whether the beat is paused
 
     # Monotonic beat counter - never resets, only increments
     beat_count: int = 0
@@ -81,6 +82,7 @@ def get_beat_state() -> BeatState:
 
 
 def update_beat_state(
+    paused: bool = False,
     interval: float | None = None,
     phase: float | None = None,
     recording_start_wall_time: float | None = None,
@@ -95,6 +97,12 @@ def update_beat_state(
     # Set interval if provided
     elif interval is not None:
         _beat_state.interval = interval
+
+    # Set paused if requested
+    if paused:
+        _beat_state.paused = True
+    else:
+        _beat_state.paused = False
 
     # When phase is updated with an existing interval, lock in beat count
     if phase is not None:

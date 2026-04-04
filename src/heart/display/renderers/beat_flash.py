@@ -114,7 +114,6 @@ class BeatFlashRenderer(AtomicBaseRenderer[BeatFlashState]):
             None  # Detected tempo (seconds between beats)
         )
         self._beat_phase: float = 0.0  # Time of last confirmed beat
-        self._consecutive_missed_beats: int = 0  # Count of missed beats in a row
 
         # FFT state
         self._fft_freqs: np.ndarray | None = None
@@ -212,6 +211,22 @@ class BeatFlashRenderer(AtomicBaseRenderer[BeatFlashState]):
         # Convert to relative time (0 = start of recording)
         audio_time = stream_time - self._recording_start_time
 
+        # Check if we've missed beats based on time elapsed (not just onset detection)
+        if self._beat_interval is not None:
+            time_since_phase = audio_time - self._beat_phase
+            beats_elapsed = time_since_phase / self._beat_interval
+            if beats_elapsed > 1:
+                update_beat_state(paused=True)
+            if beats_elapsed > 3:
+                # More than 3 beats have passed without a confirmed beat
+                print(
+                    f"*** BEAT LOST (no onset for {beats_elapsed:.1f} beats) "
+                    "- searching for new beat ***"
+                )
+                self._beat_interval = None
+                self._beat_phase = 0.0
+                update_beat_state(clear_interval=True)
+
         # Initialize FFT bins
         if self._fft_freqs is None:
             self._fft_freqs = np.fft.rfftfreq(len(audio), 1.0 / self.SAMPLERATE)
@@ -250,13 +265,7 @@ class BeatFlashRenderer(AtomicBaseRenderer[BeatFlashState]):
                 # Lower threshold for more sensitivity
                 threshold = mean_flux + std_flux * (1.0 / self._sensitivity)
 
-                time_since_last = audio_time - self._last_onset_time
-
-                if (
-                    flux > threshold
-                    and threshold > 0
-                    and time_since_last > self._min_interval * 0.8
-                ):
+                if flux > threshold and threshold > 0:
                     # Refine onset time by finding exact transient in the block
                     precise_time, _ = self._find_precise_onset_with_index(
                         audio, stream_time
@@ -265,40 +274,32 @@ class BeatFlashRenderer(AtomicBaseRenderer[BeatFlashState]):
                     # Check if this onset matches established beat pattern
                     is_main = False
                     phase_error = 0.0
+                    time_since_main = precise_time - self._last_onset_time
                     if self._beat_interval is not None:
                         # Check if onset is near expected beat time
                         time_since_phase = precise_time - self._beat_phase
                         beats_elapsed = time_since_phase / self._beat_interval
                         phase_error = abs(beats_elapsed - round(beats_elapsed))
 
-                        # On beat if timing within 15%
-                        if phase_error < 0.15:
+                        # On beat if: timing within 15% AND enough time since last main beat
+                        # The cooldown (50% of interval) prevents double-counting same beat
+                        if (
+                            phase_error < 0.15
+                            and time_since_main > self._beat_interval * 0.5
+                        ):
                             is_main = True
-                            self._consecutive_missed_beats = 0
                             # Update phase to this onset for better tracking
                             self._beat_phase = precise_time
                             # Update shared beat state for other renderers
                             update_beat_state(
                                 phase=self._audio_time_to_wall_time(precise_time),
                             )
-                        else:
-                            # Beat missed - stop sprite immediately
-                            self._consecutive_missed_beats += 1
-                            update_beat_state(clear_interval=True)
-
-                            if self._consecutive_missed_beats >= 3:
-                                # After 3 missed beats, fully reset beat tracking
-                                print(
-                                    f"*** BEAT LOST ({self._consecutive_missed_beats} "
-                                    "consecutive misses) - searching for new beat ***"
-                                )
-                                self._beat_interval = None
-                                self._beat_phase = 0.0
-                                self._consecutive_missed_beats = 0
 
                     self._onset_times.append(precise_time)
                     self._onset_is_main_beat.append(is_main)
-                    self._last_onset_time = precise_time
+                    # Only update for MAIN beats - this is our cooldown reference
+                    if is_main:
+                        self._last_onset_time = precise_time
 
                     # Trim to keep only last 10 seconds of onset data
                     self._trim_onset_history(precise_time, max_age=10.0)
@@ -324,18 +325,20 @@ class BeatFlashRenderer(AtomicBaseRenderer[BeatFlashState]):
                             if len(self._onset_times) - 1 in sequence:
                                 is_main = True
                                 self._onset_is_main_beat[-1] = True
+                                # Update cooldown reference for newly detected main beat
+                                self._last_onset_time = precise_time
 
                     # Print status
                     bpm = 60.0 / self._beat_interval if self._beat_interval else 0
                     if self._beat_interval:
                         if is_main:
-                            print(f"MAIN +{time_since_last:.3f}s | {bpm:.0f} BPM")
+                            print(f"MAIN +{time_since_main:.3f}s | {bpm:.0f} BPM")
                         else:
                             print(
-                                f"miss +{time_since_last:.3f}s (err={phase_error:.0%})"
+                                f"miss +{time_since_main:.3f}s (err={phase_error:.0%})"
                             )
                     else:
-                        print(f"+{time_since_last:.3f}s")
+                        print(f"+{time_since_main:.3f}s")
 
     def _trim_onset_history(self, current_time: float, max_age: float = 10.0) -> None:
         """Trim onset history to keep only recent data.

@@ -34,3 +34,4 @@ def configure(loop: GameLoop) -> None:
     # Start directly in content mode (skip title selection)
     loop.app_controller.modes.state.in_select_mode = False
 
+
