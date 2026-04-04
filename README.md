@@ -34,13 +34,14 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
 ## Command-Line Interfaces
 | Command | Purpose |
 | --- | --- |
-| `totem` | Runs the runtime (`totem run`), updates firmware (`totem update-driver`), and manages renderer options. |
+| `totem` | Runs the runtime (`totem run`), checks Raspberry Pi host health (`totem check-health`), updates firmware (`totem update-driver`), and manages renderer options. |
 | `totem_debug` | Provides hardware diagnostics, including Bluetooth scanning, UART inspection, and accelerometer streaming. |
 
 Key `totem run` flags:
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--x11-forward` forces a pygame window even when the RGB matrix driver is active.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
+- `totem check-health` runs Raspberry Pi host checks, including `vcgencmd get_throttled`, so operators can confirm that no current throttling is active.
 - `totem run-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
 
 ## Architecture Summary

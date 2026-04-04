@@ -17,6 +17,16 @@ operators and developers can locate the right command without scanning multiple 
 - `totem_debug` is the hardware validation CLI (`src/heart/cli/debug_app.py`).
 - Command implementations live under `src/heart/cli/`.
 
+Common `totem` operator commands:
+
+```bash
+totem run --configuration lib_2025
+totem check-health
+totem update-driver --name <driver-name>
+```
+
+`totem check-health` currently inspects Raspberry Pi throttling state via `vcgencmd get_throttled` and reports both active and historical flags.
+
 ## Configuration Modules
 
 Configuration modules live under `heart.programs.configurations` and expose

@@ -111,6 +111,14 @@ totem_debug gamepad scan
 
 See `docs/library/tooling_and_configuration.md` for the full command catalog.
 
+For Raspberry Pi host checks, run:
+
+```bash
+totem check-health
+```
+
+The command includes `vcgencmd get_throttled` output so you can verify that no current throttling is active on the totem.
+
 ## Driver Firmware Updates
 
 Update driver firmware with the consolidated CLI:
