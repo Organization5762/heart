@@ -128,9 +128,12 @@ class HeartRateManager(Peripheral[Any]):
 
     @classmethod
     def detect(cls) -> Iterator["HeartRateManager"]:
-        # If this errors with NoBackendError, we can't detect heart rate monitors
+        # If this errors, we can't detect heart rate monitors on this host.
         try:
             Node()
+        except DriverNotFound:
+            logger.info("Unable to detect heart rate monitors - ANT driver not found")
+            return
         except usb.core.NoBackendError:
             logger.info("Unable to detect heart rate monitors - USB backend not available")
             return
