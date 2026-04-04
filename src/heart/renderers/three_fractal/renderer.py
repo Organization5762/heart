@@ -493,13 +493,21 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
         self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
-    # def _check_enter_auto(self, peripheral_manager: PeripheralManager):
-    #     gamepad = peripheral_manager.get_gamepad()
-    #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-    #     if gamepad.is_connected():
-    #         if gamepad.was_tapped(mapping.BUTTON_Y):
-    #             self.mode = "auto"
-    #             self._reset_camera_pos()
+    def _check_enter_auto(self, peripheral_manager: PeripheralManager) -> None:
+        """Return from free-look to auto mode on an explicit operator action."""
+
+        keyboard_toggle_pressed = self._is_key_down(pygame.K_y)
+        keyboard_toggle_tapped = keyboard_toggle_pressed and not self.key_pressed_last_frame.get(
+            pygame.K_y, False
+        )
+        self.key_pressed_last_frame[pygame.K_y] = keyboard_toggle_pressed
+
+        if keyboard_toggle_tapped or self._gamepad_snapshot.button_tapped(
+            GamepadButton.NORTH
+        ):
+            self.mode = "auto"
+            self._auto_started = False
+            self._reset_camera_pos()
 
     def _check_break_auto(self, peripheral_manager: PeripheralManager):
         # ignore break auto check at first to avoid inut overlap from scene

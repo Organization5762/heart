@@ -10,15 +10,15 @@ from typing import Annotated
 import typer
 
 from heart.cli.commands.run import (DEFAULT_ADD_LOW_POWER_MODE,
-                                    DEFAULT_CONFIGURATION, DEFAULT_X11_FORWARD)
-from heart.device.beats.websocket import WEBSOCKET_HOST, WEBSOCKET_PORT
+                                    DEFAULT_BEATS_WORKSPACE,
+                                    DEFAULT_CONFIGURATION,
+                                    DEFAULT_INSTALL_BEATS_DEPS,
+                                    DEFAULT_X11_FORWARD)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_BEATS_WORKSPACE = Path("experimental/beats")
 DEFAULT_BEATS_START_SCRIPT = "start"
-DEFAULT_INSTALL_BEATS_DEPS = True
 FORWARD_TO_BEATS_ENV_VAR = "FORWARD_TO_BEATS_APP"
 BEATS_WEBSOCKET_ENV_VAR = "VITE_BEATS_WEBSOCKET_URL"
 PROCESS_POLL_INTERVAL_SECONDS = 0.5
@@ -153,6 +153,8 @@ def ensure_beats_dependencies(beats_workspace: Path) -> None:
 def build_beats_websocket_url() -> str:
     """Build the websocket URL expected by the Beats UI."""
 
+    from heart.device.beats.websocket import WEBSOCKET_HOST, WEBSOCKET_PORT
+
     return f"ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}"
 
 
@@ -282,4 +284,3 @@ def terminate_process(process: subprocess.Popen[bytes]) -> None:
         else:
             process.kill()
         process.wait(timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS)
-

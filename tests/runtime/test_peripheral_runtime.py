@@ -66,6 +66,29 @@ class _WebSocketStub:
 class TestPeripheralRuntimeStreaming:
     """Exercise peripheral runtime stream bridging so Beats receives structured reconnect-safe peripheral payloads."""
 
+    def test_configure_streaming_skips_websocket_when_beats_forwarding_is_disabled(
+        self, monkeypatch
+    ) -> None:
+        """Verify default runtime startup avoids booting the Beats websocket so plain sessions do not open an unused server."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.forward_to_beats_app",
+            classmethod(lambda cls: False),
+        )
+
+        def _unexpected_websocket() -> object:
+            raise AssertionError("WebSocket should not be constructed without Beats forwarding")
+
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime._build_websocket",
+            _unexpected_websocket,
+        )
+
+        runtime.configure_streaming()
+
     def test_configure_streaming_emits_peripheral_envelopes(self) -> None:
         """Verify debug tap events are wrapped as peripheral payloads so the Beats websocket can replay and decode them after reconnects."""
         manager = _PeripheralManagerStub()

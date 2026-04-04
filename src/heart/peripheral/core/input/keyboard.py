@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import cache, cached_property
-from typing import cast
+from typing import Any, cast
 
 import pygame
 import reactivex
@@ -24,6 +24,12 @@ from heart.utilities.reactivex_threads import (input_scheduler,
 
 KEYBOARD_POLL_INTERVAL_MS = 5
 KEYBOARD_RELEASE_DEBOUNCE_MS = 60.0
+NON_INDEX_KEY_CODES = (
+    pygame.K_UP,
+    pygame.K_DOWN,
+    pygame.K_LEFT,
+    pygame.K_RIGHT,
+)
 logger = get_logger(__name__)
 
 
@@ -50,6 +56,7 @@ class KeyboardController:
 
         def _sample(_: int) -> KeyboardSnapshot:
             try:
+                pygame.event.pump()
                 keys = pygame.key.get_pressed()
             except pygame.error:
                 logger.debug(
@@ -59,9 +66,7 @@ class KeyboardController:
                     pressed_keys=frozenset(),
                     timestamp_ms=time.monotonic() * 1000.0,
                 )
-            pressed = frozenset(
-                index for index in range(len(keys)) if keys[index]
-            )
+            pressed = _pressed_keys_from_state(keys)
             return KeyboardSnapshot(
                 pressed_keys=pressed,
                 timestamp_ms=time.monotonic() * 1000.0,
@@ -129,6 +134,21 @@ class KeyboardController:
                     )
                 else:
                     updated = current
+
+            if isinstance(event, KeyPressedEvent):
+                logger.info(
+                    "Keyboard key pressed: key=%s code=%s timestamp_ms=%.1f",
+                    key_name,
+                    key,
+                    now,
+                )
+            elif isinstance(event, KeyReleasedEvent):
+                logger.info(
+                    "Keyboard key released: key=%s code=%s timestamp_ms=%.1f",
+                    key_name,
+                    key,
+                    now,
+                )
 
             return _KeyboardTracker(state=updated, event=event)
 
@@ -211,3 +231,17 @@ class KeyboardController:
             source_id=key_name,
             upstream_ids=(f"keyboard.key.{key_name}",),
         )
+
+
+def _pressed_keys_from_state(keys: Any) -> frozenset[int]:
+    """Normalize pygame key state into key constants used by input profiles."""
+
+    pressed = {
+        index
+        for index in range(len(keys))
+        if keys[index]
+    }
+    for key_code in NON_INDEX_KEY_CODES:
+        if keys[key_code]:
+            pressed.add(key_code)
+    return frozenset(pressed)

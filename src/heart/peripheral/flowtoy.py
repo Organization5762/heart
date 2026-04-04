@@ -7,17 +7,33 @@ from collections.abc import Iterator, Mapping
 from typing import Any
 
 import reactivex
-from heart_firmware_io import flowtoy
 from reactivex.subject import Subject
 
 from heart.peripheral.core import PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (RadioPeripheral, RawRadioPacket,
                                     SerialRadioDriver)
+from heart.utilities.logging import get_logger
 
 FLOWTOY_INPUT_VARIANT = "flowtoy"
 FLOWTOY_PERIPHERAL_ID_PREFIX = "flowtoy"
 PORT_SANITIZE_PATTERN = re.compile(r"[^a-zA-Z0-9]+")
+
+logger = get_logger(__name__)
+
+
+def _flowtoy_module() -> Any | None:
+    """Return the optional FlowToy firmware helper module when available."""
+
+    try:
+        from heart_firmware_io import flowtoy
+    except ImportError:
+        logger.debug(
+            "FlowToy firmware helpers are unavailable; using undecoded radio packets",
+            exc_info=True,
+        )
+        return None
+    return flowtoy
 
 
 class FlowToyPeripheral(RadioPeripheral):
@@ -39,7 +55,12 @@ class FlowToyPeripheral(RadioPeripheral):
 
     def peripheral_info(self) -> PeripheralInfo:
         decoded = self._decoded_payload(self.latest_packet)
-        mode_name = flowtoy.mode_name_from_decoded(decoded)
+        flowtoy_module = _flowtoy_module()
+        mode_name = (
+            flowtoy_module.mode_name_from_decoded(decoded)
+            if flowtoy_module is not None
+            else "flowtoy-unknown"
+        )
         tags = [
             PeripheralTag(name="input_variant", variant=FLOWTOY_INPUT_VARIANT),
             PeripheralTag(
@@ -61,7 +82,12 @@ class FlowToyPeripheral(RadioPeripheral):
         if decoded is not None and packet.decoded is None:
             packet.decoded = decoded
 
-        mode_name = flowtoy.mode_name_from_decoded(decoded)
+        flowtoy_module = _flowtoy_module()
+        mode_name = (
+            flowtoy_module.mode_name_from_decoded(decoded)
+            if flowtoy_module is not None
+            else "flowtoy-unknown"
+        )
         body = self._body_from_packet(packet)
         self._latest_packet = packet
         self._packet_subject.on_next(FlowToyPacket(body=body, mode_name=mode_name))
@@ -99,7 +125,10 @@ class FlowToyPeripheral(RadioPeripheral):
             return None
         if packet.decoded is not None:
             return packet.decoded
-        return flowtoy.decode_if_matching(packet.payload)
+        flowtoy_module = _flowtoy_module()
+        if flowtoy_module is None:
+            return None
+        return flowtoy_module.decode_if_matching(packet.payload)
 
     def _mode_metadata(self, decoded: Mapping[str, Any] | None) -> dict[str, str]:
         if decoded is None:

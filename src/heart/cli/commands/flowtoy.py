@@ -10,8 +10,6 @@ from typing import Annotated, Any, Iterator
 import serial.tools.list_ports
 import typer
 from heart_firmware_io import constants as firmware_constants
-from heart_firmware_io import flowtoy as flowtoy_protocol
-from heart_firmware_io.radio import FLOWTOY_PROTOCOL
 
 from heart.peripheral.radio import (FlowToyPattern, SerialRadioDriver,
                                     SerialRadioMessage)
@@ -28,6 +26,7 @@ DEFAULT_COMMAND_REPEAT_COUNT = 5
 DEFAULT_COMMAND_INTERVAL_SECONDS = 0.35
 DEFAULT_ACM_GLOB = "/dev/ttyACM*"
 DEFAULT_USB_GLOB = "/dev/ttyUSB*"
+FLOWTOY_PROTOCOL = "flowtoy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +35,20 @@ class FlowToyBridge:
 
     port: str
     mode: str
+
+
+def _decode_flowtoy_payload(payload: bytes) -> dict[str, Any] | None:
+    """Decode FlowToy payload bytes on demand."""
+
+    try:
+        from heart_firmware_io import flowtoy as flowtoy_protocol
+    except ImportError as exc:
+        logger.error(
+            "FlowToy firmware helpers are unavailable; reinstall heart-firmware-io "
+            "so the flowtoy module is present"
+        )
+        raise typer.Exit(code=1) from exc
+    return flowtoy_protocol.decode_if_matching(payload)
 
 
 def _candidate_ports() -> list[str]:
@@ -123,7 +136,7 @@ def _decode_flowtoy_message(message: SerialRadioMessage) -> dict[str, Any] | Non
         return None
     if message.packet.decoded:
         return dict(message.packet.decoded)
-    return flowtoy_protocol.decode_if_matching(message.packet.payload)
+    return _decode_flowtoy_payload(message.packet.payload)
 
 
 def _render_packet_line(port: str, decoded: dict[str, Any], rssi_dbm: float | None) -> str:
