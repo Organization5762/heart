@@ -54,7 +54,7 @@ def looks_like_sync_packet(
     """Return ``True`` when *payload* matches the known FlowToy packet shape."""
 
     packet = normalize_payload(payload)
-    return len(packet) == FLOWTOY_SYNC_PACKET_SIZE
+    return len(packet) >= FLOWTOY_SYNC_PACKET_SIZE
 
 
 def decode_group_id(
@@ -103,7 +103,7 @@ def decode_sync_packet(
 ) -> dict[str, Any]:
     """Decode a FlowToy sync packet into a structured mapping."""
 
-    packet = normalize_payload(payload)
+    packet = normalize_payload(payload)[:FLOWTOY_SYNC_PACKET_SIZE]
     if not looks_like_sync_packet(packet):
         raise ValueError("Payload does not match the known FlowToy sync packet shape")
 
