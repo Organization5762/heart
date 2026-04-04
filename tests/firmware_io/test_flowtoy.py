@@ -140,3 +140,12 @@ class TestFirmwareIoFlowToy:
                 "alternate": False,
             },
         }
+
+    def test_decode_if_matching_accepts_extended_payloads(self) -> None:
+        """Verify longer captures still decode from the leading FlowToy frame so bridges can tolerate extra trailer bytes without losing state visibility."""
+        decoded = flowtoy.decode_if_matching(_valid_sync_packet() + b"\x99\xAA\xBB")
+
+        assert decoded is not None
+        assert decoded["group_id"] == 1
+        assert decoded["page"] == 2
+        assert decoded["mode"] == 7

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
@@ -23,6 +24,9 @@ serial = optional_import("serial", logger=logger)
 DEFAULT_RADIO_BAUDRATE = 115_200
 DEFAULT_RADIO_TIMEOUT_SECONDS = 1.0
 DEFAULT_RADIO_RECONNECT_DELAY_SECONDS = 1.0
+DEFAULT_RADIO_READY_DELAY_SECONDS = 1.0
+DEFAULT_RADIO_IDENTIFY_TIMEOUT_SECONDS = 2.0
+DEFAULT_RADIO_IDENTIFY_ATTEMPTS = 2
 FLOWTOY_RAW_COMMAND_EVENT = "peripheral.radio.command.raw"
 FLOWTOY_SYNC_EVENT = "peripheral.radio.flowtoy.sync"
 FLOWTOY_STOP_SYNC_EVENT = "peripheral.radio.flowtoy.stop_sync"
@@ -134,6 +138,16 @@ class RawRadioPacket:
     metadata: Mapping[str, Any] | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SerialRadioMessage:
+    """Decoded JSON line emitted by a serial radio bridge."""
+
+    event_type: str
+    data: Mapping[str, Any]
+    raw: Mapping[str, Any]
+    packet: RawRadioPacket | None = None
+
+
 class RadioDriver:
     """Interface consumed by :class:`RadioPeripheral`."""
 
@@ -211,6 +225,43 @@ class SerialRadioDriver(RadioDriver):
         with self._open_serial() as handle:
             self._write_to_handle(handle, encoded_command)
 
+    def identify(
+        self,
+        *,
+        ready_delay: float = DEFAULT_RADIO_READY_DELAY_SECONDS,
+        timeout_seconds: float = DEFAULT_RADIO_IDENTIFY_TIMEOUT_SECONDS,
+        attempts: int = DEFAULT_RADIO_IDENTIFY_ATTEMPTS,
+    ) -> Mapping[str, Any] | None:
+        """Return Identify metadata for the attached bridge when available."""
+
+        for _ in range(max(1, int(attempts))):
+            with self._open_serial() as handle:
+                self._prepare_handle(handle, ready_delay=ready_delay)
+                self._write_to_handle(handle, self._encode_command("Identify"))
+                for message in self._read_messages_from_handle(
+                    handle,
+                    timeout_seconds=timeout_seconds,
+                ):
+                    if message.event_type != "device.identify":
+                        continue
+                    return dict(message.data)
+        return None
+
+    def read_messages(
+        self,
+        *,
+        duration_seconds: float,
+        ready_delay: float = DEFAULT_RADIO_READY_DELAY_SECONDS,
+    ) -> Iterator[SerialRadioMessage]:
+        """Yield decoded JSON messages from the bridge for a bounded duration."""
+
+        with self._open_serial() as handle:
+            self._prepare_handle(handle, ready_delay=ready_delay)
+            yield from self._read_messages_from_handle(
+                handle,
+                timeout_seconds=duration_seconds,
+            )
+
     def close(self) -> None:
         self._stop_event.set()
         with self._handle_lock:
@@ -256,16 +307,40 @@ class SerialRadioDriver(RadioDriver):
             timeout=self._timeout,
         )
 
+    def _prepare_handle(self, handle: Any, *, ready_delay: float) -> None:
+        # Feather boards reset on open; wait briefly so Identify/reads are not lost
+        # during USB serial re-enumeration.
+        if ready_delay > 0:
+            threading.Event().wait(ready_delay)
+        if hasattr(handle, "reset_input_buffer"):
+            handle.reset_input_buffer()
+
     def _drain_serial(self, handle: Any) -> Iterator[RawRadioPacket]:
         while not self._stop_event.is_set():
             raw = handle.readline()
             if not raw:
                 continue
-            packet = self._decode(raw)
+            message = self._decode_message(raw)
+            packet = message.packet if message is not None else None
             if packet is not None:
                 yield packet
 
-    def _decode(self, raw: bytes) -> RawRadioPacket | None:
+    def _read_messages_from_handle(
+        self,
+        handle: Any,
+        *,
+        timeout_seconds: float,
+    ) -> Iterator[SerialRadioMessage]:
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            raw = handle.readline()
+            if not raw:
+                continue
+            message = self._decode_message(raw)
+            if message is not None:
+                yield message
+
+    def _decode_message(self, raw: bytes) -> SerialRadioMessage | None:
         text = raw.decode("utf-8", errors="ignore").strip()
         if not text:
             return None
@@ -286,8 +361,7 @@ class SerialRadioDriver(RadioDriver):
             payload_mapping = payload
         else:
             payload_mapping = {}
-
-        return RawRadioPacket(
+        packet = RawRadioPacket(
             payload=self._extract_payload(payload_mapping.get("payload")),
             protocol=self._extract_str(payload_mapping.get("protocol")),
             frequency_hz=self._extract_float(payload_mapping.get("frequency_hz")),
@@ -298,6 +372,12 @@ class SerialRadioDriver(RadioDriver):
             rssi_dbm=self._extract_float(payload_mapping.get("rssi_dbm")),
             decoded=self._extract_metadata(payload_mapping.get("decoded")),
             metadata=self._extract_metadata(payload_mapping.get("metadata")),
+        )
+        return SerialRadioMessage(
+            event_type=self._extract_str(message.get("event_type")) or "",
+            data=dict(payload_mapping),
+            raw=dict(message),
+            packet=packet if payload_mapping else None,
         )
 
     def _extract_float(self, value: Any) -> float | None:

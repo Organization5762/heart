@@ -42,6 +42,8 @@ class FakeSerialHandle:
         self.writes: list[bytes] = []
         self.closed = False
         self.flushed = False
+        self.lines: list[bytes] = []
+        self.reset_calls = 0
 
     def write(self, data: bytes) -> None:
         self.writes.append(data)
@@ -50,7 +52,12 @@ class FakeSerialHandle:
         self.flushed = True
 
     def readline(self) -> bytes:
-        return b""
+        if not self.lines:
+            return b""
+        return self.lines.pop(0)
+
+    def reset_input_buffer(self) -> None:
+        self.reset_calls += 1
 
     def close(self) -> None:
         self.closed = True
@@ -266,3 +273,51 @@ class TestSerialRadioDriverWrites:
         assert len(serial_module.handles) == 1
         assert serial_module.handles[0].writes == [b"S\n"]
         assert serial_module.handles[0].flushed is True
+
+    def test_identify_returns_bridge_metadata(self) -> None:
+        """Verify identify queries reuse the serial driver so higher-level tooling can discover the correct bridge without bespoke serial code."""
+        serial_module = FakeSerialModule()
+        driver = SerialRadioDriver(port="/dev/null", serial_module=serial_module)
+
+        def _serial(*_args: Any, **_kwargs: Any) -> FakeSerialHandle:
+            handle = FakeSerialHandle()
+            handle.lines = [
+                b'{"event_type":"device.identify","data":{"device_name":"feather-flowtoy-bridge","protocol":"flowtoy","mode":"receive-only"}}\n'
+            ]
+            serial_module.handles.append(handle)
+            return handle
+
+        serial_module.Serial = _serial  # type: ignore[method-assign]
+
+        identity = driver.identify(ready_delay=0, timeout_seconds=0.01, attempts=1)
+
+        assert identity == {
+            "device_name": "feather-flowtoy-bridge",
+            "protocol": "flowtoy",
+            "mode": "receive-only",
+        }
+        assert serial_module.handles[0].writes == [b"Identify\n"]
+        assert serial_module.handles[0].reset_calls == 1
+
+    def test_read_messages_decodes_radio_packets(self) -> None:
+        """Ensure bounded message reads return parsed packet events so operator tooling can inspect live traffic through the shared driver."""
+        serial_module = FakeSerialModule()
+        driver = SerialRadioDriver(port="/dev/null", serial_module=serial_module)
+
+        def _serial(*_args: Any, **_kwargs: Any) -> FakeSerialHandle:
+            handle = FakeSerialHandle()
+            handle.lines = [
+                b'{"event_type":"peripheral.radio.packet","data":{"protocol":"flowtoy","payload":[1,2,3],"rssi_dbm":-42}}\n'
+            ]
+            serial_module.handles.append(handle)
+            return handle
+
+        serial_module.Serial = _serial  # type: ignore[method-assign]
+
+        messages = list(driver.read_messages(duration_seconds=0.01, ready_delay=0))
+
+        assert len(messages) == 1
+        assert messages[0].event_type == "peripheral.radio.packet"
+        assert messages[0].packet is not None
+        assert messages[0].packet.protocol == "flowtoy"
+        assert messages[0].packet.payload == b"\x01\x02\x03"
