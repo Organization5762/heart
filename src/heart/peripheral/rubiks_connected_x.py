@@ -60,6 +60,7 @@ RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE = (
 RUBIKS_CONNECTED_X_THREAD_NAME = "peripheral-rubiks-connected-x"
 RUBIKS_CONNECTED_X_DISABLE_ORIENTATION_COMMAND = b"\x37"
 RUBIKS_CONNECTED_X_REQUEST_STATE_COMMAND = b"\x33"
+DEFAULT_RUBIKS_CONNECTED_X_ADDRESS = "E1:EE:92:6B:CF:CD"
 DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME = "RubiksX_CDCF6B"
 RUBIKS_CONNECTED_X_NAME_TOKENS = (
     "connected x",
@@ -1036,26 +1037,18 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
 
     @classmethod
     def detect(cls) -> Iterator["RubiksConnectedXPeripheral"]:
-        configured_address = os.environ.get(RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR)
+        configured_address = os.environ.get(RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, "").strip()
         if configured_address:
-            yield cls(address=configured_address)
+            yield cls(
+                address=configured_address,
+                name=DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME,
+            )
             return
-        if not _env_flag(RUBIKS_CONNECTED_X_AUTODETECT_ENV_VAR):
-            return
-        try:
-            candidates = asyncio.run(discover_rubiks_connected_x_candidates())
-        except Exception:
-            logger.exception("Rubik's Connected X autodetect scan failed.")
-            return
-        if not candidates:
-            logger.warning("Rubik's Connected X autodetect found no candidates.")
-            return
-        selected = candidates[0]
-        logger.info(
-            "Using autodetected Rubik's Connected X candidate %s",
-            render_candidate_line(selected),
+        yield cls(
+            address=DEFAULT_RUBIKS_CONNECTED_X_ADDRESS,
+            name=DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME,
         )
-        yield cls(address=selected.address, name=selected.name)
+        return
 
     def run(self) -> None:
         if self._thread is not None and self._thread.is_alive():

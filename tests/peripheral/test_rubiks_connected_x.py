@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 import heart.peripheral.rubiks_connected_x as rubiks_connected_x_module
 from heart.peripheral.rubiks_connected_x import (
+    DEFAULT_RUBIKS_CONNECTED_X_ADDRESS,
+    DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME,
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
     RUBIKS_CONNECTED_X_SOLVED_FACELETS,
     RubiksConnectedXMessageType,
@@ -353,6 +355,18 @@ class TestRubiksConnectedXHelpers:
 
         assert len(peripherals) == 1
         assert peripherals[0].address == "AA:BB:CC:DD"
+        assert peripherals[0].name == DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME
+
+    def test_detect_defaults_to_the_known_cube_address(self, monkeypatch) -> None:
+        """Verify peripheral detection defaults to the team's single Rubik cube so the visualizer works without extra address setup in the common workflow."""
+
+        monkeypatch.delenv(RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, raising=False)
+
+        peripherals = list(RubiksConnectedXPeripheral.detect())
+
+        assert len(peripherals) == 1
+        assert peripherals[0].address == DEFAULT_RUBIKS_CONNECTED_X_ADDRESS
+        assert peripherals[0].name == DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME
 
     def test_resolve_runtime_device_attempts_bluez_connect_for_known_address(
         self,
