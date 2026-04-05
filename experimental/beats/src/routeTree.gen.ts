@@ -46,7 +46,7 @@ export interface FileRoutesByFullPath {
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
   '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
-  '/stream': typeof StreamIndexRoute
+  '/stream/': typeof StreamIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,7 +70,7 @@ export interface FileRouteTypes {
     | '/peripherals/connected'
     | '/peripherals/events'
     | '/peripherals/snapshots'
-    | '/stream'
+    | '/stream/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -107,7 +107,7 @@ declare module '@tanstack/react-router' {
     '/stream/': {
       id: '/stream/'
       path: '/stream'
-      fullPath: '/stream'
+      fullPath: '/stream/'
       preLoaderRoute: typeof StreamIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
