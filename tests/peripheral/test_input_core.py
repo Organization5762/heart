@@ -513,6 +513,7 @@ class TestMandelbrotControlProfile:
         )
         gamepad_snapshots.on_next(
             _gamepad_snapshot(
+                dpad=GamepadDpadValue(x=-1, y=1),
                 axes={
                     GamepadAxis.LEFT_X: 0.0,
                     GamepadAxis.LEFT_Y: 0.0,

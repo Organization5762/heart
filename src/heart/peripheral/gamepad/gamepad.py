@@ -11,7 +11,8 @@ from pygame.event import Event
 from heart.peripheral.core import Peripheral, events
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import interval_in_background
+from heart.utilities.reactivex_threads import (interval_in_background,
+                                               pipe_in_main_thread)
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
@@ -151,7 +152,11 @@ class Gamepad(Peripheral[Any]):
         self._axis_prev_frame = self._axis_curr_frame.copy()
         self._dpad_last_frame = self._dpad_curr_frame
 
-        self._dpad_curr_frame = self.joystick.get_hat(0)
+        try:
+            self._dpad_curr_frame = self.joystick.get_hat(0)
+        except:
+            pass
+
         for button_id in range(self.num_buttons):
             pressed = bool(self.joystick.get_button(button_id))
             self._pressed_curr_frame[button_id] = pressed
@@ -242,10 +247,14 @@ class Gamepad(Peripheral[Any]):
         # TODO: Is this needed?
         time.sleep(INITIALIZATION_DELAY_SECONDS)
 
-        # check every 1 second for controller state, so that we can attempt to connect
-        interval_in_background(period=timedelta(seconds=1)).subscribe(
+        # macOS AppKit requires SDL event and joystick APIs to run on the process
+        # main thread, so route both polling loops through the frame-thread queue.
+        pipe_in_main_thread(
+            interval_in_background(period=timedelta(seconds=1))
+        ).subscribe(
             on_next=self._read_from_gamepad,
         )
 
-        # Query the controller state frequently
-        interval_in_background(period=timedelta(milliseconds=20)).subscribe(on_next=lambda x: self._update())
+        pipe_in_main_thread(
+            interval_in_background(period=timedelta(milliseconds=20))
+        ).subscribe(on_next=lambda _: self._update())
