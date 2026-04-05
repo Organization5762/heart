@@ -2,6 +2,7 @@ from typing import Callable
 
 import numpy as np
 
+from heart import DeviceDisplayMode
 from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
@@ -18,6 +19,10 @@ from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.random_pixel import RandomPixel
+from heart.renderers.rock_paper_scissors import (
+    RockPaperScissorsRenderer,
+    RockPaperScissorsTitle,
+)
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
@@ -27,6 +32,8 @@ from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
 from heart.runtime.game_loop import GameLoop
 
+PORTRAIT_SELFIE_ASSET = "photos/portrait_selfie.png"
+
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     t_i = int(t)
@@ -35,6 +42,11 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
 
 
 PRANAY_SKETCH_MODE_TITLE = "Dolly's\nsketch"
+
+def full_display_image(image_file: str) -> RenderImage:
+    renderer = RenderImage(image_file=image_file)
+    renderer.device_display_mode = DeviceDisplayMode.FULL
+    return renderer
 
 
 def configure(loop: GameLoop) -> None:
@@ -79,6 +91,27 @@ def configure(loop: GameLoop) -> None:
         )
     )
     mario_mode.add_renderer(MarioRenderer)
+
+    photo_mode = loop.add_mode("photo")
+    photo_mode.add_renderer(full_display_image(PORTRAIT_SELFIE_ASSET))
+
+    rock_paper_scissors_mode = loop.add_mode(
+        loop.compose(
+            [
+                RockPaperScissorsTitle(randomness=randomness),
+                TextRendering(
+                    text=["Shi Fu Mi"],
+                    font="Grand9K Pixel.ttf",
+                    font_size=14,
+                    color=Color(255, 255, 255),
+                    y_location=0.7,
+                ),
+            ]
+        )
+    )
+    rock_paper_scissors_mode.add_renderer(
+        RockPaperScissorsRenderer(randomness=randomness)
+    )
 
     def multicolor_renderer() -> MulticolorRenderer:
         return loop.resolve(MulticolorRenderer)

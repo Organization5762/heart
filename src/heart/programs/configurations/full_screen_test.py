@@ -1,11 +1,12 @@
-from heart.peripheral.providers.randomness import RandomnessProvider
-from heart.renderers.pixels import Border
-from heart.renderers.random_pixel import RandomPixel
+from heart import DeviceDisplayMode
+from heart.renderers.image import RenderImage
 from heart.runtime.game_loop import GameLoop
+
+PHOTO_ASSET = "photos/portrait_selfie.png"
 
 
 def configure(loop: GameLoop) -> None:
-    randomness = RandomnessProvider()
-    mode = loop.add_mode("pixel")
-    mode.add_renderer(RandomPixel(num_pixels=200, randomness=randomness))
-    mode.add_renderer(Border(width=2))
+    mode = loop.add_mode("photo")
+    renderer = RenderImage(image_file=PHOTO_ASSET)
+    renderer.device_display_mode = DeviceDisplayMode.FULL
+    mode.add_renderer(renderer)
