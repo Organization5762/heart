@@ -3,11 +3,12 @@ DOCS_SOURCES = docs
 TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
+RUN_CONFIGURATION ?= lib_2025
 SEMGREP_CONFIG ?= semgrep.yml
 SEMGREP_TARGETS ?= src
 SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --metrics=off --disable-version-check
 SEMGREP_EXTRA_ARGS ?=
-.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session fractal
+.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session fractal run debug-gamepad
 
 install:
 	@uv sync --all-extras --group dev
@@ -61,6 +62,12 @@ dev-session:
 
 fractal:
 	@UV_CACHE_DIR=.uv-cache uv run python -c "from heart.renderers.three_fractal.renderer import main; main()"
+
+run:
+	@uv run totem run --configuration $(RUN_CONFIGURATION)
+
+debug-gamepad:
+	@UV_CACHE_DIR=.uv-cache uv run python scripts/debug/gamepad_probe.py
 
 pi_install:
 	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_rgb_matrix.sh

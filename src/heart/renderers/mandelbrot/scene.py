@@ -61,6 +61,9 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self.scene_controls: SceneControls | None = None
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
+        self._split_view_surfaces: dict[
+            tuple[int, int], tuple[pygame.Surface, pygame.Surface]
+        ] = {}
         self.mandelbrot_interior_strategy = (
             Configuration.mandelbrot_interior_strategy()
         )
@@ -129,6 +132,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def reset(self):
         self.initialized = False
+        self._split_view_surfaces.clear()
         # if self.state is not None:
         #     self.state.reset()
         #     self.state.set_mode_auto()
@@ -143,7 +147,22 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         # if connected := self.gamepad.is_connected():
         #     mapping = self.control_mappings.get(self.gamepad.gamepad_identifier)
         #     mapping.update()
-        return False
+        return True
+
+    def _get_split_view_surfaces(self) -> tuple[pygame.Surface, pygame.Surface]:
+        assert self.width is not None
+        assert self.height is not None
+        size = (self.width // 2, self.height)
+        surfaces = self._split_view_surfaces.get(size)
+        if surfaces is None:
+            surfaces = (
+                pygame.Surface(size),
+                pygame.Surface(size),
+            )
+            self._split_view_surfaces[size] = surfaces
+        for surface in surfaces:
+            surface.fill((0, 0, 0))
+        return surfaces
 
     def real_process(
         self,
@@ -184,8 +203,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         ):
             match self.state.orientation:
                 case Rectangle():
-                    mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
-                    julia_surface = pygame.Surface((self.width // 2, self.height))
+                    mandelbrot_surface, julia_surface = self._get_split_view_surfaces()
                     self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
                     # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))

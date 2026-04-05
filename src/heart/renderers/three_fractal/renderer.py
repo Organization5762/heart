@@ -43,6 +43,7 @@ DEFAULT_DEBUG_WIDTH = 800
 DEFAULT_DEBUG_HEIGHT = 800
 DEFAULT_DEBUG_FPS = 60
 DEFAULT_DEBUG_LAYOUT = "rectangle"
+TRIGGER_ACTIVE_THRESHOLD = 0.5
 
 
 @dataclass
@@ -95,7 +96,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.virtual_time = 0
         self.INFLATE_SPEED = 10
         self.look_speed = 0.003
-        self.key_pressed_last_frame: dict[int, bool] = {}
+        self.key_pressed_last_frame: dict = {}
         self.screen_center = None
 
         self.prev_mouse_pos = None
@@ -122,6 +123,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._trigger_right_prev_active = False
 
     def is_initialized(self) -> bool:
         if not super().is_initialized():
@@ -521,9 +523,11 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         # ignore break auto check at first to avoid inut overlap from scene
         # select mode
         if time.monotonic() - self.time_initialized < 0.3:
-            return
+            return False
         if self._has_manual_input():
             self.mode = "free"
+            return True
+        return False
 
     def _check_switch_auto(self, peripheral_manager: PeripheralManager):
         pass
@@ -694,18 +698,35 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                 lerp_factor = 0.1  # Adjust for faster/slower response
                 self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
 
-        # invert the radius
-        radius_toggle_pressed = self._is_key_down(pygame.K_r)
-        if radius_toggle_pressed and not self.key_pressed_last_frame.get(pygame.K_r, False):
+        trigger_right_active = (
+            self._gamepad_snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0)
+            > TRIGGER_ACTIVE_THRESHOLD
+        )
+        _keyboard_signal = (
+            radius_toggle_pressed := self._is_key_down(pygame.K_r)
+            and not self.key_pressed_last_frame.get(pygame.K_r, False)
+        )
+        _gamepad_signal = trigger_right_active and not self._trigger_right_prev_active
+        if _keyboard_signal or _gamepad_signal:
             self.BASE_RADIUS = (
                 self._LO_BASE if self.BASE_RADIUS == self._HI_BASE else self._HI_BASE
             )
         self.key_pressed_last_frame[pygame.K_r] = radius_toggle_pressed
+        self._trigger_right_prev_active = trigger_right_active
 
         # "inflate/deflate" sphere on hold/release
         try:
-            if self._is_key_down(pygame.K_SPACE) or self._gamepad_snapshot.button_held(
-                GamepadButton.SOUTH
+            trigger_left_active = (
+                self._gamepad_snapshot.axis_value(
+                    GamepadAxis.TRIGGER_LEFT,
+                    dead_zone=0.0,
+                )
+                > TRIGGER_ACTIVE_THRESHOLD
+            )
+            if (
+                self._is_key_down(pygame.K_SPACE)
+                or trigger_left_active
+                or self._gamepad_snapshot.button_held(GamepadButton.SOUTH)
             ):
                 target = self.BASE_RADIUS + 0.2
                 self.active_radius = lerp(
@@ -734,6 +755,12 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             rz = self.make_rot(0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
         if self._is_key_down(pygame.K_e):
+            rz = self.make_rot(-0.01, 2)
+            self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+        if self._gamepad_snapshot.button_held(GamepadButton.ZL):
+            rz = self.make_rot(0.01, 2)
+            self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+        if self._gamepad_snapshot.button_held(GamepadButton.ZR):
             rz = self.make_rot(-0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
@@ -816,9 +843,11 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.delta_real_time = now - (self.last_frame_time or 0.0)
         self.last_frame_time = now
 
-        if self.mode == "auto":
+        if self.mode == "auto" and self._check_break_auto(peripheral_manager):
+            self._process_input(peripheral_manager)
+            self._check_enter_auto(peripheral_manager)
+        elif self.mode == "auto":
             self._process_auto()
-            self._check_break_auto(peripheral_manager)
         else:
             self._process_input(peripheral_manager)
             self._check_enter_auto(peripheral_manager)
@@ -941,6 +970,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.delta_real_time = None
         self.surface_array = None
         self.time_initialized = None
+        self._trigger_right_prev_active = False
 
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):

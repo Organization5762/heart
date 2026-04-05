@@ -7,6 +7,7 @@ from enum import StrEnum
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
 
+import pygame
 import reactivex
 from reactivex import operators as ops
 
@@ -250,10 +251,10 @@ class GamepadController:
 
         mapping = self._mapping_for_gamepad(gamepad)
         buttons = {
-            GamepadButton.SOUTH: gamepad.is_held(mapping.BUTTON_A),
-            GamepadButton.EAST: gamepad.is_held(mapping.BUTTON_B),
-            GamepadButton.WEST: gamepad.is_held(mapping.BUTTON_X),
-            GamepadButton.NORTH: gamepad.is_held(mapping.BUTTON_Y),
+            GamepadButton.SOUTH: gamepad.is_held(mapping.BUTTON_B),
+            GamepadButton.EAST: gamepad.is_held(mapping.BUTTON_A),
+            GamepadButton.WEST: gamepad.is_held(mapping.BUTTON_Y),
+            GamepadButton.NORTH: gamepad.is_held(mapping.BUTTON_X),
             GamepadButton.PLUS: gamepad.is_held(mapping.BUTTON_PLUS),
             GamepadButton.MINUS: gamepad.is_held(mapping.BUTTON_MINUS),
             GamepadButton.HOME: gamepad.is_held(mapping.BUTTON_HOME),
@@ -266,10 +267,10 @@ class GamepadController:
         tapped_buttons = frozenset(
             button
             for button, button_id in {
-                GamepadButton.SOUTH: mapping.BUTTON_A,
-                GamepadButton.EAST: mapping.BUTTON_B,
-                GamepadButton.WEST: mapping.BUTTON_X,
-                GamepadButton.NORTH: mapping.BUTTON_Y,
+                GamepadButton.SOUTH: mapping.BUTTON_B,
+                GamepadButton.EAST: mapping.BUTTON_A,
+                GamepadButton.WEST: mapping.BUTTON_Y,
+                GamepadButton.NORTH: mapping.BUTTON_X,
                 GamepadButton.PLUS: mapping.BUTTON_PLUS,
                 GamepadButton.MINUS: mapping.BUTTON_MINUS,
                 GamepadButton.HOME: mapping.BUTTON_HOME,
@@ -321,7 +322,13 @@ class GamepadController:
         mapping: SwitchLikeMapping,
     ) -> GamepadDpadValue:
         if mapping.get_dpad_type() is DpadType.HAT and gamepad.joystick is not None:
-            x_dir, y_dir = gamepad.joystick.get_hat(mapping.DPAD_HAT)
+            hat_index = mapping.DPAD_HAT
+            if hat_index is None or hat_index < 0:
+                return GamepadDpadValue()
+            try:
+                x_dir, y_dir = gamepad.joystick.get_hat(hat_index)
+            except pygame.error:
+                return GamepadDpadValue()
             return GamepadDpadValue(x=int(x_dir), y=int(y_dir))
 
         if mapping.get_dpad_type() is DpadType.BUTTONS:
