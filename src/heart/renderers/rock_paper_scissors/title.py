@@ -79,6 +79,7 @@ class RockPaperScissorsTitle(StatefulBaseRenderer[RockPaperScissorsState]):
                 )
             )
         self._last_frame_time = now
+        window.fill(TITLE_BACKGROUND_COLOR)
         window_width, window_height = window.get_size()
 
         max_w = int(window_width * TITLE_IMAGE_WIDTH_RATIO)
