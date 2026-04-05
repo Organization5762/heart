@@ -19,7 +19,10 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 def _detect_switches() -> Iterator[Peripheral[Any]]:
-    if Configuration.is_pi() and not Configuration.is_x11_forward():
+    if Configuration.use_mock_switch():
+        logger.info("MOCK_SWITCH enabled; using fake switch")
+        switches = list(FakeSwitch.detect())
+    elif Configuration.is_pi() and not Configuration.is_x11_forward():
         logger.info("Detecting switches")
         switches: list[Peripheral[Any]] = [
             *Switch.detect(),
@@ -39,6 +42,7 @@ def _detect_switches() -> Iterator[Peripheral[Any]]:
 
 def _detect_phone_text() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(PhoneText.detect())
+
 
 def _detect_sensors() -> Iterator[Peripheral[Any]]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
