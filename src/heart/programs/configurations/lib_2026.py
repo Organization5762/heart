@@ -6,6 +6,7 @@ from heart.runtime.game_loop import GameLoop
 
 from .lib_2025 import configure as configure_lib_2025
 
+TUBE_SHEET_PATH = "vibe/tube_64x64_spritesheet.png"
 TUBE_FRAME_SIZE = 64
 TUBE_FRAME_COUNT = 29
 TUBE_FRAME_DURATION_MS = 250
@@ -37,7 +38,7 @@ def _tube_frame_data() -> list[FrameDescription]:
 
 def _build_tube_spritesheet() -> SpritesheetLoop:
     return SpritesheetLoop(
-        "tube_64x64_spritesheet.png",
+        TUBE_SHEET_PATH,
         disable_input=True,
         frame_data=_tube_frame_data(),
     )
