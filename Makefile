@@ -7,7 +7,7 @@ SEMGREP_CONFIG ?= semgrep.yml
 SEMGREP_TARGETS ?= src
 SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --metrics=off --disable-version-check
 SEMGREP_EXTRA_ARGS ?=
-.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session
+.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session fractal
 
 install:
 	@uv sync --all-extras --group dev
@@ -58,6 +58,9 @@ focus-watch:
 
 dev-session:
 	@uv run python scripts/devex_session.py
+
+fractal:
+	@UV_CACHE_DIR=.uv-cache uv run python -c "from heart.renderers.three_fractal.renderer import main; main()"
 
 pi_install:
 	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_rgb_matrix.sh

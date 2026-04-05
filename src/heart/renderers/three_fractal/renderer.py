@@ -1,3 +1,4 @@
+import argparse
 import math
 import time
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Orientation
+from heart.device import Cube, Orientation, Rectangle
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -31,10 +32,17 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
+from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import shutdown
 
 logger = get_logger(__name__)
+DEFAULT_DEBUG_WIDTH = 800
+DEFAULT_DEBUG_HEIGHT = 800
+DEFAULT_DEBUG_FPS = 60
+DEFAULT_DEBUG_LAYOUT = "rectangle"
 
 
 @dataclass
@@ -988,3 +996,95 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         self._initial_state = None
         self._peripheral_manager = None
         super().reset()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the three-fractal renderer directly in a local debug window.",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULT_DEBUG_WIDTH,
+        help="Window width in pixels.",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULT_DEBUG_HEIGHT,
+        help="Window height in pixels.",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=DEFAULT_DEBUG_FPS,
+        help="Frame cap for the debug loop.",
+    )
+    parser.add_argument(
+        "--layout",
+        choices=(DEFAULT_DEBUG_LAYOUT, "cube"),
+        default=DEFAULT_DEBUG_LAYOUT,
+        help="Render as a single rectangle or use the cube tiling path.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = _parse_args()
+    orientation = (
+        Cube.sides()
+        if args.layout == "cube"
+        else Rectangle.with_layout(columns=1, rows=1)
+    )
+    from heart.device.local import LocalScreen
+
+    device = LocalScreen(width=args.width, height=args.height, orientation=orientation)
+    container = build_runtime_container(device=device)
+    peripheral_manager = container.resolve(PeripheralManager)
+    peripheral_runtime = container.resolve(PeripheralRuntime)
+    display = container.resolve(DisplayContext)
+    runtime = FractalRuntime(device=device)
+
+    logger.info(
+        "Starting standalone three-fractal debug window width=%s height=%s layout=%s fps=%s",
+        args.width,
+        args.height,
+        args.layout,
+        args.fps,
+    )
+
+    display.initialize()
+    display.configure_window(DeviceDisplayMode.OPENGL)
+    peripheral_manager.detect()
+    peripheral_manager.start()
+
+    running = True
+    try:
+        runtime.initialize(
+            window=display,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+            peripheral_runtime.tick()
+            runtime.real_process(window=display, orientation=orientation)
+            pygame.display.flip()
+            if display.clock is None:
+                raise RuntimeError("Standalone fractal debug loop did not initialize a clock")
+            display.clock.tick(args.fps)
+            peripheral_runtime.tick()
+        runtime.reset()
+    finally:
+        shutdown.on_next(True)
+        shutdown.on_completed()
+        shutdown.dispose()
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
