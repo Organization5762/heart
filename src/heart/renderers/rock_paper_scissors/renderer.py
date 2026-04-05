@@ -16,11 +16,17 @@ from heart.runtime.display_context import DisplayContext
 
 from .state import RockPaperScissorsPhase, RockPaperScissorsState
 
-DOCUMENTS_ASSET_DIR = Path.home() / "Documents"
-DEFAULT_PAPER_PATH = DOCUMENTS_ASSET_DIR / "Paper.png"
-DEFAULT_ROCK_PATH = DOCUMENTS_ASSET_DIR / "Rock.png"
-DEFAULT_SCISSORS_PATH = DOCUMENTS_ASSET_DIR / "Scissors.png"
-DEFAULT_MIDDLE_PATH = DOCUMENTS_ASSET_DIR / "Middle.png"
+_DEFAULT_RPS_DIR = "rock_paper_scissors"
+
+
+def _default_rps_path(filename: str) -> Path:
+    return Loader.resolve_path(f"{_DEFAULT_RPS_DIR}/{filename}")
+
+
+DEFAULT_PAPER_PATH = _default_rps_path("Paper.png")
+DEFAULT_ROCK_PATH = _default_rps_path("Rock.png")
+DEFAULT_SCISSORS_PATH = _default_rps_path("Scissors.png")
+DEFAULT_MIDDLE_PATH = _default_rps_path("Middle.png")
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 BACKGROUND_COLOR = (0, 0, 0)
 COUNTDOWN_LABELS = ("", "Rock", "Paper", "Scissors")
