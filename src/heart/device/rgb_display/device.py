@@ -6,7 +6,7 @@ from PIL import Image
 from heart.device import Device, Layout, Orientation
 from heart.device.rgb_display.sample_base import SampleBase
 from heart.device.rgb_display.worker import MatrixDisplayWorker
-from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
+from heart.runtime.rendering.constants import RGB_IMAGE_FORMAT
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -65,13 +65,13 @@ class LEDMatrix(Device, SampleBase):
         self.display_mode = mode
 
     def set_screen(self, screen: pygame.Surface) -> None:
-        image_bytes = pygame.image.tostring(screen, RGBA_IMAGE_FORMAT)
+        image_bytes = pygame.image.tostring(screen, RGB_IMAGE_FORMAT)
         image = Image.frombuffer(
-            RGBA_IMAGE_FORMAT,
+            RGB_IMAGE_FORMAT,
             screen.get_size(),
             image_bytes,
             "raw",
-            RGBA_IMAGE_FORMAT,
+            RGB_IMAGE_FORMAT,
             0,
             1,
         )
