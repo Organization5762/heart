@@ -16,6 +16,7 @@ from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
+from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
@@ -31,6 +32,9 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     t_i = int(t)
     val = (Y - 2 * t_i) * (X - 2 - t_i)
     return val
+
+
+PRANAY_SKETCH_MODE_TITLE = "Dolly's\nsketch"
 
 
 def configure(loop: GameLoop) -> None:
@@ -137,6 +141,9 @@ def configure(loop: GameLoop) -> None:
 
     artist_mode = loop.add_mode(ArtistScene.title_scene())
     artist_mode.add_renderer(ArtistScene)
+
+    pranay_mode = loop.add_mode(PRANAY_SKETCH_MODE_TITLE)
+    pranay_mode.add_renderer(PranaySketchRenderer())
 
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(

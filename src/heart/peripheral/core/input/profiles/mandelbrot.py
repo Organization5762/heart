@@ -159,6 +159,7 @@ class MandelbrotControlProfile:
             self._gamepad.button_held(GamepadButton.MINUS),
             self._gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT, 0.0),
             self._gamepad.axis_value(GamepadAxis.TRIGGER_LEFT, 0.0),
+            self._gamepad.dpad_value(),
             self._gamepad.stick_value("left", DEFAULT_GAMEPAD_AXIS_DEAD_ZONE),
             self._gamepad.stick_value("right", MANDELBROT_RIGHT_STICK_DEAD_ZONE),
         )
@@ -449,6 +450,7 @@ class MandelbrotControlProfile:
             button_minus_held,
             trigger_right,
             trigger_left,
+            dpad,
             left_stick,
             right_stick,
         ) = gamepad_state
@@ -466,8 +468,8 @@ class MandelbrotControlProfile:
         move_multiplier = 2.0 if button_b_held else 1.0
 
         return MandelbrotMotionState(
-            move_x=keyboard_move_x + left_stick.x,
-            move_y=keyboard_move_y - left_stick.y,
+            move_x=keyboard_move_x + dpad.x + left_stick.x,
+            move_y=keyboard_move_y - dpad.y - left_stick.y,
             pan_x=right_stick.x,
             pan_y=-right_stick.y,
             move_multiplier=move_multiplier,

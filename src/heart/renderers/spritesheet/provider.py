@@ -9,10 +9,13 @@ from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth)
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
+from heart.utilities.env import Configuration
 from heart.utilities.reactivex_threads import pipe_in_background
 
 
@@ -157,21 +160,34 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             switch_state=switch_state,
         )
 
-    # def _apply_gamepad_input(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
-    #     if self.disable_input:
-    #         return state
+    def _apply_gamepad_input(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
+        if self.disable_input:
+            return state
 
-    #     gamepad = state.gamepad
-    #     if gamepad is None or not gamepad.is_connected():
-    #         return state
+        gamepad = state.gamepad
+        if gamepad is None or not gamepad.is_connected():
+            return state
 
-    #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-    #     duration_scale = state.duration_scale
-    #     if gamepad.axis_passed_threshold(mapping.AXIS_R):
-    #         duration_scale += 0.005
-    #     elif gamepad.axis_passed_threshold(mapping.AXIS_L):
-    #         duration_scale -= 0.005
-    #     return replace(state, duration_scale=duration_scale)
+        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        duration_scale = state.duration_scale
+        accelerate = False
+        decelerate = False
+
+        try:
+            accelerate = bool(gamepad.is_held(mapping.BUTTON_PLUS)) or bool(
+                gamepad.axis_passed_threshold(mapping.AXIS_R)
+            )
+            decelerate = bool(gamepad.is_held(mapping.BUTTON_MINUS)) or bool(
+                gamepad.axis_passed_threshold(mapping.AXIS_L)
+            )
+        except Exception:
+            return state
+
+        if accelerate and not decelerate:
+            duration_scale += 0.005
+        elif decelerate and not accelerate:
+            duration_scale -= 0.005
+        return replace(state, duration_scale=duration_scale)
 
     def _next_frame(
         self,
@@ -241,7 +257,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     def advance(
         self, state: SpritesheetLoopState, *, elapsed_ms: float
     ) -> SpritesheetLoopState:
-        # state = self._apply_gamepad_input(state)
+        state = self._apply_gamepad_input(state)
 
         current_kf = self.frames[state.phase][state.current_frame]
         if self.disable_input:

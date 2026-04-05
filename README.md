@@ -23,13 +23,17 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```
 3. Launch the default playlist:
    ```bash
-   uv run totem run --configuration lib_2025
+   make run
    ```
 4. Launch the default playlist with the Beats UI attached:
    ```bash
    uv run totem run-beats --configuration lib_2025
    ```
-5. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
+5. Launch a different playlist:
+   ```bash
+   make run RUN_CONFIGURATION=your_configuration
+   ```
+6. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
 ## Command-Line Interfaces
 | Command | Purpose |
@@ -63,6 +67,7 @@ See the following references for deeper analysis:
 
 ## Development Workflow
 - `make install` sets up the editable package and dev extras using `uv`.
+- `make run` starts `uv run totem run --configuration lib_2025`; override with `RUN_CONFIGURATION=<name>`.
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.

@@ -120,7 +120,10 @@ class FakeSwitch(BaseSwitch):
         )
 
     def run(self) -> None:
-        if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
+        if (
+            Configuration.use_mock_switch()
+            or not (Configuration.is_pi() and not Configuration.is_x11_forward())
+        ):
             from heart.runtime.game_loop import GameLoop
 
             loop = GameLoop.get_game_loop()
