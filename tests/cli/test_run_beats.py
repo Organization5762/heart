@@ -11,13 +11,15 @@ from typer.testing import CliRunner
 
 from heart import loop
 from heart.cli.commands import run as run_module
-from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
-                                          FORWARD_TO_BEATS_ENV_VAR,
-                                          build_beats_env,
-                                          build_beats_websocket_url,
-                                          build_totem_run_command,
-                                          ensure_beats_dependencies,
-                                          resolve_beats_workspace)
+from heart.cli.commands.run_beats import (
+    BEATS_WEBSOCKET_ENV_VAR,
+    FORWARD_TO_BEATS_ENV_VAR,
+    build_beats_env,
+    build_beats_websocket_url,
+    build_totem_run_command,
+    ensure_beats_dependencies,
+    resolve_beats_workspace,
+)
 
 runner = CliRunner()
 
@@ -80,7 +82,9 @@ class TestEnsureBeatsDependencies:
         beats_workspace = tmp_path / "beats"
         (beats_workspace / "node_modules").mkdir(parents=True)
 
-        def _unexpected_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        def _unexpected_run(
+            *args: object, **kwargs: object
+        ) -> subprocess.CompletedProcess[bytes]:
             raise AssertionError("npm install should not run when node_modules exists")
 
         monkeypatch.setattr(subprocess, "run", _unexpected_run)
@@ -208,7 +212,9 @@ class TestRunCommandWithBeats:
         )
 
         def _unexpected_run_beats_command(**kwargs: object) -> None:
-            raise AssertionError("run_beats_command should not execute without --with-beats")
+            raise AssertionError(
+                "run_beats_command should not execute without --with-beats"
+            )
 
         monkeypatch.setattr(
             "heart.cli.commands.run_beats.run_beats_command",
@@ -216,6 +222,51 @@ class TestRunCommandWithBeats:
         )
 
         run_module.run_command()
+
+    def test_run_command_uses_configuration_override_env_var(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the runtime honors the top-level configuration override so service restarts can temporarily boot a development mode without changing the command line."""
+
+        resolver = _FakeResolver()
+        monkeypatch.setattr(
+            run_module,
+            "build_game_loop_container",
+            lambda *, x11_forward: resolver,
+        )
+        monkeypatch.setenv(
+            run_module.CONFIGURATION_OVERRIDE_ENV_VAR,
+            "rubiks_connected_x_visualizer",
+        )
+
+        run_module.run_command()
+
+        assert resolver._registry.last_requested_configuration == (
+            "rubiks_connected_x_visualizer"
+        )
+
+    def test_run_command_forwards_configuration_override_to_beats(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the Beats launcher receives the same configuration override so direct and UI-backed sessions stay aligned during temporary development overrides."""
+
+        recorded_call: dict[str, object] = {}
+
+        def _fake_run_beats_command(**kwargs: object) -> None:
+            recorded_call.update(kwargs)
+
+        monkeypatch.setenv(
+            run_module.CONFIGURATION_OVERRIDE_ENV_VAR,
+            "rubiks_connected_x_visualizer",
+        )
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_beats_command",
+            _fake_run_beats_command,
+        )
+
+        run_module.run_command(with_beats=True)
+
+        assert recorded_call["configuration"] == "rubiks_connected_x_visualizer"
 
 
 class _FakeResolver:
@@ -236,8 +287,11 @@ class _FakeResolver:
 class _FakeConfigurationRegistry:
     """Stub configuration registry that returns a no-op configuration callback."""
 
+    def __init__(self) -> None:
+        self.last_requested_configuration: str | None = None
+
     def get(self, configuration: str) -> object:
-        assert configuration == "lib_2025"
+        self.last_requested_configuration = configuration
         return lambda loop: None
 
 

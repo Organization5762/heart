@@ -11,6 +11,7 @@ from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+FRAME_LOG_INTERVAL = 120
 
 
 class LEDMatrix(Device, SampleBase):
@@ -49,8 +50,17 @@ class LEDMatrix(Device, SampleBase):
         # I hate this option.
         options.drop_privileges = False
 
+        logger.info(
+            "Initializing LEDMatrix rows=%s cols=%s chain_length=%s parallel=%s full_size=%s",
+            options.rows,
+            options.cols,
+            options.chain_length,
+            options.parallel,
+            self.full_display_size(),
+        )
         self.matrix = RGBMatrix(options=options)
         self.worker = MatrixDisplayWorker(self.matrix)
+        self._frames_sent = 0
 
     def layout(self) -> Layout:
         return Layout(columns=self.chain_length, rows=self.parallel)
@@ -65,6 +75,15 @@ class LEDMatrix(Device, SampleBase):
         self.display_mode = mode
 
     def set_screen(self, screen: pygame.Surface) -> None:
+        self._frames_sent += 1
+        if self._frames_sent == 1 or self._frames_sent % FRAME_LOG_INTERVAL == 0:
+            average_color = pygame.transform.average_color(screen)
+            logger.info(
+                "Sending matrix frame #%s size=%s avg_rgba=%s",
+                self._frames_sent,
+                screen.get_size(),
+                average_color,
+            )
         image_bytes = pygame.image.tostring(screen, RGB_IMAGE_FORMAT)
         image = Image.frombuffer(
             RGB_IMAGE_FORMAT,
