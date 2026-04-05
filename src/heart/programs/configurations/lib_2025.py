@@ -147,7 +147,6 @@ def configure(loop: GameLoop) -> None:
 
     pranay_mode = loop.add_mode(PRANAY_SKETCH_MODE_TITLE)
     pranay_mode.add_renderer(PranaySketchRenderer())
-
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(
         MultiScene(

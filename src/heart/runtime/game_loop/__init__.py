@@ -237,13 +237,16 @@ class GameLoop:
             )
 
     def _initialize_screen(self) -> None:
+        logger.info("Initializing display surfaces.")
         if (
             self.components.display.screen is None
             or self.components.display.clock is None
         ):
             self.components.display.initialize()
+        logger.info("Binding initialized display surfaces to the device.")
         self.set_screen(self.components.display.screen)
         self.set_clock(self.components.display.clock)
+        logger.info("Display surfaces are ready.")
 
     def ensure_screen_initialized(self) -> None:
         if (
@@ -253,9 +256,13 @@ class GameLoop:
             self._initialize_screen()
 
     def _initialize(self) -> None:
+        logger.info("Registering active GameLoop instance.")
         self._set_singleton()
+        logger.info("Preparing display initialization.")
         self._initialize_screen()
+        logger.info("Preparing peripheral detection.")
         self.components.peripheral_runtime.detect_and_start()
+        logger.info("Peripheral detection complete.")
         self.initialized = True
 
     def _dim_display(self) -> None:

@@ -9,11 +9,14 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.run import (DEFAULT_ADD_LOW_POWER_MODE,
-                                    DEFAULT_BEATS_WORKSPACE,
-                                    DEFAULT_CONFIGURATION,
-                                    DEFAULT_INSTALL_BEATS_DEPS,
-                                    DEFAULT_X11_FORWARD)
+from heart.cli.commands.run import (
+    DEFAULT_ADD_LOW_POWER_MODE,
+    DEFAULT_BEATS_WORKSPACE,
+    DEFAULT_CONFIGURATION,
+    DEFAULT_INSTALL_BEATS_DEPS,
+    DEFAULT_X11_FORWARD,
+    resolve_configuration_name,
+)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,7 +29,9 @@ PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5.0
 
 
 def run_beats_command(
-    configuration: Annotated[str, typer.Option("--configuration")] = DEFAULT_CONFIGURATION,
+    configuration: Annotated[
+        str, typer.Option("--configuration")
+    ] = DEFAULT_CONFIGURATION,
     add_low_power_mode: bool = typer.Option(
         DEFAULT_ADD_LOW_POWER_MODE,
         "--add-low-power-mode",
@@ -42,8 +47,11 @@ def run_beats_command(
         "--install-beats-deps/--no-install-beats-deps",
         help="Install Beats node dependencies when node_modules is missing.",
     ),
-    beats_workspace: Annotated[Path, typer.Option("--beats-workspace")] = DEFAULT_BEATS_WORKSPACE,
+    beats_workspace: Annotated[
+        Path, typer.Option("--beats-workspace")
+    ] = DEFAULT_BEATS_WORKSPACE,
 ) -> None:
+    configuration = resolve_configuration_name(configuration)
     repo_root = resolve_repo_root()
     resolved_beats_workspace = resolve_beats_workspace(repo_root, beats_workspace)
     validate_beats_workspace(resolved_beats_workspace)
