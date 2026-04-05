@@ -154,7 +154,7 @@ class Gamepad(Peripheral[Any]):
 
         try:
             self._dpad_curr_frame = self.joystick.get_hat(0)
-        except:
+        except Exception:
             pass
 
         for button_id in range(self.num_buttons):

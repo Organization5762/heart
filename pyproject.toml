@@ -79,7 +79,7 @@ heart-firmware-io = { path = "./packages/heart-firmware-io" }
 heart-rust = { path = "./rust/heart_rust" }
 
 [tool.setuptools.package-data]
-heart = ["*.png"]
+heart = ["*.png", "**/*.png"]
 
 [project.scripts]
 totem = "heart.loop:main"

@@ -18,6 +18,7 @@ from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.random_pixel import RandomPixel
+from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
@@ -79,6 +80,8 @@ def configure(loop: GameLoop) -> None:
         )
     )
     mario_mode.add_renderer(MarioRenderer)
+
+    add_rock_paper_scissors_mode(loop, randomness=randomness)
 
     def multicolor_renderer() -> MulticolorRenderer:
         return loop.resolve(MulticolorRenderer)
