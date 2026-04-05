@@ -11,6 +11,8 @@ import serial.tools.list_ports
 import typer
 from heart_firmware_io import constants as firmware_constants
 
+from heart.cli.commands.flowtoy_fast_path import (
+    parse_fast_flowtoy_set_mode, send_fast_flowtoy_command_on_handle)
 from heart.peripheral.radio import (FlowToyPattern, SerialRadioDriver,
                                     SerialRadioMessage)
 from heart.utilities.logging import get_logger
@@ -22,12 +24,12 @@ app = typer.Typer(help="Discover and control FlowToy radio bridges.")
 FLOWTOY_DEVICE_NAME = "feather-flowtoy-bridge"
 DEFAULT_DISCOVER_SECONDS = 5.0
 DEFAULT_LISTEN_SECONDS = 30.0
-DEFAULT_COMMAND_REPEAT_COUNT = 5
-DEFAULT_COMMAND_INTERVAL_SECONDS = 0.35
+DEFAULT_COMMAND_REPEAT_COUNT = 1
+DEFAULT_COMMAND_INTERVAL_SECONDS = 0.0
 DEFAULT_ACM_GLOB = "/dev/ttyACM*"
 DEFAULT_USB_GLOB = "/dev/ttyUSB*"
 FLOWTOY_PROTOCOL = "flowtoy"
-DEFAULT_GROUP_OBSERVE_SECONDS = 5.0
+DEFAULT_GROUP_OBSERVE_SECONDS = 0.0
 DEFAULT_BRIGHTNESS_SCAN_STEP = 10
 DEFAULT_BRIGHTNESS_SCAN_DELAY_SECONDS = 1.0
 FLOWTOY_LFO_ACTIVE_BIT = 1 << 0
@@ -121,6 +123,8 @@ def _detect_bridges(port: str | None = None) -> list[FlowToyBridge]:
 
 
 def _require_bridges(port: str | None = None) -> list[FlowToyBridge]:
+    if port is not None:
+        return [FlowToyBridge(port=port, mode="transmit-receive")]
     bridges = _detect_bridges(port)
     if bridges:
         return bridges
@@ -129,6 +133,8 @@ def _require_bridges(port: str | None = None) -> list[FlowToyBridge]:
 
 
 def _resolve_transmit_bridge(port: str | None = None) -> FlowToyBridge:
+    if port is not None:
+        return FlowToyBridge(port=port, mode="transmit-receive")
     bridges = _require_bridges(port)
     for bridge in bridges:
         if bridge.mode == "transmit-receive":
@@ -484,7 +490,7 @@ def set_mode_command(
     ] = DEFAULT_BRIGHTNESS_SCAN_DELAY_SECONDS,
     observe_seconds: Annotated[
         float,
-        typer.Option("--observe-seconds", min=0.1, help="How long to observe the group before reusing its sync state."),
+        typer.Option("--observe-seconds", min=0.0, help="How long to observe the group before reusing its sync state."),
     ] = DEFAULT_GROUP_OBSERVE_SECONDS,
     port: Annotated[
         str | None,
@@ -523,12 +529,16 @@ def set_mode_command(
 
     decoded: dict[str, Any] | None = None
     if page is None or mode is None:
+        if observe_seconds <= 0:
+            raise typer.BadParameter(
+                "Provide --page and --mode, or set --observe-seconds to a positive value"
+            )
         decoded = _observe_group_state(
             bridge,
             group_id=group_id,
             seconds=observe_seconds,
         )
-    else:
+    elif observe_seconds > 0:
         decoded = _observe_group_state(
             bridge,
             group_id=group_id,
@@ -623,3 +633,60 @@ def set_mode_command(
         f"brightness={pattern.brightness}, speed={pattern.speed}, "
         f"density={pattern.density})."
     )
+
+
+@app.command("shell")
+def shell_command(
+    port: Annotated[
+        str | None,
+        typer.Option("--port", help="Specific transmit bridge port."),
+    ] = None,
+) -> None:
+    """Open an interactive FlowToy command shell with a persistent serial handle."""
+
+    import serial
+
+    bridge = _resolve_transmit_bridge(port)
+    typer.echo(f"FlowToy shell on {bridge.port}. Type 'exit' to quit.")
+    typer.echo("Use raw commands like 'p2575,0,5,8,0,0,80,0,0,0,0,0,0'")
+    typer.echo("or 'set-mode --group-id 2575 --page 1 --mode 6 --brightness 80'.")
+
+    with serial.Serial(bridge.port, 115200, timeout=1) as handle:
+        while True:
+            try:
+                line = typer.prompt("flowtoy", prompt_suffix="> ", default="", show_default=False)
+            except (EOFError, KeyboardInterrupt):
+                typer.echo("")
+                break
+
+            command_text = line.strip()
+            if not command_text:
+                continue
+            if command_text in {"exit", "quit"}:
+                break
+            if command_text == "help":
+                typer.echo("Raw command example: p2575,0,5,8,0,0,80,0,0,0,0,0,0")
+                typer.echo(
+                    "Set-mode example: set-mode --group-id 2575 --page 1 --mode 6 --brightness 80"
+                )
+                continue
+
+            if command_text.startswith("set-mode "):
+                try:
+                    fast_command = parse_fast_flowtoy_set_mode(
+                        ("flowtoy " + command_text + f" --port {bridge.port}").split()
+                    )
+                except ValueError as error:
+                    typer.echo(f"Error: {error}")
+                    continue
+                if fast_command is None:
+                    typer.echo(
+                        "Error: shell set-mode supports explicit --group-id/--page/--mode and direct override flags only."
+                    )
+                    continue
+                send_fast_flowtoy_command_on_handle(handle, fast_command.command)
+                typer.echo(fast_command.summary)
+                continue
+
+            send_fast_flowtoy_command_on_handle(handle, command_text)
+            typer.echo(f"Sent {command_text} on {bridge.port}.")
