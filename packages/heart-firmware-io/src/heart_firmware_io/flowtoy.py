@@ -1,15 +1,20 @@
-"""Helpers for recognizing and decoding FlowToy RF payloads."""
+"""Helpers for recognizing, decoding, and updating FlowToy RF payloads."""
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 FLOWTOY_SYNC_PACKET_SIZE = 21
 FLOWTOY_SCHEMA = "flowtoy.sync.v1"
+FLOWTOY_HUE_OFFSET = 10
+FLOWTOY_SATURATION_OFFSET = 11
+FLOWTOY_BRIGHTNESS_OFFSET = 12
+FLOWTOY_SPEED_OFFSET = 13
+FLOWTOY_DENSITY_OFFSET = 14
 FLOWTOY_FLAGS_OFFSET = 15
 FLOWTOY_RESERVED_OFFSET = 16
 FLOWTOY_PAGE_OFFSET = 18
@@ -33,7 +38,7 @@ def _documented_modes_by_key() -> dict[tuple[int, int], dict[str, Any]]:
 
 
 def normalize_payload(
-    payload: bytes | bytearray | memoryview | Sequence[int],
+    payload: bytes | bytearray | memoryview | Iterable[int],
 ) -> bytes:
     """Normalize a payload into raw bytes."""
 
@@ -49,7 +54,7 @@ def normalize_payload(
 
 
 def looks_like_sync_packet(
-    payload: bytes | bytearray | memoryview | Sequence[int],
+    payload: bytes | bytearray | memoryview | Iterable[int],
 ) -> bool:
     """Return ``True`` when *payload* matches the known FlowToy packet shape."""
 
@@ -58,7 +63,7 @@ def looks_like_sync_packet(
 
 
 def decode_group_id(
-    payload: bytes | bytearray | memoryview | Sequence[int],
+    payload: bytes | bytearray | memoryview | Iterable[int],
 ) -> int:
     """Decode the byte-swapped group identifier from *payload*."""
 
@@ -99,7 +104,7 @@ def documented_mode_metadata(
 
 
 def decode_sync_packet(
-    payload: bytes | bytearray | memoryview | Sequence[int],
+    payload: bytes | bytearray | memoryview | Iterable[int],
 ) -> dict[str, Any]:
     """Decode a FlowToy sync packet into a structured mapping."""
 
@@ -118,11 +123,11 @@ def decode_sync_packet(
         "padding": int.from_bytes(packet[2:6], byteorder="little", signed=False),
         "lfo": [int(value) for value in packet[6:10]],
         "global": {
-            "hue": packet[10],
-            "saturation": packet[11],
-            "brightness": packet[12],
-            "speed": packet[13],
-            "density": packet[14],
+            "hue": packet[FLOWTOY_HUE_OFFSET],
+            "saturation": packet[FLOWTOY_SATURATION_OFFSET],
+            "brightness": packet[FLOWTOY_BRIGHTNESS_OFFSET],
+            "speed": packet[FLOWTOY_SPEED_OFFSET],
+            "density": packet[FLOWTOY_DENSITY_OFFSET],
         },
         "active_flags": {
             "lfo": bool(radio_flags & (1 << 0)),
@@ -149,8 +154,25 @@ def decode_sync_packet(
     }
 
 
+def update_sync_packet_brightness(
+    payload: bytes | bytearray | memoryview | Iterable[int],
+    *,
+    brightness: int,
+) -> bytes:
+    """Return *payload* with the FlowToy sync-packet brightness byte updated."""
+
+    if not 0 <= int(brightness) <= 0xFF:
+        raise ValueError("Brightness must fit in one byte")
+
+    packet = bytearray(normalize_payload(payload))
+    if not looks_like_sync_packet(packet):
+        raise ValueError("Payload does not match the known FlowToy sync packet shape")
+    packet[FLOWTOY_BRIGHTNESS_OFFSET] = int(brightness)
+    return bytes(packet)
+
+
 def decode_if_matching(
-    payload: bytes | bytearray | memoryview | Sequence[int],
+    payload: bytes | bytearray | memoryview | Iterable[int],
 ) -> Mapping[str, Any] | None:
     """Decode *payload* when it matches the FlowToy packet schema."""
 

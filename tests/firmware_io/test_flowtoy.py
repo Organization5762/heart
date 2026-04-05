@@ -149,3 +149,15 @@ class TestFirmwareIoFlowToy:
         assert decoded["group_id"] == 1
         assert decoded["page"] == 2
         assert decoded["mode"] == 7
+
+    def test_update_sync_packet_brightness_accepts_iterators(self) -> None:
+        """Verify iterator-backed payloads can update the brightness byte so streaming packet transforms can adjust FlowToy intensity in flight."""
+        updated_packet = flowtoy.update_sync_packet_brightness(
+            iter(_valid_sync_packet()),
+            brightness=99,
+        )
+
+        decoded = flowtoy.decode_sync_packet(updated_packet)
+
+        assert decoded["global"]["brightness"] == 99
+        assert updated_packet[12] == 99
