@@ -1,7 +1,5 @@
 from enum import StrEnum
 
-import pygame
-
 
 class DeviceDisplayMode(StrEnum):
     MIRRORED = "mirrored"
@@ -9,6 +7,8 @@ class DeviceDisplayMode(StrEnum):
     OPENGL = "opengl"
 
     def to_pygame_mode(self) -> int:
+        import pygame
+
         match self:
             case DeviceDisplayMode.OPENGL:
                 return pygame.OPENGL | pygame.DOUBLEBUF

@@ -7,10 +7,10 @@ from reactivex import operators as ops
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
-from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
-                                                          BitDoLite2Bluetooth)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth)
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
