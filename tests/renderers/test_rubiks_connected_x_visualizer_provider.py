@@ -8,21 +8,15 @@ from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_BASELINE_FACELETS_ENV_VAR,
     RUBIKS_CONNECTED_X_BASELINE_PATH_ENV_VAR,
     RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-    load_rubiks_connected_x_baseline_facelets,
-    RubiksConnectedXMessageType,
-    RubiksConnectedXMove,
-    RubiksConnectedXNotification,
-    RubiksConnectedXParsedMessage,
-)
-from heart.renderers.rubiks_connected_x_visualizer.provider import (
-    RubiksConnectedXVisualizerStateProvider,
-)
-from heart.renderers.rubiks_connected_x_visualizer.state import (
-    RubiksConnectedXVisualizerState,
-)
-from heart.peripheral.rubiks_connected_x_state import apply_rubiks_connected_x_move
-
+    RUBIKS_CONNECTED_X_SOLVED_FACELETS, RubiksConnectedXMessageType,
+    RubiksConnectedXMove, RubiksConnectedXNotification,
+    RubiksConnectedXParsedMessage, load_rubiks_connected_x_baseline_facelets)
+from heart.peripheral.rubiks_connected_x_state import \
+    apply_rubiks_connected_x_move
+from heart.renderers.rubiks_connected_x_visualizer.provider import \
+    RubiksConnectedXVisualizerStateProvider
+from heart.renderers.rubiks_connected_x_visualizer.state import \
+    RubiksConnectedXVisualizerState
 
 SCRAMBLED_BASELINE = apply_rubiks_connected_x_move(
     RUBIKS_CONNECTED_X_SOLVED_FACELETS,
@@ -33,9 +27,25 @@ SCRAMBLED_BASELINE = apply_rubiks_connected_x_move(
 class TestRubiksConnectedXVisualizerStateProvider:
     """Exercise provider recovery paths so cube sync issues can be worked around without the phone app."""
 
-    def test_state_sync_updates_visualizer_when_not_overridden(self) -> None:
+    def test_state_sync_updates_visualizer_when_not_overridden(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+    ) -> None:
         """Verify a full state sync replaces the fallback solved cube so normal BLE sync continues to reflect the cube's reported state."""
 
+        monkeypatch.delenv(
+            RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
+            raising=False,
+        )
+        monkeypatch.delenv(
+            RUBIKS_CONNECTED_X_BASELINE_FACELETS_ENV_VAR,
+            raising=False,
+        )
+        monkeypatch.setenv(
+            RUBIKS_CONNECTED_X_BASELINE_PATH_ENV_VAR,
+            str(tmp_path / "missing-baseline.txt"),
+        )
         provider = RubiksConnectedXVisualizerStateProvider()
         notification = RubiksConnectedXNotification(
             characteristic_uuid="test",
