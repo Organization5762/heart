@@ -1,4 +1,7 @@
 from heart.display.color import Color
+from heart.display.renderers.crabdance import (CrabDanceLaserBackground,
+                                               ControlledCrabDance)
+from heart.display.renderers.badders import BaddersRenderer
 from heart.display.renderers.hilbert_curve import HilbertScene
 from heart.display.renderers.kirby import KirbyScene
 from heart.display.renderers.mandelbrot.scene import MandelbrotMode
@@ -32,6 +35,19 @@ def configure(loop: GameLoop) -> None:
 
     yolisten_mode = loop.add_mode("yo listen")
     yolisten_mode.add_renderer(YoListenRenderer())
+
+    badders_mode = loop.add_mode("badders")
+    badders_mode.add_renderer(BaddersRenderer())
+
+    crabdance_mode = loop.add_mode("crabdance")
+    crabdance_mode.add_title_renderer(
+        CrabDanceLaserBackground(),
+        ControlledCrabDance(image_scale=0.8, offset_y=-2),
+    )
+    crabdance_mode.add_renderer(
+        CrabDanceLaserBackground(),
+        ControlledCrabDance(image_scale=0.92, offset_y=-1),
+    )
 
     mode = loop.add_mode("friend beacon")
 
