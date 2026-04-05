@@ -37,12 +37,16 @@ class _StubGamepad:
     def __init__(self, *, connected: bool = False) -> None:
         self._connected = connected
         self.axis_thresholds: dict[int, bool] = {}
+        self.held_buttons: dict[int, bool] = {}
 
     def is_connected(self) -> bool:
         return self._connected
 
     def axis_passed_threshold(self, axis: int) -> bool:
         return self.axis_thresholds.get(axis, False)
+
+    def is_held(self, button: int) -> bool:
+        return self.held_buttons.get(button, False)
 
 
 class _StubPeripheralManager:
