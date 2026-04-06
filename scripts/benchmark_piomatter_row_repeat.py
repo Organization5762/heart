@@ -46,8 +46,8 @@ DEFAULT_VARIANT = "all"
 DEFAULT_WARMUP_SECONDS = 1.0
 DEFAULT_WIDTH = 64
 DEFAULT_RP1_PIO_PARAM_ROOT = Path("/sys/module/rp1_pio/parameters")
-DEFAULT_BASELINE_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
-DEFAULT_EXPERIMENT_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
+DEFAULT_BASELINE_RP1_PIO_PARAMS = ("tx_mmio_blind=Y",)
+DEFAULT_EXPERIMENT_RP1_PIO_PARAMS = ("tx_mmio_blind=Y",)
 PINOUT_CHOICES = (
     "adafruit-matrix-bonnet",
     "adafruit-matrix-bonnet-bgr",
@@ -203,13 +203,13 @@ def parse_args() -> argparse.Namespace:
         "--baseline-rp1-pio-param",
         action="append",
         default=list(DEFAULT_BASELINE_RP1_PIO_PARAMS),
-        help="RP1 PIO module parameter override for baseline runs, in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
+        help="RP1 PIO module parameter override for baseline runs, in NAME=VALUE form. Defaults to tx_mmio_blind=Y.",
     )
     parser.add_argument(
         "--experiment-rp1-pio-param",
         action="append",
         default=list(DEFAULT_EXPERIMENT_RP1_PIO_PARAMS),
-        help="RP1 PIO module parameter override for experiment runs, in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
+        help="RP1 PIO module parameter override for experiment runs, in NAME=VALUE form. Defaults to tx_mmio_blind=Y.",
     )
     return parser.parse_args()
 
@@ -322,7 +322,7 @@ def main() -> int:
 
     for result in results:
         LOGGER.info(
-            "%s refresh_fps median=%.2f trimmed=%.2f effective_display=%.2f raw_avg=%.2f min=%.2f max=%.2f samples=%s plausible=%s tx_use_mmio=%s tx_mmio_max_words=%s tx_ioctl_coalesce_bytes=%s",
+            "%s refresh_fps median=%.2f trimmed=%.2f effective_display=%.2f raw_avg=%.2f min=%.2f max=%.2f samples=%s plausible=%s tx_mmio_blind=%s",
             result["variant"],
             result["median_refresh_fps"],
             result["trimmed_refresh_fps"],
@@ -332,9 +332,7 @@ def main() -> int:
             result["max_refresh_fps"],
             result["sample_count"],
             result["measurement_plausible"],
-            result.get("tx_use_mmio"),
-            result.get("tx_mmio_max_words"),
-            result.get("tx_ioctl_coalesce_bytes"),
+            result.get("tx_mmio_blind"),
         )
     print(json.dumps(results, indent=2))
     if any(not bool(result["measurement_plausible"]) for result in results):
@@ -707,9 +705,7 @@ result = {{
     "kernel_release": platform.release(),
     "shift_only_ceiling_hz": {shift_only_ceiling_hz},
     "measurement_plausible": trimmed_refresh_fps <= {shift_only_ceiling_hz * DEFAULT_SHIFT_ONLY_PLAUSIBILITY_MARGIN},
-    "tx_use_mmio": read_param("tx_use_mmio"),
-    "tx_mmio_max_words": read_param("tx_mmio_max_words"),
-    "tx_ioctl_coalesce_bytes": read_param("tx_ioctl_coalesce_bytes"),
+    "tx_mmio_blind": read_param("tx_mmio_blind"),
 }}
 del matrix
 gc.collect()

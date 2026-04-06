@@ -4,12 +4,16 @@ pub enum PioOutDest {
     X = 1,
     Y = 2,
     Null = 3,
+    Pindirs = 4,
     Isr = 6,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PioSetDest {
     Pins = 0,
+    X = 1,
+    Y = 2,
+    Pindirs = 4,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,6 +30,7 @@ pub enum PioMovSrc {
     Pins = 0,
     X = 1,
     Y = 2,
+    Null = 3,
     Isr = 6,
     Osr = 7,
 }
@@ -68,6 +73,35 @@ pub struct PioSimulation {
     pub program: Vec<u16>,
     pub steps: Vec<PioTraceStep>,
     pub stalled_on_pull: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MultiPioTraceStep {
+    pub sm: usize,
+    pub cycle_start: u64,
+    pub cycle_end: u64,
+    pub pc: u8,
+    pub instruction: u16,
+    pub delay_cycles: u8,
+    pub sideset_value: u8,
+    pub x: u32,
+    pub y: u32,
+    pub osr: u32,
+    pub osr_bits_available: u8,
+    pub pins: u32,
+    pub pindirs: u32,
+    pub tx_fifo_remaining: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultiPioSimulation {
+    pub programs: Vec<Vec<u16>>,
+    pub steps: Vec<MultiPioTraceStep>,
+    pub final_pins: u32,
+    pub final_pindirs: u32,
+    pub stalled_on_pull: Vec<bool>,
+    pub stalled_on_wait: Vec<bool>,
+    pub deadlocked: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -169,6 +203,7 @@ pub fn simulate_program(
                     out_dest if out_dest == PioOutDest::X as u8 => x = value,
                     out_dest if out_dest == PioOutDest::Y as u8 => y = value,
                     out_dest if out_dest == PioOutDest::Null as u8 => {}
+                    out_dest if out_dest == PioOutDest::Pindirs as u8 => {}
                     out_dest if out_dest == PioOutDest::Isr as u8 => isr = value,
                     _ => {
                         return Err(format!(
@@ -206,28 +241,33 @@ pub fn simulate_program(
                 let dest = ((instruction >> 5) & 0x7) as u8;
                 let op = ((instruction >> 3) & 0x3) as u8;
                 let src = (instruction & 0x7) as u8;
-                if op != 0 {
-                    return Err(format!(
-                        "PIO simulation only supports plain MOV instructions, but saw opcode 0x{instruction:04x}."
-                    ));
-                }
+                let transform = |value: u32| match op {
+                    0 => Ok(value),
+                    1 => Ok(!value),
+                    _ => Err(format!(
+                        "PIO simulation only supports plain and inverted MOV instructions, but saw opcode 0x{instruction:04x}."
+                    )),
+                };
                 match (dest, src) {
+                    (d, s) if d == PioMovDest::X as u8 && s == PioMovSrc::Osr as u8 => {
+                        x = transform(osr)?;
+                    }
                     (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Y as u8 => {}
                     (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Isr as u8 => {
-                        y = isr;
+                        y = transform(isr)?;
                     }
                     (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Osr as u8 => {
-                        y = osr;
+                        y = transform(osr)?;
                     }
                     (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
-                        isr = y;
+                        isr = transform(y)?;
                     }
                     (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::X as u8 => {
                         write_consecutive_pins(
                             &mut pins,
                             config.out_pin_base,
                             config.out_pin_count,
-                            x,
+                            transform(x)?,
                         );
                     }
                     (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Isr as u8 => {
@@ -235,7 +275,7 @@ pub fn simulate_program(
                             &mut pins,
                             config.out_pin_base,
                             config.out_pin_count,
-                            isr,
+                            transform(isr)?,
                         );
                     }
                     (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Osr as u8 => {
@@ -243,7 +283,7 @@ pub fn simulate_program(
                             &mut pins,
                             config.out_pin_base,
                             config.out_pin_count,
-                            osr,
+                            transform(osr)?,
                         );
                     }
                     (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Isr as u8 => {
@@ -251,21 +291,25 @@ pub fn simulate_program(
                             &mut pins,
                             config.out_pin_base,
                             config.out_pin_count,
-                            isr,
+                            transform(isr)?,
                         );
                     }
                     (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::X as u8 => {
-                        isr = x;
+                        isr = transform(x)?;
                     }
                     (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
-                        isr = y;
+                        isr = transform(y)?;
                     }
                     (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::Y as u8 => {
-                        osr = y;
+                        osr = transform(y)?;
                         osr_bits_available = 32;
                     }
                     (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::X as u8 => {
-                        osr = x;
+                        osr = transform(x)?;
+                        osr_bits_available = 32;
+                    }
+                    (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::Null as u8 => {
+                        osr = transform(0)?;
                         osr_bits_available = 32;
                     }
                     _ => {
@@ -278,17 +322,23 @@ pub fn simulate_program(
             7 => {
                 let dest = ((instruction >> 5) & 0x7) as u8;
                 let value = (instruction & 0x1f) as u8;
-                if dest != PioSetDest::Pins as u8 {
-                    return Err(format!(
-                        "PIO simulation does not support SET destination {dest} in opcode 0x{instruction:04x}."
-                    ));
+                match dest {
+                    d if d == PioSetDest::Pins as u8 => {
+                        write_consecutive_pins(
+                            &mut pins,
+                            config.set_pin_base,
+                            config.set_pin_count,
+                            u32::from(value),
+                        );
+                    }
+                    d if d == PioSetDest::X as u8 => x = u32::from(value),
+                    d if d == PioSetDest::Y as u8 => y = u32::from(value),
+                    _ => {
+                        return Err(format!(
+                            "PIO simulation does not support SET destination {dest} in opcode 0x{instruction:04x}."
+                        ));
+                    }
                 }
-                write_consecutive_pins(
-                    &mut pins,
-                    config.set_pin_base,
-                    config.set_pin_count,
-                    u32::from(value),
-                );
             }
             _ => {
                 return Err(format!(
@@ -488,4 +538,377 @@ fn write_consecutive_pins(pins: &mut u32, base: u8, count: u8, value: u32) {
 
 fn pio_encode_instr_and_args(instruction_bits: u16, arg1: u8, arg2: u8) -> u16 {
     instruction_bits | (u16::from(arg1) << 5) | u16::from(arg2)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SmRuntimeState {
+    pc: u8,
+    x: u32,
+    y: u32,
+    osr: u32,
+    osr_bits_available: u8,
+    isr: u32,
+    tx_index: usize,
+    stalled_on_pull: bool,
+    stalled_on_wait: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StepOutcome {
+    Executed(MultiPioTraceStep),
+    StalledOnPull,
+    StalledOnWait,
+}
+
+pub fn simulate_programs(
+    programs: &[&[u16]],
+    configs: &[PioSimulatorConfig],
+    fifo_words: &[&[u32]],
+    initial_pins: u32,
+    initial_pindirs: u32,
+    max_rounds: usize,
+) -> Result<MultiPioSimulation, String> {
+    if programs.len() != configs.len() || programs.len() != fifo_words.len() {
+        return Err("multi-SM simulation requires matching programs, configs, and fifo slices".to_string());
+    }
+    let mut pins = initial_pins;
+    let mut pindirs = initial_pindirs;
+    let mut cycle = 0_u64;
+    let mut steps = Vec::new();
+    let mut sms = vec![
+        SmRuntimeState {
+            pc: 0,
+            x: 0,
+            y: 0,
+            osr: 0,
+            osr_bits_available: 0,
+            isr: 0,
+            tx_index: 0,
+            stalled_on_pull: false,
+            stalled_on_wait: false,
+        };
+        programs.len()
+    ];
+
+    for _ in 0..max_rounds {
+        let mut made_progress = false;
+        for sm in 0..programs.len() {
+            match execute_multi_step(
+                sm,
+                programs[sm],
+                configs[sm],
+                fifo_words[sm],
+                &mut sms[sm],
+                &mut pins,
+                &mut pindirs,
+                &mut cycle,
+            )? {
+                StepOutcome::Executed(step) => {
+                    sms[sm].stalled_on_pull = false;
+                    sms[sm].stalled_on_wait = false;
+                    steps.push(step);
+                    made_progress = true;
+                }
+                StepOutcome::StalledOnPull => {
+                    sms[sm].stalled_on_pull = true;
+                    sms[sm].stalled_on_wait = false;
+                }
+                StepOutcome::StalledOnWait => {
+                    sms[sm].stalled_on_pull = false;
+                    sms[sm].stalled_on_wait = true;
+                }
+            }
+        }
+        if !made_progress {
+            return Ok(MultiPioSimulation {
+                programs: programs.iter().map(|program| program.to_vec()).collect(),
+                steps,
+                final_pins: pins,
+                final_pindirs: pindirs,
+                stalled_on_pull: sms.iter().map(|sm| sm.stalled_on_pull).collect(),
+                stalled_on_wait: sms.iter().map(|sm| sm.stalled_on_wait).collect(),
+                deadlocked: true,
+            });
+        }
+    }
+
+    Err("PIO multi-SM simulation exceeded the maximum round budget before stalling.".to_string())
+}
+
+fn execute_multi_step(
+    sm: usize,
+    program: &[u16],
+    config: PioSimulatorConfig,
+    fifo_words: &[u32],
+    state: &mut SmRuntimeState,
+    pins: &mut u32,
+    pindirs: &mut u32,
+    cycle: &mut u64,
+) -> Result<StepOutcome, String> {
+    let instruction = *program.get(state.pc as usize).ok_or_else(|| {
+        format!(
+            "PIO simulation SM {sm} PC {} ran past program length {}.",
+            state.pc,
+            program.len()
+        )
+    })?;
+    let decoded_sideset = decode_sideset(instruction, config);
+    let mut next_pc = state.pc.wrapping_add(1);
+    let opcode = instruction >> 13;
+
+    match opcode {
+        0 => {
+            let condition = ((instruction >> 5) & 0x7) as u8;
+            let address = (instruction & 0x1f) as u8;
+            let should_jump = match condition {
+                0 => true,
+                1 => state.x == 0,
+                2 => {
+                    let initial = state.x;
+                    state.x = state.x.wrapping_sub(1);
+                    initial != 0
+                }
+                3 => state.y == 0,
+                4 => {
+                    let initial = state.y;
+                    state.y = state.y.wrapping_sub(1);
+                    initial != 0
+                }
+                _ => {
+                    return Err(format!(
+                        "PIO simulation does not support JMP condition {condition} in opcode 0x{instruction:04x}."
+                    ))
+                }
+            };
+            if should_jump {
+                next_pc = address;
+            }
+        }
+        1 => {
+            let source = ((instruction >> 5) & 0x3) as u8;
+            let polarity = ((instruction >> 7) & 0x1) != 0;
+            let index = (instruction & 0x1f) as u8;
+            let condition_met = match source {
+                1 => gpio_is_high(*pins, u32::from(index)) == polarity,
+                _ => {
+                    return Err(format!(
+                        "PIO simulation only supports WAIT PIN, but saw source {source} in opcode 0x{instruction:04x}."
+                    ))
+                }
+            };
+            if !condition_met {
+                return Ok(StepOutcome::StalledOnWait);
+            }
+        }
+        3 => {
+            let dest = ((instruction >> 5) & 0x7) as u8;
+            let count = decode_out_count(instruction);
+            if config.auto_pull && should_autopull(config.pull_threshold, state.osr_bits_available) {
+                match pull_from_fifo(
+                    &mut state.osr,
+                    &mut state.osr_bits_available,
+                    fifo_words,
+                    &mut state.tx_index,
+                ) {
+                    Ok(()) => {}
+                    Err(()) => return Ok(StepOutcome::StalledOnPull),
+                }
+            }
+            let value = shift_out(
+                &mut state.osr,
+                &mut state.osr_bits_available,
+                count,
+                config.out_shift_right,
+            );
+            match dest {
+                out_dest if out_dest == PioOutDest::Pins as u8 => {
+                    let pin_count = count.min(config.out_pin_count);
+                    write_consecutive_pins(pins, config.out_pin_base, pin_count, value);
+                }
+                out_dest if out_dest == PioOutDest::X as u8 => state.x = value,
+                out_dest if out_dest == PioOutDest::Y as u8 => state.y = value,
+                out_dest if out_dest == PioOutDest::Null as u8 => {}
+                out_dest if out_dest == PioOutDest::Pindirs as u8 => {
+                    let pin_count = count.min(config.out_pin_count);
+                    write_consecutive_pins(pindirs, config.out_pin_base, pin_count, value);
+                }
+                out_dest if out_dest == PioOutDest::Isr as u8 => state.isr = value,
+                _ => {
+                    return Err(format!(
+                        "PIO simulation does not support OUT destination {dest} in opcode 0x{instruction:04x}."
+                    ))
+                }
+            }
+        }
+        4 => {
+            let is_pull = ((instruction >> 7) & 0x1) != 0;
+            let if_empty = ((instruction >> 6) & 0x1) != 0;
+            let block = ((instruction >> 5) & 0x1) != 0;
+            if !is_pull {
+                return Err(format!(
+                    "PIO simulation does not support PUSH/RX-FIFO opcodes (0x{instruction:04x})."
+                ));
+            }
+            if if_empty && state.osr_bits_available != 0 {
+            } else if state.tx_index >= fifo_words.len() {
+                if block {
+                    return Ok(StepOutcome::StalledOnPull);
+                }
+                state.osr = 0;
+                state.osr_bits_available = 32;
+            } else {
+                let _ = pull_from_fifo(
+                    &mut state.osr,
+                    &mut state.osr_bits_available,
+                    fifo_words,
+                    &mut state.tx_index,
+                );
+            }
+        }
+        5 => {
+            let dest = ((instruction >> 5) & 0x7) as u8;
+            let op = ((instruction >> 3) & 0x3) as u8;
+            let src = (instruction & 0x7) as u8;
+            let transform = |value: u32| match op {
+                0 => Ok(value),
+                1 => Ok(!value),
+                _ => Err(format!(
+                    "PIO simulation only supports plain and inverted MOV instructions, but saw opcode 0x{instruction:04x}."
+                )),
+            };
+            match (dest, src) {
+                (d, s) if d == PioMovDest::X as u8 && s == PioMovSrc::Osr as u8 => {
+                    state.x = transform(state.osr)?;
+                }
+                (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Y as u8 => {}
+                (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Isr as u8 => {
+                    state.y = transform(state.isr)?;
+                }
+                (d, s) if d == PioMovDest::Y as u8 && s == PioMovSrc::Osr as u8 => {
+                    state.y = transform(state.osr)?;
+                }
+                (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
+                    state.isr = transform(state.y)?;
+                }
+                (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::X as u8 => {
+                    write_consecutive_pins(
+                        pins,
+                        config.out_pin_base,
+                        config.out_pin_count,
+                        transform(state.x)?,
+                    );
+                }
+                (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Isr as u8 => {
+                    write_consecutive_pins(
+                        pins,
+                        config.out_pin_base,
+                        config.out_pin_count,
+                        transform(state.isr)?,
+                    );
+                }
+                (d, s) if d == PioMovDest::Pins as u8 && s == PioMovSrc::Osr as u8 => {
+                    write_consecutive_pins(
+                        pins,
+                        config.out_pin_base,
+                        config.out_pin_count,
+                        transform(state.osr)?,
+                    );
+                }
+                (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::X as u8 => {
+                    state.isr = transform(state.x)?;
+                }
+                (d, s) if d == PioMovDest::Isr as u8 && s == PioMovSrc::Y as u8 => {
+                    state.isr = transform(state.y)?;
+                }
+                (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::Y as u8 => {
+                    state.osr = transform(state.y)?;
+                    state.osr_bits_available = 32;
+                }
+                (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::X as u8 => {
+                    state.osr = transform(state.x)?;
+                    state.osr_bits_available = 32;
+                }
+                (d, s) if d == PioMovDest::Osr as u8 && s == PioMovSrc::Null as u8 => {
+                    state.osr = transform(0)?;
+                    state.osr_bits_available = 32;
+                }
+                _ => {
+                    return Err(format!(
+                        "PIO simulation does not support MOV dest={dest} src={src} in opcode 0x{instruction:04x}."
+                    ));
+                }
+            }
+        }
+        7 => {
+            let dest = ((instruction >> 5) & 0x7) as u8;
+            let value = (instruction & 0x1f) as u8;
+            match dest {
+                d if d == PioSetDest::Pins as u8 => {
+                    write_consecutive_pins(
+                        pins,
+                        config.set_pin_base,
+                        config.set_pin_count,
+                        u32::from(value),
+                    );
+                }
+                d if d == PioSetDest::Pindirs as u8 => {
+                    write_consecutive_pins(
+                        pindirs,
+                        config.set_pin_base,
+                        config.set_pin_count,
+                        u32::from(value),
+                    );
+                }
+                d if d == PioSetDest::X as u8 => state.x = u32::from(value),
+                d if d == PioSetDest::Y as u8 => state.y = u32::from(value),
+                _ => {
+                    return Err(format!(
+                        "PIO simulation does not support SET destination {dest} in opcode 0x{instruction:04x}."
+                    ));
+                }
+            }
+        }
+        _ => {
+            return Err(format!(
+                        "PIO simulation does not support opcode class {opcode} in instruction 0x{instruction:04x}."
+            ));
+        }
+    }
+
+    if decoded_sideset.enabled && config.sideset_count != 0 {
+        write_consecutive_pins(
+            pins,
+            config.sideset_pin_base,
+            decoded_sideset.pin_count,
+            u32::from(decoded_sideset.value),
+        );
+    }
+
+    let cycle_end = (*cycle)
+        .checked_add(1 + u64::from(decoded_sideset.delay_cycles))
+        .ok_or_else(|| "PIO simulation cycle counter overflowed.".to_string())?;
+    let step = MultiPioTraceStep {
+        sm,
+        cycle_start: *cycle,
+        cycle_end,
+        pc: state.pc,
+        instruction,
+        delay_cycles: decoded_sideset.delay_cycles,
+        sideset_value: decoded_sideset.value,
+        x: state.x,
+        y: state.y,
+        osr: state.osr,
+        osr_bits_available: state.osr_bits_available,
+        pins: *pins,
+        pindirs: *pindirs,
+        tx_fifo_remaining: fifo_words.len().saturating_sub(state.tx_index),
+    };
+    *cycle = cycle_end;
+
+    if state.pc == config.wrap && next_pc == state.pc.wrapping_add(1) {
+        next_pc = config.wrap_target;
+    }
+    state.pc = next_pc;
+
+    Ok(StepOutcome::Executed(step))
 }

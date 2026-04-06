@@ -27,7 +27,7 @@ DEFAULT_PATTERN = "rgb-cycle"
 DEFAULT_PINOUT = "adafruit-matrix-bonnet"
 DEFAULT_RESCALE_MODE = "stock"
 DEFAULT_RP1_PIO_PARAM_ROOT = Path("/sys/module/rp1_pio/parameters")
-DEFAULT_RP1_PIO_PARAMS = ("tx_use_mmio=Y",)
+DEFAULT_RP1_PIO_PARAMS = ("tx_mmio_blind=Y",)
 DEFAULT_TARGET_FREQ_HZ = 27_000_000
 DEFAULT_VARIANT = "row-repeat"
 DEFAULT_WIDTH = 64
@@ -118,7 +118,7 @@ def parse_args() -> argparse.Namespace:
         "--rp1-pio-param",
         action="append",
         default=list(DEFAULT_RP1_PIO_PARAMS),
-        help="RP1 PIO module parameter override in NAME=VALUE form. Defaults to tx_use_mmio=Y.",
+        help="RP1 PIO module parameter override in NAME=VALUE form. Defaults to tx_mmio_blind=Y.",
     )
     return parser.parse_args()
 

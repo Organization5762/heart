@@ -10,7 +10,9 @@ pub(crate) struct FrameBuffer {
 
 impl FrameBuffer {
     pub(crate) fn new(frame_len: usize) -> Self {
-        Self { data: vec![0_u8; frame_len] }
+        Self {
+            data: vec![0_u8; frame_len],
+        }
     }
 
     pub(crate) fn as_slice(&self) -> &[u8] {

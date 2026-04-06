@@ -1,0 +1,19 @@
+.program round_robin_out
+
+.wrap_target
+wait 1 irq 0 rel
+
+drain:
+    out x, 1
+    jmp !x emit
+    jmp handoff
+
+emit:
+    out pins, 31
+    jmp drain
+
+handoff:
+    irq clear 0 rel
+    irq 1 rel
+
+.wrap

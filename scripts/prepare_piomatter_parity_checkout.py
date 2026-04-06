@@ -39,6 +39,13 @@ TARGET_FREQ_PATTERN = re.compile(
     r"constexpr double target_freq =\s*\n\s*\d+; // .*"
 )
 MAX_XFER_PATTERN = re.compile(r"constexpr size_t MAX_XFER = \d+;")
+PIOMATTER_THREAD_INCLUDE_PATTERN = re.compile(r'#include <thread>\n')
+PIOMATTER_SCHED_INCLUDE_PATTERN = re.compile(r'#include <sched.h>\n')
+PIO_XFER_HELPER_PATTERN = re.compile(
+    r"static int pio_sm_xfer_data_large\(PIO pio, int sm, int direction, size_t size,\n"
+    r"\s+uint32_t \*databuf\) \{.*?\n\}",
+    re.DOTALL,
+)
 POST_ADDR_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_addr_delay = \d+;")
 POST_LATCH_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_latch_delay = \d+;")
 POST_OE_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_oe_delay = \d+;")
@@ -212,6 +219,7 @@ def main() -> int:
     )
     patch_setup_compile_args(args.checkout / DEFAULT_SETUP_PY_RELATIVE_PATH)
     patch_program_lifecycle(args.checkout / DEFAULT_PIOMATTER_HEADER_RELATIVE_PATH)
+    patch_fifo_mode_support(args.checkout / DEFAULT_PIOMATTER_HEADER_RELATIVE_PATH)
     if args.render_override is not None:
         render_destination = args.checkout / DEFAULT_RENDER_HEADER_RELATIVE_PATH
         copy_render_override(args.render_override, render_destination, args.slab_copies)
@@ -421,6 +429,246 @@ def patch_program_lifecycle(destination: Path) -> None:
 
     destination.write_text(updated_content, encoding="utf-8")
     LOGGER.info("Patched Piomatter program lifecycle in %s", destination)
+
+
+def patch_fifo_mode_support(destination: Path) -> None:
+    content = destination.read_text(encoding="utf-8")
+    updated_content = content
+
+    if '#include <sys/ioctl.h>' not in updated_content:
+        updated_content, include_replacements = PIOMATTER_THREAD_INCLUDE_PATTERN.subn(
+            '#include <thread>\n#include <cerrno>\n#include <cstdlib>\n#include <cstring>\n'
+            '#include <sched.h>\n'
+            '#include "rp1_pio_if.h"\n'
+            '#include <sys/ioctl.h>\n#include <sys/mman.h>\n#include <unistd.h>\n',
+            updated_content,
+            count=1,
+        )
+        if include_replacements != 1:
+            raise ValueError(f"Could not patch Piomatter includes in {destination}")
+    elif '#include "rp1_pio_if.h"' not in updated_content:
+        updated_content, include_replacements = PIOMATTER_SCHED_INCLUDE_PATTERN.subn(
+            '#include <sched.h>\n#include "rp1_pio_if.h"\n',
+            updated_content,
+            count=1,
+        )
+        if include_replacements != 1:
+            raise ValueError(f"Could not patch Piomatter rp1_pio_if include in {destination}")
+
+    replacement = r'''#ifndef PIO_IOC_SM_GET_FIFO_MAP_INFO
+#define PIO_IOC_MAGIC 102
+struct rp1_pio_sm_fifo_state_args {
+    uint16_t sm;
+    uint8_t tx;
+    uint8_t rsvd;
+    uint16_t level;
+    uint8_t empty;
+    uint8_t full;
+};
+struct rp1_pio_sm_clear_fifos_args {
+    uint16_t sm;
+};
+struct rp1_pio_sm_fifo_map_info_args {
+    uint16_t sm;
+    uint16_t dir;
+    uint32_t mmap_offset;
+    uint32_t mmap_bytes;
+    uint32_t fifo_offset;
+    uint32_t reserved;
+};
+#define PIO_IOC_SM_FIFO_STATE _IOW(PIO_IOC_MAGIC, 44, struct rp1_pio_sm_fifo_state_args)
+#define PIO_IOC_SM_DRAIN_TX _IOW(PIO_IOC_MAGIC, 45, struct rp1_pio_sm_clear_fifos_args)
+#define PIO_IOC_SM_GET_FIFO_MAP_INFO _IOWR(PIO_IOC_MAGIC, 58, struct rp1_pio_sm_fifo_map_info_args)
+#define PIO_IOC_SM_TX_FENCE _IOW(PIO_IOC_MAGIC, 59, struct rp1_pio_sm_clear_fifos_args)
+#endif
+
+static int pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size,
+                                  uint32_t *databuf) {
+    enum fifo_mode {
+        FIFO_MODE_DEFAULT = -1,
+        FIFO_MODE_RAW = 0,
+        FIFO_MODE_FENCE,
+        FIFO_MODE_DRAIN,
+        FIFO_MODE_GUARD,
+    };
+
+    struct heart_rp1_pio_handle {
+        pio_instance base;
+        const char *devname;
+        int fd;
+    };
+
+    auto fifo_mode_from_env = []() -> fifo_mode {
+        const char *s = std::getenv("RP1_PIO_FIFO_MODE");
+        if (!s || !*s) {
+            return FIFO_MODE_DEFAULT;
+        }
+        if (std::strcmp(s, "raw") == 0) {
+            return FIFO_MODE_RAW;
+        }
+        if (std::strcmp(s, "fence") == 0) {
+            return FIFO_MODE_FENCE;
+        }
+        if (std::strcmp(s, "drain") == 0) {
+            return FIFO_MODE_DRAIN;
+        }
+        if (std::strcmp(s, "guard") == 0) {
+            return FIFO_MODE_GUARD;
+        }
+        return FIFO_MODE_DEFAULT;
+    };
+
+    auto env_u32 = [](const char *name, unsigned int fallback) -> unsigned int {
+        const char *raw = std::getenv(name);
+        char *end = nullptr;
+        unsigned long parsed;
+        if (!raw || !*raw) {
+            return fallback;
+        }
+        errno = 0;
+        parsed = std::strtoul(raw, &end, 0);
+        if (errno != 0 || !end || *end != 0) {
+            return fallback;
+        }
+        return static_cast<unsigned int>(parsed);
+    };
+
+    auto ioctl_errno = [&](unsigned long request, void *arg) -> int {
+        auto *rp = reinterpret_cast<heart_rp1_pio_handle *>(pio);
+        int r = ioctl(rp->fd, request, arg);
+        return (r < 0) ? -errno : r;
+    };
+
+    auto default_chunked_xfer = [&]() -> int {
+        constexpr size_t MAX_XFER = 262140;
+        while (size) {
+            size_t xfersize = std::min(size_t{MAX_XFER}, size);
+            int r = pio_sm_xfer_data(pio, sm, direction, xfersize, databuf);
+            if (r != 0) {
+                return r;
+            }
+            size -= xfersize;
+            databuf += xfersize / sizeof(*databuf);
+        }
+        return 0;
+    };
+
+    fifo_mode mode = fifo_mode_from_env();
+    if (mode == FIFO_MODE_DEFAULT || direction != PIO_DIR_TO_SM || size == 0 || (size & 3)) {
+        return default_chunked_xfer();
+    }
+
+    static void *fifo_map = MAP_FAILED;
+    static size_t fifo_map_bytes = 0;
+    static uint32_t fifo_offset = 0;
+    static int fifo_map_fd = -1;
+    static int fifo_map_sm = -1;
+    static uint64_t call_count = 0;
+
+    auto *rp = reinterpret_cast<heart_rp1_pio_handle *>(pio);
+    if (fifo_map == MAP_FAILED || fifo_map_fd != rp->fd || fifo_map_sm != sm) {
+        struct rp1_pio_sm_fifo_map_info_args info = {};
+        info.sm = static_cast<uint16_t>(sm);
+        info.dir = static_cast<uint16_t>(PIO_DIR_TO_SM);
+        int r = ioctl_errno(PIO_IOC_SM_GET_FIFO_MAP_INFO, &info);
+        if (r < 0) {
+            return default_chunked_xfer();
+        }
+        if (fifo_map != MAP_FAILED) {
+            (void)munmap(fifo_map, fifo_map_bytes);
+        }
+        fifo_map = mmap(NULL, info.mmap_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, rp->fd, info.mmap_offset);
+        if (fifo_map == MAP_FAILED) {
+            fifo_map_bytes = 0;
+            fifo_offset = 0;
+            fifo_map_fd = -1;
+            fifo_map_sm = -1;
+            return default_chunked_xfer();
+        }
+        fifo_map_bytes = info.mmap_bytes;
+        fifo_offset = info.fifo_offset;
+        fifo_map_fd = rp->fd;
+        fifo_map_sm = sm;
+    }
+
+    volatile uint32_t *fifo = reinterpret_cast<volatile uint32_t *>(
+        reinterpret_cast<uint8_t *>(fifo_map) + fifo_offset);
+    const uint32_t *words = databuf;
+    size_t word_count = size / sizeof(*databuf);
+
+    if (mode == FIFO_MODE_GUARD) {
+        unsigned int guard_max_words =
+            env_u32("RP1_PIO_FIFO_GUARD_MAX_WORDS", 8U);
+        unsigned int guard_poll_usec =
+            env_u32("RP1_PIO_FIFO_GUARD_POLL_USEC", 0U);
+        size_t idx = 0;
+        if (!guard_max_words) {
+            guard_max_words = 8U;
+        }
+        while (idx < word_count) {
+            struct rp1_pio_sm_fifo_state_args state = {};
+            state.sm = static_cast<uint16_t>(sm);
+            state.tx = 1;
+            int r = ioctl_errno(PIO_IOC_SM_FIFO_STATE, &state);
+            if (r < 0) {
+                return r;
+            }
+            unsigned int free_words = 8U - state.level;
+            if (!free_words) {
+                if (guard_poll_usec) {
+                    usleep(guard_poll_usec);
+                } else {
+                    sched_yield();
+                }
+                continue;
+            }
+            if (free_words > guard_max_words) {
+                free_words = guard_max_words;
+            }
+            size_t burst = word_count - idx;
+            if (burst > free_words) {
+                burst = free_words;
+            }
+            while (burst--) {
+                *fifo = words[idx++];
+            }
+        }
+    } else {
+        for (size_t i = 0; i < word_count; ++i) {
+            *fifo = words[i];
+        }
+    }
+
+    call_count++;
+    unsigned int sync_every_calls =
+        env_u32("RP1_PIO_FIFO_SYNC_EVERY_CALLS", 1U);
+    if (sync_every_calls && (call_count % sync_every_calls) == 0) {
+        struct rp1_pio_sm_clear_fifos_args args = {};
+        args.sm = static_cast<uint16_t>(sm);
+        if (mode == FIFO_MODE_FENCE) {
+            int r = ioctl_errno(PIO_IOC_SM_TX_FENCE, &args);
+            if (r < 0) {
+                return r;
+            }
+        } else if (mode == FIFO_MODE_DRAIN) {
+            int r = ioctl_errno(PIO_IOC_SM_DRAIN_TX, &args);
+            if (r < 0) {
+                return r;
+            }
+        }
+    }
+    return 0;
+}'''
+    updated_content, helper_replacements = PIO_XFER_HELPER_PATTERN.subn(
+        replacement,
+        updated_content,
+        count=1,
+    )
+    if helper_replacements != 1:
+        raise ValueError(f"Could not patch Piomatter FIFO mode support in {destination}")
+
+    destination.write_text(updated_content, encoding="utf-8")
+    LOGGER.info("Patched Piomatter FIFO mode support in %s", destination)
 
 
 if __name__ == "__main__":
