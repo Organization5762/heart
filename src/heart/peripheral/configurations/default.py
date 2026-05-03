@@ -6,7 +6,6 @@ from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configurations import (_detect_drawing_pads,
                                              _detect_gamepads,
                                              _detect_heart_rate_sensor,
-                                             _detect_microphones,
                                              _detect_phone_text,
                                              _detect_sensors, _detect_switches,
                                              _detect_uwb_position,
@@ -22,7 +21,6 @@ def configure() -> PeripheralConfiguration:
         _detect_gamepads,
         _detect_heart_rate_sensor,
         _detect_phone_text,
-        _detect_microphones,
         _detect_drawing_pads,
         _detect_uwb_position
     )
