@@ -5,10 +5,13 @@ from collections.abc import Iterator
 from manyfold import Graph
 
 from heart.peripheral.configurations import (_accelerometer_detection_node,
+                                             _detect_heart_rate_sensor,
                                              _detect_radios,
+                                             _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
                                              _microphone_detection_node,
                                              _radio_detection_node)
+from heart.peripheral.configurations.default import configure
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
 from heart.peripheral.microphone import (Microphone,
                                          microphone_detection_route,
@@ -233,3 +236,13 @@ class TestManyfoldMicrophoneConfiguration:
         assert latest_level is not None
         assert latest_level.value.event_type == MicrophoneLevel.EVENT_TYPE
         assert latest_level.value.data["rms"] == 0.5
+
+
+class TestManyfoldHeartRateConfiguration:
+    """Cover default graph-node factories so ANT+ heart-rate streams stay Manyfold-owned."""
+
+    def test_default_configuration_moves_heart_rate_to_graph_node(self) -> None:
+        configuration = configure()
+
+        assert _heart_rate_detection_node in configuration.graph_nodes
+        assert _detect_heart_rate_sensor not in configuration.detectors
