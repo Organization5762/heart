@@ -100,7 +100,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             peripheral_manager=peripheral_manager
         )
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         if self.disable_input:
             switch_updates = empty_node()
@@ -110,19 +110,19 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                 lambda switch_state: (
                     lambda state: self.handle_switch(state, switch_state)
                 )
-            ).share()
+            )
         tick_updates = frame_ticks.map(
             lambda frame_tick: (
                 lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
             )
-        ).share()
+        )
         return (
             MergeNode.merge(switch_updates, tick_updates)
             .scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
             .do_action(self._remember_state)
-            .share()
-            .share()
+
+
         )
 
     def _remember_state(self, state: SpritesheetLoopState) -> None:

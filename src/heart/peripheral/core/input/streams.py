@@ -10,11 +10,11 @@ U = TypeVar("U")
 
 
 def map_stream(source: StreamNode[T], mapper: Callable[[T], U]) -> StreamNode[U]:
-    return source.map(mapper).share()
+    return source.map(mapper)
 
 
 def merge_streams(*streams: StreamNode[T]) -> StreamNode[T]:
-    return MergeNode.merge(*streams).share()
+    return MergeNode.merge(*streams)
 
 
 def threshold_direction(value: float, threshold: float) -> int:

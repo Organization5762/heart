@@ -22,7 +22,7 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
         result = (
             MergeNode.merge(*main_switches)
             .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
-            .share()
+
         )
         return result
 

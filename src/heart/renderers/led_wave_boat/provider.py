@@ -38,21 +38,21 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
             self._peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_size())
             .distinct_until_changed()
-            .share()
-            .share()
+
+
         )
         frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable().share().share()
+            self._peripheral_manager.frame_tick_controller.observable()
         )
         if self._accelerometer_debug_profile.should_use_debug_input():
             acceleration_source = self._accelerometer_debug_profile.node()
         else:
             acceleration_source = self._accelerometer_controller.node()
-        accelerations = acceleration_source.start_with(None).share()
+        accelerations = acceleration_source.start_with(None)
         frame_inputs = (
             frame_ticks.with_latest_from(window_sizes, accelerations)
             .map(self._to_frame_input)
-            .share()
+
         )
         initial_state = self._initial_state()
         return (
@@ -61,7 +61,7 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-            .share()
+
         )
 
     @staticmethod

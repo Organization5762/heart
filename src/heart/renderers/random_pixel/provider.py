@@ -38,17 +38,17 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()
         )
-        color_updates = self._color.map(lambda color: ("color", color)).share()
+        color_updates = self._color.map(lambda color: ("color", color))
         tick_updates = (
             self._peripheral_manager.frame_tick_controller.observable()
             .map(lambda _: ("tick", None))
-            .share()
+
         )
         return (
             MergeNode.merge(color_updates, tick_updates)
             .scan(self._advance_state, seed=initial_state)
-            .share()
-            .share()
+
+
         )
 
     def set_color(self, color: Color | None) -> None:

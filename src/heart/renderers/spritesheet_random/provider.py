@@ -52,26 +52,26 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[SpritesheetLoopRandomState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         switches = peripheral_manager.get_main_switch_subscription()
         switch_updates = switches.map(
             lambda switch_state: (
                 lambda state: self.handle_switch_state(state, switch_state)
             )
-        ).share()
+        )
         tick_updates = frame_ticks.map(
             lambda latest: (
                 lambda state: self.next_state(state=state, elapsed_ms=latest.delta_ms)
             )
-        ).share()
+        )
         initial_state = self.initial_state()
         return (
             MergeNode.merge(switch_updates, tick_updates)
             .scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def handle_switch_state(

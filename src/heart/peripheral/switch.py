@@ -8,8 +8,9 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, Self
 
 import serial
 from bleak.backends.device import BLEDevice
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
+from manyfold import (CallbackObservable, CallbackSubscription, DetectionNode,
+                      Graph, Layer, ManagedGraphNode, ManagedGraphNodeHandle,
+                      NoopSubscription, OwnerName, Plane, RoutePipeline,
                       Schema, StreamFamily, StreamName, StreamNode, Timer,
                       TypedRoute, Variant, route)
 from manyfold.graph import ObserverLike, SubscriptionLike
@@ -22,9 +23,6 @@ from heart.peripheral.core import (Peripheral, PeripheralEventNode,
                                    PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.nodes import empty_node
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 CallbackSubscription,
-                                                 NoopSubscription)
 from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
@@ -235,7 +233,7 @@ class FakeSwitch(BaseSwitch):
         def _is_pressed(event: KeyboardEvent) -> bool:
             return isinstance(event, KeyPressedEvent)
 
-        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed).share()
+        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed)
         return result
 
     @classmethod

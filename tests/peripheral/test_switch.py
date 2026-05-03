@@ -7,9 +7,8 @@ from collections.abc import Iterator
 from importlib import import_module
 
 import pytest
-from manyfold import Graph
+from manyfold import Graph, NoopSubscription
 
-from heart.peripheral.core.subscriptions import NoopSubscription
 from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
 

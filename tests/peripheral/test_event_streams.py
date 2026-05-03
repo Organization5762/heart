@@ -5,18 +5,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from manyfold import Graph, StreamNode
+from manyfold import CallbackObservable, Graph, NoopSubscription, StreamNode
 
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 NoopSubscription)
 
 
 class CountingPeripheral(Peripheral[int]):
-    """Capture subscription counts so shared streams avoid duplicate work."""
+    """Capture subscription counts so materialized streams avoid duplicate work."""
 
     def __init__(self, counter: dict[str, int]) -> None:
         self._counter = counter
@@ -29,11 +27,11 @@ class CountingPeripheral(Peripheral[int]):
         return CallbackObservable(on_subscribe)
 
 
-class TestPeripheralObserveSharing:
-    """Group tests for shared peripheral streams to avoid duplicate source work."""
+class TestPeripheralObserveMaterialization:
+    """Group tests for materialized peripheral streams avoiding duplicate source work."""
 
-    def test_observe_shares_subscription(self) -> None:
-        """Ensure observe shares a single subscription so redundant polling is avoided for scalability."""
+    def test_observe_uses_one_source_subscription(self) -> None:
+        """Ensure observe uses one subscription so redundant polling is avoided."""
         counter = {"subscriptions": 0}
         peripheral = CountingPeripheral(counter)
         stream = peripheral.observe
@@ -42,7 +40,7 @@ class TestPeripheralObserveSharing:
         subscription_b = stream.subscribe()
         try:
             assert counter["subscriptions"] == 1, (
-                "Observe should share the underlying stream."
+                "Observe should materialize the underlying stream once."
             )
         finally:
             subscription_a.dispose()
@@ -71,7 +69,7 @@ class TestGraphRouteStreamTransforms:
         finally:
             connection.remove()
 
-    def test_pipe_delegates_operator_sharing_to_observable_pipeline(
+    def test_pipe_delegates_operator_materialization_to_observable_pipeline(
         self,
     ) -> None:
         graph = Graph()
@@ -83,7 +81,7 @@ class TestGraphRouteStreamTransforms:
             calls["mapper"] += 1
             return value + 1
 
-        transformed = stream.map(mapper).share()
+        transformed = stream.map(mapper)
         doubled = stream.map(lambda value: value * 2)
         observed_a: list[int] = []
         observed_b: list[int] = []

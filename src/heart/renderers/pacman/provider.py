@@ -36,7 +36,7 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
             self._peripheral_manager.frame_tick_controller.observable()
             .scan(lambda state, _: self._next_state(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
+
         )
 
     def _next_state(self, state: PacmanGhostState) -> PacmanGhostState:

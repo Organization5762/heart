@@ -29,11 +29,11 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size())
             .distinct_until_changed()
-            .share()
+
         )
         base_image = self._load_base_image()
 
         def build_state(size: tuple[int, int]) -> RenderImageState:
             return RenderImageState(base_image=base_image, window_size=size)
 
-        return window_stream.map(build_state).share().share()
+        return window_stream.map(build_state)

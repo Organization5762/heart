@@ -134,7 +134,7 @@ class KeyboardController:
             .map(lambda tracker: tracker.event)
             .filter(lambda event: event is not None)
             .map(lambda event: cast(KeyboardEvent, event))
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -163,7 +163,7 @@ class KeyboardController:
             .map(lambda event: event.state)
             .start_with(KeyState())
             .distinct_until_changed()
-            .share()
+
         )
         key_name = pygame.key.name(key)
         return InputDebugNode(
@@ -190,7 +190,7 @@ class KeyboardController:
                     KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent, event
                 )
             )
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,

@@ -7,8 +7,8 @@ Heart utility layer.
 
 - Heart code should expose `manyfold.StreamNode` or graph route handles at public
   boundaries.
-- Callback-backed bridges should use
-  `heart.peripheral.core.subscriptions.CallbackObservable`.
+- Callback-backed bridges should use `manyfold.CallbackObservable` or
+  `manyfold.stream_from`.
 - Push-style test and input sources should use
   `heart.peripheral.core.streams.EventStream`.
 - Peripheral lifecycle cleanup should use the graph/runtime shutdown primitive

@@ -22,7 +22,7 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[WaterTitleScreenState]:
         frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable().share().share()
+            self._peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = WaterTitleScreenState()
 
@@ -37,6 +37,6 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )

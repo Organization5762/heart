@@ -91,14 +91,14 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
                     lambda state: self.handle_switch_state(state, switch_state)
                 )
             )
-            .share()
+
         )
         window_widths = (
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_width())
             .distinct_until_changed()
             .start_with(0)
-            .share()
+
         )
 
         def advance(state: YoListenState, window_width: int) -> YoListenState:
@@ -121,12 +121,12 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             peripheral_manager.frame_tick_controller.observable()
             .with_latest_from(window_widths)
             .map(lambda latest: lambda state: advance(state, latest[1]))
-            .share()
+
         )
         return (
             MergeNode.merge(switch_updates, tick_updates)
             .scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )

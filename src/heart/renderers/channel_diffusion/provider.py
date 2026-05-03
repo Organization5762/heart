@@ -26,9 +26,9 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             .map(lambda window: window.get_size())
             .distinct_until_changed()
             .start_with(initial_size)
-            .share()
+
         )
-        ticks = peripheral_manager.frame_tick_controller.observable().share()
+        ticks = peripheral_manager.frame_tick_controller.observable()
 
         def build_stream(
             size: tuple[int, int],
@@ -37,10 +37,10 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             return (
                 ticks.scan(lambda state, _: self.next_state(state), seed=seeded_state)
                 .start_with(seeded_state)
-                .share()
+
             )
 
-        return window_sizes.map(build_stream).switch_latest().share().share()
+        return window_sizes.map(build_stream).switch_latest()
 
     def next_state(self, state: ChannelDiffusionState) -> ChannelDiffusionState:
         grid = state.grid.astype(np.int32)

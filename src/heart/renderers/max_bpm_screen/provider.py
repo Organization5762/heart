@@ -30,8 +30,8 @@ class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
                 AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)
             )
             .distinct_until_changed()
-            .share()
-            .share()
+
+
         )
 
     def _select_top_bpm(self) -> AvatarBpmRendererState:

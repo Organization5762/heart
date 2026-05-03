@@ -92,9 +92,9 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
             acceleration_source = self._accelerometer_debug_profile.node()
         else:
             acceleration_source = self._accelerometer_controller.node()
-        accelerations = acceleration_source.start_with(None).share()
+        accelerations = acceleration_source.start_with(None)
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         return (
             frame_ticks.with_latest_from(accelerations)
@@ -107,5 +107,5 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
                 seed=initial,
             )
             .start_with(initial)
-            .share()
+
         )

@@ -48,7 +48,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-            .share()
+
         )
 
     @classmethod

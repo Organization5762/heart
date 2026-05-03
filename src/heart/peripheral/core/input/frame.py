@@ -49,4 +49,4 @@ class FrameTickController:
         return frame
 
     def observable(self) -> StreamNode[FrameTick]:
-        return cast(StreamNode[FrameTick], self._stream.observable()).share()
+        return cast(StreamNode[FrameTick], self._stream.observable())

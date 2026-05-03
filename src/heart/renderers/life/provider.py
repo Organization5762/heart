@@ -48,32 +48,32 @@ class LifeStateProvider:
             self._pm.window.filter(lambda w: w is not None)
             .map(lambda w: w.get_size())
             .distinct_until_changed()
-            .share()
-            .share()
+
+
         )
         initial_state: StreamNode[LifeState] = (
-            window_sizes.take(1).map(create_new_grid).map(create_state).share()
+            window_sizes.take(1).map(create_new_grid).map(create_state)
         )
         reseed_states: StreamNode[LifeState] = (
             self._main_switch.observable()
             .with_latest_from(window_sizes)
             .map(lambda pair: create_new_grid(pair[1]))
             .map(create_state)
-            .share()
-            .share()
+
+
         )
         injected_states: StreamNode[LifeState] = MergeNode.merge(
             initial_state, reseed_states
         )
         operations: StreamNode[StateOp] = MergeNode.merge(
-            injected_states.map(op_from_injected).share(),
-            self._pm.frame_tick_controller.observable().map(op_from_tick).share(),
+            injected_states.map(op_from_injected),
+            self._pm.frame_tick_controller.observable().map(op_from_tick),
         )
         result: StreamNode[LifeState] = initial_state.flat_map(
             lambda first_state: operations.scan(
                 lambda acc, op: op(acc), seed=first_state
             )
             .start_with(first_state)
-            .share()
-        ).share()
+
+        )
         return result

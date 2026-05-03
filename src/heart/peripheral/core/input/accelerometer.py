@@ -6,8 +6,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
 import pygame
-from manyfold import (CombineLatestNode, Graph, MergeNode, StreamNode,
-                      TypedRoute)
+from manyfold import (CombineLatestNode, CompositeSubscription, Graph,
+                      MergeNode, StreamNode, TypedRoute)
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
@@ -15,7 +15,6 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.utilities.env import Configuration
@@ -80,7 +79,7 @@ class AccelerometerController:
             .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)
             .filter(lambda value: value is not None)
             .map(lambda value: cast(Acceleration, value))
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -139,7 +138,7 @@ class AccelerometerDebugProfile:
             .with_latest_from(key_states)
             .map(lambda latest: self._to_acceleration(latest[0].monotonic_s, latest[1]))
             .distinct_until_changed()
-            .share()
+
         )
         instrumented_keyboard_stream = InputDebugNode(
             tap=self._debug_tap,

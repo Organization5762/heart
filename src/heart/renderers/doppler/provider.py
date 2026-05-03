@@ -75,7 +75,7 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[DopplerState]:
         frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable().share().share()
+            self._peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = self._initial_state()
 
@@ -87,8 +87,8 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     @property

@@ -4,11 +4,10 @@ from itertools import count
 from threading import Lock
 from typing import Any, Callable, Generic, TypeVar, cast
 
-from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
-                      StreamName, StreamNode, TypedRoute, Variant, route)
+from manyfold import (CallbackObservable, Graph, Layer, OwnerName, Plane,
+                      Schema, StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.graph import ObservableLike
-
-from heart.peripheral.core.subscriptions import CallbackObservable
 
 T = TypeVar("T")
 TOut = TypeVar("TOut")

@@ -46,7 +46,7 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         initial_state: ThreeDGlassesState,
     ) -> StreamNode[ThreeDGlassesState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         tick_updates = frame_ticks.map(
             lambda frame_tick: (
@@ -54,10 +54,10 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
                     state, elapsed_ms=float(frame_tick.delta_ms)
                 )
             )
-        ).share()
+        )
         return (
             tick_updates.scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )

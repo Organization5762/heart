@@ -19,7 +19,7 @@ class BorderStateProvider(ObservableProvider[BorderState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[BorderState]:
-        return self._color.map(lambda color: BorderState(color=color)).share().share()
+        return self._color.map(lambda color: BorderState(color=color))
 
     def set_color(self, color: Color) -> None:
         self._color.on_next(color)
@@ -51,7 +51,7 @@ class RainStateProvider(ObservableProvider[RainState]):
             self._peripheral_manager.frame_tick_controller.observable()
             .scan(lambda state, _: self._next_state(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
+
         )
 
     def _next_state(self, state: RainState) -> RainState:
@@ -89,7 +89,7 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
             self._peripheral_manager.frame_tick_controller.observable()
             .scan(lambda state, _: self._next_state(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
+
         )
 
     def _next_state(self, state: SlinkyState) -> SlinkyState:

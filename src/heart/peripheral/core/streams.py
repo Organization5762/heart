@@ -4,31 +4,18 @@ from functools import cached_property
 from threading import Lock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
-from manyfold import (Graph, Layer, MergeNode, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
-from manyfold.graph import RoutePipeline
+from manyfold import (CallbackObservable, Graph, Layer, MergeNode, OwnerName,
+                      Plane, RoutePipeline, Schema, StreamFamily, StreamName,
+                      StreamNode, TypedRoute, Variant, route, stream_from)
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.core.nodes import empty_node
-from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
-
-
-def _subscribe_source(source: Any, observer: Any) -> Any:
-    def emit(value: Any) -> None:
-        observer.on_next(value.value if hasattr(value, "closed") else value)
-
-    return source.subscribe(emit, observer.on_error, observer.on_completed)
-
-
-def _stream_from_source(source: Any) -> "_DerivedStream":
-    return _DerivedStream(lambda observer: _subscribe_source(source, observer))
 
 
 class EventStream(Generic[T]):
@@ -77,35 +64,18 @@ class EventStream(Generic[T]):
         return _EventStreamSubscription(self, subscription_id)
 
     def pipe(self, *operators: Any) -> StreamNode[Any]:
-        stream: Any = self
-        for operator in operators:
-            stream = operator(stream)
-        return stream
+        return stream_from(self).pipe(*operators)
 
     def share(self) -> StreamNode[T]:
-        return cast(StreamNode[T], self)
+        return cast(StreamNode[T], stream_from(self).share())
 
     def map(self, transform: Callable[[T], Any], *, name: str | None = None) -> Any:
         del name
-        return _DerivedStream(
-            lambda observer: self.subscribe(
-                lambda value: observer.on_next(transform(value)),
-                observer.on_error,
-                observer.on_completed,
-            )
-        )
+        return stream_from(self).map(transform).share()
 
     def filter(self, predicate: Callable[[T], bool], *, name: str | None = None) -> Any:
         del name
-
-        def subscribe(observer: Any) -> Any:
-            def on_next(value: T) -> None:
-                if predicate(value):
-                    observer.on_next(value)
-
-            return self.subscribe(on_next, observer.on_error, observer.on_completed)
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).filter(predicate).share()
 
     def do_action(
         self,
@@ -113,154 +83,31 @@ class EventStream(Generic[T]):
         *_args: Any,
         **_kwargs: Any,
     ) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            def emit(value: T) -> None:
-                if on_next is not None:
-                    on_next(value)
-                observer.on_next(value)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return cast(StreamNode[T], _DerivedStream(subscribe))
+        return cast(StreamNode[T], stream_from(self).do_action(on_next).share())
 
     def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
-        def subscribe(observer: Any) -> Any:
-            state = seed
-
-            def emit(value: T) -> None:
-                nonlocal state
-                state = accumulator(state, value)
-                observer.on_next(state)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).scan(accumulator, seed=seed).share()
 
     def start_with(self, value: Any) -> Any:
-        def subscribe(observer: Any) -> Any:
-            observer.on_next(value)
-            return self.subscribe(
-                observer.on_next, observer.on_error, observer.on_completed
-            )
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).start_with(value).share()
 
     def distinct_until_changed(self) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            sentinel = object()
-            previous: Any = sentinel
-
-            def emit(value: T) -> None:
-                nonlocal previous
-                if previous is sentinel or value != previous:
-                    previous = value
-                    observer.on_next(value)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return cast(StreamNode[T], _DerivedStream(subscribe))
+        return cast(StreamNode[T], stream_from(self).distinct_until_changed().share())
 
     def pairwise(self) -> Any:
-        def subscribe(observer: Any) -> Any:
-            sentinel = object()
-            previous: Any = sentinel
-
-            def emit(value: T) -> None:
-                nonlocal previous
-                if previous is not sentinel:
-                    observer.on_next((previous, value))
-                previous = value
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).pairwise().share()
 
     def take(self, count: int) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            seen = 0
-            subscription: Any | None = None
-
-            def emit(value: T) -> None:
-                nonlocal seen
-                if seen >= count:
-                    return
-                seen += 1
-                observer.on_next(value)
-                if seen >= count and subscription is not None:
-                    subscription.dispose()
-
-            subscription = self.subscribe(
-                emit, observer.on_error, observer.on_completed
-            )
-            return subscription
-
-        return cast(StreamNode[T], _DerivedStream(subscribe))
+        return cast(StreamNode[T], stream_from(self).take(count).share())
 
     def with_latest_from(self, *sources: Any) -> Any:
-        def subscribe(observer: Any) -> Any:
-            latest: list[Any] = [None] * len(sources)
-            ready = [False] * len(sources)
-            subscriptions = [
-                source.subscribe(
-                    lambda value, index=index: _record_latest(
-                        latest, ready, index, value
-                    ),
-                    observer.on_error,
-                    observer.on_completed,
-                )
-                for index, source in enumerate(sources)
-            ]
-
-            def emit(value: T) -> None:
-                if all(ready):
-                    observer.on_next((value, *latest))
-
-            subscriptions.append(
-                self.subscribe(emit, observer.on_error, observer.on_completed)
-            )
-            return _CompositeSubscription(subscriptions)
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).with_latest_from(*sources).share()
 
     def flat_map(self, project: Callable[[T], Any]) -> Any:
-        def subscribe(observer: Any) -> Any:
-            subscriptions: list[Any] = []
-
-            def emit(value: T) -> None:
-                inner = project(value)
-                subscriptions.append(
-                    inner.subscribe(
-                        observer.on_next, observer.on_error, observer.on_completed
-                    )
-                )
-
-            subscriptions.append(
-                self.subscribe(emit, observer.on_error, observer.on_completed)
-            )
-            return _CompositeSubscription(subscriptions)
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).flat_map(project).share()
 
     def switch_latest(self) -> Any:
-        def subscribe(observer: Any) -> Any:
-            active_subscription: Any | None = None
-
-            def emit(inner: Any) -> None:
-                nonlocal active_subscription
-                if active_subscription is not None:
-                    active_subscription.dispose()
-                active_subscription = inner.subscribe(
-                    observer.on_next, observer.on_error, observer.on_completed
-                )
-
-            outer_subscription = self.subscribe(
-                emit, observer.on_error, observer.on_completed
-            )
-            return _SwitchLatestSubscription(
-                lambda: active_subscription, outer_subscription
-            )
-
-        return _DerivedStream(subscribe)
+        return stream_from(self).switch_latest().share()
 
     def _unsubscribe(self, subscription_id: int) -> None:
         with self._lock:
@@ -278,201 +125,6 @@ class _EventStreamSubscription:
             return
         self._disposed = True
         self._stream._unsubscribe(self._subscription_id)
-
-
-class _Observer:
-    def __init__(
-        self,
-        on_next: Callable[[Any], None],
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-    ) -> None:
-        self.on_next = on_next
-        self.on_error = on_error or (lambda _error: None)
-        self.on_completed = on_completed or (lambda: None)
-
-
-class _CompositeSubscription:
-    def __init__(self, subscriptions: Iterable[Any]) -> None:
-        self._subscriptions = tuple(subscriptions)
-
-    def dispose(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-
-
-class _SwitchLatestSubscription:
-    def __init__(
-        self, active_subscription: Callable[[], Any | None], outer_subscription: Any
-    ) -> None:
-        self._active_subscription = active_subscription
-        self._outer_subscription = outer_subscription
-
-    def dispose(self) -> None:
-        self._outer_subscription.dispose()
-        active_subscription = self._active_subscription()
-        if active_subscription is not None:
-            active_subscription.dispose()
-
-
-class _CallbackConnection:
-    def __init__(self, subscription: Any) -> None:
-        self._subscription = subscription
-
-    def remove(self) -> None:
-        self._subscription.dispose()
-
-    def dispose(self) -> None:
-        self.remove()
-
-
-class _NoopSubscription:
-    def dispose(self) -> None:
-        return None
-
-
-def _record_latest(
-    latest: list[Any], ready: list[bool], index: int, value: Any
-) -> None:
-    latest[index] = value
-    ready[index] = True
-
-
-class _DerivedStream(EventStream[Any]):
-    def __init__(self, subscribe: Callable[[Any], Any]) -> None:
-        super().__init__()
-        self._subscribe = subscribe
-
-    def subscribe(
-        self,
-        observer: Callable[[Any], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[Any], None] | None = None,
-    ) -> Any:
-        del scheduler
-        callback = on_next or observer
-        if callback is None:
-
-            def callback(_value: Any) -> None:
-                return None
-
-        if callable(callback):
-            wrapped = _Observer(callback, on_error, on_completed)
-        else:
-            wrapped = callback
-        return self._subscribe(wrapped)
-
-    def share(self) -> StreamNode[Any]:
-        return cast(StreamNode[Any], _SharedStream(self))
-
-    def callback(
-        self, receive: Callable[[Any], None], *, name: str | None = None
-    ) -> _CallbackConnection:
-        del name
-        return _CallbackConnection(self.subscribe(receive))
-
-
-class _SharedStream(EventStream[Any]):
-    def __init__(self, source: Any) -> None:
-        super().__init__()
-        self._source = source
-        self._source_subscription: Any | None = None
-
-    def subscribe(
-        self,
-        observer: Callable[[Any], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[Any], None] | None = None,
-    ) -> Any:
-        subscription = super().subscribe(
-            observer,
-            on_error,
-            on_completed,
-            scheduler,
-            on_next=on_next,
-        )
-        if self._source_subscription is None:
-            self._source_subscription = self._source.subscribe(
-                self.emit, on_error, on_completed
-            )
-        return subscription
-
-    def share(self) -> StreamNode[Any]:
-        return cast(StreamNode[Any], self)
-
-
-def _route_pipeline_share(self: RoutePipeline[Any]) -> StreamNode[Any]:
-    return _stream_from_source(self).share()
-
-
-def _route_pipeline_do_action(
-    self: RoutePipeline[Any],
-    on_next: Callable[[Any], None] | None = None,
-    *_args: Any,
-    **_kwargs: Any,
-) -> RoutePipeline[Any]:
-    def emit(value: Any) -> Any:
-        if on_next is not None:
-            on_next(value)
-        return value
-
-    return self.map(emit)
-
-
-def _route_pipeline_start_with(
-    self: RoutePipeline[Any], *values: Any
-) -> StreamNode[Any]:
-    def subscribe(observer: Any) -> Any:
-        for value in values:
-            observer.on_next(value)
-        return _subscribe_source(self, observer)
-
-    return cast(StreamNode[Any], _DerivedStream(subscribe).share())
-
-
-def _route_pipeline_scan(
-    self: RoutePipeline[Any],
-    accumulator: Callable[[Any, Any], Any],
-    *,
-    seed: Any = None,
-) -> StreamNode[Any]:
-    return _stream_from_source(self).scan(accumulator, seed=seed).share()
-
-
-def _route_pipeline_pairwise(self: RoutePipeline[Any]) -> StreamNode[Any]:
-    return _stream_from_source(self).pairwise().share()
-
-
-def _route_pipeline_take(self: RoutePipeline[Any], count: int) -> StreamNode[Any]:
-    return _stream_from_source(self).take(count).share()
-
-
-def _route_pipeline_with_latest_from(
-    self: RoutePipeline[Any], *sources: Any
-) -> StreamNode[Any]:
-    return _stream_from_source(self).with_latest_from(*sources).share()
-
-
-def _route_pipeline_flat_map(
-    self: RoutePipeline[Any], project: Callable[[Any], Any]
-) -> StreamNode[Any]:
-    return _stream_from_source(self).flat_map(project).share()
-
-
-RoutePipeline.share = _route_pipeline_share  # type: ignore[attr-defined, method-assign]
-RoutePipeline.do_action = _route_pipeline_do_action  # type: ignore[attr-defined, method-assign]
-RoutePipeline.start_with = _route_pipeline_start_with  # type: ignore[attr-defined, method-assign]
-RoutePipeline.scan = _route_pipeline_scan  # type: ignore[attr-defined, method-assign]
-RoutePipeline.pairwise = _route_pipeline_pairwise  # type: ignore[attr-defined, method-assign]
-RoutePipeline.take = _route_pipeline_take  # type: ignore[attr-defined, method-assign]
-RoutePipeline.with_latest_from = _route_pipeline_with_latest_from  # type: ignore[attr-defined, method-assign]
-RoutePipeline.flat_map = _route_pipeline_flat_map  # type: ignore[attr-defined, method-assign]
 
 
 def runtime_route(name: str, schema_id: str) -> Any:
@@ -526,12 +178,12 @@ class GraphRouteStream(Generic[T]):
         )
 
     def map(self, transform: Callable[[T], Any], *, name: str | None = None) -> Any:
-        del name
-        return _stream_from_source(self).map(transform)
+        return GraphRoutePipeline(self._graph.observe(self._route).map(transform, name=name))
 
     def filter(self, predicate: Callable[[T], bool], *, name: str | None = None) -> Any:
-        del name
-        return _stream_from_source(self).filter(predicate)
+        return GraphRoutePipeline(
+            self._graph.observe(self._route).filter(predicate, name=name)
+        )
 
     def do_action(
         self,
@@ -539,31 +191,37 @@ class GraphRouteStream(Generic[T]):
         *_args: Any,
         **_kwargs: Any,
     ) -> StreamNode[T]:
-        return _stream_from_source(self).do_action(on_next).share()
+        return cast(
+            StreamNode[T],
+            stream_from(self, unwrap_envelopes=True).do_action(on_next),
+        )
 
     def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
-        return _stream_from_source(self).scan(accumulator, seed=seed).share()
+        return stream_from(self, unwrap_envelopes=True).scan(accumulator, seed=seed)
 
     def start_with(self, value: Any) -> Any:
-        return _stream_from_source(self).start_with(value).share()
+        return stream_from(self, unwrap_envelopes=True).start_with(value)
 
     def distinct_until_changed(self) -> StreamNode[T]:
-        return _stream_from_source(self).distinct_until_changed().share()
+        return cast(
+            StreamNode[T],
+            stream_from(self, unwrap_envelopes=True).distinct_until_changed(),
+        )
 
     def pairwise(self) -> Any:
-        return _stream_from_source(self).pairwise().share()
+        return stream_from(self, unwrap_envelopes=True).pairwise()
 
     def take(self, count: int) -> StreamNode[T]:
-        return _stream_from_source(self).take(count).share()
+        return cast(StreamNode[T], stream_from(self, unwrap_envelopes=True).take(count))
 
     def with_latest_from(self, *sources: Any) -> Any:
-        return _stream_from_source(self).with_latest_from(*sources).share()
+        return stream_from(self, unwrap_envelopes=True).with_latest_from(*sources)
 
     def flat_map(self, project: Callable[[T], Any]) -> Any:
-        return _stream_from_source(self).flat_map(project).share()
+        return stream_from(self, unwrap_envelopes=True).flat_map(project)
 
     def switch_latest(self) -> Any:
-        return _stream_from_source(self).switch_latest().share()
+        return stream_from(self, unwrap_envelopes=True).switch_latest()
 
     def _observable(self) -> StreamNode[T]:
         def subscribe(observer: Any, scheduler: Any = None) -> Any:
@@ -573,8 +231,71 @@ class GraphRouteStream(Generic[T]):
         return cast(StreamNode[T], CallbackObservable(subscribe))
 
 
+class GraphRoutePipeline(Generic[T]):
+    """Value-facing wrapper around a Manyfold route pipeline."""
+
+    def __init__(self, pipeline: RoutePipeline[T]) -> None:
+        self._pipeline = pipeline
+        self._values = stream_from(pipeline, unwrap_envelopes=True).share()
+
+    def subscribe(self, *args: Any, **kwargs: Any) -> Any:
+        return self._values.subscribe(*args, **kwargs)
+
+    def callback(
+        self,
+        receive: Callable[[T], None],
+        *,
+        name: str | None = None,
+    ) -> Any:
+        return self._pipeline.callback(receive, name=name)
+
+    def pipe(self, *operators: Any) -> StreamNode[Any]:
+        return self._values.pipe(*operators)
+
+    def share(self) -> StreamNode[T]:
+        return cast(StreamNode[T], self._values.share())
+
+    def map(self, transform: Callable[[T], Any], *, name: str | None = None) -> Any:
+        return GraphRoutePipeline(self._pipeline.map(transform, name=name))
+
+    def filter(self, predicate: Callable[[T], bool], *, name: str | None = None) -> Any:
+        return GraphRoutePipeline(self._pipeline.filter(predicate, name=name))
+
+    def do_action(
+        self,
+        on_next: Callable[[T], None] | None = None,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> StreamNode[T]:
+        return cast(StreamNode[T], self._values.do_action(on_next).share())
+
+    def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
+        return self._values.scan(accumulator, seed=seed).share()
+
+    def start_with(self, value: Any) -> Any:
+        return self._values.start_with(value).share()
+
+    def distinct_until_changed(self) -> StreamNode[T]:
+        return cast(StreamNode[T], self._values.distinct_until_changed().share())
+
+    def pairwise(self) -> Any:
+        return self._values.pairwise().share()
+
+    def take(self, count: int) -> StreamNode[T]:
+        return cast(StreamNode[T], self._values.take(count).share())
+
+    def with_latest_from(self, *sources: Any) -> Any:
+        return self._values.with_latest_from(*sources).share()
+
+    def flat_map(self, project: Callable[[T], Any]) -> Any:
+        return self._values.flat_map(project).share()
+
+    def switch_latest(self) -> Any:
+        return self._values.switch_latest().share()
+
+
 class PeripheralStreams:
-    """Build shared event streams for detected peripherals."""
+    """Build event streams for detected peripherals."""
 
     def __init__(self, graph: Graph, peripheral_source: PeripheralSource) -> None:
         self._graph = graph
@@ -598,10 +319,8 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
         if not observables:
             return empty_node()
-        merged = (
-            MergeNode.merge(*observables)
-            .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
-            .share()
+        merged = MergeNode.merge(*observables).map(
+            PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
         return merged
 
