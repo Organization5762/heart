@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import (WebSocket,
                                           _encode_peripheral_message,
+                                          beats_websocket_frame_route,
                                           decode_control_message,
                                           decode_stream_envelope)
 from heart.peripheral.core import (Input, PeripheralInfo, PeripheralLocation,
@@ -317,6 +318,27 @@ class TestWebSocketReplayCache:
             b"switch-1-latest",
             b"sensor-1-latest",
         )
+
+    def test_send_publishes_encoded_frames_to_manyfold_route(self) -> None:
+        """Verify outbound websocket frames cross the Manyfold route boundary before node delivery."""
+        from manyfold import Graph
+
+        websocket = object.__new__(WebSocket)
+        websocket._graph = Graph()
+        websocket._frame_route = beats_websocket_frame_route()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+        seen = []
+        websocket._graph.observe(websocket._frame_route, replay_latest=False).subscribe(
+            seen.append
+        )
+
+        websocket.send("frame", b"frame-bytes")
+
+        assert len(seen) == 1
+        decoded = decode_stream_envelope(seen[0].value)
+        assert decoded == ("frame", b"frame-bytes")
 
 
 class TestWebSocketDisconnectHandling:

@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
 import pygame
+from manyfold import Graph, TypedRoute
 
 import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.utilities.env import Configuration
+from heart.utilities.reactive import CompositeDisposable
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import pipe_in_background
 
@@ -27,6 +31,37 @@ DEBUG_ACCEL_SCALE = 1.5
 DEBUG_ACCEL_Z_BIAS = 0.7
 DEBUG_ACCEL_IMPULSE = 3.0
 DEBUG_ACCEL_IMPULSE_SECONDS = 0.12
+ACCELERATION_ROUTE = runtime_route(
+    "accelerometer.merged",
+    "HeartAcceleration",
+)
+DEBUG_ACCELERATION_ROUTE = runtime_route(
+    "accelerometer.debug.merged",
+    "HeartDebugAcceleration",
+)
+
+
+@dataclass
+class AccelerometerMergeNode:
+    source_streams: tuple[reactive.Observable[Acceleration | None], ...]
+    output_route: TypedRoute[Acceleration | None]
+    _subscription: CompositeDisposable | None = field(default=None, init=False)
+    _latest: Acceleration | None | object = field(default=object(), init=False)
+
+    def install(self, graph: Graph) -> CompositeDisposable:
+        if self._subscription is not None:
+            return self._subscription
+
+        def publish_if_changed(value: Acceleration | None) -> None:
+            if value == self._latest:
+                return
+            self._latest = value
+            graph.publish(self.output_route, value)
+
+        self._subscription = CompositeDisposable(
+            *(stream.subscribe(publish_if_changed) for stream in self.source_streams)
+        )
+        return self._subscription
 
 
 class AccelerometerController:
@@ -37,9 +72,15 @@ class AccelerometerController:
     ) -> None:
         self._manager = manager
         self._debug_tap = debug_tap
+        self._graph = manager.graph
+        self._stream = GraphRouteStream[Acceleration](
+            self._graph,
+            ACCELERATION_ROUTE,
+        )
+        self._merge_subscription: CompositeDisposable | None = None
 
     @cached_property
-    def _observable(self) -> reactive.Observable[Acceleration]:
+    def _source_observable(self) -> reactive.Observable[Acceleration]:
         streams = [
             peripheral.observe
             for peripheral in self._manager.peripherals
@@ -62,8 +103,16 @@ class AccelerometerController:
             source_id="accelerometer",
         )
 
+    def node(self) -> GraphRouteStream[Acceleration]:
+        if self._merge_subscription is None:
+            self._merge_subscription = AccelerometerMergeNode(
+                source_streams=(self._source_observable,),
+                output_route=ACCELERATION_ROUTE,
+            ).install(self._graph)
+        return self._stream
+
     def observable(self) -> reactive.Observable[Acceleration]:
-        return self._observable
+        return self.node()
 
 
 class AccelerometerDebugProfile:
@@ -73,15 +122,22 @@ class AccelerometerDebugProfile:
         frame_tick_controller: "FrameTickController",
         debug_tap: InputDebugTap,
         external_sensor_hub: ExternalSensorHub,
+        graph: Graph | None = None,
     ) -> None:
         self._keyboard_controller = keyboard_controller
         self._frame_tick_controller = frame_tick_controller
         self._debug_tap = debug_tap
         self._external_sensor_hub = external_sensor_hub
+        self._graph = graph or Graph()
+        self._debug_stream = GraphRouteStream[Acceleration | None](
+            self._graph,
+            DEBUG_ACCELERATION_ROUTE,
+        )
+        self._merge_subscription: CompositeDisposable | None = None
         self._space_impulse_until = 0.0
 
     @cached_property
-    def _observable(self) -> reactive.Observable[Acceleration | None]:
+    def _keyboard_observable(self) -> reactive.Observable[Acceleration | None]:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
@@ -117,16 +173,21 @@ class AccelerometerDebugProfile:
                 "keyboard.key_state.e",
             ),
         )
-        return pipe_in_background(
-            reactive.merge(
-                self._external_sensor_hub.observable_acceleration(),
-                instrumented_keyboard_stream,
-            ),
-            ops.distinct_until_changed(),
-        )
+        return instrumented_keyboard_stream
+
+    def node(self) -> GraphRouteStream[Acceleration | None]:
+        if self._merge_subscription is None:
+            self._merge_subscription = AccelerometerMergeNode(
+                source_streams=(
+                    self._external_sensor_hub.observable_acceleration(),
+                    self._keyboard_observable,
+                ),
+                output_route=DEBUG_ACCELERATION_ROUTE,
+            ).install(self._graph)
+        return self._debug_stream
 
     def observable(self) -> reactive.Observable[Acceleration | None]:
-        return self._observable
+        return self.node()
 
     def should_use_debug_input(self) -> bool:
         return not (Configuration.is_pi() and not Configuration.is_x11_forward())

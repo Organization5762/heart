@@ -47,9 +47,9 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
             ops.share(),
         )
         if self._accelerometer_debug_profile.should_use_debug_input():
-            acceleration_source = self._accelerometer_debug_profile.observable()
+            acceleration_source = self._accelerometer_debug_profile.node()
         else:
-            acceleration_source = self._accelerometer_controller.observable()
+            acceleration_source = self._accelerometer_controller.node()
         accelerations = pipe_in_background(
             acceleration_source,
             ops.start_with(None),

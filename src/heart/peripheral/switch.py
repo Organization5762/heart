@@ -22,11 +22,8 @@ from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import (Disposable, ObserverBase, SchedulerBase,
-                                      create)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (blocking_io_scheduler,
-                                              interval_in_background,
+from heart.utilities.reactive_threads import (interval_in_background,
                                               pipe_in_background)
 
 logger = get_logger(__name__)
@@ -319,7 +316,7 @@ class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:
         self.port = port
         self.baudrate = baudrate
-        self._subscription: Any | None = None
+        self._loop_handle: ManagedRunLoopHandle | None = None
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -330,39 +327,39 @@ class Switch(BaseSwitch):
     def _connect_to_ser(self) -> Any:
         return serial.Serial(self.port, self.baudrate)
 
-    def _read_from_switch(
-        self,
-        observer: ObserverBase[Any],
-        scheduler: SchedulerBase | None,
-    ) -> Disposable:
-        while True:
-            try:
-                ser = self._connect_to_ser()
-                try:
-                    while True:
-                        if ser.in_waiting > 0:
-                            bus_data = ser.readline().decode("utf-8").rstrip()
-                            data = json.loads(bus_data)
-                            observer.on_next(data)
-                except KeyboardInterrupt:
-                    pass
-                except Exception:
-                    pass
-                finally:
-                    ser.close()
-            except Exception:
-                pass
-
-            time.sleep(SERIAL_RECONNECT_DELAY_SECONDS)
-        return Disposable()
-
     def run(self) -> None:
-        source = create(self._read_from_switch).pipe(
-            ops.subscribe_on(blocking_io_scheduler()),
+        if self._loop_handle is not None and self._loop_handle.thread.is_alive():
+            return
+        loop = ManagedRunLoop(
+            body=self._run_serial_loop,
+            backoff=BackoffPolicy.fixed(SERIAL_RECONNECT_DELAY_SECONDS),
+            on_error=lambda _exc, attempt: logger.exception(
+                "Switch serial reader failed; reconnecting (attempt %s).",
+                attempt,
+            ),
+            group="switch",
         )
-        self._subscription = source.subscribe(
-            on_next=self.update_due_to_data,
+        self._loop_handle = loop.start_thread(
+            name="peripheral-switch",
+            daemon=True,
         )
+
+    def stop(self) -> None:
+        if self._loop_handle is not None:
+            self._loop_handle.stop()
+
+    def _run_serial_loop(self, stop: StopToken) -> None:
+        try:
+            with self._connect_to_ser() as ser:
+                while not stop.is_set():
+                    if ser.in_waiting <= 0:
+                        stop.wait(SERIAL_RECONNECT_DELAY_SECONDS)
+                        continue
+                    bus_data = ser.readline().decode("utf-8").rstrip()
+                    data = json.loads(bus_data)
+                    self.update_due_to_data(data)
+        except KeyboardInterrupt:
+            stop.set()
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(

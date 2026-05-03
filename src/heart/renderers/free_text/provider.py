@@ -4,13 +4,14 @@ import textwrap
 from typing import Iterable
 
 import pygame
+from manyfold import Graph
 
 import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.renderers.free_text.state import FreeTextRendererState
-from heart.utilities.reactive import BehaviorSubject
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import pipe_in_background
 
@@ -22,7 +23,11 @@ INITIAL_FONT_SIZE = 10
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
     def __init__(self) -> None:
-        self._text = BehaviorSubject("Waiting for text...")
+        self._text: GraphRouteStream[str] = GraphRouteStream(
+            Graph(),
+            runtime_route("renderer.free_text.text", "HeartRendererFreeText"),
+        )
+        self._text.on_next("Waiting for text...")
         self._font_cache: dict[int, pygame.font.Font] = {}
         self._font_size_max: int = FONT_SIZE_MAX
         self._font_size_min: int = FONT_SIZE_MIN

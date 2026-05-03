@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pygame
+from manyfold import Graph
 
 import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import (AccelerometerDebugProfile,
@@ -18,6 +19,7 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          NavigationProfile,
                                          SetOrientationCommand,
                                          ToggleDebugCommand)
+from heart.peripheral.core.input.accelerometer import DEBUG_ACCELERATION_ROUTE
 from heart.peripheral.core.input.debug import instrument_input_stream
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
@@ -684,6 +686,7 @@ class TestAccelerometerDebugProfile:
     ) -> None:
         """Verify keyboard tilt and jump keys map to deterministic acceleration vectors so water and Mario scenes share one debug motion contract."""
         tap = InputDebugTap()
+        graph = Graph()
         keyboard = KeyboardController(tap)
         frame_ticks = FrameTickController(tap)
         keyboard_snapshots: Subject[KeyboardSnapshot] = Subject()
@@ -694,7 +697,8 @@ class TestAccelerometerDebugProfile:
             keyboard_controller=keyboard,
             frame_tick_controller=frame_ticks,
             debug_tap=tap,
-            external_sensor_hub=ExternalSensorHub(tap),
+            external_sensor_hub=ExternalSensorHub(tap, graph=graph),
+            graph=graph,
         )
         observed: list[Acceleration | None] = []
         monkeypatch.setattr(
@@ -736,6 +740,9 @@ class TestAccelerometerDebugProfile:
         assert observed[0] is None
         assert observed[1] == Acceleration(x=1.5, y=1.5, z=13.51)
         assert observed[2] == Acceleration(x=1.5, y=1.5, z=10.51)
+        latest = graph.latest(DEBUG_ACCELERATION_ROUTE)
+        assert latest is not None
+        assert latest.value == observed[-1]
         assert any(
             envelope.stream_name == "accelerometer.debug"
             for envelope in tap.snapshot()

@@ -3,13 +3,15 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
+from manyfold import Graph
+
 import heart.utilities.reactive as reactive
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
-from heart.utilities.reactive import BehaviorSubject
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import pipe_in_background
 
@@ -30,7 +32,14 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         self._height = height
         self._num_pixels = num_pixels
         self._peripheral_manager = peripheral_manager
-        self._color = BehaviorSubject(initial_color)
+        self._color: GraphRouteStream[Color | None] = GraphRouteStream(
+            Graph(),
+            runtime_route(
+                "renderer.random_pixel.color",
+                "HeartRendererRandomPixelColor",
+            ),
+        )
+        self._color.on_next(initial_color)
         self._rng = rng or randomness.rng()
 
     def observable(

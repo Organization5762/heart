@@ -7,26 +7,15 @@ from __future__ import annotations
 
 from typing import TypeAlias
 
-try:
-    import manyfold._rx as _rx_backend
-    from manyfold._rx import Observable, Subject, operators, pipe
-    from manyfold._rx.abc import DisposableBase, ObserverBase, SchedulerBase
-    from manyfold._rx.disposable import CompositeDisposable, Disposable
-    from manyfold._rx.scheduler import (EventLoopScheduler, NewThreadScheduler,
-                                        ThreadPoolScheduler, TimeoutScheduler)
-    from manyfold._rx.subject import BehaviorSubject
-    from manyfold._rx.testing.marbles import marbles_testing
-    from manyfold._rx.typing import StartableTarget
-except ModuleNotFoundError:
-    import manyfold.rx as _rx_backend
-    from manyfold.rx import Observable, Subject, operators, pipe
-    from manyfold.rx.abc import DisposableBase, ObserverBase, SchedulerBase
-    from manyfold.rx.disposable import CompositeDisposable, Disposable
-    from manyfold.rx.scheduler import (EventLoopScheduler, NewThreadScheduler,
-                                       ThreadPoolScheduler, TimeoutScheduler)
-    from manyfold.rx.subject import BehaviorSubject
-    from manyfold.rx.testing.marbles import marbles_testing
-    from manyfold.rx.typing import StartableTarget
+import manyfold._rx as _rx_backend
+from manyfold._rx import Observable, Subject, operators, pipe
+from manyfold._rx.abc import DisposableBase, ObserverBase, SchedulerBase
+from manyfold._rx.disposable import CompositeDisposable, Disposable
+from manyfold._rx.scheduler import (EventLoopScheduler, NewThreadScheduler,
+                                    ThreadPoolScheduler, TimeoutScheduler)
+from manyfold._rx.subject import BehaviorSubject
+from manyfold._rx.testing.marbles import marbles_testing
+from manyfold._rx.typing import StartableTarget
 
 ObservableStream: TypeAlias = Observable
 SubjectStream: TypeAlias = Subject

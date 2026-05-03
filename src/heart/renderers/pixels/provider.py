@@ -3,20 +3,26 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
+from manyfold import Graph
+
 import heart.utilities.reactive as reactive
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
-from heart.utilities.reactive import BehaviorSubject
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import pipe_in_background
 
 
 class BorderStateProvider(ObservableProvider[BorderState]):
     def __init__(self, initial_color: Color | None = None) -> None:
-        self._color = BehaviorSubject(initial_color or Color.random())
+        self._color: GraphRouteStream[Color] = GraphRouteStream(
+            Graph(),
+            runtime_route("renderer.border.color", "HeartRendererBorderColor"),
+        )
+        self._color.on_next(initial_color or Color.random())
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None

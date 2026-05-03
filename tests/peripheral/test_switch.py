@@ -10,7 +10,6 @@ from manyfold import Graph
 
 from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
-from heart.utilities.reactive import Disposable
 from heart.utilities.reactive_threads import \
     reset_reactive_threading_state_for_tests
 
@@ -29,31 +28,34 @@ def _reset_reactive_threads() -> Iterator[None]:
 class TestSwitchRunLoopIsolation:
     """Group switch run-loop tests so blocking serial readers stay off the startup path and remain observable."""
 
-    def test_run_returns_while_reader_waits_on_blocking_scheduler(
+    def test_run_returns_while_reader_waits_on_manyfold_loop(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Verify the serial reader subscribes on the blocking scheduler so peripheral startup is not pinned behind a long-lived read loop."""
+        """Verify the serial reader runs on a manyfold loop so startup is not pinned behind a long-lived read loop."""
         switch = Switch(port="/dev/null", baudrate=115200)
         started = threading.Event()
-        release = threading.Event()
+        stopped = threading.Event()
         observed: list[dict[str, object]] = []
 
-        def _read_from_switch(_observer, _scheduler=None) -> Disposable:
+        def _run_serial_loop(stop) -> None:
             started.set()
-            release.wait(timeout=1.0)
-            return Disposable()
+            while not stop.is_set():
+                stop.wait(timeout=0.01)
+            stopped.set()
 
-        monkeypatch.setattr(switch, "_read_from_switch", _read_from_switch)
+        monkeypatch.setattr(switch, "_run_serial_loop", _run_serial_loop)
         monkeypatch.setattr(switch, "update_due_to_data", observed.append)
 
         switch.run()
 
         assert started.wait(timeout=0.5)
         assert observed == []
-        assert switch._subscription is not None
+        assert switch._loop_handle is not None
+        assert switch._loop_handle.thread.is_alive()
 
-        release.set()
+        switch.stop()
+        assert stopped.wait(timeout=0.5)
 
 
 class _SerialStub:

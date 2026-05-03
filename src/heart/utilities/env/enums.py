@@ -58,20 +58,6 @@ class DeviceLayoutMode(StrEnum):
     RECTANGLE = "rectangle"
 
 
-class ReactivexStreamShareStrategy(StrEnum):
-    SHARE = "share"
-    SHARE_AUTO_CONNECT = "share_auto_connect"
-    REPLAY_LATEST = "replay_latest"
-    REPLAY_LATEST_AUTO_CONNECT = "replay_latest_auto_connect"
-    REPLAY_BUFFER = "replay_buffer"
-    REPLAY_BUFFER_AUTO_CONNECT = "replay_buffer_auto_connect"
-
-
-class ReactivexStreamConnectMode(StrEnum):
-    LAZY = "lazy"
-    EAGER = "eager"
-
-
 class IsolatedRendererAckStrategy(StrEnum):
     ALWAYS = "always"
     NEVER = "never"

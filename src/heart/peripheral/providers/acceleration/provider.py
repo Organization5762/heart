@@ -13,4 +13,4 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
     def observable(
         self, *args: object, **kwargs: object
     ) -> reactive.Observable[Acceleration]:
-        return self._controller.observable()
+        return self._controller.node()

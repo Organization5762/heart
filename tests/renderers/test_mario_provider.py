@@ -22,6 +22,9 @@ class _StubAccelerationController:
     def observable(self) -> reactive.Observable[Acceleration | None]:
         return self._stream
 
+    def node(self) -> reactive.Observable[Acceleration | None]:
+        return self._stream
+
     def emit(self, acceleration: Acceleration | None) -> None:
         self._stream.on_next(acceleration)
 
