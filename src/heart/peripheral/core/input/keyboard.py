@@ -236,12 +236,18 @@ class KeyboardController:
 def _pressed_keys_from_state(keys: Any) -> frozenset[int]:
     """Normalize pygame key state into key constants used by input profiles."""
 
-    pressed = {index for index in range(len(keys)) if keys[index]}
+    pressed: set[int] = set()
+    for index in range(len(keys)):
+        if _is_pressed(keys, index):
+            pressed.add(index)
     for key_code in NON_INDEX_KEY_CODES:
-        try:
-            is_pressed = keys[key_code]
-        except IndexError:
-            continue
-        if is_pressed:
+        if _is_pressed(keys, key_code):
             pressed.add(key_code)
     return frozenset(pressed)
+
+
+def _is_pressed(keys: Any, key: int) -> bool:
+    try:
+        return bool(keys[key])
+    except (IndexError, KeyError):
+        return False
