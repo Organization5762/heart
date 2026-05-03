@@ -78,7 +78,6 @@ build-backend = "uv_build"
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
 heart-rgb-matrix-driver = { path = "./rust/heart_rgb_matrix_driver" }
-manyfold = { git = "ssh://git@github.com/Organization5762/manyfold.git" }
 
 [tool.setuptools.package-data]
 heart = ["*.png", "**/*.png"]
