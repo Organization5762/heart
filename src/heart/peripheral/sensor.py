@@ -362,6 +362,53 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
     def detect(cls) -> Iterator[Self]:
         yield cls()
 
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        vector_output_route: TypedRoute[SensorEvent] | None = None,
+        vector_error_route: TypedRoute[BaseException] | None = None,
+        spawn_sources: bool = False,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or accelerometer_detection_route()
+        resolved_vector_output_route = (
+            vector_output_route or accelerometer_vector_event_route()
+        )
+
+        def mapper(peripheral: "FakeAccelerometer") -> SensorEvent:
+            return SensorEvent(
+                event_type="peripheral.accelerometer.detected",
+                data={"mode": "fake"},
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        def spawn(peripheral: "FakeAccelerometer", access: Any) -> None:
+            if not spawn_sources:
+                return
+            access.own(
+                peripheral.install_node(
+                    access.graph,
+                    output_route=resolved_vector_output_route,
+                    error_route=vector_error_route or accelerometer_error_route(),
+                )
+            )
+
+        return DetectionNode(
+            name="heart-fake-accelerometer-detection",
+            detector=cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            spawn=spawn,
+            error_route=accelerometer_error_route(),
+            group="accelerometer-detection",
+            start_immediately=start_immediately,
+        )
+
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
             id="fake_accelerometer",
@@ -373,13 +420,57 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
     def _event_stream(
         self
     ) -> reactive.Observable[Acceleration | None]:
-        def random_accel(_: int) -> Acceleration:
-            return Acceleration(
-                x=random.random(),
-                y=random.random(),
-                z=9.8,
-            )
         return pipe_in_background(
             interval_in_background(period=timedelta(milliseconds=500)),
-            ops.map(random_accel)
+            ops.map(lambda _: self._sample())
+        )
+
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        sample_interval_seconds: float = 0.5,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this fake accelerometer as a Manyfold-managed graph source."""
+
+        resolved_output_route = output_route or accelerometer_vector_event_route()
+
+        def _body(stop: StopToken, graph: Graph) -> None:
+            while not stop.is_set():
+                graph.publish(
+                    resolved_output_route,
+                    self._sample_to_sensor_event(self._sample()),
+                )
+                if sample_interval_seconds <= 0:
+                    stop.set()
+                    continue
+                stop.wait(sample_interval_seconds)
+
+        return ManagedGraphNode(
+            name="heart-fake-accelerometer-vectors",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or accelerometer_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff or BackoffPolicy.fixed(0.5),
+            group="accelerometer",
+            start_immediately=start_immediately,
+        ).install(graph)
+
+    def _sample(self) -> Acceleration:
+        return Acceleration(
+            x=random.random(),
+            y=random.random(),
+            z=9.8,
+        )
+
+    def _sample_to_sensor_event(self, sample: Acceleration) -> SensorEvent:
+        vector = AccelerometerVector(x=sample.x, y=sample.y, z=sample.z)
+        return vector.to_input().to_sensor_event(
+            identity=self.peripheral_info().to_sensor_identity()
         )
