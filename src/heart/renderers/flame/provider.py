@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import Graph
 
 import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.renderers.flame.state import FlameState
+from heart.utilities.reactive import BehaviorSubject
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import (pipe_in_background,
                                               start_with_once)
@@ -17,11 +16,7 @@ class FlameStateProvider(ObservableProvider[FlameState]):
     def __init__(self) -> None:
         self._initial_time = pygame.time.get_ticks() * 2 / 1000.0
         self._initial_state = FlameState(time_seconds=self._initial_time, dt_seconds=0.0)
-        self._latest_state: GraphRouteStream[FlameState] = GraphRouteStream(
-            Graph(),
-            runtime_route("renderer.flame.state", "HeartRendererFlameState"),
-        )
-        self._latest_state.on_next(self._initial_state)
+        self._latest_state = BehaviorSubject(self._initial_state)
 
     def observable(
         self, peripheral_manager: PeripheralManager

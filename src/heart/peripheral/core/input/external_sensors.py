@@ -35,7 +35,9 @@ class ExternalSensorHub:
         self._lock = Lock()
         self._values: dict[str, float] = {}
         self._peripheral_snapshots: dict[str, dict[str, Any]] = {}
-        self._accelerometer_stream: GraphRouteStream[Acceleration | None] = (
+        self._accelerometer_stream: GraphRouteStream[
+            Acceleration | None
+        ] = (
             GraphRouteStream(self._graph, EXTERNAL_ACCELEROMETER_ROUTE)
         )
         self._accelerometer_stream.on_next(None)

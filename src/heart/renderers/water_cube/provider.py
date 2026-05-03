@@ -27,9 +27,9 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> reactive.Observable[WaterCubeState]:
         if self._accelerometer_debug_profile.should_use_debug_input():
-            accel = self._accelerometer_debug_profile.node()
+            accel = self._accelerometer_debug_profile.observable()
         else:
-            accel = self._accelerometer_controller.node()
+            accel = self._accelerometer_controller.observable()
 
         def update_state(prev: WaterCubeState, acceleration: Acceleration):
             return prev._step(
