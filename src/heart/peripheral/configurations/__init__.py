@@ -95,18 +95,18 @@ def _detect_drawing_pads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(DrawingPad.detect())
 
 def _detect_radios() -> Iterator[Peripheral[Any]]:
-    from heart.peripheral.flowtoy import FlowToyPeripheral
+    from heart.peripheral.radio import RadioPeripheral
 
-    yield from itertools.chain(FlowToyPeripheral.detect())
+    yield from itertools.chain(RadioPeripheral.detect())
 
 def _radio_detection_node(
     *,
     start_immediately: bool,
     on_detect: Any | None,
 ) -> Any:
-    from heart.peripheral.flowtoy import FlowToyPeripheral
+    from heart.peripheral.radio import RadioPeripheral
 
-    return FlowToyPeripheral.detection_node(
+    return RadioPeripheral.detection_node(
         spawn_sources=True,
         on_detect=on_detect,
         start_immediately=start_immediately,
