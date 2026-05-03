@@ -73,6 +73,13 @@ def _gamepad_snapshot(
     )
 
 
+def _enable_keyboard_polling(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "heart.peripheral.core.input.keyboard.Configuration.is_pi",
+        lambda: False,
+    )
+
+
 class TestInputDebugTap:
     """Group debug-tap tests so traced input lineage stays inspectable during runtime and tests."""
 
@@ -144,7 +151,7 @@ class TestKeyboardController:
 
         tap = InputDebugTap()
         controller = KeyboardController(tap)
-        monkeypatch.setenv("X11_FORWARD", "1")
+        _enable_keyboard_polling(monkeypatch)
 
         class _KeyStateStub:
             def __len__(self) -> int:
@@ -183,7 +190,7 @@ class TestKeyboardController:
 
         tap = InputDebugTap()
         controller = KeyboardController(tap)
-        monkeypatch.setenv("X11_FORWARD", "1")
+        _enable_keyboard_polling(monkeypatch)
 
         class _KeyStateStub:
             def __len__(self) -> int:
@@ -226,7 +233,7 @@ class TestKeyboardController:
         tap = InputDebugTap()
         controller = KeyboardController(tap)
         call_order: list[str] = []
-        monkeypatch.setenv("X11_FORWARD", "1")
+        _enable_keyboard_polling(monkeypatch)
 
         class _KeyStateStub:
             def __len__(self) -> int:
