@@ -6,7 +6,9 @@ from typing import Any
 from manyfold import Graph
 from pytest import MonkeyPatch
 
+from heart.peripheral.compass import Compass, compass_detection_route
 from heart.peripheral.configurations import (_accelerometer_detection_node,
+                                             _compass_detection_node,
                                              _detect_drawing_pads,
                                              _detect_gamepads,
                                              _detect_heart_rate_sensor,
@@ -229,6 +231,49 @@ class TestManyfoldAccelerometerConfiguration:
         nodes = _manyfold_graph_nodes()
 
         assert _accelerometer_detection_node in nodes
+
+    def test_compass_detection_node_spawns_compass_source(
+        self,
+        monkeypatch,
+    ) -> None:
+        detected = Compass()
+
+        def _detect(cls) -> Iterator[Compass]:
+            yield detected
+
+        monkeypatch.setattr(Compass, "detect", classmethod(_detect))
+        graph = Graph()
+        registered: list[Compass] = []
+
+        handle = _compass_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(compass_detection_route())
+        assert registered == [detected]
+        assert len(handle.spawned_handles) == 1
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.compass.detected"
+
+    def test_manyfold_graph_nodes_include_compass_on_pi(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        nodes = _manyfold_graph_nodes()
+
+        assert _compass_detection_node in nodes
 
     def test_manyfold_graph_nodes_keep_fake_accelerometer_direct_off_pi(
         self,
