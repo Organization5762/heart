@@ -16,7 +16,12 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import manyfold.rx as reactivex
 from bleak import BleakClient, BleakScanner
+from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
+                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
 from manyfold.rx.subject import Subject
+from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
+                                StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.logging import get_logger
@@ -58,8 +63,14 @@ RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE = (
     "U'",
 )
 RUBIKS_CONNECTED_X_THREAD_NAME = "peripheral-rubiks-connected-x"
+RUBIKS_CONNECTED_X_DETECTED_EVENT = "peripheral.rubiks_connected_x.detected"
+RUBIKS_CONNECTED_X_NOTIFICATION_EVENT = (
+    "peripheral.rubiks_connected_x.notification"
+)
 RUBIKS_CONNECTED_X_DISABLE_ORIENTATION_COMMAND = b"\x37"
 RUBIKS_CONNECTED_X_REQUEST_STATE_COMMAND = b"\x33"
+RUBIKS_CONNECTED_X_GRAPH_OWNER = OwnerName("heart.rubiks_connected_x")
+RUBIKS_CONNECTED_X_GRAPH_FAMILY = StreamFamily("peripheral")
 DEFAULT_RUBIKS_CONNECTED_X_ADDRESS = "E1:EE:92:6B:CF:CD"
 DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME = "RubiksX_CDCF6B"
 RUBIKS_CONNECTED_X_NAME_TOKENS = (
@@ -88,6 +99,57 @@ class RubiksConnectedXMessageType(StrEnum):
     BATTERY = "battery"
     OFFLINE_STATS = "offline_stats"
     CUBE_TYPE = "cube_type"
+
+
+def rubiks_connected_x_detection_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RUBIKS_CONNECTED_X_GRAPH_OWNER,
+        family=RUBIKS_CONNECTED_X_GRAPH_FAMILY,
+        stream=StreamName("detected"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartRubiksConnectedXDetectionEvent"),
+    )
+
+
+def rubiks_connected_x_notification_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RUBIKS_CONNECTED_X_GRAPH_OWNER,
+        family=RUBIKS_CONNECTED_X_GRAPH_FAMILY,
+        stream=StreamName("notifications"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartRubiksConnectedXNotificationEvent"),
+    )
+
+
+def rubiks_connected_x_exception_schema() -> Schema[BaseException]:
+    def encode(exc: BaseException) -> bytes:
+        return f"{type(exc).__name__}:{exc}".encode("utf-8")
+
+    def decode(payload: bytes) -> BaseException:
+        return RuntimeError(payload.decode("utf-8"))
+
+    return Schema(
+        schema_id="PythonException",
+        version=1,
+        encode=encode,
+        decode=decode,
+    )
+
+
+def rubiks_connected_x_error_route() -> TypedRoute[BaseException]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RUBIKS_CONNECTED_X_GRAPH_OWNER,
+        family=RUBIKS_CONNECTED_X_GRAPH_FAMILY,
+        stream=StreamName("errors"),
+        variant=Variant.Meta,
+        schema=rubiks_connected_x_exception_schema(),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1022,6 +1084,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self._sequence = 0
         self._frame_buffers: dict[str, bytearray] = {}
         self._last_bluez_connect_attempt_monotonic = 0.0
+        self._managed_graph_node_installed = False
 
     def _event_stream(self) -> reactivex.Observable[RubiksConnectedXNotification]:
         return self._events
@@ -1050,7 +1113,62 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         )
         return
 
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        detector: Any | None = None,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        notification_output_route: TypedRoute[SensorEvent] | None = None,
+        notification_error_route: TypedRoute[BaseException] | None = None,
+        spawn_sources: bool = False,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or rubiks_connected_x_detection_route()
+        resolved_notification_output_route = (
+            notification_output_route or rubiks_connected_x_notification_route()
+        )
+
+        def mapper(peripheral: "RubiksConnectedXPeripheral") -> SensorEvent:
+            return SensorEvent(
+                event_type=RUBIKS_CONNECTED_X_DETECTED_EVENT,
+                data={
+                    "address": peripheral.address,
+                    "name": peripheral.name,
+                    "characteristic_uuids": list(peripheral.characteristic_uuids),
+                },
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        def spawn(peripheral: "RubiksConnectedXPeripheral", access: Any) -> None:
+            if not spawn_sources:
+                return
+            access.own(
+                peripheral.install_node(
+                    access.graph,
+                    output_route=resolved_notification_output_route,
+                    error_route=notification_error_route
+                    or rubiks_connected_x_error_route(),
+                )
+            )
+
+        return DetectionNode(
+            name="heart-rubiks-connected-x-detection",
+            detector=detector or cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            spawn=spawn,
+            error_route=rubiks_connected_x_error_route(),
+            group="rubiks-connected-x-detection",
+            start_immediately=start_immediately,
+        )
+
     def run(self) -> None:
+        if self._managed_graph_node_installed:
+            return
         if self._thread is not None and self._thread.is_alive():
             return
         self._stop_event.clear()
@@ -1063,6 +1181,57 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
 
     def stop(self) -> None:
         self._stop_event.set()
+
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this cube as a self-running Manyfold graph notification source."""
+
+        resolved_output_route = output_route or rubiks_connected_x_notification_route()
+        self._managed_graph_node_installed = True
+
+        def _publish(notification: RubiksConnectedXNotification) -> None:
+            graph.publish(
+                resolved_output_route,
+                self._notification_to_sensor_event(notification),
+            )
+
+        def _body(stop: StopToken, _graph: Graph) -> None:
+            subscription = self._events.subscribe(_publish)
+            try:
+                asyncio.run(self._monitor_until_stopped(stop))
+            finally:
+                subscription.dispose()
+
+        return ManagedGraphNode(
+            name="heart-rubiks-connected-x",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or rubiks_connected_x_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff or BackoffPolicy.fixed(DEFAULT_RECONNECT_DELAY_SECONDS),
+            group="rubiks-connected-x",
+            start_immediately=start_immediately,
+        ).install(graph)
+
+    async def _monitor_until_stopped(self, stop: StopToken) -> None:
+        self._stop_event.clear()
+        monitor_task = asyncio.create_task(self._monitor_forever())
+        try:
+            while not stop.is_set() and not monitor_task.done():
+                await asyncio.sleep(DEFAULT_IDLE_POLL_INTERVAL_SECONDS)
+            if stop.is_set():
+                self.stop()
+            await monitor_task
+        finally:
+            self.stop()
 
     def _run_thread(self) -> None:
         try:
@@ -1273,7 +1442,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
                     and parsed_message.message_type is RubiksConnectedXMessageType.STATE
                 ):
                     logger.info("Observed Rubik's Connected X full state sync.")
-                self._events.on_next(
+                self._emit_notification(
                     RubiksConnectedXNotification(
                         characteristic_uuid=characteristic_uuid,
                         payload_hex=payload.hex(" "),
@@ -1286,3 +1455,18 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
                 )
 
         return _callback
+
+    def _emit_notification(self, notification: RubiksConnectedXNotification) -> None:
+        self._events.on_next(notification)
+
+    def _notification_to_sensor_event(
+        self,
+        notification: RubiksConnectedXNotification,
+    ) -> SensorEvent:
+        return SensorEvent(
+            event_type=RUBIKS_CONNECTED_X_NOTIFICATION_EVENT,
+            data=serialize_rubiks_connected_x_notification(notification),
+            observed_at=time.time(),
+            identity=self.peripheral_info().to_sensor_identity(),
+            sequence_number=notification.sequence,
+        )

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from manyfold import DetectionNode, Layer, OwnerName, Plane, StreamFamily
-from manyfold import StreamName, TypedEnvelope, TypedRoute, Variant, route
+from manyfold import (DetectionNode, Layer, OwnerName, Plane, StreamFamily,
+                      StreamName, TypedEnvelope, TypedRoute, Variant, route)
 from manyfold.sensor_io import (ManagedGraphNode, SensorEvent, StopToken,
                                 sensor_event_schema)
 

@@ -4,20 +4,26 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from typing import Any
+
+from manyfold import Graph
 
 import heart.peripheral.rubiks_connected_x as rubiks_connected_x_module
 from heart.peripheral.rubiks_connected_x import (
     DEFAULT_RUBIKS_CONNECTED_X_ADDRESS,
     DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME,
-    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RUBIKS_CONNECTED_X_SOLVED_FACELETS,
+    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RUBIKS_CONNECTED_X_DETECTED_EVENT,
+    RUBIKS_CONNECTED_X_NOTIFICATION_EVENT, RUBIKS_CONNECTED_X_SOLVED_FACELETS,
     RubiksConnectedXMessageType, RubiksConnectedXNotification,
     RubiksConnectedXPeripheral, candidate_from_scan_result,
     extract_rubiks_connected_x_frames, normalize_candidate_name,
     parse_rubiks_connected_x_facelets, parse_rubiks_connected_x_message,
     parse_rubiks_connected_x_packet, render_candidate_line,
     render_notification_line, rubiks_connected_x_candidate_score,
-    rubiks_connected_x_face_slice, serialize_rubiks_connected_x_notification,
-    snapshot_services, summarize_rubiks_connected_x_notifications)
+    rubiks_connected_x_detection_route, rubiks_connected_x_face_slice,
+    rubiks_connected_x_notification_route,
+    serialize_rubiks_connected_x_notification, snapshot_services,
+    summarize_rubiks_connected_x_notifications)
 
 
 class TestRubiksConnectedXHelpers:
@@ -357,6 +363,74 @@ class TestRubiksConnectedXHelpers:
         assert len(peripherals) == 1
         assert peripherals[0].address == DEFAULT_RUBIKS_CONNECTED_X_ADDRESS
         assert peripherals[0].name == DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME
+
+    def test_detection_node_publishes_detected_cube_to_manyfold_route(self) -> None:
+        """Verify cube discovery can be represented as a Manyfold graph source instead of a manager-only detector."""
+
+        detected = RubiksConnectedXPeripheral(address="AA:BB:CC:DD", name="Cube")
+        graph = Graph()
+        detection_route = rubiks_connected_x_detection_route()
+        registered: list[RubiksConnectedXPeripheral] = []
+
+        handle = RubiksConnectedXPeripheral.detection_node(
+            detector=lambda: iter((detected,)),
+            output_route=detection_route,
+            on_detect=lambda peripheral, _graph: registered.append(peripheral),
+            start_immediately=False,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(detection_route)
+        assert latest is not None
+        assert latest.value.event_type == RUBIKS_CONNECTED_X_DETECTED_EVENT
+        assert latest.value.data["address"] == "AA:BB:CC:DD"
+        assert latest.value.identity.id == "rubiks-connected-x:AA:BB:CC:DD"
+        assert registered == [detected]
+
+    def test_detection_node_can_spawn_notification_source(self, monkeypatch) -> None:
+        """Verify detected cubes can install their runtime notification source through graph access."""
+
+        notification = RubiksConnectedXNotification(
+            characteristic_uuid="6e400003-b5a3-f393-e0a9-e50e24dcca9e",
+            payload_hex="2a 06 01 02 00 33 0d 0a",
+            payload_utf8=None,
+            byte_count=8,
+            sequence=7,
+        )
+        detected = RubiksConnectedXPeripheral(address="AA:BB:CC:DD", name="Cube")
+
+        async def fake_monitor_until_stopped(self: Any, stop: Any) -> None:
+            self._emit_notification(notification)
+            stop.set()
+
+        monkeypatch.setattr(
+            RubiksConnectedXPeripheral,
+            "_monitor_until_stopped",
+            fake_monitor_until_stopped,
+        )
+        graph = Graph()
+        detection_route = rubiks_connected_x_detection_route()
+        notification_route = rubiks_connected_x_notification_route()
+
+        handle = RubiksConnectedXPeripheral.detection_node(
+            detector=lambda: iter((detected,)),
+            output_route=detection_route,
+            notification_output_route=notification_route,
+            spawn_sources=True,
+            start_immediately=False,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+        assert len(handle.spawned_handles) == 1
+        spawned = handle.spawned_handles[0]
+        spawned.loop_handle.loop.run(spawned.loop_handle.token)
+
+        latest = graph.latest(notification_route)
+        assert latest is not None
+        assert latest.value.event_type == RUBIKS_CONNECTED_X_NOTIFICATION_EVENT
+        assert latest.value.sequence_number == 7
+        assert latest.value.data["payload_hex"] == "2a 06 01 02 00 33 0d 0a"
 
     def test_resolve_runtime_device_attempts_bluez_connect_for_known_address(
         self,

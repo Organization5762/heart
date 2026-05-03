@@ -4,8 +4,8 @@ import itertools
 import os
 from typing import Any, Iterator
 
-from heart.peripheral.configuration import GraphNodeFactory
 from heart.peripheral.compass import Compass
+from heart.peripheral.configuration import GraphNodeFactory
 from heart.peripheral.core import Peripheral
 from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
@@ -60,6 +60,22 @@ def _detect_rubiks_connected_x() -> Iterator[Peripheral[Any]]:
     if not configured_address and not autodetect_enabled:
         return
     yield from itertools.chain(RubiksConnectedXPeripheral.detect())
+
+def _rubiks_connected_x_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return RubiksConnectedXPeripheral.detection_node(
+        detector=_detect_rubiks_connected_x,
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+def _rubiks_connected_x_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (_rubiks_connected_x_detection_node,)
+
 def _detect_sensors() -> Iterator[Peripheral[Any]]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
         yield from itertools.chain(Accelerometer.detect(), Compass.detect())
@@ -98,6 +114,9 @@ def _radio_detection_node(
 
 def _radio_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (_radio_detection_node,)
+
+def _manyfold_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (*_radio_graph_nodes(), *_rubiks_connected_x_graph_nodes())
 
 def _detect_uwb_position() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(FakeUWBPositioning.detect())
