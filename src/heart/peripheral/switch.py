@@ -292,6 +292,47 @@ class FakeSwitch(BaseSwitch):
         else:
             logger.warning("Not running FakeSwitch")
 
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        poll_interval_seconds: float = 0.01,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this fake switch as a Manyfold-managed graph state source."""
+
+        resolved_output_route = output_route or switch_state_event_route()
+
+        def _body(stop: StopToken, graph: Graph) -> None:
+            previous_state: SwitchState | None = None
+            while not stop.is_set():
+                state = self._snapshot()
+                if state != previous_state:
+                    graph.publish(
+                        resolved_output_route,
+                        self._state_to_sensor_event(state),
+                    )
+                    previous_state = state
+                if poll_interval_seconds <= 0:
+                    stop.set()
+                    continue
+                stop.wait(poll_interval_seconds)
+
+        return ManagedGraphNode(
+            name="heart-fake-switch-state",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or switch_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff or BackoffPolicy.fixed(0.5),
+            group="switch",
+            start_immediately=start_immediately,
+        ).install(graph)
+
     def _handle_alternate_activate(self, _: Any) -> None:
         self.button_long_press_value += 1
         self.rotation_value_at_last_long_button_press = self.rotational_value
