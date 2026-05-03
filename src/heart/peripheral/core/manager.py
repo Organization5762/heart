@@ -1,7 +1,7 @@
 from typing import Any, Iterable
 
-from manyfold import Graph
 import manyfold.rx as reactivex
+from manyfold import Graph
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
