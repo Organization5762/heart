@@ -5,14 +5,18 @@ from collections.abc import Iterator
 from manyfold import Graph
 
 from heart.peripheral.configurations import (_accelerometer_detection_node,
+                                             _detect_gamepads,
                                              _detect_heart_rate_sensor,
                                              _detect_radios, _detect_switches,
+                                             _gamepad_detection_node,
                                              _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
                                              _microphone_detection_node,
                                              _radio_detection_node,
                                              _switch_detection_node)
 from heart.peripheral.configurations.default import configure
+from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.gamepad.gamepad import gamepad_detection_route
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
 from heart.peripheral.microphone import (Microphone,
                                          microphone_detection_route,
@@ -189,6 +193,47 @@ class TestManyfoldAccelerometerConfiguration:
         nodes = _manyfold_graph_nodes()
 
         assert _accelerometer_detection_node not in nodes
+
+
+class TestManyfoldGamepadConfiguration:
+    """Cover default graph-node factories so gamepad discovery stays Manyfold-owned."""
+
+    def test_gamepad_detection_node_publishes_detection_event(
+        self,
+        monkeypatch,
+    ) -> None:
+        detected = Gamepad(joystick_id=2)
+
+        def _detect(cls) -> Iterator[Gamepad]:
+            yield detected
+
+        monkeypatch.setattr(Gamepad, "detect", classmethod(_detect))
+        graph = Graph()
+        registered: list[Gamepad] = []
+
+        handle = _gamepad_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(gamepad_detection_route())
+        assert registered == [detected]
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.gamepad.detected"
+        assert latest_detection.value.data == {
+            "joystick_id": 2,
+            "connected": False,
+            "name": None,
+        }
+        assert latest_detection.value.identity.id == "gamepad:2"
+
+    def test_default_configuration_moves_gamepad_to_graph_node(self) -> None:
+        configuration = configure()
+
+        assert _gamepad_detection_node in configuration.graph_nodes
+        assert _detect_gamepads not in configuration.detectors
 
 
 class TestManyfoldSwitchConfiguration:

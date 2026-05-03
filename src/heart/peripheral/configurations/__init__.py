@@ -120,6 +120,19 @@ def _accelerometer_graph_nodes() -> tuple[GraphNodeFactory, ...]:
 def _detect_gamepads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(Gamepad.detect())
 
+def _gamepad_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return Gamepad.detection_node(
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+def _gamepad_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (_gamepad_detection_node,)
+
 def _detect_heart_rate_sensor() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(HeartRateManager.detect())
 
@@ -182,6 +195,7 @@ def _manyfold_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (
         *_switch_graph_nodes(),
         *_accelerometer_graph_nodes(),
+        *_gamepad_graph_nodes(),
         *_heart_rate_graph_nodes(),
         *_radio_graph_nodes(),
         *_rubiks_connected_x_graph_nodes(),
