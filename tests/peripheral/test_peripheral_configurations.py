@@ -40,7 +40,8 @@ from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     radio_packet_event_route)
 from heart.peripheral.sensor import (Accelerometer,
                                      accelerometer_detection_route,
-                                     accelerometer_vector_event_route)
+                                     accelerometer_vector_event_route,
+                                     magnetometer_vector_event_route)
 from heart.peripheral.uwb import (BaseStationMeasurement, FakeUWBPositioning,
                                   LocalizedTarget, uwb_detection_route,
                                   uwb_position_event_route)
@@ -175,6 +176,42 @@ class TestManyfoldAccelerometerConfiguration:
         assert latest_vector is not None
         assert latest_vector.value.event_type == "peripheral.accelerometer.vector"
         assert latest_vector.value.data == {"x": 1.0, "y": 2.0, "z": 3.0}
+
+    def test_accelerometer_detection_node_spawns_magnetometer_source(
+        self,
+        monkeypatch,
+    ) -> None:
+        payload = b'{"event_type":"sensor.magnetic","data":{"x":7,"y":8,"z":9}}\n'
+        detected = Accelerometer(port="/dev/ttyUSB0", baudrate=115200)
+
+        def _detect(cls) -> Iterator[Accelerometer]:
+            yield detected
+
+        monkeypatch.setattr(Accelerometer, "detect", classmethod(_detect))
+        monkeypatch.setattr(
+            detected,
+            "_connect_to_ser",
+            lambda: _SerialStub(iter((payload,))),
+        )
+        graph = Graph()
+
+        handle = _accelerometer_detection_node(
+            start_immediately=False,
+            on_detect=None,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+        assert len(handle.spawned_handles) == 1
+
+        spawned = handle.spawned_handles[0]
+        spawned.loop_handle.loop.run(spawned.loop_handle.token)
+
+        latest_detection = graph.latest(accelerometer_detection_route())
+        latest_vector = graph.latest(magnetometer_vector_event_route())
+        assert latest_detection is not None
+        assert latest_vector is not None
+        assert latest_vector.value.event_type == "peripheral.magnetometer.vector"
+        assert latest_vector.value.data == {"x": 7.0, "y": 8.0, "z": 9.0}
 
     def test_manyfold_graph_nodes_include_accelerometer_on_pi(
         self,

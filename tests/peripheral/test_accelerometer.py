@@ -8,7 +8,8 @@ from manyfold.sensor_io import BackoffPolicy, RetryPolicy
 from heart.peripheral.sensor import (Accelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_error_route,
-                                     accelerometer_vector_event_route)
+                                     accelerometer_vector_event_route,
+                                     magnetometer_vector_event_route)
 
 
 class _SerialStub:
@@ -85,6 +86,34 @@ class TestAccelerometerManyfoldNode:
         assert latest.value.data == {"x": 1.0, "y": 2.0, "z": 3.0}
         assert latest.value.identity.id == "accelerometer:/dev/ttyUSB0"
         assert peripheral.get_acceleration() is not None
+
+    def test_install_node_publishes_magnetometer_vectors_to_manyfold_route(
+        self,
+        monkeypatch,
+    ) -> None:
+        peripheral = Accelerometer(port="/dev/ttyUSB0", baudrate=115200)
+        payload = b'{"event_type":"sensor.magnetic","data":{"x":7,"y":8,"z":9}}\n'
+        monkeypatch.setattr(
+            peripheral,
+            "_connect_to_ser",
+            lambda: _SerialStub(iter((payload,))),
+        )
+        graph = Graph()
+
+        handle = peripheral.install_node(
+            graph,
+            start_immediately=False,
+            retry=RetryPolicy(max_attempts=1),
+            backoff=BackoffPolicy.none(),
+        )
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(magnetometer_vector_event_route())
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.magnetometer.vector"
+        assert latest.value.data == {"x": 7.0, "y": 8.0, "z": 9.0}
+        assert latest.value.identity.id == "accelerometer:/dev/ttyUSB0"
+        assert peripheral.get_acceleration() is None
 
     def test_detection_node_can_spawn_vector_source(self, monkeypatch) -> None:
         detected = Accelerometer(port="/dev/ttyUSB0", baudrate=115200)

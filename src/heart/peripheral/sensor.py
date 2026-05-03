@@ -15,8 +15,10 @@ from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 StopToken, sensor_event_schema)
 
 import heart.utilities.reactive as reactive
-from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.input_payloads.motion import AccelerometerVector
+from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
+                                   PeripheralTag)
+from heart.peripheral.input_payloads.motion import (AccelerometerVector,
+                                                    MagnetometerVector)
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
@@ -28,6 +30,7 @@ logger = get_logger(__name__)
 RECONNECT_DELAY_SECONDS = 1.0
 ACCELEROMETER_THREAD_NAME = "peripheral-accelerometer"
 ACCELEROMETER_GRAPH_OWNER = OwnerName("heart.accelerometer")
+MAGNETOMETER_GRAPH_OWNER = OwnerName("heart.magnetometer")
 ACCELEROMETER_GRAPH_FAMILY = StreamFamily("peripheral")
 
 
@@ -40,6 +43,18 @@ def accelerometer_vector_event_route() -> TypedRoute[SensorEvent]:
         stream=StreamName("vectors"),
         variant=Variant.Meta,
         schema=sensor_event_schema("HeartAccelerometerVectorEvent"),
+    )
+
+
+def magnetometer_vector_event_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=MAGNETOMETER_GRAPH_OWNER,
+        family=ACCELEROMETER_GRAPH_FAMILY,
+        stream=StreamName("vectors"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartMagnetometerVectorEvent"),
     )
 
 
@@ -210,6 +225,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
         graph: Graph,
         *,
         output_route: TypedRoute[SensorEvent] | None = None,
+        magnetometer_output_route: TypedRoute[SensorEvent] | None = None,
         error_route: TypedRoute[BaseException] | None = None,
         retry: RetryPolicy | None = None,
         backoff: BackoffPolicy | None = None,
@@ -218,6 +234,9 @@ class Accelerometer(Peripheral[Acceleration | None]):
         """Install this accelerometer as a self-running Manyfold graph source."""
 
         resolved_output_route = output_route or accelerometer_vector_event_route()
+        resolved_magnetometer_output_route = (
+            magnetometer_output_route or magnetometer_vector_event_route()
+        )
 
         def _body(stop: StopToken, graph: Graph) -> None:
             try:
@@ -226,12 +245,20 @@ class Accelerometer(Peripheral[Acceleration | None]):
                         datum = ser.readline()
                         if not datum:
                             continue
-                        acceleration = self._process_data(datum)
-                        if acceleration is None:
+                        sensor_input = self._process_data(datum)
+                        if sensor_input is None:
                             continue
+                        output = (
+                            resolved_magnetometer_output_route
+                            if sensor_input.event_type
+                            == MagnetometerVector.EVENT_TYPE
+                            else resolved_output_route
+                        )
                         graph.publish(
-                            resolved_output_route,
-                            self._acceleration_to_sensor_event(acceleration),
+                            output,
+                            sensor_input.to_sensor_event(
+                                identity=self.peripheral_info().to_sensor_identity()
+                            ),
                         )
             except KeyboardInterrupt:
                 stop.set()
@@ -240,7 +267,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
         return ManagedGraphNode(
             name="heart-accelerometer-vectors",
             body=_body,
-            output_routes=(resolved_output_route,),
+            output_routes=(resolved_output_route, resolved_magnetometer_output_route),
             error_route=error_route or accelerometer_error_route(),
             retry=retry or RetryPolicy(max_attempts=1_000_000),
             backoff=backoff or BackoffPolicy.fixed(RECONNECT_DELAY_SECONDS),
@@ -248,7 +275,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
             start_immediately=start_immediately,
         ).install(graph)
 
-    def _process_data(self, data: bytes) -> Acceleration | None:
+    def _process_data(self, data: bytes) -> Input | None:
         bus_data = data.decode("utf-8").rstrip()
         if not bus_data:
             return None
@@ -288,8 +315,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
             )
             return None
 
-
-    def _update_due_to_data(self, data: dict[str, Any]) -> Acceleration | None:
+    def _update_due_to_data(self, data: dict[str, Any]) -> Input | None:
         event_type = data.get("event_type")
         payload = data.get("data")
         if not isinstance(payload, dict):
@@ -299,12 +325,11 @@ class Accelerometer(Peripheral[Acceleration | None]):
         if event_type in {"acceleration", "sensor.acceleration"}:
             return self._handle_acceleration(payload)
         if event_type in {"magnetic", "sensor.magnetic"}:
-            self._handle_magnetic(payload)
-            return None
+            return self._handle_magnetic(payload)
         logger.debug("Ignoring unknown sensor payload type: %s", event_type)
         return None
 
-    def _handle_acceleration(self, payload: Mapping[str, Any]) -> Acceleration | None:
+    def _handle_acceleration(self, payload: Mapping[str, Any]) -> Input | None:
         try:
             vector = AccelerometerVector(
                 x=float(payload["x"]),
@@ -317,35 +342,20 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
         input_event = vector.to_input()
         self.acceleration_value = cast(dict[str, float], input_event.data)
-        return Acceleration(
-            x=self.acceleration_value["x"],
-            y=self.acceleration_value["y"],
-            z=self.acceleration_value["z"],
-        )
+        return input_event
 
-    def _acceleration_to_sensor_event(self, acceleration: Acceleration) -> SensorEvent:
-        vector = AccelerometerVector(
-            x=acceleration.x,
-            y=acceleration.y,
-            z=acceleration.z,
-        )
-        return vector.to_input().to_sensor_event(
-            identity=self.peripheral_info().to_sensor_identity()
-        )
+    def _handle_magnetic(self, payload: Mapping[str, Any]) -> Input | None:
+        try:
+            vector = MagnetometerVector(
+                x=float(payload["x"]),
+                y=float(payload["y"]),
+                z=float(payload["z"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.debug("Magnetometer payload missing axis components: %s", payload)
+            return None
+        return vector.to_input()
 
-    def _handle_magnetic(self, payload: Mapping[str, Any]) -> None:
-        logger.debug("Ignoring magnetic payload: %s", payload)
-        # try:
-        #     vector = MagnetometerVector(
-        #         x=float(payload["x"]),
-        #         y=float(payload["y"]),
-        #         z=float(payload["z"]),
-        #     )
-        # except (KeyError, TypeError, ValueError):
-        #     logger.debug("Magnetometer payload missing axis components: %s", payload)
-        #     return
-
-        # raise NotImplementedError("")
 
 class FakeAccelerometer(Peripheral[Acceleration | None]):
     @classmethod
