@@ -9,9 +9,7 @@ from enum import StrEnum
 from math import ceil
 from typing import Any
 
-from manyfold import StreamNode
-
-from heart.peripheral.core.streams import EventStream
+from manyfold import EventStream, StreamNode
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
 DEFAULT_LATENCY_HISTORY_SIZE = 512

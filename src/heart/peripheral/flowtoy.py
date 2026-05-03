@@ -6,10 +6,9 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-from manyfold import StreamNode
+from manyfold import EventStream, StreamNode
 
 from heart.peripheral.core import PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (RadioPeripheral, RawRadioPacket,
                                     SerialRadioDriver)

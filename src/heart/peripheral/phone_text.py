@@ -11,15 +11,14 @@ from collections.abc import Iterator
 from types import ModuleType
 from typing import Any, Callable, Self, cast
 
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (DetectionNode, EventStream, Graph, Layer,
+                      ManagedGraphNode, ManagedGraphNodeHandle, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, StreamNode,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 

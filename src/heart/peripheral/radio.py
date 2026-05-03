@@ -9,15 +9,14 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (DetectionNode, EventStream, Graph, Layer,
+                      ManagedGraphNode, ManagedGraphNodeHandle, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, StreamNode,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Input, Peripheral
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import

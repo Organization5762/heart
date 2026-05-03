@@ -10,15 +10,14 @@ from types import TracebackType
 from typing import Any, Self, cast
 
 import numpy as np
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (DetectionNode, EventStream, Graph, Layer,
+                      ManagedGraphNode, ManagedGraphNodeHandle, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, StreamNode,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import

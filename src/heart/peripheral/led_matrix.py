@@ -7,11 +7,10 @@ import threading
 from datetime import datetime
 from typing import Any, Mapping
 
-from manyfold import StreamNode
+from manyfold import EventStream, StreamNode
 from PIL import Image
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller

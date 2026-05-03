@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import TypeVar
 
 import pygame
-from manyfold import CompositeSubscription, MergeNode, StreamNode
+from manyfold import CompositeSubscription, EventStream, MergeNode, StreamNode
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
@@ -17,7 +17,6 @@ from heart.peripheral.core.input.keyboard import KeyboardController
 from heart.peripheral.core.input.streams import (map_stream, merge_streams,
                                                  threshold_direction)
 from heart.peripheral.core.nodes import empty_node
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.switch import SwitchState
 
 NAVIGATION_STICK_THRESHOLD = 0.6

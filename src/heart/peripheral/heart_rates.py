@@ -4,10 +4,10 @@ import time
 from typing import (Any, Callable, ClassVar, Dict, Iterator, List, Optional,
                     SupportsIndex, Tuple, overload)
 
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (DetectionNode, EventStream, Graph, Layer,
+                      ManagedGraphNode, ManagedGraphNodeHandle, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, StreamNode,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from openant.base.ant import usb
@@ -22,7 +22,6 @@ from openant.easy.node import Node
 from usb.core import NoBackendError
 
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads import (HeartRateLifecycle,
                                              HeartRateMeasurement)
 from heart.utilities.logging import get_logger

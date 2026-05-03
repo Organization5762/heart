@@ -15,15 +15,14 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
 from bleak import BleakClient, BleakScanner
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (DetectionNode, EventStream, Graph, Layer,
+                      ManagedGraphNode, ManagedGraphNodeHandle, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, StreamNode,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)

@@ -5,10 +5,9 @@ from dataclasses import dataclass
 from typing import cast
 
 import pygame
-from manyfold import StreamNode
+from manyfold import EventStream, StreamNode
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.peripheral.core.streams import EventStream
 
 
 @dataclass(frozen=True, slots=True)

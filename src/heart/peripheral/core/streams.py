@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import cached_property
-from threading import Lock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 from manyfold import (CallbackObservable, Graph, Layer, MergeNode, OwnerName,
@@ -16,115 +15,6 @@ PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
-
-
-class EventStream(Generic[T]):
-    """Small Heart-owned push stream for event producers."""
-
-    def __init__(self) -> None:
-        self._lock = Lock()
-        self._subscribers: dict[int, Any] = {}
-        self._next_subscription_id = 0
-
-    @property
-    def lock(self) -> Lock:
-        return self._lock
-
-    def emit(self, value: T) -> None:
-        with self._lock:
-            subscribers = tuple(self._subscribers.values())
-        for subscriber in subscribers:
-            subscriber(value)
-
-    def observable(self) -> StreamNode[T]:
-        return cast(StreamNode[T], self)
-
-    def subscribe(
-        self,
-        observer: Callable[[T], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[T], None] | None = None,
-    ) -> Any:
-        del on_error, on_completed, scheduler
-        callback = on_next or observer
-        if callback is None:
-
-            def callback(_value: T) -> None:
-                return None
-
-        if not callable(callback):
-            callback = callback.on_next
-        with self._lock:
-            subscription_id = self._next_subscription_id
-            self._next_subscription_id += 1
-            self._subscribers[subscription_id] = callback
-        return _EventStreamSubscription(self, subscription_id)
-
-    def pipe(self, *operators: Any) -> StreamNode[Any]:
-        return stream_from(self).pipe(*operators)
-
-    def share(self) -> StreamNode[T]:
-        return cast(StreamNode[T], stream_from(self).share())
-
-    def map(self, transform: Callable[[T], Any], *, name: str | None = None) -> Any:
-        del name
-        return stream_from(self).map(transform).share()
-
-    def filter(self, predicate: Callable[[T], bool], *, name: str | None = None) -> Any:
-        del name
-        return stream_from(self).filter(predicate).share()
-
-    def do_action(
-        self,
-        on_next: Callable[[T], None] | None = None,
-        *_args: Any,
-        **_kwargs: Any,
-    ) -> StreamNode[T]:
-        return cast(StreamNode[T], stream_from(self).do_action(on_next).share())
-
-    def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
-        return stream_from(self).scan(accumulator, seed=seed).share()
-
-    def start_with(self, value: Any) -> Any:
-        return stream_from(self).start_with(value).share()
-
-    def distinct_until_changed(self) -> StreamNode[T]:
-        return cast(StreamNode[T], stream_from(self).distinct_until_changed().share())
-
-    def pairwise(self) -> Any:
-        return stream_from(self).pairwise().share()
-
-    def take(self, count: int) -> StreamNode[T]:
-        return cast(StreamNode[T], stream_from(self).take(count).share())
-
-    def with_latest_from(self, *sources: Any) -> Any:
-        return stream_from(self).with_latest_from(*sources).share()
-
-    def flat_map(self, project: Callable[[T], Any]) -> Any:
-        return stream_from(self).flat_map(project).share()
-
-    def switch_latest(self) -> Any:
-        return stream_from(self).switch_latest().share()
-
-    def _unsubscribe(self, subscription_id: int) -> None:
-        with self._lock:
-            self._subscribers.pop(subscription_id, None)
-
-
-class _EventStreamSubscription:
-    def __init__(self, stream: EventStream[Any], subscription_id: int) -> None:
-        self._stream = stream
-        self._subscription_id = subscription_id
-        self._disposed = False
-
-    def dispose(self) -> None:
-        if self._disposed:
-            return
-        self._disposed = True
-        self._stream._unsubscribe(self._subscription_id)
 
 
 def runtime_route(name: str, schema_id: str) -> Any:

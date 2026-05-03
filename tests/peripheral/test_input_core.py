@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pygame
-from manyfold import ConstantNode, Graph
+from manyfold import ConstantNode, EventStream, Graph
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core.input import (AccelerometerController,
@@ -27,7 +27,6 @@ from heart.peripheral.core.input.accelerometer import (
     ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
