@@ -4,7 +4,9 @@ from collections.abc import Iterator
 
 from manyfold import Graph
 
-from heart.peripheral.configurations import (_detect_radios,
+from heart.peripheral.configurations import (_accelerometer_detection_node,
+                                             _detect_radios,
+                                             _manyfold_graph_nodes,
                                              _microphone_detection_node,
                                              _radio_detection_node)
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
@@ -15,6 +17,26 @@ from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver,
                                     radio_detection_route,
                                     radio_packet_event_route)
+from heart.peripheral.sensor import (Accelerometer,
+                                     accelerometer_detection_route,
+                                     accelerometer_vector_event_route)
+
+
+class _SerialStub:
+    def __init__(self, packets: Iterator[bytes]) -> None:
+        self._packets = packets
+
+    def __enter__(self) -> "_SerialStub":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def readline(self) -> bytes:
+        try:
+            return next(self._packets)
+        except StopIteration:
+            raise KeyboardInterrupt
 
 
 class _DriverStub(RadioDriver):
@@ -86,6 +108,83 @@ class TestManyfoldRadioConfiguration:
         assert latest_packet is not None
         assert latest_packet.value.event_type == RadioPacket.EVENT_TYPE
         assert latest_packet.value.data["payload"] == [16]
+
+
+class TestManyfoldAccelerometerConfiguration:
+    """Cover default graph-node factories so connected IMU streams stay Manyfold-owned."""
+
+    def test_accelerometer_detection_node_spawns_vector_source(
+        self,
+        monkeypatch,
+    ) -> None:
+        payload = b'{"event_type":"sensor.acceleration","data":{"x":1,"y":2,"z":3}}\n'
+        detected = Accelerometer(port="/dev/ttyUSB0", baudrate=115200)
+
+        def _detect(cls) -> Iterator[Accelerometer]:
+            yield detected
+
+        monkeypatch.setattr(Accelerometer, "detect", classmethod(_detect))
+        monkeypatch.setattr(
+            detected,
+            "_connect_to_ser",
+            lambda: _SerialStub(iter((payload,))),
+        )
+        graph = Graph()
+        registered: list[Accelerometer] = []
+
+        handle = _accelerometer_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+        assert registered == [detected]
+        assert len(handle.spawned_handles) == 1
+
+        spawned = handle.spawned_handles[0]
+        spawned.loop_handle.loop.run(spawned.loop_handle.token)
+
+        latest_detection = graph.latest(accelerometer_detection_route())
+        latest_vector = graph.latest(accelerometer_vector_event_route())
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.accelerometer.detected"
+        assert latest_vector is not None
+        assert latest_vector.value.event_type == "peripheral.accelerometer.vector"
+        assert latest_vector.value.data == {"x": 1.0, "y": 2.0, "z": 3.0}
+
+    def test_manyfold_graph_nodes_include_accelerometer_on_pi(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        nodes = _manyfold_graph_nodes()
+
+        assert nodes[0] is _accelerometer_detection_node
+
+    def test_manyfold_graph_nodes_keep_fake_accelerometer_direct_off_pi(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        nodes = _manyfold_graph_nodes()
+
+        assert _accelerometer_detection_node not in nodes
 
 
 class TestManyfoldMicrophoneConfiguration:
