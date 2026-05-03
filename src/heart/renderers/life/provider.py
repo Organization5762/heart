@@ -1,17 +1,13 @@
-
 from typing import Callable
 
 import numpy as np
+from manyfold import MergeNode, StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.providers.switch import MainSwitchProvider
-from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
 from heart.utilities.env import Configuration
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 
 class LifeStateProvider:
@@ -26,9 +22,8 @@ class LifeStateProvider:
         self._randomness = randomness
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager | None = None,
-    ) -> reactive.Observable[LifeState]:
+        self, peripheral_manager: PeripheralManager | None = None
+    ) -> StreamNode[LifeState]:
         StateOp = Callable[[LifeState], LifeState]
         life_seed = Configuration.life_random_seed()
         rng = (
@@ -47,72 +42,38 @@ class LifeStateProvider:
             return lambda _: new_state
 
         def op_from_tick(_: object) -> StateOp:
-            # Advance the simulation one step
             return lambda s: s._update_grid()
 
-        # If the window size changes, we want to observe and correct for this
-        window_sizes: reactive.Observable[tuple[int, int]] = (
-            pipe_in_background(
-                self._pm.window,
-                ops.filter(lambda w: w is not None),
-                ops.map(lambda w: w.get_size()),
-                ops.distinct_until_changed(),
-                ops.share(),
+        window_sizes: StreamNode[tuple[int, int]] = (
+            self._pm.window.filter(lambda w: w is not None)
+            .map(lambda w: w.get_size())
+            .distinct_until_changed()
+            .share()
+            .share()
+        )
+        initial_state: StreamNode[LifeState] = (
+            window_sizes.take(1).map(create_new_grid).map(create_state).share()
+        )
+        reseed_states: StreamNode[LifeState] = (
+            self._main_switch.observable()
+            .with_latest_from(window_sizes)
+            .map(lambda pair: create_new_grid(pair[1]))
+            .map(create_state)
+            .share()
+            .share()
+        )
+        injected_states: StreamNode[LifeState] = MergeNode.merge(
+            initial_state, reseed_states
+        )
+        operations: StreamNode[StateOp] = MergeNode.merge(
+            injected_states.map(op_from_injected).share(),
+            self._pm.frame_tick_controller.observable().map(op_from_tick).share(),
+        )
+        result: StreamNode[LifeState] = initial_state.flat_map(
+            lambda first_state: operations.scan(
+                lambda acc, op: op(acc), seed=first_state
             )
-        )
-
-        # We create an initial state
-        initial_state: reactive.Observable[LifeState] = pipe_in_background(
-            window_sizes,
-
-            ops.take(1),
-            ops.map(create_new_grid),
-            ops.map(create_state),
-        )
-
-        # If the button changes, reseed the state
-        reseed_states: reactive.Observable[LifeState] = (
-            pipe_in_background(
-                self._main_switch.observable(),
-
-                ops.with_latest_from(window_sizes),
-                ops.map(lambda pair: create_new_grid((pair[1]))),
-                ops.map(create_state),
-                ops.share(),
-            )
-        )
-
-        # Combine the initial + concat state
-        injected_states: reactive.Observable[LifeState] = reactive.merge(
-            initial_state,
-            reseed_states
-        )
-
-        # Merge the initial state + update streams
-        operations: reactive.Observable[StateOp] = reactive.merge(
-            pipe_in_background(
-                injected_states,
-
-                ops.map(op_from_injected),
-            ),
-            pipe_in_background(
-                self._pm.frame_tick_controller.observable(),
-
-                ops.map(op_from_tick),
-            )
-        )
-
-        result: reactive.Observable[LifeState] = pipe_in_background(
-            initial_state,
-
-            ops.flat_map(
-                lambda first_state: pipe_in_background(
-                    operations,
-                    ops.scan(lambda acc, op: op(acc), seed=first_state),
-                    start_with_once(first_state),
-                )
-            ),
-            ops.share(),
-        )
-
+            .start_with(first_state)
+            .share()
+        ).share()
         return result

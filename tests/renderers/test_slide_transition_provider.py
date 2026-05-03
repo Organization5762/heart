@@ -19,7 +19,9 @@ def _advance_inputs(draw: st.DrawFn) -> tuple[float, int, float]:
     )
     slide_duration_ms = draw(st.integers(min_value=1, max_value=5000))
     delta_ms = draw(
-        st.floats(min_value=0.0, max_value=5000.0, allow_nan=False, allow_infinity=False)
+        st.floats(
+            min_value=0.0, max_value=5000.0, allow_nan=False, allow_infinity=False
+        )
     )
     return fraction_offset, slide_duration_ms, delta_ms
 
@@ -28,7 +30,9 @@ class TestSlideTransitionProviderStateTransitions:
     """Property checks for slide transitions so renderer sequencing stays stable under motion."""
 
     @given(data=_advance_inputs())
-    def test_advance_state_moves_toward_target(self, data: tuple[float, int, float]) -> None:
+    def test_advance_state_moves_toward_target(
+        self, data: tuple[float, int, float]
+    ) -> None:
         """Verify slide steps advance toward completion so transitions finish predictably."""
         fraction_offset, slide_duration_ms, delta_ms = data
         state = SlideTransitionState(

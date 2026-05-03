@@ -53,6 +53,7 @@ def dummy_sdl_video_driver(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     yield
 
+
 @pytest.fixture(autouse=True)
 def init_pygame() -> None:
     pygame.init()
@@ -136,6 +137,7 @@ def device(orientation) -> Device:
 @pytest.fixture()
 def manager() -> PeripheralManager:
     return PeripheralManager()
+
 
 @pytest.fixture()
 def resolver(device: Device) -> RuntimeContainer:

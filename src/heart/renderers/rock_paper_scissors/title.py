@@ -114,9 +114,7 @@ class RockPaperScissorsTitle(StatefulBaseRenderer[RockPaperScissorsState]):
         assets_changed = False
         for name, path in self._throw_paths.items():
             if not path.exists():
-                raise FileNotFoundError(
-                    f"Missing Rock Paper Scissors asset: {path}"
-                )
+                raise FileNotFoundError(f"Missing Rock Paper Scissors asset: {path}")
             modified_at_ns = path.stat().st_mtime_ns
             if self._asset_mtimes_ns.get(name) == modified_at_ns:
                 continue

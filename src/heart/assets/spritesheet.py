@@ -20,7 +20,9 @@ class Spritesheet:
         with path.open("rb") as file_handle:
             self.sheet = pygame.image.load(file_handle)
         self._frame_cache: dict[tuple[int, int, int, int], pygame.Surface] = {}
-        self._scaled_cache: dict[tuple[int, int, int, int, int, int], pygame.Surface] = {}
+        self._scaled_cache: dict[
+            tuple[int, int, int, int, int, int], pygame.Surface
+        ] = {}
         self._display_optimized = False
 
     def _sheet_surface(self) -> pygame.Surface:

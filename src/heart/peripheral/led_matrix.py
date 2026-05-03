@@ -9,17 +9,16 @@ from typing import Any, Mapping
 
 from manyfold import (Graph, Layer, ManagedGraphNode, ManagedGraphNodeHandle,
                       OwnerName, Plane, Schema, StreamFamily, StreamName,
-                      TypedRoute, Variant, route)
+                      StreamNode, TypedRoute, Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from PIL import Image
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
-from heart.utilities.reactive import Subject
 
 _LOGGER = get_logger(__name__)
 DISPLAY_GRAPH_OWNER = OwnerName("heart.display")
@@ -85,7 +84,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         self._latest_frame: DisplayFrame | None = None
         self._sequence = 0
         self._stop = threading.Event()
-        self._frame_subject: Subject[DisplayFrame] = Subject()
+        self._frame_stream: EventStream[DisplayFrame] = EventStream()
         self._frame_publishers: list[tuple[Graph, TypedRoute[SensorEvent]]] = []
         self._log_controller = get_logging_controller()
         self._frame_count = 0
@@ -107,8 +106,8 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         with self._frame_lock:
             return self._latest_frame
 
-    def _event_stream(self) -> reactive.Observable[DisplayFrame]:
-        return self._frame_subject
+    def _event_stream(self) -> StreamNode[DisplayFrame]:
+        return self._frame_stream.observable()
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
@@ -186,7 +185,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
             self._latest_frame = frame
 
         self._frame_count += 1
-        self._frame_subject.on_next(frame)
+        self._frame_stream.emit(frame)
         for graph, output_route in tuple(self._frame_publishers):
             graph.publish(
                 output_route,

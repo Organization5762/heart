@@ -62,7 +62,9 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
             return heights[0, :]  # x = 0
         return heights[:, -1]  # −Y (south)
 
-    def _mask_from_heights(self, FACE_PX: int, heights: np.ndarray, gz: float) -> np.ndarray:
+    def _mask_from_heights(
+        self, FACE_PX: int, heights: np.ndarray, gz: float
+    ) -> np.ndarray:
         """Convert GRID-length *heights* → 64×64 boolean mask."""
         mask = np.zeros((FACE_PX, FACE_PX), bool)
         # map every LED column to a grid column via COL_LUT
@@ -80,7 +82,6 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
     def real_process(
         self,
         window: DisplayContext,
-
         orientation: Orientation,
     ) -> None:
         gvec = _norm(self.state.gvec_tuple())

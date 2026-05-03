@@ -5,12 +5,10 @@ from dataclasses import dataclass
 from typing import cast
 
 import pygame
-from manyfold import Graph, TypedRoute
+from manyfold import Graph, StreamNode, TypedRoute
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.utilities.reactive_threads import pipe_in_background
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,5 +53,5 @@ class FrameTickController:
         self._stream.on_next(frame)
         return frame
 
-    def observable(self) -> reactive.Observable[FrameTick]:
-        return pipe_in_background(cast(reactive.Observable[FrameTick], self._stream))
+    def observable(self) -> StreamNode[FrameTick]:
+        return cast(StreamNode[FrameTick], self._stream)

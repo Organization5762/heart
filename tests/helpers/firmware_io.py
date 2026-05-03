@@ -14,7 +14,9 @@ class HandlerStep:
     advance: float = 0.0
 
 
-def run_handler_steps(handler, encoder, switch, steps: Sequence[HandlerStep], clock=None):
+def run_handler_steps(
+    handler, encoder, switch, steps: Sequence[HandlerStep], clock=None
+):
     """Execute ``handler.handle`` over ``steps`` recording emitted events."""
 
     timeline: List[tuple[str, list[str]]] = []

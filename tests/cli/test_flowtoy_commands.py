@@ -26,9 +26,13 @@ class TestFlowToyCommandHelpers:
             -89.0,
         )
 
-        assert rendered == "/dev/ttyACM2 group_id=2575 user_page=2 user_mode=2 rssi=-89.0"
+        assert (
+            rendered == "/dev/ttyACM2 group_id=2575 user_page=2 user_mode=2 rssi=-89.0"
+        )
 
-    def test_build_pattern_from_decoded_preserves_sync_fields_when_brightness_changes(self) -> None:
+    def test_build_pattern_from_decoded_preserves_sync_fields_when_brightness_changes(
+        self,
+    ) -> None:
         """Verify brightness-only updates reuse the observed sync packet state so manual CLI adjustments do not zero out unrelated FlowToy controls."""
         pattern = _build_pattern_from_decoded(
             decoded={

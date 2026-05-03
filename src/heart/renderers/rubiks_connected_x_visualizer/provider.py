@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 
-import heart.utilities.reactive as reactive
+from manyfold import ConstantNode, MergeNode, StreamNode
+
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -18,10 +19,6 @@ from heart.peripheral.rubiks_connected_x_state import \
 from heart.renderers.rubiks_connected_x_visualizer.state import \
     RubiksConnectedXVisualizerState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              pipe_in_main_thread,
-                                              start_with_once)
 
 logger = get_logger(__name__)
 
@@ -32,7 +29,9 @@ def _ignore_state_sync() -> bool:
 
 
 def _use_local_baseline_mode() -> bool:
-    return _ignore_state_sync() or load_rubiks_connected_x_baseline_facelets() is not None
+    return (
+        _ignore_state_sync() or load_rubiks_connected_x_baseline_facelets() is not None
+    )
 
 
 class RubiksConnectedXVisualizerStateProvider(
@@ -41,40 +40,35 @@ class RubiksConnectedXVisualizerStateProvider(
     """Maintain the latest full cube state from Rubik's Connected X packets."""
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactive.Observable[RubiksConnectedXVisualizerState]:
+        self, peripheral_manager: PeripheralManager
+    ) -> StreamNode[RubiksConnectedXVisualizerState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, RubiksConnectedXPeripheral)
         ]
         if not cube_peripherals:
-            return reactive.just(RubiksConnectedXVisualizerState())
-
+            return ConstantNode(RubiksConnectedXVisualizerState()).observable()
         initial_state = RubiksConnectedXVisualizerState(
             facelets=load_rubiks_connected_x_baseline_facelets()
             or RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-            last_move=(
-                "Set "
-                f"{RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR} "
-                "to the cube address if auto-detect is disabled."
-            ),
+            last_move=f"Set {RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR} to the cube address if auto-detect is disabled.",
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
-        merged = pipe_in_background(
-            reactive.merge(*observables),
-            ops.map(
+        merged = (
+            MergeNode.merge(*observables)
+            .map(
                 PeripheralMessageEnvelope[
                     RubiksConnectedXNotification
                 ].unwrap_peripheral
-            ),
+            )
+            .share()
         )
-        return pipe_in_main_thread(
-            merged,
-            ops.scan(self._advance_state, seed=initial_state),
-            start_with_once(initial_state),
-            ops.share(),
+        return (
+            merged.scan(self._advance_state, seed=initial_state)
+            .start_with(initial_state)
+            .share()
+            .share()
         )
 
     def _advance_state(
@@ -112,7 +106,7 @@ class RubiksConnectedXVisualizerStateProvider(
                 last_move = parsed_message.moves[-1].notation
                 recent_moves = (
                     recent_moves
-                    + tuple(move.notation for move in parsed_message.moves)
+                    + tuple((move.notation for move in parsed_message.moves))
                 )[-len(state.baseline_capture_gesture) :]
                 seed_facelets = (
                     facelets
@@ -121,13 +115,11 @@ class RubiksConnectedXVisualizerStateProvider(
                 )
                 facelets = apply_rubiks_connected_x_moves(
                     seed_facelets,
-                    tuple(move.notation for move in parsed_message.moves),
+                    tuple((move.notation for move in parsed_message.moves)),
                 )
                 if recent_moves == state.baseline_capture_gesture:
                     baseline_facelets = last_reported_facelets or facelets
-                    path = save_rubiks_connected_x_baseline_facelets(
-                        baseline_facelets
-                    )
+                    path = save_rubiks_connected_x_baseline_facelets(baseline_facelets)
                     facelets = baseline_facelets
                     is_synced = False
                     last_move = "Baseline captured"
@@ -137,7 +129,7 @@ class RubiksConnectedXVisualizerStateProvider(
                     )
                 logger.info(
                     "Visualizer applied Rubik's Connected X move(s): %s",
-                    ",".join(move.notation for move in parsed_message.moves),
+                    ",".join((move.notation for move in parsed_message.moves)),
                 )
         return RubiksConnectedXVisualizerState(
             facelets=facelets,

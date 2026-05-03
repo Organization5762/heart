@@ -84,9 +84,7 @@ class SlidingRenderer(StatefulBaseRenderer[SlidingRendererState]):
         renderer: StatefulBaseRenderer,
         *,
         speed: int = 1,
-        provider_factory: Callable[
-            [SlidingRendererState], SlidingRendererStateProvider
-        ]
+        provider_factory: Callable[[SlidingRendererState], SlidingRendererStateProvider]
         | None = None,
     ) -> None:
         self.composed = renderer

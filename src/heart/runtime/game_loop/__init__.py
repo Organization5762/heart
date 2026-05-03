@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pygame
+from manyfold import shutdown
 
 from heart import DeviceDisplayMode
 from heart.device import Device
@@ -14,7 +15,6 @@ from heart.runtime.container import (build_runtime_container,
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive_threads import shutdown
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
@@ -93,7 +93,9 @@ class GameLoop:
 
     def compose(
         self,
-        renderers: list["StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]],
+        renderers: list[
+            "StatefulBaseRenderer[Any]" | type["StatefulBaseRenderer[Any]"]
+        ],
     ) -> ComposedRenderer:
         result = self.context_container.resolve(ComposedRenderer)
         result.add_renderer(*renderers)
@@ -161,7 +163,9 @@ class GameLoop:
     def set_screen(self, screen: pygame.Surface) -> None:
         self.components.display.set_screen(screen)
         pygame.display.flip()
-        self.components.peripheral_manager.window.on_next(self.components.display.screen)
+        self.components.peripheral_manager.window.on_next(
+            self.components.display.screen
+        )
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
         self.components.display.set_clock(clock)
@@ -301,4 +305,6 @@ class GameLoop:
             self.components.display.clock.tick(self.max_fps)
 
             self.components.peripheral_runtime.tick()
-            self.components.peripheral_manager.clock.on_next(self.components.display.clock)
+            self.components.peripheral_manager.clock.on_next(
+                self.components.display.clock
+            )

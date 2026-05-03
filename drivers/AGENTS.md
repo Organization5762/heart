@@ -1,5 +1,8 @@
 # Drivers Agent Instructions
 
+## Import style
+- Never place imports inside functions or methods. Keep imports at module scope so dependencies are visible and stable.
+
 ## CircuitPython constraints
 - Assume these drivers will run under CircuitPython first and CPython second. Keep dependencies to the built-ins that ship with CircuitPython or a clearly documented external bundle.
 - Avoid dynamic imports, reflection, or heavy use of Python metaprogramming features that CircuitPython omits.

@@ -52,9 +52,7 @@ class Loader:
         if strategy not in {AssetCacheStrategy.METADATA, AssetCacheStrategy.ALL}:
             return None
         if cls._metadata_cache is None:
-            cls._metadata_cache = AssetCache(
-                cls._cache_max_entries(), name="metadata"
-            )
+            cls._metadata_cache = AssetCache(cls._cache_max_entries(), name="metadata")
         return cls._metadata_cache
 
     @classmethod

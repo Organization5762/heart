@@ -43,11 +43,12 @@ class TestRubiksConnectedXVisualizerStateProvider:
             ),
         )
 
-        updated = provider._advance_state(RubiksConnectedXVisualizerState(), notification)
+        updated = provider._advance_state(
+            RubiksConnectedXVisualizerState(), notification
+        )
 
         assert (
-            updated.facelets
-            == "FRBLUBLUFDDUBRLFDBDFLFFRFBRRUURDLLLLBBRLDBFDRDUFBUUUR"
+            updated.facelets == "FRBLUBLUFDDUBRLFDBDFLFFRFBRRUURDLLLLBBRLDBFDRDUFBUUUR"
         )
         assert updated.is_synced is True
 
@@ -89,7 +90,9 @@ class TestRubiksConnectedXVisualizerStateProvider:
             ),
         )
 
-        ignored = provider._advance_state(RubiksConnectedXVisualizerState(), scrambled_state)
+        ignored = provider._advance_state(
+            RubiksConnectedXVisualizerState(), scrambled_state
+        )
         moved = provider._advance_state(ignored, move)
 
         assert ignored.facelets == RUBIKS_CONNECTED_X_SOLVED_FACELETS
@@ -196,7 +199,9 @@ class TestRubiksConnectedXVisualizerStateProvider:
         )
         provider = RubiksConnectedXVisualizerStateProvider()
         ignored = provider._advance_state(
-            RubiksConnectedXVisualizerState(facelets=RUBIKS_CONNECTED_X_SOLVED_FACELETS),
+            RubiksConnectedXVisualizerState(
+                facelets=RUBIKS_CONNECTED_X_SOLVED_FACELETS
+            ),
             RubiksConnectedXNotification(
                 characteristic_uuid="test",
                 payload_hex="",

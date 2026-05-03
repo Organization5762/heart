@@ -65,9 +65,8 @@ def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
     saturation = np.zeros_like(c_max)
     non_zero_value = c_max != 0
     saturation[non_zero_value] = (
-        (delta[non_zero_value] * 255 + c_max[non_zero_value] // 2)
-        // c_max[non_zero_value]
-    )
+        delta[non_zero_value] * 255 + c_max[non_zero_value] // 2
+    ) // c_max[non_zero_value]
     saturation_uint8 = saturation.astype(np.uint8)
 
     hue_uint8 = (np.round(hue * 180.0) % 180).astype(np.uint8)

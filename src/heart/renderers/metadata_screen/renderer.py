@@ -58,7 +58,9 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
         text_rect = text.get_rect(center=(x + 16, y + 25))
         window.blit(text, text_rect)
 
-    def display_battery_status(self, window: Surface, monitor_id: str, x: int, y: int) -> None:
+    def display_battery_status(
+        self, window: Surface, monitor_id: str, x: int, y: int
+    ) -> None:
         battery_level = battery_status.get(monitor_id, None)
 
         if battery_level is not None:
@@ -73,7 +75,9 @@ class MetadataScreen(StatefulBaseRenderer[MetadataScreenState]):
             draw.rect(
                 window,
                 color,
-                Rect(x + 30 - rect_size, y + 30 - rect_size, rect_size * 2, rect_size * 2),
+                Rect(
+                    x + 30 - rect_size, y + 30 - rect_size, rect_size * 2, rect_size * 2
+                ),
             )
 
     def real_process(

@@ -104,7 +104,9 @@ def configure(loop: GameLoop) -> None:
         loop.compose(
             [
                 multicolor_renderer(),
-                SpritesheetLoop(sheet_file_path="ness.png", metadata_file_path="ness.json"),
+                SpritesheetLoop(
+                    sheet_file_path="ness.png", metadata_file_path="ness.json"
+                ),
             ]
         )
     )
@@ -194,7 +196,7 @@ def configure(loop: GameLoop) -> None:
     tixyland_factory = loop.resolve(TixylandFactory)
 
     def build_tixyland(
-        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray],
     ) -> Tixyland:
         return tixyland_factory(fn)
 

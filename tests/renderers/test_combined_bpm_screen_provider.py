@@ -28,7 +28,9 @@ class TestCombinedBpmScreenProviderTransitions:
         self, data: tuple[int, int, int, int, bool]
     ) -> None:
         """Verify elapsed time accumulates when below thresholds so screen phases stay steady."""
-        metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = data
+        metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = (
+            data
+        )
         provider = CombinedBpmScreenStateProvider(
             metadata_duration_ms=metadata_duration,
             max_bpm_duration_ms=max_bpm_duration,
@@ -50,7 +52,9 @@ class TestCombinedBpmScreenProviderTransitions:
         self, data: tuple[int, int, int, int, bool]
     ) -> None:
         """Verify exceeding thresholds flips screen phases so render cycles stay predictable."""
-        metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = data
+        metadata_duration, max_bpm_duration, elapsed_time, delta, showing_metadata = (
+            data
+        )
         provider = CombinedBpmScreenStateProvider(
             metadata_duration_ms=metadata_duration,
             max_bpm_duration_ms=max_bpm_duration,

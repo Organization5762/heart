@@ -27,7 +27,9 @@ class LedWaveBoat(StatefulBaseRenderer[LedWaveBoatState]):
         crest_color: tuple[int, int, int],
         body_color: tuple[int, int, int],
     ) -> None:
-        pygame.draw.line(screen, body_color, (column, crest_y), (column, screen_height - 1))
+        pygame.draw.line(
+            screen, body_color, (column, crest_y), (column, screen_height - 1)
+        )
         screen.set_at((column, crest_y), crest_color)
 
     @staticmethod
@@ -76,7 +78,6 @@ class LedWaveBoat(StatefulBaseRenderer[LedWaveBoatState]):
     def real_process(
         self,
         window: Surface,
-
         orientation: Orientation,
     ) -> None:
         width, height = window.get_size()

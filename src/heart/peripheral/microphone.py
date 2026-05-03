@@ -12,21 +12,23 @@ from typing import Any, Self, cast
 import numpy as np
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
-from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 
 sd: Any | None = None
-if ctypes.util.find_library("portaudio") is not None:  # pragma: no cover - optional dependency
+if (
+    ctypes.util.find_library("portaudio") is not None
+):  # pragma: no cover - optional dependency
     sd = optional_import("sounddevice", logger=logger)
 
 DEFAULT_SAMPLE_RATE = 16_000
@@ -109,7 +111,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         self._latest_level: dict[str, Any] | None = None
         self._stop_token = StopToken(group="microphone")
-        self._level_subject: Subject[MicrophoneLevel] = Subject()
+        self._level_stream: EventStream[MicrophoneLevel] = EventStream()
 
     # ------------------------------------------------------------------
     # Detection lifecycle
@@ -128,9 +130,13 @@ class Microphone(Peripheral[MicrophoneLevel]):
             logger.warning("Failed to query audio devices: %s", exc)
             return
 
-        input_present = any(device.get("max_input_channels", 0) > 0 for device in devices)
+        input_present = any(
+            device.get("max_input_channels", 0) > 0 for device in devices
+        )
         if not input_present:
-            logger.info("No audio input devices detected; skipping microphone peripheral")
+            logger.info(
+                "No audio input devices detected; skipping microphone peripheral"
+            )
             return
 
         yield cls()
@@ -147,7 +153,9 @@ class Microphone(Peripheral[MicrophoneLevel]):
         start_immediately: bool = True,
     ) -> DetectionNode:
         resolved_output_route = output_route or microphone_detection_route()
-        resolved_level_output_route = level_output_route or microphone_level_event_route()
+        resolved_level_output_route = (
+            level_output_route or microphone_level_event_route()
+        )
 
         def mapper(peripheral: "Microphone") -> SensorEvent:
             return SensorEvent(
@@ -193,8 +201,8 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         return self._latest_level
 
-    def _event_stream(self) -> reactive.Observable[MicrophoneLevel]:
-        return self._level_subject
+    def _event_stream(self) -> StreamNode[MicrophoneLevel]:
+        return self._level_stream.observable()
 
     def stop(self) -> None:
         """Signal the run-loop to stop on the next iteration."""
@@ -355,7 +363,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
         )
         payload = level.to_input()
         self._latest_level = cast(dict[str, Any], payload.data)
-        self._level_subject.on_next(level)
+        self._level_stream.emit(level)
         return level
 
     def _level_to_sensor_event(self, level: MicrophoneLevel) -> SensorEvent:

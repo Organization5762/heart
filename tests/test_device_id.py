@@ -39,18 +39,26 @@ class TestDeviceId:
         storage_path = tmp_path / "device_id.txt"
         monkeypatch.setenv(device_id.DEVICE_ID_PATH_ENV_VAR, str(storage_path))
 
-        stub_microcontroller = types.SimpleNamespace(cpu=types.SimpleNamespace(uid=b"\x01\xAB"))
+        stub_microcontroller = types.SimpleNamespace(
+            cpu=types.SimpleNamespace(uid=b"\x01\xab")
+        )
 
-        result = device_id.persistent_device_id(microcontroller_module=stub_microcontroller)
+        result = device_id.persistent_device_id(
+            microcontroller_module=stub_microcontroller
+        )
 
         assert result == "01ab"
         assert storage_path.read_text(encoding="utf-8") == "01ab"
 
-    def test_persistent_device_id_generates_when_no_sources(self, tmp_path, monkeypatch):
+    def test_persistent_device_id_generates_when_no_sources(
+        self, tmp_path, monkeypatch
+    ):
         """Verify random IDs are generated as a fallback to keep devices identifiable in emergencies."""
         storage_path = tmp_path / "device_id.txt"
         monkeypatch.setenv(device_id.DEVICE_ID_PATH_ENV_VAR, str(storage_path))
-        monkeypatch.setattr(device_id, "_hardware_device_uid", lambda _module=None: None)
+        monkeypatch.setattr(
+            device_id, "_hardware_device_uid", lambda _module=None: None
+        )
         monkeypatch.setattr(device_id, "_random_device_id", lambda: "feedbeef")
 
         result = device_id.persistent_device_id()

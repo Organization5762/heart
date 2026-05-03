@@ -6,13 +6,14 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.peripheral.core import PeripheralInfo, PeripheralTag
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (RadioPeripheral, RawRadioPacket,
                                     SerialRadioDriver)
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import Subject
 
 FLOWTOY_INPUT_VARIANT = "flowtoy"
 FLOWTOY_PERIPHERAL_ID_PREFIX = "flowtoy"
@@ -42,15 +43,15 @@ class FlowToyPeripheral(RadioPeripheral):
 
     def __init__(self, *, driver: SerialRadioDriver) -> None:
         super().__init__(driver=driver)
-        self._packet_subject: Subject[FlowToyPacket] = Subject()
+        self._packet_stream: EventStream[FlowToyPacket] = EventStream()
 
     @classmethod
     def detect(cls) -> Iterator["FlowToyPeripheral"]:
         for driver in SerialRadioDriver.detect():
             yield cls(driver=driver)
 
-    def _event_stream(self) -> reactive.Observable[FlowToyPacket]:
-        return self._packet_subject
+    def _event_stream(self) -> StreamNode[FlowToyPacket]:
+        return self._packet_stream.observable()
 
     def peripheral_info(self) -> PeripheralInfo:
         decoded = self._decoded_payload(self.latest_packet)
@@ -89,7 +90,7 @@ class FlowToyPeripheral(RadioPeripheral):
         )
         body = self._body_from_packet(packet)
         self._latest_packet = packet
-        self._packet_subject.on_next(FlowToyPacket(body=body, mode_name=mode_name))
+        self._packet_stream.emit(FlowToyPacket(body=body, mode_name=mode_name))
 
     def _base_id(self) -> str:
         port = getattr(self._driver, "port", None)

@@ -81,7 +81,10 @@ def run_pi5_pinctrl_debug_probe(
         color_order=native_module.ColorOrder.RGB,
     )
     driver = native_module.MatrixDriver(config)
-    gpios = tuple(signal_gpio for _signal_name, signal_gpio, _level in DEFAULT_PINCTRL_DEBUG_PATTERN)
+    gpios = tuple(
+        signal_gpio
+        for _signal_name, signal_gpio, _level in DEFAULT_PINCTRL_DEBUG_PATTERN
+    )
     width = driver.width
     height = driver.height
 
@@ -156,7 +159,9 @@ def _restore_debug_pattern(gpios: tuple[int, ...]) -> None:
         try:
             _run_command([PINCTRL_BINARY, "set", str(gpio), "no", "pn"])
         except (FileNotFoundError, RuntimeError):
-            logger.exception("Failed to restore GPIO %s after pinctrl debug probe.", gpio)
+            logger.exception(
+                "Failed to restore GPIO %s after pinctrl debug probe.", gpio
+            )
 
 
 def _read_pi_model() -> str:

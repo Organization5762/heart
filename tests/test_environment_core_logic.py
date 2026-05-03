@@ -56,15 +56,19 @@ class TestEnvironmentCoreLogic:
                 np.array([255, 0, 0], dtype=np.uint8),
                 np.array([120, 255, 255], dtype=np.uint8),
             ),
-            (np.array([50, 50, 50], dtype=np.uint8), np.array([0, 0, 50], dtype=np.uint8)),
+            (
+                np.array([50, 50, 50], dtype=np.uint8),
+                np.array([0, 0, 50], dtype=np.uint8),
+            ),
         ],
     )
-    def test_convert_bgr_to_hsv_known_colors(self, bgr: np.ndarray, expected: np.ndarray) -> None:
+    def test_convert_bgr_to_hsv_known_colors(
+        self, bgr: np.ndarray, expected: np.ndarray
+    ) -> None:
         """Verify that _convert_bgr_to_hsv maps canonical BGR inputs to expected HSV values. This keeps colour transforms dependable for renderer pipelines."""
         image = bgr.reshape(1, 1, 3)
         hsv = _convert_bgr_to_hsv(image)
         np.testing.assert_array_equal(hsv.reshape(3), expected)
-
 
     @pytest.mark.parametrize(
         "hsv,expected",
@@ -81,16 +85,19 @@ class TestEnvironmentCoreLogic:
                 np.array([119, 255, 255], dtype=np.uint8),
                 np.array([255, 0, 5], dtype=np.uint8),
             ),
-            (np.array([0, 0, 50], dtype=np.uint8), np.array([50, 50, 50], dtype=np.uint8)),
+            (
+                np.array([0, 0, 50], dtype=np.uint8),
+                np.array([50, 50, 50], dtype=np.uint8),
+            ),
         ],
     )
-    def test_convert_hsv_to_bgr_known_colors(self, hsv: np.ndarray, expected: np.ndarray) -> None:
+    def test_convert_hsv_to_bgr_known_colors(
+        self, hsv: np.ndarray, expected: np.ndarray
+    ) -> None:
         """Verify that _convert_hsv_to_bgr reproduces known BGR colours from HSV inputs. This prevents palette drift when using cached conversions."""
         image = hsv.reshape(1, 1, 3)
         bgr = _convert_hsv_to_bgr(image)
         np.testing.assert_array_equal(bgr.reshape(3), expected)
-
-
 
     @pytest.mark.parametrize("seed", [0, 1, 42])
     def test_color_round_trip(self, seed: int) -> None:
@@ -102,8 +109,6 @@ class TestEnvironmentCoreLogic:
         round_trip = _convert_hsv_to_bgr(hsv)
 
         np.testing.assert_array_equal(round_trip, bgr)
-
-
 
     def test_convert_bgr_to_hsv_populates_cache_for_standard_values(self) -> None:
         """Verify that _convert_bgr_to_hsv populates the cache for standard values while skipping sentinel entries. This ensures repeated conversions stay fast without polluting special cases."""
@@ -126,8 +131,6 @@ class TestEnvironmentCoreLogic:
         assert special_key == (60, 255, 255)
         assert special_key not in HSV_TO_BGR_CACHE
 
-
-
     def test_convert_hsv_to_bgr_prefers_cached_values(self) -> None:
         """Verify that _convert_hsv_to_bgr prefers cached values when available. This keeps interactive rendering snappy by avoiding recomputation."""
         key = (12, 34, 200)
@@ -140,8 +143,6 @@ class TestEnvironmentCoreLogic:
         np.testing.assert_array_equal(result[0, 0], cached_value)
         assert next(reversed(HSV_TO_BGR_CACHE)) == key
 
-
-
     def test_convert_hsv_to_bgr_calibration_clears_cache_for_known_keys(self) -> None:
         """Verify that _convert_hsv_to_bgr clears cached values for calibration keys. This allows dynamic tuning without stale entries lingering."""
         key = (60, 255, 255)
@@ -150,10 +151,10 @@ class TestEnvironmentCoreLogic:
         hsv = np.array([[list(key)]], dtype=np.uint8)
         result = _convert_hsv_to_bgr(hsv)
 
-        np.testing.assert_array_equal(result[0, 0], np.array([2, 255, 0], dtype=np.uint8))
+        np.testing.assert_array_equal(
+            result[0, 0], np.array([2, 255, 0], dtype=np.uint8)
+        )
         assert key not in HSV_TO_BGR_CACHE
-
-
 
     def test_render_batch_merges_surfaces_sequentially(self, loop, monkeypatch) -> None:
         """Verify that composed batch rendering layers child surfaces in order. This keeps the new single composition path visually stable when multiple renderers overlap."""
@@ -176,7 +177,6 @@ class TestEnvironmentCoreLogic:
 
         assert isinstance(result, pygame.Surface)
         assert result.get_at((0, 0))[:3] == (0, 0, 255)
-
 
     @pytest.mark.parametrize(
         "value,expected",
@@ -232,7 +232,9 @@ class TestEnvironmentCoreLogic:
         monkeypatch.setattr(
             ComposedRenderer,
             "_render_renderer",
-            staticmethod(lambda _renderer, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))),
+            staticmethod(
+                lambda _renderer, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+            ),
         )
 
         with pytest.raises(RuntimeError, match="boom"):

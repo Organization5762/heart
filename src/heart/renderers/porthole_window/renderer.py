@@ -136,7 +136,9 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
         shingle_color = (186, 189, 194)
         for offset in range(0, height - ridge_y, 6):
             y = ridge_y + offset
-            pygame.draw.line(surface, shingle_color, (int(width * 0.1), y), (int(width * 0.9), y))
+            pygame.draw.line(
+                surface, shingle_color, (int(width * 0.1), y), (int(width * 0.9), y)
+            )
 
     def _draw_cityline(self, surface: pygame.Surface) -> None:
         width, height = surface.get_size()
@@ -151,7 +153,9 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
         tower_color = (169, 178, 190)
         tower_width = max(6, width // 16)
         tower_height = int(height * 0.14)
-        tower_rect = pygame.Rect(width * 0.75, base_y - tower_height, tower_width, tower_height)
+        tower_rect = pygame.Rect(
+            width * 0.75, base_y - tower_height, tower_width, tower_height
+        )
         surface.fill(tower_color, tower_rect)
 
     def _draw_clouds(self, surface: pygame.Surface, elapsed: float) -> None:
@@ -160,8 +164,12 @@ class PortholeWindowRenderer(StatefulBaseRenderer[PortholeWindowState]):
         cloud_color = (255, 255, 255, 180)
         drift = (math.sin(elapsed * 0.25) + 1) / 2
         offset = int(drift * width * 0.25)
-        primary_rect = pygame.Rect(-width // 6 + offset, height * 0.2, width // 2, height // 5)
-        secondary_rect = pygame.Rect(width * 0.3 + offset, height * 0.28, width // 3, height // 6)
+        primary_rect = pygame.Rect(
+            -width // 6 + offset, height * 0.2, width // 2, height // 5
+        )
+        secondary_rect = pygame.Rect(
+            width * 0.3 + offset, height * 0.28, width // 3, height // 6
+        )
         pygame.draw.ellipse(cloud_surface, cloud_color, primary_rect)
         pygame.draw.ellipse(cloud_surface, cloud_color, secondary_rect)
         surface.blit(cloud_surface, (0, 0))

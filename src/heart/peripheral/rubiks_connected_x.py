@@ -17,14 +17,14 @@ from typing import Any, Iterable, Iterator, Sequence
 from bleak import BleakClient, BleakScanner
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
+from heart.peripheral.core.streams import EventStream
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 
@@ -64,9 +64,7 @@ RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE = (
 )
 RUBIKS_CONNECTED_X_THREAD_NAME = "peripheral-rubiks-connected-x"
 RUBIKS_CONNECTED_X_DETECTED_EVENT = "peripheral.rubiks_connected_x.detected"
-RUBIKS_CONNECTED_X_NOTIFICATION_EVENT = (
-    "peripheral.rubiks_connected_x.notification"
-)
+RUBIKS_CONNECTED_X_NOTIFICATION_EVENT = "peripheral.rubiks_connected_x.notification"
 RUBIKS_CONNECTED_X_DISABLE_ORIENTATION_COMMAND = b"\x37"
 RUBIKS_CONNECTED_X_REQUEST_STATE_COMMAND = b"\x33"
 RUBIKS_CONNECTED_X_GRAPH_OWNER = OwnerName("heart.rubiks_connected_x")
@@ -484,7 +482,9 @@ def _preferred_rubiks_connected_x_name() -> str:
     return DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME
 
 
-def _candidate_priority(candidate: RubiksConnectedXCandidate) -> tuple[int, int, int, str]:
+def _candidate_priority(
+    candidate: RubiksConnectedXCandidate,
+) -> tuple[int, int, int, str]:
     preferred_name = _preferred_rubiks_connected_x_name()
     is_preferred_name = int((candidate.name or "") == preferred_name)
     return (
@@ -1078,7 +1078,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self.address = address
         self.name = name
         self.characteristic_uuids = tuple(characteristic_uuids or ())
-        self._events: Subject[RubiksConnectedXNotification] = Subject()
+        self._events: EventStream[RubiksConnectedXNotification] = EventStream()
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._sequence = 0
@@ -1086,8 +1086,8 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self._last_bluez_connect_attempt_monotonic = 0.0
         self._managed_graph_node_installed = False
 
-    def _event_stream(self) -> reactive.Observable[RubiksConnectedXNotification]:
-        return self._events
+    def _event_stream(self) -> StreamNode[RubiksConnectedXNotification]:
+        return self._events.observable()
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
@@ -1100,7 +1100,9 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
 
     @classmethod
     def detect(cls) -> Iterator["RubiksConnectedXPeripheral"]:
-        configured_address = os.environ.get(RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, "").strip()
+        configured_address = os.environ.get(
+            RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, ""
+        ).strip()
         if configured_address:
             yield cls(
                 address=configured_address,
@@ -1243,7 +1245,9 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         while not self._stop_event.is_set():
             try:
                 resolved_device = await self._resolve_runtime_device()
-                resolved_address = str(getattr(resolved_device, "address", self.address))
+                resolved_address = str(
+                    getattr(resolved_device, "address", self.address)
+                )
                 async with BleakClient(resolved_device) as client:
                     logger.info(
                         "Connected to Rubik's Connected X at %s",
@@ -1457,7 +1461,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         return _callback
 
     def _emit_notification(self, notification: RubiksConnectedXNotification) -> None:
-        self._events.on_next(notification)
+        self._events.emit(notification)
 
     def _notification_to_sensor_event(
         self,

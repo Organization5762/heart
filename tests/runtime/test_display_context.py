@@ -42,7 +42,9 @@ class TestDisplayContext:
             DeviceDisplayMode.OPENGL.to_pygame_mode(),
             DeviceDisplayMode.FULL.to_pygame_mode(),
         ]
-        assert display_context.last_render_mode == DeviceDisplayMode.FULL.to_pygame_mode()
+        assert (
+            display_context.last_render_mode == DeviceDisplayMode.FULL.to_pygame_mode()
+        )
 
     def test_scratch_context_rejects_mode_switching(self, device) -> None:
         """Verify scratch contexts cannot call set_mode so per-renderer surfaces never mutate the real pygame display behind the game loop."""

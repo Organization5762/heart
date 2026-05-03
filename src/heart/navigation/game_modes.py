@@ -120,7 +120,10 @@ class GameModeState:
         *,
         transition_mode: SlideTransitionMode,
     ) -> int:
-        if transition_mode in (SlideTransitionMode.STATIC, SlideTransitionMode.GAUSSIAN):
+        if transition_mode in (
+            SlideTransitionMode.STATIC,
+            SlideTransitionMode.GAUSSIAN,
+        ):
             return 0
         forward_steps = (mode_index - last_scene_index) % len(self.entries)
         backward_steps = (last_scene_index - mode_index) % len(self.entries)
@@ -253,9 +256,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def is_empty(self) -> bool:
         return len(self.state.entries) == 0
 
-    def real_process(
-        self, window: DisplayContext, orientation: Orientation
-    ) -> None:
+    def real_process(self, window: DisplayContext, orientation: Orientation) -> None:
         raise NotImplementedError("GameModes.real_process is not implemented")
 
     def _handle_browse_delta(self, delta: int) -> None:
@@ -332,7 +333,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         screen_width, screen_height = screen.get_size()
         progress_ratio = completed / total
         bar_width = max(1, screen_width - (INITIALIZATION_BAR_MARGIN_PX * 2))
-        bar_top = screen_height - INITIALIZATION_BAR_MARGIN_PX - INITIALIZATION_BAR_HEIGHT_PX
+        bar_top = (
+            screen_height - INITIALIZATION_BAR_MARGIN_PX - INITIALIZATION_BAR_HEIGHT_PX
+        )
         progress_width = int(bar_width * progress_ratio)
 
         screen.fill(INITIALIZATION_BACKGROUND_COLOR)
@@ -355,7 +358,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             bar_width,
             INITIALIZATION_BAR_HEIGHT_PX,
         )
-        pygame.draw.rect(screen, INITIALIZATION_TRACK_COLOR, track_rect, border_radius=4)
+        pygame.draw.rect(
+            screen, INITIALIZATION_TRACK_COLOR, track_rect, border_radius=4
+        )
 
         if progress_width > 0:
             progress_rect = pygame.Rect(
@@ -375,12 +380,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def _log_initialization_progress(self, *, completed: int, total: int) -> None:
         progress_units = max(0, min(completed, total))
-        filled_units = int(
-            (progress_units / total) * INITIALIZATION_TERMINAL_BAR_WIDTH
-        )
-        bar = (
-            ("#" * filled_units)
-            + ("-" * (INITIALIZATION_TERMINAL_BAR_WIDTH - filled_units))
+        filled_units = int((progress_units / total) * INITIALIZATION_TERMINAL_BAR_WIDTH)
+        bar = ("#" * filled_units) + (
+            "-" * (INITIALIZATION_TERMINAL_BAR_WIDTH - filled_units)
         )
         logger.info(
             "Initializing game mode renderers (%s of %s) [%s]",
@@ -427,4 +429,6 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             return self._renderer_resolver.resolve(title)
         if isinstance(title, StatefulBaseRenderer):
             return title
-        raise ValueError(f"Title must be a string or StatefulBaseRenderer, got: {title}")
+        raise ValueError(
+            f"Title must be a string or StatefulBaseRenderer, got: {title}"
+        )

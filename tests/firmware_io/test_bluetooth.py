@@ -11,14 +11,37 @@ class TestFirmwareIoBluetooth:
     @pytest.mark.parametrize(
         "connected, advertising, message, expected_starts, expected_writes",
         [
-            (True, False, "ping", 1, [b"ping", bluetooth.END_OF_MESSAGE_DELIMETER.encode(bluetooth.ENCODING)]),
-            (True, True, "pong", 0, [b"pong", bluetooth.END_OF_MESSAGE_DELIMETER.encode(bluetooth.ENCODING)]),
+            (
+                True,
+                False,
+                "ping",
+                1,
+                [
+                    b"ping",
+                    bluetooth.END_OF_MESSAGE_DELIMETER.encode(bluetooth.ENCODING),
+                ],
+            ),
+            (
+                True,
+                True,
+                "pong",
+                0,
+                [
+                    b"pong",
+                    bluetooth.END_OF_MESSAGE_DELIMETER.encode(bluetooth.ENCODING),
+                ],
+            ),
             (False, False, "idle", 1, []),
         ],
     )
     def test_send_handles_advertising_and_buffer_flush(
         self,
-        monkeypatch, connected, advertising, message, expected_starts, expected_writes
+        monkeypatch,
+        connected,
+        advertising,
+        message,
+        expected_starts,
+        expected_writes,
     ) -> None:
         """Verify that bluetooth.send manages advertising and flushes buffered messages after connecting. This keeps wireless telemetry flowing even when the link drops momentarily."""
         stub_ble = StubBLE(advertising=advertising, connected=connected)
@@ -39,8 +62,6 @@ class TestFirmwareIoBluetooth:
             assert stub_uart.written == expected_writes
         else:
             assert stub_uart.written == []
-
-
 
     def test_send_encodes_multiple_messages(self, monkeypatch) -> None:
         """Verify that bluetooth.send encodes each message with the expected delimiter sequence. This ensures protocol compatibility with microcontroller firmware consuming the stream."""

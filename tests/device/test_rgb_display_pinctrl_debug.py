@@ -58,15 +58,22 @@ class TestRgbDisplayPinctrlDebug:
         assert snapshot.backend_name == PI5_HAT_PWM_BACKEND_NAME
         assert snapshot.width == panel_cols * chain_length
         assert snapshot.height == panel_rows * parallel
-        assert snapshot.pin_states_before.keys() == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
-        assert snapshot.pin_states_driven.keys() == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
-        assert snapshot.pin_states_restored.keys() == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
+        assert (
+            snapshot.pin_states_before.keys() == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
+        )
+        assert (
+            snapshot.pin_states_driven.keys() == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
+        )
+        assert (
+            snapshot.pin_states_restored.keys()
+            == EXPECTED_DRIVEN_STATE_SUBSTRINGS.keys()
+        )
         for gpio, expected_tokens in EXPECTED_DRIVEN_STATE_SUBSTRINGS.items():
             driven_state = snapshot.pin_states_driven[gpio]
             restored_state = snapshot.pin_states_restored[gpio]
-            assert all(
-                token in driven_state for token in expected_tokens
-            ), f"GPIO{gpio} did not expose the expected driven state: {driven_state}"
+            assert all(token in driven_state for token in expected_tokens), (
+                f"GPIO{gpio} did not expose the expected driven state: {driven_state}"
+            )
             assert " = none" in restored_state, (
                 f"GPIO{gpio} did not restore to NONE after the debug probe: {restored_state}"
             )
