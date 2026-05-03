@@ -8,7 +8,8 @@ from collections.abc import Iterator
 import pytest
 from manyfold import Graph
 
-from heart.peripheral.switch import (Switch, switch_detection_route,
+from heart.peripheral.switch import (FakeSwitch, Switch,
+                                     switch_detection_route,
                                      switch_state_event_route)
 from heart.utilities.reactive import Disposable
 from heart.utilities.reactive_threads import \
@@ -137,3 +138,23 @@ class TestSwitchManyfoldRuntime:
         assert latest_state.value.event_type == "peripheral.switch.state"
         assert latest_state.value.data["rotational_value"] == 3
         assert latest_state.value.data["button_value"] == 1
+
+    def test_fake_switch_install_node_publishes_state_snapshot(self) -> None:
+        switch = FakeSwitch()
+        switch._handle_browse(2)
+        switch._handle_activate(object())
+        graph = Graph()
+
+        handle = switch.install_node(
+            graph,
+            poll_interval_seconds=0,
+            start_immediately=False,
+        )
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_state = graph.latest(switch_state_event_route())
+        assert latest_state is not None
+        assert latest_state.value.event_type == "peripheral.switch.state"
+        assert latest_state.value.data["rotational_value"] == 2
+        assert latest_state.value.data["button_value"] == 1
+        assert latest_state.value.identity.id == "fake_switch"

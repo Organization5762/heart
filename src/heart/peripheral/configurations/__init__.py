@@ -65,11 +65,7 @@ def _switch_detection_node(
 
 
 def _switch_graph_nodes() -> tuple[GraphNodeFactory, ...]:
-    if Configuration.use_mock_switch():
-        return ()
-    if Configuration.is_pi() and not Configuration.is_x11_forward():
-        return (_switch_detection_node,)
-    return ()
+    return (_switch_detection_node,)
 
 
 def _detect_phone_text() -> Iterator[Peripheral[Any]]:

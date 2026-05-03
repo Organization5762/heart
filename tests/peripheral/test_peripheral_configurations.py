@@ -463,7 +463,7 @@ class TestManyfoldDrawingPadConfiguration:
 
 
 class TestManyfoldSwitchConfiguration:
-    """Cover default graph-node factories so physical switch streams stay Manyfold-owned."""
+    """Cover default graph-node factories so switch streams stay Manyfold-owned."""
 
     def test_manyfold_graph_nodes_include_physical_switch_on_pi(
         self,
@@ -508,7 +508,7 @@ class TestManyfoldSwitchConfiguration:
         assert _switch_detection_node in configuration.graph_nodes
         assert _detect_switches not in configuration.detectors
 
-    def test_default_configuration_keeps_switch_direct_for_local_fake(
+    def test_default_configuration_moves_local_fake_switch_to_graph_node(
         self,
         monkeypatch,
     ) -> None:
@@ -527,8 +527,8 @@ class TestManyfoldSwitchConfiguration:
 
         configuration = configure()
 
-        assert _switch_detection_node not in configuration.graph_nodes
-        assert configuration.detectors[0] is _detect_switches
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
 
     def test_rubiks_configuration_moves_physical_switch_to_graph_node(
         self,
@@ -552,7 +552,7 @@ class TestManyfoldSwitchConfiguration:
         assert _switch_detection_node in configuration.graph_nodes
         assert _detect_switches not in configuration.detectors
 
-    def test_rubiks_configuration_keeps_switch_direct_for_local_fake(
+    def test_rubiks_configuration_moves_local_fake_switch_to_graph_node(
         self,
         monkeypatch,
     ) -> None:
@@ -571,8 +571,8 @@ class TestManyfoldSwitchConfiguration:
 
         configuration = configure_rubiks_connected_x()
 
-        assert _switch_detection_node not in configuration.graph_nodes
-        assert configuration.detectors[0] is _detect_switches
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
 
     def test_pranay_configuration_moves_physical_switch_to_graph_node(
         self,
@@ -596,7 +596,7 @@ class TestManyfoldSwitchConfiguration:
         assert _switch_detection_node in configuration.graph_nodes
         assert _detect_switches not in configuration.detectors
 
-    def test_pranay_configuration_keeps_switch_direct_for_local_fake(
+    def test_pranay_configuration_moves_local_fake_switch_to_graph_node(
         self,
         monkeypatch,
     ) -> None:
@@ -615,8 +615,8 @@ class TestManyfoldSwitchConfiguration:
 
         configuration = configure_pranay_pi()
 
-        assert _switch_detection_node not in configuration.graph_nodes
-        assert configuration.detectors[0] is _detect_switches
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
 
 
 class TestManyfoldMicrophoneConfiguration:
