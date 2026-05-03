@@ -3,9 +3,9 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import BehaviorSubject
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager

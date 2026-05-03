@@ -3,10 +3,10 @@ from __future__ import annotations
 import textwrap
 from typing import Iterable
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import BehaviorSubject
+from manyfold.rx import operators as ops
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager

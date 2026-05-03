@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pygame
-from reactivex.subject import BehaviorSubject
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.device import Device, Rectangle
 from heart.peripheral.core.input import FrameTick

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from reactivex.subject import Subject
+from manyfold.rx.subject import Subject
 
 from heart.device.beats.websocket import ControlMessage
 from heart.peripheral.core.input import InputDebugEnvelope, InputDebugStage

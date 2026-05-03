@@ -3,9 +3,9 @@ from __future__ import annotations
 from threading import RLock
 from typing import Any, TypeVar
 
-import reactivex
-from reactivex.disposable import Disposable
-from reactivex.scheduler import TimeoutScheduler
+import manyfold.rx as reactivex
+from manyfold.rx.disposable import Disposable
+from manyfold.rx.scheduler import TimeoutScheduler
 
 from heart.utilities.logging import get_logger
 

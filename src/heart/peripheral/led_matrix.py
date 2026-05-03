@@ -7,9 +7,9 @@ import threading
 from datetime import datetime
 from typing import Any, Mapping
 
-import reactivex
+import manyfold.rx as reactivex
+from manyfold.rx.subject import Subject
 from PIL import Image
-from reactivex.subject import Subject
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.display import DisplayFrame

@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager

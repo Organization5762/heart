@@ -1,10 +1,10 @@
 import time
 from types import SimpleNamespace
 
+import manyfold.rx as reactivex
 import pytest
-import reactivex
-from reactivex.disposable import Disposable
-from reactivex.subject import Subject
+from manyfold.rx.disposable import Disposable
+from manyfold.rx.subject import Subject
 
 from heart.utilities.reactivex.sharing import share_stream
 

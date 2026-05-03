@@ -3,9 +3,9 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any, Callable, Iterable
 
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject.behaviorsubject import BehaviorSubject
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
+from manyfold.rx.subject.behaviorsubject import BehaviorSubject
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState

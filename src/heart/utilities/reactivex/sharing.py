@@ -3,10 +3,10 @@ from __future__ import annotations
 from threading import RLock
 from typing import Any, TypeVar, cast
 
-import reactivex
-from reactivex import operators as ops
-from reactivex.disposable import Disposable
-from reactivex.scheduler import TimeoutScheduler
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
+from manyfold.rx.disposable import Disposable
+from manyfold.rx.scheduler import TimeoutScheduler
 
 from heart.utilities.env import (ReactivexStreamConnectMode,
                                  ReactivexStreamShareStrategy)

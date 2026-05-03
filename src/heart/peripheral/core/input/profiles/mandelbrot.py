@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)

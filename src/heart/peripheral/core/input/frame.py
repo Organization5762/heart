@@ -4,9 +4,9 @@ import time
 from dataclasses import dataclass
 from typing import cast
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex.subject import Subject
+from manyfold.rx.subject import Subject
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.utilities.reactivex_threads import pipe_in_background

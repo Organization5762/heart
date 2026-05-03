@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider

@@ -11,15 +11,15 @@ from functools import partial
 from threading import Lock, Thread, get_ident
 from typing import Any, TypeVar
 
-import reactivex
-from reactivex import Observable, Subject, create
-from reactivex import operators as ops
-from reactivex import pipe
-from reactivex.abc import SchedulerBase
-from reactivex.disposable import Disposable
-from reactivex.scheduler import (EventLoopScheduler, NewThreadScheduler,
-                                 ThreadPoolScheduler, TimeoutScheduler)
-from reactivex.typing import StartableTarget
+import manyfold.rx as reactivex
+from manyfold.rx import Observable, Subject, create
+from manyfold.rx import operators as ops
+from manyfold.rx import pipe
+from manyfold.rx.abc import SchedulerBase
+from manyfold.rx.disposable import Disposable
+from manyfold.rx.scheduler import (EventLoopScheduler, NewThreadScheduler,
+                                   ThreadPoolScheduler, TimeoutScheduler)
+from manyfold.rx.typing import StartableTarget
 
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger

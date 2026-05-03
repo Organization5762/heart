@@ -2,7 +2,7 @@
 
 import pygame
 import pytest
-from reactivex.subject import BehaviorSubject
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle

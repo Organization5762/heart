@@ -1,6 +1,6 @@
 from typing import Any, Iterable
 
-import reactivex
+import manyfold.rx as reactivex
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader

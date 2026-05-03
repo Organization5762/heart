@@ -6,8 +6,8 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-import reactivex
-from reactivex.subject import Subject
+import manyfold.rx as reactivex
+from manyfold.rx.subject import Subject
 
 from heart.peripheral.core import PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket

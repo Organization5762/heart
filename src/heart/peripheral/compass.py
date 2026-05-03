@@ -9,8 +9,8 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Deque, Mapping, Self
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger

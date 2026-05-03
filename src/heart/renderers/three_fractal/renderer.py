@@ -3,9 +3,9 @@ import math
 import time
 from dataclasses import dataclass
 
+import manyfold.rx as reactivex
 import numpy as np
 import pygame
-import reactivex
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
                        GL_FLOAT, GL_LINEAR, GL_MODELVIEW, GL_NEAREST,
                        GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,

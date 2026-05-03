@@ -37,6 +37,7 @@ dependencies = [
     "heart-firmware-io",
     "lagom",
     "moderngl",
+    "manyfold",
     "numba",
     "numpy",
     "openant",
@@ -47,7 +48,6 @@ dependencies = [
     "PyOpenGL>=3.1.0",
     "pygame==2.6.1",
     "pyserial",
-    "reactivex==5.0.0a2",
     "requests",
     "scipy",
     "sounddevice",
@@ -77,6 +77,7 @@ build-backend = "uv_build"
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
 heart-rust = { path = "./rust/heart_rust" }
+manyfold = { git = "https://github.com/Organization5762/manyfold.git", rev = "7e8d2164e911e770f315519d6f13a8e0f95da531" }
 
 [tool.setuptools.package-data]
 heart = ["*.png", "**/*.png"]

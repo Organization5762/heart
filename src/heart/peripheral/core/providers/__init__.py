@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import InputDescriptor
 from heart.peripheral.core.providers import registry as providers_registry

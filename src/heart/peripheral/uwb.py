@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterator, List, Self
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.reactivex_threads import (interval_in_background,

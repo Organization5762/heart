@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol, TypeVar
 
-import reactivex
-from reactivex.disposable import Disposable
+import manyfold.rx as reactivex
+from manyfold.rx.disposable import Disposable
 
 T_co = TypeVar("T_co", covariant=True)
 DEFAULT_SUBSCRIBER_COUNT = 1

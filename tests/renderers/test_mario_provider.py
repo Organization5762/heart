@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import reactivex
-from reactivex.subject import BehaviorSubject, Subject
+import manyfold.rx as reactivex
+from manyfold.rx.subject import BehaviorSubject, Subject
 
 from heart.peripheral.core.input import FrameTick
 from heart.peripheral.sensor import Acceleration

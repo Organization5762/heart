@@ -1,9 +1,9 @@
 import math
 
+import manyfold.rx as reactivex
 import numba as nb
 import numpy as np
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation

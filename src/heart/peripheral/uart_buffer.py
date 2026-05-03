@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
+from manyfold.sensor_io import DelimitedMessageBuffer
+
 from heart.utilities.env import BleUartBufferStrategy, Configuration
 
 
@@ -10,10 +12,7 @@ class UartMessageBuffer:
 
     __slots__ = (
         "_strategy",
-        "_delimiter",
-        "_text_delimiter",
-        "_bytes_buffer",
-        "_text_buffer",
+        "_buffer",
     )
 
     def __init__(
@@ -25,10 +24,10 @@ class UartMessageBuffer:
         self._strategy = (
             strategy_provider or Configuration.ble_uart_buffer_strategy
         )()
-        self._delimiter = delimiter
-        self._text_delimiter = delimiter.decode("utf-8", errors="ignore")
-        self._bytes_buffer = bytearray()
-        self._text_buffer = ""
+        self._buffer = DelimitedMessageBuffer(
+            delimiter=delimiter,
+            mode="text" if self._strategy == BleUartBufferStrategy.TEXT else "bytes",
+        )
 
     @property
     def strategy(self) -> BleUartBufferStrategy:
@@ -36,45 +35,10 @@ class UartMessageBuffer:
 
     @property
     def buffer_size(self) -> int:
-        if self._strategy == BleUartBufferStrategy.TEXT:
-            return len(self._text_buffer)
-        return len(self._bytes_buffer)
+        return self._buffer.buffer_size
 
     def append(self, data: bytes | bytearray) -> Iterable[str | bytes]:
-        if self._strategy == BleUartBufferStrategy.TEXT:
-            decoded = data.decode("utf-8", errors="ignore")
-            self._text_buffer += decoded
-            return self._drain_text()
-        self._bytes_buffer.extend(data)
-        return self._drain_bytes()
+        return self._buffer.append(data)
 
     def clear(self) -> None:
-        self._bytes_buffer.clear()
-        self._text_buffer = ""
-
-    def _drain_bytes(self) -> list[bytes]:
-        messages: list[bytes] = []
-        delimiter = self._delimiter
-        delimiter_len = len(delimiter)
-        while True:
-            try:
-                index = self._bytes_buffer.index(delimiter)
-            except ValueError:
-                break
-            line = bytes(self._bytes_buffer[:index])
-            del self._bytes_buffer[: index + delimiter_len]
-            messages.append(line)
-        return messages
-
-    def _drain_text(self) -> list[str]:
-        messages: list[str] = []
-        delimiter = self._text_delimiter
-        delimiter_len = len(delimiter)
-        while True:
-            index = self._text_buffer.find(delimiter)
-            if index == -1:
-                break
-            line = self._text_buffer[:index]
-            self._text_buffer = self._text_buffer[index + delimiter_len :]
-            messages.append(line)
-        return messages
+        self._buffer.clear()

@@ -4,10 +4,10 @@ import math
 import time
 from dataclasses import replace
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
+from manyfold.rx import operators as ops
 from numba import njit
-from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider

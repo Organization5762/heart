@@ -1,4 +1,4 @@
-import reactivex
+import manyfold.rx as reactivex
 
 from heart.peripheral.core.input import AccelerometerController
 from heart.peripheral.core.providers import ObservableProvider

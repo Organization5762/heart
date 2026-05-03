@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
-import reactivex
-from reactivex.disposable import Disposable
+import manyfold.rx as reactivex
+from manyfold.rx.disposable import Disposable
 
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
+                                   PeripheralLocation,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 
 
 class CountingPeripheral(Peripheral[int]):
@@ -40,3 +43,48 @@ class TestPeripheralObserveSharing:
         finally:
             subscription_a.dispose()
             subscription_b.dispose()
+
+
+class TestManyfoldSensorEnvelopeBridge:
+    """Validate Heart peripheral envelopes can cross the Manyfold sensor boundary."""
+
+    def test_peripheral_info_converts_to_sensor_identity(self) -> None:
+        observed_at = datetime(2026, 5, 2, tzinfo=timezone.utc)
+        info = PeripheralInfo(
+            id="switch:main",
+            tags=[PeripheralTag(name="input_variant", variant="button")],
+            location=PeripheralLocation(x=1.0, y=2.0, z=3.0, time=observed_at),
+        )
+
+        identity = info.to_sensor_identity()
+
+        assert identity.id == "switch:main"
+        assert identity.tags[0].name == "input_variant"
+        assert identity.tags[0].variant == "button"
+        assert identity.location.x == 1.0
+        assert identity.location.timestamp == observed_at.timestamp()
+
+    def test_input_and_envelope_convert_to_sensor_events(self) -> None:
+        observed_at = datetime(2026, 5, 2, tzinfo=timezone.utc)
+        input_event = Input(
+            event_type="peripheral.radio.command.raw",
+            data={"command": "S"},
+            timestamp=observed_at,
+        )
+        envelope = PeripheralMessageEnvelope(
+            peripheral_info=PeripheralInfo(id="radio:bridge"),
+            data={"payload": [1, 2, 3]},
+        )
+
+        command_event = input_event.to_sensor_event(sequence_number=7)
+        packet_event = envelope.to_sensor_event(
+            event_type="peripheral.radio.packet",
+            observed_at=observed_at,
+            sequence_number=8,
+        )
+
+        assert command_event.event_type == "peripheral.radio.command.raw"
+        assert command_event.sequence_number == 7
+        assert command_event.observed_at == observed_at.timestamp()
+        assert packet_event.identity.id == "radio:bridge"
+        assert packet_event.data == {"payload": [1, 2, 3]}

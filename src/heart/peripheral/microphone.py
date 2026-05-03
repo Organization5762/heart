@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import contextlib
 import ctypes.util
-import threading
 import time
 from collections.abc import Iterator
 from types import TracebackType
 from typing import Any, Self, cast
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
-from reactivex.subject import Subject
+from manyfold.rx.subject import Subject
+from manyfold.sensor_io import BackoffPolicy, ManagedRunLoop, StopToken
 
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
@@ -51,7 +51,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
         self._retry_delay = retry_delay
 
         self._latest_level: dict[str, Any] | None = None
-        self._stop_event = threading.Event()
+        self._stop_token = StopToken(group="microphone")
         self._level_subject: Subject[MicrophoneLevel] = Subject()
 
     # ------------------------------------------------------------------
@@ -93,7 +93,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
     def stop(self) -> None:
         """Signal the run-loop to stop on the next iteration."""
 
-        self._stop_event.set()
+        self._stop_token.set()
 
     # ------------------------------------------------------------------
     # Run loop
@@ -105,7 +105,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         blocksize = max(1, int(self.samplerate * self.block_duration))
 
-        while not self._stop_event.is_set():
+        def _run_stream(stop: StopToken) -> None:
             try:
                 with self._open_stream(blocksize):
                     logger.info(
@@ -113,18 +113,28 @@ class Microphone(Peripheral[MicrophoneLevel]):
                         self.samplerate,
                         blocksize,
                     )
-                    self._wait_forever()
+                    self._wait_forever(stop)
             except KeyboardInterrupt:
                 logger.info("Microphone peripheral interrupted; stopping stream")
-                break
-            except Exception:
-                logger.exception("Microphone stream failed; retrying in %.1fs", self._retry_delay)
-                time.sleep(self._retry_delay)
+                stop.set()
+                return
 
-        self._stop_event.clear()
+        loop = ManagedRunLoop(
+            body=_run_stream,
+            backoff=BackoffPolicy.fixed(self._retry_delay),
+            on_error=lambda _exc, _attempt: logger.exception(
+                "Microphone stream failed; retrying in %.1fs",
+                self._retry_delay,
+            ),
+            group="microphone",
+        )
+        try:
+            loop.run(self._stop_token)
+        finally:
+            self._stop_token = StopToken(group="microphone")
 
-    def _wait_forever(self) -> None:
-        while not self._stop_event.wait(self.block_duration):
+    def _wait_forever(self, stop: StopToken) -> None:
+        while not stop.wait(self.block_duration):
             pass
 
     def _open_stream(self, blocksize: int) -> Any:  # pragma: no cover - thin wrapper
@@ -187,4 +197,4 @@ class Microphone(Peripheral[MicrophoneLevel]):
         self.stop()
         # Drain any context managers to avoid suppressing exceptions
         with contextlib.suppress(Exception):
-            self._stop_event.set()
+            self._stop_token.set()

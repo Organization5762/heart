@@ -1,6 +1,6 @@
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.device import Device
 from heart.peripheral.core.input import (AccelerometerController,

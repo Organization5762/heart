@@ -1,15 +1,15 @@
 import json
 import logging
 import random
-import time
 from dataclasses import dataclass
 from datetime import timedelta
-from threading import Thread
-from typing import Any, Iterator, Mapping, NoReturn, Self, cast
+from typing import Any, Iterator, Mapping, Self, cast
 
-import reactivex
+import manyfold.rx as reactivex
 import serial
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
+from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
+                                ManagedRunLoopHandle, StopToken)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads.motion import AccelerometerVector
@@ -44,6 +44,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
         self._log_controller = get_logging_controller()
         self._messages_received = 0
         self._decode_failures = 0
+        self._loop_handle: ManagedRunLoopHandle | None = None
 
     def _event_stream(
         self
@@ -64,28 +65,32 @@ class Accelerometer(Peripheral[Acceleration | None]):
         return serial.Serial(self.port, self.baudrate, timeout=1.0)
 
     def run(self) -> None:
-        Thread(
+        if self._loop_handle is not None and self._loop_handle.thread.is_alive():
+            return
+        loop = ManagedRunLoop(
+            body=self._run_loop,
+            backoff=BackoffPolicy.fixed(RECONNECT_DELAY_SECONDS),
+            on_error=lambda _exc, _attempt: logger.exception(
+                "Accelerometer stream failed; reconnecting"
+            ),
+            group="accelerometer",
+        )
+        self._loop_handle = loop.start_thread(
             name=ACCELEROMETER_THREAD_NAME,
-            target=self._run_loop,
             daemon=True,
-        ).start()
+        )
 
-    def _run_loop(self) -> NoReturn:
-        # If it crashes, try to re-connect
-        while True:
-            try:
-                with self._connect_to_ser() as ser:
-                    while True:
-                        datum = ser.readline()
-                        if not datum:
-                            continue
-                        self._process_data(datum)
-            except KeyboardInterrupt:
-                logger.info("Accelerometer stream terminated by user")
-                raise
-            except Exception:
-                logger.exception("Accelerometer stream failed; reconnecting")
-                time.sleep(RECONNECT_DELAY_SECONDS)
+    def stop(self) -> None:
+        if self._loop_handle is not None:
+            self._loop_handle.stop()
+
+    def _run_loop(self, stop: StopToken) -> None:
+        with self._connect_to_ser() as ser:
+            while not stop.is_set():
+                datum = ser.readline()
+                if not datum:
+                    continue
+                self._process_data(datum)
 
     def _process_data(self, data: bytes) -> None:
         bus_data = data.decode("utf-8").rstrip()

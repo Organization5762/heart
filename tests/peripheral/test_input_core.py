@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex.subject import Subject
+from manyfold.rx.subject import Subject
 
 from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
