@@ -708,7 +708,7 @@ requires-dist = [
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
     { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", directory = "rust/heart_rgb_matrix_driver" },
     { name = "lagom" },
-    { name = "manyfold", git = "https://github.com/Organization5762/manyfold.git?rev=7e8d2164e911e770f315519d6f13a8e0f95da531" },
+    { name = "manyfold", specifier = ">=0.1.4" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
@@ -1057,10 +1057,16 @@ wheels = [
 
 [[package]]
 name = "manyfold"
-version = "0.1.3"
-source = { git = "https://github.com/Organization5762/manyfold.git?rev=7e8d2164e911e770f315519d6f13a8e0f95da531#7e8d2164e911e770f315519d6f13a8e0f95da531" }
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "reactivex" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/0e/477c8e29ce74168a1d7d19ac6c6b6ae93b95de8241845e207861d2c5ed4d/manyfold-0.1.4-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:da71f7c1c99b063de3466d58b5af9d74ee9b9d5b6dc25e551ed452a2e274806e", size = 509784, upload-time = "2026-05-03T05:25:59.222Z" },
+    { url = "https://files.pythonhosted.org/packages/36/23/17bacad50b865fa7946453b47025decac4dabf219a77d7384eb1bdcb691d/manyfold-0.1.4-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:a85aa5f6d854c7c15f5e5f921fbb4b866725a9926f32babca41bdb1bc3c94684", size = 502802, upload-time = "2026-05-03T05:26:01.162Z" },
+    { url = "https://files.pythonhosted.org/packages/62/73/9ee6c8719aefc0a7a5f466ffc151a9d3d391c85f57e5d7bf433c1159a09b/manyfold-0.1.4-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e395b312f4059c0f4495b2b49962b06f16df912fe0eb248834ea1a5b38cc415e", size = 548935, upload-time = "2026-05-03T05:26:03.09Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/5e/b73280e6db5aaf6631c8625ada152775414dee076323c682439ae338dae1/manyfold-0.1.4-cp310-abi3-win_amd64.whl", hash = "sha256:c2f9ce9a1415d0bfb21d7a90e05e9eba52ff9d85c10fa4c70e997e479fa1fcbf", size = 387360, upload-time = "2026-05-03T05:26:04.771Z" },
 ]
 
 [[package]]

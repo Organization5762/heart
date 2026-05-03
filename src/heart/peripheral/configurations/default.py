@@ -8,7 +8,7 @@ from heart.peripheral.configurations import (_detect_drawing_pads,
                                              _detect_heart_rate_sensor,
                                              _detect_microphones,
                                              _detect_phone_text,
-                                             _detect_radios,
+                                             _radio_graph_nodes,
                                              _detect_rubiks_connected_x,
                                              _detect_sensors, _detect_switches,
                                              _detect_uwb_position)
@@ -26,7 +26,6 @@ def configure() -> PeripheralConfiguration:
         _detect_rubiks_connected_x,
         _detect_microphones,
         _detect_drawing_pads,
-        _detect_radios,
         _detect_uwb_position
     )
-    return PeripheralConfiguration(detectors=detectors)
+    return PeripheralConfiguration(detectors=detectors, graph_nodes=_radio_graph_nodes())

@@ -37,7 +37,7 @@ dependencies = [
     "heart-firmware-io",
     "lagom",
     "moderngl",
-    "manyfold",
+    "manyfold>=0.1.4",
     "numba",
     "numpy",
     "openant",
@@ -77,7 +77,6 @@ build-backend = "uv_build"
 [tool.uv.sources]
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
-manyfold = { git = "https://github.com/Organization5762/manyfold.git", rev = "7e8d2164e911e770f315519d6f13a8e0f95da531" }
 heart-rgb-matrix-driver = { path = "./rust/heart_rgb_matrix_driver" }
 
 [tool.setuptools.package-data]
