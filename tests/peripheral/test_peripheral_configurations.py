@@ -5,8 +5,12 @@ from collections.abc import Iterator
 from manyfold import Graph
 
 from heart.peripheral.configurations import (_detect_radios,
+                                             _microphone_detection_node,
                                              _radio_detection_node)
-from heart.peripheral.input_payloads import RadioPacket
+from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
+from heart.peripheral.microphone import (Microphone,
+                                         microphone_detection_route,
+                                         microphone_level_event_route)
 from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver,
                                     radio_detection_route,
@@ -82,3 +86,51 @@ class TestManyfoldRadioConfiguration:
         assert latest_packet is not None
         assert latest_packet.value.event_type == RadioPacket.EVENT_TYPE
         assert latest_packet.value.data["payload"] == [16]
+
+
+class TestManyfoldMicrophoneConfiguration:
+    """Cover default graph-node factories so microphone streams stay Manyfold-owned."""
+
+    def test_microphone_detection_node_spawns_level_source(
+        self,
+        monkeypatch,
+    ) -> None:
+        detected = Microphone()
+        level = MicrophoneLevel(
+            rms=0.5,
+            peak=1.0,
+            frames=16,
+            samplerate=16_000,
+            timestamp=123.0,
+        )
+
+        def _detect(cls) -> Iterator[Microphone]:
+            yield detected
+
+        def _install_node(self, graph: Graph, **kwargs):
+            graph.publish(
+                kwargs["output_route"],
+                self._level_to_sensor_event(level),
+            )
+            return object()
+
+        monkeypatch.setattr(Microphone, "detect", classmethod(_detect))
+        monkeypatch.setattr(Microphone, "install_node", _install_node)
+        graph = Graph()
+        registered: list[Microphone] = []
+
+        handle = _microphone_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(microphone_detection_route())
+        latest_level = graph.latest(microphone_level_event_route())
+        assert registered == [detected]
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.microphone.detected"
+        assert latest_level is not None
+        assert latest_level.value.event_type == MicrophoneLevel.EVENT_TYPE
+        assert latest_level.value.data["rms"] == 0.5

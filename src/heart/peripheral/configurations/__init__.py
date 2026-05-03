@@ -91,6 +91,20 @@ def _detect_heart_rate_sensor() -> Iterator[Peripheral[Any]]:
 def _detect_microphones() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(Microphone.detect())
 
+def _microphone_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return Microphone.detection_node(
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+def _microphone_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (_microphone_detection_node,)
+
 def _detect_drawing_pads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(DrawingPad.detect())
 
@@ -116,7 +130,11 @@ def _radio_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (_radio_detection_node,)
 
 def _manyfold_graph_nodes() -> tuple[GraphNodeFactory, ...]:
-    return (*_radio_graph_nodes(), *_rubiks_connected_x_graph_nodes())
+    return (
+        *_radio_graph_nodes(),
+        *_rubiks_connected_x_graph_nodes(),
+        *_microphone_graph_nodes(),
+    )
 
 def _detect_uwb_position() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(FakeUWBPositioning.detect())
