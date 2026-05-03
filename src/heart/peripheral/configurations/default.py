@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.configurations import (_detect_drawing_pads,
-                                             _detect_sensors,
+from heart.peripheral.configurations import (_detect_sensors,
                                              _manyfold_graph_nodes,
                                              _switch_graph_nodes)
 
@@ -14,7 +13,6 @@ def configure() -> PeripheralConfiguration:
 
     detectors = [
         _detect_sensors,
-        _detect_drawing_pads,
     ]
     if not _switch_graph_nodes():
         from heart.peripheral.configurations import _detect_switches

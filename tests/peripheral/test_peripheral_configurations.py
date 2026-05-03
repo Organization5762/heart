@@ -7,11 +7,13 @@ from manyfold import Graph
 from pytest import MonkeyPatch
 
 from heart.peripheral.configurations import (_accelerometer_detection_node,
+                                             _detect_drawing_pads,
                                              _detect_gamepads,
                                              _detect_heart_rate_sensor,
                                              _detect_phone_text,
                                              _detect_radios, _detect_switches,
                                              _detect_uwb_position,
+                                             _drawing_pad_detection_node,
                                              _gamepad_detection_node,
                                              _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
@@ -21,6 +23,9 @@ from heart.peripheral.configurations import (_accelerometer_detection_node,
                                              _switch_detection_node,
                                              _uwb_detection_node)
 from heart.peripheral.configurations.default import configure
+from heart.peripheral.drawing_pad import (DrawingPad,
+                                          drawing_pad_detection_route,
+                                          drawing_pad_sample_event_route)
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.gamepad import gamepad_detection_route
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
@@ -245,6 +250,62 @@ class TestManyfoldGamepadConfiguration:
 
         assert _gamepad_detection_node in configuration.graph_nodes
         assert _detect_gamepads not in configuration.detectors
+
+
+class TestManyfoldDrawingPadConfiguration:
+    """Cover default graph-node factories so virtual drawing pads stay Manyfold-owned."""
+
+    def test_drawing_pad_detection_node_spawns_sample_source(
+        self,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        detected = DrawingPad()
+
+        def _detect(cls) -> Iterator[DrawingPad]:
+            yield detected
+
+        def _install_node(
+            self: DrawingPad,
+            graph: Graph,
+            **kwargs: Any,
+        ) -> object:
+            graph.publish(
+                kwargs["output_route"],
+                self._sample_to_sensor_event(
+                    self._parse_payload(
+                        {"x": 0.5, "y": 0.25, "pressure": 0.6},
+                        is_erase=False,
+                    )["sample"]
+                ),
+            )
+            return object()
+
+        monkeypatch.setattr(DrawingPad, "detect", classmethod(_detect))
+        monkeypatch.setattr(DrawingPad, "install_node", _install_node)
+        graph = Graph()
+        registered: list[DrawingPad] = []
+
+        handle = _drawing_pad_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(drawing_pad_detection_route())
+        latest_sample = graph.latest(drawing_pad_sample_event_route())
+        assert registered == [detected]
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.drawing_pad.detected"
+        assert latest_sample is not None
+        assert latest_sample.value.event_type == "peripheral.drawing_pad.sample"
+        assert latest_sample.value.data["pressure"] == 0.6
+
+    def test_default_configuration_moves_drawing_pad_to_graph_node(self) -> None:
+        configuration = configure()
+
+        assert _drawing_pad_detection_node in configuration.graph_nodes
+        assert _detect_drawing_pads not in configuration.detectors
 
 
 class TestManyfoldSwitchConfiguration:

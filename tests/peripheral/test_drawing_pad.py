@@ -1,7 +1,12 @@
+import time
+
 import pytest
+from manyfold import Graph
 
 from heart.peripheral.core import Input
-from heart.peripheral.drawing_pad import DrawingPad, StylusSample
+from heart.peripheral.drawing_pad import (DrawingPad, StylusSample,
+                                          drawing_pad_detection_route,
+                                          drawing_pad_sample_event_route)
 
 
 class TestPeripheralDrawingPad:
@@ -70,3 +75,70 @@ class TestPeripheralDrawingPad:
         x_idx = round(sample.x * (pad.resolution - 1))
         y_idx = round(sample.y * (pad.resolution - 1))
         assert grid[y_idx][x_idx] == pytest.approx(1.0)
+
+
+class TestDrawingPadManyfoldRuntime:
+    """Cover graph-native drawing pad discovery and stylus sample publication."""
+
+    def test_detection_node_publishes_drawing_pad_to_manyfold_route(
+        self,
+        monkeypatch,
+    ) -> None:
+        detected = DrawingPad(resolution=12)
+
+        def _detect(cls):
+            yield detected
+
+        monkeypatch.setattr(DrawingPad, "detect", classmethod(_detect))
+        graph = Graph()
+        registered: list[DrawingPad] = []
+
+        handle = DrawingPad.detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(drawing_pad_detection_route())
+        assert registered == [detected]
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.drawing_pad.detected"
+        assert latest.value.data == {
+            "width_inches": 6.0,
+            "height_inches": 6.0,
+            "resolution": 12,
+        }
+        assert latest.value.identity.id == "drawing_pad"
+
+    def test_install_node_publishes_stylus_samples_to_manyfold_route(self) -> None:
+        pad = DrawingPad(resolution=8, polling_interval=0.01)
+        graph = Graph()
+
+        handle = pad.install_node(graph)
+        try:
+            deadline = time.monotonic() + 1.0
+            while not pad._sample_publishers and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert pad._sample_publishers
+
+            pad.handle_input(
+                Input(
+                    event_type="drawing_pad.stroke",
+                    data={"x": 0.25, "y": 0.5, "pressure": 0.7, "radius": 0.1},
+                )
+            )
+        finally:
+            handle.dispose(timeout=1.0)
+
+        latest = graph.latest(drawing_pad_sample_event_route())
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.drawing_pad.sample"
+        assert latest.value.data == {
+            "x": 0.25,
+            "y": 0.5,
+            "pressure": 0.7,
+            "radius": 0.1,
+            "is_erase": False,
+        }
+        assert latest.value.identity.id == "drawing_pad"
