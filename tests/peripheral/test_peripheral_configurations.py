@@ -9,12 +9,14 @@ from pytest import MonkeyPatch
 from heart.peripheral.configurations import (_accelerometer_detection_node,
                                              _detect_gamepads,
                                              _detect_heart_rate_sensor,
+                                             _detect_phone_text,
                                              _detect_radios, _detect_switches,
                                              _detect_uwb_position,
                                              _gamepad_detection_node,
                                              _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
                                              _microphone_detection_node,
+                                             _phone_text_detection_node,
                                              _radio_detection_node,
                                              _switch_detection_node,
                                              _uwb_detection_node)
@@ -25,6 +27,8 @@ from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
 from heart.peripheral.microphone import (Microphone,
                                          microphone_detection_route,
                                          microphone_level_event_route)
+from heart.peripheral.phone_text import (PhoneText, phone_text_detection_route,
+                                         phone_text_message_route)
 from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver,
                                     radio_detection_route,
@@ -368,6 +372,57 @@ class TestManyfoldHeartRateConfiguration:
 
         assert _heart_rate_detection_node in configuration.graph_nodes
         assert _detect_heart_rate_sensor not in configuration.detectors
+
+
+class TestManyfoldPhoneTextConfiguration:
+    """Cover default graph-node factories so BLE text input stays Manyfold-owned."""
+
+    def test_phone_text_detection_node_spawns_message_source(
+        self,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        detected = PhoneText()
+
+        def _detect(cls) -> Iterator[PhoneText]:
+            yield detected
+
+        def _install_node(
+            self: PhoneText,
+            graph: Graph,
+            **kwargs: Any,
+        ) -> object:
+            graph.publish(
+                kwargs["output_route"],
+                self._text_to_sensor_event("hello"),
+            )
+            return object()
+
+        monkeypatch.setattr(PhoneText, "detect", classmethod(_detect))
+        monkeypatch.setattr(PhoneText, "install_node", _install_node)
+        graph = Graph()
+        registered: list[PhoneText] = []
+
+        handle = _phone_text_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(phone_text_detection_route())
+        latest_message = graph.latest(phone_text_message_route())
+        assert registered == [detected]
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.phone_text.detected"
+        assert latest_message is not None
+        assert latest_message.value.event_type == "peripheral.phone_text.message"
+        assert latest_message.value.data == {"text": "hello"}
+
+    def test_default_configuration_moves_phone_text_to_graph_node(self) -> None:
+        configuration = configure()
+
+        assert _phone_text_detection_node in configuration.graph_nodes
+        assert _detect_phone_text not in configuration.detectors
 
 
 class TestManyfoldUWBConfiguration:
