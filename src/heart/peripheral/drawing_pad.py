@@ -16,11 +16,73 @@ underlying grid, while an erase event clears a circular region.
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Iterator, Mapping, Self
 
-from heart.peripheral.core import Input, Peripheral
+from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
+                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
+from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
+                                StopToken, sensor_event_schema)
+
+from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
+                                   PeripheralTag)
+
+DRAWING_PAD_GRAPH_OWNER = OwnerName("heart.drawing_pad")
+DRAWING_PAD_GRAPH_FAMILY = StreamFamily("peripheral")
+
+
+def drawing_pad_sample_event_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=DRAWING_PAD_GRAPH_OWNER,
+        family=DRAWING_PAD_GRAPH_FAMILY,
+        stream=StreamName("samples"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartDrawingPadSampleEvent"),
+    )
+
+
+def drawing_pad_detection_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=DRAWING_PAD_GRAPH_OWNER,
+        family=DRAWING_PAD_GRAPH_FAMILY,
+        stream=StreamName("detected"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartDrawingPadDetectionEvent"),
+    )
+
+
+def drawing_pad_exception_schema() -> Schema[BaseException]:
+    def encode(exc: BaseException) -> bytes:
+        return f"{type(exc).__name__}:{exc}".encode("utf-8")
+
+    def decode(payload: bytes) -> BaseException:
+        return RuntimeError(payload.decode("utf-8"))
+
+    return Schema(
+        schema_id="PythonException",
+        version=1,
+        encode=encode,
+        decode=decode,
+    )
+
+
+def drawing_pad_error_route() -> TypedRoute[BaseException]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=DRAWING_PAD_GRAPH_OWNER,
+        family=DRAWING_PAD_GRAPH_FAMILY,
+        stream=StreamName("errors"),
+        variant=Variant.Meta,
+        schema=drawing_pad_exception_schema(),
+    )
 
 
 @dataclass(slots=True)
@@ -76,6 +138,7 @@ class DrawingPad(Peripheral[Any]):
             [0.0 for _ in range(self.resolution)] for _ in range(self.resolution)
         ]
         self._stylus_history: list[StylusSample] = []
+        self._sample_publishers: list[tuple[Graph, TypedRoute[SensorEvent]]] = []
         self._polling_interval = polling_interval
         self._stop = threading.Event()
         super().__init__()
@@ -157,6 +220,104 @@ class DrawingPad(Peripheral[Any]):
         """Expose a single virtual drawing pad instance."""
         yield cls()
 
+    def peripheral_info(self) -> PeripheralInfo:
+        return PeripheralInfo(
+            id="drawing_pad",
+            tags=[
+                PeripheralTag(name="input_variant", variant="drawing_pad"),
+                PeripheralTag(name="input_mode", variant="stylus"),
+            ],
+        )
+
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        detector: Any | None = None,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        sample_output_route: TypedRoute[SensorEvent] | None = None,
+        sample_error_route: TypedRoute[BaseException] | None = None,
+        spawn_sources: bool = False,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or drawing_pad_detection_route()
+        resolved_sample_output_route = (
+            sample_output_route or drawing_pad_sample_event_route()
+        )
+
+        def mapper(peripheral: "DrawingPad") -> SensorEvent:
+            return SensorEvent(
+                event_type="peripheral.drawing_pad.detected",
+                data={
+                    "width_inches": peripheral.width_inches,
+                    "height_inches": peripheral.height_inches,
+                    "resolution": peripheral.resolution,
+                },
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        def spawn(peripheral: "DrawingPad", access: Any) -> None:
+            if not spawn_sources:
+                return
+            access.own(
+                peripheral.install_node(
+                    access.graph,
+                    output_route=resolved_sample_output_route,
+                    error_route=sample_error_route or drawing_pad_error_route(),
+                )
+            )
+
+        return DetectionNode(
+            name="heart-drawing-pad-detection",
+            detector=detector or cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            spawn=spawn,
+            error_route=drawing_pad_error_route(),
+            group="drawing-pad-detection",
+            start_immediately=start_immediately,
+        )
+
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this virtual pad as a Manyfold-managed stylus sample source."""
+
+        resolved_output_route = output_route or drawing_pad_sample_event_route()
+
+        def _body(stop: StopToken, _graph: Graph) -> None:
+            publisher = (graph, resolved_output_route)
+            self._sample_publishers.append(publisher)
+            try:
+                while not stop.wait(self._polling_interval):
+                    pass
+            finally:
+                try:
+                    self._sample_publishers.remove(publisher)
+                except ValueError:
+                    pass
+
+        return ManagedGraphNode(
+            name="heart-drawing-pad-samples",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or drawing_pad_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff or BackoffPolicy.fixed(1.0),
+            group="drawing-pad",
+            start_immediately=start_immediately,
+        ).install(graph)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -196,6 +357,22 @@ class DrawingPad(Peripheral[Any]):
                 )
 
         self._stylus_history.append(sample)
+        self._publish_sample(sample)
+
+    def _publish_sample(self, sample: StylusSample) -> None:
+        if not self._sample_publishers:
+            return
+        event = self._sample_to_sensor_event(sample)
+        for graph, output_route in tuple(self._sample_publishers):
+            graph.publish(output_route, event)
+
+    def _sample_to_sensor_event(self, sample: StylusSample) -> SensorEvent:
+        return SensorEvent(
+            event_type="peripheral.drawing_pad.sample",
+            data=asdict(sample),
+            observed_at=time.time(),
+            identity=self.peripheral_info().to_sensor_identity(),
+        )
 
     def _normalize_coordinate(self, value: float, units: str, *, axis: str) -> float:
         if units == "relative":

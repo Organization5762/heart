@@ -210,6 +210,22 @@ def _detect_drawing_pads() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(DrawingPad.detect())
 
 
+def _drawing_pad_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return DrawingPad.detection_node(
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+
+def _drawing_pad_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (_drawing_pad_detection_node,)
+
+
 def _detect_radios() -> Iterator[Peripheral[Any]]:
     from heart.peripheral.radio import RadioPeripheral
 
@@ -254,6 +270,7 @@ def _manyfold_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (
         *_switch_graph_nodes(),
         *_accelerometer_graph_nodes(),
+        *_drawing_pad_graph_nodes(),
         *_gamepad_graph_nodes(),
         *_heart_rate_graph_nodes(),
         *_phone_text_graph_nodes(),
