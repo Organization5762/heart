@@ -94,6 +94,28 @@ class TestDriversFlowtoyBridgeDriver:
                     "page": 2,
                     "mode": 7,
                     "mode_name": "flowtoy-page-2-mode-7",
+                    "mode_documentation": {
+                        "page": 2,
+                        "mode": 7,
+                        "key": "flowtoy-page-2-mode-7",
+                        "display_name": "unicorn",
+                        "adjust": ["rainbow_brightness"],
+                        "kinetic_trigger": ["low_force"],
+                        "kinetic_response": ["activate_effect"],
+                        "runtime": {
+                            "static_hours": 9,
+                            "kinetic_hours": 5,
+                            "qualifier": "approx_plus",
+                        },
+                        "color_spectrum": [
+                            {"t": 0.0, "hex": "#ffd6f6"},
+                            {"t": 0.25, "hex": "#d9c2ff"},
+                            {"t": 0.5, "hex": "#9be7ff"},
+                            {"t": 0.75, "hex": "#b8ffd6"},
+                            {"t": 1.0, "hex": "#fffdf7"},
+                        ],
+                        "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes",
+                    },
                     "command_flags": {
                         "adjust_active": False,
                         "wakeup": True,

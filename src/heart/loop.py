@@ -43,6 +43,9 @@ def _build_rubiks_connected_x_only_app() -> typer.Typer:
     return app
 
 
+app = _build_full_app()
+
+
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "flowtoy":
         _build_flowtoy_only_app()()
@@ -76,7 +79,7 @@ def main() -> None:
         app()
         return
 
-    _build_full_app()()
+    app()
 
 
 if __name__ == "__main__":
