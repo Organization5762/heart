@@ -6,11 +6,19 @@ null terminator (`\0`).  The most-recent message is available via
 `PhoneText.get_last_text()` for inspection by other code/tests.
 """
 
+import time
 from collections.abc import Iterator
 from types import ModuleType
-from typing import Any, Self, cast
+from typing import Any, Callable, Self, cast
 
-from heart.peripheral.core import Peripheral
+from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
+                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
+from manyfold.rx.subject import Subject
+from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
+                                StopToken, sensor_event_schema)
+
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
@@ -27,6 +35,59 @@ bz_peripheral = cast(
 _SERVICE_UUID = "1235"
 _CHARACTERISTIC_UUID = "5679"
 _LOCAL_NAME = "PhoneText"
+PHONE_TEXT_GRAPH_OWNER = OwnerName("heart.phone_text")
+PHONE_TEXT_GRAPH_FAMILY = StreamFamily("peripheral")
+
+
+def phone_text_message_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=PHONE_TEXT_GRAPH_OWNER,
+        family=PHONE_TEXT_GRAPH_FAMILY,
+        stream=StreamName("messages"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartPhoneTextMessageEvent"),
+    )
+
+
+def phone_text_detection_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=PHONE_TEXT_GRAPH_OWNER,
+        family=PHONE_TEXT_GRAPH_FAMILY,
+        stream=StreamName("detected"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartPhoneTextDetectionEvent"),
+    )
+
+
+def phone_text_exception_schema() -> Schema[BaseException]:
+    def encode(exc: BaseException) -> bytes:
+        return f"{type(exc).__name__}:{exc}".encode("utf-8")
+
+    def decode(payload: bytes) -> BaseException:
+        return RuntimeError(payload.decode("utf-8"))
+
+    return Schema(
+        schema_id="PythonException",
+        version=1,
+        encode=encode,
+        decode=decode,
+    )
+
+
+def phone_text_error_route() -> TypedRoute[BaseException]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=PHONE_TEXT_GRAPH_OWNER,
+        family=PHONE_TEXT_GRAPH_FAMILY,
+        stream=StreamName("errors"),
+        variant=Variant.Meta,
+        schema=phone_text_exception_schema(),
+    )
 
 
 class PhoneText(Peripheral[str]):
@@ -38,6 +99,8 @@ class PhoneText(Peripheral[str]):
         self._last_text: str | None = None  # full text as received
         self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
+        self._text_subject: Subject[str] = Subject()
+        self._on_text: Callable[[str], None] | None = None
 
     # ---------------------------------------------------------------------
     # Peripheral API
@@ -56,6 +119,67 @@ class PhoneText(Peripheral[str]):
         logger.info("PhoneText peripheral advertising. (Ctrl-C to quit)")
         pi_ble.publish()
 
+    def peripheral_info(self) -> PeripheralInfo:
+        return PeripheralInfo(
+            id="phone_text",
+            tags=[
+                PeripheralTag(name="input_variant", variant="text"),
+                PeripheralTag(name="transport", variant="ble"),
+            ],
+        )
+
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        detector: Any | None = None,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        message_output_route: TypedRoute[SensorEvent] | None = None,
+        message_error_route: TypedRoute[BaseException] | None = None,
+        spawn_sources: bool = False,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or phone_text_detection_route()
+        resolved_message_output_route = (
+            message_output_route or phone_text_message_route()
+        )
+
+        def mapper(peripheral: "PhoneText") -> SensorEvent:
+            return SensorEvent(
+                event_type="peripheral.phone_text.detected",
+                data={
+                    "local_name": _LOCAL_NAME,
+                    "service_uuid": _SERVICE_UUID,
+                    "characteristic_uuid": _CHARACTERISTIC_UUID,
+                },
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        def spawn(peripheral: "PhoneText", access: Any) -> None:
+            if not spawn_sources:
+                return
+            access.own(
+                peripheral.install_node(
+                    access.graph,
+                    output_route=resolved_message_output_route,
+                    error_route=message_error_route or phone_text_error_route(),
+                )
+            )
+
+        return DetectionNode(
+            name="heart-phone-text-detection",
+            detector=detector or cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            spawn=spawn,
+            error_route=phone_text_error_route(),
+            group="phone-text-detection",
+            start_immediately=start_immediately,
+        )
+
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
@@ -72,12 +196,50 @@ class PhoneText(Peripheral[str]):
         self.new_text = False
         return text
 
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this BLE text service as a Manyfold graph message source."""
+
+        resolved_output_route = output_route or phone_text_message_route()
+
+        def _body(stop: StopToken, graph: Graph) -> None:
+            def publish_text(text: str) -> None:
+                graph.publish(
+                    resolved_output_route,
+                    self._text_to_sensor_event(text),
+                )
+
+            previous_callback = self._on_text
+            self._on_text = publish_text
+            try:
+                self.run()
+            finally:
+                self._on_text = previous_callback
+                stop.set()
+
+        return ManagedGraphNode(
+            name="heart-phone-text-messages",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or phone_text_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff or BackoffPolicy.fixed(1.0),
+            group="phone-text",
+            start_immediately=start_immediately,
+        ).install(graph)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _on_write(
-        self, value: bytes, _options: dict[str, Any] | None
-    ) -> None:  # noqa: D401
+    def _on_write(self, value: bytes, _options: dict[str, Any] | None) -> None:  # noqa: D401
         """Bluezero callback executed whenever a central writes new data."""
 
         logger.debug("Received value: %r", value)
@@ -138,7 +300,21 @@ class PhoneText(Peripheral[str]):
 
         self._last_text = text
         self.new_text = True
+        self._text_subject.on_next(text)
+        if self._on_text is not None:
+            self._on_text(text)
         logger.info("Processed text: %r", text)
+
+    def _event_stream(self) -> Subject[str]:
+        return self._text_subject
+
+    def _text_to_sensor_event(self, text: str) -> SensorEvent:
+        return SensorEvent(
+            event_type="peripheral.phone_text.message",
+            data={"text": text},
+            observed_at=time.time(),
+            identity=self.peripheral_info().to_sensor_identity(),
+        )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
