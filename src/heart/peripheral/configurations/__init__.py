@@ -124,9 +124,27 @@ def _rubiks_connected_x_graph_nodes() -> tuple[GraphNodeFactory, ...]:
 
 def _detect_sensors() -> Iterator[Peripheral[Any]]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
-        yield from itertools.chain(Compass.detect())
+        return
     else:
         yield from FakeAccelerometer.detect()
+
+
+def _compass_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return Compass.detection_node(
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+
+def _compass_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    if Configuration.is_pi() and not Configuration.is_x11_forward():
+        return (_compass_detection_node,)
+    return ()
 
 
 def _accelerometer_detection_node(
@@ -270,6 +288,7 @@ def _manyfold_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (
         *_switch_graph_nodes(),
         *_accelerometer_graph_nodes(),
+        *_compass_graph_nodes(),
         *_drawing_pad_graph_nodes(),
         *_gamepad_graph_nodes(),
         *_heart_rate_graph_nodes(),
