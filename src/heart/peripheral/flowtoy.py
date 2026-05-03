@@ -6,14 +6,13 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
-import manyfold.rx as reactivex
-from manyfold.rx.subject import Subject
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (RadioPeripheral, RawRadioPacket,
                                     SerialRadioDriver)
 from heart.utilities.logging import get_logger
+from heart.utilities.reactive import Subject
 
 FLOWTOY_INPUT_VARIANT = "flowtoy"
 FLOWTOY_PERIPHERAL_ID_PREFIX = "flowtoy"
@@ -50,7 +49,7 @@ class FlowToyPeripheral(RadioPeripheral):
         for driver in SerialRadioDriver.detect():
             yield cls(driver=driver)
 
-    def _event_stream(self) -> reactivex.Observable[FlowToyPacket]:
+    def _event_stream(self) -> reactive.Observable[FlowToyPacket]:
         return self._packet_subject
 
     def peripheral_info(self) -> PeripheralInfo:

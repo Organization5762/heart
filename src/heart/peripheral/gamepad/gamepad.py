@@ -16,8 +16,8 @@ from heart.peripheral.core import (Peripheral, PeripheralInfo, PeripheralTag,
                                    events)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (interval_in_background,
-                                               pipe_in_main_thread)
+from heart.utilities.reactive_threads import (interval_in_background,
+                                              pipe_in_main_thread)
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5

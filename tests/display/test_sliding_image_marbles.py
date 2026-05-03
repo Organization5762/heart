@@ -4,29 +4,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import manyfold.rx as reactivex
 import pygame
 import pytest
-from manyfold.rx import operators as ops
-from manyfold.rx.testing.marbles import marbles_testing
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import FrameTick
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider
 from heart.renderers.sliding_image.state import SlidingImageState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive_testing import marbles_testing
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 @dataclass(frozen=True)
 class _StubFrameTickController:
-    stream: reactivex.Observable[FrameTick]
+    stream: reactive.Observable[FrameTick]
 
-    def observable(self) -> reactivex.Observable[FrameTick]:
+    def observable(self) -> reactive.Observable[FrameTick]:
         return self.stream
 
 
 @dataclass(frozen=True)
 class _StubManager:
-    window: reactivex.Observable[pygame.Surface | None]
+    window: reactive.Observable[pygame.Surface | None]
     frame_tick_controller: _StubFrameTickController
 
 
@@ -86,8 +85,11 @@ class TestSlidingImageMarbleOutputs:
             window_stream = cold("a------|", {"a": window_surface})
             tick_stream = pipe_in_background(
                 cold(tick_pattern, tick_values),
-                ops.scan(lambda frame_index, _tick: frame_index + 1, seed=-1),
-                ops.map(
+                reactive.operators.scan(
+                    lambda frame_index, _tick: frame_index + 1,
+                    seed=-1,
+                ),
+                reactive.operators.map(
                     lambda frame_index: FrameTick(
                         frame_index=frame_index,
                         delta_ms=0.0,
@@ -103,9 +105,11 @@ class TestSlidingImageMarbleOutputs:
             )
             image_stream = pipe_in_background(
                 provider.observable(manager),
-                ops.filter(lambda state: state.width > 0),
-                ops.map(lambda state: _render_sliding_frame(state, base_surface)),
-                ops.map(
+                reactive.operators.filter(lambda state: state.width > 0),
+                reactive.operators.map(
+                    lambda state: _render_sliding_frame(state, base_surface)
+                ),
+                reactive.operators.map(
                     lambda image: [
                         image.get_at((x, 0))[:3] for x in range(image.get_width())
                     ]

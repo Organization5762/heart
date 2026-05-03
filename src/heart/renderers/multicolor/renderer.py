@@ -1,10 +1,10 @@
 import math
 
-import manyfold.rx as reactivex
 import numba as nb
 import numpy as np
 import pygame
 
+import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -94,7 +94,7 @@ class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[MulticolorState]:
+    ) -> reactive.Observable[MulticolorState]:
         if self._builder is None:
             self._builder = MulticolorStateProvider(peripheral_manager)
             self.builder = self._builder

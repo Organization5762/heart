@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from manyfold.rx.subject import Subject
-
+import heart.utilities.reactive as reactive
 from heart.device.beats.websocket import ControlMessage
 from heart.peripheral.core.input import InputDebugEnvelope, InputDebugStage
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
@@ -13,9 +12,9 @@ from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
 
 class _DebugTapStub:
     def __init__(self) -> None:
-        self.subject: Subject[InputDebugEnvelope] = Subject()
+        self.subject: reactive.Subject[InputDebugEnvelope] = reactive.Subject()
 
-    def observable(self) -> Subject[InputDebugEnvelope]:
+    def observable(self) -> reactive.Subject[InputDebugEnvelope]:
         return self.subject
 
 

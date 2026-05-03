@@ -4,12 +4,12 @@ import time
 from dataclasses import dataclass
 from typing import cast
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx.subject import Subject
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import Subject
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,5 +47,5 @@ class FrameTickController:
         self._subject.on_next(frame)
         return frame
 
-    def observable(self) -> reactivex.Observable[FrameTick]:
-        return pipe_in_background(cast(reactivex.Observable[FrameTick], self._subject))
+    def observable(self) -> reactive.Observable[FrameTick]:
+        return pipe_in_background(cast(reactive.Observable[FrameTick], self._subject))

@@ -4,21 +4,22 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
-from manyfold.rx.abc import DisposableBase
-from manyfold.rx.disposable import CompositeDisposable
-from manyfold.rx.subject import Subject
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
 from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
     GamepadController)
 from heart.peripheral.core.input.keyboard import KeyboardController
+from heart.peripheral.core.input.streams import (map_stream, merge_streams,
+                                                 threshold_direction)
 from heart.peripheral.switch import SwitchState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import (CompositeDisposable, DisposableBase,
+                                      Subject)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 NAVIGATION_STICK_THRESHOLD = 0.6
 
@@ -52,7 +53,7 @@ class NavigationProfile:
         keyboard_controller: KeyboardController,
         gamepad_controller: GamepadController,
         debug_tap: InputDebugTap,
-        switch_stream_factory: Callable[[], reactivex.Observable[SwitchState]]
+        switch_stream_factory: Callable[[], reactive.Observable[SwitchState]]
         | None = None,
     ) -> None:
         self._keyboard = keyboard_controller
@@ -83,36 +84,22 @@ class NavigationProfile:
         return CompositeDisposable(*subscriptions)
 
     @cached_property
-    def intents(self) -> reactivex.Observable[NavigationIntent]:
-        keyboard_left = pipe_in_background(
+    def intents(self) -> reactive.Observable[NavigationIntent]:
+        keyboard_left = map_stream(
             self._keyboard.key_pressed(pygame.K_LEFT),
-            ops.map(
-                lambda _event: BrowseIntent(
-                    source="keyboard.left",
-                    step=-1,
-                )
-            ),
+            lambda _event: BrowseIntent(source="keyboard.left", step=-1),
         )
-        keyboard_right = pipe_in_background(
+        keyboard_right = map_stream(
             self._keyboard.key_pressed(pygame.K_RIGHT),
-            ops.map(
-                lambda _event: BrowseIntent(
-                    source="keyboard.right",
-                    step=1,
-                )
-            ),
+            lambda _event: BrowseIntent(source="keyboard.right", step=1),
         )
-        keyboard_down = pipe_in_background(
+        keyboard_down = map_stream(
             self._keyboard.key_pressed(pygame.K_DOWN),
-            ops.map(
-                lambda _event: ActivateIntent(source="keyboard.down")
-            ),
+            lambda _event: ActivateIntent(source="keyboard.down"),
         )
-        keyboard_up = pipe_in_background(
+        keyboard_up = map_stream(
             self._keyboard.key_pressed(pygame.K_UP),
-            ops.map(
-                lambda _event: AlternateActivateIntent(source="keyboard.up")
-            ),
+            lambda _event: AlternateActivateIntent(source="keyboard.up"),
         )
         dpad_events = pipe_in_background(
             self._gamepad.dpad_value(),
@@ -130,11 +117,7 @@ class NavigationProfile:
                 GamepadAxis.LEFT_X,
                 DEFAULT_GAMEPAD_AXIS_DEAD_ZONE,
             ),
-            ops.map(
-                lambda value: 1
-                if value >= NAVIGATION_STICK_THRESHOLD
-                else (-1 if value <= -NAVIGATION_STICK_THRESHOLD else 0)
-            ),
+            ops.map(lambda value: threshold_direction(value, NAVIGATION_STICK_THRESHOLD)),
             ops.distinct_until_changed(),
             ops.filter(lambda direction: direction != 0),
             ops.map(
@@ -144,32 +127,26 @@ class NavigationProfile:
                 )
             ),
         )
-        button_south = pipe_in_background(
+        button_south = map_stream(
             self._gamepad.button_tapped(GamepadButton.SOUTH),
-            ops.map(
-                lambda _button: ActivateIntent(source="gamepad.south")
-            ),
+            lambda _button: ActivateIntent(source="gamepad.south"),
         )
-        button_north = pipe_in_background(
+        button_north = map_stream(
             self._gamepad.button_tapped(GamepadButton.NORTH),
-            ops.map(
-                lambda _button: AlternateActivateIntent(source="gamepad.north")
-            ),
+            lambda _button: AlternateActivateIntent(source="gamepad.north"),
         )
         switch_intents = self._switch_intents()
-        stream = pipe_in_background(
-            reactivex.merge(
-                keyboard_left,
-                keyboard_right,
-                keyboard_down,
-                keyboard_up,
-                dpad_events,
-                stick_events,
-                button_south,
-                button_north,
-                switch_intents,
-                pipe_in_background(self._injected_intents),
-            ),
+        stream = merge_streams(
+            keyboard_left,
+            keyboard_right,
+            keyboard_down,
+            keyboard_up,
+            dpad_events,
+            stick_events,
+            button_south,
+            button_north,
+            switch_intents,
+            pipe_in_background(self._injected_intents),
         )
         return instrument_input_stream(
             stream,
@@ -193,7 +170,7 @@ class NavigationProfile:
         )
 
     @cached_property
-    def browse(self) -> reactivex.Observable[BrowseIntent]:
+    def browse(self) -> reactive.Observable[BrowseIntent]:
         return pipe_in_background(
             self.intents,
             ops.filter(lambda intent: isinstance(intent, BrowseIntent)),
@@ -201,7 +178,7 @@ class NavigationProfile:
         )
 
     @cached_property
-    def activate(self) -> reactivex.Observable[ActivateIntent]:
+    def activate(self) -> reactive.Observable[ActivateIntent]:
         return pipe_in_background(
             self.intents,
             ops.filter(lambda intent: isinstance(intent, ActivateIntent)),
@@ -209,7 +186,7 @@ class NavigationProfile:
         )
 
     @cached_property
-    def alternate_activate(self) -> reactivex.Observable[AlternateActivateIntent]:
+    def alternate_activate(self) -> reactive.Observable[AlternateActivateIntent]:
         return pipe_in_background(
             self.intents,
             ops.filter(lambda intent: isinstance(intent, AlternateActivateIntent)),
@@ -217,7 +194,7 @@ class NavigationProfile:
         )
 
     @cached_property
-    def browse_delta(self) -> reactivex.Observable[int]:
+    def browse_delta(self) -> reactive.Observable[int]:
         return pipe_in_background(
             self.browse,
             ops.map(lambda intent: intent.step),
@@ -234,12 +211,12 @@ class NavigationProfile:
     def inject_alternate_activate(self, source: str = "beats.control") -> None:
         self._injected_intents.on_next(AlternateActivateIntent(source=source))
 
-    def _switch_intents(self) -> reactivex.Observable[NavigationIntent]:
+    def _switch_intents(self) -> reactive.Observable[NavigationIntent]:
         if self._switch_stream_factory is None:
-            return reactivex.empty()
+            return reactive.empty()
 
         switch_updates = self._switch_stream_factory()
-        return reactivex.merge(
+        return reactive.merge(
             self._switch_browse_intents(switch_updates),
             self._switch_activate_intents(switch_updates),
             self._switch_alternate_activate_intents(switch_updates),
@@ -247,8 +224,8 @@ class NavigationProfile:
 
     def _switch_browse_intents(
         self,
-        switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[BrowseIntent]:
+        switch_updates: reactive.Observable[SwitchState],
+    ) -> reactive.Observable[BrowseIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
@@ -266,15 +243,15 @@ class NavigationProfile:
 
     def _switch_activate_intents(
         self,
-        switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[ActivateIntent]:
+        switch_updates: reactive.Observable[SwitchState],
+    ) -> reactive.Observable[ActivateIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
             ops.map(lambda latest: latest[1].button_value - latest[0].button_value),
             ops.filter(lambda delta: delta > 0),
             ops.flat_map(
-                lambda delta: reactivex.from_iterable(
+                lambda delta: reactive.from_iterable(
                     ActivateIntent(source="switch.button")
                     for _ in range(delta)
                 )
@@ -283,8 +260,8 @@ class NavigationProfile:
 
     def _switch_alternate_activate_intents(
         self,
-        switch_updates: reactivex.Observable[SwitchState],
-    ) -> reactivex.Observable[AlternateActivateIntent]:
+        switch_updates: reactive.Observable[SwitchState],
+    ) -> reactive.Observable[AlternateActivateIntent]:
         return pipe_in_background(
             switch_updates,
             ops.pairwise(),
@@ -294,7 +271,7 @@ class NavigationProfile:
             ),
             ops.filter(lambda delta: delta > 0),
             ops.flat_map(
-                lambda delta: reactivex.from_iterable(
+                lambda delta: reactive.from_iterable(
                     AlternateActivateIntent(source="switch.long_button")
                     for _ in range(delta)
                 )

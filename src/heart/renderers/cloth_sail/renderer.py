@@ -6,7 +6,6 @@ import importlib.util
 import math
 from typing import Any, Optional
 
-import manyfold.rx as reactivex
 import numpy as np
 import pygame
 from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
@@ -25,6 +24,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
                        glUniform1f, glUniform2f, glUseProgram,
                        glVertexAttribPointer, glViewport)
 
+import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -270,7 +270,7 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[ClothSailState]:
+    ) -> reactive.Observable[ClothSailState]:
         if self._builder is None:
             self._builder = ClothSailStateProvider(peripheral_manager)
             self.builder = self._builder

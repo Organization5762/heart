@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.l_system.state import LSystemState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 def _update_grammar(grammar: str) -> str:
@@ -43,7 +42,7 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[LSystemState]:
+    ) -> reactive.Observable[LSystemState]:
         frame_ticks = pipe_in_background(
             self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

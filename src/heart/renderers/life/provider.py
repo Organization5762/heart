@@ -1,16 +1,16 @@
 
 from typing import Callable
 
-import manyfold.rx as reactivex
 import numpy as np
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class LifeStateProvider:
@@ -27,7 +27,7 @@ class LifeStateProvider:
     def observable(
         self,
         peripheral_manager: PeripheralManager | None = None,
-    ) -> reactivex.Observable[LifeState]:
+    ) -> reactive.Observable[LifeState]:
         StateOp = Callable[[LifeState], LifeState]
         life_seed = Configuration.life_random_seed()
         rng = (
@@ -50,7 +50,7 @@ class LifeStateProvider:
             return lambda s: s._update_grid()
 
         # If the window size changes, we want to observe and correct for this
-        window_sizes: reactivex.Observable[tuple[int, int]] = (
+        window_sizes: reactive.Observable[tuple[int, int]] = (
             pipe_in_background(
                 self._pm.window,
                 ops.filter(lambda w: w is not None),
@@ -61,7 +61,7 @@ class LifeStateProvider:
         )
 
         # We create an initial state
-        initial_state: reactivex.Observable[LifeState] = pipe_in_background(
+        initial_state: reactive.Observable[LifeState] = pipe_in_background(
             window_sizes,
 
             ops.take(1),
@@ -70,7 +70,7 @@ class LifeStateProvider:
         )
 
         # If the button changes, reseed the state
-        reseed_states: reactivex.Observable[LifeState] = (
+        reseed_states: reactive.Observable[LifeState] = (
             pipe_in_background(
                 self._main_switch.observable(),
 
@@ -82,13 +82,13 @@ class LifeStateProvider:
         )
 
         # Combine the initial + concat state
-        injected_states: reactivex.Observable[LifeState] = reactivex.merge(
+        injected_states: reactive.Observable[LifeState] = reactive.merge(
             initial_state,
             reseed_states
         )
 
         # Merge the initial state + update streams
-        operations: reactivex.Observable[StateOp] = reactivex.merge(
+        operations: reactive.Observable[StateOp] = reactive.merge(
             pipe_in_background(
                 injected_states,
 
@@ -101,7 +101,7 @@ class LifeStateProvider:
             )
         )
 
-        result: reactivex.Observable[LifeState] = pipe_in_background(
+        result: reactive.Observable[LifeState] = pipe_in_background(
             initial_state,
 
             ops.flat_map(

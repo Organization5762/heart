@@ -1,6 +1,5 @@
 from typing import Any, Iterable
 
-import manyfold.rx as reactivex
 from manyfold import Graph
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -14,10 +13,10 @@ from heart.peripheral.core.input import (AccelerometerController,
                                          KeyboardController,
                                          MandelbrotControlProfile,
                                          NavigationProfile)
-from heart.peripheral.core.streams import PeripheralStreams
+from heart.peripheral.core.streams import GraphRouteStream, PeripheralStreams
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.switch import BluetoothSwitch, SwitchState
+from heart.peripheral.switch import BluetoothSwitch
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +44,7 @@ class PeripheralManager:
             configuration=configuration,
             registry=configuration_registry,
         )
-        self._streams = PeripheralStreams(self._iter_peripherals)
+        self._streams = PeripheralStreams(self._graph, self._iter_peripherals)
         self._debug_tap = InputDebugTap()
         self._frame_tick_controller = FrameTickController(self._debug_tap)
         self._keyboard_controller = KeyboardController(self._debug_tap)
@@ -147,10 +146,12 @@ class PeripheralManager:
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
 
-    def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+    def get_main_switch_subscription(self) -> Any:
         return self._streams.main_switch_subscription()
 
-    def get_physical_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+    def get_physical_main_switch_subscription(
+        self,
+    ) -> Any:
         return self._streams.physical_main_switch_subscription()
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
@@ -166,15 +167,15 @@ class PeripheralManager:
         return None
 
     @property
-    def game_tick(self) -> reactivex.Subject[Any]:
+    def game_tick(self) -> GraphRouteStream[Any]:
         return self._streams.game_tick
 
     @property
-    def window(self) -> reactivex.Subject[Any]:
+    def window(self) -> GraphRouteStream[Any]:
         return self._streams.window
 
     @property
-    def clock(self) -> reactivex.Subject[Any]:
+    def clock(self) -> GraphRouteStream[Any]:
         return self._streams.clock
 
     @property

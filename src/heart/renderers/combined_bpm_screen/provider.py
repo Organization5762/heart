@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_METADATA_DURATION_MS = 12000
 DEFAULT_MAX_BPM_DURATION_MS = 5000
@@ -23,7 +22,7 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[CombinedBpmScreenState]:
+    ) -> reactive.Observable[CombinedBpmScreenState]:
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

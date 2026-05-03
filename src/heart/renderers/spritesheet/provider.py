@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
@@ -16,7 +14,8 @@ from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
@@ -105,7 +104,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SpritesheetLoopState]:
+    ) -> reactive.Observable[SpritesheetLoopState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
@@ -113,7 +112,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         )
 
         if self.disable_input:
-            switch_updates = reactivex.empty()
+            switch_updates = reactive.empty()
         else:
             switches = peripheral_manager.get_main_switch_subscription()
             switch_updates = pipe_in_background(
@@ -132,7 +131,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         )
 
         return pipe_in_background(
-            reactivex.merge(switch_updates, tick_updates),
+            reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

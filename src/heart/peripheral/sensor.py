@@ -6,23 +6,23 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterator, Mapping, Self, cast
 
-import manyfold.rx as reactivex
 import serial
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx import operators as ops
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads.motion import AccelerometerVector
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
-from heart.utilities.reactivex_threads import (interval_in_background,
-                                               pipe_in_background)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (interval_in_background,
+                                              pipe_in_background)
 
 logger = get_logger(__name__)
 RECONNECT_DELAY_SECONDS = 1.0
@@ -106,7 +106,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
     def _event_stream(
         self
-    ) -> reactivex.Observable[Acceleration | None]:
+    ) -> reactive.Observable[Acceleration | None]:
         return pipe_in_background(
             interval_in_background(period=timedelta(milliseconds=10)),
 
@@ -362,7 +362,7 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
 
     def _event_stream(
         self
-    ) -> reactivex.Observable[Acceleration | None]:
+    ) -> reactive.Observable[Acceleration | None]:
         def random_accel(_: int) -> Acceleration:
             return Acceleration(
                 x=random.random(),

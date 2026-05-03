@@ -7,10 +7,9 @@ from enum import StrEnum
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
@@ -20,10 +19,11 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import (input_scheduler,
-                                               interval_in_background,
-                                               pipe_in_background,
-                                               pipe_in_main_thread)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (input_scheduler,
+                                              interval_in_background,
+                                              pipe_in_background,
+                                              pipe_in_main_thread)
 
 if TYPE_CHECKING:
     from heart.peripheral.core.manager import PeripheralManager
@@ -108,7 +108,7 @@ class GamepadController:
         self._debug_tap = debug_tap
 
     @cached_property
-    def _snapshot_stream(self) -> reactivex.Observable[GamepadSnapshot]:
+    def _snapshot_stream(self) -> reactive.Observable[GamepadSnapshot]:
         stream = pipe_in_main_thread(
             interval_in_background(
                 period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS),
@@ -125,11 +125,11 @@ class GamepadController:
             source_id=lambda snapshot: "gamepad" if snapshot.connected else "gamepad:none",
         )
 
-    def snapshot_stream(self) -> reactivex.Observable[GamepadSnapshot]:
+    def snapshot_stream(self) -> reactive.Observable[GamepadSnapshot]:
         return self._snapshot_stream
 
     @cache
-    def button_held(self, button: GamepadButton) -> reactivex.Observable[bool]:
+    def button_held(self, button: GamepadButton) -> reactive.Observable[bool]:
         stream = pipe_in_background(
             self.snapshot_stream(),
             ops.map(lambda snapshot: snapshot.button_held(button)),
@@ -148,7 +148,7 @@ class GamepadController:
     def button_tapped(
         self,
         button: GamepadButton,
-    ) -> reactivex.Observable[GamepadButtonTapEvent]:
+    ) -> reactive.Observable[GamepadButtonTapEvent]:
         stream = pipe_in_background(
             self.snapshot_stream(),
             ops.filter(lambda snapshot: snapshot.button_tapped(button)),
@@ -173,7 +173,7 @@ class GamepadController:
         self,
         axis: GamepadAxis,
         dead_zone: float = DEFAULT_GAMEPAD_AXIS_DEAD_ZONE,
-    ) -> reactivex.Observable[float]:
+    ) -> reactive.Observable[float]:
         stream = pipe_in_background(
             self.snapshot_stream(),
             ops.map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone)),
@@ -193,11 +193,11 @@ class GamepadController:
         self,
         stick_name: str,
         dead_zone: float = DEFAULT_GAMEPAD_AXIS_DEAD_ZONE,
-    ) -> reactivex.Observable[GamepadStickValue]:
+    ) -> reactive.Observable[GamepadStickValue]:
         axis_x = GamepadAxis.LEFT_X if stick_name == "left" else GamepadAxis.RIGHT_X
         axis_y = GamepadAxis.LEFT_Y if stick_name == "left" else GamepadAxis.RIGHT_Y
         stream = pipe_in_background(
-            reactivex.combine_latest(
+            reactive.combine_latest(
                 self.axis_value(axis_x, dead_zone),
                 self.axis_value(axis_y, dead_zone),
             ),
@@ -217,7 +217,7 @@ class GamepadController:
         )
 
     @cache
-    def dpad_value(self) -> reactivex.Observable[GamepadDpadValue]:
+    def dpad_value(self) -> reactive.Observable[GamepadDpadValue]:
         stream = pipe_in_background(
             self.snapshot_stream(),
             ops.map(lambda snapshot: snapshot.dpad),

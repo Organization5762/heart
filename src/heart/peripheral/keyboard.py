@@ -4,16 +4,16 @@ from datetime import timedelta
 from functools import cache
 from typing import Any, Iterator, Self, cast
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (input_scheduler,
-                                               interval_in_background,
-                                               pipe_in_main_thread)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (input_scheduler,
+                                              interval_in_background,
+                                              pipe_in_main_thread)
 
 logger = get_logger(__name__)
 
@@ -71,7 +71,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
     def get(cls, key: int) -> Self:
         return cls(key)
 
-    def _event_stream(self) -> reactivex.Observable[KeyboardEvent]:
+    def _event_stream(self) -> reactive.Observable[KeyboardEvent]:
         """
         Periodically sample keyboard state as KeyboardEvent edges.
 
@@ -85,7 +85,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             # empty() is typed as Observable[NoReturn | Never] so we cast it
             # to keep type checkers happy about the return type.
-            return cast(reactivex.Observable[KeyboardEvent], reactivex.empty())
+            return cast(reactive.Observable[KeyboardEvent], reactive.empty())
 
         return pipe_in_main_thread(
             interval_in_background(

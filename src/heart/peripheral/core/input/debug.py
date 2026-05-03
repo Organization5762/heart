@@ -9,11 +9,9 @@ from enum import StrEnum
 from math import ceil
 from typing import Any
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-from manyfold.rx.subject import Subject
-
-from heart.utilities.reactivex_threads import pipe_in_background
+import heart.utilities.reactive as reactive
+from heart.utilities.reactive import Subject, ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
 DEFAULT_LATENCY_HISTORY_SIZE = 512
@@ -89,7 +87,7 @@ class InputDebugTap:
             self._history.append(envelope)
         self._subject.on_next(envelope)
 
-    def observable(self) -> reactivex.Observable[InputDebugEnvelope]:
+    def observable(self) -> reactive.Observable[InputDebugEnvelope]:
         return pipe_in_background(self._subject)
 
     def snapshot(self) -> tuple[InputDebugEnvelope, ...]:
@@ -147,14 +145,14 @@ def _payload_monotonic(value: Any) -> float | None:
 
 
 def instrument_input_stream(
-    source: reactivex.Observable[Any],
+    source: reactive.Observable[Any],
     *,
     tap: InputDebugTap,
     stage: InputDebugStage,
     stream_name: str,
     source_id: SourceResolver,
     upstream_ids: Iterable[str] = (),
-) -> reactivex.Observable[Any]:
+) -> reactive.Observable[Any]:
     """Attach debug tap side effects to ``source`` without changing its payloads."""
 
     upstream_ids_tuple = tuple(upstream_ids)

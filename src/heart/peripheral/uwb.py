@@ -7,18 +7,18 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterator, List, Self
 
-import manyfold.rx as reactivex
 import numpy as np
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx import operators as ops
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.utilities.reactivex_threads import (interval_in_background,
-                                               pipe_in_background)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (interval_in_background,
+                                              pipe_in_background)
 
 # --- Shared types ------------------------------------------------------------
 
@@ -228,7 +228,7 @@ class FakeUWBPositioning(Peripheral[LocalizedTarget | None]):
             ],
         )
 
-    def _event_stream(self) -> reactivex.Observable[LocalizedTarget | None]:
+    def _event_stream(self) -> reactive.Observable[LocalizedTarget | None]:
         # Emit a new multilateration solution every 500 ms
         return pipe_in_background(
             interval_in_background(period=timedelta(milliseconds=500)),

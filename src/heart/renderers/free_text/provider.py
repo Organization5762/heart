@@ -3,16 +3,16 @@ from __future__ import annotations
 import textwrap
 from typing import Iterable
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
-from manyfold.rx.subject import BehaviorSubject
 
+import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.free_text.state import FreeTextRendererState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import BehaviorSubject
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 FONT_SIZE_MAX = 12
@@ -30,7 +30,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FreeTextRendererState]:
+    ) -> reactive.Observable[FreeTextRendererState]:
         windows = pipe_in_background(
             peripheral_manager.window,
             ops.filter(lambda window: window is not None),

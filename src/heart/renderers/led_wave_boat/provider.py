@@ -3,9 +3,7 @@ from __future__ import annotations
 import math
 from random import Random
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import (AccelerometerController,
                                          AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
@@ -15,7 +13,8 @@ from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
                                                  LedWaveBoatState,
                                                  SprayParticle)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 HULL_DEPTH = 1.0
 
@@ -35,7 +34,7 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[LedWaveBoatState]:
+    ) -> reactive.Observable[LedWaveBoatState]:
         window_sizes = pipe_in_background(
             self._peripheral_manager.window,
             ops.filter(lambda window: window is not None),

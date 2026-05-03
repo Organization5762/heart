@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.max_bpm_screen.state import AvatarBpmRendererState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 AVATAR_MAPPINGS = {
     "sri": "0E906",  # PINK
@@ -24,7 +23,7 @@ AVATAR_MAPPINGS = {
 class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[AvatarBpmRendererState]:
+    ) -> reactive.Observable[AvatarBpmRendererState]:
         return (
             pipe_in_background(
                 peripheral_manager.frame_tick_controller.observable(),

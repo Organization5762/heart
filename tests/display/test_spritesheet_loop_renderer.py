@@ -2,7 +2,6 @@
 
 import pygame
 import pytest
-from manyfold.rx.subject import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
@@ -11,6 +10,7 @@ from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription,
                                          LoopPhase, Size, SpritesheetLoop)
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.reactive import BehaviorSubject
 
 
 class _StubSpritesheet:

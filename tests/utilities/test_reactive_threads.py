@@ -4,25 +4,22 @@ from __future__ import annotations
 
 import threading
 
-import manyfold.rx as reactivex
 import pytest
-from manyfold.rx import create
-from manyfold.rx import operators as ops
-from manyfold.rx.disposable import Disposable
-from manyfold.rx.subject import Subject
 
-from heart.utilities.reactivex_threads import (
+import heart.utilities.reactive as reactive
+from heart.utilities.reactive import Disposable
+from heart.utilities.reactive_threads import (
     FRAME_THREAD_LATENCY_STREAM, background_scheduler, blocking_io_scheduler,
     delivery_latency_snapshot, drain_frame_thread_queue, input_scheduler,
     on_frame_thread, pipe_in_main_thread,
-    reset_reactivex_threading_state_for_tests, scheduler_diagnostics)
+    reset_reactive_threading_state_for_tests, scheduler_diagnostics)
 
 
 @pytest.fixture(autouse=True)
-def _reset_reactivex_threads() -> None:
-    reset_reactivex_threading_state_for_tests()
+def _reset_reactive_threads() -> None:
+    reset_reactive_threading_state_for_tests()
     yield
-    reset_reactivex_threading_state_for_tests()
+    reset_reactive_threading_state_for_tests()
 
 
 class TestFrameThreadHandoff:
@@ -30,12 +27,12 @@ class TestFrameThreadHandoff:
 
     def test_pipe_in_main_thread_defers_delivery_until_frame_drain(self) -> None:
         """Verify frame-thread delivery waits for an explicit drain and then runs on the draining thread so pygame observers keep thread affinity."""
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         observed: list[tuple[int, int]] = []
 
         pipe_in_main_thread(
             source,
-            ops.map(lambda value: (value, threading.get_ident())),
+            reactive.operators.map(lambda value: (value, threading.get_ident())),
         ).subscribe(observed.append)
 
         thread = threading.Thread(
@@ -73,14 +70,14 @@ class TestSchedulerIsolation:
             observer.on_completed()
             return Disposable()
 
-        create(_blocking_source).pipe(
-            ops.subscribe_on(blocking_io_scheduler()),
+        reactive.create(_blocking_source).pipe(
+            reactive.operators.subscribe_on(blocking_io_scheduler()),
         ).subscribe(blocking_values.append)
 
         assert started.wait(timeout=0.5)
 
-        reactivex.just("input").pipe(
-            ops.subscribe_on(input_scheduler()),
+        reactive.just("input").pipe(
+            reactive.operators.subscribe_on(input_scheduler()),
         ).subscribe(
             on_next=input_values.append,
             on_completed=input_ready.set,

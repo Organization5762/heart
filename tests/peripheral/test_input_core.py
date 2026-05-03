@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx.subject import Subject
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
                                          ExternalSensorHub, FrameTick,
@@ -25,6 +24,7 @@ from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyState)
 from heart.peripheral.sensor import Acceleration
 from heart.peripheral.switch import SwitchState
+from heart.utilities.reactive import Subject
 
 
 class _StubClock:
@@ -89,7 +89,7 @@ class TestInputDebugTap:
         observed: list[int] = []
 
         instrument_input_stream(
-            reactivex.from_iterable([7]),
+            reactive.from_iterable([7]),
             tap=tap,
             stage=InputDebugStage.LOGICAL,
             stream_name="navigation.activate",
@@ -162,7 +162,7 @@ class TestKeyboardController:
 
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.interval_in_background",
-            lambda period, scheduler: reactivex.from_iterable([0]),
+            lambda period, scheduler: reactive.from_iterable([0]),
         )
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
@@ -203,7 +203,7 @@ class TestKeyboardController:
 
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.interval_in_background",
-            lambda period, scheduler: reactivex.from_iterable([0]),
+            lambda period, scheduler: reactive.from_iterable([0]),
         )
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
@@ -245,7 +245,7 @@ class TestKeyboardController:
 
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.interval_in_background",
-            lambda period, scheduler: reactivex.from_iterable([0]),
+            lambda period, scheduler: reactive.from_iterable([0]),
         )
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
@@ -287,7 +287,7 @@ class TestKeyboardController:
 
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.interval_in_background",
-            lambda period, scheduler: reactivex.from_iterable([0]),
+            lambda period, scheduler: reactive.from_iterable([0]),
         )
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.pipe_in_main_thread",

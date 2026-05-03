@@ -3,11 +3,9 @@ from __future__ import annotations
 from threading import RLock
 from typing import Any, TypeVar
 
-import manyfold.rx as reactivex
-from manyfold.rx.disposable import Disposable
-from manyfold.rx.scheduler import TimeoutScheduler
-
+from heart.utilities import reactive
 from heart.utilities.logging import get_logger
+from heart.utilities.reactive import Disposable, TimeoutScheduler
 
 logger = get_logger(__name__)
 
@@ -16,11 +14,11 @@ _STATS_SCHEDULER = TimeoutScheduler()
 
 
 def instrument_stream(
-    source: reactivex.Observable[T],
+    source: reactive.Observable[T],
     *,
     stream_name: str,
     log_interval_ms: int,
-) -> reactivex.Observable[T]:
+) -> reactive.Observable[T]:
     if log_interval_ms <= 0:
         return source
 
@@ -93,4 +91,4 @@ def instrument_stream(
 
         return Disposable(_dispose)
 
-    return reactivex.create(_subscribe)
+    return reactive.create(_subscribe)

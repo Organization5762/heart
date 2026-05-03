@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import os
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -20,8 +18,9 @@ from heart.peripheral.rubiks_connected_x_state import \
 from heart.renderers.rubiks_connected_x_visualizer.state import \
     RubiksConnectedXVisualizerState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (pipe_in_background,
-                                               pipe_in_main_thread)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              pipe_in_main_thread)
 
 logger = get_logger(__name__)
 
@@ -43,14 +42,14 @@ class RubiksConnectedXVisualizerStateProvider(
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[RubiksConnectedXVisualizerState]:
+    ) -> reactive.Observable[RubiksConnectedXVisualizerState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, RubiksConnectedXPeripheral)
         ]
         if not cube_peripherals:
-            return reactivex.just(RubiksConnectedXVisualizerState())
+            return reactive.just(RubiksConnectedXVisualizerState())
 
         initial_state = RubiksConnectedXVisualizerState(
             facelets=load_rubiks_connected_x_baseline_facelets()
@@ -63,7 +62,7 @@ class RubiksConnectedXVisualizerStateProvider(
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
         merged = pipe_in_background(
-            reactivex.merge(*observables),
+            reactive.merge(*observables),
             ops.map(
                 PeripheralMessageEnvelope[
                     RubiksConnectedXNotification

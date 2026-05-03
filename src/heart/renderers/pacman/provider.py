@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import random
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pacman.state import PacmanGhostState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
@@ -30,7 +29,7 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[PacmanGhostState]:
+    ) -> reactive.Observable[PacmanGhostState]:
         initial_state = self._spawn_state(
             width=self._width,
             height=self._height,

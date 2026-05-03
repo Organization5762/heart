@@ -3,15 +3,15 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import cast
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
@@ -36,7 +36,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[SlidingImageState]:
+    ) -> reactive.Observable[SlidingImageState]:
         if peripheral_manager is None:
             raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
 
@@ -48,8 +48,8 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = reactivex.merge(
-            reactivex.just(initial_state.width),
+        window_stream = reactive.merge(
+            reactive.just(initial_state.width),
             window_stream,
         )
 
@@ -90,7 +90,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[SlidingRendererState]:
+    ) -> reactive.Observable[SlidingRendererState]:
         if peripheral_manager is None:
             raise ValueError("SlidingRendererStateProvider requires a PeripheralManager")
 
@@ -102,8 +102,8 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = reactivex.merge(
-            reactivex.just(initial_state.width),
+        window_stream = reactive.merge(
+            reactive.just(initial_state.width),
             window_stream,
         )
 

@@ -3,12 +3,12 @@ from functools import lru_cache
 from typing import Self, Tuple
 
 import numpy as np
-from manyfold.rx import Observable
-from manyfold.rx import operators as ops
 
 from heart.device import Device
 from heart.peripheral.sensor import Acceleration
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import Observable
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 GRID = 64  # internal height-field resolution
 SIM_SPEED = 1

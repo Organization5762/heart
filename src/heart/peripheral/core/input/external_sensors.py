@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from manyfold.rx.subject import BehaviorSubject
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.sensor import Acceleration
+from heart.utilities.reactive import BehaviorSubject
 
 ACCELEROMETER_PATHS = frozenset({"x", "y", "z"})
 EXTERNAL_SENSOR_STREAM_NAME = "beats.sensor.control"
@@ -28,7 +28,9 @@ class ExternalSensorHub:
         self._lock = Lock()
         self._values: dict[str, float] = {}
         self._peripheral_snapshots: dict[str, dict[str, Any]] = {}
-        self._accelerometer_subject: BehaviorSubject[Acceleration | None] = (
+        self._accelerometer_subject: BehaviorSubject[
+            Acceleration | None
+        ] = (
             BehaviorSubject(None)
         )
 
@@ -68,7 +70,7 @@ class ExternalSensorHub:
             upstream_ids=(EXTERNAL_SENSOR_SOURCE,),
         )
 
-    def observable_acceleration(self) -> BehaviorSubject[Acceleration | None]:
+    def observable_acceleration(self) -> reactive.Observable[Acceleration | None]:
         return self._accelerometer_subject
 
     def _resolve_acceleration_locked(self) -> Acceleration | None:

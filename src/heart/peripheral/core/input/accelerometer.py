@@ -4,10 +4,9 @@ import time
 from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
@@ -15,7 +14,8 @@ from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 if TYPE_CHECKING:
     from heart.peripheral.core.input.frame import FrameTickController
@@ -39,17 +39,17 @@ class AccelerometerController:
         self._debug_tap = debug_tap
 
     @cached_property
-    def _observable(self) -> reactivex.Observable[Acceleration]:
+    def _observable(self) -> reactive.Observable[Acceleration]:
         streams = [
             peripheral.observe
             for peripheral in self._manager.peripherals
             if isinstance(peripheral, (Accelerometer, FakeAccelerometer))
         ]
         if not streams:
-            return cast(reactivex.Observable[Acceleration], reactivex.empty())
+            return cast(reactive.Observable[Acceleration], reactive.empty())
 
         merged = pipe_in_background(
-            reactivex.merge(*streams),
+            reactive.merge(*streams),
             ops.map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral),
             ops.filter(lambda value: value is not None),
             ops.map(lambda value: cast(Acceleration, value)),
@@ -62,7 +62,7 @@ class AccelerometerController:
             source_id="accelerometer",
         )
 
-    def observable(self) -> reactivex.Observable[Acceleration]:
+    def observable(self) -> reactive.Observable[Acceleration]:
         return self._observable
 
 
@@ -81,12 +81,12 @@ class AccelerometerDebugProfile:
         self._space_impulse_until = 0.0
 
     @cached_property
-    def _observable(self) -> reactivex.Observable[Acceleration | None]:
+    def _observable(self) -> reactive.Observable[Acceleration | None]:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
 
-        key_states = reactivex.combine_latest(
+        key_states = reactive.combine_latest(
             self._keyboard_controller.key_state(pygame.K_a),
             self._keyboard_controller.key_state(pygame.K_d),
             self._keyboard_controller.key_state(pygame.K_w),
@@ -118,14 +118,14 @@ class AccelerometerDebugProfile:
             ),
         )
         return pipe_in_background(
-            reactivex.merge(
+            reactive.merge(
                 self._external_sensor_hub.observable_acceleration(),
                 instrumented_keyboard_stream,
             ),
             ops.distinct_until_changed(),
         )
 
-    def observable(self) -> reactivex.Observable[Acceleration | None]:
+    def observable(self) -> reactive.Observable[Acceleration | None]:
         return self._observable
 
     def should_use_debug_input(self) -> bool:

@@ -3,16 +3,15 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-from manyfold.rx.subject import BehaviorSubject
-
+import heart.utilities.reactive as reactive
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import BehaviorSubject
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class BorderStateProvider(ObservableProvider[BorderState]):
@@ -21,7 +20,7 @@ class BorderStateProvider(ObservableProvider[BorderState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[BorderState]:
+    ) -> reactive.Observable[BorderState]:
         return pipe_in_background(
             self._color,
             ops.map(lambda color: BorderState(color=color)),
@@ -49,7 +48,7 @@ class RainStateProvider(ObservableProvider[RainState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[RainState]:
+    ) -> reactive.Observable[RainState]:
         initial_state = RainState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
@@ -90,7 +89,7 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[SlinkyState]:
+    ) -> reactive.Observable[SlinkyState]:
         initial_state = SlinkyState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),

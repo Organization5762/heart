@@ -14,13 +14,13 @@ from typing import Any, Callable, Self, cast
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx.subject import Subject
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
+from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 

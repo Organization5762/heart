@@ -5,12 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-import manyfold.rx as reactivex
-from manyfold.rx.disposable import Disposable
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
+from heart.utilities.reactive import Disposable
 
 
 class CountingPeripheral(Peripheral[int]):
@@ -19,12 +18,12 @@ class CountingPeripheral(Peripheral[int]):
     def __init__(self, counter: dict[str, int]) -> None:
         self._counter = counter
 
-    def _event_stream(self) -> reactivex.Observable[int]:
+    def _event_stream(self) -> reactive.Observable[int]:
         def on_subscribe(observer: Any, scheduler: Any) -> Disposable:
             self._counter["subscriptions"] += 1
             return Disposable()
 
-        return reactivex.create(on_subscribe)
+        return reactive.create(on_subscribe)
 
 
 class TestPeripheralObserveSharing:

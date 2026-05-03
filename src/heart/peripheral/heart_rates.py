@@ -7,7 +7,6 @@ from typing import (Any, Callable, ClassVar, Dict, Iterator, List, Optional,
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx.subject import Subject
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from openant.base.ant import usb
@@ -25,6 +24,7 @@ from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads import (HeartRateLifecycle,
                                              HeartRateMeasurement)
 from heart.utilities.logging import get_logger
+from heart.utilities.reactive import Subject
 
 RETRY_DELAY = 5
 DEVICE_TIMEOUT = 30  # seconds of silence ⇒ forget the strap

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -11,7 +10,8 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.pranay_sketch.state import (PranaySketchPiece,
                                                  PranaySketchState)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 SEGMENT_DIRECTORY = "pranay_sketch_segments"
 SEGMENT_LAYOUT_PATH = f"{SEGMENT_DIRECTORY}/layout.json"
@@ -110,7 +110,7 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[PranaySketchState]:
+    ) -> reactive.Observable[PranaySketchState]:
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

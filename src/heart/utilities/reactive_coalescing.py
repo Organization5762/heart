@@ -4,12 +4,11 @@ import time
 from threading import RLock, Timer
 from typing import Any, TypeVar
 
-import manyfold.rx as reactivex
-from manyfold.rx.disposable import Disposable
-
+from heart.utilities import reactive
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (_COALESCE_SCHEDULER,
-                                               coalesce_scheduler)
+from heart.utilities.reactive import Disposable
+from heart.utilities.reactive_threads import (_COALESCE_SCHEDULER,
+                                              coalesce_scheduler)
 
 logger = get_logger(__name__)
 
@@ -18,11 +17,11 @@ _NO_PENDING: Any = object()
 
 
 def coalesce_latest(
-    source: reactivex.Observable[T],
+    source: reactive.Observable[T],
     *,
     window_ms: int,
     stream_name: str,
-) -> reactivex.Observable[T]:
+) -> reactive.Observable[T]:
     if window_ms <= 0:
         return source
 
@@ -128,4 +127,4 @@ def coalesce_latest(
         )
         return Disposable(_dispose)
 
-    return reactivex.create(_subscribe)
+    return reactive.create(_subscribe)
