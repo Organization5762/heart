@@ -12,6 +12,7 @@ from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
 from heart.peripheral.microphone import Microphone
 from heart.peripheral.phone_text import PhoneText
+from heart.peripheral.radio import RadioPeripheral
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RUBIKS_CONNECTED_X_AUTODETECT_ENV_VAR,
     RubiksConnectedXPeripheral)
@@ -245,8 +246,6 @@ def _drawing_pad_graph_nodes() -> tuple[GraphNodeFactory, ...]:
 
 
 def _detect_radios() -> Iterator[Peripheral[Any]]:
-    from heart.peripheral.radio import RadioPeripheral
-
     yield from itertools.chain(RadioPeripheral.detect())
 
 
@@ -255,8 +254,6 @@ def _radio_detection_node(
     start_immediately: bool,
     on_detect: Any | None,
 ) -> Any:
-    from heart.peripheral.radio import RadioPeripheral
-
     return RadioPeripheral.detection_node(
         spawn_sources=True,
         on_detect=on_detect,
