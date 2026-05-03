@@ -49,7 +49,7 @@ class PeripheralManager:
         self._frame_tick_controller = FrameTickController(self._debug_tap)
         self._keyboard_controller = KeyboardController(self._debug_tap)
         self._gamepad_controller = GamepadController(self, self._debug_tap)
-        self._external_sensor_hub = ExternalSensorHub(self._debug_tap)
+        self._external_sensor_hub = ExternalSensorHub(self._debug_tap, graph=self._graph)
         self._navigation_profile = NavigationProfile(
             keyboard_controller=self._keyboard_controller,
             gamepad_controller=self._gamepad_controller,
@@ -65,6 +65,7 @@ class PeripheralManager:
             frame_tick_controller=self._frame_tick_controller,
             debug_tap=self._debug_tap,
             external_sensor_hub=self._external_sensor_hub,
+            graph=self._graph,
         )
         self._mandelbrot_control_profile = MandelbrotControlProfile(
             keyboard_controller=self._keyboard_controller,

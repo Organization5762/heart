@@ -11,6 +11,10 @@ from heart.utilities.reactive_streams import share_stream
 class TestShareStreamStrategy:
     """Validate reactive stream sharing strategies so core event pipelines stay consistent."""
 
+    @pytest.fixture(autouse=True)
+    def _disable_coalescing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "0")
+
     @pytest.mark.parametrize(
         ("strategy", "expected_initial"),
         [

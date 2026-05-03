@@ -12,7 +12,8 @@ from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
                                                     SlideTransitionMode,
                                                     SlideTransitionState)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 if TYPE_CHECKING:
     pass
@@ -57,7 +58,7 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
                 ),
                 seed=initial_state,
             ),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

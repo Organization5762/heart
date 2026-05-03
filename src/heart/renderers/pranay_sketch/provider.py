@@ -11,7 +11,8 @@ from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.pranay_sketch.state import (PranaySketchPiece,
                                                  PranaySketchState)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 SEGMENT_DIRECTORY = "pranay_sketch_segments"
 SEGMENT_LAYOUT_PATH = f"{SEGMENT_DIRECTORY}/layout.json"
@@ -129,7 +130,7 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         return pipe_in_background(
             frame_ticks,
             ops.scan(advance_state, seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

@@ -7,6 +7,7 @@ from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
                       StreamName, TypedRoute, Variant, route)
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 from heart.utilities import reactive
 from heart.utilities.reactive_threads import pipe_in_background
@@ -25,12 +26,7 @@ def runtime_route(name: str, schema_id: str) -> Any:
         family=RUNTIME_FAMILY,
         stream=StreamName(name),
         variant=Variant.State,
-        schema=Schema(
-            schema_id=schema_id,
-            version=1,
-            encode=lambda value: repr(value).encode("utf-8", errors="replace"),
-            decode=lambda payload: payload.decode("utf-8", errors="replace"),
-        ),
+        schema=Schema.any(schema_id),
     )
 
 
@@ -40,19 +36,14 @@ class GraphRouteStream(Generic[T]):
     def __init__(self, graph: Graph, route_ref: TypedRoute[T]) -> None:
         self._graph = graph
         self._route = route_ref
-        self._subject: reactive.BehaviorSubject[T | None] = reactive.BehaviorSubject(
-            None
-        )
-        self._value: T | None = None
 
     @property
     def value(self) -> T | None:
-        return self._value
+        latest = self._graph.latest(self._route)
+        return None if latest is None else latest.value
 
     def on_next(self, value: T) -> None:
-        self._value = value
         self._graph.publish(self._route, value)
-        self._subject.on_next(value)
 
     def subscribe(self, *args: Any, **kwargs: Any) -> Any:
         return self._observable().subscribe(*args, **kwargs)
@@ -60,8 +51,16 @@ class GraphRouteStream(Generic[T]):
     def pipe(self, *operators: Any) -> reactive.Observable[Any]:
         return self._observable().pipe(*operators)
 
-    def _observable(self) -> reactive.Observable[T | None]:
-        return self._subject
+    def _observable(self) -> reactive.Observable[T]:
+        def subscribe(observer: Any, scheduler: Any = None) -> Any:
+            return self._graph.observe(self._route).subscribe(
+                lambda envelope: observer.on_next(envelope.value),
+                observer.on_error,
+                observer.on_completed,
+                scheduler=scheduler,
+            )
+
+        return reactive.create(subscribe)
 
 
 class PeripheralStreams:
@@ -93,7 +92,7 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
 
         if not observables:
-            return reactive.empty()
+            return empty_node()
 
         merged = pipe_in_background(
             reactive.merge(*observables),

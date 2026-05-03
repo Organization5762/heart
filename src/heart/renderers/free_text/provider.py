@@ -12,7 +12,8 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 from heart.utilities.reactive import BehaviorSubject
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 FONT_SIZE_MAX = 12
@@ -59,7 +60,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             frame_ticks,
             ops.with_latest_from(windows, self._text),
             ops.map(to_state),
-            ops.start_with(self.initial_state()),
+            start_with_once(self.initial_state()),
             ops.distinct_until_changed(),
             ops.share(),
         )

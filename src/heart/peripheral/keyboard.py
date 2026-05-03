@@ -8,6 +8,7 @@ import pygame
 
 import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.nodes import empty_node
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 from heart.utilities.reactive import operators as ops
@@ -83,9 +84,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             return result
 
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            # empty() is typed as Observable[NoReturn | Never] so we cast it
-            # to keep type checkers happy about the return type.
-            return cast(reactive.Observable[KeyboardEvent], reactive.empty())
+            return empty_node()
 
         return pipe_in_main_thread(
             interval_in_background(

@@ -5,7 +5,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.porthole_window.state import PortholeWindowState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
@@ -35,7 +36,7 @@ class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
             pipe_in_background(
                 frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
-                ops.start_with(initial_state),
+                start_with_once(initial_state),
                 ops.share(),
             )
         )

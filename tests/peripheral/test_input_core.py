@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pygame
+from manyfold import Graph
 
 import heart.utilities.reactive as reactive
-from heart.peripheral.core.input import (AccelerometerDebugProfile,
+from heart.peripheral.configuration import PeripheralConfiguration
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
                                          ExternalSensorHub, FrameTick,
                                          FrameTickController, GamepadAxis,
@@ -18,11 +23,14 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          NavigationProfile,
                                          SetOrientationCommand,
                                          ToggleDebugCommand)
+from heart.peripheral.core.input.accelerometer import (
+    ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
 from heart.peripheral.core.input.debug import instrument_input_stream
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
-from heart.peripheral.sensor import Acceleration
+from heart.peripheral.sensor import Acceleration, FakeAccelerometer
 from heart.peripheral.switch import SwitchState
 from heart.utilities.reactive import Subject
 
@@ -37,6 +45,13 @@ class _StubClock:
 
     def get_fps(self) -> float:
         return self._fps
+
+
+class _ConfigurationLoaderStub:
+    registry: object = object()
+
+    def load(self) -> PeripheralConfiguration:
+        return PeripheralConfiguration(detectors=(), graph_nodes=())
 
 
 def _keyboard_snapshot(*pressed_keys: int, timestamp_ms: float) -> KeyboardSnapshot:
@@ -678,12 +693,38 @@ class TestMandelbrotControlProfile:
 class TestAccelerometerDebugProfile:
     """Group accelerometer debug-profile tests so keyboard motion debugging stays deterministic across scenes."""
 
+    def test_controller_node_publishes_physical_acceleration_to_graph(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify physical accelerometer input is exposed through a graph route handle instead of only a raw reactive stream."""
+        tap = InputDebugTap()
+        accelerometer = FakeAccelerometer()
+        source: Subject[Acceleration | None] = Subject()
+        monkeypatch.setattr(accelerometer, "_event_stream", lambda: source)
+        manager = PeripheralManager(
+            configuration_loader=cast(Any, _ConfigurationLoaderStub()),
+        )
+        manager.register(accelerometer)
+        graph = manager.graph
+        controller = AccelerometerController(manager=manager, debug_tap=tap)
+        observed: list[Acceleration] = []
+
+        controller.node().subscribe(observed.append)
+        source.on_next(Acceleration(x=1.0, y=2.0, z=3.0))
+
+        assert observed == [Acceleration(x=1.0, y=2.0, z=3.0)]
+        latest = graph.latest(ACCELERATION_ROUTE)
+        assert latest is not None
+        assert latest.value == observed[-1]
+
     def test_profile_emits_keyboard_tilt_and_space_impulse(
         self,
         monkeypatch,
     ) -> None:
         """Verify keyboard tilt and jump keys map to deterministic acceleration vectors so water and Mario scenes share one debug motion contract."""
         tap = InputDebugTap()
+        graph = Graph()
         keyboard = KeyboardController(tap)
         frame_ticks = FrameTickController(tap)
         keyboard_snapshots: Subject[KeyboardSnapshot] = Subject()
@@ -694,7 +735,8 @@ class TestAccelerometerDebugProfile:
             keyboard_controller=keyboard,
             frame_tick_controller=frame_ticks,
             debug_tap=tap,
-            external_sensor_hub=ExternalSensorHub(tap),
+            external_sensor_hub=ExternalSensorHub(tap, graph=graph),
+            graph=graph,
         )
         observed: list[Acceleration | None] = []
         monkeypatch.setattr(
@@ -736,6 +778,10 @@ class TestAccelerometerDebugProfile:
         assert observed[0] is None
         assert observed[1] == Acceleration(x=1.5, y=1.5, z=13.51)
         assert observed[2] == Acceleration(x=1.5, y=1.5, z=10.51)
+        latest = graph.latest(DEBUG_ACCELERATION_ROUTE)
+        assert latest is not None
+        assert latest.value == observed[-1]
+        assert profile.node() is profile.observable()
         assert any(
             envelope.stream_name == "accelerometer.debug"
             for envelope in tap.snapshot()

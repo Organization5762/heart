@@ -10,7 +10,8 @@ from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.peripheral.uwb import ops
 from heart.renderers.life.state import LifeState
 from heart.utilities.env import Configuration
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class LifeStateProvider:
@@ -108,7 +109,7 @@ class LifeStateProvider:
                 lambda first_state: pipe_in_background(
                     operations,
                     ops.scan(lambda acc, op: op(acc), seed=first_state),
-                    ops.start_with(first_state),
+                    start_with_once(first_state),
                 )
             ),
             ops.share(),

@@ -98,13 +98,12 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
     ) -> reactive.Observable[MarioRendererState]:
         initial = self._create_initial_state()
         if self._accelerometer_debug_profile.should_use_debug_input():
-            acceleration_source = self._accelerometer_debug_profile.observable()
+            acceleration_source = self._accelerometer_debug_profile.node()
         else:
-            acceleration_source = self._accelerometer_controller.observable()
+            acceleration_source = self._accelerometer_controller.node()
         accelerations = pipe_in_background(
             acceleration_source,
-            ops.start_with(None),
-            ops.share(),
+            starting_value=None,
         )
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
@@ -122,6 +121,5 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
                 ),
                 seed=initial,
             ),
-            ops.start_with(initial),
-            ops.share(),
+            starting_value=initial,
         )

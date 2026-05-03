@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from manyfold import Graph
+
 from heart.peripheral.core.input.debug import InputDebugTap
-from heart.peripheral.core.input.external_sensors import ExternalSensorHub
+from heart.peripheral.core.input.external_sensors import (
+    EXTERNAL_ACCELEROMETER_ROUTE, ExternalSensorHub)
 from heart.peripheral.sensor import Acceleration
 
 
@@ -40,3 +43,14 @@ class TestExternalSensorHub:
             Acceleration(x=0.0, y=0.0, z=12.5),
             None,
         ]
+
+    def test_accelerometer_updates_publish_to_graph(self) -> None:
+        """Verify external acceleration state is owned by the Manyfold graph rather than a Heart RX subject."""
+        graph = Graph()
+        hub = ExternalSensorHub(InputDebugTap(), graph=graph)
+
+        hub.set_value("accelerometer:debug:y", 2.5)
+
+        latest = graph.latest(EXTERNAL_ACCELEROMETER_ROUTE)
+        assert latest is not None
+        assert latest.value == Acceleration(x=0.0, y=2.5, z=0.0)

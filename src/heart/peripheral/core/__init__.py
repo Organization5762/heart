@@ -10,6 +10,8 @@ from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
 import heart.utilities.reactive as reactive
+from heart.peripheral.core.graph_transforms import ManyfoldObservableTransform
+from heart.peripheral.core.nodes import empty_node
 from heart.utilities.logging import get_logger
 
 
@@ -132,7 +134,7 @@ class Peripheral(Generic[A]):
     _logger = get_logger(__name__)
 
     def _event_stream(self) -> reactive.Observable[A]:
-        return reactive.empty()
+        return empty_node()
 
     def peripheral_info(self) -> PeripheralInfo:
         # Default implementation returns a generic PeripheralInfo instance
@@ -150,10 +152,12 @@ class Peripheral(Generic[A]):
                 peripheral_info=self.peripheral_info()
             )
 
-        return self._event_stream().pipe(
-            reactive.operators.map(wrap),
-            reactive.operators.share(),
-        )
+        return ManyfoldObservableTransform(
+            self._event_stream(),
+            wrap,
+            name=f"peripheral.{type(self).__name__}",
+            schema_id=f"Heart{type(self).__name__}PeripheralObserve",
+        ).observable()
 
     @classmethod
     def detect(cls) -> Iterator[Self]:

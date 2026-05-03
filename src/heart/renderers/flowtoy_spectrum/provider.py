@@ -6,13 +6,15 @@ from dataclasses import replace
 import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.flowtoy import FlowToyPeripheral
 from heart.peripheral.input_payloads import FlowToyPacket
 from heart.renderers.flowtoy_spectrum.state import (FlowToySpectrumState,
                                                     FlowToySpectrumStop)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 DEFAULT_FLOWTOY_RENDER_PERIOD_SECONDS = 3.0
 DEFAULT_UNKNOWN_COLOR_SPECTRUM = (
@@ -49,7 +51,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
         return pipe_in_background(
             reactive.merge(packet_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 
@@ -63,7 +65,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
             if isinstance(peripheral, FlowToyPeripheral)
         ]
         if not observables:
-            return reactive.empty()
+            return empty_node()
         return pipe_in_background(
             reactive.merge(*observables),
             ops.map(PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral),

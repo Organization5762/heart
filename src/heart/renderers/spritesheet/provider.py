@@ -6,6 +6,7 @@ import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
@@ -15,7 +16,8 @@ from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                SpritesheetLoopState)
 from heart.utilities.env import Configuration
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
@@ -112,7 +114,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         )
 
         if self.disable_input:
-            switch_updates = reactive.empty()
+            switch_updates = empty_node()
         else:
             switches = peripheral_manager.get_main_switch_subscription()
             switch_updates = pipe_in_background(
@@ -133,7 +135,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         return pipe_in_background(
             reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

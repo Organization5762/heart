@@ -1,6 +1,7 @@
 import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import FakeSwitch, SwitchState
 from heart.utilities.reactive import operators as ops
@@ -18,7 +19,7 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
             if isinstance(peripheral, FakeSwitch)
         ]
         if not main_switches:
-            return reactive.empty()
+            return empty_node()
         result = pipe_in_background(
             reactive.merge(*main_switches),
             ops.map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral),

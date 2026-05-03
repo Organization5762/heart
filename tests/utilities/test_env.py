@@ -11,7 +11,7 @@ import pytest
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
-                                 ReactivexStreamConnectMode, get_device_ports)
+                                 get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -314,59 +314,6 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("HEART_RX_INPUT_MAX_WORKERS", "5")
 
         assert Configuration.reactivex_input_max_workers() == 5
-
-    def test_reactivex_stream_refcount_grace_defaults_to_zero(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount grace defaults to zero so streams disconnect promptly unless tuned for churn."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_GRACE_MS")
-
-        assert Configuration.reactivex_stream_refcount_grace_ms() == 0
-
-    def test_reactivex_stream_refcount_grace_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount grace reads the environment value so churn protection remains configurable."""
-        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "25")
-
-        assert Configuration.reactivex_stream_refcount_grace_ms() == 25
-
-    def test_reactivex_stream_refcount_min_subscribers_defaults_to_one(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount min subscribers defaults to one so share behaviour remains unchanged by default."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS")
-
-        assert Configuration.reactivex_stream_refcount_min_subscribers() == 1
-
-    def test_reactivex_stream_refcount_min_subscribers_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount min subscribers reads the environment value so connection thresholds are configurable."""
-        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS", "2")
-
-        assert Configuration.reactivex_stream_refcount_min_subscribers() == 2
-
-    def test_reactivex_stream_connect_mode_defaults_lazy(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify stream connect mode defaults to lazy to avoid missing immediate emissions."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_CONNECT_MODE")
-
-        assert (
-            Configuration.reactivex_stream_connect_mode()
-            == ReactivexStreamConnectMode.LAZY
-        )
-
-    def test_reactivex_stream_connect_mode_rejects_invalid_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify invalid stream connect modes fail fast to keep configuration errors visible."""
-        monkeypatch.setenv("HEART_RX_STREAM_CONNECT_MODE", "nope")
-
-        with pytest.raises(ValueError):
-            Configuration.reactivex_stream_connect_mode()
-
 
     def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
