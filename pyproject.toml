@@ -59,6 +59,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "adafruit-circuitpython-pioasm",
     "mypy",
     "Pillow",
     "pre-commit",
@@ -67,7 +68,7 @@ dev = [
     "types-requests",
     "types-toml",
 ]
-native = ["heart-rust"]
+native = ["heart-rgb-matrix-driver"]
 
 [build-system]
 requires = ["uv_build>=0.9.6,<0.10.0"]
@@ -76,8 +77,8 @@ build-backend = "uv_build"
 [tool.uv.sources]
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
-heart-rust = { path = "./rust/heart_rust" }
 manyfold = { git = "https://github.com/Organization5762/manyfold.git", rev = "7e8d2164e911e770f315519d6f13a8e0f95da531" }
+heart-rgb-matrix-driver = { path = "./rust/heart_rgb_matrix_driver" }
 
 [tool.setuptools.package-data]
 heart = ["*.png", "**/*.png"]
@@ -183,6 +184,8 @@ pythonpath = [
 testpaths = ["tests"]
 addopts = "-vv -n auto --dist=loadscope"
 markers = [
+    "integration: hardware or network integration tests that require an external host or device",
+    "slow: tests that routinely exceed one second locally",
     "timeout(duration): mark tests that should fail if they exceed the given duration",
 ]
 

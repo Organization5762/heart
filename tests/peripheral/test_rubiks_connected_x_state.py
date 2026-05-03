@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from heart.peripheral.rubiks_connected_x import RUBIKS_CONNECTED_X_SOLVED_FACELETS
+from heart.peripheral.rubiks_connected_x import \
+    RUBIKS_CONNECTED_X_SOLVED_FACELETS
 from heart.peripheral.rubiks_connected_x_state import (
-    apply_rubiks_connected_x_move,
-    apply_rubiks_connected_x_moves,
-)
+    apply_rubiks_connected_x_move, apply_rubiks_connected_x_moves)
 
 
 class TestRubiksConnectedXStateHelpers:

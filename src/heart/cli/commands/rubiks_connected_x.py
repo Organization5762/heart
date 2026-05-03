@@ -10,27 +10,18 @@ from typing import Annotated
 import typer
 
 from heart.peripheral.rubiks_connected_x import (
-    DEFAULT_MONITOR_SECONDS,
-    DEFAULT_SCAN_TIMEOUT_SECONDS,
-    DEFAULT_STATE_SYNC_TIMEOUT_SECONDS,
-    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
-    RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE,
-    RUBIKS_CONNECTED_X_FACE_ORDER,
-    RubiksConnectedXNotification,
-    discover_rubiks_connected_x_candidates,
+    DEFAULT_MONITOR_SECONDS, DEFAULT_SCAN_TIMEOUT_SECONDS,
+    DEFAULT_STATE_SYNC_TIMEOUT_SECONDS, RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
+    RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE, RUBIKS_CONNECTED_X_FACE_ORDER,
+    RubiksConnectedXNotification, discover_rubiks_connected_x_candidates,
     inspect_rubiks_connected_x_services,
     load_rubiks_connected_x_baseline_facelets,
-    monitor_rubiks_connected_x_notifications,
-    render_candidate_line,
-    render_notification_line,
-    request_rubiks_connected_x_state,
-    resolve_rubiks_connected_x_candidate,
-    rubiks_connected_x_face_slice,
-    rubiks_connected_x_baseline_path,
-    save_rubiks_connected_x_baseline_facelets,
+    monitor_rubiks_connected_x_notifications, render_candidate_line,
+    render_notification_line, request_rubiks_connected_x_state,
+    resolve_rubiks_connected_x_candidate, rubiks_connected_x_baseline_path,
+    rubiks_connected_x_face_slice, save_rubiks_connected_x_baseline_facelets,
     serialize_rubiks_connected_x_notification,
-    summarize_rubiks_connected_x_notifications,
-)
+    summarize_rubiks_connected_x_notifications)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)

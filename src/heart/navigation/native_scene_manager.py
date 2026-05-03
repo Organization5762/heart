@@ -9,7 +9,7 @@ from typing import Protocol, Sequence, cast
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
-NATIVE_SCENE_BRIDGE_MODULE = "heart_rust"
+NATIVE_SCENE_BRIDGE_MODULE = "heart_rgb_matrix_driver"
 
 logger = get_logger(__name__)
 

@@ -4,9 +4,13 @@ if TYPE_CHECKING:
     from heart.device.rgb_display.constants import \
         DEFAULT_SOCKET_PATH as DEFAULT_SOCKET_PATH
     from heart.device.rgb_display.device import LEDMatrix as LEDMatrix
-    from heart.device.rgb_display.sample_base import SampleBase as SampleBase
-    from heart.device.rgb_display.worker import \
-        MatrixDisplayWorker as MatrixDisplayWorker
+    from heart.device.rgb_display.heart_rgb_matrix_driver_rgbmatrix import \
+        RGBMatrix as RGBMatrix
+    from heart.device.rgb_display.heart_rgb_matrix_driver_rgbmatrix import \
+        RGBMatrixOptions as RGBMatrixOptions
+
+    HeartRgbMatrixDriver = RGBMatrix
+    HeartRgbMatrixDriverOptions = RGBMatrixOptions
 
 
 def __getattr__(name: str) -> Any:
@@ -18,12 +22,14 @@ def __getattr__(name: str) -> Any:
         from heart.device.rgb_display.constants import DEFAULT_SOCKET_PATH
 
         return DEFAULT_SOCKET_PATH
-    if name == "SampleBase":
-        from heart.device.rgb_display.sample_base import SampleBase
+    if name == "HeartRgbMatrixDriver":
+        from heart.device.rgb_display.heart_rgb_matrix_driver_rgbmatrix import \
+            RGBMatrix
 
-        return SampleBase
-    if name == "MatrixDisplayWorker":
-        from heart.device.rgb_display.worker import MatrixDisplayWorker
+        return RGBMatrix
+    if name == "HeartRgbMatrixDriverOptions":
+        from heart.device.rgb_display.heart_rgb_matrix_driver_rgbmatrix import \
+            RGBMatrixOptions
 
-        return MatrixDisplayWorker
+        return RGBMatrixOptions
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

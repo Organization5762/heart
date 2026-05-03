@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.configurations import (
-    _detect_rubiks_connected_x,
-    _detect_sensors,
-    _detect_switches,
-)
+from heart.peripheral.configurations import (_detect_rubiks_connected_x,
+                                             _detect_sensors, _detect_switches)
 
 
 def configure() -> PeripheralConfiguration:

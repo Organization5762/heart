@@ -6,12 +6,10 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Device
-from heart.renderers.rubiks_connected_x_visualizer.renderer import (
-    RubiksConnectedXVisualizerRenderer,
-)
-from heart.renderers.rubiks_connected_x_visualizer.state import (
-    RubiksConnectedXVisualizerState,
-)
+from heart.renderers.rubiks_connected_x_visualizer.renderer import \
+    RubiksConnectedXVisualizerRenderer
+from heart.renderers.rubiks_connected_x_visualizer.state import \
+    RubiksConnectedXVisualizerState
 from heart.runtime.display_context import DisplayContext
 
 

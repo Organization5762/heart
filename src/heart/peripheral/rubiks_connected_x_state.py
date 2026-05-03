@@ -5,9 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 from heart.peripheral.rubiks_connected_x import (
-    RUBIKS_CONNECTED_X_FACE_ORDER,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-)
+    RUBIKS_CONNECTED_X_FACE_ORDER, RUBIKS_CONNECTED_X_SOLVED_FACELETS)
 
 AXIS_INDEX: Final[dict[str, int]] = {"x": 0, "y": 1, "z": 2}
 FACE_TO_VECTOR: Final[dict[str, tuple[int, int, int]]] = {

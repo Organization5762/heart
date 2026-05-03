@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 from heart.cli.commands.rubiks_connected_x import (
-    _normalize_calibration_moves,
-    _render_calibration_summary,
-    _render_state_summary,
-    DEFAULT_BASELINE_OUTPUT_PATH,
-)
+    DEFAULT_BASELINE_OUTPUT_PATH, _normalize_calibration_moves,
+    _render_calibration_summary, _render_state_summary)
 from heart.peripheral.rubiks_connected_x import (
-    RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE,
-    RubiksConnectedXNotification,
-    parse_rubiks_connected_x_packet,
-)
+    RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE, RubiksConnectedXNotification,
+    parse_rubiks_connected_x_packet)
 
 
 class TestRubiksConnectedXCliHelpers:

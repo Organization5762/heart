@@ -1,3 +1,2 @@
-from .renderer import (
-    RubiksConnectedXVisualizerRenderer as RubiksConnectedXVisualizerRenderer,
-)
+from .renderer import \
+    RubiksConnectedXVisualizerRenderer as RubiksConnectedXVisualizerRenderer
