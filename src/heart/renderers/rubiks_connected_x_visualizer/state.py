@@ -4,10 +4,8 @@ from dataclasses import dataclass
 
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_BASELINE_CAPTURE_GESTURE,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-    RUBIKS_CONNECTED_X_VISIBLE_FACE_ORDER,
-    RubiksConnectedXNotification,
-)
+    RUBIKS_CONNECTED_X_SOLVED_FACELETS, RUBIKS_CONNECTED_X_VISIBLE_FACE_ORDER,
+    RubiksConnectedXNotification)
 
 
 @dataclass(frozen=True)

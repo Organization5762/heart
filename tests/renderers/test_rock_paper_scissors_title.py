@@ -7,10 +7,8 @@ import time
 import pygame
 
 from heart.device import Device
-from heart.renderers.rock_paper_scissors.state import (
-    RockPaperScissorsPhase,
-    RockPaperScissorsState,
-)
+from heart.renderers.rock_paper_scissors.state import (RockPaperScissorsPhase,
+                                                       RockPaperScissorsState)
 from heart.renderers.rock_paper_scissors.title import RockPaperScissorsTitle
 from heart.runtime.display_context import DisplayContext
 

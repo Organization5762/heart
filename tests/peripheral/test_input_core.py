@@ -73,6 +73,13 @@ def _gamepad_snapshot(
     )
 
 
+def _enable_keyboard_polling(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "heart.peripheral.core.input.keyboard.Configuration.is_pi",
+        lambda: False,
+    )
+
+
 class TestInputDebugTap:
     """Group debug-tap tests so traced input lineage stays inspectable during runtime and tests."""
 
@@ -144,6 +151,7 @@ class TestKeyboardController:
 
         tap = InputDebugTap()
         controller = KeyboardController(tap)
+        _enable_keyboard_polling(monkeypatch)
 
         class _KeyStateStub:
             def __len__(self) -> int:
@@ -174,6 +182,90 @@ class TestKeyboardController:
 
         assert snapshots[0].pressed_keys == frozenset({pygame.K_LEFT})
 
+    def test_snapshot_stream_ignores_arrow_key_index_errors(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify Linux key-state wrappers that reject SDL2 key constants do not terminate the snapshot stream."""
+
+        tap = InputDebugTap()
+        controller = KeyboardController(tap)
+        _enable_keyboard_polling(monkeypatch)
+
+        class _KeyStateStub:
+            def __len__(self) -> int:
+                return 8
+
+            def __getitem__(self, key: int) -> bool:
+                if key >= len(self):
+                    raise IndexError("list index out of range")
+                return False
+
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.interval_in_background",
+            lambda period, scheduler: reactivex.from_iterable([0]),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
+            lambda source, *operators: source.pipe(*operators),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.event.pump",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
+            lambda: _KeyStateStub(),
+        )
+
+        snapshots: list[KeyboardSnapshot] = []
+        controller.snapshot_stream().subscribe(snapshots.append)
+
+        assert len(snapshots) == 1
+        assert snapshots[0].pressed_keys == frozenset()
+
+    def test_snapshot_stream_ignores_indexed_key_state_errors(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify sparse pygame key-state wrappers cannot terminate keyboard polling during the indexed key scan."""
+
+        tap = InputDebugTap()
+        controller = KeyboardController(tap)
+        _enable_keyboard_polling(monkeypatch)
+
+        class _KeyStateStub:
+            def __len__(self) -> int:
+                return 8
+
+            def __getitem__(self, key: int) -> bool:
+                if key == 3:
+                    raise IndexError("list index out of range")
+                return key == 2
+
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.interval_in_background",
+            lambda period, scheduler: reactivex.from_iterable([0]),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pipe_in_main_thread",
+            lambda source, *operators: source.pipe(*operators),
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.event.pump",
+            lambda: None,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
+            lambda: _KeyStateStub(),
+        )
+
+        snapshots: list[KeyboardSnapshot] = []
+        controller.snapshot_stream().subscribe(snapshots.append)
+
+        assert len(snapshots) == 1
+        assert snapshots[0].pressed_keys == frozenset({2})
+
     def test_snapshot_stream_pumps_pygame_events_before_reading_pressed_keys(
         self,
         monkeypatch,
@@ -183,6 +275,7 @@ class TestKeyboardController:
         tap = InputDebugTap()
         controller = KeyboardController(tap)
         call_order: list[str] = []
+        _enable_keyboard_polling(monkeypatch)
 
         class _KeyStateStub:
             def __len__(self) -> int:

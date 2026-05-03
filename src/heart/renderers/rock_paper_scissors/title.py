@@ -12,13 +12,8 @@ from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
 
-from .renderer import (
-    DEFAULT_PAPER_PATH,
-    DEFAULT_ROCK_PATH,
-    DEFAULT_SCISSORS_PATH,
-    RNG_NAMESPACE,
-    THROW_NAMES,
-)
+from .renderer import (DEFAULT_PAPER_PATH, DEFAULT_ROCK_PATH,
+                       DEFAULT_SCISSORS_PATH, RNG_NAMESPACE, THROW_NAMES)
 from .state import RockPaperScissorsPhase, RockPaperScissorsState
 
 TITLE_BACKGROUND_COLOR = (0, 0, 0)

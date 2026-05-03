@@ -8,21 +8,15 @@ from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_BASELINE_FACELETS_ENV_VAR,
     RUBIKS_CONNECTED_X_BASELINE_PATH_ENV_VAR,
     RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-    load_rubiks_connected_x_baseline_facelets,
-    RubiksConnectedXMessageType,
-    RubiksConnectedXMove,
-    RubiksConnectedXNotification,
-    RubiksConnectedXParsedMessage,
-)
-from heart.renderers.rubiks_connected_x_visualizer.provider import (
-    RubiksConnectedXVisualizerStateProvider,
-)
-from heart.renderers.rubiks_connected_x_visualizer.state import (
-    RubiksConnectedXVisualizerState,
-)
-from heart.peripheral.rubiks_connected_x_state import apply_rubiks_connected_x_move
-
+    RUBIKS_CONNECTED_X_SOLVED_FACELETS, RubiksConnectedXMessageType,
+    RubiksConnectedXMove, RubiksConnectedXNotification,
+    RubiksConnectedXParsedMessage, load_rubiks_connected_x_baseline_facelets)
+from heart.peripheral.rubiks_connected_x_state import \
+    apply_rubiks_connected_x_move
+from heart.renderers.rubiks_connected_x_visualizer.provider import \
+    RubiksConnectedXVisualizerStateProvider
+from heart.renderers.rubiks_connected_x_visualizer.state import \
+    RubiksConnectedXVisualizerState
 
 SCRAMBLED_BASELINE = apply_rubiks_connected_x_move(
     RUBIKS_CONNECTED_X_SOLVED_FACELETS,

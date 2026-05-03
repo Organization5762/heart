@@ -4,14 +4,12 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.renderers import StatefulBaseRenderer
 from heart.peripheral.rubiks_connected_x import rubiks_connected_x_face_slice
-from heart.renderers.rubiks_connected_x_visualizer.provider import (
-    RubiksConnectedXVisualizerStateProvider,
-)
-from heart.renderers.rubiks_connected_x_visualizer.state import (
-    RubiksConnectedXVisualizerState,
-)
+from heart.renderers import StatefulBaseRenderer
+from heart.renderers.rubiks_connected_x_visualizer.provider import \
+    RubiksConnectedXVisualizerStateProvider
+from heart.renderers.rubiks_connected_x_visualizer.state import \
+    RubiksConnectedXVisualizerState
 from heart.runtime.display_context import DisplayContext
 
 FRAME_BACKGROUND = (4, 6, 10)

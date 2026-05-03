@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
 import subprocess
 import sys
 import threading
@@ -12,6 +11,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
 import reactivex

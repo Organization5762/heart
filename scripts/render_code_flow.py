@@ -143,10 +143,17 @@ COLUMNS: tuple[ColumnDef, ...] = (
             NodeDef("local_screen", "LocalScreen Window", "output"),
             NodeDef("capture", "Frame Capture\n(share surface)", "service"),
             NodeDef("device_bridge", "Device Bridge", "service"),
-            NodeDef("led_matrix", "LEDMatrix Driver\n(rgbmatrix)", "output"),
             NodeDef(
-                "average_mirror", "AverageColorLED Peripheral", "output"
+                "led_matrix",
+                "LEDMatrix Driver\n(clean-room HUB75 runtime)",
+                "output",
             ),
+            NodeDef(
+                "pi5_scan_scheduler",
+                "Pi 5 Scan Scheduler\n(LAT/OE/A-E + PWM loop)",
+                "output",
+            ),
+            NodeDef("average_mirror", "AverageColorLED Peripheral", "output"),
             NodeDef("single_led", "Single LED Device", "output"),
         ),
     ),
@@ -171,6 +178,7 @@ EDGES: tuple[EdgeDef, ...] = (
     EdgeDef("display_service", "capture"),
     EdgeDef("capture", "device_bridge"),
     EdgeDef("device_bridge", "led_matrix"),
+    EdgeDef("led_matrix", "pi5_scan_scheduler"),
     EdgeDef("capture", "average_mirror"),
     EdgeDef("average_mirror", "single_led"),
     EdgeDef("loop", "peripheral_manager"),

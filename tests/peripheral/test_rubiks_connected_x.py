@@ -9,25 +9,15 @@ import heart.peripheral.rubiks_connected_x as rubiks_connected_x_module
 from heart.peripheral.rubiks_connected_x import (
     DEFAULT_RUBIKS_CONNECTED_X_ADDRESS,
     DEFAULT_RUBIKS_CONNECTED_X_PREFERRED_NAME,
-    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
-    RubiksConnectedXMessageType,
-    RubiksConnectedXNotification,
-    RubiksConnectedXPeripheral,
-    candidate_from_scan_result,
-    extract_rubiks_connected_x_frames,
-    normalize_candidate_name,
-    parse_rubiks_connected_x_facelets,
-    parse_rubiks_connected_x_message,
-    parse_rubiks_connected_x_packet,
-    render_candidate_line,
-    render_notification_line,
-    rubiks_connected_x_candidate_score,
-    rubiks_connected_x_face_slice,
-    serialize_rubiks_connected_x_notification,
-    snapshot_services,
-    summarize_rubiks_connected_x_notifications,
-)
+    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RUBIKS_CONNECTED_X_SOLVED_FACELETS,
+    RubiksConnectedXMessageType, RubiksConnectedXNotification,
+    RubiksConnectedXPeripheral, candidate_from_scan_result,
+    extract_rubiks_connected_x_frames, normalize_candidate_name,
+    parse_rubiks_connected_x_facelets, parse_rubiks_connected_x_message,
+    parse_rubiks_connected_x_packet, render_candidate_line,
+    render_notification_line, rubiks_connected_x_candidate_score,
+    rubiks_connected_x_face_slice, serialize_rubiks_connected_x_notification,
+    snapshot_services, summarize_rubiks_connected_x_notifications)
 
 
 class TestRubiksConnectedXHelpers:

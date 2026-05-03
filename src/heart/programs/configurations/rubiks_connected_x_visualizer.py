@@ -1,8 +1,7 @@
 from heart.display.color import Color
 from heart.renderers.color import RenderColor
-from heart.renderers.rubiks_connected_x_visualizer import (
-    RubiksConnectedXVisualizerRenderer,
-)
+from heart.renderers.rubiks_connected_x_visualizer import \
+    RubiksConnectedXVisualizerRenderer
 from heart.runtime.game_loop import GameLoop
 
 

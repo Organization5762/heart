@@ -9,14 +9,12 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.run import (
-    DEFAULT_ADD_LOW_POWER_MODE,
-    DEFAULT_BEATS_WORKSPACE,
-    DEFAULT_CONFIGURATION,
-    DEFAULT_INSTALL_BEATS_DEPS,
-    DEFAULT_X11_FORWARD,
-    resolve_configuration_name,
-)
+from heart.cli.commands.run import (DEFAULT_ADD_LOW_POWER_MODE,
+                                    DEFAULT_BEATS_WORKSPACE,
+                                    DEFAULT_CONFIGURATION,
+                                    DEFAULT_INSTALL_BEATS_DEPS,
+                                    DEFAULT_X11_FORWARD,
+                                    resolve_configuration_name)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)

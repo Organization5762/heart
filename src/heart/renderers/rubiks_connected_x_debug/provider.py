@@ -7,12 +7,10 @@ from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.rubiks_connected_x import (
-    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
-    RubiksConnectedXMessageType,
-    RubiksConnectedXNotification,
-    RubiksConnectedXPeripheral,
-)
-from heart.renderers.rubiks_connected_x_debug.state import RubiksConnectedXDebugState
+    RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RubiksConnectedXMessageType,
+    RubiksConnectedXNotification, RubiksConnectedXPeripheral)
+from heart.renderers.rubiks_connected_x_debug.state import \
+    RubiksConnectedXDebugState
 from heart.utilities.reactivex_threads import pipe_in_background
 
 DEFAULT_STATUS_LINES = (

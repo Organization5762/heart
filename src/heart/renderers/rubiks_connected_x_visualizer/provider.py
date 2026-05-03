@@ -11,22 +11,17 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
     RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
-    RUBIKS_CONNECTED_X_SOLVED_FACELETS,
+    RUBIKS_CONNECTED_X_SOLVED_FACELETS, RubiksConnectedXMessageType,
+    RubiksConnectedXNotification, RubiksConnectedXPeripheral,
     load_rubiks_connected_x_baseline_facelets,
-    save_rubiks_connected_x_baseline_facelets,
-    RubiksConnectedXMessageType,
-    RubiksConnectedXNotification,
-    RubiksConnectedXPeripheral,
-)
-from heart.peripheral.rubiks_connected_x_state import apply_rubiks_connected_x_moves
-from heart.renderers.rubiks_connected_x_visualizer.state import (
-    RubiksConnectedXVisualizerState,
-)
+    save_rubiks_connected_x_baseline_facelets)
+from heart.peripheral.rubiks_connected_x_state import \
+    apply_rubiks_connected_x_moves
+from heart.renderers.rubiks_connected_x_visualizer.state import \
+    RubiksConnectedXVisualizerState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (
-    pipe_in_background,
-    pipe_in_main_thread,
-)
+from heart.utilities.reactivex_threads import (pipe_in_background,
+                                               pipe_in_main_thread)
 
 logger = get_logger(__name__)
 
