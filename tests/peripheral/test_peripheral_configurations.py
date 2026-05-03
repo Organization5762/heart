@@ -6,11 +6,12 @@ from manyfold import Graph
 
 from heart.peripheral.configurations import (_accelerometer_detection_node,
                                              _detect_heart_rate_sensor,
-                                             _detect_radios,
+                                             _detect_radios, _detect_switches,
                                              _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
                                              _microphone_detection_node,
-                                             _radio_detection_node)
+                                             _radio_detection_node,
+                                             _switch_detection_node)
 from heart.peripheral.configurations.default import configure
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
 from heart.peripheral.microphone import (Microphone,
@@ -170,7 +171,7 @@ class TestManyfoldAccelerometerConfiguration:
 
         nodes = _manyfold_graph_nodes()
 
-        assert nodes[0] is _accelerometer_detection_node
+        assert _accelerometer_detection_node in nodes
 
     def test_manyfold_graph_nodes_keep_fake_accelerometer_direct_off_pi(
         self,
@@ -188,6 +189,75 @@ class TestManyfoldAccelerometerConfiguration:
         nodes = _manyfold_graph_nodes()
 
         assert _accelerometer_detection_node not in nodes
+
+
+class TestManyfoldSwitchConfiguration:
+    """Cover default graph-node factories so physical switch streams stay Manyfold-owned."""
+
+    def test_manyfold_graph_nodes_include_physical_switch_on_pi(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        nodes = _manyfold_graph_nodes()
+
+        assert nodes[0] is _switch_detection_node
+
+    def test_default_configuration_moves_physical_switch_to_graph_node(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure()
+
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
+
+    def test_default_configuration_keeps_switch_direct_for_local_fake(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure()
+
+        assert _switch_detection_node not in configuration.graph_nodes
+        assert configuration.detectors[0] is _detect_switches
 
 
 class TestManyfoldMicrophoneConfiguration:
