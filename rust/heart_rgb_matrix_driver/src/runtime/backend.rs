@@ -5,8 +5,9 @@ use std::fs;
 #[cfg(not(test))]
 use std::path::Path;
 
-use super::config::{MatrixConfigNative, WiringProfile};
+use super::config::MatrixConfigNative;
 use super::frame::FrameBuffer;
+use super::rp1_hub75::Rp1Hub75Backend;
 use super::tuning::runtime_tuning;
 
 pub(crate) trait MatrixBackend: Send {
@@ -90,20 +91,15 @@ fn build_pi4_backend(
     }
     Ok((
         Box::new(Pi4GpioBackend) as Box<dyn MatrixBackend>,
-        match config.wiring {
-            WiringProfile::AdafruitHatPwm => "pi4-adafruit-hat-pwm",
-            WiringProfile::AdafruitHat => "pi4-adafruit-hat",
-            WiringProfile::AdafruitTripleHat => "pi4-adafruit-triple-hat",
-        }
-        .to_string(),
+        "pi4-adafruit-hat-pwm".to_string(),
     ))
 }
 
 fn build_pi5_backend(
-    _config: &MatrixConfigNative,
+    config: &MatrixConfigNative,
 ) -> Result<(Box<dyn MatrixBackend>, String), String> {
-    Err(
-        "The native Pi 5 HUB75 backend is not available in the runtime build. Piomatter remains bench/parity tooling only."
-            .to_string(),
-    )
+    Ok((
+        Box::new(Rp1Hub75Backend::new(config)?) as Box<dyn MatrixBackend>,
+        "pi5-rp1-hub75-packer".to_string(),
+    ))
 }

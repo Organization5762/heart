@@ -6,6 +6,9 @@ wait 1 irq 0 rel
 drain:
     out x, 1
     jmp !x emit
+    out y, 1
+    out null, 30
+    jmp !y drain
     jmp handoff
 
 emit:

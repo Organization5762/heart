@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use heart_rgb_matrix_driver::{PackedScanFrame, Pi5ScanConfig, ProbeWiringProfile as WiringProfile};
+use heart_rgb_matrix_driver::{
+    PackedScanFrame, Pi5ScanConfig, ProbeWiringProfile as WiringProfile,
+};
 
 #[path = "../runtime/pi5_pio_programs_generated.rs"]
 mod generated;
@@ -200,7 +202,10 @@ const PIO_IOC_GPIO_INIT: libc::c_ulong = iow::<Rp1GpioInitArgs>(102, 50);
 const PIO_IOC_GPIO_SET_FUNCTION: libc::c_ulong = iow::<Rp1GpioSetFunctionArgs>(102, 51);
 
 fn log(message: impl AsRef<str>) {
-    if env::var("HEART_PI5_SIMPLE_PROBE_LOG").map(|value| value != "0").unwrap_or(true) {
+    if env::var("HEART_PI5_SIMPLE_PROBE_LOG")
+        .map(|value| value != "0")
+        .unwrap_or(true)
+    {
         eprintln!("[pi5_round_robin_probe] {}", message.as_ref());
     }
 }
@@ -214,7 +219,9 @@ fn xioctl<T>(fd: RawFd, request: libc::c_ulong, arg: &mut T, label: &str) -> Res
 }
 
 fn encode_clkdiv(clkdiv: f32) -> (u16, u8) {
-    let scaled = (clkdiv * 256.0).round().clamp(256.0, (u16::MAX as f32) * 256.0) as u32;
+    let scaled = (clkdiv * 256.0)
+        .round()
+        .clamp(256.0, (u16::MAX as f32) * 256.0) as u32;
     ((scaled >> 8) as u16, (scaled & 0xff) as u8)
 }
 
@@ -245,20 +252,40 @@ fn round_robin_words(frame: &PackedScanFrame) -> Vec<u32> {
         .collect()
 }
 
-fn round_robin_turn_words(frame: &PackedScanFrame, frames_per_turn: usize) -> Vec<u32> {
-    let base = round_robin_words(frame);
-    let repeat = frames_per_turn.max(1);
-    let mut words = Vec::with_capacity(
-        base.len()
-            .checked_mul(repeat)
-            .and_then(|n| n.checked_add(1))
-            .unwrap_or(base.len() + 1),
-    );
-    for _ in 0..repeat {
-        words.extend_from_slice(&base);
+struct RoundRobinTurnBuffers {
+    continuation: Vec<u32>,
+    handoff: Vec<u32>,
+}
+
+impl RoundRobinTurnBuffers {
+    fn from_frame(frame: &PackedScanFrame) -> Self {
+        let payload = round_robin_words(frame);
+        let mut continuation = Vec::with_capacity(payload.len() + 1);
+        continuation.extend_from_slice(&payload);
+        continuation.push(0x8000_0000);
+        let mut handoff = Vec::with_capacity(payload.len() + 1);
+        handoff.extend_from_slice(&payload);
+        handoff.push(0xc000_0000);
+        Self {
+            continuation,
+            handoff,
+        }
     }
-    words.push(0x8000_0000);
-    words
+
+    fn payload_bytes(&self) -> Result<usize, String> {
+        self.continuation
+            .len()
+            .checked_mul(size_of::<u32>())
+            .and_then(|bytes| bytes.checked_sub(size_of::<u32>()))
+            .ok_or_else(|| "round robin payload frame size overflowed".to_string())
+    }
+
+    fn max_submit_bytes(&self) -> Result<usize, String> {
+        self.handoff
+            .len()
+            .checked_mul(size_of::<u32>())
+            .ok_or_else(|| "round robin submit frame size overflowed".to_string())
+    }
 }
 
 fn panel_gpios() -> [u16; 15] {
@@ -321,34 +348,33 @@ fn main() -> Result<(), String> {
         ("sm2", [0xff, 0x00, 0x00]),
         ("sm3", [0xff, 0x00, 0x00]),
     ];
-    let frames: Vec<Vec<u32>> = colors
+    let frames: Vec<RoundRobinTurnBuffers> = colors
         .iter()
-        .enumerate()
-        .map(|(sm, (_, rgb))| {
-            let (frame, _) = PackedScanFrame::pack_rgba(&config, &solid_rgba(&config, *rgb)).unwrap();
-            round_robin_turn_words(&frame, turn_weights[sm])
+        .map(|(_, rgb)| {
+            let (frame, _) =
+                PackedScanFrame::pack_rgba(&config, &solid_rgba(&config, *rgb)).unwrap();
+            RoundRobinTurnBuffers::from_frame(&frame)
         })
         .collect();
     let frame_bytes_by_sm: Vec<usize> = frames
         .iter()
-        .map(|frame| {
-            frame
-                .len()
-                .checked_mul(size_of::<u32>())
-                .ok_or_else(|| "round robin frame size overflowed".to_string())
-        })
+        .map(RoundRobinTurnBuffers::payload_bytes)
         .collect::<Result<_, _>>()?;
-    let max_frame_bytes = frame_bytes_by_sm
+    let submit_bytes_by_sm: Vec<usize> = frames
+        .iter()
+        .map(RoundRobinTurnBuffers::max_submit_bytes)
+        .collect::<Result<_, _>>()?;
+    let max_frame_bytes = submit_bytes_by_sm
         .iter()
         .copied()
         .max()
         .ok_or_else(|| "round robin requires at least one frame".to_string())?;
-    let dma_buf_size_by_sm: Vec<usize> = frame_bytes_by_sm
+    let dma_buf_size_by_sm: Vec<usize> = submit_bytes_by_sm
         .iter()
         .map(|frame_bytes| (*frame_bytes).min(dma_buf_size_cap))
         .collect();
     log(format!(
-        "starting round robin frame_bytes_by_sm={frame_bytes_by_sm:?} dma_buf_size_by_sm={dma_buf_size_by_sm:?} dma_buf_count={dma_buf_count} frame_submits={frame_submits} clock_divider={clock_divider} run_seconds={run_seconds:?} turn_weights={turn_weights:?}"
+        "starting round robin frame_bytes_by_sm={frame_bytes_by_sm:?} submit_bytes_by_sm={submit_bytes_by_sm:?} dma_buf_size_by_sm={dma_buf_size_by_sm:?} dma_buf_count={dma_buf_count} frame_submits={frame_submits} clock_divider={clock_divider} run_seconds={run_seconds:?} turn_weights={turn_weights:?}"
     ));
 
     let file = OpenOptions::new()
@@ -358,21 +384,38 @@ fn main() -> Result<(), String> {
         .map_err(|error| format!("open /dev/pio0: {error}"))?;
     let fd = file.as_raw_fd();
     for gpio in panel_gpios() {
-        xioctl(fd, PIO_IOC_GPIO_INIT, &mut Rp1GpioInitArgs { gpio }, "PIO_IOC_GPIO_INIT")?;
+        xioctl(
+            fd,
+            PIO_IOC_GPIO_INIT,
+            &mut Rp1GpioInitArgs { gpio },
+            "PIO_IOC_GPIO_INIT",
+        )?;
         xioctl(
             fd,
             PIO_IOC_GPIO_SET_FUNCTION,
-            &mut Rp1GpioSetFunctionArgs { gpio, fn_: RP1_GPIO_FUNC_PIO },
+            &mut Rp1GpioSetFunctionArgs {
+                gpio,
+                fn_: RP1_GPIO_FUNC_PIO,
+            },
             "PIO_IOC_GPIO_SET_FUNCTION",
         )?;
     }
 
     let claim_mask = 0x0f;
-    xioctl(fd, PIO_IOC_SM_CLAIM, &mut Rp1PioSmClaimArgs { mask: claim_mask }, "PIO_IOC_SM_CLAIM")?;
+    xioctl(
+        fd,
+        PIO_IOC_SM_CLAIM,
+        &mut Rp1PioSmClaimArgs { mask: claim_mask },
+        "PIO_IOC_SM_CLAIM",
+    )?;
     xioctl(
         fd,
         PIO_IOC_SM_SET_ENABLED,
-        &mut Rp1PioSmSetEnabledArgs { mask: claim_mask, enable: 0, rsvd: 0 },
+        &mut Rp1PioSmSetEnabledArgs {
+            mask: claim_mask,
+            enable: 0,
+            rsvd: 0,
+        },
         "PIO_IOC_SM_SET_ENABLED(disable)",
     )?;
 
@@ -381,10 +424,19 @@ fn main() -> Result<(), String> {
         origin: RP1_PIO_ORIGIN_ANY,
         ..Default::default()
     };
-    for (index, instruction) in PI5_PIO_ROUND_ROBIN_OUT_BASE_PROGRAM.iter().copied().enumerate() {
+    for (index, instruction) in PI5_PIO_ROUND_ROBIN_OUT_BASE_PROGRAM
+        .iter()
+        .copied()
+        .enumerate()
+    {
         add.instrs[index] = instruction;
     }
-    let origin = xioctl(fd, PIO_IOC_ADD_PROGRAM, &mut add, "PIO_IOC_ADD_PROGRAM(round_robin)")? as u16;
+    let origin = xioctl(
+        fd,
+        PIO_IOC_ADD_PROGRAM,
+        &mut add,
+        "PIO_IOC_ADD_PROGRAM(round_robin)",
+    )? as u16;
     log(format!("round_robin program loaded at origin={origin}"));
 
     let (clkdiv_int, clkdiv_frac) = encode_clkdiv(clock_divider);
@@ -393,18 +445,26 @@ fn main() -> Result<(), String> {
             | (u32::from(clkdiv_frac) << PROC_PIO_SM0_CLKDIV_FRAC_LSB),
         execctrl: (u32::from(PI5_PIO_ROUND_ROBIN_OUT_WRAP_TARGET + origin as u8)
             << PROC_PIO_SM0_EXECCTRL_WRAP_BOTTOM_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_WRAP + origin as u8) << PROC_PIO_SM0_EXECCTRL_WRAP_TOP_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_SIDESET_OPTIONAL as u8) << PROC_PIO_SM0_EXECCTRL_SIDE_EN_LSB)
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_WRAP + origin as u8)
+                << PROC_PIO_SM0_EXECCTRL_WRAP_TOP_LSB)
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_SIDESET_OPTIONAL as u8)
+                << PROC_PIO_SM0_EXECCTRL_SIDE_EN_LSB)
             | (0_u32 << PROC_PIO_SM0_EXECCTRL_STATUS_SEL_LSB)
             | (1_u32 << PROC_PIO_SM0_EXECCTRL_STATUS_N_LSB),
-        shiftctrl: (u32::from(PI5_PIO_ROUND_ROBIN_OUT_AUTO_PULL as u8) << PROC_PIO_SM0_SHIFTCTRL_AUTOPULL_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_SHIFT_RIGHT as u8) << PROC_PIO_SM0_SHIFTCTRL_OUT_SHIFTDIR_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_PULL_THRESHOLD & 0x1f) << PROC_PIO_SM0_SHIFTCTRL_PULL_THRESH_LSB)
+        shiftctrl: (u32::from(PI5_PIO_ROUND_ROBIN_OUT_AUTO_PULL as u8)
+            << PROC_PIO_SM0_SHIFTCTRL_AUTOPULL_LSB)
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_SHIFT_RIGHT as u8)
+                << PROC_PIO_SM0_SHIFTCTRL_OUT_SHIFTDIR_LSB)
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_PULL_THRESHOLD & 0x1f)
+                << PROC_PIO_SM0_SHIFTCTRL_PULL_THRESH_LSB)
             | (1_u32 << PROC_PIO_SM0_SHIFTCTRL_FJOIN_TX_LSB),
-        pinctrl: (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_PIN_BASE) << PROC_PIO_SM0_PINCTRL_OUT_BASE_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_PIN_COUNT) << PROC_PIO_SM0_PINCTRL_OUT_COUNT_LSB)
+        pinctrl: (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_PIN_BASE)
+            << PROC_PIO_SM0_PINCTRL_OUT_BASE_LSB)
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_OUT_PIN_COUNT)
+                << PROC_PIO_SM0_PINCTRL_OUT_COUNT_LSB)
             | (u32::from(17_u8) << PROC_PIO_SM0_PINCTRL_SIDESET_BASE_LSB)
-            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_SIDESET_PIN_COUNT) << PROC_PIO_SM0_PINCTRL_SIDESET_COUNT_LSB),
+            | (u32::from(PI5_PIO_ROUND_ROBIN_OUT_SIDESET_PIN_COUNT)
+                << PROC_PIO_SM0_PINCTRL_SIDESET_COUNT_LSB),
     };
 
     let pindir_mask = panel_gpios()
@@ -412,18 +472,33 @@ fn main() -> Result<(), String> {
         .fold(0_u32, |mask, gpio| mask | (1_u32 << u32::from(*gpio)));
     for sm in 0..4_u16 {
         let frame_bytes = frame_bytes_by_sm[sm as usize];
+        let submit_bytes = submit_bytes_by_sm[sm as usize];
         let dma_buf_size = dma_buf_size_by_sm[sm as usize];
-        xioctl(fd, PIO_IOC_SM_CLEAR_FIFOS, &mut Rp1PioSmClearFifosArgs { sm }, "PIO_IOC_SM_CLEAR_FIFOS")?;
+        xioctl(
+            fd,
+            PIO_IOC_SM_CLEAR_FIFOS,
+            &mut Rp1PioSmClearFifosArgs { sm },
+            "PIO_IOC_SM_CLEAR_FIFOS",
+        )?;
         xioctl(
             fd,
             PIO_IOC_SM_INIT,
-            &mut Rp1PioSmInitArgs { sm, initial_pc: origin, config: sm_config },
+            &mut Rp1PioSmInitArgs {
+                sm,
+                initial_pc: origin,
+                config: sm_config,
+            },
             "PIO_IOC_SM_INIT",
         )?;
         xioctl(
             fd,
             PIO_IOC_SM_SET_PINDIRS,
-            &mut Rp1PioSmSetPindirsArgs { sm, rsvd: 0, dirs: pindir_mask, mask: pindir_mask },
+            &mut Rp1PioSmSetPindirsArgs {
+                sm,
+                rsvd: 0,
+                dirs: pindir_mask,
+                mask: pindir_mask,
+            },
             "PIO_IOC_SM_SET_PINDIRS",
         )?;
         xioctl(
@@ -438,27 +513,52 @@ fn main() -> Result<(), String> {
             "PIO_IOC_SM_CONFIG_XFER32",
         )?;
         log(format!(
-            "configured sm={sm} frame_bytes={frame_bytes} dma_buf_size={dma_buf_size} dma_buf_count={dma_buf_count}"
+            "configured sm={sm} frame_bytes={frame_bytes} submit_bytes={submit_bytes} dma_buf_size={dma_buf_size} dma_buf_count={dma_buf_count}"
         ));
     }
 
-    xioctl(fd, PIO_IOC_SM_RESTART, &mut Rp1PioSmRestartArgs { mask: claim_mask }, "PIO_IOC_SM_RESTART")?;
-    xioctl(fd, PIO_IOC_SM_CLKDIV_RESTART, &mut Rp1PioSmRestartArgs { mask: claim_mask }, "PIO_IOC_SM_CLKDIV_RESTART")?;
+    xioctl(
+        fd,
+        PIO_IOC_SM_RESTART,
+        &mut Rp1PioSmRestartArgs { mask: claim_mask },
+        "PIO_IOC_SM_RESTART",
+    )?;
+    xioctl(
+        fd,
+        PIO_IOC_SM_CLKDIV_RESTART,
+        &mut Rp1PioSmRestartArgs { mask: claim_mask },
+        "PIO_IOC_SM_CLKDIV_RESTART",
+    )?;
     for irq in 0..4_u8 {
         xioctl(
             fd,
             PIO_IOC_SM_EXEC,
-            &mut Rp1PioSmExecArgs { sm: 0, instr: pio_encode_irq_clear(false, irq), blocking: 1, rsvd: 0 },
+            &mut Rp1PioSmExecArgs {
+                sm: 0,
+                instr: pio_encode_irq_clear(false, irq),
+                blocking: 1,
+                rsvd: 0,
+            },
             "PIO_IOC_SM_EXEC(irq_clear)",
         )?;
     }
     xioctl(
         fd,
         PIO_IOC_SM_EXEC,
-        &mut Rp1PioSmExecArgs { sm: 0, instr: pio_encode_irq_set(false, 0), blocking: 1, rsvd: 0 },
+        &mut Rp1PioSmExecArgs {
+            sm: 0,
+            instr: pio_encode_irq_set(false, 0),
+            blocking: 1,
+            rsvd: 0,
+        },
         "PIO_IOC_SM_EXEC(seed_irq0)",
     )?;
-    xioctl(fd, PIO_IOC_SM_ENABLE_SYNC, &mut Rp1PioSmEnableSyncArgs { mask: claim_mask }, "PIO_IOC_SM_ENABLE_SYNC")?;
+    xioctl(
+        fd,
+        PIO_IOC_SM_ENABLE_SYNC,
+        &mut Rp1PioSmEnableSyncArgs { mask: claim_mask },
+        "PIO_IOC_SM_ENABLE_SYNC",
+    )?;
 
     let started = Instant::now();
     let deadline = run_seconds.map(|seconds| started + Duration::from_secs_f64(seconds));
@@ -475,22 +575,37 @@ fn main() -> Result<(), String> {
             let counter = &completed_submits[sm];
             let weight = turn_weights[sm];
             handles.push(scope.spawn(move || -> Result<(), String> {
+                let transfer_file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open("/dev/pio0")
+                    .map_err(|error| format!("open /dev/pio0 for {label}: {error}"))?;
+                let transfer_fd = transfer_file.as_raw_fd();
                 for submit_index in 0..frame_submits {
                     if deadline.is_some_and(|end| Instant::now() >= end) {
                         break;
                     }
-                    let mut args = Rp1PioSmXferData32Args {
-                        sm: sm as u16,
-                        dir: RP1_PIO_DIR_TO_SM,
-                        data_bytes: (frame.len() * size_of::<u32>()) as u32,
-                        data: frame.as_ptr() as *mut libc::c_void,
-                    };
-                    xioctl(
-                        fd,
-                        PIO_IOC_SM_XFER_DATA32,
-                        &mut args,
-                        &format!("PIO_IOC_SM_XFER_DATA32({label},submit={submit_index})"),
-                    )?;
+                    for frame_index in 0..weight {
+                        let words = if frame_index + 1 == weight {
+                            &frame.handoff
+                        } else {
+                            &frame.continuation
+                        };
+                        let mut args = Rp1PioSmXferData32Args {
+                            sm: sm as u16,
+                            dir: RP1_PIO_DIR_TO_SM,
+                            data_bytes: (words.len() * size_of::<u32>()) as u32,
+                            data: words.as_ptr() as *mut libc::c_void,
+                        };
+                        xioctl(
+                            transfer_fd,
+                            PIO_IOC_SM_XFER_DATA32,
+                            &mut args,
+                            &format!(
+                                "PIO_IOC_SM_XFER_DATA32({label},submit={submit_index},frame={frame_index})"
+                            ),
+                        )?;
+                    }
                     counter.fetch_add(weight, Ordering::Relaxed);
                 }
                 Ok(())
@@ -507,18 +622,37 @@ fn main() -> Result<(), String> {
     xioctl(
         fd,
         PIO_IOC_SM_SET_ENABLED,
-        &mut Rp1PioSmSetEnabledArgs { mask: claim_mask, enable: 0, rsvd: 0 },
+        &mut Rp1PioSmSetEnabledArgs {
+            mask: claim_mask,
+            enable: 0,
+            rsvd: 0,
+        },
         "PIO_IOC_SM_SET_ENABLED(disable)",
     )?;
     for sm in 0..4_u16 {
-        let _ = xioctl(fd, PIO_IOC_SM_CLEAR_FIFOS, &mut Rp1PioSmClearFifosArgs { sm }, "PIO_IOC_SM_CLEAR_FIFOS");
+        let _ = xioctl(
+            fd,
+            PIO_IOC_SM_CLEAR_FIFOS,
+            &mut Rp1PioSmClearFifosArgs { sm },
+            "PIO_IOC_SM_CLEAR_FIFOS",
+        );
     }
     let mut remove = Rp1PioRemoveProgram {
         num_instrs: PI5_PIO_ROUND_ROBIN_OUT_PROGRAM_LENGTH as u16,
         origin,
     };
-    let _ = xioctl(fd, PIO_IOC_REMOVE_PROGRAM, &mut remove, "PIO_IOC_REMOVE_PROGRAM");
-    let _ = xioctl(fd, PIO_IOC_SM_UNCLAIM, &mut Rp1PioSmClaimArgs { mask: claim_mask }, "PIO_IOC_SM_UNCLAIM");
+    let _ = xioctl(
+        fd,
+        PIO_IOC_REMOVE_PROGRAM,
+        &mut remove,
+        "PIO_IOC_REMOVE_PROGRAM",
+    );
+    let _ = xioctl(
+        fd,
+        PIO_IOC_SM_UNCLAIM,
+        &mut Rp1PioSmClaimArgs { mask: claim_mask },
+        "PIO_IOC_SM_UNCLAIM",
+    );
     let elapsed_s = started.elapsed().as_secs_f64();
     let completed_per_sm = [
         completed_submits[0].load(Ordering::Relaxed),
@@ -530,8 +664,15 @@ fn main() -> Result<(), String> {
     let avg_completed_per_sm = total_completed as f64 / 4.0;
     let per_sm_hz = avg_completed_per_sm / elapsed_s;
     let ring_hz = total_completed as f64 / elapsed_s;
+    let per_sm_mib_s = [
+        completed_per_sm[0] as f64 * frame_bytes_by_sm[0] as f64 / elapsed_s / (1024.0 * 1024.0),
+        completed_per_sm[1] as f64 * frame_bytes_by_sm[1] as f64 / elapsed_s / (1024.0 * 1024.0),
+        completed_per_sm[2] as f64 * frame_bytes_by_sm[2] as f64 / elapsed_s / (1024.0 * 1024.0),
+        completed_per_sm[3] as f64 * frame_bytes_by_sm[3] as f64 / elapsed_s / (1024.0 * 1024.0),
+    ];
+    let total_mib_s = per_sm_mib_s.iter().sum::<f64>();
     println!(
-        "round_robin_elapsed_s={elapsed_s:.3} per_sm_hz={per_sm_hz:.2} ring_hz={ring_hz:.2} max_frame_bytes={max_frame_bytes} frame_bytes_by_sm={frame_bytes_by_sm:?} completed_frames_per_sm={completed_per_sm:?}"
+        "round_robin_elapsed_s={elapsed_s:.3} per_sm_hz={per_sm_hz:.2} ring_hz={ring_hz:.2} total_mib_s={total_mib_s:.2} per_sm_mib_s={per_sm_mib_s:?} max_frame_bytes={max_frame_bytes} frame_bytes_by_sm={frame_bytes_by_sm:?} completed_frames_per_sm={completed_per_sm:?}"
     );
     Ok(())
 }

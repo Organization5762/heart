@@ -23,6 +23,10 @@ const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RuntimeTuning {
+    pub(crate) matrix_simulated_refresh_interval_ms: u64,
+    pub(crate) matrix_pi4_refresh_interval_ms: u64,
+    pub(crate) matrix_max_pending_frames: usize,
+    pub(crate) parallel_color_remap_threshold_bytes: usize,
     /* Default PWM bit depth used when building a Pi 5 scan config. */
     pub(crate) pi5_simple_scan_default_pwm_bits: u8,
     /* Default LSB dwell used when building a Pi 5 scan config. */
@@ -43,10 +47,28 @@ static HEART_RUNTIME_TUNING: OnceLock<RuntimeTuning> = OnceLock::new();
 
 pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
     HEART_RUNTIME_TUNING.get_or_init(|| RuntimeTuning {
+        matrix_simulated_refresh_interval_ms: parse_env_u64(
+            "HEART_MATRIX_SIMULATED_REFRESH_INTERVAL_MS",
+            16,
+            |_| true,
+        ),
+        matrix_pi4_refresh_interval_ms: parse_env_u64(
+            "HEART_MATRIX_PI4_REFRESH_INTERVAL_MS",
+            16,
+            |_| true,
+        ),
+        matrix_max_pending_frames: parse_env_usize("HEART_MATRIX_MAX_PENDING_FRAMES", 2, |value| {
+            value > 0
+        }),
+        parallel_color_remap_threshold_bytes: parse_env_usize(
+            "HEART_PARALLEL_COLOR_REMAP_THRESHOLD_BYTES",
+            256 * 1024,
+            |_| true,
+        ),
         pi5_simple_scan_default_pwm_bits: parse_env_u8(
             "HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS",
             HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS_DEFAULT,
-            |value| (1..=16).contains(&value),
+            |value| (1..=11).contains(&value),
         ),
         pi5_simple_scan_lsb_dwell_ticks: parse_env_u32(
             "HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS",
@@ -81,10 +103,30 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
     })
 }
 
+pub(crate) fn frame_pool_size() -> usize {
+    parse_env_usize("HEART_MATRIX_FRAME_POOL_SIZE", 3, |value| value > 0)
+}
+
+fn parse_env_u64(key: &str, default: u64, validator: impl Fn(u64) -> bool) -> u64 {
+    env::var(key)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| validator(*value))
+        .unwrap_or(default)
+}
+
 fn parse_env_u32(key: &str, default: u32, validator: impl Fn(u32) -> bool) -> u32 {
     env::var(key)
         .ok()
         .and_then(|value| value.parse::<u32>().ok())
+        .filter(|value| validator(*value))
+        .unwrap_or(default)
+}
+
+fn parse_env_usize(key: &str, default: usize, validator: impl Fn(usize) -> bool) -> usize {
+    env::var(key)
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
         .filter(|value| validator(*value))
         .unwrap_or(default)
 }

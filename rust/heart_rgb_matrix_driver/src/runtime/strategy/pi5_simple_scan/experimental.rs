@@ -7,7 +7,8 @@ pub(crate) fn build_raw_group_words_for_rgba(
     row_pair: usize,
     plane_index: usize,
 ) -> Result<Vec<u32>, String> {
-    let width = usize::try_from(config.width()?).map_err(|_| "Pi 5 raw replay width exceeds host usize.".to_string())?;
+    let width = usize::try_from(config.width()?)
+        .map_err(|_| "Pi 5 raw replay width exceeds host usize.".to_string())?;
     let row_pairs = config.row_pairs()?;
     let pinout = config.pinout();
     let addr_bits = pinout.address_bits(row_pair, RAW_PIN_WORD_SHIFT);
@@ -17,16 +18,30 @@ pub(crate) fn build_raw_group_words_for_rgba(
     let clock_word = 1_u32 << pinout.clock_gpio();
     let msb_first_shift = usize::from(config.pwm_bits()) - plane_index - 1;
     let timing = config.timing();
-    let post_addr = usize::try_from(timing.post_addr_ticks).map_err(|_| "Pi 5 raw replay post_addr_ticks exceeds host usize.".to_string())?;
-    let latch = usize::try_from(timing.latch_ticks).map_err(|_| "Pi 5 raw replay latch_ticks exceeds host usize.".to_string())?;
-    let post_latch = usize::try_from(timing.post_latch_ticks).map_err(|_| "Pi 5 raw replay post_latch_ticks exceeds host usize.".to_string())?;
-    let hold = usize::try_from(timing.simple_clock_hold_ticks).map_err(|_| "Pi 5 raw replay simple_clock_hold_ticks exceeds host usize.".to_string())?;
-    let dwell_ticks = usize::try_from(raw_dwell_ticks(config, plane_index)?).map_err(|_| "Pi 5 raw replay dwell exceeds host usize.".to_string())?;
+    let post_addr = usize::try_from(timing.post_addr_ticks)
+        .map_err(|_| "Pi 5 raw replay post_addr_ticks exceeds host usize.".to_string())?;
+    let latch = usize::try_from(timing.latch_ticks)
+        .map_err(|_| "Pi 5 raw replay latch_ticks exceeds host usize.".to_string())?;
+    let post_latch = usize::try_from(timing.post_latch_ticks)
+        .map_err(|_| "Pi 5 raw replay post_latch_ticks exceeds host usize.".to_string())?;
+    let hold = usize::try_from(timing.simple_clock_hold_ticks)
+        .map_err(|_| "Pi 5 raw replay simple_clock_hold_ticks exceeds host usize.".to_string())?;
+    let dwell_ticks = usize::try_from(raw_dwell_ticks(config, plane_index)?)
+        .map_err(|_| "Pi 5 raw replay dwell exceeds host usize.".to_string())?;
 
     let mut words = Vec::with_capacity(raw_group_word_count(config, width, plane_index)?);
     repeat_word(&mut words, blank_word, post_addr);
     for column in 0..width {
-        let data_word = blank_word | scan_pixel_bits(rgba, config, width, row_pair, row_pairs, column, msb_first_shift);
+        let data_word = blank_word
+            | scan_pixel_bits(
+                rgba,
+                config,
+                width,
+                row_pair,
+                row_pairs,
+                column,
+                msb_first_shift,
+            );
         repeat_word(&mut words, data_word, hold);
         repeat_word(&mut words, data_word | clock_word, hold);
     }
@@ -36,14 +51,26 @@ pub(crate) fn build_raw_group_words_for_rgba(
     Ok(words.into_iter().map(raw_word_to_out_word).collect())
 }
 
-pub(crate) fn raw_group_word_count(config: &Pi5ScanConfig, width: usize, plane_index: usize) -> Result<usize, String> {
+pub(crate) fn raw_group_word_count(
+    config: &Pi5ScanConfig,
+    width: usize,
+    plane_index: usize,
+) -> Result<usize, String> {
     let timing = config.timing();
-    let post_addr = usize::try_from(timing.post_addr_ticks).map_err(|_| "Pi 5 raw replay post_addr_ticks exceeds host usize.".to_string())?;
-    let latch = usize::try_from(timing.latch_ticks).map_err(|_| "Pi 5 raw replay latch_ticks exceeds host usize.".to_string())?;
-    let post_latch = usize::try_from(timing.post_latch_ticks).map_err(|_| "Pi 5 raw replay post_latch_ticks exceeds host usize.".to_string())?;
-    let hold = usize::try_from(timing.simple_clock_hold_ticks).map_err(|_| "Pi 5 raw replay simple_clock_hold_ticks exceeds host usize.".to_string())?;
-    let clocks = width.checked_mul(hold).and_then(|v| v.checked_mul(2)).ok_or_else(|| "Pi 5 raw replay clock expansion overflowed.".to_string())?;
-    let dwell = usize::try_from(raw_dwell_ticks(config, plane_index)?).map_err(|_| "Pi 5 raw replay dwell exceeds host usize.".to_string())?;
+    let post_addr = usize::try_from(timing.post_addr_ticks)
+        .map_err(|_| "Pi 5 raw replay post_addr_ticks exceeds host usize.".to_string())?;
+    let latch = usize::try_from(timing.latch_ticks)
+        .map_err(|_| "Pi 5 raw replay latch_ticks exceeds host usize.".to_string())?;
+    let post_latch = usize::try_from(timing.post_latch_ticks)
+        .map_err(|_| "Pi 5 raw replay post_latch_ticks exceeds host usize.".to_string())?;
+    let hold = usize::try_from(timing.simple_clock_hold_ticks)
+        .map_err(|_| "Pi 5 raw replay simple_clock_hold_ticks exceeds host usize.".to_string())?;
+    let clocks = width
+        .checked_mul(hold)
+        .and_then(|v| v.checked_mul(2))
+        .ok_or_else(|| "Pi 5 raw replay clock expansion overflowed.".to_string())?;
+    let dwell = usize::try_from(raw_dwell_ticks(config, plane_index)?)
+        .map_err(|_| "Pi 5 raw replay dwell exceeds host usize.".to_string())?;
     post_addr
         .checked_add(clocks)
         .and_then(|v| v.checked_add(latch))
@@ -54,7 +81,10 @@ pub(crate) fn raw_group_word_count(config: &Pi5ScanConfig, width: usize, plane_i
 
 fn raw_dwell_ticks(config: &Pi5ScanConfig, plane_index: usize) -> Result<u32, String> {
     let msb_first_shift = usize::from(config.pwm_bits()) - plane_index - 1;
-    config.lsb_dwell_ticks().checked_shl(msb_first_shift as u32).ok_or_else(|| "Pi 5 raw replay dwell ticks overflowed.".to_string())
+    config
+        .lsb_dwell_ticks()
+        .checked_shl(msb_first_shift as u32)
+        .ok_or_else(|| "Pi 5 raw replay dwell ticks overflowed.".to_string())
 }
 
 fn repeat_word(words: &mut Vec<u32>, word: u32, count: usize) {
@@ -80,7 +110,10 @@ fn scan_pixel_bits(
     let lower = pixel_channels(rgba, width, row_pair + row_pairs, column);
     let rgb_gpios = config.pinout().rgb_gpios();
     let mut bits = 0_u32;
-    for (index, value) in [upper[0], upper[1], upper[2], lower[0], lower[1], lower[2]].into_iter().enumerate() {
+    for (index, value) in [upper[0], upper[1], upper[2], lower[0], lower[1], lower[2]]
+        .into_iter()
+        .enumerate()
+    {
         if channel_plane_is_set(value, shift, config.pwm_bits()) {
             bits |= 1_u32 << u32::from(rgb_gpios[index]);
         }

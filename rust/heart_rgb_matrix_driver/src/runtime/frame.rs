@@ -28,10 +28,10 @@ impl FrameBuffer {
     }
 
     pub(crate) fn write_rgba(&mut self, source: &[u8], color_order: ColorOrder) {
-        debug_assert_eq!(self.data.len(), source.len());
+        debug_assert_eq!(self.data.len(), source.len() / 4 * 3);
         match color_order {
-            ColorOrder::Rgb => self.data.copy_from_slice(source),
-            ColorOrder::Gbr => copy_with_gbr_remap(&mut self.data, source),
+            ColorOrder::Rgb => copy_rgb888(&mut self.data, source),
+            ColorOrder::Gbr => copy_rgb888_with_gbr_remap(&mut self.data, source),
         }
     }
 }
@@ -67,31 +67,83 @@ impl FrameBufferPool {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn available(&self) -> usize {
         self.recycled.len()
     }
 }
 
-fn copy_with_gbr_remap(destination: &mut [u8], source: &[u8]) {
+fn copy_rgb888(destination: &mut [u8], source: &[u8]) {
     if source.len() >= runtime_tuning().parallel_color_remap_threshold_bytes {
         destination
-            .par_chunks_exact_mut(4)
+            .par_chunks_exact_mut(3)
             .zip(source.par_chunks_exact(4))
             .for_each(|(destination_chunk, source_chunk)| {
                 destination_chunk[0] = source_chunk[0];
-                destination_chunk[1] = source_chunk[2];
-                destination_chunk[2] = source_chunk[1];
-                destination_chunk[3] = source_chunk[3];
+                destination_chunk[1] = source_chunk[1];
+                destination_chunk[2] = source_chunk[2];
             });
         return;
     }
 
     for (destination_chunk, source_chunk) in
-        destination.chunks_exact_mut(4).zip(source.chunks_exact(4))
+        destination.chunks_exact_mut(3).zip(source.chunks_exact(4))
+    {
+        destination_chunk[0] = source_chunk[0];
+        destination_chunk[1] = source_chunk[1];
+        destination_chunk[2] = source_chunk[2];
+    }
+}
+
+fn copy_rgb888_with_gbr_remap(destination: &mut [u8], source: &[u8]) {
+    if source.len() >= runtime_tuning().parallel_color_remap_threshold_bytes {
+        destination
+            .par_chunks_exact_mut(3)
+            .zip(source.par_chunks_exact(4))
+            .for_each(|(destination_chunk, source_chunk)| {
+                destination_chunk[0] = source_chunk[0];
+                destination_chunk[1] = source_chunk[2];
+                destination_chunk[2] = source_chunk[1];
+            });
+        return;
+    }
+
+    for (destination_chunk, source_chunk) in
+        destination.chunks_exact_mut(3).zip(source.chunks_exact(4))
     {
         destination_chunk[0] = source_chunk[0];
         destination_chunk[1] = source_chunk[2];
         destination_chunk[2] = source_chunk[1];
-        destination_chunk[3] = source_chunk[3];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_rgba_drops_alpha_and_preserves_rgb_order_for_kernel_rgb888() {
+        let rgba = [
+            1, 2, 3, 255, //
+            4, 5, 6, 128,
+        ];
+        let mut frame = FrameBuffer::new(6);
+
+        frame.write_rgba(&rgba, ColorOrder::Rgb);
+
+        assert_eq!(frame.as_slice(), &[1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn write_rgba_drops_alpha_and_applies_gbr_panel_remap_before_kernel_submit() {
+        let rgba = [
+            1, 2, 3, 255, //
+            4, 5, 6, 128,
+        ];
+        let mut frame = FrameBuffer::new(6);
+
+        frame.write_rgba(&rgba, ColorOrder::Gbr);
+
+        assert_eq!(frame.as_slice(), &[1, 3, 2, 4, 6, 5]);
     }
 }

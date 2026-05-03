@@ -63,7 +63,7 @@ class FrameCanvas:
 
 
 class MatrixDriver:
-    def __init__(self, config: MatrixConfig) -> None:
+    def __init__(self, config: MatrixConfig, *, skip_duplicate_frames: bool = True) -> None:
         self._driver = NativeMatrixDriver(
             config.wiring,
             config.panel_rows,
@@ -72,6 +72,8 @@ class MatrixDriver:
             config.parallel,
             config.color_order,
         )
+        self._skip_duplicate_frames = skip_duplicate_frames
+        self._last_submitted_frame: tuple[bytes, int, int] | None = None
 
     @property
     def width(self) -> int:
@@ -82,10 +84,15 @@ class MatrixDriver:
         return self._driver.height
 
     def submit_rgba(self, data: bytes, width: int, height: int) -> None:
+        frame = (data, width, height)
+        if self._skip_duplicate_frames and frame == self._last_submitted_frame:
+            return
         self._driver.submit_rgba(data, width, height)
+        self._last_submitted_frame = frame
 
     def clear(self) -> None:
         self._driver.clear()
+        self._last_submitted_frame = None
 
     def CreateFrameCanvas(self) -> FrameCanvas:
         return FrameCanvas(self.width, self.height)

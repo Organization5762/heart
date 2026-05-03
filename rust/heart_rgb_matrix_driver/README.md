@@ -8,7 +8,8 @@ It provides two related pieces:
 
 - a PyO3 extension that exposes the matrix driver and scene-management bridge
   to Python
-- a Pi 5 userspace scan transport that feeds RP1 PIO from a packed HUB75 stream
+- a Pi 5 backend that submits image frames to the patched kernel
+  `/dev/rp1-hub75` misc-device packer
 
 The package is small at the Python API boundary, but it owns the
 performance-sensitive display path on Raspberry Pi hardware.
@@ -27,30 +28,63 @@ That surface is intentionally close to the existing Python matrix API:
 - the Python wrapper exposes compatibility helpers such as
   `CreateFrameCanvas()` and `SwapOnVSync()`
 
-### Pi 5 parity tooling
+### Pi 5 kernel packer path
 
-The Pi 5 path is implemented in
-[`src/runtime/pi5_scan.rs`](/Users/lampe/.codex/worktrees/b4c5/heart/rust/heart_rgb_matrix_driver/src/runtime/pi5_scan.rs).
+The runtime Pi 5 path is implemented in
+[`src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs).
 
-Rust packs RGBA input into a compact scan stream for simulator, audit, and parity
-work. The runtime-facing Python path no longer links against the Piomatter adapter.
+For each submitted image, Rust converts the Python RGBA buffer into the kernel
+UAPI's flat RGB888 layout and calls:
+
+1. `open("/dev/rp1-hub75", O_RDWR | O_CLOEXEC)` during backend creation
+1. `ioctl(fd, RP1H_CONFIG, &mut rp1h_config)` with `slot_count = 2` and
+   `stream_format = RP1H_STREAM_STATE32`
+1. `mmap(NULL, cfg.mmap_size, PROT_READ, MAP_SHARED, fd, 0)` to keep the
+   queued packed stream visible to the display side
+1. `ioctl(fd, RP1H_QUEUE_FRAME, &rp1h_queue_frame { length, data, .. })` for
+   each submitted image, using `RP1H_QUEUE_F_REPLACE_PENDING` so animation
+   updates replace any unpresented pending frame
+1. optionally `ioctl(fd, RP1H_SIGNAL_VSYNC, &mut rp1h_vsync)` after queueing
+   when `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is set
+1. optionally `ioctl(fd, RP1H_WAIT_PRESENT, &rp1h_wait_present)` when
+   `HEART_RP1_HUB75_WAIT_PRESENT_TIMEOUT_NS` is set
+1. optionally `ioctl(fd, RP1H_GET_PRESENT_STATS, &mut rp1h_present_stats)` when
+   `HEART_RP1_HUB75_LOG_STATS` is set
+
+Programmatic kernel packer counters are exposed through `RP1H_GET_STATS`, and
+queued presentation counters are exposed through `RP1H_GET_PRESENT_STATS`.
+Userspace can read both without constructing a display runtime:
+
+- Rust: `heart_rgb_matrix_driver::rp1_hub75_read_pack_stats()`
+- Rust: `heart_rgb_matrix_driver::rp1_hub75_read_present_stats()`
+- Python: `heart_rgb_matrix_driver.rp1_hub75_get_stats()`
+- Python: `heart_rgb_matrix_driver.rp1_hub75_get_present_stats()`
+- CLI: `cargo run --bin rp1_hub75_stats -- /dev/rp1-hub75`
+
+The display/worker side must call `RP1H_SIGNAL_VSYNC` at the safe frame
+boundary. That promotes the pending queued slot to the displayed slot and wakes
+optional `RP1H_WAIT_PRESENT` waiters. In the normal direct-RIO path this is
+handled by the display/worker side; the Rust-side environment switch is for
+software-vsync bring-up.
 
 ## High-Level Data Flow
 
 1. Python renders an RGBA image.
 1. `NativeMatrixDriver.submit_rgba()` hands that frame to Rust.
-1. The Rust runtime reorders color channels if needed and reuses pooled frame
-   buffers to avoid per-frame allocation churn.
-1. Pi 5 parity tools can still pack RGBA into a compact row-pair/bitplane
-   scan stream for audit and simulation work.
+1. The Rust runtime drops alpha, optionally applies the configured channel
+   order, and stores a flat row-major RGB888 frame.
+1. On Pi 5, the backend submits that RGB888 frame to `/dev/rp1-hub75` with
+   `RP1H_QUEUE_FRAME`.
+1. The patched kernel packs the frame into the pending mmap slot as a STATE32
+   stream for the RP1-side consumer, then `RP1H_SIGNAL_VSYNC` makes it visible
+   at the next safe boundary.
 
 Two details matter for performance:
 
-- the Pi 5 transport owns steady-state refresh in userspace, so the generic
-  Rust runtime worker should not re-render unchanged frames in software
-- the packed scan format tries to reduce replay bytes aggressively through
-  blank-group omission, blank-span trimming/splitting, repeated-pin-word spans,
-  identical-plane merging, and dense GPIO-word packing
+- the kernel UAPI expects RGB888, not RGBA, so the native runtime keeps its
+  queue buffers in the exact byte layout passed to `RP1H_QUEUE_FRAME`
+- the local patched kernel currently accepts the double-buffered shape
+  (`slot_count = 2`); wider queued rings remain kernel-side future work
 
 ## Building
 

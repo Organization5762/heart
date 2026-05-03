@@ -145,9 +145,10 @@ fn raw_byte_pull_holds_every_output_word_for_constant_duration() {
         "raw byte pull should hold every emitted word for the same number of instructions; got deltas {deltas:?}"
     );
 
-    let pinout = Pi5ScanPinout::for_wiring(WiringProfile::AdafruitHatPwm)
-        .expect("pinout should resolve");
-    let active_groups_per_plane = usize::from(config.pwm_bits()) * config.row_pairs().expect("row pairs");
+    let pinout =
+        Pi5ScanPinout::for_wiring(WiringProfile::AdafruitHatPwm).expect("pinout should resolve");
+    let active_groups_per_plane =
+        usize::from(config.pwm_bits()) * config.row_pairs().expect("row pairs");
     let active_deltas: Vec<u64> = out_steps
         .iter()
         .map(|step| step.pins)

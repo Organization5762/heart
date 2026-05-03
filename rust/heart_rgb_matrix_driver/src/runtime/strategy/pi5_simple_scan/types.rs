@@ -93,14 +93,20 @@ impl Pi5ScanConfig {
     }
 
     pub fn with_pwm_bits(mut self, pwm_bits: u8) -> Result<Self, String> {
-        probe_log(format!("with_pwm_bits old={} new={}", self.pwm_bits, pwm_bits));
+        probe_log(format!(
+            "with_pwm_bits old={} new={}",
+            self.pwm_bits, pwm_bits
+        ));
         self.pwm_bits = pwm_bits;
         self.validate()?;
         Ok(self)
     }
 
     pub fn with_clock_divider(mut self, clock_divider: f32) -> Result<Self, String> {
-        probe_log(format!("with_clock_divider old={} new={}", self.timing.clock_divider, clock_divider));
+        probe_log(format!(
+            "with_clock_divider old={} new={}",
+            self.timing.clock_divider, clock_divider
+        ));
         self.timing.clock_divider = clock_divider;
         self.validate()?;
         Ok(self)
@@ -142,19 +148,31 @@ impl Pi5ScanConfig {
 
     fn validate(&self) -> Result<(), String> {
         if self.parallel != 1 {
-            return Err(format!("Pi 5 simple scan supports parallel=1, received {}.", self.parallel));
+            return Err(format!(
+                "Pi 5 simple scan supports parallel=1, received {}.",
+                self.parallel
+            ));
         }
         if !matches!(self.panel_rows, 16 | 32 | 64) {
-            return Err(format!("Unsupported panel_rows {}. Expected 16, 32, or 64.", self.panel_rows));
+            return Err(format!(
+                "Unsupported panel_rows {}. Expected 16, 32, or 64.",
+                self.panel_rows
+            ));
         }
         if !matches!(self.panel_cols, 32 | 64) {
-            return Err(format!("Unsupported panel_cols {}. Expected 32 or 64.", self.panel_cols));
+            return Err(format!(
+                "Unsupported panel_cols {}. Expected 32 or 64.",
+                self.panel_cols
+            ));
         }
         if self.chain_length == 0 {
             return Err("chain_length must be at least 1.".to_string());
         }
         if self.pwm_bits == 0 || self.pwm_bits > 16 {
-            return Err(format!("Unsupported pwm_bits {}. Expected 1 through 16.", self.pwm_bits));
+            return Err(format!(
+                "Unsupported pwm_bits {}. Expected 1 through 16.",
+                self.pwm_bits
+            ));
         }
         if self.lsb_dwell_ticks == 0 {
             return Err("lsb_dwell_ticks must be at least 1.".to_string());
@@ -185,7 +203,10 @@ pub struct PackedScanFrame {
 }
 
 impl PackedScanFrame {
-    pub fn pack_rgba(config: &Pi5ScanConfig, rgba: &[u8]) -> Result<(Self, PackedScanFrameStats), String> {
+    pub fn pack_rgba(
+        config: &Pi5ScanConfig,
+        rgba: &[u8],
+    ) -> Result<(Self, PackedScanFrameStats), String> {
         let width = usize::try_from(config.width()?)
             .map_err(|_| "Pi 5 simple scan width exceeds host usize.".to_string())?;
         let height = usize::try_from(config.height()?)
@@ -193,21 +214,32 @@ impl PackedScanFrame {
         let expected_size = expected_rgba_size(width as u32, height as u32)
             .ok_or_else(|| "Pi 5 simple scan geometry exceeds supported RGBA size.".to_string())?;
         if rgba.len() != expected_size {
-            return Err(format!("Pi 5 simple scan expected {expected_size} RGBA bytes but received {}.", rgba.len()));
+            return Err(format!(
+                "Pi 5 simple scan expected {expected_size} RGBA bytes but received {}.",
+                rgba.len()
+            ));
         }
 
         let row_pairs = config.row_pairs()?;
         let started = Instant::now();
-        let mut words =
-            Vec::with_capacity(row_pairs * usize::from(config.pwm_bits()) * raw_group_word_count(config, width, 0)?);
+        let mut words = Vec::with_capacity(
+            row_pairs * usize::from(config.pwm_bits()) * raw_group_word_count(config, width, 0)?,
+        );
         for row_pair in 0..row_pairs {
             for plane_index in 0..usize::from(config.pwm_bits()) {
-                words.extend(build_raw_group_words_for_rgba(config, rgba, row_pair, plane_index)?);
+                words.extend(build_raw_group_words_for_rgba(
+                    config,
+                    rgba,
+                    row_pair,
+                    plane_index,
+                )?);
             }
         }
 
         Ok((
-            Self { words: words.clone() },
+            Self {
+                words: words.clone(),
+            },
             PackedScanFrameStats {
                 word_count: words.len(),
                 pack_duration: started.elapsed(),

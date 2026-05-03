@@ -3,19 +3,14 @@ use std::mem::size_of;
 use std::os::fd::{AsRawFd, RawFd};
 use std::time::{Duration, Instant};
 
-use super::pi5_pio_programs_generated::{
-    PI5_PIO_RAW_BYTE_PULL_BASE_PROGRAM,
-    PI5_PIO_RAW_BYTE_PULL_DELAY_PATCH_INDICES,
-    PI5_PIO_RAW_BYTE_PULL_OUT_PIN_BASE,
-    PI5_PIO_RAW_BYTE_PULL_OUT_PIN_COUNT,
-    PI5_PIO_RAW_BYTE_PULL_OUT_SHIFT_RIGHT,
-    PI5_PIO_RAW_BYTE_PULL_PROGRAM_LENGTH,
-    PI5_PIO_RAW_BYTE_PULL_SIDESET_OPTIONAL,
-    PI5_PIO_RAW_BYTE_PULL_SIDESET_PIN_COUNT,
-    PI5_PIO_RAW_BYTE_PULL_WRAP,
-    PI5_PIO_RAW_BYTE_PULL_WRAP_TARGET,
-};
 use super::pi5_pinout::Pi5ScanPinout;
+use super::pi5_pio_programs_generated::{
+    PI5_PIO_RAW_BYTE_PULL_BASE_PROGRAM, PI5_PIO_RAW_BYTE_PULL_DELAY_PATCH_INDICES,
+    PI5_PIO_RAW_BYTE_PULL_OUT_PIN_BASE, PI5_PIO_RAW_BYTE_PULL_OUT_PIN_COUNT,
+    PI5_PIO_RAW_BYTE_PULL_OUT_SHIFT_RIGHT, PI5_PIO_RAW_BYTE_PULL_PROGRAM_LENGTH,
+    PI5_PIO_RAW_BYTE_PULL_SIDESET_OPTIONAL, PI5_PIO_RAW_BYTE_PULL_SIDESET_PIN_COUNT,
+    PI5_PIO_RAW_BYTE_PULL_WRAP, PI5_PIO_RAW_BYTE_PULL_WRAP_TARGET,
+};
 use super::strategy::pi5_simple_scan::{PackedScanFrame, Pi5ScanConfig, Pi5ScanTiming};
 
 fn probe_log(message: impl AsRef<str>) {
@@ -230,10 +225,7 @@ pub struct Pi5SimpleProbeSession {
 }
 
 impl Pi5SimpleProbeSession {
-    pub fn new(
-        config: &Pi5ScanConfig,
-        frame_bytes: usize,
-    ) -> Result<Self, String> {
+    pub fn new(config: &Pi5ScanConfig, frame_bytes: usize) -> Result<Self, String> {
         probe_log("opening /dev/pio0");
         let file = OpenOptions::new()
             .read(true)
@@ -325,7 +317,8 @@ impl Pi5SimpleProbeSession {
             frame.as_bytes().len(),
             frame.word_count()
         ));
-        let configured_capacity = self.configured_buf_size as usize * self.configured_buf_count as usize;
+        let configured_capacity =
+            self.configured_buf_size as usize * self.configured_buf_count as usize;
         if frame.as_bytes().len() > configured_capacity {
             return Err(format!(
                 "Packed frame size {} exceeds configured DMA pool capacity {} (buf_size={} * buf_count={}).",
@@ -379,7 +372,9 @@ impl Drop for Pi5SimpleProbeSession {
         }
         if self.claimed_mask != 0 {
             let pindir_mask = self.panel_pindir_mask;
-            probe_log(format!("restoring pindirs to input mask=0x{pindir_mask:08x}"));
+            probe_log(format!(
+                "restoring pindirs to input mask=0x{pindir_mask:08x}"
+            ));
             let _ = unsafe {
                 libc::ioctl(
                     fd,
@@ -406,7 +401,13 @@ impl Drop for Pi5SimpleProbeSession {
                 "removing program origin={} instructions={}",
                 program.origin, program.num_instrs
             ));
-            let _ = unsafe { libc::ioctl(fd, PIO_IOC_REMOVE_PROGRAM, program as *mut Rp1PioRemoveProgram) };
+            let _ = unsafe {
+                libc::ioctl(
+                    fd,
+                    PIO_IOC_REMOVE_PROGRAM,
+                    program as *mut Rp1PioRemoveProgram,
+                )
+            };
         }
         if self.claimed_mask != 0 {
             probe_log(format!("unclaiming SM mask=0x{:x}", self.claimed_mask));
@@ -433,7 +434,9 @@ fn init_panel_gpios(fd: RawFd, pinout: Pi5ScanPinout) -> Result<(), String> {
             &mut Rp1GpioInitArgs { gpio },
             "PIO_IOC_GPIO_INIT",
         )?;
-        probe_log(format!("gpio set function gpio={gpio} fn={RP1_GPIO_FUNC_PIO}"));
+        probe_log(format!(
+            "gpio set function gpio={gpio} fn={RP1_GPIO_FUNC_PIO}"
+        ));
         xioctl(
             fd,
             PIO_IOC_GPIO_SET_FUNCTION,
@@ -475,13 +478,11 @@ fn add_probe_programs(
         for &index in spec.delay_patch_indices {
             program[index] = with_delay_bits(program[index], timing.simple_clock_hold_ticks);
         }
-        validate_program_uses_sideset(
-            &program,
-            spec.sideset_pin_count,
-            spec.sideset_optional,
-        )?;
+        validate_program_uses_sideset(&program, spec.sideset_pin_count, spec.sideset_optional)?;
         validate_program_uses_out_pins(&program, spec.out_pin_count)?;
-        if spec.program_length > RP1_PIO_INSTRUCTION_COUNT || program.len() > RP1_PIO_INSTRUCTION_COUNT {
+        if spec.program_length > RP1_PIO_INSTRUCTION_COUNT
+            || program.len() > RP1_PIO_INSTRUCTION_COUNT
+        {
             return Err(format!(
                 "PIO program for sm={} is too long: program_length={} actual_len={} max={}.",
                 sm_index,
@@ -501,13 +502,18 @@ fn add_probe_programs(
         }
         let add_label = format!("PIO_IOC_ADD_PROGRAM(sm={sm_index})");
         let origin = xioctl(fd, PIO_IOC_ADD_PROGRAM, &mut add, &add_label)? as u16;
-        probe_log(format!("PIO_IOC_ADD_PROGRAM sm={} origin={origin}", sm_index));
+        probe_log(format!(
+            "PIO_IOC_ADD_PROGRAM sm={} origin={origin}",
+            sm_index
+        ));
 
         let clear_label = format!("PIO_IOC_SM_CLEAR_FIFOS(sm={sm_index})");
         xioctl(
             fd,
             PIO_IOC_SM_CLEAR_FIFOS,
-            &mut Rp1PioSmClearFifosArgs { sm: sm_index as u16 },
+            &mut Rp1PioSmClearFifosArgs {
+                sm: sm_index as u16,
+            },
             &clear_label,
         )?;
         let sm_config = build_sm_config(origin, pinout, timing, spec);
@@ -563,19 +569,15 @@ fn build_sm_config(
 ) -> Rp1PioSmConfig {
     let mut config = Rp1PioSmConfig::default();
     let (clkdiv_int, clkdiv_frac) = encode_clkdiv(timing.clock_divider);
-    config.clkdiv =
-        (u32::from(clkdiv_int) << PROC_PIO_SM0_CLKDIV_INT_LSB)
+    config.clkdiv = (u32::from(clkdiv_int) << PROC_PIO_SM0_CLKDIV_INT_LSB)
         | (u32::from(clkdiv_frac) << PROC_PIO_SM0_CLKDIV_FRAC_LSB);
     config.execctrl = (u32::from(spec.wrap_target + origin as u8)
         << PROC_PIO_SM0_EXECCTRL_WRAP_BOTTOM_LSB)
         | (u32::from(spec.wrap + origin as u8) << PROC_PIO_SM0_EXECCTRL_WRAP_TOP_LSB)
         | (u32::from(spec.sideset_optional as u8) << PROC_PIO_SM0_EXECCTRL_SIDE_EN_LSB);
-    config.shiftctrl = (u32::from(spec.auto_pull as u8)
-        << PROC_PIO_SM0_SHIFTCTRL_AUTOPULL_LSB)
-        | (u32::from(spec.out_shift_right as u8)
-            << PROC_PIO_SM0_SHIFTCTRL_OUT_SHIFTDIR_LSB)
-        | (u32::from(spec.pull_threshold & 0x1f)
-            << PROC_PIO_SM0_SHIFTCTRL_PULL_THRESH_LSB)
+    config.shiftctrl = (u32::from(spec.auto_pull as u8) << PROC_PIO_SM0_SHIFTCTRL_AUTOPULL_LSB)
+        | (u32::from(spec.out_shift_right as u8) << PROC_PIO_SM0_SHIFTCTRL_OUT_SHIFTDIR_LSB)
+        | (u32::from(spec.pull_threshold & 0x1f) << PROC_PIO_SM0_SHIFTCTRL_PULL_THRESH_LSB)
         | (1_u32 << PROC_PIO_SM0_SHIFTCTRL_FJOIN_TX_LSB);
     config.pinctrl = (u32::from(spec.out_pin_base) << PROC_PIO_SM0_PINCTRL_OUT_BASE_LSB)
         | (u32::from(spec.out_pin_count) << PROC_PIO_SM0_PINCTRL_OUT_COUNT_LSB)
@@ -588,7 +590,9 @@ fn build_sm_config(
 }
 
 fn encode_clkdiv(clkdiv: f32) -> (u16, u8) {
-    let scaled = (clkdiv * 256.0).round().clamp(256.0, (u16::MAX as f32) * 256.0);
+    let scaled = (clkdiv * 256.0)
+        .round()
+        .clamp(256.0, (u16::MAX as f32) * 256.0);
     let scaled = scaled as u32;
     ((scaled >> 8) as u16, (scaled & 0xff) as u8)
 }
@@ -602,8 +606,8 @@ fn panel_pindir_mask(pinout: Pi5ScanPinout) -> u32 {
 }
 
 fn aligned_buf_size(frame_bytes: usize, requested_buf_size: u32) -> Result<u32, String> {
-    let frame_bytes =
-        u32::try_from(frame_bytes).map_err(|_| "RawBytePull frame size exceeds 32-bit DMA configuration.".to_string())?;
+    let frame_bytes = u32::try_from(frame_bytes)
+        .map_err(|_| "RawBytePull frame size exceeds 32-bit DMA configuration.".to_string())?;
     Ok(requested_buf_size.max(frame_bytes))
 }
 
@@ -619,10 +623,9 @@ pub(crate) fn validate_program_uses_sideset(
     if sideset_count == 0 {
         return Ok(());
     }
-    if program
-        .iter()
-        .any(|&instruction| decoded_sideset_value(instruction, sideset_count, sideset_optional) != 0)
-    {
+    if program.iter().any(|&instruction| {
+        decoded_sideset_value(instruction, sideset_count, sideset_optional) != 0
+    }) {
         return Ok(());
     }
     Err(format!(
@@ -631,11 +634,17 @@ pub(crate) fn validate_program_uses_sideset(
     ))
 }
 
-pub(crate) fn validate_program_uses_out_pins(program: &[u16], out_pin_count: u8) -> Result<(), String> {
+pub(crate) fn validate_program_uses_out_pins(
+    program: &[u16],
+    out_pin_count: u8,
+) -> Result<(), String> {
     if out_pin_count == 0 {
         return Ok(());
     }
-    if program.iter().any(|&instruction| instruction_writes_out_pins(instruction)) {
+    if program
+        .iter()
+        .any(|&instruction| instruction_writes_out_pins(instruction))
+    {
         return Ok(());
     }
     Err(format!(
@@ -646,7 +655,8 @@ pub(crate) fn validate_program_uses_out_pins(program: &[u16], out_pin_count: u8)
 
 fn decoded_sideset_value(instruction: u16, sideset_count: u8, sideset_optional: bool) -> u8 {
     let total_non_delay_bits = sideset_count.saturating_add(u8::from(sideset_optional));
-    let active_sideset_count = sideset_count.min(total_non_delay_bits.saturating_sub(u8::from(sideset_optional)));
+    let active_sideset_count =
+        sideset_count.min(total_non_delay_bits.saturating_sub(u8::from(sideset_optional)));
     let delay_bits = 5_u8.saturating_sub(total_non_delay_bits);
     let field = ((instruction >> 8) & 0x1f) as u8;
     let value_mask = if active_sideset_count == 0 {
@@ -660,7 +670,11 @@ fn decoded_sideset_value(instruction: u16, sideset_count: u8, sideset_optional: 
     } else {
         true
     };
-    if enabled { value } else { 0 }
+    if enabled {
+        value
+    } else {
+        0
+    }
 }
 
 fn instruction_writes_out_pins(instruction: u16) -> bool {

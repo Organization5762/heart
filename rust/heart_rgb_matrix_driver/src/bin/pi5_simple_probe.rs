@@ -1,8 +1,8 @@
 use std::env;
 use std::time::{Duration, Instant};
 
-use heart_rgb_matrix_driver::{Pi5ScanConfig, Pi5SimpleProbeMode, Pi5SimpleProbeSession};
 use heart_rgb_matrix_driver::ProbeWiringProfile as WiringProfile;
+use heart_rgb_matrix_driver::{Pi5ScanConfig, Pi5SimpleProbeMode, Pi5SimpleProbeSession};
 
 fn probe_log(message: impl AsRef<str>) {
     if env::var("HEART_PI5_SIMPLE_PROBE_LOG")

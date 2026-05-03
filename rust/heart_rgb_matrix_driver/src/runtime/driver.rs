@@ -161,14 +161,10 @@ impl MatrixDriverCore {
             )));
         }
 
-        let mut state = self
-            .runtime
-            .state
-            .lock()
-            .map_err(|_| {
-                driver_log("submit_rgba failed: runtime lock poisoned");
-                MatrixDriverError::runtime("Matrix runtime lock poisoned.")
-            })?;
+        let mut state = self.runtime.state.lock().map_err(|_| {
+            driver_log("submit_rgba failed: runtime lock poisoned");
+            MatrixDriverError::runtime("Matrix runtime lock poisoned.")
+        })?;
         if state.is_closed() {
             driver_log("submit_rgba rejected: driver already closed");
             return Err(MatrixDriverError::runtime(MATRIX_DRIVER_CLOSED_ERROR));
@@ -192,14 +188,10 @@ impl MatrixDriverCore {
 
     pub fn clear(&self) -> Result<(), MatrixDriverError> {
         driver_log("clear requested");
-        let mut state = self
-            .runtime
-            .state
-            .lock()
-            .map_err(|_| {
-                driver_log("clear failed: runtime lock poisoned");
-                MatrixDriverError::runtime("Matrix runtime lock poisoned.")
-            })?;
+        let mut state = self.runtime.state.lock().map_err(|_| {
+            driver_log("clear failed: runtime lock poisoned");
+            MatrixDriverError::runtime("Matrix runtime lock poisoned.")
+        })?;
         if state.is_closed() {
             driver_log("clear rejected: driver already closed");
             return Err(MatrixDriverError::runtime(MATRIX_DRIVER_CLOSED_ERROR));
@@ -212,14 +204,10 @@ impl MatrixDriverCore {
 
     pub fn stats(&self) -> Result<MatrixStatsCore, MatrixDriverError> {
         driver_log("stats requested");
-        let state = self
-            .runtime
-            .state
-            .lock()
-            .map_err(|_| {
-                driver_log("stats failed: runtime lock poisoned");
-                MatrixDriverError::runtime("Matrix runtime lock poisoned.")
-            })?;
+        let state = self.runtime.state.lock().map_err(|_| {
+            driver_log("stats failed: runtime lock poisoned");
+            MatrixDriverError::runtime("Matrix runtime lock poisoned.")
+        })?;
         let snapshot = state.stats_snapshot(
             self.runtime.width,
             self.runtime.height,
@@ -239,14 +227,10 @@ impl MatrixDriverCore {
     fn shutdown_inner(&self) -> Result<(), MatrixDriverError> {
         driver_log("shutdown requested");
         {
-            let mut state = self
-                .runtime
-                .state
-                .lock()
-                .map_err(|_| {
-                    driver_log("shutdown failed: runtime lock poisoned");
-                    MatrixDriverError::runtime("Matrix runtime lock poisoned.")
-                })?;
+            let mut state = self.runtime.state.lock().map_err(|_| {
+                driver_log("shutdown failed: runtime lock poisoned");
+                MatrixDriverError::runtime("Matrix runtime lock poisoned.")
+            })?;
             if state.is_closed() {
                 driver_log("shutdown skipped: already closed");
                 return Ok(());
@@ -256,21 +240,16 @@ impl MatrixDriverCore {
             self.runtime.signal.notify_all();
         }
 
-        let mut worker = self
-            .worker
-            .lock()
-            .map_err(|_| {
-                driver_log("shutdown failed: worker handle lock poisoned");
-                MatrixDriverError::runtime("Matrix worker handle lock poisoned.")
-            })?;
+        let mut worker = self.worker.lock().map_err(|_| {
+            driver_log("shutdown failed: worker handle lock poisoned");
+            MatrixDriverError::runtime("Matrix worker handle lock poisoned.")
+        })?;
         if let Some(join_handle) = worker.take() {
             driver_log("joining worker thread");
-            join_handle
-                .join()
-                .map_err(|_| {
-                    driver_log("worker thread panicked during shutdown");
-                    MatrixDriverError::runtime("Matrix worker thread panicked.")
-                })?;
+            join_handle.join().map_err(|_| {
+                driver_log("worker thread panicked during shutdown");
+                MatrixDriverError::runtime("Matrix worker thread panicked.")
+            })?;
             driver_log("worker thread joined");
         }
         Ok(())
@@ -342,7 +321,10 @@ fn run_matrix_worker(
             }
         };
 
-        driver_log(format!("worker rendering frame bytes={}", frame.as_slice().len()));
+        driver_log(format!(
+            "worker rendering frame bytes={}",
+            frame.as_slice().len()
+        ));
         if let Err(error) = backend.render(&frame) {
             driver_log(format!("worker exiting: backend render failed: {error}"));
             return;

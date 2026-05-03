@@ -24,4 +24,6 @@ pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_OUT_SHIFT_RIGHT: bool = false;
 pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_AUTO_PULL: bool = true;
 pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_PULL_THRESHOLD: u8 = 32;
 pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_DELAY_PATCH_INDICES: [usize; 0] = [];
-pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_BASE_PROGRAM: [u16; 11] = [0x20d0, 0x6021, 0x0024, 0x0009, 0x601f, 0xa042, 0xa042, 0xa042, 0x0001, 0xc050, 0xc011];
+pub(crate) const PI5_PIO_ROUND_ROBIN_OUT_BASE_PROGRAM: [u16; 11] = [
+    0x20d0, 0x6021, 0x0027, 0x6041, 0x607e, 0x0061, 0x0009, 0x601f, 0x0001, 0xc050, 0xc011,
+];

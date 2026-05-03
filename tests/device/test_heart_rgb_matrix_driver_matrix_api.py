@@ -102,13 +102,21 @@ class TestHeartRgbMatrixDriverMatrixCompatibilityApi:
         fake_native_module.ColorOrder = FakeColorOrder
         fake_native_module.NativeMatrixDriver = FakeNativeMatrixDriver
         fake_native_module.NativeMatrixStats = FakeNativeMatrixStats
+        fake_native_module.Rp1Hub75PresentStats = object
+        fake_native_module.Rp1Hub75Stats = object
+        fake_native_module.Rp1Hub75WorkerStatus = object
         fake_native_module.WiringProfile = FakeWiringProfile
         fake_native_module.SceneManagerBridge = object
         fake_native_module.SceneSnapshot = object
         fake_native_module.bridge_version = lambda: "0.1.0"
+        fake_native_module.rp1_hub75_get_present_stats = lambda device_path=None: None
+        fake_native_module.rp1_hub75_get_stats = lambda device_path=None: None
+        fake_native_module.rp1_hub75_get_worker_status = lambda device_path=None: None
 
         monkeypatch.syspath_prepend(str(HEART_RGB_MATRIX_DRIVER_PYTHON_PATH))
-        monkeypatch.setitem(sys.modules, "heart_rgb_matrix_driver._heart_rgb_matrix_driver", fake_native_module)
+        monkeypatch.setitem(
+            sys.modules, "heart_rgb_matrix_driver._heart_rgb_matrix_driver", fake_native_module
+        )
         return importlib.import_module("heart_rgb_matrix_driver")
 
     def test_frame_canvas_swaponvsync_submits_full_rgba_frame(
@@ -172,3 +180,77 @@ class TestHeartRgbMatrixDriverMatrixCompatibilityApi:
         submitted_bytes, width, height = driver._driver.submissions[0]
         submitted_image = Image.frombytes("RGBA", (width, height), submitted_bytes)
         assert submitted_image.getpixel((0, 0)) == (0, 0, 0, 255)
+
+    def test_swaponvsync_skips_duplicate_frames_by_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify identical canvas swaps are not resubmitted by default. This matters because steady client loops should not have to implement their own no-op frame suppression to avoid kernel work."""
+
+        heart_rgb_matrix_driver = self._load_heart_rgb_matrix_driver(monkeypatch)
+        driver = heart_rgb_matrix_driver.MatrixDriver(
+            heart_rgb_matrix_driver.MatrixConfig(
+                wiring=heart_rgb_matrix_driver.WiringProfile.AdafruitHatPwm,
+                panel_rows=16,
+                panel_cols=32,
+                chain_length=1,
+                parallel=1,
+                color_order=heart_rgb_matrix_driver.ColorOrder.RGB,
+            )
+        )
+        offscreen = driver.CreateFrameCanvas()
+        offscreen.SetImage(Image.new("RGBA", (2, 2), (255, 0, 0, 255)), 0, 0)
+
+        driver.SwapOnVSync(offscreen)
+        driver.SwapOnVSync(offscreen)
+
+        assert len(driver._driver.submissions) == 1
+
+    def test_duplicate_frame_skip_can_be_disabled(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify clients can force repeated submissions when they need every swap to reach the backend."""
+
+        heart_rgb_matrix_driver = self._load_heart_rgb_matrix_driver(monkeypatch)
+        driver = heart_rgb_matrix_driver.MatrixDriver(
+            heart_rgb_matrix_driver.MatrixConfig(
+                wiring=heart_rgb_matrix_driver.WiringProfile.AdafruitHatPwm,
+                panel_rows=16,
+                panel_cols=32,
+                chain_length=1,
+                parallel=1,
+                color_order=heart_rgb_matrix_driver.ColorOrder.RGB,
+            ),
+            skip_duplicate_frames=False,
+        )
+        offscreen = driver.CreateFrameCanvas()
+        offscreen.SetImage(Image.new("RGBA", (2, 2), (255, 0, 0, 255)), 0, 0)
+
+        driver.SwapOnVSync(offscreen)
+        driver.SwapOnVSync(offscreen)
+
+        assert len(driver._driver.submissions) == 2
+
+    def test_clear_resets_duplicate_frame_tracking(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify a clear lets the next matching frame through so the backend can restore visible content after blanking."""
+
+        heart_rgb_matrix_driver = self._load_heart_rgb_matrix_driver(monkeypatch)
+        driver = heart_rgb_matrix_driver.MatrixDriver(
+            heart_rgb_matrix_driver.MatrixConfig(
+                wiring=heart_rgb_matrix_driver.WiringProfile.AdafruitHatPwm,
+                panel_rows=16,
+                panel_cols=32,
+                chain_length=1,
+                parallel=1,
+                color_order=heart_rgb_matrix_driver.ColorOrder.RGB,
+            )
+        )
+        offscreen = driver.CreateFrameCanvas()
+        offscreen.SetImage(Image.new("RGBA", (2, 2), (255, 0, 0, 255)), 0, 0)
+
+        driver.SwapOnVSync(offscreen)
+        driver.clear()
+        driver.SwapOnVSync(offscreen)
+
+        assert len(driver._driver.submissions) == 3
