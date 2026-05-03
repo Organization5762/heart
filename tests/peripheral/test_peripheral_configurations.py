@@ -25,6 +25,10 @@ from heart.peripheral.configurations import (_accelerometer_detection_node,
                                              _switch_detection_node,
                                              _uwb_detection_node)
 from heart.peripheral.configurations.default import configure
+from heart.peripheral.configurations.pranay_pi import \
+    configure as configure_pranay_pi
+from heart.peripheral.configurations.rubiks_connected_x import \
+    configure as configure_rubiks_connected_x
 from heart.peripheral.drawing_pad import (DrawingPad,
                                           drawing_pad_detection_route,
                                           drawing_pad_sample_event_route)
@@ -454,6 +458,94 @@ class TestManyfoldSwitchConfiguration:
         )
 
         configuration = configure()
+
+        assert _switch_detection_node not in configuration.graph_nodes
+        assert configuration.detectors[0] is _detect_switches
+
+    def test_rubiks_configuration_moves_physical_switch_to_graph_node(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure_rubiks_connected_x()
+
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
+
+    def test_rubiks_configuration_keeps_switch_direct_for_local_fake(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure_rubiks_connected_x()
+
+        assert _switch_detection_node not in configuration.graph_nodes
+        assert configuration.detectors[0] is _detect_switches
+
+    def test_pranay_configuration_moves_physical_switch_to_graph_node(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure_pranay_pi()
+
+        assert _switch_detection_node in configuration.graph_nodes
+        assert _detect_switches not in configuration.detectors
+
+    def test_pranay_configuration_keeps_switch_direct_for_local_fake(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.use_mock_switch",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure_pranay_pi()
 
         assert _switch_detection_node not in configuration.graph_nodes
         assert configuration.detectors[0] is _detect_switches
