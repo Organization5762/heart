@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configurations import (_detect_drawing_pads,
-                                             _detect_gamepads,
                                              _detect_phone_text,
                                              _detect_sensors,
                                              _detect_uwb_position,
@@ -17,7 +16,6 @@ def configure() -> PeripheralConfiguration:
 
     detectors = [
         _detect_sensors,
-        _detect_gamepads,
         _detect_phone_text,
         _detect_drawing_pads,
         _detect_uwb_position
