@@ -123,11 +123,16 @@ def _rubiks_connected_x_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     return (_rubiks_connected_x_detection_node,)
 
 
-def _detect_sensors() -> Iterator[Peripheral[Any]]:
-    if Configuration.is_pi() and not Configuration.is_x11_forward():
-        return
-    else:
-        yield from FakeAccelerometer.detect()
+def _fake_accelerometer_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    return FakeAccelerometer.detection_node(
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
 
 
 def _compass_detection_node(
@@ -163,7 +168,13 @@ def _accelerometer_detection_node(
 def _accelerometer_graph_nodes() -> tuple[GraphNodeFactory, ...]:
     if Configuration.is_pi() and not Configuration.is_x11_forward():
         return (_accelerometer_detection_node,)
-    return ()
+    return _fake_accelerometer_graph_nodes()
+
+
+def _fake_accelerometer_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    if Configuration.is_pi() and not Configuration.is_x11_forward():
+        return ()
+    return (_fake_accelerometer_detection_node,)
 
 
 def _detect_gamepads() -> Iterator[Peripheral[Any]]:

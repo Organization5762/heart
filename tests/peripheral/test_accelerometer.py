@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from manyfold import Graph
 from manyfold.sensor_io import BackoffPolicy, RetryPolicy
 
-from heart.peripheral.sensor import (Accelerometer,
+from heart.peripheral.sensor import (Accelerometer, FakeAccelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_error_route,
                                      accelerometer_vector_event_route,
@@ -178,3 +178,48 @@ class TestAccelerometerManyfoldNode:
         latest = graph.latest(accelerometer_error_route())
         assert latest is not None
         assert isinstance(latest.value, RuntimeError)
+
+
+class TestFakeAccelerometerManyfoldNode:
+    """Cover graph-native fake accelerometer discovery and vector streaming."""
+
+    def test_detection_node_publishes_fake_accelerometer_to_manyfold_route(
+        self,
+    ) -> None:
+        graph = Graph()
+        registered: list[FakeAccelerometer] = []
+
+        handle = FakeAccelerometer.detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(accelerometer_detection_route())
+        assert len(registered) == 1
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.accelerometer.detected"
+        assert latest.value.data == {"mode": "fake"}
+        assert latest.value.identity.id == "fake_accelerometer"
+
+    def test_install_node_publishes_fake_vectors_to_manyfold_route(self) -> None:
+        peripheral = FakeAccelerometer()
+        graph = Graph()
+
+        handle = peripheral.install_node(
+            graph,
+            start_immediately=False,
+            retry=RetryPolicy(max_attempts=1),
+            backoff=BackoffPolicy.none(),
+            sample_interval_seconds=0,
+        )
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(accelerometer_vector_event_route())
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.accelerometer.vector"
+        assert 0.0 <= latest.value.data["x"] <= 1.0
+        assert 0.0 <= latest.value.data["y"] <= 1.0
+        assert latest.value.data["z"] == 9.8
+        assert latest.value.identity.id == "fake_accelerometer"

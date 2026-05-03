@@ -7,23 +7,14 @@ from manyfold import Graph
 from pytest import MonkeyPatch
 
 from heart.peripheral.compass import Compass, compass_detection_route
-from heart.peripheral.configurations import (_accelerometer_detection_node,
-                                             _compass_detection_node,
-                                             _detect_drawing_pads,
-                                             _detect_gamepads,
-                                             _detect_heart_rate_sensor,
-                                             _detect_phone_text,
-                                             _detect_radios, _detect_switches,
-                                             _detect_uwb_position,
-                                             _drawing_pad_detection_node,
-                                             _gamepad_detection_node,
-                                             _heart_rate_detection_node,
-                                             _manyfold_graph_nodes,
-                                             _microphone_detection_node,
-                                             _phone_text_detection_node,
-                                             _radio_detection_node,
-                                             _switch_detection_node,
-                                             _uwb_detection_node)
+from heart.peripheral.configurations import (
+    _accelerometer_detection_node, _compass_detection_node,
+    _detect_drawing_pads, _detect_gamepads, _detect_heart_rate_sensor,
+    _detect_phone_text, _detect_radios, _detect_switches, _detect_uwb_position,
+    _drawing_pad_detection_node, _fake_accelerometer_detection_node,
+    _gamepad_detection_node, _heart_rate_detection_node, _manyfold_graph_nodes,
+    _microphone_detection_node, _phone_text_detection_node,
+    _radio_detection_node, _switch_detection_node, _uwb_detection_node)
 from heart.peripheral.configurations.default import configure
 from heart.peripheral.configurations.pranay_pi import \
     configure as configure_pranay_pi
@@ -44,7 +35,7 @@ from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver,
                                     radio_detection_route,
                                     radio_packet_event_route)
-from heart.peripheral.sensor import (Accelerometer,
+from heart.peripheral.sensor import (Accelerometer, FakeAccelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_vector_event_route,
                                      magnetometer_vector_event_route)
@@ -279,7 +270,7 @@ class TestManyfoldAccelerometerConfiguration:
 
         assert _compass_detection_node in nodes
 
-    def test_manyfold_graph_nodes_keep_fake_accelerometer_direct_off_pi(
+    def test_manyfold_graph_nodes_include_fake_accelerometer_off_pi(
         self,
         monkeypatch,
     ) -> None:
@@ -295,6 +286,83 @@ class TestManyfoldAccelerometerConfiguration:
         nodes = _manyfold_graph_nodes()
 
         assert _accelerometer_detection_node not in nodes
+        assert _fake_accelerometer_detection_node in nodes
+
+    def test_fake_accelerometer_detection_node_spawns_vector_source(
+        self,
+        monkeypatch,
+    ) -> None:
+        original_install_node = FakeAccelerometer.install_node
+
+        def _install_node(
+            self: FakeAccelerometer,
+            graph: Graph,
+            **kwargs: Any,
+        ) -> Any:
+            return original_install_node(
+                self,
+                graph,
+                **kwargs,
+                sample_interval_seconds=0,
+            )
+
+        monkeypatch.setattr(FakeAccelerometer, "install_node", _install_node)
+        graph = Graph()
+        registered: list[FakeAccelerometer] = []
+
+        handle = _fake_accelerometer_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+        assert len(registered) == 1
+        assert len(handle.spawned_handles) == 1
+
+        spawned = handle.spawned_handles[0]
+        spawned.loop_handle.loop.run(spawned.loop_handle.token)
+
+        latest_detection = graph.latest(accelerometer_detection_route())
+        latest_vector = graph.latest(accelerometer_vector_event_route())
+        assert latest_detection is not None
+        assert latest_detection.value.identity.id == "fake_accelerometer"
+        assert latest_vector is not None
+        assert latest_vector.value.event_type == "peripheral.accelerometer.vector"
+        assert latest_vector.value.identity.id == "fake_accelerometer"
+
+    def test_default_configuration_moves_fake_accelerometer_to_graph_node(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure()
+
+        assert _fake_accelerometer_detection_node in configuration.graph_nodes
+
+    def test_rubiks_configuration_moves_fake_accelerometer_to_graph_node(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.configurations.Configuration.is_x11_forward",
+            lambda: False,
+        )
+
+        configuration = configure_rubiks_connected_x()
+
+        assert _fake_accelerometer_detection_node in configuration.graph_nodes
 
 
 class TestManyfoldGamepadConfiguration:
