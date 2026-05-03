@@ -6,7 +6,6 @@ from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configurations import (_detect_drawing_pads,
                                              _detect_phone_text,
                                              _detect_sensors,
-                                             _detect_uwb_position,
                                              _manyfold_graph_nodes,
                                              _switch_graph_nodes)
 
@@ -18,7 +17,6 @@ def configure() -> PeripheralConfiguration:
         _detect_sensors,
         _detect_phone_text,
         _detect_drawing_pads,
-        _detect_uwb_position
     ]
     if not _switch_graph_nodes():
         from heart.peripheral.configurations import _detect_switches

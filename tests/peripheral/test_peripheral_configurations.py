@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any
 
 from manyfold import Graph
+from pytest import MonkeyPatch
 
 from heart.peripheral.configurations import (_accelerometer_detection_node,
                                              _detect_gamepads,
                                              _detect_heart_rate_sensor,
                                              _detect_radios, _detect_switches,
+                                             _detect_uwb_position,
                                              _gamepad_detection_node,
                                              _heart_rate_detection_node,
                                              _manyfold_graph_nodes,
                                              _microphone_detection_node,
                                              _radio_detection_node,
-                                             _switch_detection_node)
+                                             _switch_detection_node,
+                                             _uwb_detection_node)
 from heart.peripheral.configurations.default import configure
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.gamepad import gamepad_detection_route
@@ -28,6 +32,9 @@ from heart.peripheral.radio import (RadioDriver, RadioPeripheral,
 from heart.peripheral.sensor import (Accelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_vector_event_route)
+from heart.peripheral.uwb import (BaseStationMeasurement, FakeUWBPositioning,
+                                  LocalizedTarget, uwb_detection_route,
+                                  uwb_position_event_route)
 
 
 class _SerialStub:
@@ -361,3 +368,68 @@ class TestManyfoldHeartRateConfiguration:
 
         assert _heart_rate_detection_node in configuration.graph_nodes
         assert _detect_heart_rate_sensor not in configuration.detectors
+
+
+class TestManyfoldUWBConfiguration:
+    """Cover default graph-node factories so UWB positioning stays Manyfold-owned."""
+
+    def test_uwb_detection_node_spawns_position_source(
+        self,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        detected = FakeUWBPositioning()
+        target = LocalizedTarget(
+            x=1.0,
+            y=2.0,
+            z=3.0,
+            stations=[
+                BaseStationMeasurement(
+                    station_id="bs_0",
+                    x=0.0,
+                    y=0.0,
+                    z=2.5,
+                    distance=3.5,
+                )
+            ],
+        )
+
+        def _detect(cls) -> Iterator[FakeUWBPositioning]:
+            yield detected
+
+        def _install_node(
+            self: FakeUWBPositioning,
+            graph: Graph,
+            **kwargs: Any,
+        ) -> object:
+            graph.publish(
+                kwargs["output_route"],
+                self._target_to_sensor_event(target),
+            )
+            return object()
+
+        monkeypatch.setattr(FakeUWBPositioning, "detect", classmethod(_detect))
+        monkeypatch.setattr(FakeUWBPositioning, "install_node", _install_node)
+        graph = Graph()
+        registered: list[FakeUWBPositioning] = []
+
+        handle = _uwb_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest_detection = graph.latest(uwb_detection_route())
+        latest_position = graph.latest(uwb_position_event_route())
+        assert registered == [detected]
+        assert latest_detection is not None
+        assert latest_detection.value.event_type == "peripheral.uwb.detected"
+        assert latest_position is not None
+        assert latest_position.value.event_type == "peripheral.uwb.position"
+        assert latest_position.value.data["stations"][0]["station_id"] == "bs_0"
+
+    def test_default_configuration_moves_uwb_to_graph_node(self) -> None:
+        configuration = configure()
+
+        assert _uwb_detection_node in configuration.graph_nodes
+        assert _detect_uwb_position not in configuration.detectors
