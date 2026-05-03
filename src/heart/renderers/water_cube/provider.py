@@ -8,7 +8,8 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
@@ -41,7 +42,7 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
         return pipe_in_background(
             accel,
-            ops.start_with(initial),
+            start_with_once(initial),
             ops.scan(update_state),
             ops.share(),
         )

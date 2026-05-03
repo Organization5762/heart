@@ -15,6 +15,7 @@ from heart.peripheral.core.input.gamepad import (
 from heart.peripheral.core.input.keyboard import KeyboardController
 from heart.peripheral.core.input.streams import (map_stream, merge_streams,
                                                  threshold_direction)
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.switch import SwitchState
 from heart.utilities.reactive import (CompositeDisposable, DisposableBase,
                                       Subject)
@@ -213,7 +214,7 @@ class NavigationProfile:
 
     def _switch_intents(self) -> reactive.Observable[NavigationIntent]:
         if self._switch_stream_factory is None:
-            return reactive.empty()
+            return empty_node()
 
         switch_updates = self._switch_stream_factory()
         return reactive.merge(

@@ -10,7 +10,8 @@ from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 logger = get_logger(__name__)
 
@@ -103,7 +104,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_width()),
             ops.distinct_until_changed(),
-            ops.start_with(0),
+            start_with_once(0),
         )
 
         def advance(state: YoListenState, window_width: int) -> YoListenState:
@@ -133,6 +134,6 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         return pipe_in_background(
             reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )

@@ -13,6 +13,7 @@ from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
@@ -87,7 +88,7 @@ class AccelerometerController:
             if isinstance(peripheral, (Accelerometer, FakeAccelerometer))
         ]
         if not streams:
-            return cast(reactive.Observable[Acceleration], reactive.empty())
+            return empty_node()
 
         merged = pipe_in_background(
             reactive.merge(*streams),

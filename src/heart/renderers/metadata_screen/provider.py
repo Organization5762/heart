@@ -10,7 +10,8 @@ from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
                                                    MetadataScreenState)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
@@ -41,7 +42,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
             pipe_in_background(
                 frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
-                ops.start_with(initial_state),
+                start_with_once(initial_state),
                 ops.share(),
             )
         )

@@ -61,8 +61,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
                 lambda state, width: self.advance_state(state, width),
                 seed=initial_state,
             ),
-            ops.start_with(initial_state),
-            ops.share(),
+            starting_value=initial_state,
         )
 
 
@@ -115,6 +114,5 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
                 lambda state, width: self.advance_state(state, width),
                 seed=initial_state,
             ),
-            ops.start_with(initial_state),
-            ops.share(),
+            starting_value=initial_state,
         )

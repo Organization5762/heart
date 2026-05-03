@@ -5,7 +5,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 DEFAULT_FRAME_DURATION_MS = 650
 DEFAULT_FRAME_COUNT = 0
@@ -67,6 +68,6 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         return pipe_in_background(
             tick_updates,
             ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )

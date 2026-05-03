@@ -10,7 +10,8 @@ from heart.peripheral.rubiks_connected_x import (
 from heart.renderers.rubiks_connected_x_debug.state import \
     RubiksConnectedXDebugState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 DEFAULT_STATUS_LINES = (
     "Rubik's Connected X debug mode",
@@ -59,7 +60,7 @@ class RubiksConnectedXDebugStateProvider(
         return pipe_in_background(
             merged,
             ops.scan(self._advance_state, seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

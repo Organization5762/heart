@@ -9,7 +9,8 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.renderers.flame.state import FlameState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class FlameStateProvider(ObservableProvider[FlameState]):
@@ -40,7 +41,7 @@ class FlameStateProvider(ObservableProvider[FlameState]):
             frame_ticks,
             ops.map(to_state),
             ops.do_action(self._latest_state.on_next),
-            ops.start_with(self._initial_state),
+            start_with_once(self._initial_state),
             ops.share(),
         )
 

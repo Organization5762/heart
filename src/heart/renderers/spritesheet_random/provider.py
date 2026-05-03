@@ -11,7 +11,8 @@ from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
@@ -79,7 +80,7 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         return pipe_in_background(
             reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

@@ -8,7 +8,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.text.state import TextRenderingState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class TextRenderingProvider(ObservableProvider[TextRenderingState]):
@@ -44,15 +45,14 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
 
         return pipe_in_background(
             peripheral_manager.get_main_switch_subscription(),
-            ops.start_with(None),
+            start_with_once(None),
             ops.scan(
                 lambda state, switch_state: replace(
                     state, switch_state=switch_state
                 ),
                 seed=initial_state,
             ),
-            ops.start_with(initial_state),
-            ops.share(),
+            starting_value=initial_state,
         )
 
     @classmethod

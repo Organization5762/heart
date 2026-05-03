@@ -20,7 +20,8 @@ from heart.renderers.rubiks_connected_x_visualizer.state import \
 from heart.utilities.logging import get_logger
 from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import (pipe_in_background,
-                                              pipe_in_main_thread)
+                                              pipe_in_main_thread,
+                                              start_with_once)
 
 logger = get_logger(__name__)
 
@@ -72,7 +73,7 @@ class RubiksConnectedXVisualizerStateProvider(
         return pipe_in_main_thread(
             merged,
             ops.scan(self._advance_state, seed=initial_state),
-            ops.start_with(initial_state),
+            start_with_once(initial_state),
             ops.share(),
         )
 

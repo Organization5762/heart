@@ -9,10 +9,11 @@ import pytest
 import heart.utilities.reactive as reactive
 from heart.utilities.reactive import Disposable
 from heart.utilities.reactive_threads import (
-    FRAME_THREAD_LATENCY_STREAM, background_scheduler, blocking_io_scheduler,
-    delivery_latency_snapshot, drain_frame_thread_queue, input_scheduler,
-    on_frame_thread, pipe_in_main_thread,
-    reset_reactive_threading_state_for_tests, scheduler_diagnostics)
+    FRAME_THREAD_LATENCY_STREAM, BackgroundPipeNode, background_scheduler,
+    blocking_io_scheduler, delivery_latency_snapshot, drain_frame_thread_queue,
+    input_scheduler, on_frame_thread, pipe_in_background, pipe_in_main_thread,
+    reset_reactive_threading_state_for_tests, scheduler_diagnostics,
+    start_with_once)
 
 
 @pytest.fixture(autouse=True)
@@ -107,3 +108,48 @@ class TestSchedulerIsolation:
             "blocking_io_max_workers": 3,
             "input_max_workers": 5,
         }
+
+
+class TestBackgroundStreamStartingValue:
+    """Group background stream starting-value tests so renderer bootstrap semantics stay explicit."""
+
+    def test_pipe_in_background_emits_none_once_before_updates(self) -> None:
+        """Verify a None starting value is treated as a real one-shot stream value."""
+        source: reactive.Subject[int] = reactive.Subject()
+        observed: list[int | None] = []
+
+        pipe_in_background(source, starting_value=None).subscribe(observed.append)
+        source.on_next(1)
+        source.on_next(2)
+
+        assert observed == [None, 1, 2]
+
+    def test_start_with_once_installs_constant_and_update_capacitors(self) -> None:
+        """Verify the starting value is modeled as a constant route merged through capacitors."""
+        source: reactive.Subject[int] = reactive.Subject()
+        node = start_with_once(None)
+        observed: list[int | None] = []
+
+        node(source).subscribe(observed.append)
+        source.on_next(5)
+
+        topology = node.topology()
+        assert observed == [None, 5]
+        assert len(topology) == 2
+        assert any("constant" in source for source, _sink in topology)
+        assert any("source" in source for source, _sink in topology)
+
+    def test_background_pipe_is_manyfold_capacitor_node(self) -> None:
+        """Verify the background pipe boundary is backed by a Manyfold graph edge."""
+        source: reactive.Subject[int] = reactive.Subject()
+        node = BackgroundPipeNode(source, (reactive.operators.map(lambda value: value + 1),))
+        observed: list[int] = []
+
+        node.observable().subscribe(observed.append)
+        source.on_next(2)
+
+        topology = node.topology()
+        assert observed == [3]
+        assert len(topology) == 1
+        assert "source" in topology[0][0]
+        assert "output" in topology[0][1]

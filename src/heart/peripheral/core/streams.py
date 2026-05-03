@@ -7,6 +7,7 @@ from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
                       StreamName, TypedRoute, Variant, route)
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 from heart.utilities import reactive
 from heart.utilities.reactive_threads import pipe_in_background
@@ -51,9 +52,15 @@ class GraphRouteStream(Generic[T]):
         return self._observable().pipe(*operators)
 
     def _observable(self) -> reactive.Observable[T]:
-        return self._graph.observe(self._route).pipe(
-            reactive.operators.map(lambda envelope: envelope.value)
-        )
+        def subscribe(observer: Any, scheduler: Any = None) -> Any:
+            return self._graph.observe(self._route).subscribe(
+                lambda envelope: observer.on_next(envelope.value),
+                observer.on_error,
+                observer.on_completed,
+                scheduler=scheduler,
+            )
+
+        return reactive.create(subscribe)
 
 
 class PeripheralStreams:
@@ -85,7 +92,7 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
 
         if not observables:
-            return reactive.empty()
+            return empty_node()
 
         merged = pipe_in_background(
             reactive.merge(*observables),

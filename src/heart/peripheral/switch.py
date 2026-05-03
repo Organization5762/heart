@@ -18,6 +18,7 @@ import heart.utilities.reactive as reactive
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
@@ -303,7 +304,7 @@ class FakeSwitch(BaseSwitch):
         self
     ) -> reactive.Observable[SwitchState]:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return reactive.empty()
+            return empty_node()
         else:
             result = pipe_in_background(
                 interval_in_background(period=timedelta(milliseconds=10)),

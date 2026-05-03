@@ -5,7 +5,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.heart_title_screen.state import HeartTitleScreenState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
@@ -34,7 +35,7 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
             pipe_in_background(
                 frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
-                ops.start_with(initial_state),
+                start_with_once(initial_state),
                 ops.share(),
             )
         )

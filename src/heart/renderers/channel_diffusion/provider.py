@@ -7,7 +7,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.channel_diffusion.state import ChannelDiffusionState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
@@ -28,7 +29,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             ops.filter(lambda window: window is not None),
             ops.map(lambda window: window.get_size()),
             ops.distinct_until_changed(),
-            ops.start_with(initial_size),
+            start_with_once(initial_size),
         )
 
         ticks = pipe_in_background(
@@ -42,7 +43,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             return pipe_in_background(
                 ticks,
                 ops.scan(lambda state, _: self.next_state(state), seed=seeded_state),
-                ops.start_with(seeded_state),
+                start_with_once(seeded_state),
             )
 
         return pipe_in_background(

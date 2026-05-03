@@ -14,7 +14,8 @@ from heart.peripheral.core.input.gamepad import (
 from heart.peripheral.core.input.keyboard import KeyboardController
 from heart.peripheral.core.input.streams import map_stream
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -201,7 +202,7 @@ class MandelbrotControlProfile:
         return pipe_in_background(
             self.command_events,
             ops.scan(self._apply_command, seed=MandelbrotEdgeState()),
-            ops.start_with(MandelbrotEdgeState()),
+            start_with_once(MandelbrotEdgeState()),
         )
 
     @cached_property

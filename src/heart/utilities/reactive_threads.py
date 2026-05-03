@@ -8,8 +8,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
+from itertools import count
 from threading import Lock, Thread, get_ident
-from typing import Any, TypeVar
+from typing import Any, Generic, Protocol, TypeVar, cast, runtime_checkable
+
+from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
+                      StreamName, TypedRoute, Variant, route)
 
 from heart.utilities import reactive
 from heart.utilities.env import Configuration
@@ -25,8 +29,11 @@ from heart.utilities.reactive import pipe
 logger = get_logger(__name__)
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+TStarting = TypeVar("TStarting")
 FRAME_THREAD_LATENCY_STREAM = "frame_thread_handoff"
 DEFAULT_DELIVERY_LATENCY_HISTORY_SIZE = 2048
+_NODE_ROUTE_IDS = count(1)
 
 
 @dataclass
@@ -49,6 +56,207 @@ class DeliveryLatencyStats:
 class _FrameThreadTask:
     callback: Callable[[], None]
     enqueued_monotonic: float
+
+
+class _NoStartingValue:
+    pass
+
+
+_NO_STARTING_VALUE = _NoStartingValue()
+
+
+@runtime_checkable
+class _ObservableLike(Protocol[T_co]):
+    def subscribe(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+def _node_route(name: str, schema_id: str) -> TypedRoute[Any]:
+    route_id = next(_NODE_ROUTE_IDS)
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=OwnerName("heart.reactive"),
+        family=StreamFamily("background"),
+        stream=StreamName(f"{name}.{route_id}"),
+        variant=Variant.State,
+        schema=Schema.any(schema_id),
+    )
+
+
+class _ManyfoldObservableNode(Generic[T]):
+    def __init__(self, *, name: str, schema_id: str) -> None:
+        self._graph = Graph()
+        self._source_route: TypedRoute[Any] = _node_route(
+            f"{name}.source",
+            f"{schema_id}Source",
+        )
+        self._output_route: TypedRoute[Any] = _node_route(
+            f"{name}.output",
+            f"{schema_id}Output",
+        )
+        self._lock = Lock()
+        self._installed = False
+        self._subscriptions: list[Any] = []
+
+    @property
+    def graph(self) -> Graph:
+        return self._graph
+
+    @staticmethod
+    def _route_display(route_like: Any) -> str:
+        display = getattr(route_like, "display", None)
+        if callable(display):
+            return cast(str, display())
+        route_ref = getattr(route_like, "route_ref", None)
+        display = getattr(route_ref, "display", None)
+        if callable(display):
+            return cast(str, display())
+        return str(route_like)
+
+    def topology(self) -> tuple[tuple[str, str], ...]:
+        native_edges = tuple(self._graph.topology())
+        capacitors = getattr(self._graph, "_capacitors", {})
+        capacitor_edges = tuple(
+            (
+                self._route_display(capacitor.source),
+                self._route_display(capacitor.sink),
+            )
+            for capacitor in capacitors.values()
+        )
+        return (*native_edges, *capacitor_edges)
+
+    @property
+    def capacitors(self) -> tuple[Any, ...]:
+        return tuple(getattr(self._graph, "_capacitors", {}).values())
+
+    def _publish_observable_values(
+        self,
+        source: _ObservableLike[Any],
+        target: TypedRoute[Any],
+        *,
+        scheduler: SchedulerBase | None = None,
+    ) -> Any:
+        return source.subscribe(
+            lambda value: self._graph.publish(target, value),
+            lambda error: (_ for _ in ()).throw(error),
+            scheduler=scheduler,
+        )
+
+class BackgroundPipeNode(_ManyfoldObservableNode[Any]):
+    """Manyfold-backed async boundary for Heart background streams."""
+
+    def __init__(
+        self,
+        source: _ObservableLike[Any],
+        operators: tuple[Any, ...],
+        *,
+        name: str = "pipe",
+    ) -> None:
+        super().__init__(name=name, schema_id="HeartBackgroundPipe")
+        self._source = source
+        self._operators = operators
+
+    def observable(self) -> Observable[Any]:
+        def _subscribe(observer: Any, scheduler: SchedulerBase | None = None) -> Any:
+            with self._lock:
+                if not self._installed:
+                    self._graph.capacitor(
+                        source=self._source_route,
+                        sink=self._output_route,
+                        capacity=1,
+                        immediate=True,
+                        overflow="latest",
+                        name=f"{self._output_route.display()}.background_capacitor",
+                    )
+                    output_subscription = self._graph.observe(
+                        self._output_route,
+                        replay_latest=False,
+                    ).subscribe(
+                        lambda envelope: observer.on_next(envelope.value),
+                        observer.on_error,
+                        observer.on_completed,
+                        scheduler=scheduler,
+                    )
+                    transformed = cast(Any, self._source).pipe(*self._operators)
+                    self._subscriptions.append(
+                        self._publish_observable_values(
+                            transformed,
+                            self._source_route,
+                            scheduler=scheduler,
+                        )
+                    )
+                    self._installed = True
+                    return output_subscription
+
+            return self._graph.observe(
+                self._output_route,
+                replay_latest=False,
+            ).subscribe(
+                lambda envelope: observer.on_next(envelope.value),
+                observer.on_error,
+                observer.on_completed,
+                scheduler=scheduler,
+            )
+
+        return create(_subscribe).pipe(ops.share())
+
+
+class StartWithOnceNode(_ManyfoldObservableNode[Any]):
+    """Prepend a one-shot constant through a Manyfold capacitor."""
+
+    def __init__(self, value: Any, *, name: str = "start_with_once") -> None:
+        super().__init__(name=name, schema_id="HeartStartWithOnce")
+        self._constant_route: TypedRoute[Any] = _node_route(
+            f"{name}.constant",
+            "HeartStartWithOnceConstant",
+        )
+        self._value = value
+
+    def __call__(self, source: Observable[T]) -> Observable[Any]:
+        return self.observable(source)
+
+    def observable(self, source: Observable[T]) -> Observable[Any]:
+        def _subscribe(observer: Any, scheduler: SchedulerBase | None = None) -> Any:
+            with self._lock:
+                if not self._installed:
+                    self._graph.capacitor(
+                        source=self._constant_route,
+                        sink=self._output_route,
+                        capacity=1,
+                        immediate=True,
+                        overflow="latest",
+                        name=f"{self._output_route.display()}.initial_capacitor",
+                    )
+                    self._graph.capacitor(
+                        source=self._source_route,
+                        sink=self._output_route,
+                        capacity=1,
+                        immediate=True,
+                        overflow="latest",
+                        name=f"{self._output_route.display()}.update_capacitor",
+                    )
+                    self._subscriptions.append(
+                        self._publish_observable_values(
+                            source,
+                            self._source_route,
+                            scheduler=scheduler,
+                        )
+                    )
+                    self._installed = True
+
+            output_subscription = self._graph.observe(
+                self._output_route,
+                replay_latest=False,
+            ).subscribe(
+                lambda envelope: observer.on_next(envelope.value),
+                observer.on_error,
+                observer.on_completed,
+                scheduler=scheduler,
+            )
+            self._graph.publish(self._constant_route, self._value)
+            return output_subscription
+
+        return create(_subscribe)
 
 
 class _LatencyRecorder:
@@ -275,15 +483,29 @@ def deliver_on_frame_thread(source: Observable[T]) -> Observable[T]:
     return create(_subscribe)
 
 
-def pipe_in_background(source: Observable[T], *operators: Any) -> Observable[Any]:
+def start_with_once(value: TStarting) -> StartWithOnceNode:
+    """Prepend one value to a stream, then continue with source updates.
+
+    This is the Rx boundary equivalent of a one-shot constant feeding a
+    single-item capacitor: the value is produced once for each subscription,
+    rather than being held as a continuously active signal.
+    """
+    return StartWithOnceNode(value)
+
+
+def pipe_in_background(
+    source: Observable[T],
+    *operators: Any,
+    starting_value: TStarting | _NoStartingValue = _NO_STARTING_VALUE,
+) -> Observable[Any]:
     logger.debug("Building background pipeline.")
-    return pipe(
-        source,
-        *[
+    resolved_operators = operators
+    if not isinstance(starting_value, _NoStartingValue):
+        resolved_operators = (
             *operators,
-            ops.share(),
-        ],
-    )
+            start_with_once(starting_value),
+        )
+    return BackgroundPipeNode(source, resolved_operators).observable()
 
 
 def pipe_in_main_thread(source: Observable[T], *operators: Any) -> Observable[Any]:

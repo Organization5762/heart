@@ -5,10 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from manyfold import Graph
+
 import heart.utilities.reactive as reactive
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.utilities.reactive import Disposable
 
 
@@ -42,6 +45,44 @@ class TestPeripheralObserveSharing:
         finally:
             subscription_a.dispose()
             subscription_b.dispose()
+
+
+class TestGraphRouteStreamTransforms:
+    def test_pipe_delegates_operator_sharing_to_observable_pipeline(
+        self,
+    ) -> None:
+        graph = Graph()
+        route = runtime_route("test_event_stream_map", "HeartTestEventStreamMap")
+        stream = GraphRouteStream[int](graph, route)
+        calls = {"mapper": 0}
+
+        def mapper(value: int) -> int:
+            calls["mapper"] += 1
+            return value + 1
+
+        transformed = stream.pipe(
+            reactive.operators.map(mapper),
+            reactive.operators.share(),
+        )
+        doubled = stream.pipe(reactive.operators.map(lambda value: value * 2))
+        observed_a: list[int] = []
+        observed_b: list[int] = []
+        observed_doubled: list[int] = []
+
+        subscription_a = transformed.subscribe(observed_a.append)
+        subscription_b = transformed.subscribe(observed_b.append)
+        subscription_doubled = doubled.subscribe(observed_doubled.append)
+        try:
+            stream.on_next(41)
+
+            assert observed_a == [42]
+            assert observed_b == [42]
+            assert observed_doubled == [82]
+            assert calls["mapper"] == 1
+        finally:
+            subscription_a.dispose()
+            subscription_b.dispose()
+            subscription_doubled.dispose()
 
 
 class TestManyfoldSensorEnvelopeBridge:

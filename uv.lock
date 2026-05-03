@@ -1057,8 +1057,8 @@ wheels = [
 
 [[package]]
 name = "manyfold"
-version = "0.1.15"
-source = { git = "ssh://git@github.com/Organization5762/manyfold.git#2427df64e969e8eceeb2bf75bd9fc98b1f8b4edb" }
+version = "0.1.16"
+source = { git = "ssh://git@github.com/Organization5762/manyfold.git#6f3b0b7ffd818fd970761fb1c2a6290ee201142c" }
 dependencies = [
     { name = "reactivex" },
 ]

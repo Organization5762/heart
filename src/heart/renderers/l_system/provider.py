@@ -5,7 +5,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.l_system.state import LSystemState
 from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.utilities.reactive_threads import (pipe_in_background,
+                                              start_with_once)
 
 
 def _update_grammar(grammar: str) -> str:
@@ -61,7 +62,7 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
             pipe_in_background(
                 frame_ticks,
                 ops.scan(advance, seed=initial_state),
-                ops.start_with(initial_state),
+                start_with_once(initial_state),
                 ops.share(),
             )
         )

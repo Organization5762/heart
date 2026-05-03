@@ -11,6 +11,7 @@ import pygame
 import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
+from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -20,7 +21,8 @@ from heart.utilities.reactive import operators as ops
 from heart.utilities.reactive_threads import (input_scheduler,
                                               interval_in_background,
                                               pipe_in_background,
-                                              pipe_in_main_thread)
+                                              pipe_in_main_thread,
+                                              start_with_once)
 
 KEYBOARD_POLL_INTERVAL_MS = 5
 KEYBOARD_RELEASE_DEBOUNCE_MS = 60.0
@@ -52,7 +54,7 @@ class KeyboardController:
     @cached_property
     def _snapshot_stream(self) -> reactive.Observable[KeyboardSnapshot]:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return cast(reactive.Observable[KeyboardSnapshot], reactive.empty())
+            return empty_node()
 
         def _sample(_: int) -> KeyboardSnapshot:
             try:
@@ -197,7 +199,7 @@ class KeyboardController:
         stream = pipe_in_background(
             self.key_events(key),
             ops.map(lambda event: event.state),
-            ops.start_with(KeyState()),
+            start_with_once(KeyState()),
             ops.distinct_until_changed(),
         )
         key_name = pygame.key.name(key)
