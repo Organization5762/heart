@@ -3,18 +3,15 @@ from __future__ import annotations
 from threading import RLock
 from typing import Any, TypeVar, cast
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-from manyfold.rx.disposable import Disposable
-from manyfold.rx.scheduler import TimeoutScheduler
-
+from heart.utilities import reactive
 from heart.utilities.env import (ReactivexStreamConnectMode,
                                  ReactivexStreamShareStrategy)
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex.coalescing import coalesce_latest
-from heart.utilities.reactivex.instrumentation import instrument_stream
-from heart.utilities.reactivex.settings import StreamShareSettings
-from heart.utilities.reactivex.types import ConnectableStream
+from heart.utilities.reactive import Disposable, TimeoutScheduler, ops
+from heart.utilities.reactive_coalescing import coalesce_latest
+from heart.utilities.reactive_instrumentation import instrument_stream
+from heart.utilities.reactive_stream_settings import StreamShareSettings
+from heart.utilities.reactive_stream_types import ConnectableStream
 
 logger = get_logger(__name__)
 
@@ -30,7 +27,7 @@ def _share_with_refcount_grace(
     min_subscribers: int,
     connect_mode: ReactivexStreamConnectMode,
     stream_name: str,
-) -> reactivex.Observable[T]:
+) -> reactive.Observable[T]:
     lock = RLock()
     connection: Any | None = None
     disconnect_timer: Any | None = None
@@ -106,14 +103,14 @@ def _share_with_refcount_grace(
 
         return Disposable(_dispose)
 
-    return reactivex.create(_subscribe)
+    return reactive.create(_subscribe)
 
 
 def share_stream(
-    source: reactivex.Observable[T],
+    source: reactive.Observable[T],
     *,
     stream_name: str,
-) -> reactivex.Observable[T]:
+) -> reactive.Observable[T]:
     """Share a stream using the configured strategy."""
 
     settings = StreamShareSettings.from_environment()

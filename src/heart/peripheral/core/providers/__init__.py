@@ -1,12 +1,10 @@
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import InputDescriptor
 from heart.peripheral.core.providers import registry as providers_registry
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive_threads import pipe_in_background
 
 apply_provider_registrations = providers_registry.apply_provider_registrations
 register_provider = providers_registry.register_provider
@@ -18,7 +16,9 @@ T = TypeVar("T")
 
 class ObservableProvider(Generic[T]):
     @abstractmethod
-    def observable(self, *args: object, **kwargs: object) -> reactivex.Observable[T]:
+    def observable(
+        self, *args: object, **kwargs: object
+    ) -> reactive.Observable[T]:
         raise NotImplementedError("")
 
     def inputs(self) -> tuple[InputDescriptor, ...]:
@@ -35,8 +35,10 @@ class StaticStateProvider(ObservableProvider[T]):
     def state(self) -> T:
         return self._state
 
-    def observable(self, *args: object, **kwargs: object) -> reactivex.Observable[T]:
+    def observable(
+        self, *args: object, **kwargs: object
+    ) -> reactive.Observable[T]:
         return pipe_in_background(
-            reactivex.just(self._state),
-            ops.share(),
+            reactive.just(self._state),
+            reactive.operators.share(),
         )

@@ -7,12 +7,12 @@ from collections.abc import Iterator
 
 import pytest
 from manyfold import Graph
-from manyfold.rx.disposable import Disposable
 
 from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
-from heart.utilities.reactivex_threads import \
-    reset_reactivex_threading_state_for_tests
+from heart.utilities.reactive import Disposable
+from heart.utilities.reactive_threads import \
+    reset_reactive_threading_state_for_tests
 
 BUTTON_PRESS_EVENT = "button.press"
 BUTTON_LONG_PRESS_EVENT = "button.long_press"
@@ -20,10 +20,10 @@ SWITCH_ROTATION_EVENT = "switch.rotation"
 
 
 @pytest.fixture(autouse=True)
-def _reset_reactivex_threads() -> Iterator[None]:
-    reset_reactivex_threading_state_for_tests()
+def _reset_reactive_threads() -> Iterator[None]:
+    reset_reactive_threading_state_for_tests()
     yield
-    reset_reactivex_threading_state_for_tests()
+    reset_reactive_threading_state_for_tests()
 
 
 class TestSwitchRunLoopIsolation:

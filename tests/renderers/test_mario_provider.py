@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx.subject import BehaviorSubject, Subject
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import FrameTick
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.provider import MarioRendererProvider
+from heart.utilities.reactive import BehaviorSubject
 
 
 class _StubSpritesheet:
@@ -16,9 +15,11 @@ class _StubSpritesheet:
 
 class _StubAccelerationController:
     def __init__(self) -> None:
-        self._stream: BehaviorSubject[Acceleration | None] = BehaviorSubject(None)
+        self._stream: BehaviorSubject[Acceleration | None] = (
+            BehaviorSubject(None)
+        )
 
-    def observable(self) -> reactivex.Observable[Acceleration | None]:
+    def observable(self) -> reactive.Observable[Acceleration | None]:
         return self._stream
 
     def emit(self, acceleration: Acceleration | None) -> None:
@@ -36,9 +37,9 @@ class _StubAccelerationDebugProfile(_StubAccelerationController):
 
 class _StubFrameTickController:
     def __init__(self) -> None:
-        self._stream: Subject[FrameTick] = Subject()
+        self._stream: reactive.Subject[FrameTick] = reactive.Subject()
 
-    def observable(self) -> reactivex.Observable[FrameTick]:
+    def observable(self) -> reactive.Observable[FrameTick]:
         return self._stream
 
     def emit(self, frame_tick: FrameTick) -> None:

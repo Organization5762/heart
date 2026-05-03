@@ -6,11 +6,10 @@ from enum import StrEnum
 from functools import cached_property
 from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
+import heart.utilities.reactive as reactive
 from heart.utilities.logging import get_logger
 
 
@@ -42,7 +41,7 @@ class InputDescriptor:
     """Describe an input a peripheral or provider expects to consume."""
 
     name: str
-    stream: reactivex.Observable[Any]
+    stream: reactive.Observable[Any]
     payload_type: type[Any] | None = None
     description: str | None = None
 
@@ -132,8 +131,8 @@ class Peripheral(Generic[A]):
 
     _logger = get_logger(__name__)
 
-    def _event_stream(self) -> reactivex.Observable[A]:
-        return reactivex.empty()
+    def _event_stream(self) -> reactive.Observable[A]:
+        return reactive.empty()
 
     def peripheral_info(self) -> PeripheralInfo:
         # Default implementation returns a generic PeripheralInfo instance
@@ -144,7 +143,7 @@ class Peripheral(Generic[A]):
     @cached_property
     def observe(
         self
-    ) -> reactivex.Observable[PeripheralMessageEnvelope[A]]:
+    ) -> reactive.Observable[PeripheralMessageEnvelope[A]]:
         def wrap(a: A) -> PeripheralMessageEnvelope[A]:
             return PeripheralMessageEnvelope[A](
                 data=a,
@@ -152,8 +151,8 @@ class Peripheral(Generic[A]):
             )
 
         return self._event_stream().pipe(
-            ops.map(wrap),
-            ops.share(),
+            reactive.operators.map(wrap),
+            reactive.operators.share(),
         )
 
     @classmethod

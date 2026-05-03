@@ -11,18 +11,16 @@ from functools import partial
 from threading import Lock, Thread, get_ident
 from typing import Any, TypeVar
 
-import manyfold.rx as reactivex
-from manyfold.rx import Observable, Subject, create
-from manyfold.rx import operators as ops
-from manyfold.rx import pipe
-from manyfold.rx.abc import SchedulerBase
-from manyfold.rx.disposable import Disposable
-from manyfold.rx.scheduler import (EventLoopScheduler, NewThreadScheduler,
-                                   ThreadPoolScheduler, TimeoutScheduler)
-from manyfold.rx.typing import StartableTarget
-
+from heart.utilities import reactive
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
+from heart.utilities.reactive import (Disposable, EventLoopScheduler,
+                                      NewThreadScheduler, Observable,
+                                      SchedulerBase, StartableTarget, Subject,
+                                      ThreadPoolScheduler, TimeoutScheduler,
+                                      create)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive import pipe
 
 logger = get_logger(__name__)
 
@@ -173,7 +171,7 @@ def interval_scheduler() -> SchedulerBase:
         _INTERVAL_SCHEDULER,
         constructor=partial(
             EventLoopScheduler,
-            thread_factory=create_default_thread_factory("reactivex-interval"),
+            thread_factory=create_default_thread_factory("reactive-interval"),
         ),
     )
 
@@ -202,7 +200,7 @@ def interval_in_background(
             else interval_scheduler()
         )
     )
-    return reactivex.interval(period=period, scheduler=resolved_scheduler).pipe(
+    return reactive.interval(period=period, scheduler=resolved_scheduler).pipe(
         ops.take_until(shutdown),
     )
 
@@ -365,7 +363,7 @@ def scheduler_diagnostics() -> dict[str, int | None]:
     }
 
 
-def reset_reactivex_threading_state_for_tests() -> None:
+def reset_reactive_threading_state_for_tests() -> None:
     global _FRAME_THREAD_IDENT
     for state in (
         _BACKGROUND_SCHEDULER,
@@ -385,4 +383,4 @@ def reset_reactivex_threading_state_for_tests() -> None:
 
 
 def share_sequence(sequence: Iterable[T]) -> Observable[T]:
-    return reactivex.from_iterable(sequence).pipe(ops.share())
+    return reactive.from_iterable(sequence).pipe(ops.share())

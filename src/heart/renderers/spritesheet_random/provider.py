@@ -1,9 +1,7 @@
 import random
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
@@ -12,7 +10,8 @@ from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
@@ -53,7 +52,7 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SpritesheetLoopRandomState]:
+    ) -> reactive.Observable[SpritesheetLoopRandomState]:
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
@@ -78,7 +77,7 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         )
         initial_state = self.initial_state()
         return pipe_in_background(
-            reactivex.merge(switch_updates, tick_updates),
+            reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

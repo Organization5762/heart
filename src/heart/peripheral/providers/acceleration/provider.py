@@ -1,5 +1,4 @@
-import manyfold.rx as reactivex
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input import AccelerometerController
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
@@ -13,5 +12,5 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
 
     def observable(
         self, *args: object, **kwargs: object
-    ) -> reactivex.Observable[Acceleration]:
+    ) -> reactive.Observable[Acceleration]:
         return self._controller.observable()

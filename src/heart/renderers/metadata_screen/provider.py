@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import Iterable
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
                                                    MetadataScreenState)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
@@ -22,7 +21,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[MetadataScreenState]:
+    ) -> reactive.Observable[MetadataScreenState]:
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

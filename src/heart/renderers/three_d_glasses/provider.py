@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_FRAME_DURATION_MS = 650
 DEFAULT_FRAME_COUNT = 0
@@ -49,7 +48,7 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: ThreeDGlassesState,
-    ) -> reactivex.Observable[ThreeDGlassesState]:
+    ) -> reactive.Observable[ThreeDGlassesState]:
         frame_ticks = pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

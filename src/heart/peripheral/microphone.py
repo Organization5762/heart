@@ -9,19 +9,19 @@ from collections.abc import Iterator
 from types import TracebackType
 from typing import Any, Self, cast
 
-import manyfold.rx as reactivex
 import numpy as np
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx.subject import Subject
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
+from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 
@@ -193,7 +193,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         return self._latest_level
 
-    def _event_stream(self) -> reactivex.Observable[MicrophoneLevel]:
+    def _event_stream(self) -> reactive.Observable[MicrophoneLevel]:
         return self._level_subject
 
     def stop(self) -> None:

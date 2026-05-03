@@ -1,12 +1,11 @@
 import time
 from types import SimpleNamespace
 
-import manyfold.rx as reactivex
 import pytest
-from manyfold.rx.disposable import Disposable
-from manyfold.rx.subject import Subject
 
-from heart.utilities.reactivex.sharing import share_stream
+import heart.utilities.reactive as reactive
+from heart.utilities.reactive import Disposable
+from heart.utilities.reactive_streams import share_stream
 
 
 class TestShareStreamStrategy:
@@ -36,7 +35,7 @@ class TestShareStreamStrategy:
         """Ensure configured replay behaviour matches expectations to preserve late-subscriber correctness."""
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", strategy)
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="test")
 
         received_a: list[int] = []
@@ -80,7 +79,7 @@ class TestShareStreamStrategy:
             observer.on_next(subscribe_count)
             return Disposable()
 
-        source = reactivex.create(_subscribe)
+        source = reactive.create(_subscribe)
         shared = share_stream(source, stream_name="auto_connect")
 
         received_a: list[int] = []
@@ -102,7 +101,7 @@ class TestShareStreamStrategy:
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_buffer")
         monkeypatch.setenv("HEART_RX_STREAM_REPLAY_BUFFER", "2")
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="buffered")
 
         received_a: list[int] = []
@@ -127,7 +126,7 @@ class TestShareStreamStrategy:
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "replay_latest")
         monkeypatch.setenv("HEART_RX_STREAM_REPLAY_WINDOW_MS", "5")
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="windowed")
 
         received_a: list[int] = []
@@ -164,7 +163,7 @@ class TestShareStreamStrategy:
             observer.on_next(subscribe_count)
             return Disposable()
 
-        source = reactivex.create(_subscribe)
+        source = reactive.create(_subscribe)
         shared = share_stream(source, stream_name="min_subscribers")
 
         received_a: list[int] = []
@@ -195,7 +194,7 @@ class TestShareStreamStrategy:
             observer.on_next(subscribe_count)
             return Disposable()
 
-        source = reactivex.create(_subscribe)
+        source = reactive.create(_subscribe)
         shared = share_stream(source, stream_name="grace")
 
         subscription_a = shared.subscribe()
@@ -229,7 +228,7 @@ class TestShareStreamStrategy:
             observer.on_next("ready")
             return Disposable()
 
-        source = reactivex.create(_subscribe)
+        source = reactive.create(_subscribe)
         shared = share_stream(source, stream_name="connect_order")
 
         received: list[str] = []
@@ -253,7 +252,7 @@ class TestShareStreamStrategy:
             subscribe_count += 1
             return Disposable()
 
-        source = reactivex.create(_subscribe)
+        source = reactive.create(_subscribe)
         shared = share_stream(source, stream_name="min_refcount")
 
         subscription_a = shared.subscribe()
@@ -285,7 +284,7 @@ class TestShareStreamFlowControl:
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "20")
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="coalesce")
 
         received: list[int] = []
@@ -307,7 +306,7 @@ class TestShareStreamFlowControl:
     ) -> None:
         """Ensure fallback flush cancels laggy scheduler timers so coalescing windows stay consistent."""
 
-        import heart.utilities.reactivex.coalescing as reactivex_coalescing
+        import heart.utilities.reactive_coalescing as reactive_coalescing
 
         class StubDisposable:
             def __init__(self) -> None:
@@ -326,12 +325,12 @@ class TestShareStreamFlowControl:
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "10")
         monkeypatch.setattr(
-            reactivex_coalescing,
+            reactive_coalescing,
             "_COALESCE_SCHEDULER",
             SimpleNamespace(schedule_relative=_schedule_relative),
         )
 
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="coalesce_stale_scheduler")
 
         received: list[int] = []
@@ -361,7 +360,7 @@ class TestShareStreamFlowControl:
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "50")
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="coalesce_complete")
 
         received: list[int] = []
@@ -378,7 +377,7 @@ class TestShareStreamFlowControl:
     ) -> None:
         """Confirm overdue coalescing windows flush pending values to avoid delayed updates."""
 
-        import heart.utilities.reactivex.coalescing as reactivex_coalescing
+        import heart.utilities.reactive_coalescing as reactive_coalescing
 
         monkeypatch.setenv("HEART_RX_STREAM_SHARE_STRATEGY", "share")
         monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "5")
@@ -387,12 +386,12 @@ class TestShareStreamFlowControl:
             return Disposable()
 
         monkeypatch.setattr(
-            reactivex_coalescing,
+            reactive_coalescing,
             "_COALESCE_SCHEDULER",
             SimpleNamespace(schedule_relative=_schedule_relative),
         )
 
-        source: Subject[int] = Subject()
+        source: reactive.Subject[int] = reactive.Subject()
         shared = share_stream(source, stream_name="coalesce_overdue")
 
         received: list[int] = []

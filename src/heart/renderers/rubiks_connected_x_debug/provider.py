@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -11,7 +9,8 @@ from heart.peripheral.rubiks_connected_x import (
     RubiksConnectedXNotification, RubiksConnectedXPeripheral)
 from heart.renderers.rubiks_connected_x_debug.state import \
     RubiksConnectedXDebugState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_STATUS_LINES = (
     "Rubik's Connected X debug mode",
@@ -28,14 +27,14 @@ class RubiksConnectedXDebugStateProvider(
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[RubiksConnectedXDebugState]:
+    ) -> reactive.Observable[RubiksConnectedXDebugState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, RubiksConnectedXPeripheral)
         ]
         if not cube_peripherals:
-            return reactivex.just(
+            return reactive.just(
                 RubiksConnectedXDebugState(status_lines=DEFAULT_STATUS_LINES)
             )
 
@@ -50,7 +49,7 @@ class RubiksConnectedXDebugStateProvider(
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
         merged = pipe_in_background(
-            reactivex.merge(*observables),
+            reactive.merge(*observables),
             ops.map(
                 PeripheralMessageEnvelope[
                     RubiksConnectedXNotification

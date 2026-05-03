@@ -4,15 +4,15 @@ import math
 import time
 from dataclasses import replace
 
-import manyfold.rx as reactivex
 import numpy as np
-from manyfold.rx import operators as ops
 from numba import njit
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 def compute_bounding_box(points: np.ndarray) -> BoundingBox:
@@ -291,7 +291,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: HilbertCurveState,
-    ) -> reactivex.Observable[HilbertCurveState]:
+    ) -> reactive.Observable[HilbertCurveState]:
         return pipe_in_background(
             peripheral_manager.frame_tick_controller.observable(),
             ops.map(lambda _: time.monotonic()),

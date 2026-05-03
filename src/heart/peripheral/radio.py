@@ -9,18 +9,18 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
-import manyfold.rx as reactivex
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx.subject import Subject
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Input, Peripheral
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
+from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 
@@ -568,7 +568,7 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             start_immediately=start_immediately,
         )
 
-    def _event_stream(self) -> reactivex.Observable[RadioPacket]:
+    def _event_stream(self) -> reactive.Observable[RadioPacket]:
         return self._packet_subject
 
     @property

@@ -28,18 +28,20 @@ implementation swap will still force broad renderer and peripheral churn.
 
 Files involved:
 
-- `src/heart/utilities/reactivex_threads.py`
-- `src/heart/utilities/reactivex/coalescing.py`
-- `src/heart/utilities/reactivex/instrumentation.py`
-- `src/heart/utilities/reactivex/sharing.py`
-- `src/heart/utilities/reactivex/types.py`
+- `src/heart/utilities/reactive.py`
+- `src/heart/utilities/reactive_threads.py`
+- `src/heart/utilities/reactive_coalescing.py`
+- `src/heart/utilities/reactive_instrumentation.py`
+- `src/heart/utilities/reactive_streams.py`
+- `src/heart/utilities/reactive_stream_settings.py`
+- `src/heart/utilities/reactive_stream_types.py`
+- `src/heart/utilities/reactive_testing.py`
 
 Why this comes first:
 
-These files are the lowest-level shared imports. They currently own scheduling,
-sharing, coalescing, and type aliases, but they still import directly from
-`manyfold.rx`. A facade gives the rest of the tree a Heart-owned import target
-before any behavioral changes happen.
+These files are the lowest-level shared imports. They own scheduling, sharing,
+coalescing, and type aliases. A Heart-owned API gives the rest of the tree a
+stable import target before any behavioral changes happen.
 
 Work required:
 
@@ -48,7 +50,10 @@ Work required:
   `BehaviorSubject`, `Disposable`, `CompositeDisposable`, scheduler types,
   `create`, `empty`, `from_iterable`, `interval`, `just`, `merge`,
   `combine_latest`, `pipe`, and `operators`.
-- Move type protocols in `reactivex/types.py` to refer to Heart-owned aliases.
+- Move type protocols in `reactive_stream_types.py` to refer to Heart-owned
+  aliases.
+- Remove the old `heart.utilities.reactivex` import path instead of preserving a
+  compatibility shim.
 - Keep behavior identical at first. This should be a mechanical import migration.
 
 Acceptance criteria:
@@ -216,8 +221,8 @@ Files involved:
 - `tests/renderers/test_mario_provider.py`
 - `tests/renderers/test_yolisten_renderer.py`
 - `tests/runtime/test_peripheral_runtime.py`
-- `tests/utilities/test_reactivex_streams.py`
-- `tests/utilities/test_reactivex_threads.py`
+- `tests/utilities/test_reactive_streams.py`
+- `tests/utilities/test_reactive_threads.py`
 
 Why this matters:
 

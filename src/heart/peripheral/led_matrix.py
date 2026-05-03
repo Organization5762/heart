@@ -7,14 +7,14 @@ import threading
 from datetime import datetime
 from typing import Any, Mapping
 
-import manyfold.rx as reactivex
-from manyfold.rx.subject import Subject
 from PIL import Image
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral
 from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
+from heart.utilities.reactive import Subject
 
 _LOGGER = get_logger(__name__)
 
@@ -60,7 +60,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         with self._frame_lock:
             return self._latest_frame
 
-    def _event_stream(self) -> reactivex.Observable[DisplayFrame]:
+    def _event_stream(self) -> reactive.Observable[DisplayFrame]:
         return self._frame_subject
 
     def publish_image(

@@ -9,13 +9,12 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Deque, Mapping, Self
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (interval_in_background,
-                                               pipe_in_background)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (interval_in_background,
+                                              pipe_in_background)
 
 logger = get_logger(__name__)
 
@@ -73,7 +72,7 @@ class Compass(Peripheral[Vector3 | None]):
 
     def _event_stream(
         self
-    ) -> reactivex.Observable[Vector3 | None]:
+    ) -> reactive.Observable[Vector3 | None]:
         return pipe_in_background(
             interval_in_background(timedelta(milliseconds=10)),
 

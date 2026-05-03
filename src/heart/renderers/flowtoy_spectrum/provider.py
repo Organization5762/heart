@@ -3,9 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -13,7 +11,8 @@ from heart.peripheral.flowtoy import FlowToyPeripheral
 from heart.peripheral.input_payloads import FlowToyPacket
 from heart.renderers.flowtoy_spectrum.state import (FlowToySpectrumState,
                                                     FlowToySpectrumStop)
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 DEFAULT_FLOWTOY_RENDER_PERIOD_SECONDS = 3.0
 DEFAULT_UNKNOWN_COLOR_SPECTRUM = (
@@ -37,7 +36,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[FlowToySpectrumState]:
+    ) -> reactive.Observable[FlowToySpectrumState]:
         initial_state = self.initial_state()
         packet_updates = pipe_in_background(
             self._flowtoy_packet_stream(peripheral_manager),
@@ -48,7 +47,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
             ops.map(lambda frame_tick: lambda state: self._advance(state, frame_tick.delta_s)),
         )
         return pipe_in_background(
-            reactivex.merge(packet_updates, tick_updates),
+            reactive.merge(packet_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),
@@ -57,16 +56,16 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
     def _flowtoy_packet_stream(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[FlowToyPacket]:
+    ) -> reactive.Observable[FlowToyPacket]:
         observables = [
             peripheral.observe
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, FlowToyPeripheral)
         ]
         if not observables:
-            return reactivex.empty()
+            return reactive.empty()
         return pipe_in_background(
-            reactivex.merge(*observables),
+            reactive.merge(*observables),
             ops.map(PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral),
         )
 

@@ -3,7 +3,6 @@ import math
 import time
 from dataclasses import dataclass
 
-import manyfold.rx as reactivex
 import numpy as np
 import pygame
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
@@ -22,6 +21,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
                        glVertex2f, glVertexAttribPointer, glViewport)
 from pygame.math import lerp
 
+import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
 from heart.display.shaders.shader import Shader
@@ -36,7 +36,7 @@ from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import shutdown
+from heart.utilities.reactive_threads import shutdown
 
 logger = get_logger(__name__)
 DEFAULT_DEBUG_WIDTH = 800
@@ -997,7 +997,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FractalSceneState]:
+    ) -> reactive.Observable[FractalSceneState]:
         if self._initial_state is None:
             raise ValueError("FractalScene requires an initial state")
         return self.provider.observable(initial_state=self._initial_state)

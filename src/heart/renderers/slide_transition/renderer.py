@@ -1,10 +1,10 @@
 import logging
 import time
 
-import manyfold.rx as reactivex
 import numpy as np
 import pygame
 
+import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
@@ -47,7 +47,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SlideTransitionState]:
+    ) -> reactive.Observable[SlideTransitionState]:
         if self._initial_state is None:
             raise ValueError("SlideTransitionRenderer requires an initial state")
         return self.provider.observable(

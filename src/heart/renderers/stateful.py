@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import Generic
 
-from manyfold.rx import Observable
-from manyfold.rx.disposable import Disposable
-
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.reactive import Disposable, Observable
 
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
 import numpy as np
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.channel_diffusion.state import ChannelDiffusionState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
@@ -21,7 +21,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: ChannelDiffusionState,
-    ) -> reactivex.Observable[ChannelDiffusionState]:
+    ) -> reactive.Observable[ChannelDiffusionState]:
         initial_size = (initial_state.grid.shape[1], initial_state.grid.shape[0])
         window_sizes = pipe_in_background(
             peripheral_manager.window,
@@ -37,7 +37,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
 
         def build_stream(
             size: tuple[int, int],
-        ) -> reactivex.Observable[ChannelDiffusionState]:
+        ) -> reactive.Observable[ChannelDiffusionState]:
             seeded_state = self.initial_state(width=size[0], height=size[1])
             return pipe_in_background(
                 ticks,

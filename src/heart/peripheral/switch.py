@@ -5,20 +5,16 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Callable, Iterable, Iterator, Mapping, Self
 
-import manyfold.rx as reactivex
 import serial
 from bleak.backends.device import BLEDevice
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, TypedRoute, Variant, route)
-from manyfold.rx import create
-from manyfold.rx import operators as ops
-from manyfold.rx.abc import ObserverBase, SchedulerBase
-from manyfold.rx.disposable import Disposable
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
@@ -26,9 +22,12 @@ from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (blocking_io_scheduler,
-                                               interval_in_background,
-                                               pipe_in_background)
+from heart.utilities.reactive import (Disposable, ObserverBase, SchedulerBase,
+                                      create)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (blocking_io_scheduler,
+                                              interval_in_background,
+                                              pipe_in_background)
 
 logger = get_logger(__name__)
 SERIAL_RECONNECT_DELAY_SECONDS = 0.1
@@ -120,7 +119,7 @@ class BaseSwitch(Peripheral[SwitchState]):
 
     def _event_stream(
         self
-    ) -> reactivex.Observable[SwitchState]:
+    ) -> reactive.Observable[SwitchState]:
         return pipe_in_background(
             interval_in_background(period=timedelta(milliseconds=10)),
             ops.map(lambda _: self._snapshot()),
@@ -236,7 +235,7 @@ class FakeSwitch(BaseSwitch):
         super().__init__(*args, **kwargs)
         self._navigation_subscription = None
 
-    def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+    def _key_press_stream(self, key: int) -> reactive.Observable[KeyboardEvent]:
         def _unwrap(envelope: PeripheralMessageEnvelope[KeyboardEvent]) -> KeyboardEvent:
             return envelope.data
 
@@ -305,9 +304,9 @@ class FakeSwitch(BaseSwitch):
 
     def _event_stream(
         self
-    ) -> reactivex.Observable[SwitchState]:
+    ) -> reactive.Observable[SwitchState]:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return reactivex.empty()
+            return reactive.empty()
         else:
             result = pipe_in_background(
                 interval_in_background(period=timedelta(milliseconds=10)),

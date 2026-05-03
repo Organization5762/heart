@@ -2,16 +2,15 @@ import random
 import time
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 logger = get_logger(__name__)
 
@@ -91,7 +90,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[YoListenState]:
+    ) -> reactive.Observable[YoListenState]:
         initial_state = self.initial_state()
 
         switch_updates = pipe_in_background(
@@ -132,7 +131,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         )
 
         return pipe_in_background(
-            reactivex.merge(switch_updates, tick_updates),
+            reactive.merge(switch_updates, tick_updates),
             ops.scan(lambda state, update: update(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

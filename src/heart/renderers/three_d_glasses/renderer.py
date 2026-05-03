@@ -9,10 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-import manyfold.rx as reactivex
 import numpy as np
 import pygame
 
+import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -191,7 +191,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[ThreeDGlassesState]:
+    ) -> reactive.Observable[ThreeDGlassesState]:
         if self._initial_state is None:
             raise ValueError("ThreeDGlassesRenderer requires an initial state")
         return self.provider.observable(

@@ -3,16 +3,15 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-from manyfold.rx.subject import BehaviorSubject
-
+import heart.utilities.reactive as reactive
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import BehaviorSubject
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
@@ -36,7 +35,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[RandomPixelState]:
+    ) -> reactive.Observable[RandomPixelState]:
         initial_color = self._color.value or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()
@@ -52,7 +51,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         )
 
         return pipe_in_background(
-            reactivex.merge(color_updates, tick_updates),
+            reactive.merge(color_updates, tick_updates),
             ops.scan(self._advance_state, seed=initial_state),
             ops.share(),
         )

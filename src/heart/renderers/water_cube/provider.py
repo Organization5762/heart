@@ -1,7 +1,5 @@
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.device import Device
 from heart.peripheral.core.input import (AccelerometerController,
                                          AccelerometerDebugProfile)
@@ -9,7 +7,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
@@ -25,7 +24,7 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[WaterCubeState]:
+    ) -> reactive.Observable[WaterCubeState]:
         if self._accelerometer_debug_profile.should_use_debug_input():
             accel = self._accelerometer_debug_profile.observable()
         else:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
 import pygame
 
+import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -32,7 +32,7 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[HilbertCurveState]:
+    ) -> reactive.Observable[HilbertCurveState]:
         if self._initial_state is None:
             raise ValueError("HilbertScene requires an initial state")
         return self.provider.observable(

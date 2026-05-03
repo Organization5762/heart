@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pygame
-from manyfold.rx.subject import BehaviorSubject
 
 from heart.device import Device, Rectangle
 from heart.peripheral.core.input import FrameTick
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.renderer import YoListenRenderer
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.reactive import BehaviorSubject
 
 
 class _StubPeripheralManager:

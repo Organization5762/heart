@@ -6,10 +6,9 @@ from datetime import timedelta
 from functools import cache, cached_property
 from typing import Any, cast
 
-import manyfold.rx as reactivex
 import pygame
-from manyfold.rx import operators as ops
 
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
@@ -17,10 +16,11 @@ from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyState)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (input_scheduler,
-                                               interval_in_background,
-                                               pipe_in_background,
-                                               pipe_in_main_thread)
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import (input_scheduler,
+                                              interval_in_background,
+                                              pipe_in_background,
+                                              pipe_in_main_thread)
 
 KEYBOARD_POLL_INTERVAL_MS = 5
 KEYBOARD_RELEASE_DEBOUNCE_MS = 60.0
@@ -50,9 +50,9 @@ class KeyboardController:
         self._debug_tap = debug_tap
 
     @cached_property
-    def _snapshot_stream(self) -> reactivex.Observable[KeyboardSnapshot]:
+    def _snapshot_stream(self) -> reactive.Observable[KeyboardSnapshot]:
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return cast(reactivex.Observable[KeyboardSnapshot], reactivex.empty())
+            return cast(reactive.Observable[KeyboardSnapshot], reactive.empty())
 
         def _sample(_: int) -> KeyboardSnapshot:
             try:
@@ -87,11 +87,11 @@ class KeyboardController:
             source_id="keyboard",
         )
 
-    def snapshot_stream(self) -> reactivex.Observable[KeyboardSnapshot]:
+    def snapshot_stream(self) -> reactive.Observable[KeyboardSnapshot]:
         return self._snapshot_stream
 
     @cache
-    def key_events(self, key: int) -> reactivex.Observable[KeyboardEvent]:
+    def key_events(self, key: int) -> reactive.Observable[KeyboardEvent]:
         def _advance(
             tracker: _KeyboardTracker,
             snapshot: KeyboardSnapshot,
@@ -169,7 +169,7 @@ class KeyboardController:
         )
 
     @cache
-    def key_pressed(self, key: int) -> reactivex.Observable[KeyPressedEvent]:
+    def key_pressed(self, key: int) -> reactive.Observable[KeyPressedEvent]:
         return self._key_view(
             key,
             event_type=KeyPressedEvent,
@@ -177,7 +177,7 @@ class KeyboardController:
         )
 
     @cache
-    def key_released(self, key: int) -> reactivex.Observable[KeyReleasedEvent]:
+    def key_released(self, key: int) -> reactive.Observable[KeyReleasedEvent]:
         return self._key_view(
             key,
             event_type=KeyReleasedEvent,
@@ -185,7 +185,7 @@ class KeyboardController:
         )
 
     @cache
-    def key_held(self, key: int) -> reactivex.Observable[KeyHeldEvent]:
+    def key_held(self, key: int) -> reactive.Observable[KeyHeldEvent]:
         return self._key_view(
             key,
             event_type=KeyHeldEvent,
@@ -193,7 +193,7 @@ class KeyboardController:
         )
 
     @cache
-    def key_state(self, key: int) -> reactivex.Observable[KeyState]:
+    def key_state(self, key: int) -> reactive.Observable[KeyState]:
         stream = pipe_in_background(
             self.key_events(key),
             ops.map(lambda event: event.state),
@@ -216,7 +216,7 @@ class KeyboardController:
         *,
         event_type: type[KeyPressedEvent] | type[KeyReleasedEvent] | type[KeyHeldEvent],
         suffix: str,
-    ) -> reactivex.Observable[KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent]:
+    ) -> reactive.Observable[KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent]:
         key_name = pygame.key.name(key)
         stream = pipe_in_background(
             self.key_events(key),

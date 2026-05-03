@@ -14,7 +14,7 @@ from heart.runtime.container import (build_runtime_container,
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import shutdown
+from heart.utilities.reactive_threads import shutdown
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer

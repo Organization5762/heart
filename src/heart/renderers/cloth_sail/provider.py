@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-from manyfold.rx import operators as ops
-
+import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.cloth_sail.state import ClothSailState
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.utilities.reactive import operators as ops
+from heart.utilities.reactive_threads import pipe_in_background
 
 
 class ClothSailStateProvider(ObservableProvider[ClothSailState]):
@@ -15,7 +14,7 @@ class ClothSailStateProvider(ObservableProvider[ClothSailState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactivex.Observable[ClothSailState]:
+    ) -> reactive.Observable[ClothSailState]:
         frame_ticks = pipe_in_background(
             self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),

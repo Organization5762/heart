@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import manyfold.rx as reactivex
-
+import heart.utilities.reactive as reactive
 from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -27,5 +26,5 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
 
     def observable(
         self, *, initial_state: FractalSceneState
-    ) -> reactivex.Observable[FractalSceneState]:
-        return reactivex.just(initial_state)
+    ) -> reactive.Observable[FractalSceneState]:
+        return reactive.just(initial_state)
