@@ -22,7 +22,11 @@ def discover_registry(
     for entry in configurations_dir.iterdir():
         if not entry.is_file():
             continue
-        if entry.suffix != ".py" or entry.name == "__init__.py":
+        if (
+            entry.suffix != ".py"
+            or entry.name == "__init__.py"
+            or entry.name.startswith("._")
+        ):
             continue
         module_name = f"{module_root}.{entry.stem}"
         module = import_module(module_name)

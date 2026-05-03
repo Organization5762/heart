@@ -95,7 +95,7 @@ class LifeStateProvider:
                 ops.map(op_from_injected),
             ),
             pipe_in_background(
-                self._pm.game_tick,
+                self._pm.frame_tick_controller.observable(),
 
                 ops.map(op_from_tick),
             )

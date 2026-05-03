@@ -1,11 +1,9 @@
 import pygame
 import pygame.ftfont
-import reactivex
 
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.display.color import Color
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.text.provider import TextRenderingProvider
 from heart.renderers.text.state import TextRenderingState
@@ -37,11 +35,6 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             y_location=y_location,
         )
         super().__init__(builder=self._provider)
-
-    def state_observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[TextRenderingState]:
-        return self._provider.observable(peripheral_manager)
 
     @classmethod
     def default(cls, text: str) -> "TextRendering":

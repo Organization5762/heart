@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import reactivex
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet.provider import SpritesheetProvider
 from heart.renderers.spritesheet.state import (FrameDescription,
@@ -83,12 +80,6 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         )
         return cls(provider)
 
-    def state_observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[SpritesheetLoopState]:
-        return self.provider.observable(peripheral_manager=peripheral_manager)
-
     def real_process(
         self,
         window: DisplayContext,
@@ -116,12 +107,3 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         final_y = center_y + self.provider.offset_y
 
         window.blit(scaled, (final_x, final_y))
-
-
-def create_spritesheet_loop(
-    peripheral_manager: PeripheralManager, *args: object, **kwargs: object
-) -> SpritesheetLoop:
-    provider = SpritesheetProvider(*args, **kwargs)
-    renderer = SpritesheetLoop(provider)
-    renderer.configure_peripherals(peripheral_manager)
-    return renderer

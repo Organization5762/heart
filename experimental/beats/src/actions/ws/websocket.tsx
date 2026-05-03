@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -14,15 +15,22 @@ export const stream = new Subject<StreamEvent>();
 type WSContextValue = {
   socket: WebSocket | null;
   readyState: WebSocket["readyState"];
+  sendNavigationControl: (
+    command: "browse" | "activate" | "alternate_activate",
+    browseStep?: number,
+  ) => boolean;
+  sendSensorControl: (sensorKey: string, sensorValue: number | null) => boolean;
 };
 
 const WSContext = createContext<WSContextValue>({
   socket: null,
   readyState: WebSocket.CLOSED,
+  sendNavigationControl: () => false,
+  sendSensorControl: () => false,
 });
 
 interface WSProviderProps {
-  url: string;
+  url: string | null;
   children: React.ReactNode;
   retryDelay?: number;
   maxRetryDelay?: number;
@@ -42,10 +50,12 @@ export function WSProvider({
   const retryRef = useRef(retryDelay);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isMountedRef = useRef(true);
+  const socketRef = useRef<WebSocket | null>(null);
+  const attemptRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
-    retryRef.current = retryDelay; // reset on URL / config change
+    retryRef.current = retryDelay;
 
     const cleanupSocket = (ws: WebSocket | null) => {
       if (!ws) return;
@@ -60,36 +70,55 @@ export function WSProvider({
       }
     };
 
+    const clearReconnectTimer = () => {
+      if (reconnectTimeoutRef.current !== null) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
+
     const scheduleReconnect = () => {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || reconnectTimeoutRef.current !== null) return;
 
       const delay = retryRef.current;
       const nextDelay = Math.min(delay * 2, maxRetryDelay);
       retryRef.current = nextDelay;
 
       reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
         connect();
       }, delay);
     };
 
     const connect = () => {
-      // Make sure we don't keep an old socket alive
-      setSocket((prev) => {
-        cleanupSocket(prev);
-        return prev;
-      });
+      clearReconnectTimer();
+      attemptRef.current += 1;
+      const attempt = attemptRef.current;
+
+      cleanupSocket(socketRef.current);
+
+      if (!url) {
+        socketRef.current = null;
+        setSocket(null);
+        setReadyState(WebSocket.CLOSED);
+        return;
+      }
 
       const ws = new WebSocket(url);
       ws.binaryType = "arraybuffer";
+      socketRef.current = ws;
       setSocket(ws);
       setReadyState(ws.readyState);
 
       ws.onopen = () => {
-        retryRef.current = retryDelay; // reset backoff on successful connect
+        if (socketRef.current !== ws || attemptRef.current !== attempt) return;
+        clearReconnectTimer();
+        retryRef.current = retryDelay;
         setReadyState(ws.readyState);
       };
 
       ws.onmessage = (ev: MessageEvent) => {
+        if (socketRef.current !== ws || attemptRef.current !== attempt) return;
         if (!(ev.data instanceof ArrayBuffer)) {
           return;
         }
@@ -99,14 +128,12 @@ export function WSProvider({
             stream.next(decoded);
           }
         } catch (err) {
-          stream.error(err);
           console.error("WebSocket message parse error:", err, ev.data);
         }
       };
 
       ws.onerror = () => {
-        console.log("error");
-        // error generally followed by close, but make sure we close + reconnect
+        if (socketRef.current !== ws || attemptRef.current !== attempt) return;
         setReadyState(ws.readyState);
         try {
           ws.close();
@@ -116,7 +143,9 @@ export function WSProvider({
       };
 
       ws.onclose = () => {
-        console.log("close");
+        if (socketRef.current !== ws || attemptRef.current !== attempt) return;
+        socketRef.current = null;
+        setSocket((current) => (current === ws ? null : current));
         setReadyState(ws.readyState);
         scheduleReconnect();
       };
@@ -126,19 +155,57 @@ export function WSProvider({
 
     return () => {
       isMountedRef.current = false;
-      if (reconnectTimeoutRef.current !== null) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      setSocket((prev) => {
-        cleanupSocket(prev);
-        return null;
-      });
+      clearReconnectTimer();
+      cleanupSocket(socketRef.current);
+      socketRef.current = null;
+      setSocket(null);
       setReadyState(WebSocket.CLOSED);
     };
   }, [url, retryDelay, maxRetryDelay]);
 
+  const sendNavigationControl = useCallback<
+    WSContextValue["sendNavigationControl"]
+  >((command, browseStep = 0) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    ws.send(
+      JSON.stringify({
+        kind: "control",
+        command,
+        browse_step: browseStep,
+      }),
+    );
+    return true;
+  }, []);
+
+  const sendSensorControl = useCallback<WSContextValue["sendSensorControl"]>(
+    (sensorKey, sensorValue) => {
+      const ws = socketRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+
+      ws.send(
+        JSON.stringify({
+          kind: "control",
+          command: "sensor_update",
+          sensor_key: sensorKey,
+          sensor_value: sensorValue,
+          clear: sensorValue === null,
+        }),
+      );
+      return true;
+    },
+    [],
+  );
+
   return (
-    <WSContext.Provider value={{ socket, readyState }}>
+    <WSContext.Provider
+      value={{ socket, readyState, sendNavigationControl, sendSensorControl }}
+    >
       {children}
     </WSContext.Provider>
   );

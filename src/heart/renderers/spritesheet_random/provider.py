@@ -54,9 +54,8 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[SpritesheetLoopRandomState]:
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
         switches = peripheral_manager.get_main_switch_subscription()
@@ -69,12 +68,11 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             )
         )
         tick_updates = pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.with_latest_from(clocks),
+            frame_ticks,
             ops.map(
                 lambda latest: lambda state: self.next_state(
                     state=state,
-                    elapsed_ms=latest[1].get_time(),
+                    elapsed_ms=latest.delta_ms,
                 )
             ),
         )

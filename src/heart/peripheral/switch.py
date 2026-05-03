@@ -3,9 +3,9 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from threading import Thread
 from typing import Any, Iterator, Mapping, NoReturn, Self
 
-import pygame
 import reactivex
 import serial
 from bleak.backends.device import BLEDevice
@@ -17,11 +17,12 @@ from reactivex.disposable import Disposable
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralInfo,
                                    PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.keyboard import (KeyboardAction, KeyboardEvent,
-                                       KeyboardKey)
+from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
+                                       KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (interval_in_background,
+from heart.utilities.reactivex_threads import (blocking_io_scheduler,
+                                               interval_in_background,
                                                pipe_in_background)
 
 logger = get_logger(__name__)
@@ -30,6 +31,7 @@ BLUETOOTH_EVENT_POLL_DELAY_SECONDS = 0.1
 BLUETOOTH_RETRY_DELAY_SECONDS = 5
 BLUETOOTH_SLOW_RETRY_DELAY_SECONDS = 30
 BLUETOOTH_MAX_RETRY_ATTEMPTS = 5
+BLUETOOTH_SWITCH_THREAD_NAME = "peripheral-bluetooth-switch"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,19 +82,19 @@ class BaseSwitch(Peripheral[SwitchState]):
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._navigation_subscription = None
 
     def _key_press_stream(self, key: int) -> reactivex.Observable[KeyboardEvent]:
         def _unwrap(envelope: PeripheralMessageEnvelope[KeyboardEvent]) -> KeyboardEvent:
             return envelope.data
 
         def _is_pressed(event: KeyboardEvent) -> bool:
-            return event.action is KeyboardAction.PRESSED
+            return isinstance(event, KeyPressedEvent)
 
         result = pipe_in_background(
             KeyboardKey.get(key).observe,
             ops.map(_unwrap),
             ops.filter(_is_pressed),
-            ops.share(),
         )
         return result
 
@@ -118,27 +120,36 @@ class FakeSwitch(BaseSwitch):
         )
 
     def run(self) -> None:
-        if not (Configuration.is_pi() and not Configuration.is_x11_forward()):
-            def handle_key_up(_: Any) -> None:
-                self.button_long_press_value += 1
-                self.rotation_value_at_last_long_button_press = self.rotational_value
+        if (
+            Configuration.use_mock_switch()
+            or not (Configuration.is_pi() and not Configuration.is_x11_forward())
+        ):
+            from heart.runtime.game_loop import GameLoop
 
-            def handle_key_down(_: Any) -> None:
-                self.button_value += 1
-                self.rotation_value_at_last_button_press = self.rotational_value
+            loop = GameLoop.get_game_loop()
+            if loop is None:
+                logger.warning("FakeSwitch requires an active GameLoop for navigation input")
+                return
 
-            def handle_key_left(_: Any) -> None:
-                self.rotational_value -= 1
-
-            def handle_key_right(_: Any) -> None:
-                self.rotational_value += 1
-
-            self._key_press_stream(pygame.K_UP).subscribe(on_next=handle_key_up)
-            self._key_press_stream(pygame.K_DOWN).subscribe(on_next=handle_key_down)
-            self._key_press_stream(pygame.K_LEFT).subscribe(on_next=handle_key_left)
-            self._key_press_stream(pygame.K_RIGHT).subscribe(on_next=handle_key_right)
+            navigation = loop.peripheral_manager.navigation_profile
+            self._navigation_subscription = navigation.subscribe_events(
+                on_browse_delta=self._handle_browse,
+                on_activate=self._handle_activate,
+                on_alternate_activate=self._handle_alternate_activate,
+            )
         else:
             logger.warning("Not running FakeSwitch")
+
+    def _handle_alternate_activate(self, _: Any) -> None:
+        self.button_long_press_value += 1
+        self.rotation_value_at_last_long_button_press = self.rotational_value
+
+    def _handle_activate(self, _: Any) -> None:
+        self.button_value += 1
+        self.rotation_value_at_last_button_press = self.rotational_value
+
+    def _handle_browse(self, delta: int) -> None:
+        self.rotational_value += delta
 
     def _event_stream(
         self
@@ -150,7 +161,6 @@ class FakeSwitch(BaseSwitch):
                 interval_in_background(period=timedelta(milliseconds=10)),
                 ops.map(lambda _: self._snapshot()),
                 ops.distinct_until_changed(lambda x: x),
-                ops.share(),
             )
             return result
 
@@ -158,6 +168,7 @@ class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:
         self.port = port
         self.baudrate = baudrate
+        self._subscription = None
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -195,8 +206,10 @@ class Switch(BaseSwitch):
         return Disposable()
 
     def run(self) -> None:
-        source = create(self._read_from_switch)
-        source.subscribe(
+        source = create(self._read_from_switch).pipe(
+            ops.subscribe_on(blocking_io_scheduler()),
+        )
+        self._subscription = source.subscribe(
             on_next=self.update_due_to_data,
         )
 
@@ -269,7 +282,14 @@ class BluetoothSwitch(BaseSwitch):
     def _connect_to_ser(self) -> None:
         self.listener.start()
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
+        Thread(
+            name=BLUETOOTH_SWITCH_THREAD_NAME,
+            target=self._run_listener_loop,
+            daemon=True,
+        ).start()
+
+    def _run_listener_loop(self) -> NoReturn:
         slow_poll = False
         number_of_retries_without_success = 0
         # If it crashes, try to re-connect

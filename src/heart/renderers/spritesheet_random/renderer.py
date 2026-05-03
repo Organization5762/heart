@@ -1,8 +1,5 @@
-import reactivex
-
 from heart import DeviceDisplayMode
 from heart.device import Orientation
-from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet_random.provider import \
@@ -58,9 +55,3 @@ class SpritesheetLoopRandom(StatefulBaseRenderer[SpritesheetLoopRandomState]):
             current_kf.frame, (self.screen_width, self.screen_height)
         )
         window.blit(scaled, (state.current_screen * self.screen_width, 0))
-
-    def state_observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactivex.Observable[SpritesheetLoopRandomState]:
-        return self.provider.observable(peripheral_manager=peripheral_manager)

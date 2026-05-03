@@ -13,10 +13,8 @@ from numba import jit, prange
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.gamepad import GamepadIdentifier
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.mandelbrot.control_mappings import (KeyboardControls,
-                                                         SceneControlsMapping)
+from heart.renderers.mandelbrot.control_mappings import KeyboardControls
 from heart.renderers.mandelbrot.controls import SceneControls
 from heart.renderers.mandelbrot.state import AppState, ViewMode
 from heart.runtime.display_context import DisplayContext
@@ -60,13 +58,12 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         )
         # input properties
         self.time_initialized = None
-        # self.gamepad = None
         self.scene_controls: SceneControls | None = None
-        self.control_mappings: dict[GamepadIdentifier, SceneControlsMapping] | None = (
-            None
-        )
         self.keyboard_controls: KeyboardControls | None = None
         self.input_error: bool = False
+        self._split_view_surfaces: dict[
+            tuple[int, int], tuple[pygame.Surface, pygame.Surface]
+        ] = {}
         self.mandelbrot_interior_strategy = (
             Configuration.mandelbrot_interior_strategy()
         )
@@ -112,17 +109,11 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             mode="auto",
         )
         self.set_state(state)
-        # self.gamepad = peripheral_manager.get_gamepad()
         self.scene_controls = SceneControls(state)
-        self.keyboard_controls = KeyboardControls(self.scene_controls)
-        # self.control_mappings = {
-        #     GamepadIdentifier.BIT_DO_LITE_2: BitDoLite2Controls(
-        #         self.scene_controls, self.gamepad
-        #     ),
-        #     GamepadIdentifier.SWITCH_PRO: SwitchProControls(
-        #         self.scene_controls, self.gamepad
-        #     ),
-        # }
+        self.keyboard_controls = KeyboardControls(
+            self.scene_controls,
+            peripheral_manager.mandelbrot_control_profile,
+        )
 
         if isinstance(orientation, Cube):
             # warmup compilation of the jitted functions
@@ -141,6 +132,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
     def reset(self):
         self.initialized = False
+        self._split_view_surfaces.clear()
         # if self.state is not None:
         #     self.state.reset()
         #     self.state.set_mode_auto()
@@ -150,11 +142,27 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         if time.monotonic() - self.time_initialized < 0.5:
             return False
 
+        assert self.keyboard_controls is not None
         self.keyboard_controls.update()
         # if connected := self.gamepad.is_connected():
         #     mapping = self.control_mappings.get(self.gamepad.gamepad_identifier)
         #     mapping.update()
-        return False
+        return True
+
+    def _get_split_view_surfaces(self) -> tuple[pygame.Surface, pygame.Surface]:
+        assert self.width is not None
+        assert self.height is not None
+        size = (self.width // 2, self.height)
+        surfaces = self._split_view_surfaces.get(size)
+        if surfaces is None:
+            surfaces = (
+                pygame.Surface(size),
+                pygame.Surface(size),
+            )
+            self._split_view_surfaces[size] = surfaces
+        for surface in surfaces:
+            surface.fill((0, 0, 0))
+        return surfaces
 
     def real_process(
         self,
@@ -195,8 +203,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         ):
             match self.state.orientation:
                 case Rectangle():
-                    mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
-                    julia_surface = pygame.Surface((self.width // 2, self.height))
+                    mandelbrot_surface, julia_surface = self._get_split_view_surfaces()
                     self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
                     # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))
@@ -675,8 +682,6 @@ def main() -> None:
 
     from heart.device.local import LocalScreen
     from heart.runtime.container import build_runtime_container
-    from heart.runtime.rendering.pipeline import RendererVariant
-    from heart.utilities.env import Configuration
 
     profiling = os.environ.get("PROFILING", "False").lower() == "true"
     check_frames = int(os.environ.get("CHECK_FRAMES", "100"))
@@ -702,13 +707,9 @@ def main() -> None:
 
     frame_count = 0
 
-    render_variant = RendererVariant.parse(Configuration.render_variant())
     orientation = Rectangle.with_layout(1, 1)
     device = LocalScreen(width=width, height=height, orientation=orientation)
-    container = build_runtime_container(
-        device=device,
-        render_variant=render_variant,
-    )
+    container = build_runtime_container(device=device)
     manager = container.resolve(PeripheralManager)
     manager.detect()
     manager.start()
@@ -723,7 +724,7 @@ def main() -> None:
             screen.fill((0, 0, 0))
 
             # Process and render
-            mandelbrot._internal_process(screen, clock, manager, orientation)
+            mandelbrot._internal_process(screen, manager, orientation)
 
             # Update the display
             pygame.display.flip()

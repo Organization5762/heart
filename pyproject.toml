@@ -80,7 +80,7 @@ heart-firmware-io = { path = "./packages/heart-firmware-io" }
 heart-rgb-matrix-driver = { path = "./rust/heart_rgb_matrix_driver" }
 
 [tool.setuptools.package-data]
-heart = ["*.png"]
+heart = ["*.png", "**/*.png"]
 
 [project.scripts]
 totem = "heart.loop:main"

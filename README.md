@@ -23,9 +23,17 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```
 3. Launch the default playlist:
    ```bash
-   uv run totem run --configuration lib_2025
+   make run
    ```
-4. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
+4. Launch the default playlist with the Beats UI attached:
+   ```bash
+   uv run totem run-beats --configuration lib_2025
+   ```
+5. Launch a different playlist:
+   ```bash
+   make run RUN_CONFIGURATION=your_configuration
+   ```
+6. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
 ## Command-Line Interfaces
 | Command | Purpose |
@@ -37,6 +45,7 @@ Key `totem run` flags:
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--x11-forward` forces a pygame window even when the RGB matrix driver is active.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
+- `totem run-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
 
 ## Architecture Summary
 - `heart/environment.py` defines the `GameLoop` responsible for frame pacing and peripheral coordination.
@@ -58,6 +67,7 @@ See the following references for deeper analysis:
 
 ## Development Workflow
 - `make install` sets up the editable package and dev extras using `uv`.
+- `make run` starts `uv run totem run --configuration lib_2025`; override with `RUN_CONFIGURATION=<name>`.
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.

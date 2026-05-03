@@ -1,4 +1,12 @@
+from heart.navigation import GameModes
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile,
+                                         FrameTickController,
+                                         GamepadController, InputDebugTap,
+                                         KeyboardController,
+                                         MandelbrotControlProfile,
+                                         NavigationProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -6,8 +14,6 @@ from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop import GameLoop
 from heart.runtime.game_loop.components import GameLoopComponents
-from heart.runtime.rendering.pacing import RenderLoopPacer
-from heart.runtime.rendering.pipeline import RendererVariant, RenderPipeline
 
 
 class TestRuntimeContainer:
@@ -15,30 +21,42 @@ class TestRuntimeContainer:
 
     def test_container_build_registers_core_singletons(self, device) -> None:
         """Verify that the runtime container wires core singletons, ensuring consistent service reuse across frames."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.BINARY,
-        )
-
-        render_pipeline = container.resolve(RenderPipeline)
+        container = build_runtime_container(device=device)
 
         assert container.resolve(PeripheralManager) is container.resolve(
             PeripheralManager
         )
         assert container.resolve(DisplayContext) is container.resolve(DisplayContext)
-        assert render_pipeline is container.resolve(RenderPipeline)
-        assert render_pipeline.renderer_variant is RendererVariant.BINARY
-        assert container.resolve(RenderLoopPacer) is container.resolve(RenderLoopPacer)
+        assert container.resolve(GameModes) is container.resolve(GameModes)
         assert container.resolve(RandomnessProvider) is container.resolve(
             RandomnessProvider
+        )
+        assert container.resolve(InputDebugTap) is container.resolve(InputDebugTap)
+        assert container.resolve(FrameTickController) is container.resolve(
+            FrameTickController
+        )
+        assert container.resolve(KeyboardController) is container.resolve(
+            KeyboardController
+        )
+        assert container.resolve(GamepadController) is container.resolve(
+            GamepadController
+        )
+        assert container.resolve(NavigationProfile) is container.resolve(
+            NavigationProfile
+        )
+        assert container.resolve(AccelerometerController) is container.resolve(
+            AccelerometerController
+        )
+        assert container.resolve(AccelerometerDebugProfile) is container.resolve(
+            AccelerometerDebugProfile
+        )
+        assert container.resolve(MandelbrotControlProfile) is container.resolve(
+            MandelbrotControlProfile
         )
 
     def test_container_injects_configuration_registry(self, device) -> None:
         """Confirm the container shares a registry instance so configuration overrides stay consistent at runtime."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.BINARY,
-        )
+        container = build_runtime_container(device=device)
 
         registry = container.resolve(PeripheralConfigurationRegistry)
         manager = container.resolve(PeripheralManager)
@@ -54,7 +72,6 @@ class TestRuntimeContainer:
         )
         container = build_runtime_container(
             device=device,
-            render_variant=RendererVariant.BINARY,
             overrides={PeripheralConfigurationLoader: loader},
         )
 
@@ -67,7 +84,6 @@ class TestRuntimeContainer:
         stub_manager = PeripheralManager()
         container = build_runtime_container(
             device=device,
-            render_variant=RendererVariant.ITERATIVE,
             overrides={PeripheralManager: stub_manager},
         )
         loop = GameLoop(device=device, resolver=container)
@@ -79,22 +95,18 @@ class TestRuntimeContainer:
         stub_manager = PeripheralManager()
         container = build_runtime_container(
             device=device,
-            render_variant=RendererVariant.BINARY,
             overrides={PeripheralManager: stub_manager},
         )
 
         components = container.resolve(GameLoopComponents)
 
         assert components.peripheral_manager is stub_manager
-        assert components.render_pipeline.renderer_variant is RendererVariant.BINARY
+        assert components.game_modes is container.resolve(GameModes)
 
     def test_game_loop_prefers_container_device(self, device) -> None:
         """Verify the GameLoop uses the container-provided Device so overrides remain consistent across services."""
         alternate_device = type(device)(orientation=device.orientation)
-        container = build_runtime_container(
-            device=alternate_device,
-            render_variant=RendererVariant.BINARY,
-        )
+        container = build_runtime_container(device=alternate_device)
 
         loop = GameLoop(device=device, resolver=container)
 
@@ -102,10 +114,7 @@ class TestRuntimeContainer:
 
     def test_container_resolves_game_loop(self, device) -> None:
         """Confirm the container can resolve GameLoop so entrypoints reuse the shared DI wiring."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.ITERATIVE,
-        )
+        container = build_runtime_container(device=device)
 
         loop = container.resolve(GameLoop)
 

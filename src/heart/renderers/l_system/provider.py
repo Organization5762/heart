@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
@@ -45,26 +44,23 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> reactivex.Observable[LSystemState]:
-        clocks = pipe_in_background(
-            self._peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = LSystemState()
 
-        def advance(state: LSystemState, clock: Clock) -> LSystemState:
+        def advance(state: LSystemState, frame_tick: object) -> LSystemState:
             return _advance_state(
                 state,
-                dt_ms=float(clock.get_time()),
+                dt_ms=float(frame_tick.delta_ms),
                 update_interval_ms=self._update_interval_ms,
             )
 
         return (
             pipe_in_background(
-                self._peripheral_manager.game_tick,
-                ops.with_latest_from(clocks),
-                ops.map(lambda latest: latest[1]),
+                frame_ticks,
                 ops.scan(advance, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

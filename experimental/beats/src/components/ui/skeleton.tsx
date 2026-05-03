@@ -1,6 +1,6 @@
-import type { ComponentProps } from "react"
+import type { ComponentProps } from "react";
 
-import { cn } from "@/utils/tailwind"
+import { cn } from "@/utils/tailwind";
 
 function Skeleton({ className, ...props }: ComponentProps<"div">) {
   return (
@@ -9,7 +9,7 @@ function Skeleton({ className, ...props }: ComponentProps<"div">) {
       className={cn("bg-accent animate-pulse rounded-md", className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Skeleton }
+export { Skeleton };

@@ -1,6 +1,6 @@
+import argparse
 import math
 import time
-from collections import defaultdict
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,17 +23,27 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Orientation
+from heart.device import Cube, Orientation, Rectangle
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
+from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.utilities.logging import get_logger
+from heart.utilities.reactivex_threads import shutdown
 
 logger = get_logger(__name__)
+DEFAULT_DEBUG_WIDTH = 800
+DEFAULT_DEBUG_HEIGHT = 800
+DEFAULT_DEBUG_FPS = 60
+DEFAULT_DEBUG_LAYOUT = "rectangle"
+TRIGGER_ACTIVE_THRESHOLD = 0.5
 
 
 @dataclass
@@ -86,7 +96,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.virtual_time = 0
         self.INFLATE_SPEED = 10
         self.look_speed = 0.003
-        self.key_pressed_last_frame = defaultdict(lambda: False)
+        self.key_pressed_last_frame: dict = {}
         self.screen_center = None
 
         self.prev_mouse_pos = None
@@ -106,9 +116,14 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.surface_array = None
 
         self.initialized = False
-        self.warmup = False
         self.time_initialized = None
         self._auto_started = False
+        self._keyboard_snapshot = KeyboardSnapshot(
+            pressed_keys=frozenset(),
+            timestamp_ms=0.0,
+        )
+        self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._trigger_right_prev_active = False
 
     def is_initialized(self) -> bool:
         if not super().is_initialized():
@@ -246,6 +261,12 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         self.shader.set(self.sphere_radius_var, self.BASE_RADIUS)
         self.last_frame_time = time.monotonic()
+        peripheral_manager.keyboard_controller.snapshot_stream().subscribe(
+            on_next=self._set_keyboard_snapshot
+        )
+        peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
+            on_next=self._set_gamepad_snapshot
+        )
         return FractalRuntimeState(peripheral_manager=peripheral_manager)
 
         self.mode = "auto"
@@ -482,38 +503,31 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
         self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
-    # def _check_enter_auto(self, peripheral_manager: PeripheralManager):
-    #     gamepad = peripheral_manager.get_gamepad()
-    #     mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-    #     if gamepad.is_connected():
-    #         if gamepad.was_tapped(mapping.BUTTON_Y):
-    #             self.mode = "auto"
-    #             self._reset_camera_pos()
+    def _check_enter_auto(self, peripheral_manager: PeripheralManager) -> None:
+        """Return from free-look to auto mode on an explicit operator action."""
+
+        keyboard_toggle_pressed = self._is_key_down(pygame.K_y)
+        keyboard_toggle_tapped = keyboard_toggle_pressed and not self.key_pressed_last_frame.get(
+            pygame.K_y, False
+        )
+        self.key_pressed_last_frame[pygame.K_y] = keyboard_toggle_pressed
+
+        if keyboard_toggle_tapped or self._gamepad_snapshot.button_tapped(
+            GamepadButton.NORTH
+        ):
+            self.mode = "auto"
+            self._auto_started = False
+            self._reset_camera_pos()
 
     def _check_break_auto(self, peripheral_manager: PeripheralManager):
         # ignore break auto check at first to avoid inut overlap from scene
         # select mode
         if time.monotonic() - self.time_initialized < 0.3:
-            return
-
-        # gamepad = peripheral_manager.get_gamepad()
-        # mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
-        # if gamepad.is_connected():
-        #     xl_mov = gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.1)
-        #     yl_mov = gamepad.axis_value(mapping.AXIS_LEFT_Y, dead_zone=0.1)
-        #     xr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_X, dead_zone=0.1)
-        #     yr_mov = gamepad.axis_value(mapping.AXIS_RIGHT_Y, dead_zone=0.1)
-        #     xd_mov, yd_mov = gamepad.joystick.get_hat(mapping.DPAD_HAT)
-
-        #     if (
-        #         xl_mov != 0
-        #         or yl_mov != 0
-        #         or xr_mov != 0
-        #         or yr_mov != 0
-        #         or xd_mov != 0
-        #         or yd_mov != 0
-        #     ):
-        #         self.mode = "free"
+            return False
+        if self._has_manual_input():
+            self.mode = "free"
+            return True
+        return False
 
     def _check_switch_auto(self, peripheral_manager: PeripheralManager):
         pass
@@ -529,8 +543,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     def _process_input(self, peripheral_manager):
         try:
-            self._process_gamepad_input(peripheral_manager)
-            self._process_keyboard_input(peripheral_manager)
+            self._process_controller_input(peripheral_manager)
         except Exception:  # i haven't actually seen it fail but just in case
             pass
 
@@ -643,22 +656,33 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     #     gamepad.update()
 
-    def _process_keyboard_input(self, peripheral_manager):
-        keys = pygame.key.get_pressed()
-
+    def _process_controller_input(self, peripheral_manager):
         # Calculate acceleration based on key input
         acc = np.zeros((3,), dtype=np.float32)
-        if keys[pygame.K_a]:
+        if self._is_key_down(pygame.K_a):
             acc[0] -= self.speed_accel / self.max_fps
-        if keys[pygame.K_d]:
+        if self._is_key_down(pygame.K_d):
             acc[0] += self.speed_accel / self.max_fps
-        if keys[pygame.K_w]:
+        if self._is_key_down(pygame.K_w):
             acc[2] -= self.speed_accel / self.max_fps
-        if keys[pygame.K_s]:
+        if self._is_key_down(pygame.K_s):
             acc[2] += self.speed_accel / self.max_fps
 
+        acc[0] += (
+            self._gamepad_snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.1)
+            * self.speed_accel
+            / self.max_fps
+        )
+        acc[2] += (
+            self._gamepad_snapshot.axis_value(GamepadAxis.LEFT_Y, dead_zone=0.1)
+            * self.speed_accel
+            / self.max_fps
+        )
+        acc[0] += self._gamepad_snapshot.dpad.x * self.speed_accel / self.max_fps
+        acc[2] -= self._gamepad_snapshot.dpad.y * self.speed_accel / self.max_fps
+
         # Apply acceleration or deceleration
-        if np.dot(acc, acc) == 0.0:
+        if np.isclose(np.dot(acc, acc), 0.0):
             self.vel *= self.speed_decel
         else:
             # Calculate desired direction
@@ -674,16 +698,36 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                 lerp_factor = 0.1  # Adjust for faster/slower response
                 self.vel = self.vel * (1 - lerp_factor) + target_velocity * lerp_factor
 
-        # invert the radius
-        if keys[pygame.K_r] and not self.key_pressed_last_frame[pygame.K_r]:
+        trigger_right_active = (
+            self._gamepad_snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0)
+            > TRIGGER_ACTIVE_THRESHOLD
+        )
+        _keyboard_signal = (
+            radius_toggle_pressed := self._is_key_down(pygame.K_r)
+            and not self.key_pressed_last_frame.get(pygame.K_r, False)
+        )
+        _gamepad_signal = trigger_right_active and not self._trigger_right_prev_active
+        if _keyboard_signal or _gamepad_signal:
             self.BASE_RADIUS = (
                 self._LO_BASE if self.BASE_RADIUS == self._HI_BASE else self._HI_BASE
             )
-        self.key_pressed_last_frame[pygame.K_r] = keys[pygame.K_r]
+        self.key_pressed_last_frame[pygame.K_r] = radius_toggle_pressed
+        self._trigger_right_prev_active = trigger_right_active
 
         # "inflate/deflate" sphere on hold/release
         try:
-            if keys[pygame.K_SPACE]:
+            trigger_left_active = (
+                self._gamepad_snapshot.axis_value(
+                    GamepadAxis.TRIGGER_LEFT,
+                    dead_zone=0.0,
+                )
+                > TRIGGER_ACTIVE_THRESHOLD
+            )
+            if (
+                self._is_key_down(pygame.K_SPACE)
+                or trigger_left_active
+                or self._gamepad_snapshot.button_held(GamepadButton.SOUTH)
+            ):
                 target = self.BASE_RADIUS + 0.2
                 self.active_radius = lerp(
                     self.active_radius,
@@ -707,17 +751,43 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             self.shader.set("s_radius", self.active_radius)
 
         # rotations
-        if keys[pygame.K_q]:
+        if self._is_key_down(pygame.K_q):
             rz = self.make_rot(0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
-        if keys[pygame.K_e]:
+        if self._is_key_down(pygame.K_e):
+            rz = self.make_rot(-0.01, 2)
+            self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+        if self._gamepad_snapshot.button_held(GamepadButton.ZL):
+            rz = self.make_rot(0.01, 2)
+            self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
+        if self._gamepad_snapshot.button_held(GamepadButton.ZR):
             rz = self.make_rot(-0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
+        right_x = self._gamepad_snapshot.axis_value(GamepadAxis.RIGHT_X, dead_zone=0.1)
+        right_y = self._gamepad_snapshot.axis_value(GamepadAxis.RIGHT_Y, dead_zone=0.1)
+        if right_x != 0.0 or right_y != 0.0:
+            fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
+            stick_scale_factor = 8
+            rx = self.make_rot(
+                right_x * stick_scale_factor * fps_scale_factor * self.look_speed,
+                1,
+            )
+            ry = self.make_rot(
+                right_y * stick_scale_factor * fps_scale_factor * self.look_speed,
+                0,
+            )
+            self.mat[:3, :3] = np.dot(ry, np.dot(rx, self.mat[:3, :3]))
+            self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
+
         # speed
-        if keys[pygame.K_j]:
+        if self._is_key_down(pygame.K_j) or self._gamepad_snapshot.button_held(
+            GamepadButton.PLUS
+        ):
             self.max_velocity += 0.03
-        if keys[pygame.K_k]:
+        if self._is_key_down(pygame.K_k) or self._gamepad_snapshot.button_held(
+            GamepadButton.MINUS
+        ):
             self.max_velocity = max(self.max_velocity - 0.03, 0)
 
         try:
@@ -726,6 +796,30 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             # todo: tbh i'm just not sure if this will error if there's no mouse
             #  device detected (e.g. on pi) so just catching in case
             pass
+
+    def _is_key_down(self, key: int) -> bool:
+        return key in self._keyboard_snapshot.pressed_keys
+
+    def _set_gamepad_snapshot(self, snapshot: GamepadSnapshot) -> None:
+        self._gamepad_snapshot = snapshot
+
+    def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
+        self._keyboard_snapshot = snapshot
+
+    def _has_manual_input(self) -> bool:
+        if self._keyboard_snapshot.pressed_keys:
+            return True
+        if self._gamepad_snapshot.dpad != self._gamepad_snapshot.dpad.__class__():
+            return True
+        return any(
+            self._gamepad_snapshot.axis_value(axis, dead_zone=0.1) != 0.0
+            for axis in (
+                GamepadAxis.LEFT_X,
+                GamepadAxis.LEFT_Y,
+                GamepadAxis.RIGHT_X,
+                GamepadAxis.RIGHT_Y,
+            )
+        ) or any(self._gamepad_snapshot.buttons.values())
 
     def _reset_camera_pos(self):
         # self.mat[3, :3] = np.array([0., 0., 0.])
@@ -749,9 +843,11 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.delta_real_time = now - (self.last_frame_time or 0.0)
         self.last_frame_time = now
 
-        if self.mode == "auto":
+        if self.mode == "auto" and self._check_break_auto(peripheral_manager):
+            self._process_input(peripheral_manager)
+            self._check_enter_auto(peripheral_manager)
+        elif self.mode == "auto":
             self._process_auto()
-            self._check_break_auto(peripheral_manager)
         else:
             self._process_input(peripheral_manager)
             self._check_enter_auto(peripheral_manager)
@@ -874,6 +970,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.delta_real_time = None
         self.surface_array = None
         self.time_initialized = None
+        self._trigger_right_prev_active = False
 
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):
@@ -882,7 +979,6 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         self._initial_state: FractalSceneState | None = None
         super().__init__(builder=self.provider)
         self.device_display_mode = DeviceDisplayMode.OPENGL
-        self.warmup = False
         self._peripheral_manager: PeripheralManager | None = None
 
     def initialize(
@@ -930,3 +1026,95 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         self._initial_state = None
         self._peripheral_manager = None
         super().reset()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the three-fractal renderer directly in a local debug window.",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULT_DEBUG_WIDTH,
+        help="Window width in pixels.",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULT_DEBUG_HEIGHT,
+        help="Window height in pixels.",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=DEFAULT_DEBUG_FPS,
+        help="Frame cap for the debug loop.",
+    )
+    parser.add_argument(
+        "--layout",
+        choices=(DEFAULT_DEBUG_LAYOUT, "cube"),
+        default=DEFAULT_DEBUG_LAYOUT,
+        help="Render as a single rectangle or use the cube tiling path.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = _parse_args()
+    orientation = (
+        Cube.sides()
+        if args.layout == "cube"
+        else Rectangle.with_layout(columns=1, rows=1)
+    )
+    from heart.device.local import LocalScreen
+
+    device = LocalScreen(width=args.width, height=args.height, orientation=orientation)
+    container = build_runtime_container(device=device)
+    peripheral_manager = container.resolve(PeripheralManager)
+    peripheral_runtime = container.resolve(PeripheralRuntime)
+    display = container.resolve(DisplayContext)
+    runtime = FractalRuntime(device=device)
+
+    logger.info(
+        "Starting standalone three-fractal debug window width=%s height=%s layout=%s fps=%s",
+        args.width,
+        args.height,
+        args.layout,
+        args.fps,
+    )
+
+    display.initialize()
+    display.configure_window(DeviceDisplayMode.OPENGL)
+    peripheral_manager.detect()
+    peripheral_manager.start()
+
+    running = True
+    try:
+        runtime.initialize(
+            window=display,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+            peripheral_runtime.tick()
+            runtime.real_process(window=display, orientation=orientation)
+            pygame.display.flip()
+            if display.clock is None:
+                raise RuntimeError("Standalone fractal debug loop did not initialize a clock")
+            display.clock.tick(args.fps)
+            peripheral_runtime.tick()
+        runtime.reset()
+    finally:
+        shutdown.on_next(True)
+        shutdown.on_completed()
+        shutdown.dispose()
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    main()

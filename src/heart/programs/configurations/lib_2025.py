@@ -16,7 +16,9 @@ from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
+from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.random_pixel import RandomPixel
+from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
@@ -33,10 +35,13 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     return val
 
 
+PRANAY_SKETCH_MODE_TITLE = "Dolly's\nsketch"
+
+
 def configure(loop: GameLoop) -> None:
     randomness = RandomnessProvider()
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
-    kirby_mode.resolve_renderer_from_container(KirbyScene)
+    kirby_mode.add_renderer(KirbyScene)
 
     modelbrot = loop.add_mode(
         title=loop.compose(
@@ -52,13 +57,13 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    modelbrot.resolve_renderer_from_container(MandelbrotMode)
+    modelbrot.add_renderer(MandelbrotMode)
 
     sphere_mode = loop.add_mode("3d fractal")
-    sphere_mode.resolve_renderer_from_container(FractalScene)
+    sphere_mode.add_renderer(FractalScene)
 
     hilbert_mode = loop.add_mode("hilbert")
-    hilbert_mode.resolve_renderer_from_container(HilbertScene)
+    hilbert_mode.add_renderer(HilbertScene)
 
     mario_mode = loop.add_mode(
         loop.compose(
@@ -74,7 +79,9 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    mario_mode.resolve_renderer_from_container(MarioRenderer)
+    mario_mode.add_renderer(MarioRenderer)
+
+    add_rock_paper_scissors_mode(loop, randomness=randomness)
 
     def multicolor_renderer() -> MulticolorRenderer:
         return loop.resolve(MulticolorRenderer)
@@ -116,7 +123,7 @@ def configure(loop: GameLoop) -> None:
             ]
         )
     )
-    heart_rate_mode.resolve_renderer_from_container(CombinedBpmScreen)
+    heart_rate_mode.add_renderer(CombinedBpmScreen)
 
     water_mode = loop.add_mode(
         loop.compose(
@@ -133,11 +140,13 @@ def configure(loop: GameLoop) -> None:
         )
     )
 
-    water_mode.resolve_renderer_from_container(WaterCube)
+    water_mode.add_renderer(WaterCube)
 
     artist_mode = loop.add_mode(ArtistScene.title_scene())
-    artist_mode.resolve_renderer_from_container(ArtistScene)
+    artist_mode.add_renderer(ArtistScene)
 
+    pranay_mode = loop.add_mode(PRANAY_SKETCH_MODE_TITLE)
+    pranay_mode.add_renderer(PranaySketchRenderer())
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(
         MultiScene(
@@ -210,7 +219,7 @@ def configure(loop: GameLoop) -> None:
     )
 
     life = loop.add_mode("life")
-    life.resolve_renderer_from_container(Life)
+    life.add_renderer(Life)
 
     spooky = loop.add_mode("spook")
     spooky.add_renderer(
@@ -221,7 +230,6 @@ def configure(loop: GameLoop) -> None:
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
             randomness=randomness,
-            fill_window=True,
         )
     )
 

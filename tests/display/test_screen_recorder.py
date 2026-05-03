@@ -21,8 +21,8 @@ class SolidColorRenderer(StatefulBaseRenderer[SolidColorState]):
     def __init__(self, color: tuple[int, int, int]) -> None:
         super().__init__(state=SolidColorState(color=color))
 
-    def real_process(self, window, clock, orientation) -> None:
-        window.fill(self.state.color)
+    def real_process(self, window, orientation) -> None:
+        window.screen.fill(self.state.color)
 
 
 @dataclass
@@ -37,10 +37,11 @@ class PatternRenderer(StatefulBaseRenderer[PatternState]):
     ) -> None:
         super().__init__(state=PatternState(background=background, accent=accent))
 
-    def real_process(self, window, clock, orientation) -> None:
-        window.fill(self.state.background)
-        pygame.draw.rect(window, self.state.accent, pygame.Rect(8, 8, 48, 16))
-        pygame.draw.rect(window, self.state.accent, pygame.Rect(16, 40, 32, 16))
+    def real_process(self, window, orientation) -> None:
+        screen = window.screen
+        screen.fill(self.state.background)
+        pygame.draw.rect(screen, self.state.accent, pygame.Rect(8, 8, 48, 16))
+        pygame.draw.rect(screen, self.state.accent, pygame.Rect(16, 40, 32, 16))
 
 
 @pytest.fixture()

@@ -171,7 +171,7 @@ class TestFractalScene:
         assert state.runtime.initialized is False
 
     def test_constructor_preserves_opengl_display_mode(self) -> None:
-        """Verify the scene reports OPENGL after construction so the render pipeline allocates the correct window type for fractal rendering."""
+        """Verify the scene reports OPENGL after construction so the runtime allocates the correct window type for fractal rendering."""
         scene = FractalScene(provider=Mock())
 
         assert scene.device_display_mode == DeviceDisplayMode.OPENGL

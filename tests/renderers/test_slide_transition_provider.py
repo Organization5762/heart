@@ -12,14 +12,6 @@ from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import SlideTransitionState
 
 
-class _StubClock:
-    def __init__(self, delta_ms: float) -> None:
-        self._delta_ms = delta_ms
-
-    def get_time(self) -> float:
-        return self._delta_ms
-
-
 @st.composite
 def _advance_inputs(draw: st.DrawFn) -> tuple[float, int, float]:
     fraction_offset = draw(
@@ -47,7 +39,7 @@ class TestSlideTransitionProviderStateTransitions:
 
         result = SlideTransitionProvider._advance(
             state=state,
-            clock=_StubClock(delta_ms=delta_ms),
+            elapsed_ms=delta_ms,
             slide_duration_ms=slide_duration_ms,
         )
 
@@ -68,7 +60,7 @@ class TestSlideTransitionProviderStateTransitions:
 
         result = SlideTransitionProvider._advance(
             state=state,
-            clock=_StubClock(delta_ms=16.0),
+            elapsed_ms=16.0,
             slide_duration_ms=1000,
         )
 

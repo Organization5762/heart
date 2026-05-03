@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Iterable
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
@@ -24,26 +23,24 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[MetadataScreenState]:
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = MetadataScreenState()
 
         def advance_state(
-            state: MetadataScreenState, clock: Clock
+            state: MetadataScreenState,
+            frame_tick: object,
         ) -> MetadataScreenState:
-            elapsed_ms = float(clock.get_time())
+            elapsed_ms = float(frame_tick.delta_ms)
             active_monitors = list(current_bpms.keys())
             return self._update_state(state, active_monitors, elapsed_ms)
 
         return (
             pipe_in_background(
-                peripheral_manager.game_tick,
-                ops.with_latest_from(clocks),
-                ops.map(lambda latest: latest[1]),
+                frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

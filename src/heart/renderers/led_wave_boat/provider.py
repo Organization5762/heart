@@ -4,12 +4,12 @@ import math
 from random import Random
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
+from heart.peripheral.core.input import (AccelerometerController,
+                                         AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.providers.acceleration import AllAccelerometersProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
@@ -24,11 +24,13 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
-        accelerometers: AllAccelerometersProvider,
+        accelerometer_controller: AccelerometerController,
+        accelerometer_debug_profile: AccelerometerDebugProfile,
         randomness: RandomnessProvider,
     ) -> None:
         self._peripheral_manager = peripheral_manager
-        self._accelerometers = accelerometers
+        self._accelerometer_controller = accelerometer_controller
+        self._accelerometer_debug_profile = accelerometer_debug_profile
         self._rng = randomness.rng()
 
     def observable(
@@ -41,20 +43,23 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
             ops.distinct_until_changed(),
             ops.share(),
         )
-        clocks = pipe_in_background(
-            self._peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
+        if self._accelerometer_debug_profile.should_use_debug_input():
+            acceleration_source = self._accelerometer_debug_profile.observable()
+        else:
+            acceleration_source = self._accelerometer_controller.observable()
         accelerations = pipe_in_background(
-            self._accelerometers.observable(),
+            acceleration_source,
             ops.start_with(None),
             ops.share(),
         )
 
         frame_inputs = pipe_in_background(
-            self._peripheral_manager.game_tick,
-            ops.with_latest_from(window_sizes, clocks, accelerations),
+            frame_ticks,
+            ops.with_latest_from(window_sizes, accelerations),
             ops.map(self._to_frame_input),
         )
 
@@ -73,15 +78,14 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
     @staticmethod
     def _to_frame_input(
         latest: tuple[
-            object | None,
+            object,
             tuple[int, int],
-            Clock,
             Acceleration | None,
         ]
     ) -> LedWaveBoatFrameInput:
-        _, window_size, clock, acceleration = latest
+        frame_tick, window_size, acceleration = latest
         width, height = window_size
-        dt = max(clock.get_time() / 1000.0, 1.0 / 120.0)
+        dt = max(frame_tick.delta_s, 1.0 / 120.0)
 
         return LedWaveBoatFrameInput(
             width=width,

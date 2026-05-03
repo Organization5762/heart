@@ -56,7 +56,7 @@ class RainStateProvider(ObservableProvider[RainState]):
         )
 
         return pipe_in_background(
-            self._peripheral_manager.game_tick,
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),
@@ -97,7 +97,7 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
         )
 
         return pipe_in_background(
-            self._peripheral_manager.game_tick,
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
             ops.start_with(initial_state),
             ops.share(),

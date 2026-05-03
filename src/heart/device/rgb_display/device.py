@@ -11,6 +11,10 @@ from heart.device.rgb_display.runtime import (MatrixDriverProtocol,
                                               build_matrix_driver)
 from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
+FRAME_LOG_INTERVAL = 120
 
 
 class LEDMatrix(Device):
@@ -22,7 +26,16 @@ class LEDMatrix(Device):
         self.parallel = orientation.layout.rows
         self.row_size = Configuration.panel_rows()
         self.col_size = Configuration.panel_columns()
+        logger.info(
+            "Initializing LEDMatrix rows=%s cols=%s chain_length=%s parallel=%s full_size=%s",
+            self.row_size,
+            self.col_size,
+            self.chain_length,
+            self.parallel,
+            self.full_display_size(),
+        )
         self.driver: MatrixDriverProtocol = build_matrix_driver(orientation)
+        self._frames_sent = 0
         atexit.register(self.close)
 
     def layout(self) -> Layout:
@@ -38,6 +51,15 @@ class LEDMatrix(Device):
         self.display_mode = mode
 
     def set_screen(self, screen: pygame.Surface) -> None:
+        self._frames_sent += 1
+        if self._frames_sent == 1 or self._frames_sent % FRAME_LOG_INTERVAL == 0:
+            average_color = pygame.transform.average_color(screen)
+            logger.info(
+                "Sending matrix frame #%s size=%s avg_rgba=%s",
+                self._frames_sent,
+                screen.get_size(),
+                average_color,
+            )
         image_bytes = pygame.image.tostring(screen, RGBA_IMAGE_FORMAT)
         width, height = screen.get_size()
         self.driver.submit_rgba(image_bytes, width, height)

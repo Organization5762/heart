@@ -5,9 +5,20 @@ from pathlib import Path
 
 import toml
 from heart_device_manager.driver_update.exceptions import UpdateError
+from heart_device_manager.driver_update.modes import UpdateMode
 from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class ArduinoConfig:
+    board_manager_urls: list[str]
+    core: str
+    fqbn: str
+    libraries: list[str]
+    port_keywords: list[str]
+    sketch_path: Path
 
 
 @dataclass(frozen=True)
@@ -17,6 +28,8 @@ class DriverConfig:
     driver_libs: list[str]
     device_boot_name: str
     valid_board_ids: list[str]
+    default_update_mode: UpdateMode
+    arduino: ArduinoConfig | None
 
 
 def _parse_csv(value: str | list[str], *, field_name: str) -> list[str]:
@@ -38,6 +51,64 @@ def _require_string(value: object, *, field_name: str) -> str:
             f"Expected {field_name} to be a non-empty string, got {value!r}"
         )
     return value
+
+
+def _parse_update_mode(value: object) -> UpdateMode:
+    if value is None:
+        return UpdateMode.CIRCUITPYTHON
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Expected DEFAULT_UPDATE_MODE to be a string, got {value!r}"
+        )
+    try:
+        return UpdateMode(value.strip().lower())
+    except ValueError as error:
+        supported = ", ".join(mode.value for mode in UpdateMode)
+        raise ValueError(
+            f"Expected DEFAULT_UPDATE_MODE to be one of {supported}, got {value!r}"
+        ) from error
+
+
+def _load_arduino_config(
+    config: dict[str, object], *, settings_path: Path
+) -> ArduinoConfig | None:
+    if "ARDUINO_SKETCH_PATH" not in config:
+        return None
+
+    sketch_path = (
+        settings_path.parent
+        / _require_string(
+            config["ARDUINO_SKETCH_PATH"], field_name="ARDUINO_SKETCH_PATH"
+        )
+    ).resolve()
+    if not sketch_path.exists():
+        raise ValueError(
+            f"Expected ARDUINO_SKETCH_PATH to exist, got {sketch_path}"
+        )
+
+    port_keywords = _parse_csv(
+        config.get("ARDUINO_PORT_KEYWORDS", ""),
+        field_name="ARDUINO_PORT_KEYWORDS",
+    )
+    if not port_keywords:
+        raise ValueError(
+            "Expected ARDUINO_PORT_KEYWORDS to include at least one entry"
+        )
+
+    return ArduinoConfig(
+        board_manager_urls=_parse_csv(
+            config.get("ARDUINO_BOARD_MANAGER_URLS", ""),
+            field_name="ARDUINO_BOARD_MANAGER_URLS",
+        ),
+        core=_require_string(config.get("ARDUINO_CORE"), field_name="ARDUINO_CORE"),
+        fqbn=_require_string(config.get("ARDUINO_FQBN"), field_name="ARDUINO_FQBN"),
+        libraries=_parse_csv(
+            config.get("ARDUINO_LIBRARIES", ""),
+            field_name="ARDUINO_LIBRARIES",
+        ),
+        port_keywords=port_keywords,
+        sketch_path=sketch_path,
+    )
 
 
 def load_driver_config(settings_path: Path) -> DriverConfig:
@@ -82,10 +153,20 @@ def load_driver_config(settings_path: Path) -> DriverConfig:
         device_boot_name = _require_string(
             config["CIRCUIT_PY_BOOT_NAME"], field_name="CIRCUIT_PY_BOOT_NAME"
         )
+        default_update_mode = _parse_update_mode(config.get("DEFAULT_UPDATE_MODE"))
+        arduino_config = _load_arduino_config(config, settings_path=settings_path)
     except ValueError as error:
         message = f"Invalid driver settings in {settings_path}: {error}"
         logger.error(message)
         raise UpdateError(message) from error
+
+    if default_update_mode == UpdateMode.ARDUINO and arduino_config is None:
+        message = (
+            f"Invalid driver settings in {settings_path}: "
+            "DEFAULT_UPDATE_MODE is arduino but no Arduino sketch is configured"
+        )
+        logger.error(message)
+        raise UpdateError(message)
 
     return DriverConfig(
         uf2_url=uf2_url,
@@ -93,4 +174,6 @@ def load_driver_config(settings_path: Path) -> DriverConfig:
         driver_libs=driver_libs,
         device_boot_name=device_boot_name,
         valid_board_ids=valid_board_ids,
+        default_update_mode=default_update_mode,
+        arduino=arduino_config,
     )

@@ -20,22 +20,20 @@ class FlameStateProvider(ObservableProvider[FlameState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> reactivex.Observable[FlameState]:
-        clocks = pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
-        def to_state(clock: pygame.time.Clock) -> FlameState:
+        def to_state(frame_tick: object) -> FlameState:
             return FlameState(
                 time_seconds=pygame.time.get_ticks() * 2 / 1000.0,
-                dt_seconds=max(clock.get_time() / 1000.0, 1.0 / 120.0),
+                dt_seconds=max(frame_tick.delta_s, 1.0 / 120.0),
             )
 
         return pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.with_latest_from(clocks),
-            ops.map(lambda latest: to_state(clock=latest[1])),
+            frame_ticks,
+            ops.map(to_state),
             ops.do_action(self._latest_state.on_next),
             ops.start_with(self._initial_state),
             ops.share(),

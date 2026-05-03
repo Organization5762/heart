@@ -32,8 +32,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
         )
 
         ticks = pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.filter(lambda tick: tick is not None),
+            peripheral_manager.frame_tick_controller.observable(),
         )
 
         def build_stream(

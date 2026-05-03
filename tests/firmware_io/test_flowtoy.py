@@ -1,0 +1,163 @@
+from __future__ import annotations
+
+from heart_firmware_io import flowtoy
+
+
+def _valid_sync_packet() -> bytes:
+    return bytes(
+        [
+            0x00,
+            0x01,
+            0x02,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            10,
+            20,
+            30,
+            40,
+            50,
+            0b0000_0011,
+            0x00,
+            0x00,
+            2,
+            7,
+            0b0000_0010,
+        ]
+    )
+
+
+class TestFirmwareIoFlowToy:
+    """Validate FlowToy packet recognition so the radio bridge only forwards plausible payloads."""
+
+    def test_decode_if_matching_recognizes_sync_packet_shape(self) -> None:
+        """Verify the decoder recognizes the known sync packet shape so candidate captures can be filtered before reaching Totem."""
+        decoded = flowtoy.decode_if_matching(_valid_sync_packet())
+
+        assert decoded == {
+            "schema": "flowtoy.sync.v1",
+            "group_id": 1,
+            "padding": 2,
+            "lfo": [1, 2, 3, 4],
+            "global": {
+                "hue": 10,
+                "saturation": 20,
+                "brightness": 30,
+                "speed": 40,
+                "density": 50,
+            },
+            "active_flags": {
+                "lfo": True,
+                "hue": True,
+                "saturation": False,
+                "brightness": False,
+                "speed": False,
+                "density": False,
+            },
+            "reserved": [0, 0],
+            "page": 2,
+            "mode": 7,
+            "mode_name": "flowtoy-page-2-mode-7",
+            "mode_documentation": {
+                "page": 2,
+                "mode": 7,
+                "key": "flowtoy-page-2-mode-7",
+                "display_name": "unicorn",
+                "adjust": ["rainbow_brightness"],
+                "kinetic_trigger": ["low_force"],
+                "kinetic_response": ["activate_effect"],
+                "runtime": {
+                    "static_hours": 9,
+                    "kinetic_hours": 5,
+                    "qualifier": "approx_plus",
+                },
+                "color_spectrum": [
+                    {"t": 0.0, "hex": "#ffd6f6"},
+                    {"t": 0.25, "hex": "#d9c2ff"},
+                    {"t": 0.5, "hex": "#9be7ff"},
+                    {"t": 0.75, "hex": "#b8ffd6"},
+                    {"t": 1.0, "hex": "#fffdf7"},
+                ],
+                "source_url": "https://flowtoys2.freshdesk.com/support/solutions/articles/6000229509-capsule-v2-modes-adjust-kinetic-and-runtimes",
+            },
+            "command_flags": {
+                "adjust_active": False,
+                "wakeup": True,
+                "poweroff": False,
+                "force_reload": False,
+                "save": False,
+                "delete": False,
+                "alternate": False,
+            },
+        }
+
+    def test_decode_if_matching_rejects_non_matching_payload(self) -> None:
+        """Ensure non-matching candidate payloads are rejected so random 2.4 GHz traffic does not masquerade as FlowToy frames."""
+        assert flowtoy.decode_if_matching(b"\x01\x02\x03") is None
+
+    def test_decode_if_matching_accepts_observed_high_group_identifier(self) -> None:
+        """Verify observed live packets with large group identifiers still decode so production props remain visible to the host."""
+        decoded = flowtoy.decode_if_matching(
+            bytes([213, 88, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        )
+
+        assert decoded == {
+            "schema": "flowtoy.sync.v1",
+            "group_id": 54616,
+            "padding": 2,
+            "lfo": [0, 0, 0, 0],
+            "global": {
+                "hue": 0,
+                "saturation": 0,
+                "brightness": 0,
+                "speed": 0,
+                "density": 0,
+            },
+            "active_flags": {
+                "lfo": False,
+                "hue": False,
+                "saturation": False,
+                "brightness": False,
+                "speed": False,
+                "density": False,
+            },
+            "reserved": [0, 0],
+            "page": 0,
+            "mode": 0,
+            "mode_name": "flowtoy-page-0-mode-0",
+            "mode_documentation": None,
+            "command_flags": {
+                "adjust_active": False,
+                "wakeup": False,
+                "poweroff": False,
+                "force_reload": False,
+                "save": False,
+                "delete": False,
+                "alternate": False,
+            },
+        }
+
+    def test_decode_if_matching_accepts_extended_payloads(self) -> None:
+        """Verify longer captures still decode from the leading FlowToy frame so bridges can tolerate extra trailer bytes without losing state visibility."""
+        decoded = flowtoy.decode_if_matching(_valid_sync_packet() + b"\x99\xAA\xBB")
+
+        assert decoded is not None
+        assert decoded["group_id"] == 1
+        assert decoded["page"] == 2
+        assert decoded["mode"] == 7
+
+    def test_update_sync_packet_brightness_accepts_iterators(self) -> None:
+        """Verify iterator-backed payloads can update the brightness byte so streaming packet transforms can adjust FlowToy intensity in flight."""
+        updated_packet = flowtoy.update_sync_packet_brightness(
+            iter(_valid_sync_packet()),
+            brightness=99,
+        )
+
+        decoded = flowtoy.decode_sync_packet(updated_packet)
+
+        assert decoded["global"]["brightness"] == 99
+        assert updated_packet[12] == 99

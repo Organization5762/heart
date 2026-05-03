@@ -1,1 +1,1 @@
-"""Rendering pipeline helpers for the runtime."""
+"""Rendering helpers for the runtime."""

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Self, Tuple
 
 import numpy as np
@@ -16,22 +17,23 @@ NEIGH_K = 2.0e-1  # neighbour coupling (ripples)
 DAMPING = 0.985  # velocity decay
 BLUE = np.array([0, 90, 255], np.uint8)
 
-# grid coordinate helpers
-_centre = (GRID - 1) / 2.0
-X_COORDS, Y_COORDS = np.meshgrid(np.arange(GRID), np.arange(GRID), indexing="ij")
-DX = X_COORDS - _centre
-DY = Y_COORDS - _centre
+@lru_cache(maxsize=None)
+def _grid_offsets(size: int) -> tuple[np.ndarray, np.ndarray]:
+    centre = (size - 1) / 2.0
+    x_coords, y_coords = np.meshgrid(np.arange(size), np.arange(size), indexing="ij")
+    return x_coords - centre, y_coords - centre
 
 
 def _target_plane(face_px: int, g: Tuple[float, float, float]) -> np.ndarray:
-    """Return GRID×GRID array of target heights for gravity **g**."""
+    """Return a face-sized array of target heights for gravity ``g``."""
     gx, gy, gz = g
     # avoid blow-up when gz ~ 0 (cube on its side)
     denom = 0.001 + abs(gz)
     slope_x = -gx / denom
     slope_y = gy / denom
+    dx, dy = _grid_offsets(face_px)
 
-    return (face_px * 0.5) + slope_x * DX + slope_y * DY
+    return (face_px * 0.5) + slope_x * dx + slope_y * dy
 
 
 @dataclass

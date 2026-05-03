@@ -2,11 +2,24 @@
 set -euo pipefail
 
 DEFAULT_REMOTE_HOST="michael@totem.local"
-DEFAULT_REMOTE_DIR="~/Desktop/"
+DEFAULT_REMOTE_DIR="~/Desktop/heart/"
 DEFAULT_REMOTE_PASS="totemlib2024"
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 DEFAULT_SSH_KEY_PATH="${SCRIPT_DIR}/keys/rpi_common_ed25519"
 SCRIPT_NAME=$(basename "$0")
+DEFAULT_IGNORE_PATTERNS=(
+  ".DS_Store"
+  "._*"
+  ".git/"
+  ".venv/"
+  ".uv-cache/"
+  "__pycache__/"
+  "*.pyc"
+  ".pytest_cache/"
+  ".ruff_cache/"
+  ".mypy_cache/"
+  "node_modules/"
+)
 
 print_usage() {
   cat <<USAGE
@@ -63,7 +76,7 @@ declare -a EXTRA_RSYNC_ARGS=()
 SPELLCHECK_ENABLED=true
 RUN_ONCE=false
 
-declare -a IGNORE_PATTERNS
+declare -a IGNORE_PATTERNS=("${DEFAULT_IGNORE_PATTERNS[@]}")
 
 if [[ -n "${SYNC_PRE_SYNC_CMD:-}" ]]; then
   PRE_SYNC_CMDS+=("$SYNC_PRE_SYNC_CMD")
@@ -253,10 +266,14 @@ _sync_once() {
   local timestamp
   timestamp=$(date '+%Y-%m-%d %H:%M:%S')
   echo "[$timestamp] Syncing $SOURCE_DIR -> $DESTINATION"
-  run_hooks "pre-sync" "${PRE_SYNC_CMDS[@]}"
+  if [[ ${#PRE_SYNC_CMDS[@]} -gt 0 ]]; then
+    run_hooks "pre-sync" "${PRE_SYNC_CMDS[@]}"
+  fi
   run_spellcheck
   run_rsync
-  run_hooks "post-sync" "${POST_SYNC_CMDS[@]}"
+  if [[ ${#POST_SYNC_CMDS[@]} -gt 0 ]]; then
+    run_hooks "post-sync" "${POST_SYNC_CMDS[@]}"
+  fi
   echo "[$timestamp] Sync complete"
 }
 

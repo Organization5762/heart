@@ -19,7 +19,7 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     renderer = SlidingImage("banner.png", speed=4)
     manager.window.on_next(window)
     renderer.initialize(window, manager, orientation)
-    manager.game_tick.on_next(True)
+    manager.frame_tick_controller.advance(clock)
 
     initial_state = renderer.state
     assert initial_state.width == window.get_width()
@@ -28,8 +28,8 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
 
     window.fill((0, 0, 0, 0))
     offset_before = renderer.state.offset
-    manager.game_tick.on_next(True)
-    renderer.process(window, clock, manager, orientation)
+    manager.frame_tick_controller.advance(clock)
+    renderer._internal_process(window, manager, orientation)
     processed_state = renderer.state
     assert processed_state.offset == (
         offset_before + processed_state.speed
@@ -44,13 +44,13 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     after_reset_state = renderer.state
     assert after_reset_state.offset == after_reset_state.speed
     assert after_reset_state.speed == 4
-    manager.game_tick.on_next(True)
+    manager.frame_tick_controller.advance(clock)
     assert renderer.state.width == processed_state.width
 
     window.fill((0, 0, 0, 0))
     offset_before_second = renderer.state.offset
-    manager.game_tick.on_next(True)
-    renderer.process(window, clock, manager, orientation)
+    manager.frame_tick_controller.advance(clock)
+    renderer._internal_process(window, manager, orientation)
     after_second_process_state = renderer.state
     assert after_second_process_state.offset == (
         offset_before_second + after_second_process_state.speed

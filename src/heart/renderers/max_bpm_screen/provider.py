@@ -27,7 +27,7 @@ class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
     ) -> reactivex.Observable[AvatarBpmRendererState]:
         return (
             pipe_in_background(
-                peripheral_manager.game_tick,
+                peripheral_manager.frame_tick_controller.observable(),
                 ops.map(lambda _: self._select_top_bpm()),
                 ops.start_with(
                     AvatarBpmRendererState(sensor_id=None, bpm=None, avatar_name=None)

@@ -9,6 +9,8 @@ import path from "path";
 import { IPC_CHANNELS } from "./constants";
 
 const inDevelopment = process.env.NODE_ENV === "development";
+const installReactDevTools =
+  inDevelopment && process.env.BEATS_INSTALL_REACT_DEVTOOLS === "1";
 
 function createWindow() {
   const preload = path.join(__dirname, "preload.js");
@@ -16,6 +18,7 @@ function createWindow() {
     width: 1600,
     height: 800,
     webPreferences: {
+      backgroundThrottling: false,
       devTools: inDevelopment,
       contextIsolation: true,
       nodeIntegration: true,
@@ -40,11 +43,15 @@ function createWindow() {
 }
 
 async function installExtensions() {
+  if (!installReactDevTools) {
+    return;
+  }
+
   try {
     const result = await installExtension(REACT_DEVELOPER_TOOLS);
     console.log(`Extensions installed successfully: ${result.name}`);
-  } catch {
-    console.error("Failed to install extensions");
+  } catch (error) {
+    console.error("Failed to install React Developer Tools", error);
   }
 }
 
@@ -59,11 +66,7 @@ async function setupORPC() {
   });
 }
 
-app
-  .whenReady()
-  .then(createWindow)
-  .then(installExtensions)
-  .then(setupORPC);
+app.whenReady().then(createWindow).then(installExtensions).then(setupORPC);
 
 // osX only
 app.on("window-all-closed", () => {

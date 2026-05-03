@@ -5,22 +5,10 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
                                        IsolatedRendererAckStrategy,
                                        IsolatedRendererDedupStrategy,
                                        LifeRuleStrategy, LifeUpdateStrategy,
-                                       RendererTimingStrategy,
-                                       RenderLoopPacingStrategy,
-                                       RenderMergeStrategy,
-                                       RenderPlanSignatureStrategy,
                                        RenderTileStrategy)
-from heart.utilities.env.parsing import (_env_flag, _env_float, _env_int,
-                                         _env_optional_int)
+from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
 
-DEFAULT_RENDER_PLAN_REFRESH_MS = 100
 DEFAULT_RENDER_CRASH_ON_ERROR = False
-DEFAULT_RENDER_TIMING_EMA_ALPHA = 0.2
-DEFAULT_RENDER_TIMING_STRATEGY = RendererTimingStrategy.EMA
-DEFAULT_RENDER_LOOP_PACING_STRATEGY = RenderLoopPacingStrategy.OFF
-DEFAULT_RENDER_LOOP_PACING_MIN_INTERVAL_MS = 0.0
-DEFAULT_RENDER_LOOP_PACING_UTILIZATION = 0.9
-DEFAULT_RENDER_PLAN_SIGNATURE_STRATEGY = RenderPlanSignatureStrategy.INSTANCE
 
 
 class RenderingConfiguration:
@@ -83,58 +71,11 @@ class RenderingConfiguration:
             ) from exc
 
     @classmethod
-    def render_variant(cls) -> str:
-        return os.environ.get("HEART_RENDER_VARIANT", "iterative")
-
-    @classmethod
-    def render_plan_refresh_ms(cls) -> int:
-        return _env_int(
-            "HEART_RENDER_PLAN_REFRESH_MS",
-            default=DEFAULT_RENDER_PLAN_REFRESH_MS,
-            minimum=0,
-        )
-
-    @classmethod
     def render_crash_on_error(cls) -> bool:
         return _env_flag(
             "HEART_RENDER_CRASH_ON_ERROR",
             default=DEFAULT_RENDER_CRASH_ON_ERROR,
         )
-
-    @classmethod
-    def render_plan_signature_strategy(cls) -> RenderPlanSignatureStrategy:
-        strategy = os.environ.get(
-            "HEART_RENDER_PLAN_SIGNATURE_STRATEGY",
-            DEFAULT_RENDER_PLAN_SIGNATURE_STRATEGY.value,
-        ).strip().lower()
-        try:
-            return RenderPlanSignatureStrategy(strategy)
-        except ValueError as exc:
-            raise ValueError(
-                "HEART_RENDER_PLAN_SIGNATURE_STRATEGY must be 'instance' or 'type'"
-            ) from exc
-
-    @classmethod
-    def render_parallel_threshold(cls) -> int:
-        return _env_int("HEART_RENDER_PARALLEL_THRESHOLD", default=4, minimum=1)
-
-    @classmethod
-    def render_parallel_cost_threshold_ms(cls) -> int:
-        return _env_int(
-            "HEART_RENDER_PARALLEL_COST_THRESHOLD_MS", default=12, minimum=0
-        )
-
-    @classmethod
-    def render_executor_max_workers(cls) -> int | None:
-        return _env_optional_int("HEART_RENDER_MAX_WORKERS", minimum=1)
-
-    @classmethod
-    def render_surface_cache_enabled(cls) -> bool:
-        return _env_flag("HEART_RENDER_SURFACE_CACHE", default=False)
-
-    @classmethod
-    def render_screen_cache_enabled(cls) -> bool:
-        return _env_flag("HEART_RENDER_SCREEN_CACHE", default=False)
 
     @classmethod
     def render_tile_strategy(cls) -> RenderTileStrategy:
@@ -145,89 +86,6 @@ class RenderingConfiguration:
             raise ValueError(
                 "HEART_RENDER_TILE_STRATEGY must be 'blits' or 'loop'"
             ) from exc
-
-    @classmethod
-    def render_merge_strategy(cls) -> RenderMergeStrategy:
-        strategy = os.environ.get(
-            "HEART_RENDER_MERGE_STRATEGY", RenderMergeStrategy.BATCHED.value
-        ).strip().lower()
-        try:
-            return RenderMergeStrategy(strategy)
-        except ValueError as exc:
-            raise ValueError(
-                "HEART_RENDER_MERGE_STRATEGY must be "
-                "'in_place', 'batched', or 'adaptive'"
-            ) from exc
-
-    @classmethod
-    def render_merge_cost_threshold_ms(cls) -> int:
-        return _env_int("HEART_RENDER_MERGE_COST_THRESHOLD_MS", default=6, minimum=0)
-
-    @classmethod
-    def render_merge_surface_threshold(cls) -> int:
-        return _env_int("HEART_RENDER_MERGE_SURFACE_THRESHOLD", default=3, minimum=1)
-
-    @classmethod
-    def render_timing_strategy(cls) -> RendererTimingStrategy:
-        strategy = os.environ.get(
-            "HEART_RENDER_TIMING_STRATEGY",
-            DEFAULT_RENDER_TIMING_STRATEGY.value,
-        ).strip().lower()
-        try:
-            return RendererTimingStrategy(strategy)
-        except ValueError as exc:
-            raise ValueError(
-                "HEART_RENDER_TIMING_STRATEGY must be 'cumulative' or 'ema'"
-            ) from exc
-
-    @classmethod
-    def render_timing_ema_alpha(cls) -> float:
-        alpha = _env_float(
-            "HEART_RENDER_TIMING_EMA_ALPHA",
-            default=DEFAULT_RENDER_TIMING_EMA_ALPHA,
-            minimum=0.0,
-            maximum=1.0,
-        )
-        if alpha <= 0.0:
-            raise ValueError(
-                "HEART_RENDER_TIMING_EMA_ALPHA must be greater than 0 and at most 1"
-            )
-        return alpha
-
-    @classmethod
-    def render_loop_pacing_strategy(cls) -> RenderLoopPacingStrategy:
-        strategy = os.environ.get(
-            "HEART_RENDER_LOOP_PACING_STRATEGY",
-            DEFAULT_RENDER_LOOP_PACING_STRATEGY.value,
-        ).strip().lower()
-        try:
-            return RenderLoopPacingStrategy(strategy)
-        except ValueError as exc:
-            raise ValueError(
-                "HEART_RENDER_LOOP_PACING_STRATEGY must be 'off' or 'adaptive'"
-            ) from exc
-
-    @classmethod
-    def render_loop_pacing_min_interval_ms(cls) -> float:
-        return _env_float(
-            "HEART_RENDER_LOOP_PACING_MIN_INTERVAL_MS",
-            default=DEFAULT_RENDER_LOOP_PACING_MIN_INTERVAL_MS,
-            minimum=0.0,
-        )
-
-    @classmethod
-    def render_loop_pacing_utilization(cls) -> float:
-        utilization = _env_float(
-            "HEART_RENDER_LOOP_PACING_UTILIZATION",
-            default=DEFAULT_RENDER_LOOP_PACING_UTILIZATION,
-            minimum=0.0,
-            maximum=1.0,
-        )
-        if utilization <= 0.0:
-            raise ValueError(
-                "HEART_RENDER_LOOP_PACING_UTILIZATION must be greater than 0 and at most 1"
-            )
-        return utilization
 
     @classmethod
     def frame_array_strategy(cls) -> FrameArrayStrategy:

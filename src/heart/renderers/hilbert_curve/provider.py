@@ -293,8 +293,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         initial_state: HilbertCurveState,
     ) -> reactivex.Observable[HilbertCurveState]:
         return pipe_in_background(
-            peripheral_manager.game_tick,
-            ops.filter(lambda tick: tick is not None),
+            peripheral_manager.frame_tick_controller.observable(),
             ops.map(lambda _: time.monotonic()),
             ops.scan(
                 lambda state, now: self.advance(state, now=now),

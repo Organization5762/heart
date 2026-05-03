@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import type { ComponentProps } from "react"
+import type { ComponentProps } from "react";
 import {
   Close as SheetClosePrimitive,
   Content as SheetContentPrimitive,
@@ -10,31 +10,29 @@ import {
   Root as SheetRoot,
   Title as SheetTitlePrimitive,
   Trigger as SheetTriggerPrimitive,
-} from "@radix-ui/react-dialog"
-import { XIcon } from "lucide-react"
+} from "@radix-ui/react-dialog";
+import { XIcon } from "lucide-react";
 
-import { cn } from "@/utils/tailwind"
+import { cn } from "@/utils/tailwind";
 
 function Sheet({ ...props }: ComponentProps<typeof SheetRoot>) {
-  return <SheetRoot data-slot="sheet" {...props} />
+  return <SheetRoot data-slot="sheet" {...props} />;
 }
 
 function SheetTrigger({
   ...props
 }: ComponentProps<typeof SheetTriggerPrimitive>) {
-  return <SheetTriggerPrimitive data-slot="sheet-trigger" {...props} />
+  return <SheetTriggerPrimitive data-slot="sheet-trigger" {...props} />;
 }
 
-function SheetClose({
-  ...props
-}: ComponentProps<typeof SheetClosePrimitive>) {
-  return <SheetClosePrimitive data-slot="sheet-close" {...props} />
+function SheetClose({ ...props }: ComponentProps<typeof SheetClosePrimitive>) {
+  return <SheetClosePrimitive data-slot="sheet-close" {...props} />;
 }
 
 function SheetPortal({
   ...props
 }: ComponentProps<typeof SheetPortalPrimitive>) {
-  return <SheetPortalPrimitive data-slot="sheet-portal" {...props} />
+  return <SheetPortalPrimitive data-slot="sheet-portal" {...props} />;
 }
 
 function SheetOverlay({
@@ -46,11 +44,11 @@ function SheetOverlay({
       data-slot="sheet-overlay"
       className={cn(
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function SheetContent({
@@ -59,7 +57,7 @@ function SheetContent({
   side = "right",
   ...props
 }: ComponentProps<typeof SheetContentPrimitive> & {
-  side?: "top" | "right" | "bottom" | "left"
+  side?: "top" | "right" | "bottom" | "left";
 }) {
   return (
     <SheetPortal>
@@ -76,7 +74,7 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b",
           side === "bottom" &&
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
-          className
+          className,
         )}
         {...props}
       >
@@ -87,7 +85,7 @@ function SheetContent({
         </SheetClosePrimitive>
       </SheetContentPrimitive>
     </SheetPortal>
-  )
+  );
 }
 
 function SheetHeader({ className, ...props }: ComponentProps<"div">) {
@@ -97,7 +95,7 @@ function SheetHeader({ className, ...props }: ComponentProps<"div">) {
       className={cn("flex flex-col gap-1.5 p-4", className)}
       {...props}
     />
-  )
+  );
 }
 
 function SheetFooter({ className, ...props }: ComponentProps<"div">) {
@@ -107,7 +105,7 @@ function SheetFooter({ className, ...props }: ComponentProps<"div">) {
       className={cn("mt-auto flex flex-col gap-2 p-4", className)}
       {...props}
     />
-  )
+  );
 }
 
 function SheetTitle({
@@ -120,7 +118,7 @@ function SheetTitle({
       className={cn("text-foreground font-semibold", className)}
       {...props}
     />
-  )
+  );
 }
 
 function SheetDescription({
@@ -133,7 +131,7 @@ function SheetDescription({
       className={cn("text-muted-foreground text-sm", className)}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -145,4 +143,4 @@ export {
   SheetFooter,
   SheetTitle,
   SheetDescription,
-}
+};

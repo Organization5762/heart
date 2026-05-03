@@ -5,8 +5,6 @@ from heart.renderers.slide_transition import \
 from heart.renderers.slide_transition import \
     SlideTransitionRenderer as SlideTransitionRenderer
 
-from .app_controller import AppController as AppController
-from .app_controller import AppControllerState as AppControllerState
 from .composed_renderer import ComposedRenderer as ComposedRenderer
 from .composed_renderer import ComposedRendererState as ComposedRendererState
 from .game_modes import GameModes as GameModes

@@ -3,8 +3,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRef } from "react";
 import { frameStream } from "../streams";
 
+const ACTIVE_STATUS_POLL_INTERVAL_MS = 200;
+const STALE_URL_REVOKE_DELAY_MS = 1000;
+
 type ImageState = {
   imgURL: string | null;
+  frameBlob: Blob | null;
   isActive: boolean;
   fps: number;
 };
@@ -17,6 +21,7 @@ type ImageProviderProps = {
 
 const ImageContext = createContext<ImageState>({
   imgURL: null,
+  frameBlob: null,
   isActive: false,
   fps: 0,
 });
@@ -27,11 +32,30 @@ export function ImageProvider({
   children,
 }: ImageProviderProps) {
   const [imgURL, setImgURL] = useState<string | null>(null);
+  const [frameBlob, setFrameBlob] = useState<Blob | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [fps, setFps] = useState(0);
 
   const lastFrameRef = useRef<number>(0);
   const frameTimesRef = useRef<number[]>([]);
+  const revokeTimeoutsRef = useRef<number[]>([]);
+
+  const clearPendingRevocations = () => {
+    revokeTimeoutsRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    revokeTimeoutsRef.current = [];
+  };
+
+  const scheduleUrlRevocation = (url: string) => {
+    const timeoutId = window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      revokeTimeoutsRef.current = revokeTimeoutsRef.current.filter(
+        (pendingId) => pendingId !== timeoutId,
+      );
+    }, STALE_URL_REVOKE_DELAY_MS);
+    revokeTimeoutsRef.current.push(timeoutId);
+  };
 
   useEffect(() => {
     const sub = frameStream.subscribe((msg) => {
@@ -43,7 +67,10 @@ export function ImageProvider({
 
       // Remove old frames
       const cutoff = now - fpsWindow;
-      while (frameTimesRef.current.length && frameTimesRef.current[0] < cutoff) {
+      while (
+        frameTimesRef.current.length &&
+        frameTimesRef.current[0] < cutoff
+      ) {
         frameTimesRef.current.shift();
       }
 
@@ -64,9 +91,12 @@ export function ImageProvider({
 
       const blob = bytesToBlob(msg.payload.pngData);
       const newURL = URL.createObjectURL(blob);
+      setFrameBlob(blob);
 
       setImgURL((old) => {
-        if (old) URL.revokeObjectURL(old);
+        if (old) {
+          scheduleUrlRevocation(old);
+        }
         return newURL;
       });
 
@@ -77,17 +107,21 @@ export function ImageProvider({
     const interval = setInterval(() => {
       const now = performance.now();
       setIsActive(now - lastFrameRef.current < recentThreshold);
-    }, 200);
+    }, ACTIVE_STATUS_POLL_INTERVAL_MS);
 
     return () => {
       sub.unsubscribe();
       clearInterval(interval);
+      clearPendingRevocations();
 
       setImgURL((old) => {
-        if (old) URL.revokeObjectURL(old);
+        if (old) {
+          URL.revokeObjectURL(old);
+        }
         return null;
       });
 
+      setFrameBlob(null);
       setIsActive(false);
       setFps(0);
       frameTimesRef.current = [];
@@ -98,6 +132,7 @@ export function ImageProvider({
     <ImageContext.Provider
       value={{
         imgURL,
+        frameBlob,
         isActive,
         fps,
       }}
@@ -113,5 +148,7 @@ export function useStreamedImage() {
 
 // --- Helpers ---
 function bytesToBlob(data: Uint8Array) {
-  return new Blob([data], { type: "image/png" });
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  return new Blob([copy], { type: "image/png" });
 }

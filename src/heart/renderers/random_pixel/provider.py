@@ -47,7 +47,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
             ops.map(lambda color: ("color", color)),
         )
         tick_updates = pipe_in_background(
-            self._peripheral_manager.game_tick,
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.map(lambda _: ("tick", None)),
         )
 

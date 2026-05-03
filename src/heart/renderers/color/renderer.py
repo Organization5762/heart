@@ -1,5 +1,3 @@
-import pygame
-
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.renderers import StatefulBaseRenderer
@@ -24,9 +22,7 @@ class RenderColor(StatefulBaseRenderer[RenderColorState]):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
-        image = pygame.Surface(window.get_size())
-        image.fill(self.state.color._as_tuple())
-        window.blit(image, (0, 0))
+        window.fill(self.state.color._as_tuple())
 
     @property
     def color(self) -> Color:

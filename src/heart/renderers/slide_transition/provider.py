@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-import pygame
 import reactivex
 from reactivex import operators as ops
 
@@ -17,7 +16,7 @@ from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
 from heart.utilities.reactivex_threads import pipe_in_background
 
 if TYPE_CHECKING:
-    import pygame
+    pass
 
 DEFAULT_SLIDE_DURATION_MS = 333
 MIN_SLIDE_DURATION_MS = 1
@@ -49,14 +48,12 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         *,
         initial_state: SlideTransitionState,
     ) -> reactivex.Observable[SlideTransitionState]:
-
         return pipe_in_background(
-            peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+            peripheral_manager.frame_tick_controller.observable(),
             ops.scan(
-                lambda state, clock: self._advance(
+                lambda state, frame_tick: self._advance(
                     state=state,
-                    clock=clock,
+                    elapsed_ms=frame_tick.delta_ms,
                     slide_duration_ms=self.slide_duration_ms,
                 ),
                 seed=initial_state,
@@ -69,13 +66,13 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
     def _advance(
         *,
         state: SlideTransitionState,
-        clock: pygame.time.Clock,
+        elapsed_ms: float,
         slide_duration_ms: int,
     ) -> SlideTransitionState:
         if not state.sliding:
             return state
 
-        delta_ms = max(float(clock.get_time()), 0.0)
+        delta_ms = max(float(elapsed_ms), 0.0)
         current_location = state.fraction_offset + (delta_ms / slide_duration_ms)
         if current_location >= 1:
             return replace(state, fraction_offset=1.0, sliding=False)

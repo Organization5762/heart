@@ -1,3 +1,4 @@
+import { PaperCard } from "@/components/beats-shell";
 import { useConnectedPeripherals } from "../ws/providers/PeripheralProvider";
 
 function formatTimestamp(timestamp: number) {
@@ -6,47 +7,56 @@ function formatTimestamp(timestamp: number) {
 
 export function PeripheralSnapshots() {
   const peripherals = useConnectedPeripherals();
-  const items = Object.entries(peripherals).sort(([, left], [, right]) => right.ts - left.ts);
+  const items = Object.entries(peripherals).sort(
+    ([, left], [, right]) => right.ts - left.ts,
+  );
 
   return (
-    <div className="flex h-full flex-col select-none p-3">
-      <h2 className="text-sm font-bold mb-2 text-muted-foreground uppercase">
-        Latest Peripheral Data
-      </h2>
+    <PaperCard className="flex h-full flex-col gap-5 select-none">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-2">
+          <p className="beats-kicker">Peripheral Snapshots</p>
+          <h2 className="font-tomorrow text-2xl tracking-[0.1em]">
+            Latest Peripheral Data
+          </h2>
+        </div>
+        <p className="text-muted-foreground font-mono text-[0.72rem] tracking-[0.18em] uppercase">
+          {items.length} Captured Units
+        </p>
+      </div>
 
-      <div className="overflow-auto border rounded-md p-2 bg-black/20 max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 mb-10">
+      <div className="beats-scroll-panel max-h-screen overflow-y-auto">
         {items.length === 0 ? (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground p-4 text-xs">
             No peripheral snapshots have been captured yet.
           </div>
         ) : (
-          <table className="w-full text-xs font-mono">
-            <thead className="text-muted-foreground border-b">
+          <table className="beats-table">
+            <thead>
               <tr>
-                <th className="py-1 px-2 text-left">Peripheral</th>
-                <th className="py-1 px-2 text-left">Last Update</th>
-                <th className="py-1 px-2 text-left">Tags</th>
-                <th className="py-1 px-2 text-left">Payload</th>
+                <th className="px-2 py-1 text-left">Peripheral</th>
+                <th className="px-2 py-1 text-left">Last Update</th>
+                <th className="px-2 py-1 text-left">Tags</th>
+                <th className="px-2 py-1 text-left">Payload</th>
               </tr>
             </thead>
             <tbody>
               {items.map(([id, peripheral]) => (
-                <tr
-                  key={id}
-                  className="hover:bg-white/5 border-b border-white/5 align-top"
-                >
-                  <td className="py-1 px-2 whitespace-nowrap">
+                <tr key={id}>
+                  <td className="px-2 py-1 whitespace-nowrap">
                     {peripheral.info.id ?? "unknown"}
                   </td>
-                  <td className="py-1 px-2 whitespace-nowrap">
+                  <td className="px-2 py-1 whitespace-nowrap">
                     {formatTimestamp(peripheral.ts)}
                   </td>
-                  <td className="py-1 px-2">
+                  <td className="px-2 py-1">
                     {peripheral.info.tags.length > 0 ? (
                       <ul className="space-y-1">
                         {peripheral.info.tags.map((tag, index) => (
                           <li key={`${tag.name}-${index}`}>
-                            <span className="text-muted-foreground">{tag.variant}/</span>
+                            <span className="text-muted-foreground">
+                              {tag.variant}/
+                            </span>
                             {tag.name}
                           </li>
                         ))}
@@ -55,7 +65,7 @@ export function PeripheralSnapshots() {
                       <span className="text-muted-foreground">No tags</span>
                     )}
                   </td>
-                  <td className="py-1 px-2">
+                  <td className="px-2 py-1">
                     <pre className="whitespace-pre-wrap">
                       {JSON.stringify(peripheral.last_data ?? {}, null, 2)}
                     </pre>
@@ -66,6 +76,6 @@ export function PeripheralSnapshots() {
           </table>
         )}
       </div>
-    </div>
+    </PaperCard>
   );
 }

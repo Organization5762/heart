@@ -78,19 +78,18 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> reactivex.Observable[DopplerState]:
-        clocks = pipe_in_background(
-            self._peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = self._initial_state()
 
         def advance_state(
-            state: DopplerState, latest: tuple[object, object]
+            state: DopplerState,
+            frame_tick: object,
         ) -> DopplerState:
-            clock = latest[1]
-            dt_seconds = max(clock.get_time() / 1000.0, 1 / 120)
+            dt_seconds = max(frame_tick.delta_s, 1 / 120)
             acceleration = self._random_acceleration()
             return self._advance_state(
                 state,
@@ -100,8 +99,7 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
 
         return (
             pipe_in_background(
-                self._peripheral_manager.game_tick,
-                ops.with_latest_from(clocks),
+                frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

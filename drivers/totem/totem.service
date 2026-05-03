@@ -6,15 +6,34 @@ After=multi-user.target
 Type=simple
 User=root
 Group=root
+WorkingDirectory=/home/michael/Desktop/heart
 Environment=DISPLAY=:1
+Environment=PYTHONPATH=/home/michael/Desktop/heart/src:/home/michael/Desktop/heart/packages/heart-firmware-io/src:/home/michael/Desktop/heart/packages/heart-device-manager/src
+Environment=MOCK_SWITCH=1
+Environment=PERIPHERAL_CONFIGURATION=default
+Environment=PYTHONUNBUFFERED=1
+Environment=FORWARD_TO_BEATS_APP=0
+Environment=HEART_RUN_CONFIGURATION=lib_2025
+Environment=HEART_DISABLE_PHONE_TEXT=1
+Environment=HEART_RUBIKS_CONNECTED_X_AUTODETECT=1
+Environment=HEART_RUBIKS_CONNECTED_X_PREFERRED_NAME=RubiksX_CDCF6B
+EnvironmentFile=-/etc/default/totem
+ExecStartPre=-/usr/bin/pkill -f "/home/michael/Desktop/heart/src/heart/loop.py run"
+ExecStartPre=-/usr/bin/pkill -f "src/heart/loop.py run"
+ExecStartPre=-/usr/bin/pkill -f "Xvfb.*:1"
 # Use the helper script to set up Xvfb
 ExecStartPre=/usr/local/bin/setup-xvfb.sh
 # Start the main app (no need for sudo as we're already running as root)
-ExecStart=/usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py run --configuration lib_2025
+ExecStart=/bin/bash /home/michael/Desktop/heart/drivers/totem/start-heart.sh
 # Kill Xvfb on shutdown
-ExecStop=/usr/bin/pkill Xvfb || true
-Restart=on-failure
-RestartSec=5s
+ExecStop=-/usr/bin/pkill -f "Xvfb.*:1"
+ExecStopPost=-/usr/bin/pkill -f "/home/michael/Desktop/heart/src/heart/loop.py run"
+ExecStopPost=-/usr/bin/pkill -f "src/heart/loop.py run"
+KillMode=control-group
+TimeoutStopSec=15s
+SendSIGKILL=yes
+Restart=always
+RestartSec=3s
 
 [Install]
 WantedBy=multi-user.target

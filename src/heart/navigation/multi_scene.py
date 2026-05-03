@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
 
@@ -32,6 +31,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             resolve_renderer_spec(scene, renderer_resolver)
             for scene in scenes
         ]
+        self._navigation_subscription = None
         scene_names = [scene.name for scene in self.scenes]
         self._scene_manager = scene_manager_backend or build_scene_manager_backend(
             scene_names
@@ -49,8 +49,11 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     ) -> MultiSceneState:
         state = MultiSceneState(current_button_value=0, offset_of_button_value=None)
         self.set_state(state)
-        observable = peripheral_manager.get_main_switch_subscription()
-        observable.subscribe(on_next=self._process_switch)
+        self._navigation_subscription = (
+            peripheral_manager.navigation_profile.subscribe_events(
+                on_activate=self._process_activate,
+            )
+        )
 
         for scene in self.scenes:
             scene.initialize(window, peripheral_manager, orientation)
@@ -68,8 +71,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self._scene_manager.reset_button_offset(self.state.current_button_value)
         return super().reset()
 
-    def _process_switch(self, switch_value: SwitchState) -> None:
-        self.state.current_button_value = switch_value.button_value
+    def _process_activate(self, _event: object) -> None:
+        self.state.current_button_value += 1
 
     def _active_scene_index(self) -> int:
         return self._scene_manager.active_scene_index(self.state.current_button_value)

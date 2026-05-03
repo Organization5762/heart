@@ -144,7 +144,8 @@ class TestClothSailRenderer:
 
         monkeypatch.setattr(pygame.surfarray, "blit_array", _capture_blit_array)
 
-        renderer.process(window, clock, manager, orientation)
+        renderer.initialized = True
+        renderer._internal_process(window, manager, orientation)
 
         frame = captured["frame"]
         assert frame.flags["C_CONTIGUOUS"] is True

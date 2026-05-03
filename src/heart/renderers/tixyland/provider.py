@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
@@ -17,24 +16,23 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> reactivex.Observable[TixylandState]:
-        clocks = pipe_in_background(
-            self._peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = TixylandState()
 
-        def advance_state(state: TixylandState, clock: Clock) -> TixylandState:
-            delta_seconds = max(clock.get_time(), 0) / 1000
+        def advance_state(
+            state: TixylandState,
+            frame_tick: object,
+        ) -> TixylandState:
+            delta_seconds = max(frame_tick.delta_ms, 0.0) / 1000
             return TixylandState(time_seconds=state.time_seconds + delta_seconds)
 
         return (
             pipe_in_background(
-                self._peripheral_manager.game_tick,
-
-                ops.with_latest_from(clocks),
-                ops.map(lambda latest: latest[1]),
+                frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

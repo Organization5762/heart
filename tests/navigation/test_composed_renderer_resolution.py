@@ -6,7 +6,6 @@ from heart.device import Device
 from heart.navigation import ComposedRenderer
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.container import build_runtime_container
-from heart.runtime.rendering.pipeline import RendererVariant
 
 
 class _ContainerRenderer(StatefulBaseRenderer[int]):
@@ -32,10 +31,7 @@ class TestComposedRendererResolution:
 
     def test_resolves_renderer_types_at_construction(self, device: Device) -> None:
         """Verify renderer classes resolve via Lagom on init so configuration lists stay container-aware."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.ITERATIVE,
-        )
+        container = build_runtime_container(device=device)
         container[_ContainerRenderer] = _ContainerRenderer
 
         composed = container.resolve(ComposedRenderer)
@@ -45,10 +41,7 @@ class TestComposedRendererResolution:
 
     def test_add_renderer_resolves_types(self, device: Device) -> None:
         """Confirm add_renderer resolves class inputs so dynamic additions still honor container wiring."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.ITERATIVE,
-        )
+        container = build_runtime_container(device=device)
         container[_ContainerRenderer] = _ContainerRenderer
 
         composed = container.resolve(ComposedRenderer)
@@ -60,10 +53,7 @@ class TestComposedRendererResolution:
         self, device: Device
     ) -> None:
         """Verify adding an OpenGL child updates the composed renderer mode so initialization requests the right pygame display type."""
-        container = build_runtime_container(
-            device=device,
-            render_variant=RendererVariant.ITERATIVE,
-        )
+        container = build_runtime_container(device=device)
         container[_OpenGlContainerRenderer] = _OpenGlContainerRenderer
 
         composed = container.resolve(ComposedRenderer)

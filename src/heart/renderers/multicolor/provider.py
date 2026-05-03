@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import reactivex
-from pygame.time import Clock
 from reactivex import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
@@ -17,25 +16,23 @@ class MulticolorStateProvider(ObservableProvider[MulticolorState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> reactivex.Observable[MulticolorState]:
-        clocks = pipe_in_background(
-            self._peripheral_manager.clock,
-            ops.filter(lambda clock: clock is not None),
+        frame_ticks = pipe_in_background(
+            self._peripheral_manager.frame_tick_controller.observable(),
             ops.share(),
         )
 
         initial_state = MulticolorState()
 
         def advance_state(
-            state: MulticolorState, clock: Clock
+            state: MulticolorState,
+            frame_tick: object,
         ) -> MulticolorState:
-            dt_seconds = max(clock.get_time() / 1000.0, 1.0 / 120.0)
+            dt_seconds = max(frame_tick.delta_s, 1.0 / 120.0)
             return MulticolorState(elapsed_seconds=state.elapsed_seconds + dt_seconds)
 
         return (
             pipe_in_background(
-                self._peripheral_manager.game_tick,
-                ops.with_latest_from(clocks),
-                ops.map(lambda latest: latest[1]),
+                frame_ticks,
                 ops.scan(advance_state, seed=initial_state),
                 ops.start_with(initial_state),
                 ops.share(),

@@ -11,19 +11,9 @@ from heart.utilities.env.enums import \
 from heart.utilities.env.enums import LifeRuleStrategy as LifeRuleStrategy
 from heart.utilities.env.enums import LifeUpdateStrategy as LifeUpdateStrategy
 from heart.utilities.env.enums import \
-    ReactivexEventBusScheduler as ReactivexEventBusScheduler
-from heart.utilities.env.enums import \
     ReactivexStreamConnectMode as ReactivexStreamConnectMode
 from heart.utilities.env.enums import \
     ReactivexStreamShareStrategy as ReactivexStreamShareStrategy
-from heart.utilities.env.enums import \
-    RendererTimingStrategy as RendererTimingStrategy
-from heart.utilities.env.enums import \
-    RenderLoopPacingStrategy as RenderLoopPacingStrategy
-from heart.utilities.env.enums import \
-    RenderMergeStrategy as RenderMergeStrategy
-from heart.utilities.env.enums import \
-    RenderPlanSignatureStrategy as RenderPlanSignatureStrategy
 from heart.utilities.env.enums import RenderTileStrategy as RenderTileStrategy
 from heart.utilities.env.enums import \
     SpritesheetFrameCacheStrategy as SpritesheetFrameCacheStrategy

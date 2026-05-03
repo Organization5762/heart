@@ -26,8 +26,8 @@ class TestChannelDiffusionRenderer:
         initial_center = renderer.state.grid[1, 1]
         np.testing.assert_array_equal(initial_center, np.array([255, 255, 255], dtype=np.uint8))
 
-        manager.game_tick.on_next(True)
-        renderer.process(window, clock, manager, orientation)
+        manager.frame_tick_controller.advance(clock)
+        renderer._internal_process(window, manager, orientation)
 
         expected = np.zeros((3, 3, 3), dtype=np.uint8)
         expected[1, 1] = np.array([128, 128, 128], dtype=np.uint8)
