@@ -144,6 +144,7 @@ class TestKeyboardController:
 
         tap = InputDebugTap()
         controller = KeyboardController(tap)
+        monkeypatch.setenv("X11_FORWARD", "1")
 
         class _KeyStateStub:
             def __len__(self) -> int:
@@ -182,6 +183,7 @@ class TestKeyboardController:
 
         tap = InputDebugTap()
         controller = KeyboardController(tap)
+        monkeypatch.setenv("X11_FORWARD", "1")
 
         class _KeyStateStub:
             def __len__(self) -> int:
@@ -224,6 +226,7 @@ class TestKeyboardController:
         tap = InputDebugTap()
         controller = KeyboardController(tap)
         call_order: list[str] = []
+        monkeypatch.setenv("X11_FORWARD", "1")
 
         class _KeyStateStub:
             def __len__(self) -> int:
