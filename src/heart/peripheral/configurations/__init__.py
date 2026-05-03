@@ -4,6 +4,7 @@ import itertools
 import os
 from typing import Any, Iterator
 
+from heart.peripheral.configuration import GraphNodeFactory
 from heart.peripheral.compass import Compass
 from heart.peripheral.core import Peripheral
 from heart.peripheral.drawing_pad import DrawingPad
@@ -25,12 +26,13 @@ logger = get_logger(__name__)
 DISABLE_PHONE_TEXT_ENV_VAR = "HEART_DISABLE_PHONE_TEXT"
 
 def _detect_switches() -> Iterator[Peripheral[Any]]:
+    switches: list[Peripheral[Any]]
     if Configuration.use_mock_switch():
         logger.info("MOCK_SWITCH enabled; using fake switch")
         switches = list(FakeSwitch.detect())
     elif Configuration.is_pi() and not Configuration.is_x11_forward():
         logger.info("Detecting switches")
-        switches: list[Peripheral[Any]] = [
+        switches = [
             *Switch.detect(),
             *BluetoothSwitch.detect(),
         ]
@@ -80,6 +82,22 @@ def _detect_radios() -> Iterator[Peripheral[Any]]:
     from heart.peripheral.flowtoy import FlowToyPeripheral
 
     yield from itertools.chain(FlowToyPeripheral.detect())
+
+def _radio_detection_node(
+    *,
+    start_immediately: bool,
+    on_detect: Any | None,
+) -> Any:
+    from heart.peripheral.flowtoy import FlowToyPeripheral
+
+    return FlowToyPeripheral.detection_node(
+        spawn_sources=True,
+        on_detect=on_detect,
+        start_immediately=start_immediately,
+    )
+
+def _radio_graph_nodes() -> tuple[GraphNodeFactory, ...]:
+    return (_radio_detection_node,)
 
 def _detect_uwb_position() -> Iterator[Peripheral[Any]]:
     yield from itertools.chain(FakeUWBPositioning.detect())

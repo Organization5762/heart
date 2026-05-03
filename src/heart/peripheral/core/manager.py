@@ -1,5 +1,6 @@
 from typing import Any, Iterable
 
+from manyfold import Graph
 import manyfold.rx as reactivex
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -33,6 +34,8 @@ class PeripheralManager:
         configuration_loader: PeripheralConfigurationLoader | None = None,
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
+        self._graph = Graph()
+        self._graph_node_handles: list[Any] = []
         self._started = False
         if configuration_loader and (configuration or configuration_registry):
             raise ValueError(
@@ -82,19 +85,42 @@ class PeripheralManager:
     def configuration_registry(self) -> PeripheralConfigurationRegistry:
         return self._configuration_loader.registry
 
+    @property
+    def graph(self) -> Graph:
+        return self._graph
+
+    @property
+    def graph_node_handles(self) -> tuple[Any, ...]:
+        return tuple(self._graph_node_handles)
+
     def detect(self) -> None:
-        for peripheral in self._iter_detected_peripherals():
+        configuration = self._ensure_configuration()
+        for peripheral in self._iter_detected_peripherals(configuration):
             self._register_peripheral(peripheral)
 
-        self._ensure_configuration()
+        for graph_node_factory in configuration.graph_nodes:
+            graph_node = graph_node_factory(
+                start_immediately=True,
+                on_detect=lambda peripheral, _access: self._register_peripheral(
+                    peripheral
+                ),
+            )
+            handle = graph_node.install(self._graph)
+            self._graph_node_handles.append(handle)
+            node_handle = getattr(handle, "node_handle", None)
+            if node_handle is not None:
+                node_handle.join()
 
     def register(self, peripheral: Peripheral[Any]) -> None:
         """Manually register ``peripheral`` with the manager."""
 
         self._register_peripheral(peripheral)
 
-    def _iter_detected_peripherals(self) -> Iterable[Peripheral[Any]]:
-        for detector in self._ensure_configuration().detectors:
+    def _iter_detected_peripherals(
+        self,
+        configuration: PeripheralConfiguration,
+    ) -> Iterable[Peripheral[Any]]:
+        for detector in configuration.detectors:
             yield from detector()
 
     def _ensure_configuration(self) -> PeripheralConfiguration:
@@ -111,6 +137,12 @@ class PeripheralManager:
         for peripheral in self._peripherals:
             logger.info(f"Attempting to start peripheral '{peripheral}'")
             peripheral.run()
+
+    def stop(self) -> None:
+        for handle in reversed(self._graph_node_handles):
+            dispose = getattr(handle, "dispose", None)
+            if dispose is not None:
+                dispose(timeout=1.0)
 
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
