@@ -1,5 +1,5 @@
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame

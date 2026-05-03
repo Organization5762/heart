@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Generic
 
-from reactivex import Observable
-from reactivex.disposable import Disposable
+from manyfold.rx import Observable
+from manyfold.rx.disposable import Disposable
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager

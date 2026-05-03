@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import threading
 
+import manyfold.rx as reactivex
 import pytest
-import reactivex
-from reactivex import create
-from reactivex import operators as ops
-from reactivex.disposable import Disposable
-from reactivex.subject import Subject
+from manyfold.rx import create
+from manyfold.rx import operators as ops
+from manyfold.rx.disposable import Disposable
+from manyfold.rx.subject import Subject
 
 from heart.utilities.reactivex_threads import (
     FRAME_THREAD_LATENCY_STREAM, background_scheduler, blocking_io_scheduler,

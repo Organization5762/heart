@@ -3,8 +3,8 @@ from functools import lru_cache
 from typing import Self, Tuple
 
 import numpy as np
-from reactivex import Observable
-from reactivex import operators as ops
+from manyfold.rx import Observable
+from manyfold.rx import operators as ops
 
 from heart.device import Device
 from heart.peripheral.sensor import Acceleration

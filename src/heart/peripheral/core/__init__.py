@@ -6,8 +6,10 @@ from enum import StrEnum
 from functools import cached_property
 from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
+from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
+                                SensorTag)
 
 from heart.utilities.logging import get_logger
 
@@ -19,6 +21,20 @@ class Input:
     event_type: str
     data: Any
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_sensor_event(
+        self,
+        *,
+        identity: SensorIdentity | None = None,
+        sequence_number: int | None = None,
+    ) -> SensorEvent:
+        return SensorEvent(
+            event_type=self.event_type,
+            data=self.data,
+            observed_at=self.timestamp.timestamp(),
+            identity=identity or SensorIdentity(),
+            sequence_number=sequence_number,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +63,13 @@ class PeripheralTag:
     variant: str
     metadata: dict[str, str] = field(default_factory=dict)
 
+    def to_sensor_tag(self) -> SensorTag:
+        return SensorTag(
+            name=self.name,
+            variant=self.variant,
+            metadata=dict(self.metadata),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PeripheralLocation:
@@ -57,12 +80,27 @@ class PeripheralLocation:
     z: float = 0.0
     time: datetime | None = None
 
+    def to_sensor_location(self) -> SensorLocation:
+        return SensorLocation(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            timestamp=None if self.time is None else self.time.timestamp(),
+        )
+
 
 @dataclass
 class PeripheralInfo:
     id: str | None = None
     tags: Sequence[PeripheralTag] = field(default_factory=list)
     location: PeripheralLocation = field(default_factory=PeripheralLocation)
+
+    def to_sensor_identity(self) -> SensorIdentity:
+        return SensorIdentity(
+            id=self.id,
+            tags=tuple(tag.to_sensor_tag() for tag in self.tags),
+            location=self.location.to_sensor_location(),
+        )
 
 @dataclass
 class PeripheralMessageEnvelope(Generic[A]):
@@ -72,6 +110,22 @@ class PeripheralMessageEnvelope(Generic[A]):
     @classmethod
     def unwrap_peripheral(cls, wrapper: PeripheralMessageEnvelope[A]) -> A:
         return wrapper.data
+
+    def to_sensor_event(
+        self,
+        *,
+        event_type: str,
+        observed_at: datetime | None = None,
+        sequence_number: int | None = None,
+    ) -> SensorEvent:
+        timestamp = observed_at or datetime.now(timezone.utc)
+        return SensorEvent(
+            event_type=event_type,
+            data=self.data,
+            observed_at=timestamp.timestamp(),
+            identity=self.peripheral_info.to_sensor_identity(),
+            sequence_number=sequence_number,
+        )
 
 class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""

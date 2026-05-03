@@ -1,8 +1,8 @@
 from typing import cast
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager

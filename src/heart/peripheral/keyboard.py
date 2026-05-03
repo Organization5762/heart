@@ -4,9 +4,9 @@ from datetime import timedelta
 from functools import cache
 from typing import Any, Iterator, Self, cast
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import Peripheral
 from heart.utilities.env import Configuration

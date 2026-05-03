@@ -14,9 +14,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
-import reactivex
+import manyfold.rx as reactivex
 from bleak import BleakClient, BleakScanner
-from reactivex.subject import Subject
+from manyfold.rx.subject import Subject
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.logging import get_logger

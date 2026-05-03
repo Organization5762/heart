@@ -9,9 +9,9 @@ from enum import StrEnum
 from math import ceil
 from typing import Any
 
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import Subject
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
+from manyfold.rx.subject import Subject
 
 from heart.utilities.reactivex_threads import pipe_in_background
 

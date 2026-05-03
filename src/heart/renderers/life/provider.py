@@ -1,8 +1,8 @@
 
 from typing import Callable
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider

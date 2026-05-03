@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import manyfold.rx as reactivex
 import pygame
 import pytest
-import reactivex
-from reactivex import operators as ops
-from reactivex.testing.marbles import marbles_testing
+from manyfold.rx import operators as ops
+from manyfold.rx.testing.marbles import marbles_testing
 
 from heart.peripheral.core.input import FrameTick
 from heart.renderers.sliding_image.provider import SlidingImageStateProvider

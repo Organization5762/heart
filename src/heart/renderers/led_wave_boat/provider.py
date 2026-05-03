@@ -3,8 +3,8 @@ from __future__ import annotations
 import math
 from random import Random
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core.input import (AccelerometerController,
                                          AccelerometerDebugProfile)

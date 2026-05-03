@@ -1,9 +1,9 @@
 import logging
 import time
 
+import manyfold.rx as reactivex
 import numpy as np
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle

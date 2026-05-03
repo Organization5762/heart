@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import reactivex
+import manyfold.rx as reactivex
 
 from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager

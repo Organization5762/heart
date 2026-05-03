@@ -3,16 +3,17 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import timedelta
-from threading import Thread
-from typing import Any, Iterator, Mapping, NoReturn, Self
+from typing import Any, Iterator, Mapping, Self
 
-import reactivex
+import manyfold.rx as reactivex
 import serial
 from bleak.backends.device import BLEDevice
-from reactivex import create
-from reactivex import operators as ops
-from reactivex.abc import ObserverBase, SchedulerBase
-from reactivex.disposable import Disposable
+from manyfold.rx import create
+from manyfold.rx import operators as ops
+from manyfold.rx.abc import ObserverBase, SchedulerBase
+from manyfold.rx.disposable import Disposable
+from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
+                                ManagedRunLoopHandle, StopToken)
 
 from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralInfo,
@@ -168,7 +169,7 @@ class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:
         self.port = port
         self.baudrate = baudrate
-        self._subscription = None
+        self._subscription: Any | None = None
         super().__init__(*args, **kwargs)
 
     @classmethod
@@ -220,6 +221,7 @@ class BluetoothSwitch(BaseSwitch):
             BaseSwitch() for index in range(4)
         ]
         self.connected = False
+        self._loop_handle: ManagedRunLoopHandle | None = None
         super().__init__(*args, **kwargs)
 
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
@@ -283,48 +285,39 @@ class BluetoothSwitch(BaseSwitch):
         self.listener.start()
 
     def run(self) -> None:
-        Thread(
+        if self._loop_handle is not None and self._loop_handle.thread.is_alive():
+            return
+        loop = ManagedRunLoop(
+            body=self._run_listener_loop,
+            backoff=BackoffPolicy(
+                initial_delay=BLUETOOTH_RETRY_DELAY_SECONDS,
+                multiplier=2.0,
+                max_delay=BLUETOOTH_SLOW_RETRY_DELAY_SECONDS,
+            ),
+            on_error=lambda _exc, attempt: logger.exception(
+                "Bluetooth switch listener failed; retrying (attempt %s).",
+                attempt,
+            ),
+            group="bluetooth-switch",
+        )
+        self._loop_handle = loop.start_thread(
             name=BLUETOOTH_SWITCH_THREAD_NAME,
-            target=self._run_listener_loop,
             daemon=True,
-        ).start()
+        )
 
-    def _run_listener_loop(self) -> NoReturn:
-        slow_poll = False
-        number_of_retries_without_success = 0
-        # If it crashes, try to re-connect
-        while True:
-            try:
-                self._connect_to_ser()
-                number_of_retries_without_success = 0
-                slow_poll = False
-                self.connected = True
-                try:
-                    while True:
-                        for event in self.listener.consume_events():
-                            self.update_due_to_data(event)
-                        time.sleep(BLUETOOTH_EVENT_POLL_DELAY_SECONDS)
-                except KeyboardInterrupt:
-                    logger.info("Program terminated")
-                except Exception:
-                    self.connected = False
-                    logger.exception("Bluetooth switch listener failed; reconnecting.")
-                finally:
-                    self.connected = False
-                    self.listener.close()
-            except Exception:
-                self.connected = False
-                number_of_retries_without_success += 1
-                if number_of_retries_without_success > BLUETOOTH_MAX_RETRY_ATTEMPTS:
-                    slow_poll = True
-                logger.exception(
-                    "Failed to connect to Bluetooth switch; retrying (%s/%s).",
-                    number_of_retries_without_success,
-                    BLUETOOTH_MAX_RETRY_ATTEMPTS,
-                )
+    def stop(self) -> None:
+        if self._loop_handle is not None:
+            self._loop_handle.stop()
+        self.listener.close()
 
-            time.sleep(
-                BLUETOOTH_SLOW_RETRY_DELAY_SECONDS
-                if slow_poll
-                else BLUETOOTH_RETRY_DELAY_SECONDS
-            )
+    def _run_listener_loop(self, stop: StopToken) -> None:
+        self._connect_to_ser()
+        self.connected = True
+        try:
+            while not stop.is_set():
+                for event in self.listener.consume_events():
+                    self.update_due_to_data(event)
+                stop.wait(BLUETOOTH_EVENT_POLL_DELAY_SECONDS)
+        finally:
+            self.connected = False
+            self.listener.close()

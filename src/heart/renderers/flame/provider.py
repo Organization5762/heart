@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import BehaviorSubject
+from manyfold.rx import operators as ops
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider

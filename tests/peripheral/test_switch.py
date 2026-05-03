@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 
 import pytest
-from reactivex.disposable import Disposable
+from manyfold.rx.disposable import Disposable
 
 from heart.peripheral.switch import Switch
 from heart.utilities.reactivex_threads import \

@@ -4,12 +4,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
-from reactivex.abc import DisposableBase
-from reactivex.disposable import CompositeDisposable
-from reactivex.subject import Subject
+from manyfold.rx import operators as ops
+from manyfold.rx.abc import DisposableBase
+from manyfold.rx.disposable import CompositeDisposable
+from manyfold.rx.subject import Subject
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)

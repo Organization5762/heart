@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from reactivex.subject import BehaviorSubject
+from manyfold.rx.subject import BehaviorSubject
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.sensor import Acceleration

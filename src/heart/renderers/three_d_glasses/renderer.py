@@ -9,9 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+import manyfold.rx as reactivex
 import numpy as np
 import pygame
-import reactivex
 
 from heart.assets.loader import Loader
 from heart.device import Orientation

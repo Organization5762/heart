@@ -2,8 +2,8 @@ import random
 import time
 from dataclasses import replace
 
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager

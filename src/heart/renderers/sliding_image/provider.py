@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import cast
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider

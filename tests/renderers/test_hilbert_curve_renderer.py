@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import manyfold.rx as reactivex
 import numpy as np
-import reactivex
 
 from heart.renderers.hilbert_curve.provider import (compute_zoom_target_scale,
                                                     hilbert_curve_points_numba)

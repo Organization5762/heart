@@ -1,5 +1,5 @@
-import reactivex
-from reactivex import operators as ops
+import manyfold.rx as reactivex
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager

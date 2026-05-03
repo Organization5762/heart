@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation

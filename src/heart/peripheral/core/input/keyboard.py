@@ -6,9 +6,9 @@ from datetime import timedelta
 from functools import cache, cached_property
 from typing import Any, cast
 
+import manyfold.rx as reactivex
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold.rx import operators as ops
 
 from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
                                                instrument_input_stream)
