@@ -179,7 +179,11 @@ def main() -> None:
     LOGGER.info(header)
     LOGGER.info(divider)
     for result in results:
-        error = f"{result.angular_error_deg:10.4f}" if result.angular_error_deg is not None else "    --    "
+        error = (
+            f"{result.angular_error_deg:10.4f}"
+            if result.angular_error_deg is not None
+            else "    --    "
+        )
         LOGGER.info(
             f"{result.scenario.name:<12} | "
             f"{list(result.active_indices)!s:<12} | "

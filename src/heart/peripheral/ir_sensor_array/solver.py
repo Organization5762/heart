@@ -71,16 +71,19 @@ class MultilaterationSolver:
             raise ValueError(msg)
 
         point = np.mean(self.sensor_positions, axis=0)
-        emission_time = float(np.min(times)) - np.linalg.norm(
-            point - self.sensor_positions[0]
-        ) / self.propagation_speed
+        emission_time = (
+            float(np.min(times))
+            - np.linalg.norm(point - self.sensor_positions[0]) / self.propagation_speed
+        )
 
         def objective(vector: np.ndarray) -> np.ndarray:
             candidate_point = vector[:3]
             candidate_emission = vector[3]
             deltas = candidate_point - self.sensor_positions
             distances = np.linalg.norm(deltas, axis=1)
-            residuals = distances - self.propagation_speed * (times - candidate_emission)
+            residuals = distances - self.propagation_speed * (
+                times - candidate_emission
+            )
             return np.asarray(residuals, dtype=float)
 
         def jacobian(vector: np.ndarray) -> np.ndarray:

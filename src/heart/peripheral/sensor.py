@@ -8,21 +8,18 @@ from typing import Any, Iterator, Mapping, Self, cast
 
 import serial
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
+                      Schema, StreamFamily, StreamName, Timer, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads.motion import AccelerometerVector
 from heart.utilities.env import get_device_ports
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (interval_in_background,
-                                              pipe_in_background)
 
 logger = get_logger(__name__)
 RECONNECT_DELAY_SECONDS = 1.0
@@ -104,14 +101,12 @@ class Accelerometer(Peripheral[Acceleration | None]):
         self._decode_failures = 0
         self._loop_handle: ManagedRunLoopHandle | None = None
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[Acceleration | None]:
-        return pipe_in_background(
-            interval_in_background(period=timedelta(milliseconds=10)),
-
-            ops.map(lambda _: self.get_acceleration()),
-            ops.distinct_until_changed(lambda x: x)
+    def _event_stream(self) -> RoutePipeline[Acceleration | None]:
+        return (
+            Timer(period=timedelta(milliseconds=10))
+            .then_on_background_thread()
+            .map(lambda _: self.get_acceleration())
+            .distinct_until_changed(lambda x: x)
         )
 
     @classmethod
@@ -288,7 +283,6 @@ class Accelerometer(Peripheral[Acceleration | None]):
             )
             return None
 
-
     def _update_due_to_data(self, data: dict[str, Any]) -> Acceleration | None:
         event_type = data.get("event_type")
         payload = data.get("data")
@@ -347,6 +341,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
 
         # raise NotImplementedError("")
 
+
 class FakeAccelerometer(Peripheral[Acceleration | None]):
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -360,16 +355,16 @@ class FakeAccelerometer(Peripheral[Acceleration | None]):
             ],
         )
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[Acceleration | None]:
+    def _event_stream(self) -> RoutePipeline[Acceleration | None]:
         def random_accel(_: int) -> Acceleration:
             return Acceleration(
                 x=random.random(),
                 y=random.random(),
                 z=9.8,
             )
-        return pipe_in_background(
-            interval_in_background(period=timedelta(milliseconds=500)),
-            ops.map(random_accel)
+
+        return (
+            Timer(period=timedelta(milliseconds=500))
+            .then_on_background_thread()
+            .map(random_accel)
         )

@@ -29,7 +29,9 @@ class DisplayContext:
         self._ensure_mode(device_display_mode)
 
     @contextmanager
-    def display_mode(self, device_display_mode: DeviceDisplayMode) -> Iterator[DisplayContext]:
+    def display_mode(
+        self, device_display_mode: DeviceDisplayMode
+    ) -> Iterator[DisplayContext]:
         self._ensure_can_configure_display()
         previous_mode = self.last_render_mode
         changed = self._ensure_mode(device_display_mode)
@@ -48,9 +50,7 @@ class DisplayContext:
         logger.info("Initializing pygame display context.")
         pygame.init()
         if self.screen is None:
-            self._apply_mode(
-                DeviceDisplayMode.FULL.to_pygame_mode()
-            )
+            self._apply_mode(DeviceDisplayMode.FULL.to_pygame_mode())
         if Configuration.is_pi() and not Configuration.is_x11_forward():
             logger.info("Enabling input grab for Pi display context.")
             pygame.event.set_grab(True)
@@ -91,7 +91,9 @@ class DisplayContext:
     def _ensure_can_configure_display(self) -> None:
         if self.can_configure_display:
             return
-        raise RuntimeError("Scratch DisplayContext instances cannot change display modes")
+        raise RuntimeError(
+            "Scratch DisplayContext instances cannot change display modes"
+        )
 
     # Emulate screen
     def get_size(self) -> tuple[int, int]:

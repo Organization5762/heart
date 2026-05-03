@@ -24,7 +24,9 @@ class TestChannelDiffusionRenderer:
         renderer.initialize(window, manager, orientation)
 
         initial_center = renderer.state.grid[1, 1]
-        np.testing.assert_array_equal(initial_center, np.array([255, 255, 255], dtype=np.uint8))
+        np.testing.assert_array_equal(
+            initial_center, np.array([255, 255, 255], dtype=np.uint8)
+        )
 
         manager.frame_tick_controller.advance(clock)
         renderer._internal_process(window, manager, orientation)

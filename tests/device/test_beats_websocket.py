@@ -330,14 +330,14 @@ class TestWebSocketReplayCache:
         websocket._latest_frame = None
         websocket._latest_peripheral_frames = {}
         seen = []
-        websocket._graph.observe(websocket._frame_route, replay_latest=False).subscribe(
+        websocket._graph.observe(websocket._frame_route, replay_latest=False).callback(
             seen.append
         )
 
         websocket.send("frame", b"frame-bytes")
 
         assert len(seen) == 1
-        decoded = decode_stream_envelope(seen[0].value)
+        decoded = decode_stream_envelope(seen[0])
         assert decoded == ("frame", b"frame-bytes")
 
 
@@ -362,7 +362,9 @@ class TestWebSocketDisconnectHandling:
                 )
 
             async def wait_closed(self) -> None:
-                raise AssertionError("wait_closed should not run after replay disconnect")
+                raise AssertionError(
+                    "wait_closed should not run after replay disconnect"
+                )
 
         connection = _ClosingConnection()
         asyncio.run(websocket._handle_client(connection))

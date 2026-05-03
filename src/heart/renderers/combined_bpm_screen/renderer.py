@@ -69,7 +69,9 @@ class CombinedBpmScreen(StatefulBaseRenderer[CombinedBpmScreenState]):
         orientation: Orientation,
     ) -> None:
         if self.max_bpm_screen is None:
-            raise RuntimeError("CombinedBpmScreen must be initialized before processing")
+            raise RuntimeError(
+                "CombinedBpmScreen must be initialized before processing"
+            )
         peripheral_manager = self._peripheral_manager
         if self.state.showing_metadata:
             self.metadata_screen._internal_process(

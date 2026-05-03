@@ -40,16 +40,21 @@ class PeripheralManager:
             raise ValueError(
                 "Provide configuration_loader or configuration/configuration_registry, not both."
             )
-        self._configuration_loader = configuration_loader or PeripheralConfigurationLoader(
-            configuration=configuration,
-            registry=configuration_registry,
+        self._configuration_loader = (
+            configuration_loader
+            or PeripheralConfigurationLoader(
+                configuration=configuration,
+                registry=configuration_registry,
+            )
         )
         self._streams = PeripheralStreams(self._graph, self._iter_peripherals)
         self._debug_tap = InputDebugTap()
         self._frame_tick_controller = FrameTickController(self._debug_tap)
         self._keyboard_controller = KeyboardController(self._debug_tap)
         self._gamepad_controller = GamepadController(self, self._debug_tap)
-        self._external_sensor_hub = ExternalSensorHub(self._debug_tap, graph=self._graph)
+        self._external_sensor_hub = ExternalSensorHub(
+            self._debug_tap, graph=self._graph
+        )
         self._navigation_profile = NavigationProfile(
             keyboard_controller=self._keyboard_controller,
             gamepad_controller=self._gamepad_controller,

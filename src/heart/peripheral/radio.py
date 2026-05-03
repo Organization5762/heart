@@ -11,16 +11,16 @@ from typing import Any, Iterator, Mapping
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Input, Peripheral
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
-from heart.utilities.reactive import Subject
 
 logger = get_logger(__name__)
 
@@ -43,6 +43,10 @@ FLOWTOY_SET_WIFI_EVENT = "peripheral.radio.flowtoy.set_wifi"
 FLOWTOY_SET_GLOBAL_CONFIG_EVENT = "peripheral.radio.flowtoy.set_global_config"
 RADIO_GRAPH_OWNER = OwnerName("heart.radio")
 RADIO_GRAPH_FAMILY = StreamFamily("peripheral")
+
+
+class PyserialUnavailableError(RuntimeError):
+    """Raised when the serial radio driver is used without pyserial."""
 
 
 def radio_packet_event_route() -> TypedRoute[SensorEvent]:
@@ -239,7 +243,7 @@ class SerialRadioDriver(RadioDriver):
         self._reconnect_delay = max(0.0, reconnect_delay)
         self._serial_module = serial_module or serial
         if self._serial_module is None:
-            raise ModuleNotFoundError(
+            raise PyserialUnavailableError(
                 "pyserial is required for SerialRadioDriver but is not installed"
             )
 
@@ -265,7 +269,7 @@ class SerialRadioDriver(RadioDriver):
                         with self._handle_lock:
                             if self._active_handle is handle:
                                 self._active_handle = None
-            except ModuleNotFoundError:
+            except PyserialUnavailableError:
                 raise
             except Exception:  # pragma: no cover - defensive reconnect loop
                 logger.exception("Radio serial driver failed; retrying")
@@ -329,7 +333,9 @@ class SerialRadioDriver(RadioDriver):
         try:
             handle.close()
         except Exception:
-            logger.debug("Ignoring serial close failure for %s", self._port, exc_info=True)
+            logger.debug(
+                "Ignoring serial close failure for %s", self._port, exc_info=True
+            )
 
     @classmethod
     def detect(cls) -> Iterator["SerialRadioDriver"]:
@@ -349,14 +355,14 @@ class SerialRadioDriver(RadioDriver):
                 continue
             try:
                 yield cls(port=port)
-            except ModuleNotFoundError:
+            except PyserialUnavailableError:
                 logger.debug(
                     "pyserial missing while initialising SerialRadioDriver for %s", port
                 )
 
     def _open_serial(self) -> Any:  # pragma: no cover - thin wrapper around pyserial
         if self._serial_module is None:
-            raise ModuleNotFoundError(
+            raise PyserialUnavailableError(
                 "pyserial is required for SerialRadioDriver but is not installed"
             )
         return self._serial_module.Serial(
@@ -516,7 +522,7 @@ class RadioPeripheral(Peripheral[RadioPacket]):
         self._driver = driver
         self._stop_token = StopToken(group="radio-peripheral")
         self._latest_packet: RawRadioPacket | None = None
-        self._packet_subject: Subject[RadioPacket] = Subject()
+        self._packet_stream: EventStream[RadioPacket] = EventStream()
 
     @classmethod
     def detect(cls) -> Iterator["RadioPeripheral"]:
@@ -568,8 +574,8 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             start_immediately=start_immediately,
         )
 
-    def _event_stream(self) -> reactive.Observable[RadioPacket]:
-        return self._packet_subject
+    def _event_stream(self) -> StreamNode[RadioPacket]:
+        return self._packet_stream.observable()
 
     @property
     def latest_packet(self) -> RawRadioPacket | None:
@@ -634,7 +640,8 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             output_routes=(resolved_output_route,),
             error_route=error_route or radio_error_route(),
             retry=retry or RetryPolicy(max_attempts=1_000_000),
-            backoff=backoff or BackoffPolicy.fixed(DEFAULT_RADIO_RECONNECT_DELAY_SECONDS),
+            backoff=backoff
+            or BackoffPolicy.fixed(DEFAULT_RADIO_RECONNECT_DELAY_SECONDS),
             group="radio-peripheral",
             start_immediately=start_immediately,
         ).install(graph)
@@ -653,7 +660,7 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             metadata=packet.metadata,
         )
         self._latest_packet = packet
-        self._packet_subject.on_next(radio_packet)
+        self._packet_stream.emit(radio_packet)
 
     def _radio_packet_to_sensor_event(self, packet: RawRadioPacket) -> SensorEvent:
         radio_packet = RadioPacket(
@@ -729,7 +736,9 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             key = _mapping_value(data, "key", "name")
             value = _mapping_int(data, "value")
             if not isinstance(key, str) or not key:
-                logger.debug("Ignoring malformed Flowtoys global config payload: %s", data)
+                logger.debug(
+                    "Ignoring malformed Flowtoys global config payload: %s", data
+                )
                 return
             self.set_flow_toy_global_config(key=key, value=value)
 
@@ -745,7 +754,9 @@ class RadioPeripheral(Peripheral[RadioPacket]):
     def reset_flow_toy_sync(self) -> None:
         self.send_raw_command("a")
 
-    def wake_flow_toys(self, *, group_id: int = 0, group_is_public: bool = False) -> None:
+    def wake_flow_toys(
+        self, *, group_id: int = 0, group_is_public: bool = False
+    ) -> None:
         prefix = "W" if group_is_public else "w"
         self.send_raw_command(f"{prefix}{int(group_id)}")
 

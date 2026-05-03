@@ -167,7 +167,9 @@ def _decode_flowtoy_message(message: SerialRadioMessage) -> dict[str, Any] | Non
     return _decode_flowtoy_payload(message.packet.payload)
 
 
-def _render_packet_line(port: str, decoded: dict[str, Any], rssi_dbm: float | None) -> str:
+def _render_packet_line(
+    port: str, decoded: dict[str, Any], rssi_dbm: float | None
+) -> str:
     """Render a short operator-facing summary using 1-based FlowToy numbering."""
 
     user_page = int(decoded["page"]) + 1
@@ -316,15 +318,9 @@ def _build_pattern_from_decoded(
             if brightness is None
             else int(brightness)
         ),
-        speed=(
-            int(global_settings.get("speed", 0))
-            if speed is None
-            else int(speed)
-        ),
+        speed=(int(global_settings.get("speed", 0)) if speed is None else int(speed)),
         density=(
-            int(global_settings.get("density", 0))
-            if density is None
-            else int(density)
+            int(global_settings.get("density", 0)) if density is None else int(density)
         ),
         lfo1=int(lfo_values[0]) if len(lfo_values) > 0 else 0,
         lfo2=int(lfo_values[1]) if len(lfo_values) > 1 else 0,
@@ -394,7 +390,9 @@ def discover_command(
 
     observed_groups: dict[int, str] = {}
     for bridge in _require_bridges(port):
-        for message, decoded in _iter_flowtoy_messages(bridge, duration_seconds=seconds):
+        for message, decoded in _iter_flowtoy_messages(
+            bridge, duration_seconds=seconds
+        ):
             if decoded is None:
                 continue
             group_id = int(decoded["group_id"])
@@ -425,7 +423,9 @@ def listen_command(
     """Stream decoded FlowToy packets."""
 
     for bridge in _require_bridges(port):
-        for message, decoded in _iter_flowtoy_messages(bridge, duration_seconds=seconds):
+        for message, decoded in _iter_flowtoy_messages(
+            bridge, duration_seconds=seconds
+        ):
             if decoded is None:
                 continue
             typer.echo(
@@ -439,30 +439,47 @@ def listen_command(
 
 @app.command("set-mode")
 def set_mode_command(
-    group_id: Annotated[int, typer.Option("--group-id", help="Target FlowToy group id.")],
+    group_id: Annotated[
+        int, typer.Option("--group-id", help="Target FlowToy group id.")
+    ],
     page: Annotated[
         int | None,
-        typer.Option("--page", help="User-facing page number. Defaults to the observed page."),
+        typer.Option(
+            "--page", help="User-facing page number. Defaults to the observed page."
+        ),
     ] = None,
     mode: Annotated[
         int | None,
-        typer.Option("--mode", help="User-facing mode number. Defaults to the observed mode."),
+        typer.Option(
+            "--mode", help="User-facing mode number. Defaults to the observed mode."
+        ),
     ] = None,
     actives: Annotated[
         int | None,
-        typer.Option("--actives", min=0, max=255, help="Override the raw FlowToy actives bitfield."),
+        typer.Option(
+            "--actives",
+            min=0,
+            max=255,
+            help="Override the raw FlowToy actives bitfield.",
+        ),
     ] = None,
     hue_offset: Annotated[
         int | None,
-        typer.Option("--hue-offset", min=0, max=255, help="Override sync-packet hue offset."),
+        typer.Option(
+            "--hue-offset", min=0, max=255, help="Override sync-packet hue offset."
+        ),
     ] = None,
     saturation: Annotated[
         int | None,
-        typer.Option("--saturation", min=0, max=255, help="Override sync-packet saturation."),
+        typer.Option(
+            "--saturation", min=0, max=255, help="Override sync-packet saturation."
+        ),
     ] = None,
     brightness: Annotated[
         int | None,
-        typer.Option("--brightness", min=0, max=255, help="Override sync-packet brightness."),
+        typer.Option(
+            "--brightness", min=0, max=255, help="Override sync-packet brightness."
+        ),
     ] = None,
     speed: Annotated[
         int | None,
@@ -474,23 +491,40 @@ def set_mode_command(
     ] = None,
     brightness_scan_start: Annotated[
         int | None,
-        typer.Option("--brightness-scan-start", min=0, max=255, help="Start brightness for a scan."),
+        typer.Option(
+            "--brightness-scan-start",
+            min=0,
+            max=255,
+            help="Start brightness for a scan.",
+        ),
     ] = None,
     brightness_scan_end: Annotated[
         int | None,
-        typer.Option("--brightness-scan-end", min=0, max=255, help="End brightness for a scan."),
+        typer.Option(
+            "--brightness-scan-end", min=0, max=255, help="End brightness for a scan."
+        ),
     ] = None,
     brightness_scan_step: Annotated[
         int,
-        typer.Option("--brightness-scan-step", min=1, help="Step size for brightness scan."),
+        typer.Option(
+            "--brightness-scan-step", min=1, help="Step size for brightness scan."
+        ),
     ] = DEFAULT_BRIGHTNESS_SCAN_STEP,
     brightness_scan_delay: Annotated[
         float,
-        typer.Option("--brightness-scan-delay", min=0.0, help="Delay between brightness scan steps."),
+        typer.Option(
+            "--brightness-scan-delay",
+            min=0.0,
+            help="Delay between brightness scan steps.",
+        ),
     ] = DEFAULT_BRIGHTNESS_SCAN_DELAY_SECONDS,
     observe_seconds: Annotated[
         float,
-        typer.Option("--observe-seconds", min=0.0, help="How long to observe the group before reusing its sync state."),
+        typer.Option(
+            "--observe-seconds",
+            min=0.0,
+            help="How long to observe the group before reusing its sync state.",
+        ),
     ] = DEFAULT_GROUP_OBSERVE_SECONDS,
     port: Annotated[
         str | None,
@@ -518,7 +552,12 @@ def set_mode_command(
         value is not None
         for value in (actives, hue_offset, saturation, brightness, speed, density)
     )
-    if page is not None and mode is not None and not has_field_overrides and not brightness_scan_requested:
+    if (
+        page is not None
+        and mode is not None
+        and not has_field_overrides
+        and not brightness_scan_requested
+    ):
         pattern = _build_user_pattern(group_id=group_id, page=page, mode=mode)
         _send_pattern_command(bridge, pattern=pattern)
         typer.echo(
@@ -654,7 +693,9 @@ def shell_command(
     with serial.Serial(bridge.port, 115200, timeout=1) as handle:
         while True:
             try:
-                line = typer.prompt("flowtoy", prompt_suffix="> ", default="", show_default=False)
+                line = typer.prompt(
+                    "flowtoy", prompt_suffix="> ", default="", show_default=False
+                )
             except (EOFError, KeyboardInterrupt):
                 typer.echo("")
                 break

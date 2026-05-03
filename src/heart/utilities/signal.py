@@ -43,7 +43,9 @@ def _fft_cross_correlation(ref: np.ndarray, comp: np.ndarray) -> np.ndarray:
     return correlation
 
 
-def fft_magnitude(samples: Sequence[float], *, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray]:
+def fft_magnitude(
+    samples: Sequence[float], *, sample_rate: float | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Return frequency bins and magnitudes using an FFT."""
 
     array = _as_array(samples)
@@ -109,7 +111,9 @@ def cross_correlation(
     return lags.astype(float), correlation.astype(float)
 
 
-def dominant_frequency(samples: Sequence[float], *, sample_rate: float) -> tuple[float, float]:
+def dominant_frequency(
+    samples: Sequence[float], *, sample_rate: float
+) -> tuple[float, float]:
     """Return the dominant frequency bin (Hz) and its magnitude."""
 
     freqs, magnitudes = fft_magnitude(samples, sample_rate=sample_rate)

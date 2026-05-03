@@ -8,7 +8,8 @@ from typing import Any, Iterator, Self
 
 import pygame.joystick
 from manyfold import (DetectionNode, Layer, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, Timer, TypedRoute, Variant,
+                      route)
 from manyfold.sensor_io import SensorEvent, sensor_event_schema
 from pygame.event import Event
 
@@ -16,8 +17,6 @@ from heart.peripheral.core import (Peripheral, PeripheralInfo, PeripheralTag,
                                    events)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive_threads import (interval_in_background,
-                                              pipe_in_main_thread)
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
@@ -345,12 +344,10 @@ class Gamepad(Peripheral[Any]):
 
         # macOS AppKit requires SDL event and joystick APIs to run on the process
         # main thread, so route both polling loops through the frame-thread queue.
-        pipe_in_main_thread(
-            interval_in_background(period=timedelta(seconds=1))
-        ).subscribe(
+        Timer(period=timedelta(seconds=1)).then_on_main_thread().subscribe(
             on_next=self._read_from_gamepad,
         )
 
-        pipe_in_main_thread(
-            interval_in_background(period=timedelta(milliseconds=20))
-        ).subscribe(on_next=lambda _: self._update())
+        Timer(period=timedelta(milliseconds=20)).then_on_main_thread().subscribe(
+            on_next=lambda _: self._update()
+        )

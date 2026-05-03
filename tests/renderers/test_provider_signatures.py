@@ -35,17 +35,22 @@ def _provider_observable_sources() -> list[tuple[Path, str]]:
 PROVIDER_SOURCES = tuple(_provider_observable_sources())
 
 
-def _observable_accepts_renderer_manager(
-    source_path: Path, class_name: str
-) -> bool:
+def _observable_accepts_renderer_manager(source_path: Path, class_name: str) -> bool:
     module = ast.parse(source_path.read_text(encoding="utf-8"))
     for node in module.body:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             for class_node in node.body:
-                if isinstance(class_node, ast.FunctionDef) and class_node.name == "observable":
+                if (
+                    isinstance(class_node, ast.FunctionDef)
+                    and class_node.name == "observable"
+                ):
                     positional_args = class_node.args.posonlyargs + class_node.args.args
-                    return len(positional_args) >= 2 or class_node.args.vararg is not None
-    raise AssertionError(f"Could not find observable() on {class_name} in {source_path}")
+                    return (
+                        len(positional_args) >= 2 or class_node.args.vararg is not None
+                    )
+    raise AssertionError(
+        f"Could not find observable() on {class_name} in {source_path}"
+    )
 
 
 class TestRendererProviderObservableSignatures:

@@ -121,10 +121,7 @@ def _normalize_payload(payload: object) -> object:
         return payload.hex()
 
     if isinstance(payload, Mapping):
-        return {
-            str(key): _normalize_payload(value)
-            for key, value in payload.items()
-        }
+        return {str(key): _normalize_payload(value) for key, value in payload.items()}
 
     if isinstance(payload, AbstractSet):
         normalized_values = [_normalize_payload(value) for value in payload]
@@ -138,7 +135,9 @@ def _normalize_payload(payload: object) -> object:
             ),
         )
 
-    if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
+    if isinstance(payload, Sequence) and not isinstance(
+        payload, (str, bytes, bytearray)
+    ):
         return [_normalize_payload(value) for value in payload]
 
     return payload

@@ -175,7 +175,9 @@ class TestFlowToyPacketPayloadShape:
 
     def test_packet_to_input_keeps_mode_name(self) -> None:
         """Verify FlowToy packet payload helpers preserve mode names so renderer-facing debugging stays legible when packets are inspected manually."""
-        packet = FlowToyPacket(body={"decoded": {"page": 1, "mode": 1}}, mode_name="flowtoy-page-1-mode-1")
+        packet = FlowToyPacket(
+            body={"decoded": {"page": 1, "mode": 1}}, mode_name="flowtoy-page-1-mode-1"
+        )
 
         rendered = packet.to_input()
 

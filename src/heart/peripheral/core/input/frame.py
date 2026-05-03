@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from typing import cast
 
 import pygame
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.utilities.reactive import Subject
-from heart.utilities.reactive_threads import pipe_in_background
+from heart.peripheral.core.streams import EventStream
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +24,7 @@ class FrameTickController:
     def __init__(self, debug_tap: InputDebugTap) -> None:
         self._debug_tap = debug_tap
         self._frame_index = 0
-        self._subject: Subject[FrameTick] = Subject()
+        self._stream: EventStream[FrameTick] = EventStream()
 
     def advance(self, clock: pygame.time.Clock) -> FrameTick:
         fps = float(clock.get_fps())
@@ -37,15 +36,17 @@ class FrameTickController:
             fps=fps if fps > 0 else None,
         )
         self._frame_index += 1
-        self._debug_tap.record_latency("frame.tick", time.monotonic() - frame.monotonic_s)
+        self._debug_tap.record_latency(
+            "frame.tick", time.monotonic() - frame.monotonic_s
+        )
         self._debug_tap.publish(
             stage=InputDebugStage.FRAME,
             stream_name="frame.tick",
             source_id="frame",
             payload=frame,
         )
-        self._subject.on_next(frame)
+        self._stream.emit(frame)
         return frame
 
-    def observable(self) -> reactive.Observable[FrameTick]:
-        return pipe_in_background(cast(reactive.Observable[FrameTick], self._subject))
+    def observable(self) -> StreamNode[FrameTick]:
+        return cast(StreamNode[FrameTick], self._stream.observable()).share()

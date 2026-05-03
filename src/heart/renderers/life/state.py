@@ -153,9 +153,7 @@ def _count_neighbors_with_padding(grid: np.ndarray) -> np.ndarray:
     )
 
 
-def _count_neighbors_shifted(
-    grid: np.ndarray, neighbors: np.ndarray
-) -> np.ndarray:
+def _count_neighbors_shifted(grid: np.ndarray, neighbors: np.ndarray) -> np.ndarray:
     neighbors.fill(0)
     neighbors[1:, 1:] += grid[:-1, :-1]
     neighbors[1:, :] += grid[:-1, :]

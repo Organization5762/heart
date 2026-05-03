@@ -9,18 +9,16 @@ from typing import Any, Iterator, List, Self
 
 import numpy as np
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
+                      Schema, StreamFamily, StreamName, Timer, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (interval_in_background,
-                                              pipe_in_background)
 
 # --- Shared types ------------------------------------------------------------
+
 
 @dataclass
 class BaseStationMeasurement:
@@ -39,6 +37,7 @@ class LocalizedTarget:
     - (x, y, z): estimated target position
     - stations: the set of base station positions + their measured distances
     """
+
     x: float
     y: float
     z: float
@@ -102,6 +101,7 @@ def uwb_error_route() -> TypedRoute[BaseException]:
 
 # --- Position solver helper --------------------------------------------------
 
+
 def solve_target_position(
     station_positions: list[tuple[float, float, float]],
     distances: list[float],
@@ -118,7 +118,7 @@ def solve_target_position(
         raise ValueError("Need at least 4 base stations for 3D fix")
 
     p = np.array(station_positions, dtype=float)  # shape (N, 3)
-    d = np.array(distances, dtype=float)          # shape (N,)
+    d = np.array(distances, dtype=float)  # shape (N,)
 
     p0 = p[0]
     d0 = d[0]
@@ -134,12 +134,10 @@ def solve_target_position(
         # subtract equation for station 0:
         # 2*(pi - p0)·[x,y,z] = (||pi||^2 - ||p0||^2) + d0^2 - di^2
         rows.append(2.0 * (pi - p0))
-        rhs.append(
-            (np.dot(pi, pi) - np.dot(p0, p0)) + d0**2 - di**2
-        )
+        rhs.append((np.dot(pi, pi) - np.dot(p0, p0)) + d0**2 - di**2)
 
-    A = np.vstack(rows)       # shape (N-1, 3)
-    b = np.array(rhs)         # shape (N-1,)
+    A = np.vstack(rows)  # shape (N-1, 3)
+    b = np.array(rhs)  # shape (N-1,)
 
     # Least-squares solve (works for exactly- or over-determined)
     x_hat, *_ = np.linalg.lstsq(A, b, rcond=None)
@@ -147,6 +145,7 @@ def solve_target_position(
 
 
 # --- Fake UWB positioning peripheral ----------------------------------------
+
 
 class FakeUWBPositioning(Peripheral[LocalizedTarget | None]):
     """
@@ -228,11 +227,12 @@ class FakeUWBPositioning(Peripheral[LocalizedTarget | None]):
             ],
         )
 
-    def _event_stream(self) -> reactive.Observable[LocalizedTarget | None]:
+    def _event_stream(self) -> RoutePipeline[LocalizedTarget | None]:
         # Emit a new multilateration solution every 500 ms
-        return pipe_in_background(
-            interval_in_background(period=timedelta(milliseconds=500)),
-            ops.map(self._sample_at_index),
+        return (
+            Timer(period=timedelta(milliseconds=500))
+            .then_on_background_thread()
+            .map(self._sample_at_index)
         )
 
     def install_node(
@@ -304,9 +304,7 @@ class FakeUWBPositioning(Peripheral[LocalizedTarget | None]):
             )
 
         # Solve for estimated target position from the noisy distances
-        est_x, est_y, est_z = solve_target_position(
-            self.BASE_STATIONS, distances
-        )
+        est_x, est_y, est_z = solve_target_position(self.BASE_STATIONS, distances)
 
         return LocalizedTarget(
             x=est_x,

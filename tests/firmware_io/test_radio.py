@@ -46,7 +46,7 @@ class TestFirmwareIoRadio:
     def test_build_radio_packet_data_applies_flowtoy_defaults(self) -> None:
         """Verify packet helpers apply the shared FlowToy defaults so host parsing does not depend on board-specific ad hoc fields."""
         packet = radio.build_radio_packet_data(
-            b"\x01\x02\xFF",
+            b"\x01\x02\xff",
             crc_ok=True,
             metadata={"receiver": "feather"},
         )

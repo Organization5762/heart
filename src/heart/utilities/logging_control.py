@@ -78,9 +78,7 @@ class LoggingController:
         rule = self._rule_for(key)
         primary_level = rule.level or level
         suppressed_level = (
-            rule.fallback_level
-            if rule.fallback_level is not None
-            else fallback_level
+            rule.fallback_level if rule.fallback_level is not None else fallback_level
         )
 
         interval = rule.interval_seconds
@@ -132,7 +130,9 @@ def _parse_rules(raw_rules: str) -> dict[str, LogRule]:
         fallback_level = (
             None
             if fallback_raw is None
-            else (None if fallback_raw.lower() == "none" else _parse_level(fallback_raw))
+            else (
+                None if fallback_raw.lower() == "none" else _parse_level(fallback_raw)
+            )
         )
         rules[key] = LogRule(interval, level, fallback_level)
     return rules

@@ -102,9 +102,9 @@ class TestDisplayScreenRecorder:
         expected_hash = imagehash.phash(expected)
 
         distance = observed_hash - expected_hash
-        assert (
-            distance <= HASH_DISTANCE_LIMIT
-        ), f"perceptual hash distance too high: {distance}"
+        assert distance <= HASH_DISTANCE_LIMIT, (
+            f"perceptual hash distance too high: {distance}"
+        )
 
     @pytest.mark.parametrize(
         ("background", "accent"),
@@ -137,9 +137,9 @@ class TestDisplayScreenRecorder:
         for frame in frames:
             observed_hash = imagehash.phash(frame)
             distance = observed_hash - expected_hash
-            assert (
-                distance <= HASH_DISTANCE_LIMIT
-            ), f"perceptual hash distance too high: {distance}"
+            assert distance <= HASH_DISTANCE_LIMIT, (
+                f"perceptual hash distance too high: {distance}"
+            )
 
     def test_screen_recorder_perceptual_hashes_match_per_frame_baselines(
         self, screen_recorder: ScreenRecorder, tmp_path: Path
@@ -149,7 +149,9 @@ class TestDisplayScreenRecorder:
             ((5, 10, 20), (220, 40, 60)),
             ((15, 30, 45), (40, 200, 120)),
         ]
-        inputs = [[PatternRenderer(background, accent)] for background, accent in palette]
+        inputs = [
+            [PatternRenderer(background, accent)] for background, accent in palette
+        ]
         result_path = screen_recorder.record(inputs, tmp_path / "sequence_hash.gif")
 
         expected_hashes: list[imagehash.ImageHash] = []
@@ -171,9 +173,9 @@ class TestDisplayScreenRecorder:
         ):
             observed_hash = imagehash.phash(observed_frame)
             distance = observed_hash - expected_hash
-            assert (
-                distance <= HASH_DISTANCE_LIMIT
-            ), f"perceptual hash distance too high: {distance}"
+            assert distance <= HASH_DISTANCE_LIMIT, (
+                f"perceptual hash distance too high: {distance}"
+            )
 
     def test_screen_recorder_sets_frame_duration(
         self, screen_recorder: ScreenRecorder, tmp_path: Path

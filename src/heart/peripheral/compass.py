@@ -9,16 +9,15 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Deque, Mapping, Self
 
-import heart.utilities.reactive as reactive
+from manyfold import RoutePipeline, Timer
+
 from heart.peripheral.core import Input, Peripheral
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (interval_in_background,
-                                              pipe_in_background)
 
 logger = get_logger(__name__)
 
 Vector3 = tuple[float, float, float]
+
 
 class Compass(Peripheral[Vector3 | None]):
     """Maintain a smoothed magnetic heading derived from sensor bus events."""
@@ -49,7 +48,6 @@ class Compass(Peripheral[Vector3 | None]):
 
         yield cls()
 
-
     def _handle_magnetometer(self, event: Input) -> None:
         payload = event.data
         if not isinstance(payload, Mapping):
@@ -70,15 +68,14 @@ class Compass(Peripheral[Vector3 | None]):
             self._latest = vector
             self._history.append(vector)
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[Vector3 | None]:
-        return pipe_in_background(
-            interval_in_background(timedelta(milliseconds=10)),
-
-            ops.map(lambda _: self.get_latest_vector()),
-            ops.distinct_until_changed(lambda x: x)
+    def _event_stream(self) -> RoutePipeline[Vector3 | None]:
+        return (
+            Timer(timedelta(milliseconds=10))
+            .then_on_background_thread()
+            .map(lambda _: self.get_latest_vector())
+            .distinct_until_changed(lambda x: x)
         )
+
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------

@@ -16,7 +16,6 @@ class TestDisplayThreeDGlassesRenderer:
         with pytest.raises(ValueError):
             ThreeDGlassesRenderer([])
 
-
     def test_generate_profiles_vary_shift_and_weights(self) -> None:
         """Verify that _generate_profiles returns profiles with distinct colour shifts and weights. This underpins depth perception accuracy so 3D rendering preserves the intended effect."""
         profiles = ThreeDGlassesRenderer._generate_profiles(4)
@@ -27,9 +26,9 @@ class TestDisplayThreeDGlassesRenderer:
         assert profiles[0].red_gain < profiles[-1].red_gain
         assert profiles[0].cyan_gain > profiles[-1].cyan_gain
 
-
-
-    def test_process_applies_anaglyph_and_cycles(self, monkeypatch: pytest.MonkeyPatch, stub_clock_factory) -> None:
+    def test_process_applies_anaglyph_and_cycles(
+        self, monkeypatch: pytest.MonkeyPatch, stub_clock_factory
+    ) -> None:
         """Verify that process builds alternating anaglyph frames and advances once the frame duration elapses. This protects motion smoothness so the glasses experience remains comfortable."""
         window_size = (4, 4)
         window = pygame.Surface(window_size, pygame.SRCALPHA)

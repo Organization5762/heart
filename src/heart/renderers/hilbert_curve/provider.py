@@ -5,43 +5,31 @@ import time
 from dataclasses import replace
 
 import numpy as np
+from manyfold import StreamNode
 from numba import njit
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 
 def compute_bounding_box(points: np.ndarray) -> BoundingBox:
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
-    return min(xs), min(ys), max(xs), max(ys)
+    return (min(xs), min(ys), max(xs), max(ys))
 
 
 def compute_zoom_target_scale(
-    *,
-    width: int,
-    height: int,
-    xmargin: int,
-    ymargin: int,
-    bbox: BoundingBox,
+    *, width: int, height: int, xmargin: int, ymargin: int, bbox: BoundingBox
 ) -> float:
     min_x, min_y, max_x, max_y = bbox
     bbox_width = max_x - min_x
     bbox_height = max_y - min_y
     if bbox_width <= 0 or bbox_height <= 0:
         return 1.0
-
-    available_width = width - (2 * xmargin)
-    available_height = height - (2 * ymargin)
-    return min(
-        available_width / bbox_width,
-        available_height / bbox_height,
-    )
+    available_width = width - 2 * xmargin
+    available_height = height - 2 * ymargin
+    return min(available_width / bbox_width, available_height / bbox_height)
 
 
 @njit
@@ -51,7 +39,7 @@ def d2xy(n: int, d: int) -> tuple[int, int]:
     t = d
     s = 1
     while s < n:
-        rx = (t // 2) & 1
+        rx = t // 2 & 1
         ry = (t ^ rx) & 1
         if ry == 0:
             if rx == 1:
@@ -64,7 +52,7 @@ def d2xy(n: int, d: int) -> tuple[int, int]:
         y += s * ry
         t //= 4
         s *= 2
-    return x, y
+    return (x, y)
 
 
 @njit
@@ -73,14 +61,11 @@ def hilbert_curve_points_numba(
 ) -> np.ndarray:
     n = 2**order
     total_points = n * n
-
     ymargin = ymargin or xmargin
-
-    draw_width = width - (2 * xmargin)
-    draw_height = height - (2 * ymargin)
+    draw_width = width - 2 * xmargin
+    draw_height = height - 2 * ymargin
     draw_size = draw_width if draw_width < draw_height else draw_height
     step = draw_size / (n - 1) if n > 1 else draw_size
-
     points = np.empty((total_points, 2), dtype=np.float64)
     for d in range(total_points):
         x_grid, y_grid = d2xy(n, d)
@@ -94,7 +79,6 @@ def resample_curve_numba(points: np.ndarray, num_samples: int) -> np.ndarray:
     n = points.shape[0]
     if n < 2:
         return points
-
     cumdist = np.empty(n, dtype=np.float64)
     cumdist[0] = 0.0
     for i in range(1, n):
@@ -102,7 +86,6 @@ def resample_curve_numba(points: np.ndarray, num_samples: int) -> np.ndarray:
         dy = points[i, 1] - points[i - 1, 1]
         cumdist[i] = cumdist[i - 1] + math.hypot(dx, dy)
     total_length = cumdist[n - 1]
-
     new_points = np.empty((num_samples, 2), dtype=np.float64)
     j = 0
     for i in range(num_samples):
@@ -117,13 +100,19 @@ def resample_curve_numba(points: np.ndarray, num_samples: int) -> np.ndarray:
             t_interp = 0.0
             if seg_length != 0.0:
                 t_interp = (td - cumdist[j]) / seg_length
-            new_points[i, 0] = points[j, 0] + t_interp * (points[j + 1, 0] - points[j, 0])
-            new_points[i, 1] = points[j, 1] + t_interp * (points[j + 1, 1] - points[j, 1])
+            new_points[i, 0] = points[j, 0] + t_interp * (
+                points[j + 1, 0] - points[j, 0]
+            )
+            new_points[i, 1] = points[j, 1] + t_interp * (
+                points[j + 1, 1] - points[j, 1]
+            )
     return new_points
 
 
 @njit
-def interpolate_curves_numba(curve1: np.ndarray, curve2: np.ndarray, alpha: float) -> np.ndarray:
+def interpolate_curves_numba(
+    curve1: np.ndarray, curve2: np.ndarray, alpha: float
+) -> np.ndarray:
     n = curve1.shape[0]
     interpolated = np.empty((n, 2), dtype=np.float64)
     for i in range(n):
@@ -178,7 +167,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         self.hold_duration = hold_duration
         self.zoom_duration = zoom_duration
         self.zoom_hold_duration = zoom_hold_duration
-        self.subset_exponent = subset_exponent or (max_order + 4)
+        self.subset_exponent = subset_exponent or max_order + 4
 
     def initial_state(self, *, width: int, height: int) -> HilbertCurveState:
         current_order = 1
@@ -215,15 +204,17 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
     def _advance_morph(self, state: HilbertCurveState, now: float) -> HilbertCurveState:
         elapsed = now - state.morph_start_time
         alpha = min(1.0, elapsed / self.morph_duration)
-        frame_curve = interpolate_curves_numba(state.current_curve, state.target_curve, alpha)
-
-        hold_duration = self.hold_duration if state.current_order < self.max_order - 2 else 0
+        frame_curve = interpolate_curves_numba(
+            state.current_curve, state.target_curve, alpha
+        )
+        hold_duration = (
+            self.hold_duration if state.current_order < self.max_order - 2 else 0
+        )
         if alpha < 1.0 or elapsed < self.morph_duration + hold_duration:
             return replace(state, frame_curve=frame_curve)
-
         if state.next_order == self.max_order:
             zoom_bbox = compute_bounding_box(
-                frame_curve[: len(frame_curve) // (2**self.subset_exponent)]
+                frame_curve[: len(frame_curve) // 2**self.subset_exponent]
             )
             target_scale = compute_zoom_target_scale(
                 width=state.width,
@@ -240,7 +231,6 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
                 target_scale=target_scale,
                 frame_curve=frame_curve,
             )
-
         current_order = state.next_order
         next_order = current_order + 1
         next_points = hilbert_curve_points_numba(
@@ -262,11 +252,9 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         assert state.zoom_start_time is not None
         assert state.zoom_bbox is not None
         assert state.target_scale is not None
-
         zoom_elapsed = now - state.zoom_start_time
         raw_alpha = min(zoom_elapsed / self.zoom_duration, 1.0)
         zoom_alpha = -0.5 * (math.cos(math.pi * raw_alpha) - 1)
-
         zoomed_curve = transform_points(
             hilbert_curve_points_numba(
                 state.max_order, state.width, state.height, state.xmargin, state.ymargin
@@ -276,10 +264,8 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             state.target_scale,
             state.xmargin,
         )
-
         if zoom_elapsed < self.zoom_duration + self.zoom_hold_duration:
             return replace(state, frame_curve=np.array(zoomed_curve))
-
         return self.initial_state(width=state.width, height=state.height)
 
     def advance(self, state: HilbertCurveState, *, now: float) -> HilbertCurveState:
@@ -288,18 +274,13 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         return self._advance_morph(state, now)
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager,
-        *,
-        initial_state: HilbertCurveState,
-    ) -> reactive.Observable[HilbertCurveState]:
-        return pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.map(lambda _: time.monotonic()),
-            ops.scan(
-                lambda state, now: self.advance(state, now=now),
-                seed=initial_state,
-            ),
-            start_with_once(initial_state),
-            ops.share(),
+        self, peripheral_manager: PeripheralManager, *, initial_state: HilbertCurveState
+    ) -> StreamNode[HilbertCurveState]:
+        return (
+            peripheral_manager.frame_tick_controller.observable()
+            .map(lambda _: time.monotonic())
+            .scan(lambda state, now: self.advance(state, now=now), seed=initial_state)
+            .start_with(initial_state)
+            .share()
+            .share()
         )

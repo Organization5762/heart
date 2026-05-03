@@ -3,15 +3,13 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-import heart.utilities.reactive as reactive
+from manyfold import BehaviorSubject, MergeNode, StreamNode
+
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
-from heart.utilities.reactive import BehaviorSubject
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
 
 
 class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
@@ -35,25 +33,22 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[RandomPixelState]:
+    ) -> StreamNode[RandomPixelState]:
         initial_color = self._color.value or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()
         )
-
-        color_updates = pipe_in_background(
-            self._color,
-            ops.map(lambda color: ("color", color)),
+        color_updates = self._color.map(lambda color: ("color", color)).share()
+        tick_updates = (
+            self._peripheral_manager.frame_tick_controller.observable()
+            .map(lambda _: ("tick", None))
+            .share()
         )
-        tick_updates = pipe_in_background(
-            self._peripheral_manager.frame_tick_controller.observable(),
-            ops.map(lambda _: ("tick", None)),
-        )
-
-        return pipe_in_background(
-            reactive.merge(color_updates, tick_updates),
-            ops.scan(self._advance_state, seed=initial_state),
-            ops.share(),
+        return (
+            MergeNode.merge(color_updates, tick_updates)
+            .scan(self._advance_state, seed=initial_state)
+            .share()
+            .share()
         )
 
     def set_color(self, color: Color | None) -> None:
@@ -66,12 +61,13 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         if kind == "color":
             next_color = value or Color.random()
             return replace(state, color=next_color)
-
         next_color = self._color.value or Color.random()
         return RandomPixelState(color=next_color, pixels=self._random_pixels())
 
     def _random_pixels(self) -> tuple[tuple[int, int], ...]:
         return tuple(
-            (self._rng.randrange(self._width), self._rng.randrange(self._height))
-            for _ in range(self._num_pixels)
+            (
+                (self._rng.randrange(self._width), self._rng.randrange(self._height))
+                for _ in range(self._num_pixels)
+            )
         )

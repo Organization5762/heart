@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.porthole_window.state import PortholeWindowState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 
 class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
@@ -15,17 +13,14 @@ class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[PortholeWindowState]:
-        frame_ticks = pipe_in_background(
-            self._peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[PortholeWindowState]:
+        frame_ticks = (
+            self._peripheral_manager.frame_tick_controller.observable().share().share()
         )
-
         initial_state = PortholeWindowState()
 
         def advance_state(
-            state: PortholeWindowState,
-            frame_tick: object,
+            state: PortholeWindowState, frame_tick: object
         ) -> PortholeWindowState:
             delta_seconds = max(frame_tick.delta_ms, 0.0) / 1000.0
             return PortholeWindowState(
@@ -33,10 +28,8 @@ class PortholeWindowStateProvider(ObservableProvider[PortholeWindowState]):
             )
 
         return (
-            pipe_in_background(
-                frame_ticks,
-                ops.scan(advance_state, seed=initial_state),
-                start_with_once(initial_state),
-                ops.share(),
-            )
+            frame_ticks.scan(advance_state, seed=initial_state)
+            .start_with(initial_state)
+            .share()
+            .share()
         )

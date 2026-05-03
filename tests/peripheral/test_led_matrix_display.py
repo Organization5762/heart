@@ -8,6 +8,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def _solid_image(width: int, height: int, *, value: int) -> Image.Image:
     array = np.full((height, width, 3), value, dtype=np.uint8)
     return Image.fromarray(array, mode="RGB")

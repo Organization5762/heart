@@ -57,7 +57,9 @@ class FlowToySpectrumRenderer(StatefulBaseRenderer[FlowToySpectrumState]):
 
                 angle = atan2(dy, dx)
                 normalized_t = ((angle / (2.0 * pi)) + animated_phase) % 1.0
-                color = self._interpolate_spectrum(self.state.color_spectrum, normalized_t)
+                color = self._interpolate_spectrum(
+                    self.state.color_spectrum, normalized_t
+                )
                 if radius < inner_radius:
                     blend = radius / max(inner_radius, 1.0)
                     color = self._mix_colors(color, Color(255, 255, 255), blend * 0.2)

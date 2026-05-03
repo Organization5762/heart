@@ -116,7 +116,9 @@ class YoListenRenderer(StatefulBaseRenderer[YoListenState]):
         orientation: Orientation,
     ) -> None:
         if window.screen is None:
-            raise RuntimeError("YoListenRenderer requires an initialized display surface")
+            raise RuntimeError(
+                "YoListenRenderer requires an initialized display surface"
+            )
         state = self.state
 
         window_width, window_height = window.get_size()

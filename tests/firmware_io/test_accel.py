@@ -53,19 +53,25 @@ class TestFirmwareIoAccel:
                 ],
                 [
                     [
-                        accel.form_tuple_payload(constants.ACCELERATION, (0.0, 0.0, 0.0)),
+                        accel.form_tuple_payload(
+                            constants.ACCELERATION, (0.0, 0.0, 0.0)
+                        ),
                         accel.form_tuple_payload(constants.GYROSCOPE, (0.0, 0.0, 0.0)),
                     ],
                     [],
                     [
-                        accel.form_tuple_payload(constants.ACCELERATION, (0.3, 0.0, 0.0)),
+                        accel.form_tuple_payload(
+                            constants.ACCELERATION, (0.3, 0.0, 0.0)
+                        ),
                         accel.form_tuple_payload(constants.GYROSCOPE, (0.12, 0.0, 0.0)),
                     ],
                 ],
             ),
         ],
     )
-    def test_sensor_reader_emits_payloads_when_values_change(self, sequence, expected) -> None:
+    def test_sensor_reader_emits_payloads_when_values_change(
+        self, sequence, expected
+    ) -> None:
         """Verify that SensorReader emits payloads only when readings change beyond the configured threshold. This keeps telemetry focused on meaningful motion so links stay bandwidth-efficient."""
         sensor = StubSensor(acceleration=sequence[0]["accel"], gyro=sequence[0]["gyro"])
         reader = accel.SensorReader([sensor], min_change=0.1)
@@ -78,8 +84,6 @@ class TestFirmwareIoAccel:
 
         assert captured == expected
 
-
-
     @pytest.mark.parametrize(
         "new, old, threshold, expected",
         [
@@ -88,12 +92,12 @@ class TestFirmwareIoAccel:
             ((0.2, 0.0, 0.0), (0.0, 0.0, 0.0), 0.1, True),
         ],
     )
-    def test_changed_enough_respects_threshold(self, new, old, threshold, expected) -> None:
+    def test_changed_enough_respects_threshold(
+        self, new, old, threshold, expected
+    ) -> None:
         """Verify that SensorReader._changed_enough applies the magnitude threshold when comparing tuples. This ensures the helper enforces noise rejection consistently across the driver."""
         reader = accel.SensorReader([])
         assert reader._changed_enough(new, old, threshold) is expected
-
-
 
     @pytest.mark.parametrize(
         "sensor_kwargs, expected_key",
@@ -102,8 +106,11 @@ class TestFirmwareIoAccel:
             ({}, "RATE_104_HZ"),
         ],
     )
-    def test_get_sample_rate_falls_back_to_default(self, monkeypatch, sensor_kwargs, expected_key) -> None:
+    def test_get_sample_rate_falls_back_to_default(
+        self, monkeypatch, sensor_kwargs, expected_key
+    ) -> None:
         """Verify that SensorReader.get_sample_rate honours sensor overrides and falls back to the default rate. This keeps sampling frequency predictable so downstream filters stay tuned."""
+
         class FakeRate:
             RATE_104_HZ = "RATE_104_HZ"
             string = {
@@ -117,8 +124,6 @@ class TestFirmwareIoAccel:
         reader = accel.SensorReader([])
 
         assert reader.get_sample_rate(sensor) == FakeRate.string[expected_key]
-
-
 
     @pytest.mark.parametrize(
         "payload",

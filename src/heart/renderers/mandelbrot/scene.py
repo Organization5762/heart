@@ -64,9 +64,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self._split_view_surfaces: dict[
             tuple[int, int], tuple[pygame.Surface, pygame.Surface]
         ] = {}
-        self.mandelbrot_interior_strategy = (
-            Configuration.mandelbrot_interior_strategy()
-        )
+        self.mandelbrot_interior_strategy = Configuration.mandelbrot_interior_strategy()
         self.use_mandelbrot_interior = (
             self.mandelbrot_interior_strategy == MandelbrotInteriorStrategy.CARDIOID
         )
@@ -204,7 +202,9 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             match self.state.orientation:
                 case Rectangle():
                     mandelbrot_surface, julia_surface = self._get_split_view_surfaces()
-                    self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
+                    self._draw_split_view(
+                        mandelbrot_surface, julia_surface, window.clock
+                    )
                     # self._draw_orbit_to_surface(mandelbrot_surface)
                     window.blit(mandelbrot_surface, (0, 0))
                     window.blit(julia_surface, (self.width // 2, 0))
@@ -420,9 +420,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             thickness,
         )
 
-    def _draw_julia_to_surface(
-        self, window: pygame.Surface
-    ) -> None:
+    def _draw_julia_to_surface(self, window: pygame.Surface) -> None:
         width, height = window.get_size()
         current_params = (
             self.state.jzoom,
@@ -468,9 +466,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         surface_array = np.transpose(color_surface, (1, 0, 2))
         pygame.surfarray.blit_array(window, surface_array)
 
-    def _draw_mandelbrot_to_surface(
-        self, window: pygame.Surface
-    ) -> None:
+    def _draw_mandelbrot_to_surface(self, window: pygame.Surface) -> None:
         width, height = window.get_size()
         current_params = (
             self.state.zoom,

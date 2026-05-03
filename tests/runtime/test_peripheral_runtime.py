@@ -2,25 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import heart.utilities.reactive as reactive
 from heart.device.beats.websocket import ControlMessage
-from heart.peripheral.core.input import InputDebugEnvelope, InputDebugStage
+from heart.peripheral.core.input import InputDebugStage, InputDebugTap
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
                                               PeripheralRuntime)
 
 
-class _DebugTapStub:
-    def __init__(self) -> None:
-        self.subject: reactive.Subject[InputDebugEnvelope] = reactive.Subject()
-
-    def observable(self) -> reactive.Subject[InputDebugEnvelope]:
-        return self.subject
-
-
 class _PeripheralManagerStub:
     def __init__(self) -> None:
-        self.debug_tap = _DebugTapStub()
+        self.debug_tap = InputDebugTap()
         self.navigation_profile = _NavigationProfileStub()
         self.external_sensor_hub = _ExternalSensorHubStub()
 
@@ -79,7 +70,9 @@ class TestPeripheralRuntimeStreaming:
         )
 
         def _unexpected_websocket() -> object:
-            raise AssertionError("WebSocket should not be constructed without Beats forwarding")
+            raise AssertionError(
+                "WebSocket should not be constructed without Beats forwarding"
+            )
 
         monkeypatch.setattr(
             "heart.runtime.peripheral_runtime._build_websocket",
@@ -95,17 +88,14 @@ class TestPeripheralRuntimeStreaming:
         websocket = _WebSocketStub()
 
         runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
-        manager.debug_tap.subject.on_next(
-            InputDebugEnvelope(
-                stage=InputDebugStage.RAW,
-                stream_name="switch.tick",
-                source_id="switch-1",
-                timestamp_monotonic=12.5,
-                payload={
-                    "rotation": 1,
-                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
-                },
-            )
+        manager.debug_tap.publish(
+            stage=InputDebugStage.RAW,
+            stream_name="switch.tick",
+            source_id="switch-1",
+            payload={
+                "rotation": 1,
+                "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+            },
         )
 
         assert len(websocket.sent) == 1

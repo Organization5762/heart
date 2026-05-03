@@ -4,12 +4,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import cached_property
-from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
+from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
+                    TypeVar)
 
+from manyfold import StreamNode
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.graph_transforms import ManyfoldObservableTransform
 from heart.peripheral.core.nodes import empty_node
 from heart.utilities.logging import get_logger
@@ -43,14 +44,18 @@ class InputDescriptor:
     """Describe an input a peripheral or provider expects to consume."""
 
     name: str
-    stream: reactive.Observable[Any]
+    stream: StreamNode[Any]
     payload_type: type[Any] | None = None
     description: str | None = None
 
+
 A = TypeVar("A")
+PeripheralEventNode: TypeAlias = StreamNode[A]
+
 
 class PeripheralGroup(StrEnum):
     MAIN_SWITCH = "MAIN_SWITCH"
+
 
 @dataclass
 class PeripheralTag:
@@ -103,6 +108,7 @@ class PeripheralInfo:
             location=self.location.to_sensor_location(),
         )
 
+
 @dataclass
 class PeripheralMessageEnvelope(Generic[A]):
     peripheral_info: PeripheralInfo
@@ -128,12 +134,13 @@ class PeripheralMessageEnvelope(Generic[A]):
             sequence_number=sequence_number,
         )
 
+
 class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""
 
     _logger = get_logger(__name__)
 
-    def _event_stream(self) -> reactive.Observable[A]:
+    def _event_stream(self) -> PeripheralEventNode[A]:
         return empty_node()
 
     def peripheral_info(self) -> PeripheralInfo:
@@ -143,13 +150,10 @@ class Peripheral(Generic[A]):
         return PeripheralInfo()
 
     @cached_property
-    def observe(
-        self
-    ) -> reactive.Observable[PeripheralMessageEnvelope[A]]:
+    def observe(self) -> StreamNode[PeripheralMessageEnvelope[A]]:
         def wrap(a: A) -> PeripheralMessageEnvelope[A]:
             return PeripheralMessageEnvelope[A](
-                data=a,
-                peripheral_info=self.peripheral_info()
+                data=a, peripheral_info=self.peripheral_info()
             )
 
         return ManyfoldObservableTransform(

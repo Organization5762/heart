@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from manyfold import Graph
+from manyfold import Graph, StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.sensor import Acceleration
@@ -35,12 +34,10 @@ class ExternalSensorHub:
         self._lock = Lock()
         self._values: dict[str, float] = {}
         self._peripheral_snapshots: dict[str, dict[str, Any]] = {}
-        self._accelerometer_stream: GraphRouteStream[
-            Acceleration | None
-        ] = (
+        self._accelerometer_stream: GraphRouteStream[Acceleration | None] = (
             GraphRouteStream(self._graph, EXTERNAL_ACCELEROMETER_ROUTE)
         )
-        self._accelerometer_stream.on_next(None)
+        self._accelerometer_stream.emit(None)
 
     def set_value(self, sensor_key: str, value: float) -> None:
         peripheral_id, path = _split_sensor_key(sensor_key)
@@ -50,7 +47,7 @@ class ExternalSensorHub:
             _set_snapshot_value(snapshot, path, value)
             acceleration = self._resolve_acceleration_locked()
             published_snapshot = dict(snapshot)
-        self._accelerometer_stream.on_next(acceleration)
+        self._accelerometer_stream.emit(acceleration)
         self._debug_tap.publish(
             stage=InputDebugStage.LOGICAL,
             stream_name=EXTERNAL_SENSOR_STREAM_NAME,
@@ -69,7 +66,7 @@ class ExternalSensorHub:
                 self._peripheral_snapshots.pop(peripheral_id, None)
             acceleration = self._resolve_acceleration_locked()
             published_snapshot = dict(snapshot)
-        self._accelerometer_stream.on_next(acceleration)
+        self._accelerometer_stream.emit(acceleration)
         self._debug_tap.publish(
             stage=InputDebugStage.LOGICAL,
             stream_name=EXTERNAL_SENSOR_STREAM_NAME,
@@ -78,7 +75,7 @@ class ExternalSensorHub:
             upstream_ids=(EXTERNAL_SENSOR_SOURCE,),
         )
 
-    def observable_acceleration(self) -> reactive.Observable[Acceleration | None]:
+    def observable_acceleration(self) -> StreamNode[Acceleration | None]:
         return self._accelerometer_stream
 
     def _resolve_acceleration_locked(self) -> Acceleration | None:

@@ -3,32 +3,32 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from threading import Thread
 from typing import Any, Callable, Iterable, Iterator, Mapping, Self
 
 import serial
 from bleak.backends.device import BLEDevice
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
+                      Schema, StreamFamily, StreamName, StreamNode, Timer,
+                      TypedRoute, Variant, route)
+from manyfold.graph import ObserverLike, SubscriptionLike
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import (Peripheral, PeripheralInfo,
-                                   PeripheralMessageEnvelope, PeripheralTag)
+from heart.peripheral.core import (Peripheral, PeripheralEventNode,
+                                   PeripheralInfo, PeripheralMessageEnvelope,
+                                   PeripheralTag)
 from heart.peripheral.core.nodes import empty_node
+from heart.peripheral.core.subscriptions import (CallbackObservable,
+                                                 CallbackSubscription,
+                                                 NoopSubscription)
 from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import (Disposable, ObserverBase, SchedulerBase,
-                                      create)
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (blocking_io_scheduler,
-                                              interval_in_background,
-                                              pipe_in_background)
 
 logger = get_logger(__name__)
 SERIAL_RECONNECT_DELAY_SECONDS = 0.1
@@ -75,12 +75,7 @@ def switch_exception_schema() -> Schema[BaseException]:
     def decode(payload: bytes) -> BaseException:
         return RuntimeError(payload.decode("utf-8"))
 
-    return Schema(
-        schema_id="PythonException",
-        version=1,
-        encode=encode,
-        decode=decode,
-    )
+    return Schema(schema_id="PythonException", version=1, encode=encode, decode=decode)
 
 
 def switch_error_route() -> TypedRoute[BaseException]:
@@ -105,35 +100,33 @@ class SwitchState:
     rotation_since_last_button_press: int
     rotation_since_last_long_button_press: int
 
+
 class BaseSwitch(Peripheral[SwitchState]):
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.rotational_value = 0
-
         self.button_value = 0
         self.rotation_value_at_last_button_press = self.rotational_value
-
         self.button_long_press_value = 0
         self.rotation_value_at_last_long_button_press = self.rotational_value
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[SwitchState]:
-        return pipe_in_background(
-            interval_in_background(period=timedelta(milliseconds=10)),
-            ops.map(lambda _: self._snapshot()),
-            ops.distinct_until_changed(lambda x: x)
+    def _event_stream(self) -> RoutePipeline[SwitchState]:
+        return (
+            Timer(period=timedelta(milliseconds=10))
+            .then_on_background_thread()
+            .map(lambda _: self._snapshot())
+            .distinct_until_changed(lambda x: x)
         )
 
     def _snapshot(self) -> SwitchState:
         result = SwitchState(
             rotational_value=self.rotational_value,
             button_value=self.button_value,
-            rotation_since_last_button_press=self.rotational_value - self.rotation_value_at_last_button_press,
+            rotation_since_last_button_press=self.rotational_value
+            - self.rotation_value_at_last_button_press,
             long_button_value=self.button_long_press_value,
-            rotation_since_last_long_button_press=self.rotational_value - self.rotation_value_at_last_long_button_press,
+            rotation_since_last_long_button_press=self.rotational_value
+            - self.rotation_value_at_last_long_button_press,
         )
         return result
 
@@ -220,34 +213,29 @@ class BaseSwitch(Peripheral[SwitchState]):
                 "rotational_value": state.rotational_value,
                 "button_value": state.button_value,
                 "long_button_value": state.long_button_value,
-                "rotation_since_last_button_press": (
-                    state.rotation_since_last_button_press
-                ),
-                "rotation_since_last_long_button_press": (
-                    state.rotation_since_last_long_button_press
-                ),
+                "rotation_since_last_button_press": state.rotation_since_last_button_press,
+                "rotation_since_last_long_button_press": state.rotation_since_last_long_button_press,
             },
             observed_at=time.time(),
             identity=self.peripheral_info().to_sensor_identity(),
         )
+
 
 class FakeSwitch(BaseSwitch):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._navigation_subscription = None
 
-    def _key_press_stream(self, key: int) -> reactive.Observable[KeyboardEvent]:
-        def _unwrap(envelope: PeripheralMessageEnvelope[KeyboardEvent]) -> KeyboardEvent:
+    def _key_press_stream(self, key: int) -> StreamNode[KeyboardEvent]:
+        def _unwrap(
+            envelope: PeripheralMessageEnvelope[KeyboardEvent],
+        ) -> KeyboardEvent:
             return envelope.data
 
         def _is_pressed(event: KeyboardEvent) -> bool:
             return isinstance(event, KeyPressedEvent)
 
-        result = pipe_in_background(
-            KeyboardKey.get(key).observe,
-            ops.map(_unwrap),
-            ops.filter(_is_pressed),
-        )
+        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed).share()
         return result
 
     @classmethod
@@ -259,30 +247,24 @@ class FakeSwitch(BaseSwitch):
             id="fake_switch",
             tags=[
                 PeripheralTag(
-                    name="input_variant",
-                    variant="button",
-                    metadata={"version": "v1"}
+                    name="input_variant", variant="button", metadata={"version": "v1"}
                 ),
-                # TODO: Allow the button to change its own tags in some cases
-                PeripheralTag(
-                    name="mode",
-                    variant="main_rotary_button",
-                ),
-            ]
+                PeripheralTag(name="mode", variant="main_rotary_button"),
+            ],
         )
 
     def run(self) -> None:
-        if (
-            Configuration.use_mock_switch()
-            or not (Configuration.is_pi() and not Configuration.is_x11_forward())
+        if Configuration.use_mock_switch() or not (
+            Configuration.is_pi() and (not Configuration.is_x11_forward())
         ):
             from heart.runtime.game_loop import GameLoop
 
             loop = GameLoop.get_game_loop()
             if loop is None:
-                logger.warning("FakeSwitch requires an active GameLoop for navigation input")
+                logger.warning(
+                    "FakeSwitch requires an active GameLoop for navigation input"
+                )
                 return
-
             navigation = loop.peripheral_manager.navigation_profile
             self._navigation_subscription = navigation.subscribe_events(
                 on_browse_delta=self._handle_browse,
@@ -303,18 +285,18 @@ class FakeSwitch(BaseSwitch):
     def _handle_browse(self, delta: int) -> None:
         self.rotational_value += delta
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[SwitchState]:
-        if Configuration.is_pi() and not Configuration.is_x11_forward():
+    def _event_stream(self) -> PeripheralEventNode[SwitchState]:
+        if Configuration.is_pi() and (not Configuration.is_x11_forward()):
             return empty_node()
         else:
-            result = pipe_in_background(
-                interval_in_background(period=timedelta(milliseconds=10)),
-                ops.map(lambda _: self._snapshot()),
-                ops.distinct_until_changed(lambda x: x),
+            result = (
+                Timer(period=timedelta(milliseconds=10))
+                .then_on_background_thread()
+                .map(lambda _: self._snapshot())
+                .distinct_until_changed(lambda x: x)
             )
             return result
+
 
 class Switch(BaseSwitch):
     def __init__(self, port: str, baudrate: int, *args: Any, **kwargs: Any) -> None:
@@ -332,10 +314,9 @@ class Switch(BaseSwitch):
         return serial.Serial(self.port, self.baudrate)
 
     def _read_from_switch(
-        self,
-        observer: ObserverBase[Any],
-        scheduler: SchedulerBase | None,
-    ) -> Disposable:
+        self, observer: ObserverLike[Any], _runtime: object | None = None
+    ) -> SubscriptionLike:
+        del _runtime
         while True:
             try:
                 ser = self._connect_to_ser()
@@ -353,26 +334,43 @@ class Switch(BaseSwitch):
                     ser.close()
             except Exception:
                 pass
-
             time.sleep(SERIAL_RECONNECT_DELAY_SECONDS)
-        return Disposable()
+        return NoopSubscription()
 
     def run(self) -> None:
-        source = create(self._read_from_switch).pipe(
-            ops.subscribe_on(blocking_io_scheduler()),
+        reader = CallbackObservable(
+            lambda observer, _scheduler: self._read_from_switch(observer)
         )
-        self._subscription = source.subscribe(
-            on_next=self.update_due_to_data,
-        )
+
+        def subscribe(
+            observer: ObserverLike[Any],
+            _runtime: object | None = None,
+        ) -> SubscriptionLike:
+            del _runtime
+            holder: dict[str, SubscriptionLike] = {}
+
+            def run_reader() -> None:
+                holder["subscription"] = reader.subscribe(observer)
+
+            thread = Thread(target=run_reader, name="heart-switch-reader", daemon=True)
+            thread.start()
+
+            def dispose() -> None:
+                subscription = holder.get("subscription")
+                if subscription is not None:
+                    subscription.dispose()
+
+            return CallbackSubscription(dispose)
+
+        source = CallbackObservable(subscribe)
+        self._subscription = source.subscribe(self.update_due_to_data)
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
             id=f"switch:{self.port}",
             tags=[
                 PeripheralTag(
-                    name="input_variant",
-                    variant="button",
-                    metadata={"version": "v1"},
+                    name="input_variant", variant="button", metadata={"version": "v1"}
                 ),
                 PeripheralTag(name="mode", variant="main_rotary_button"),
             ],
@@ -413,48 +411,43 @@ class Switch(BaseSwitch):
             body=_body,
             output_routes=(resolved_output_route,),
             error_route=error_route or switch_error_route(),
-            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            retry=retry or RetryPolicy(max_attempts=1000000),
             backoff=backoff or BackoffPolicy.fixed(SERIAL_RECONNECT_DELAY_SECONDS),
             group="switch",
             start_immediately=start_immediately,
         ).install(graph)
 
+
 class BluetoothSwitch(BaseSwitch):
     def __init__(self, device: BLEDevice, *args: Any, **kwargs: Any) -> None:
         self.listener = UartListener(device=device)
-        self.switches = [
-            BaseSwitch() for index in range(4)
-        ]
+        self.switches = [BaseSwitch() for index in range(4)]
         self.connected = False
         self._loop_handle: ManagedRunLoopHandle | None = None
         super().__init__(*args, **kwargs)
 
     def update_due_to_data(self, data: Mapping[str, Any]) -> None:
-        raise NotImplementedError("Haven't figured out how to handle this multi-input case well.  Likely just map it to the observable(s)?")
+        raise NotImplementedError(
+            "Haven't figured out how to handle this multi-input case well.  Likely just map it to the observable(s)?"
+        )
         producer_raw = data.get("producer_id", 0)
         try:
             producer_id = int(producer_raw)
         except (TypeError, ValueError):
             producer_id = 0
-
         if not 0 <= producer_id < len(self.switches):
             logger.debug("Ignoring switch payload with invalid producer: %s", data)
             return
-
         payload = dict(data)
         payload["producer_id"] = producer_id
         self.switches[producer_id].update_due_to_data(payload)
-
-        # Update first producer as if it is the main switch
         if producer_id == 0:
             main_switch = self.switches[0]
             self.rotational_value = main_switch.rotational_value
-
             self.button_value = main_switch.button_value
             self.rotation_value_at_last_button_press = (
                 main_switch.rotation_value_at_last_button_press
             )
-
             self.button_long_press_value = main_switch.button_long_press_value
             self.rotation_value_at_last_long_button_press = (
                 main_switch.rotation_value_at_last_long_button_press
@@ -491,9 +484,7 @@ class BluetoothSwitch(BaseSwitch):
             id=f"bluetooth_switch:{self.listener.device.address}",
             tags=[
                 PeripheralTag(
-                    name="input_variant",
-                    variant="button",
-                    metadata={"version": "v1"},
+                    name="input_variant", variant="button", metadata={"version": "v1"}
                 ),
                 PeripheralTag(name="transport", variant="bluetooth"),
                 PeripheralTag(name="mode", variant="main_rotary_button"),
@@ -514,14 +505,12 @@ class BluetoothSwitch(BaseSwitch):
                 max_delay=BLUETOOTH_SLOW_RETRY_DELAY_SECONDS,
             ),
             on_error=lambda _exc, attempt: logger.exception(
-                "Bluetooth switch listener failed; retrying (attempt %s).",
-                attempt,
+                "Bluetooth switch listener failed; retrying (attempt %s).", attempt
             ),
             group="bluetooth-switch",
         )
         self._loop_handle = loop.start_thread(
-            name=BLUETOOTH_SWITCH_THREAD_NAME,
-            daemon=True,
+            name=BLUETOOTH_SWITCH_THREAD_NAME, daemon=True
         )
 
     def stop(self) -> None:

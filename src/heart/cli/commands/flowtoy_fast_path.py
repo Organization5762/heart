@@ -209,7 +209,9 @@ def _run_shell(port: str) -> int:
 
     print(f"FlowToy fast shell on {port}. Type 'exit' to quit.")
     print("Raw command example: p2575,0,5,8,0,0,80,0,0,0,0,0,0")
-    print("Set-mode example: set-mode --group-id 2575 --page 1 --mode 6 --brightness 80")
+    print(
+        "Set-mode example: set-mode --group-id 2575 --page 1 --mode 6 --brightness 80"
+    )
     with serial.Serial(port, DEFAULT_SERIAL_BAUDRATE, timeout=1) as handle:
         while True:
             try:

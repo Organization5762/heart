@@ -17,7 +17,7 @@ def configure(loop: GameLoop) -> None:
     tixyland_factory = loop.resolve(TixylandFactory)
 
     def build_tixyland(
-        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray],
     ) -> Tixyland:
         return tixyland_factory(fn)
 

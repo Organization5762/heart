@@ -42,9 +42,11 @@ class RenderingConfiguration:
 
     @classmethod
     def isolated_renderer_ack_strategy(cls) -> IsolatedRendererAckStrategy:
-        strategy = os.environ.get(
-            "HEART_ISOLATED_RENDERER_ACK_STRATEGY", "always"
-        ).strip().lower()
+        strategy = (
+            os.environ.get("HEART_ISOLATED_RENDERER_ACK_STRATEGY", "always")
+            .strip()
+            .lower()
+        )
         try:
             return IsolatedRendererAckStrategy(strategy)
         except ValueError as exc:
@@ -60,9 +62,11 @@ class RenderingConfiguration:
 
     @classmethod
     def isolated_renderer_dedup_strategy(cls) -> IsolatedRendererDedupStrategy:
-        strategy = os.environ.get(
-            "HEART_ISOLATED_RENDERER_DEDUP_STRATEGY", "source"
-        ).strip().lower()
+        strategy = (
+            os.environ.get("HEART_ISOLATED_RENDERER_DEDUP_STRATEGY", "source")
+            .strip()
+            .lower()
+        )
         try:
             return IsolatedRendererDedupStrategy(strategy)
         except ValueError as exc:
@@ -99,9 +103,9 @@ class RenderingConfiguration:
 
     @classmethod
     def frame_export_strategy(cls) -> FrameExportStrategy:
-        strategy = os.environ.get(
-            "HEART_FRAME_EXPORT_STRATEGY", "buffer"
-        ).strip().lower()
+        strategy = (
+            os.environ.get("HEART_FRAME_EXPORT_STRATEGY", "buffer").strip().lower()
+        )
         try:
             return FrameExportStrategy(strategy)
         except ValueError as exc:

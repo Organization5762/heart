@@ -4,6 +4,7 @@ from heart.peripheral.core.input.accelerometer import \
     AccelerometerDebugProfile as AccelerometerDebugProfile
 from heart.peripheral.core.input.debug import \
     InputDebugEnvelope as InputDebugEnvelope
+from heart.peripheral.core.input.debug import InputDebugNode as InputDebugNode
 from heart.peripheral.core.input.debug import \
     InputDebugStage as InputDebugStage
 from heart.peripheral.core.input.debug import InputDebugTap as InputDebugTap

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Generic
 
+from manyfold import StreamNode
+from manyfold.graph import SubscriptionLike
+
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
 from heart.runtime.display_context import DisplayContext
-from heart.utilities.reactive import Disposable, Observable
 
 
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
@@ -20,12 +22,14 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         **kwargs,
     ) -> None:
         if builder is not None and state is not None:
-            raise ValueError("StatefulBaseRenderer accepts a builder or state, not both")
+            raise ValueError(
+                "StatefulBaseRenderer accepts a builder or state, not both"
+            )
 
         self.builder = builder or (
             StaticStateProvider(state) if state is not None else None
         )
-        self._subscription: Disposable | None = None
+        self._subscription: SubscriptionLike | None = None
         super().__init__(*args, **kwargs)
         if state is not None:
             self.set_state(state)
@@ -34,7 +38,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def state_observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> Observable[StateT]:
+    ) -> StreamNode[StateT]:
         assert self.builder is not None
         return self.builder.observable(peripheral_manager)
 

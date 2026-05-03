@@ -21,9 +21,7 @@ class UartMessageBuffer:
         strategy_provider: Callable[[], BleUartBufferStrategy] | None = None,
         delimiter: bytes = b"\n",
     ) -> None:
-        self._strategy = (
-            strategy_provider or Configuration.ble_uart_buffer_strategy
-        )()
+        self._strategy = (strategy_provider or Configuration.ble_uart_buffer_strategy)()
         self._buffer = DelimitedMessageBuffer(
             delimiter=delimiter,
             mode="text" if self._strategy == BleUartBufferStrategy.TEXT else "bytes",

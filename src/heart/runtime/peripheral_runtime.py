@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from manyfold import drain_frame_thread_queue
+
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive_threads import drain_frame_thread_queue
 
 logger = get_logger(__name__)
 INPUT_DEBUG_STAGE_TAG = "input_debug_stage"
