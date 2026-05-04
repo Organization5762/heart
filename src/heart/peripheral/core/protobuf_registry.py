@@ -8,6 +8,7 @@ from importlib.util import find_spec
 from google.protobuf import symbol_database
 from google.protobuf.message import Message
 
+from heart.peripheral.core import protobuf_catalog
 from heart.peripheral.core.protobuf_types import PeripheralPayloadType
 from heart.utilities.logging import get_logger
 
@@ -82,8 +83,4 @@ def _normalize_payload_type(payload_type: str | PeripheralPayloadType) -> str:
 
 
 protobuf_registry = ProtobufTypeRegistry()
-
-from heart.peripheral.core import \
-    protobuf_catalog as _protobuf_catalog  # noqa: E402
-
-_protobuf_catalog.register_protobuf_catalog(protobuf_registry)
+protobuf_catalog.register_protobuf_catalog(protobuf_registry)
