@@ -7,11 +7,10 @@ from functools import cache, cached_property
 from typing import Any, cast
 
 import pygame
-from manyfold import StreamNode, Timer
+from manyfold import EmptyNode, StreamNode, Timer
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -43,7 +42,7 @@ class KeyboardController:
     @cached_property
     def _snapshot_stream(self) -> StreamNode[KeyboardSnapshot]:
         if Configuration.is_pi() and (not Configuration.is_x11_forward()):
-            return empty_node()
+            return EmptyNode().observable()
 
         def _sample(_: int) -> KeyboardSnapshot:
             try:

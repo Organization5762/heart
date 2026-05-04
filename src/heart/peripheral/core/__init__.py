@@ -9,12 +9,12 @@ from threading import Lock
 from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
                     TypeVar, cast)
 
-from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
-                      StreamName, StreamNode, TypedRoute, Variant, route)
+from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.utilities.logging import get_logger
 
@@ -146,7 +146,7 @@ class Peripheral(Generic[A]):
     _logger = get_logger(__name__)
 
     def _event_stream(self) -> PeripheralEventNode[A]:
-        return empty_node()
+        return EmptyNode().observable()
 
     def peripheral_info(self) -> PeripheralInfo:
         # Default implementation returns a generic PeripheralInfo instance

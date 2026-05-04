@@ -4,13 +4,12 @@ from functools import cached_property
 from threading import Lock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
-from manyfold import (Graph, Layer, MergeNode, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
+from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
+                      Schema, StreamFamily, StreamName, StreamNode, TypedRoute,
                       Variant, route)
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
@@ -595,7 +594,7 @@ class PeripheralStreams:
         ]
         observables = [peripheral.observe for peripheral in main_switches]
         if not observables:
-            return empty_node()
+            return EmptyNode().observable()
         merged = (
             MergeNode.merge(*observables)
             .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)

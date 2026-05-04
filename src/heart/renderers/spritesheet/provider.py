@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import MergeNode, StreamNode
+from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth)
@@ -103,7 +102,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             peripheral_manager.frame_tick_controller.observable()
         )
         if self.disable_input:
-            switch_updates = empty_node()
+            switch_updates = EmptyNode().observable()
         else:
             switches = peripheral_manager.get_main_switch_subscription()
             switch_updates = switches.map(

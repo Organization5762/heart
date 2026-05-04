@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 
-from manyfold import MergeNode, StreamNode
+from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.flowtoy import FlowToyPeripheral
 from heart.peripheral.input_payloads import FlowToyPacket
@@ -66,7 +65,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
             if isinstance(peripheral, FlowToyPeripheral)
         ]
         if not observables:
-            return empty_node()
+            return EmptyNode().observable()
         return (
             MergeNode.merge(*observables)
             .map(PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral)
