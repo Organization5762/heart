@@ -46,7 +46,10 @@ class PeripheralManager:
         )
         self._streams = PeripheralStreams(self._graph, self._iter_peripherals)
         self._debug_tap = InputDebugTap()
-        self._frame_tick_controller = FrameTickController(self._debug_tap)
+        self._frame_tick_controller = FrameTickController(
+            self._debug_tap,
+            graph=self._graph,
+        )
         self._keyboard_controller = KeyboardController(self._debug_tap)
         self._gamepad_controller = GamepadController(self, self._debug_tap)
         self._external_sensor_hub = ExternalSensorHub(self._debug_tap, graph=self._graph)
