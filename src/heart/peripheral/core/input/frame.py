@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from typing import cast
 
 import pygame
+from manyfold import Graph, TypedRoute
 
 import heart.utilities.reactive as reactive
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.utilities.reactive import Subject
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.utilities.reactive_threads import pipe_in_background
 
 
@@ -21,11 +22,18 @@ class FrameTick:
     fps: float | None = None
 
 
+FRAME_TICK_ROUTE: TypedRoute[FrameTick] = runtime_route(
+    "frame.tick",
+    "HeartFrameTick",
+)
+
+
 class FrameTickController:
-    def __init__(self, debug_tap: InputDebugTap) -> None:
+    def __init__(self, debug_tap: InputDebugTap, graph: Graph | None = None) -> None:
         self._debug_tap = debug_tap
         self._frame_index = 0
-        self._subject: Subject[FrameTick] = Subject()
+        self._graph = graph or Graph()
+        self._stream = GraphRouteStream[FrameTick](self._graph, FRAME_TICK_ROUTE)
 
     def advance(self, clock: pygame.time.Clock) -> FrameTick:
         fps = float(clock.get_fps())
@@ -44,8 +52,8 @@ class FrameTickController:
             source_id="frame",
             payload=frame,
         )
-        self._subject.on_next(frame)
+        self._stream.on_next(frame)
         return frame
 
     def observable(self) -> reactive.Observable[FrameTick]:
-        return pipe_in_background(cast(reactive.Observable[FrameTick], self._subject))
+        return pipe_in_background(cast(reactive.Observable[FrameTick], self._stream))

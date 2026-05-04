@@ -26,6 +26,7 @@ from heart.peripheral.core.input import (AccelerometerController,
 from heart.peripheral.core.input.accelerometer import (
     ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
 from heart.peripheral.core.input.debug import instrument_input_stream
+from heart.peripheral.core.input.frame import FRAME_TICK_ROUTE
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
@@ -132,7 +133,8 @@ class TestFrameTickController:
     ) -> None:
         """Verify frame ticks emit delta and monotonic timing once per advance so renderer providers can stop joining clock and tick streams."""
         tap = InputDebugTap()
-        controller = FrameTickController(tap)
+        graph = Graph()
+        controller = FrameTickController(tap, graph=graph)
         emitted: list[FrameTick] = []
         monkeypatch.setattr(
             "heart.peripheral.core.input.frame.time.monotonic",
@@ -150,6 +152,9 @@ class TestFrameTickController:
             fps=60.0,
         )
         assert emitted == [frame]
+        latest = graph.latest(FRAME_TICK_ROUTE)
+        assert latest is not None
+        assert latest.value == frame
         assert tap.snapshot()[-1].stage is InputDebugStage.FRAME
         assert tap.snapshot()[-1].stream_name == "frame.tick"
         assert tap.latency_snapshot()["frame.tick"].count == 1
