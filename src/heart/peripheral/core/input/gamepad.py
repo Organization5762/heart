@@ -124,7 +124,7 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.button_held(button))
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -144,7 +144,7 @@ class GamepadController:
                     button=button, timestamp_monotonic=snapshot.timestamp_monotonic
                 )
             )
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -162,7 +162,7 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone))
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -185,7 +185,7 @@ class GamepadController:
             )
             .map(lambda latest: GamepadStickValue(x=latest[0], y=latest[1]))
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -204,7 +204,7 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.dpad)
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,

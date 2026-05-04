@@ -65,7 +65,7 @@ class TestSlidingImageMarbleOutputs:
                         fps=None,
                     )
                 )
-                .share()
+
             )
             manager = PeripheralManager()
             monkeypatch.setattr(
@@ -82,7 +82,7 @@ class TestSlidingImageMarbleOutputs:
                         image.get_at((x, 0))[:3] for x in range(image.get_width())
                     ]
                 )
-                .share()
+
             )
             records = start(lambda: image_stream)
         images = [record.value.value for record in records if record.value.kind == "N"]

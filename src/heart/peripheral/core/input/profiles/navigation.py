@@ -68,7 +68,7 @@ def _counter_increase_intents(
         previous = current
 
     source.subscribe(emit_increases)
-    return output.share()
+    return output
 
 
 class NavigationProfile:
@@ -129,7 +129,7 @@ class NavigationProfile:
             .pairwise()
             .filter(lambda latest: latest[0].x != latest[1].x and latest[1].x != 0)
             .map(lambda latest: BrowseIntent(source="gamepad.dpad", step=latest[1].x))
-            .share()
+
         )
         stick_events = (
             self._gamepad.axis_value(GamepadAxis.LEFT_X, DEFAULT_GAMEPAD_AXIS_DEAD_ZONE)
@@ -141,7 +141,7 @@ class NavigationProfile:
                     source="gamepad.left_stick", step=direction
                 )
             )
-            .share()
+
         )
         button_south = map_stream(
             self._gamepad.button_tapped(GamepadButton.SOUTH),
@@ -162,7 +162,7 @@ class NavigationProfile:
             button_south,
             button_north,
             switch_intents,
-            self._injected_intents.share(),
+            self._injected_intents,
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -189,7 +189,7 @@ class NavigationProfile:
         return (
             self.intents.filter(lambda intent: isinstance(intent, BrowseIntent))
             .map(lambda intent: intent)
-            .share()
+
         )
 
     @cached_property
@@ -197,7 +197,7 @@ class NavigationProfile:
         return (
             self.intents.filter(lambda intent: isinstance(intent, ActivateIntent))
             .map(lambda intent: intent)
-            .share()
+
         )
 
     @cached_property
@@ -207,12 +207,12 @@ class NavigationProfile:
                 lambda intent: isinstance(intent, AlternateActivateIntent)
             )
             .map(lambda intent: intent)
-            .share()
+
         )
 
     @cached_property
     def browse_delta(self) -> StreamNode[int]:
-        return self.browse.map(lambda intent: intent.step).share()
+        return self.browse.map(lambda intent: intent.step)
 
     def inject_browse(self, step: int, source: str = "beats.control") -> None:
         if step == 0:
@@ -243,7 +243,7 @@ class NavigationProfile:
             .map(lambda latest: latest[1].rotational_value - latest[0].rotational_value)
             .filter(lambda delta: delta != 0)
             .map(lambda delta: BrowseIntent(source="switch.rotary", step=delta))
-            .share()
+
         )
 
     def _switch_activate_intents(

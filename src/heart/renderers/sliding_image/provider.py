@@ -38,7 +38,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size()[0])
             .distinct_until_changed()
-            .share()
+
         )
         initial_state = self._initial_state_snapshot()
         window_stream = MergeNode.merge(
@@ -53,7 +53,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-            .share()
+
         )
 
 
@@ -87,7 +87,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size()[0])
             .distinct_until_changed()
-            .share()
+
         )
         initial_state = self._initial_state_snapshot()
         window_stream = MergeNode.merge(
@@ -102,5 +102,5 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-            .share()
+
         )

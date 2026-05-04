@@ -36,4 +36,4 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
             )
 
         initial = WaterCubeState.initial_state(self.device)
-        return accel.start_with(initial).scan(update_state).share().share()
+        return accel.start_with(initial).scan(update_state)

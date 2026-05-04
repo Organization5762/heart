@@ -20,7 +20,7 @@ class FlameStateProvider(ObservableProvider[FlameState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[FlameState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
 
         def to_state(frame_tick: object) -> FlameState:
@@ -33,8 +33,8 @@ class FlameStateProvider(ObservableProvider[FlameState]):
             frame_ticks.map(to_state)
             .do_action(self._latest_state.on_next)
             .start_with(self._initial_state)
-            .share()
-            .share()
+
+
         )
 
     @property

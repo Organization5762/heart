@@ -80,7 +80,7 @@ class AccelerometerController:
             .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)
             .filter(lambda value: value is not None)
             .map(lambda value: cast(Acceleration, value))
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -139,7 +139,7 @@ class AccelerometerDebugProfile:
             .with_latest_from(key_states)
             .map(lambda latest: self._to_acceleration(latest[0].monotonic_s, latest[1]))
             .distinct_until_changed()
-            .share()
+
         )
         instrumented_keyboard_stream = InputDebugNode(
             tap=self._debug_tap,

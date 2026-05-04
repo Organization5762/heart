@@ -17,7 +17,7 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[HeartTitleScreenState]:
         frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable().share().share()
+            self._peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = HeartTitleScreenState()
 
@@ -29,8 +29,8 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _advance_state(

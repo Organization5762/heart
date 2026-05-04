@@ -96,7 +96,7 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[PranaySketchState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = self._load_initial_state()
 
@@ -110,8 +110,8 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _load_initial_state(self) -> PranaySketchState:

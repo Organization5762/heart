@@ -235,7 +235,7 @@ class FakeSwitch(BaseSwitch):
         def _is_pressed(event: KeyboardEvent) -> bool:
             return isinstance(event, KeyPressedEvent)
 
-        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed).share()
+        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed)
         return result
 
     @classmethod

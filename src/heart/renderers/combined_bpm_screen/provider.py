@@ -23,7 +23,7 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[CombinedBpmScreenState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = CombinedBpmScreenState()
 
@@ -35,8 +35,8 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _advance_state(

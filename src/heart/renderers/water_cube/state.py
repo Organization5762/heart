@@ -95,4 +95,4 @@ class WaterCubeState:
                 acceleration=a,
             )
 
-        return acceleration.scan(update_state).share().share()
+        return acceleration.scan(update_state)

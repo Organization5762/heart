@@ -83,7 +83,7 @@ class TestGraphRouteStreamTransforms:
             calls["mapper"] += 1
             return value + 1
 
-        transformed = stream.map(mapper).share()
+        transformed = stream.map(mapper)
         doubled = stream.map(lambda value: value * 2)
         observed_a: list[int] = []
         observed_b: list[int] = []

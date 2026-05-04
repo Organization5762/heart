@@ -52,7 +52,7 @@ class SlidingImage(StatefulBaseRenderer[SlidingImageState]):
                 width=window.get_width(),
             )
         super().initialize(window, peripheral_manager, orientation)
-        if self._state is not None:
+        if self._state is not None and self._state.offset == 0:
             self.update_state(
                 offset=self._provider.advance_state(
                     self._state, window.get_width()

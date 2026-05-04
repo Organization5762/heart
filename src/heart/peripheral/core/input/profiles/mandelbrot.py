@@ -167,7 +167,7 @@ class MandelbrotControlProfile:
             .observable(keyboard_state, gamepad_state)
             .map(lambda latest: self._to_motion_state(*latest))
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -181,7 +181,7 @@ class MandelbrotControlProfile:
     def command_events(self) -> StreamNode[MandelbrotCommand]:
         stream = MergeNode.merge(
             self._keyboard_command_streams(), self._gamepad_command_streams()
-        ).share()
+        )
         return InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
@@ -195,7 +195,7 @@ class MandelbrotControlProfile:
         return (
             self.command_events.scan(self._apply_command, seed=MandelbrotEdgeState())
             .start_with(MandelbrotEdgeState())
-            .share()
+
         )
 
     @cached_property
@@ -205,7 +205,7 @@ class MandelbrotControlProfile:
             .observable(self.motion_state, self._edge_state)
             .map(lambda latest: self._to_compatibility_state(*latest))
             .distinct_until_changed()
-            .share()
+
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -303,7 +303,7 @@ class MandelbrotControlProfile:
             .distinct_until_changed()
             .filter(bool)
             .map(lambda _active: command)
-            .share()
+
         )
 
     def _apply_command(

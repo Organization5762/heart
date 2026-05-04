@@ -24,7 +24,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[MetadataScreenState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable().share().share()
+            peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = MetadataScreenState()
 
@@ -38,8 +38,8 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
         return (
             frame_ticks.scan(advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _update_state(

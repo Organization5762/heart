@@ -32,8 +32,8 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_size())
             .distinct_until_changed()
-            .share()
-            .share()
+
+
         )
         frame_ticks = peripheral_manager.frame_tick_controller.observable()
 
@@ -58,8 +58,8 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             .map(to_state)
             .start_with(self.initial_state())
             .distinct_until_changed()
-            .share()
-            .share()
+
+
         )
 
     def initial_state(self) -> FreeTextRendererState:

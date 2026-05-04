@@ -38,7 +38,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
         packet_updates = (
             self._flowtoy_packet_stream(peripheral_manager)
             .map(lambda packet: lambda state: self._apply_packet(state, packet))
-            .share()
+
         )
         tick_updates = (
             peripheral_manager.frame_tick_controller.observable()
@@ -47,14 +47,14 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
                     lambda state: self._advance(state, frame_tick.delta_s)
                 )
             )
-            .share()
+
         )
         return (
             MergeNode.merge(packet_updates, tick_updates)
             .scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _flowtoy_packet_stream(
@@ -70,7 +70,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
         return (
             MergeNode.merge(*observables)
             .map(PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral)
-            .share()
+
         )
 
     def _advance(

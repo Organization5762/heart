@@ -62,13 +62,13 @@ class RubiksConnectedXVisualizerStateProvider(
                     RubiksConnectedXNotification
                 ].unwrap_peripheral
             )
-            .share()
+
         )
         return (
             merged.scan(self._advance_state, seed=initial_state)
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     def _advance_state(

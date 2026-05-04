@@ -88,7 +88,7 @@ class InputDebugTap:
         self._stream.emit(envelope)
 
     def observable(self) -> StreamNode[InputDebugEnvelope]:
-        return self._stream.observable().share()
+        return self._stream.observable()
 
     def snapshot(self) -> tuple[InputDebugEnvelope, ...]:
         with self._lock:
@@ -158,9 +158,9 @@ class InputDebugNode:
 
     def observable(self, source: StreamNode[Any]) -> StreamNode[Any]:
         if hasattr(source, "do_action"):
-            return source.do_action(on_next=self._publish).share()
+            return source.do_action(on_next=self._publish)
         stream = source.map(lambda value: self._publish(value) or value)
-        return stream.share() if hasattr(stream, "share") else stream
+        return stream
 
     def connect(self, source: StreamNode[Any]) -> StreamNode[Any]:
         return self.observable(source)

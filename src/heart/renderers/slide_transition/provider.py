@@ -56,8 +56,8 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-            .share()
-            .share()
+
+
         )
 
     @staticmethod
