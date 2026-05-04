@@ -4,16 +4,21 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import cached_property
+from itertools import count
+from threading import Lock
 from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
-                    TypeVar)
+                    TypeVar, cast)
 
-from manyfold import StreamNode
+from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
+                      StreamName, StreamNode, TypedRoute, Variant, route)
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
-from heart.peripheral.core.graph_transforms import ManyfoldObservableTransform
 from heart.peripheral.core.nodes import empty_node
+from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.utilities.logging import get_logger
+
+_OBSERVE_ROUTE_IDS = count(1)
 
 
 @dataclass(slots=True)
@@ -151,17 +156,65 @@ class Peripheral(Generic[A]):
 
     @cached_property
     def observe(self) -> StreamNode[PeripheralMessageEnvelope[A]]:
+        graph = Graph()
+        route_id = next(_OBSERVE_ROUTE_IDS)
+        route_name = f"peripheral.{type(self).__name__}.{route_id}"
+        schema_id = f"Heart{type(self).__name__}PeripheralObserve"
+        source_route: TypedRoute[A] = route(
+            plane=Plane.Read,
+            layer=Layer.Logical,
+            owner=OwnerName("heart.transforms"),
+            family=StreamFamily("transform"),
+            stream=StreamName(f"{route_name}.source"),
+            variant=Variant.State,
+            schema=Schema.any(f"{schema_id}Source"),
+        )
+        output_route: TypedRoute[PeripheralMessageEnvelope[A]] = route(
+            plane=Plane.Read,
+            layer=Layer.Logical,
+            owner=OwnerName("heart.transforms"),
+            family=StreamFamily("transform"),
+            stream=StreamName(f"{route_name}.output"),
+            variant=Variant.State,
+            schema=Schema.any(f"{schema_id}Output"),
+        )
+        lock = Lock()
+        map_subscription: Any | None = None
+        source_subscription: Any | None = None
+
         def wrap(a: A) -> PeripheralMessageEnvelope[A]:
             return PeripheralMessageEnvelope[A](
                 data=a, peripheral_info=self.peripheral_info()
             )
 
-        return ManyfoldObservableTransform(
-            self._event_stream(),
-            wrap,
-            name=f"peripheral.{type(self).__name__}",
-            schema_id=f"Heart{type(self).__name__}PeripheralObserve",
-        ).observable()
+        def subscribe(observer: Any, scheduler: Any = None) -> Any:
+            nonlocal map_subscription, source_subscription
+
+            with lock:
+                if map_subscription is None:
+                    map_subscription = graph.stateful_map(
+                        source_route,
+                        initial_state=None,
+                        step=lambda state, value: (state, wrap(value)),
+                        output=output_route,
+                    )
+
+                output_subscription = graph.observe(
+                    output_route,
+                    replay_latest=False,
+                ).callback(observer.on_next)
+
+                if source_subscription is None:
+                    source_subscription = graph.pipe(
+                        cast(Any, self._event_stream()),
+                        source_route,
+                    )
+
+            return output_subscription
+
+        return cast(
+            StreamNode[PeripheralMessageEnvelope[A]], CallbackObservable(subscribe)
+        )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
