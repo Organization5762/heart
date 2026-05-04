@@ -5,9 +5,10 @@ from threading import Lock
 from typing import Any, Callable, Generic, TypeVar, cast
 
 from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
-                      StreamName, TypedRoute, Variant, route)
+                      StreamName, StreamNode, TypedRoute, Variant, route)
+from manyfold.graph import ObservableLike
 
-from heart.utilities import reactive
+from heart.peripheral.core.subscriptions import CallbackObservable
 
 T = TypeVar("T")
 TOut = TypeVar("TOut")
@@ -34,7 +35,7 @@ def unique_graph_transform_route(name: str, schema_id: str) -> Any:
 class ManyfoldObservableTransform(Generic[T, TOut]):
     def __init__(
         self,
-        source: reactive.Observable[T],
+        source: ObservableLike[T],
         mapper: Callable[[T], TOut],
         *,
         name: str,
@@ -55,7 +56,7 @@ class ManyfoldObservableTransform(Generic[T, TOut]):
         self._map_subscription: Any | None = None
         self._source_subscription: Any | None = None
 
-    def observable(self) -> reactive.Observable[TOut]:
+    def observable(self) -> StreamNode[TOut]:
         def subscribe(observer: Any, scheduler: Any = None) -> Any:
             with self._lock:
                 if self._map_subscription is None:
@@ -69,12 +70,7 @@ class ManyfoldObservableTransform(Generic[T, TOut]):
                 output_subscription = self._graph.observe(
                     self._output_route,
                     replay_latest=False,
-                ).subscribe(
-                    lambda envelope: observer.on_next(envelope.value),
-                    observer.on_error,
-                    observer.on_completed,
-                    scheduler=scheduler,
-                )
+                ).callback(observer.on_next)
 
                 if self._source_subscription is None:
                     self._source_subscription = self._graph.pipe(
@@ -84,4 +80,4 @@ class ManyfoldObservableTransform(Generic[T, TOut]):
 
             return output_subscription
 
-        return reactive.create(subscribe)
+        return cast(StreamNode[TOut], CallbackObservable(subscribe))

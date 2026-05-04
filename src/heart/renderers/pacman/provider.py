@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import random
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pacman.state import PacmanGhostState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
 
 
 class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
@@ -29,17 +28,15 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[PacmanGhostState]:
+    ) -> StreamNode[PacmanGhostState]:
         initial_state = self._spawn_state(
-            width=self._width,
-            height=self._height,
-            blood=True,
+            width=self._width, height=self._height, blood=True
         )
+        return (
+            self._peripheral_manager.frame_tick_controller.observable()
+            .scan(lambda state, _: self._next_state(state), seed=initial_state)
+            .start_with(initial_state)
 
-        return pipe_in_background(
-            self._peripheral_manager.frame_tick_controller.observable(),
-            ops.scan(lambda state, _: self._next_state(state), seed=initial_state),
-            starting_value=initial_state,
         )
 
     def _next_state(self, state: PacmanGhostState) -> PacmanGhostState:
@@ -49,7 +46,6 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
         next_pacman_idx = (
             (state.pacman_idx + 1) % 3 if state.switch_pacman else state.pacman_idx
         )
-
         if new_x > state.screen_width + 50 or new_x < -150:
             return self._spawn_state(
                 width=state.screen_width,
@@ -58,7 +54,6 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
                 pacman_idx=next_pacman_idx,
                 switch_pacman=next_switch,
             )
-
         return PacmanGhostState(
             screen_width=state.screen_width,
             screen_height=state.screen_height,
@@ -100,7 +95,6 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
             x = width + 50
             y = height - 48
             reverse = True
-
         self._asset_version += 1
         return PacmanGhostState(
             screen_width=width,

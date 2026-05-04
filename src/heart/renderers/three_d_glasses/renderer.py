@@ -11,8 +11,8 @@ from typing import Sequence
 
 import numpy as np
 import pygame
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -122,15 +122,8 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         """Convert RGB input to a red/cyan anaglyph frame."""
 
         base = base_array.astype(np.float32)
-        left_eye = (
-            base[..., 0] * 0.75
-            + base[..., 1] * 0.20
-            + base[..., 2] * 0.05
-        )
-        right_eye = (
-            base[..., 1] * 0.55
-            + base[..., 2] * 0.45
-        )
+        left_eye = base[..., 0] * 0.75 + base[..., 1] * 0.20 + base[..., 2] * 0.05
+        right_eye = base[..., 1] * 0.55 + base[..., 2] * 0.45
 
         width = base.shape[0]
         red_shift = self._clamp_shift(profile.red_shift, width)
@@ -191,7 +184,7 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[ThreeDGlassesState]:
+    ) -> StreamNode[ThreeDGlassesState]:
         if self._initial_state is None:
             raise ValueError("ThreeDGlassesRenderer requires an initial state")
         return self.provider.observable(

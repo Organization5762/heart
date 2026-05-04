@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pygame
+from manyfold import StreamNode, shutdown
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
                        GL_FLOAT, GL_LINEAR, GL_MODELVIEW, GL_NEAREST,
                        GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,
@@ -21,7 +22,6 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
                        glVertex2f, glVertexAttribPointer, glViewport)
 from pygame.math import lerp
 
-import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
 from heart.display.shaders.shader import Shader
@@ -36,7 +36,6 @@ from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive_threads import shutdown
 
 logger = get_logger(__name__)
 DEFAULT_DEBUG_WIDTH = 800
@@ -216,9 +215,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         )
         logger.info(
             "OpenGL Shading Language Version: %s",
-            glGetString(GL_SHADING_LANGUAGE_VERSION).decode(
-                "utf-8", errors="replace"
-            ),
+            glGetString(GL_SHADING_LANGUAGE_VERSION).decode("utf-8", errors="replace"),
         )
 
         self.time_initialized = time.monotonic()
@@ -507,8 +504,9 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         """Return from free-look to auto mode on an explicit operator action."""
 
         keyboard_toggle_pressed = self._is_key_down(pygame.K_y)
-        keyboard_toggle_tapped = keyboard_toggle_pressed and not self.key_pressed_last_frame.get(
-            pygame.K_y, False
+        keyboard_toggle_tapped = (
+            keyboard_toggle_pressed
+            and not self.key_pressed_last_frame.get(pygame.K_y, False)
         )
         self.key_pressed_last_frame[pygame.K_y] = keyboard_toggle_pressed
 
@@ -997,7 +995,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[FractalSceneState]:
+    ) -> StreamNode[FractalSceneState]:
         if self._initial_state is None:
             raise ValueError("FractalScene requires an initial state")
         return self.provider.observable(initial_state=self._initial_state)
@@ -1105,7 +1103,9 @@ def main() -> None:
             runtime.real_process(window=display, orientation=orientation)
             pygame.display.flip()
             if display.clock is None:
-                raise RuntimeError("Standalone fractal debug loop did not initialize a clock")
+                raise RuntimeError(
+                    "Standalone fractal debug loop did not initialize a clock"
+                )
             display.clock.tick(args.fps)
             peripheral_runtime.tick()
         runtime.reset()

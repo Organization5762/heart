@@ -11,20 +11,17 @@ from datetime import timedelta
 from typing import Any, Deque, Mapping, Self
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
+                      Schema, StreamFamily, StreamName, Timer, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralTag)
 from heart.peripheral.input_payloads.motion import MagnetometerVector
 from heart.peripheral.sensor import magnetometer_vector_event_route
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (interval_in_background,
-                                              pipe_in_background)
 
 logger = get_logger(__name__)
 
@@ -202,14 +199,12 @@ class Compass(Peripheral[Vector3 | None]):
             self._latest = vector
             self._history.append(vector)
 
-    def _event_stream(
-        self
-    ) -> reactive.Observable[Vector3 | None]:
-        return pipe_in_background(
-            interval_in_background(timedelta(milliseconds=10)),
-
-            ops.map(lambda _: self.get_latest_vector()),
-            ops.distinct_until_changed(lambda x: x)
+    def _event_stream(self) -> RoutePipeline[Vector3 | None]:
+        return (
+            Timer(timedelta(milliseconds=10))
+            .then_on_background_thread()
+            .map(lambda _: self.get_latest_vector())
+            .distinct_until_changed(lambda x: x)
         )
 
     def install_node(

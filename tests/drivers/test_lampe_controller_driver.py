@@ -71,21 +71,30 @@ class FakeUARTService:
 advertising_standard = make_module(
     "adafruit_ble.advertising.standard", ProvideServicesAdvertisement=FakeAdvertisement
 )
-advertising_module = make_module("adafruit_ble.advertising", standard=advertising_standard)
-services_nordic = make_module("adafruit_ble.services.nordic", UARTService=FakeUARTService)
+advertising_module = make_module(
+    "adafruit_ble.advertising", standard=advertising_standard
+)
+services_nordic = make_module(
+    "adafruit_ble.services.nordic", UARTService=FakeUARTService
+)
 services_module = make_module("adafruit_ble.services", nordic=services_nordic)
 
 adafruit_seesaw_module = make_module(
     "adafruit_seesaw",
     seesaw=make_module("adafruit_seesaw.seesaw", Seesaw=FakeSeesaw),
-    rotaryio=make_module("adafruit_seesaw.rotaryio", IncrementalEncoder=FakeIncrementalEncoder),
+    rotaryio=make_module(
+        "adafruit_seesaw.rotaryio", IncrementalEncoder=FakeIncrementalEncoder
+    ),
     digitalio=make_module("adafruit_seesaw.digitalio", DigitalIO=FakeDigitalIO),
 )
 
 STUBS = {
     "board": make_module("board", LED="led", SCL="scl", SDA="sda"),
     "digitalio": make_module(
-        "digitalio", DigitalInOut=FakeDigitalInOut, Direction=FakeDirection, Pull=FakePull
+        "digitalio",
+        DigitalInOut=FakeDigitalInOut,
+        Direction=FakeDirection,
+        Pull=FakePull,
     ),
     "busio": make_module("busio", I2C=FakeI2C),
     "adafruit_seesaw": adafruit_seesaw_module,
@@ -149,8 +158,6 @@ class TestDriversLampeControllerDriver:
 
         assert sender.calls == [["a"], ["b", "c"]]
 
-
-
     def test_runtime_handles_empty_batches(self, lampe_controller):
         """Verify that LampeControllerRuntime still sends an empty batch when no events are produced. This keeps the protocol well-formed so idle periods do not stall the receiver."""
         controller = StubSeesawController([[]])
@@ -161,22 +168,20 @@ class TestDriversLampeControllerDriver:
 
         assert sender.calls == [[]]
 
-
-
     def test_respond_to_identify_query_emits_identity_payload(self, lampe_controller):
         """Verify that respond_to_identify_query prints the Lampe controller identity payload. This allows operations tooling to discover deployed controllers for diagnostics."""
         stream = io.StringIO("Identify\n")
         outputs: list[str] = []
 
-        handled = lampe_controller.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+        handled = lampe_controller.respond_to_identify_query(
+            stdin=stream, print_fn=outputs.append
+        )
 
         assert handled is True
         payload = json.loads(outputs[0])
         assert payload["event_type"] == constants.DEVICE_IDENTIFY
         assert payload["data"]["device_name"] == lampe_controller.IDENTITY.device_name
         assert payload["data"]["device_id"] == "lampe-controller-test-id"
-
-
 
     def test_runtime_invokes_identify_responder(self, monkeypatch, lampe_controller):
         """Verify that the runtime asks respond_to_identify_query to handle identify requests. This keeps runtime logic composable so new commands stay centralized."""

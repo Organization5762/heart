@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 from .state import DopplerState
 
@@ -32,7 +29,9 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
 
     def _initial_state(self) -> DopplerState:
         position = np.random.uniform(
-            low=-self._field_radius, high=self._field_radius, size=(self._particle_count, 3)
+            low=-self._field_radius,
+            high=self._field_radius,
+            size=(self._particle_count, 3),
         ).astype(np.float32)
         velocity = np.random.uniform(
             low=-0.5, high=0.5, size=(self._particle_count, 3)
@@ -50,15 +49,12 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
         position = state.position.copy()
         velocity = state.velocity.copy()
         previous_velocity = state.velocity.copy()
-
         velocity += acceleration * dt
         speed = np.linalg.norm(velocity, axis=1, keepdims=True)
         mask = speed > self._max_speed
         if np.any(mask):
             velocity[mask[:, 0]] *= (self._max_speed / speed[mask]).reshape(-1, 1)
-
         position += velocity * dt
-
         for axis in range(3):
             over = position[:, axis] > self._field_radius
             under = position[:, axis] < -self._field_radius
@@ -68,7 +64,6 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
             if np.any(under):
                 position[under, axis] = -self._field_radius
                 velocity[under, axis] *= -1.0
-
         return DopplerState(
             position=position,
             velocity=velocity,
@@ -78,33 +73,22 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[DopplerState]:
-        frame_ticks = pipe_in_background(
-            self._peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[DopplerState]:
+        frame_ticks = (
+            self._peripheral_manager.frame_tick_controller.observable()
         )
-
         initial_state = self._initial_state()
 
-        def advance_state(
-            state: DopplerState,
-            frame_tick: object,
-        ) -> DopplerState:
+        def advance_state(state: DopplerState, frame_tick: object) -> DopplerState:
             dt_seconds = max(frame_tick.delta_s, 1 / 120)
             acceleration = self._random_acceleration()
-            return self._advance_state(
-                state,
-                acceleration=acceleration,
-                dt=dt_seconds,
-            )
+            return self._advance_state(state, acceleration=acceleration, dt=dt_seconds)
 
         return (
-            pipe_in_background(
-                frame_ticks,
-                ops.scan(advance_state, seed=initial_state),
-                start_with_once(initial_state),
-                ops.share(),
-            )
+            frame_ticks.scan(advance_state, seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     @property

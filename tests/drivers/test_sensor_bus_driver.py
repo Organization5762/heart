@@ -73,16 +73,21 @@ class TestDriversSensorBusDriver:
         assert payload.startswith("{")
         assert payload.endswith("\n")
         decoded = json.loads(payload.strip())
-        assert decoded == {"event_type": "rotation", "data": {"x": 1.0, "y": 2.0, "z": 3.0}}
+        assert decoded == {
+            "event_type": "rotation",
+            "data": {"x": 1.0, "y": 2.0, "z": 3.0},
+        }
 
     def test_get_sample_rate_defaults_when_missing(self, sensor_bus):
         """Verify that get_sample_rate falls back to the default rate when the sensor defines no preference. This ensures predictable behaviour when hardware lacks metadata."""
+
         class Stub:
             pass
 
-        assert sensor_bus.get_sample_rate(Stub()) == sensor_bus.Rate.string[sensor_bus.Rate.RATE_104_HZ]
-
-
+        assert (
+            sensor_bus.get_sample_rate(Stub())
+            == sensor_bus.Rate.string[sensor_bus.Rate.RATE_104_HZ]
+        )
 
     def test_connect_to_sensors_skips_failures(self, monkeypatch, sensor_bus):
         """Verify that connect_to_sensors ignores constructors that fail and returns only the working sensors. This keeps initialization resilient so one bad component does not break the stack."""
@@ -103,8 +108,6 @@ class TestDriversSensorBusDriver:
         sensors = sensor_bus.connect_to_sensors("i2c-bus")
         assert len(sensors) == 2
         assert created == [("GoodSensor", "i2c-bus"), ("GoodSensor", "i2c-bus")]
-
-
 
     def test_sensor_reader_emits_when_change_exceeds_threshold(self, sensor_bus):
         """Verify that SensorReader yields events only when the change exceeds the configured threshold. This filters out sensor noise so downstream analytics highlight meaningful movement."""
@@ -143,14 +146,14 @@ class TestDriversSensorBusDriver:
         assert accel_payload["event_type"] == constants.ACCELERATION
         assert gyro_payload["event_type"] == constants.GYROSCOPE
 
-
-
     def test_respond_to_identify_query_emits_identity_payload(self, sensor_bus):
         """Verify that respond_to_identify_query prints the sensor bus identity payload. This lets maintenance tooling track which sensor assemblies are connected."""
         stream = io.StringIO("Identify\n")
         outputs: list[str] = []
 
-        handled = sensor_bus.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+        handled = sensor_bus.respond_to_identify_query(
+            stdin=stream, print_fn=outputs.append
+        )
 
         assert handled is True
         assert outputs

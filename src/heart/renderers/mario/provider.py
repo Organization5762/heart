@@ -1,4 +1,5 @@
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.input import (AccelerometerController,
@@ -8,8 +9,6 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
 
 logger = get_logger(__name__)
 
@@ -26,7 +25,6 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         self.file = sheet_file_path
         self._accelerometer_controller = accelerometer_controller
         self._accelerometer_debug_profile = accelerometer_debug_profile
-
         frame_data = Loader.load_json(self.metadata_file_path)
         self.frames = []
         for key in frame_data["frames"]:
@@ -39,9 +37,7 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
                 )
             )
 
-    def _create_initial_state(
-        self,
-    ) -> MarioRendererState:
+    def _create_initial_state(self) -> MarioRendererState:
         image = Loader.load_spirtesheet(self.file)
         return MarioRendererState(spritesheet=image)
 
@@ -56,16 +52,13 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         time_since_last_update = state.time_since_last_update
         in_loop = state.in_loop
         highest_z = state.highest_z
-
         current_keyframe = self.frames[current_frame]
         keyframe_duration = current_keyframe.duration or 0
-
         if in_loop:
             next_time = (time_since_last_update or 0.0) + elapsed_ms
             if next_time > keyframe_duration:
                 current_frame += 1
                 next_time = 0.0
-
                 if current_frame >= len(self.frames):
                     current_frame = 0
                     in_loop = False
@@ -82,7 +75,6 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
             time_since_last_update = 0.0
         else:
             time_since_last_update = None
-
         return MarioRendererState(
             spritesheet=state.spritesheet,
             current_frame=current_frame,
@@ -93,33 +85,27 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         )
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactive.Observable[MarioRendererState]:
+        self, peripheral_manager: PeripheralManager
+    ) -> StreamNode[MarioRendererState]:
         initial = self._create_initial_state()
         if self._accelerometer_debug_profile.should_use_debug_input():
             acceleration_source = self._accelerometer_debug_profile.node()
         else:
             acceleration_source = self._accelerometer_controller.node()
-        accelerations = pipe_in_background(
-            acceleration_source,
-            starting_value=None,
+        accelerations = acceleration_source.start_with(None)
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
-        )
-
-        return pipe_in_background(
-            frame_ticks,
-            ops.with_latest_from(accelerations),
-            ops.scan(
+        return (
+            frame_ticks.with_latest_from(accelerations)
+            .scan(
                 lambda state, latest: self._advance_state(
                     state=state,
                     elapsed_ms=float(latest[0].delta_ms),
                     acceleration=latest[1],
                 ),
                 seed=initial,
-            ),
-            starting_value=initial,
+            )
+            .start_with(initial)
+
         )

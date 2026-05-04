@@ -103,7 +103,9 @@ class TestHeartRateManyfoldNode:
         latest_measurement = graph.latest(heart_rate_measurement_route())
         latest_lifecycle = graph.latest(heart_rate_lifecycle_route())
         assert latest_measurement is not None
-        assert latest_measurement.value.event_type == "peripheral.heart_rate.measurement"
+        assert (
+            latest_measurement.value.event_type == "peripheral.heart_rate.measurement"
+        )
         assert latest_measurement.value.data["device_id"] == "01234"
         assert latest_measurement.value.data["bpm"] == 142
         assert latest_measurement.value.data["battery_level"] == 50.0

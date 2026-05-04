@@ -3,8 +3,8 @@ import time
 
 import numpy as np
 import pygame
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
@@ -23,14 +23,19 @@ log_controller = get_logging_controller()
 class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     """Slides renderer_B into view while renderer_A moves out."""
 
-    def __init__(self, provider: SlideTransitionProvider,) -> None:
+    def __init__(
+        self,
+        provider: SlideTransitionProvider,
+    ) -> None:
         self.provider = provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self._initial_state: SlideTransitionState | None = None
         self._static_mask_indices: np.ndarray | None = None
         self._static_mask_values: np.ndarray | None = None
         self._static_mask_shape: tuple[int, int] | None = None
-        logger.info(f"Created SlideTransitionRenderer from {provider.renderer_a.name} and {provider.renderer_b.name}")
+        logger.info(
+            f"Created SlideTransitionRenderer from {provider.renderer_a.name} and {provider.renderer_b.name}"
+        )
         super().__init__(builder=self.provider)
 
     def initialize(
@@ -47,7 +52,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[SlideTransitionState]:
+    ) -> StreamNode[SlideTransitionState]:
         if self._initial_state is None:
             raise ValueError("SlideTransitionRenderer requires an initial state")
         return self.provider.observable(
@@ -82,9 +87,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
         slide_label: str,
     ) -> None:
         start_ns = time.perf_counter_ns()
-        renderer._internal_process(
-            scratch_window, peripheral_manager, orientation
-        )
+        renderer._internal_process(scratch_window, peripheral_manager, orientation)
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         log_controller.log(
             key=f"render.loop.{slide_label}",
@@ -236,7 +239,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
     @staticmethod
     def _gaussian_kernel(radius: int, sigma: float) -> np.ndarray:
         axis = np.arange(-radius, radius + 1, dtype=np.float32)
-        kernel = np.exp(-(axis ** 2) / (2 * sigma ** 2))
+        kernel = np.exp(-(axis**2) / (2 * sigma**2))
         kernel /= np.sum(kernel)
         return kernel
 

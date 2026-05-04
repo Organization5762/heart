@@ -76,7 +76,9 @@ class TestRgbDisplayRuntime:
             ColorOrder=SimpleNamespace(RGB="rgb"),
         )
 
-        config = build_matrix_config(native_module, Rectangle.with_layout(columns=2, rows=3))
+        config = build_matrix_config(
+            native_module, Rectangle.with_layout(columns=2, rows=3)
+        )
 
         assert config == FakeMatrixConfig(
             wiring="hat-pwm",
@@ -97,7 +99,9 @@ class TestRgbDisplayRuntime:
             lambda *_args, **_kwargs: None,
         )
 
-        with pytest.raises(RuntimeError, match="clean-room HUB75 runtime is unavailable"):
+        with pytest.raises(
+            RuntimeError, match="clean-room HUB75 runtime is unavailable"
+        ):
             build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
 
     def test_build_matrix_driver_uses_native_public_api_by_default(
@@ -169,7 +173,9 @@ class TestRgbDisplayRuntime:
 
         monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "piomatter")
 
-        with pytest.raises(RuntimeError, match="Unsupported RGB display backend 'piomatter'"):
+        with pytest.raises(
+            RuntimeError, match="Unsupported RGB display backend 'piomatter'"
+        ):
             build_matrix_driver(Rectangle.with_layout(columns=1, rows=1))
 
     def test_led_matrix_submits_rgba_surface_bytes(

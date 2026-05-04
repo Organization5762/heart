@@ -6,7 +6,8 @@ from typing import (Any, Callable, ClassVar, Dict, Iterator, List, Optional,
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from openant.base.ant import usb
@@ -21,10 +22,10 @@ from openant.easy.node import Node
 from usb.core import NoBackendError
 
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads import (HeartRateLifecycle,
                                              HeartRateMeasurement)
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import Subject
 
 RETRY_DELAY = 5
 DEVICE_TIMEOUT = 30  # seconds of silence ⇒ forget the strap
@@ -140,6 +141,7 @@ def heart_rate_error_route() -> TypedRoute[BaseException]:
         schema=heart_rate_exception_schema(),
     )
 
+
 # ---------------------------------------------------------------------------
 # OpenANT sometimes has race conditions where it receives broadcast data
 # before being initialized.  We wrap the list so __getitem__ never explodes.
@@ -162,12 +164,10 @@ _DUMMY = _DummyChannel()
 
 class _SafeList(list[Any]):
     @overload
-    def __getitem__(self, i: SupportsIndex) -> Any:
-        ...
+    def __getitem__(self, i: SupportsIndex) -> Any: ...
 
     @overload
-    def __getitem__(self, i: slice) -> list[Any]:
-        ...
+    def __getitem__(self, i: slice) -> list[Any]: ...
 
     def __getitem__(self, i: SupportsIndex | slice) -> Any:
         if isinstance(i, slice):
@@ -198,7 +198,7 @@ class HeartRateManager(Peripheral[Any]):
         self._janitor.start()
 
         self._lifecycle_status: Dict[str, str] = {}
-        self._event_subject: Subject[Any] = Subject()
+        self._event_streamer: EventStream[Any] = EventStream()
         self._measurement_sink: Callable[[SensorEvent], None] | None = None
         self._lifecycle_sink: Callable[[SensorEvent], None] | None = None
 
@@ -213,7 +213,9 @@ class HeartRateManager(Peripheral[Any]):
             logger.info("Unable to detect heart rate monitors - ANT driver not found")
             return
         except usb.core.NoBackendError:
-            logger.info("Unable to detect heart rate monitors - USB backend not available")
+            logger.info(
+                "Unable to detect heart rate monitors - USB backend not available"
+            )
             return
         yield cls()
 
@@ -233,7 +235,9 @@ class HeartRateManager(Peripheral[Any]):
         resolved_measurement_route = (
             measurement_output_route or heart_rate_measurement_route()
         )
-        resolved_lifecycle_route = lifecycle_output_route or heart_rate_lifecycle_route()
+        resolved_lifecycle_route = (
+            lifecycle_output_route or heart_rate_lifecycle_route()
+        )
 
         def mapper(peripheral: "HeartRateManager") -> SensorEvent:
             return SensorEvent(
@@ -267,8 +271,8 @@ class HeartRateManager(Peripheral[Any]):
             start_immediately=start_immediately,
         )
 
-    def _event_stream(self) -> Subject[Any]:
-        return self._event_subject
+    def _event_stream(self) -> StreamNode[Any]:
+        return self._event_streamer.observable()
 
     # ---------- Callbacks -----------------------------------------------------
 
@@ -300,7 +304,7 @@ class HeartRateManager(Peripheral[Any]):
                 event = measurement.to_input().to_sensor_event(
                     identity=self.peripheral_info().to_sensor_identity()
                 )
-                self._event_subject.on_next(measurement)
+                self._event_streamer.emit(measurement)
                 if self._measurement_sink is not None:
                     self._measurement_sink(event)
 
@@ -325,7 +329,7 @@ class HeartRateManager(Peripheral[Any]):
         event = lifecycle.to_input().to_sensor_event(
             identity=self.peripheral_info().to_sensor_identity()
         )
-        self._event_subject.on_next(lifecycle)
+        self._event_streamer.emit(lifecycle)
         if self._lifecycle_sink is not None:
             self._lifecycle_sink(event)
 
@@ -391,9 +395,7 @@ class HeartRateManager(Peripheral[Any]):
                 try:
                     self._ant_cycle()
                 except DriverNotFound:
-                    logger.exception(
-                        "ANT driver not found - skipping HeartRateManager"
-                    )
+                    logger.exception("ANT driver not found - skipping HeartRateManager")
                     return
                 except NoBackendError:
                     logger.exception(
@@ -401,9 +403,7 @@ class HeartRateManager(Peripheral[Any]):
                     )
                     return
                 except (AntException, OSError, RuntimeError):
-                    logger.exception(
-                        "ANT error: retrying in %d s", RETRY_DELAY
-                    )
+                    logger.exception("ANT error: retrying in %d s", RETRY_DELAY)
                     time.sleep(RETRY_DELAY)
         finally:
             self._stop_evt.set()  # stop janitor when manager exits
@@ -424,7 +424,9 @@ class HeartRateManager(Peripheral[Any]):
         resolved_measurement_route = (
             measurement_output_route or heart_rate_measurement_route()
         )
-        resolved_lifecycle_route = lifecycle_output_route or heart_rate_lifecycle_route()
+        resolved_lifecycle_route = (
+            lifecycle_output_route or heart_rate_lifecycle_route()
+        )
 
         def _body(stop: StopToken, graph: Graph) -> None:
             self._measurement_sink = lambda event: graph.publish(

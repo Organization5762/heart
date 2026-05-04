@@ -35,8 +35,12 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
         mag = np.abs(numpy_output)
 
         # Compute red and white intensity arrays, ensuring correct float32 dtype
-        red = (mag[..., None] * np.array([1, 0, 0], dtype=np.float32) * 255).astype(np.uint32)
-        white = (mag[..., None] * np.array([1, 1, 1], dtype=np.float32) * 200).astype(np.uint32)
+        red = (mag[..., None] * np.array([1, 0, 0], dtype=np.float32) * 255).astype(
+            np.uint32
+        )
+        white = (mag[..., None] * np.array([1, 1, 1], dtype=np.float32) * 200).astype(
+            np.uint32
+        )
 
         # Shape: (h, w, 3), dtype: uint32
         rgb = np.where(numpy_output[..., None] < 0, red, white).astype(np.uint32)

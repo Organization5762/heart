@@ -2,95 +2,76 @@ from __future__ import annotations
 
 from typing import Iterable
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
                                                    MetadataScreenState)
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
 
 class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
     def __init__(self, colors: Iterable[str] | None = None) -> None:
-        self._colors = list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
+        self._colors = (
+            list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
+        )
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[MetadataScreenState]:
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[MetadataScreenState]:
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
-
         initial_state = MetadataScreenState()
 
         def advance_state(
-            state: MetadataScreenState,
-            frame_tick: object,
+            state: MetadataScreenState, frame_tick: object
         ) -> MetadataScreenState:
             elapsed_ms = float(frame_tick.delta_ms)
             active_monitors = list(current_bpms.keys())
             return self._update_state(state, active_monitors, elapsed_ms)
 
         return (
-            pipe_in_background(
-                frame_ticks,
-                ops.scan(advance_state, seed=initial_state),
-                start_with_once(initial_state),
-                ops.share(),
-            )
+            frame_ticks.scan(advance_state, seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     def _update_state(
-        self,
-        state: MetadataScreenState,
-        active_monitors: list[str],
-        elapsed_ms: float,
+        self, state: MetadataScreenState, active_monitors: list[str], elapsed_ms: float
     ) -> MetadataScreenState:
         max_visible = 16
         heart_states = dict(state.heart_states)
-
         for i, monitor_id in enumerate(active_monitors):
             if monitor_id not in heart_states:
                 heart_states[monitor_id] = HeartAnimationState(
-                    up=True,
-                    color_index=i % len(self._colors),
-                    last_update_ms=0.0,
+                    up=True, color_index=i % len(self._colors), last_update_ms=0.0
                 )
-
         for monitor_id in list(heart_states.keys()):
             if monitor_id not in active_monitors:
                 del heart_states[monitor_id]
-
         for monitor_id in active_monitors[:max_visible]:
             animation = heart_states.get(monitor_id)
             if animation is None:
                 continue
-
             current_bpm = current_bpms.get(monitor_id, 60)
             if current_bpm > 0:
                 time_between_beats = 60000 / current_bpm / 2
             else:
                 time_between_beats = DEFAULT_TIME_BETWEEN_FRAMES_MS
-
             accumulated = animation.last_update_ms + elapsed_ms
             up = animation.up
             if accumulated > time_between_beats:
                 accumulated = 0.0
                 up = not animation.up
-
             heart_states[monitor_id] = HeartAnimationState(
-                up=up,
-                color_index=animation.color_index,
-                last_update_ms=accumulated,
+                up=up, color_index=animation.color_index, last_update_ms=accumulated
             )
-
         return MetadataScreenState(
             heart_states=heart_states,
             time_since_last_update_ms=state.time_since_last_update_ms + elapsed_ms,

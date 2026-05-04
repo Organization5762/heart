@@ -2,56 +2,13 @@
 
 from __future__ import annotations
 
-import heart.utilities.reactive as reactive
-from heart.peripheral.core.input import FrameTick
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.provider import MarioRendererProvider
-from heart.utilities.reactive import BehaviorSubject
 
 
-class _StubSpritesheet:
+class _SpriteSheetProbe:
     pass
-
-
-class _StubAccelerationController:
-    def __init__(self) -> None:
-        self._stream: BehaviorSubject[Acceleration | None] = (
-            BehaviorSubject(None)
-        )
-
-    def observable(self) -> reactive.Observable[Acceleration | None]:
-        return self._stream
-
-    def node(self) -> reactive.Observable[Acceleration | None]:
-        return self._stream
-
-    def emit(self, acceleration: Acceleration | None) -> None:
-        self._stream.on_next(acceleration)
-
-
-class _StubAccelerationDebugProfile(_StubAccelerationController):
-    def __init__(self, should_use_debug_input: bool) -> None:
-        super().__init__()
-        self._should_use_debug_input = should_use_debug_input
-
-    def should_use_debug_input(self) -> bool:
-        return self._should_use_debug_input
-
-
-class _StubFrameTickController:
-    def __init__(self) -> None:
-        self._stream: reactive.Subject[FrameTick] = reactive.Subject()
-
-    def observable(self) -> reactive.Observable[FrameTick]:
-        return self._stream
-
-    def emit(self, frame_tick: FrameTick) -> None:
-        self._stream.on_next(frame_tick)
-
-
-class _StubPeripheralManager:
-    def __init__(self) -> None:
-        self.frame_tick_controller = _StubFrameTickController()
 
 
 class TestMarioRendererProvider:
@@ -60,13 +17,18 @@ class TestMarioRendererProvider:
     def test_observable_accepts_peripheral_manager_and_emits_state(
         self,
         monkeypatch,
+        stub_clock_factory,
     ) -> None:
         """Verify `observable(peripheral_manager)` works so StatefulBaseRenderer initialization does not fail at subscription time."""
-        accelerometer_controller = _StubAccelerationController()
-        accelerometer_debug_profile = _StubAccelerationDebugProfile(
-            should_use_debug_input=False
+        peripheral_manager = PeripheralManager()
+        accelerometer_controller = peripheral_manager.accelerometer_controller
+        accelerometer_debug_profile = peripheral_manager.accelerometer_debug_profile
+        spritesheet = _SpriteSheetProbe()
+        monkeypatch.setattr(
+            accelerometer_debug_profile,
+            "should_use_debug_input",
+            lambda: False,
         )
-        spritesheet = _StubSpritesheet()
         monkeypatch.setattr(
             "heart.renderers.mario.provider.Loader.load_json",
             lambda _path: {
@@ -89,19 +51,12 @@ class TestMarioRendererProvider:
             accelerometer_controller=accelerometer_controller,
             accelerometer_debug_profile=accelerometer_debug_profile,
         )
-        peripheral_manager = _StubPeripheralManager()
         observed_states = []
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
-        accelerometer_controller.emit(Acceleration(x=0.0, y=0.0, z=12.5))
-        peripheral_manager.frame_tick_controller.emit(
-            FrameTick(
-                frame_index=0,
-                delta_ms=16.0,
-                delta_s=0.016,
-                monotonic_s=1.0,
-                fps=60.0,
-            )
+        accelerometer_controller.node().on_next(Acceleration(x=0.0, y=0.0, z=12.5))
+        peripheral_manager.frame_tick_controller.advance(
+            stub_clock_factory(16, fps=60.0)
         )
 
         assert observed_states
@@ -116,11 +71,15 @@ class TestMarioRendererProvider:
         monkeypatch,
     ) -> None:
         """Confirm frame advancement uses elapsed clock time so Mario animation can progress once a jump loop has started."""
-        accelerometer_controller = _StubAccelerationController()
-        accelerometer_debug_profile = _StubAccelerationDebugProfile(
-            should_use_debug_input=False
+        peripheral_manager = PeripheralManager()
+        accelerometer_controller = peripheral_manager.accelerometer_controller
+        accelerometer_debug_profile = peripheral_manager.accelerometer_debug_profile
+        spritesheet = _SpriteSheetProbe()
+        monkeypatch.setattr(
+            accelerometer_debug_profile,
+            "should_use_debug_input",
+            lambda: False,
         )
-        spritesheet = _StubSpritesheet()
         monkeypatch.setattr(
             "heart.renderers.mario.provider.Loader.load_json",
             lambda _path: {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pygame
+from manyfold import shutdown
 
 from heart.device import Rectangle
 from heart.device.local import LocalScreen
@@ -13,7 +14,6 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.utilities.reactivex_threads import shutdown
 
 WINDOW_WIDTH = 900
 WINDOW_HEIGHT = 700

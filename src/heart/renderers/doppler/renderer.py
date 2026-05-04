@@ -78,22 +78,21 @@ class DopplerRenderer(StatefulBaseRenderer[DopplerState]):
         delta_v = velocity - state.previous_velocity
         acceleration = delta_v / dt
 
-        direction = velocity / np.maximum(np.linalg.norm(velocity, axis=1, keepdims=True), 1e-6)
+        direction = velocity / np.maximum(
+            np.linalg.norm(velocity, axis=1, keepdims=True), 1e-6
+        )
         doppler_component = (-direction[:, 2] + 1.0) * 0.5
         hue = doppler_component * self._hue_extent
 
         accel_magnitude = np.linalg.norm(acceleration, axis=1)
         brightness = np.clip(accel_magnitude / (self._max_speed * 2.0), 0.0, 1.0)
-        saturation = np.clip(
-            0.3 + accel_magnitude / (self._max_speed * 3.0), 0.3, 1.0
-        )
+        saturation = np.clip(0.3 + accel_magnitude / (self._max_speed * 3.0), 0.3, 1.0)
 
         return self._hsv_to_rgb(hue, saturation, brightness)
 
     def real_process(
         self,
         window: Surface,
-
         orientation: Orientation,
     ) -> None:
         state = self.state

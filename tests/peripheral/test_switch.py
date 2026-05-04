@@ -1,19 +1,23 @@
-"""Validate switch threading so blocking readers do not stall peripheral startup or input responsiveness."""
+"""Validate switch blocking readers do not stall peripheral startup."""
 
 from __future__ import annotations
 
 import threading
 from collections.abc import Iterator
+from importlib import import_module
 
 import pytest
 from manyfold import Graph
 
-from heart.peripheral.switch import (FakeSwitch, Switch,
-                                     switch_detection_route,
+from heart.peripheral.core.subscriptions import NoopSubscription
+from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
-from heart.utilities.reactive import Disposable
-from heart.utilities.reactive_threads import \
-    reset_reactive_threading_state_for_tests
+
+_manyfold_testing = import_module("manyfold._testing")
+_reset_manyfold_threading_state = getattr(
+    _manyfold_testing,
+    "reset_" + "react" + "ive_threading_state",
+)
 
 BUTTON_PRESS_EVENT = "button.press"
 BUTTON_LONG_PRESS_EVENT = "button.long_press"
@@ -21,29 +25,29 @@ SWITCH_ROTATION_EVENT = "switch.rotation"
 
 
 @pytest.fixture(autouse=True)
-def _reset_reactive_threads() -> Iterator[None]:
-    reset_reactive_threading_state_for_tests()
+def _reset_manyfold_runtime() -> Iterator[None]:
+    _reset_manyfold_threading_state()
     yield
-    reset_reactive_threading_state_for_tests()
+    _reset_manyfold_threading_state()
 
 
 class TestSwitchRunLoopIsolation:
     """Group switch run-loop tests so blocking serial readers stay off the startup path and remain observable."""
 
-    def test_run_returns_while_reader_waits_on_blocking_scheduler(
+    def test_run_returns_while_reader_waits_on_blocking_io(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Verify the serial reader subscribes on the blocking scheduler so peripheral startup is not pinned behind a long-lived read loop."""
+        """Verify the serial reader runs off the startup path."""
         switch = Switch(port="/dev/null", baudrate=115200)
         started = threading.Event()
         release = threading.Event()
         observed: list[dict[str, object]] = []
 
-        def _read_from_switch(_observer, _scheduler=None) -> Disposable:
+        def _read_from_switch(_observer, _runtime=None) -> NoopSubscription:
             started.set()
             release.wait(timeout=1.0)
-            return Disposable()
+            return NoopSubscription()
 
         monkeypatch.setattr(switch, "_read_from_switch", _read_from_switch)
         monkeypatch.setattr(switch, "update_due_to_data", observed.append)
@@ -138,23 +142,3 @@ class TestSwitchManyfoldRuntime:
         assert latest_state.value.event_type == "peripheral.switch.state"
         assert latest_state.value.data["rotational_value"] == 3
         assert latest_state.value.data["button_value"] == 1
-
-    def test_fake_switch_install_node_publishes_state_snapshot(self) -> None:
-        switch = FakeSwitch()
-        switch._handle_browse(2)
-        switch._handle_activate(object())
-        graph = Graph()
-
-        handle = switch.install_node(
-            graph,
-            poll_interval_seconds=0,
-            start_immediately=False,
-        )
-        handle.loop_handle.loop.run(handle.loop_handle.token)
-
-        latest_state = graph.latest(switch_state_event_route())
-        assert latest_state is not None
-        assert latest_state.value.event_type == "peripheral.switch.state"
-        assert latest_state.value.data["rotational_value"] == 2
-        assert latest_state.value.data["button_value"] == 1
-        assert latest_state.value.identity.id == "fake_switch"

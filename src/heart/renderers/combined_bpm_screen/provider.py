@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 DEFAULT_METADATA_DURATION_MS = 12000
 DEFAULT_MAX_BPM_DURATION_MS = 5000
@@ -23,30 +21,22 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[CombinedBpmScreenState]:
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[CombinedBpmScreenState]:
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
-
         initial_state = CombinedBpmScreenState()
 
         def advance_state(
-            state: CombinedBpmScreenState,
-            frame_tick: object,
+            state: CombinedBpmScreenState, frame_tick: object
         ) -> CombinedBpmScreenState:
-            return self._advance_state(
-                state=state,
-                elapsed_ms=int(frame_tick.delta_ms),
-            )
+            return self._advance_state(state=state, elapsed_ms=int(frame_tick.delta_ms))
 
         return (
-            pipe_in_background(
-                frame_ticks,
-                ops.scan(advance_state, seed=initial_state),
-                start_with_once(initial_state),
-                ops.share(),
-            )
+            frame_ticks.scan(advance_state, seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     def _advance_state(
@@ -54,14 +44,12 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
     ) -> CombinedBpmScreenState:
         elapsed_time = state.elapsed_time_ms + elapsed_ms
         showing_metadata = state.showing_metadata
-
         if showing_metadata and elapsed_time >= self._metadata_duration_ms:
             showing_metadata = False
             elapsed_time = 0
-        elif (not showing_metadata) and elapsed_time >= self._max_bpm_duration_ms:
+        elif not showing_metadata and elapsed_time >= self._max_bpm_duration_ms:
             showing_metadata = True
             elapsed_time = 0
-
         return CombinedBpmScreenState(
             elapsed_time_ms=elapsed_time, showing_metadata=showing_metadata
         )

@@ -3,8 +3,8 @@ import math
 import numba as nb
 import numpy as np
 import pygame
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -27,7 +27,9 @@ def patterns(x: float, y: float, t: float) -> float:
 
 
 @nb.njit(fastmath=True)
-def map_value(value: float, min1: float, max1: float, min2: float, max2: float) -> float:
+def map_value(
+    value: float, min1: float, max1: float, min2: float, max2: float
+) -> float:
     """Map a value from one range to another."""
     return min2 + (value - min1) * (max2 - min2) / (max1 - min1)
 
@@ -94,7 +96,7 @@ class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[MulticolorState]:
+    ) -> StreamNode[MulticolorState]:
         if self._builder is None:
             self._builder = MulticolorStateProvider(peripheral_manager)
             self.builder = self._builder

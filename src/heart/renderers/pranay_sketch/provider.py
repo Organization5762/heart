@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pygame
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -10,9 +10,6 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.pranay_sketch.state import (PranaySketchPiece,
                                                  PranaySketchState)
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 SEGMENT_DIRECTORY = "pranay_sketch_segments"
 SEGMENT_LAYOUT_PATH = f"{SEGMENT_DIRECTORY}/layout.json"
@@ -39,7 +36,6 @@ def _clamp_channel(value: float) -> int:
 
 def enhance_piece_image(image: pygame.Surface) -> pygame.Surface:
     """Boost piece saturation and edge opacity for LED-friendly rendering."""
-
     enhanced = image.copy()
     width, height = enhanced.get_size()
     for x in range(width):
@@ -50,7 +46,6 @@ def enhance_piece_image(image: pygame.Surface) -> pygame.Surface:
             if pixel.a < MIN_VISIBLE_ALPHA:
                 enhanced.set_at((x, y), (0, 0, 0, 0))
                 continue
-
             working = pygame.Color(pixel.r, pixel.g, pixel.b, pixel.a)
             hue, saturation, value, alpha = working.hsva
             working.hsva = (
@@ -59,34 +54,22 @@ def enhance_piece_image(image: pygame.Surface) -> pygame.Surface:
                 min(100.0, value * VALUE_MULTIPLIER),
                 alpha,
             )
-
-            luminance = (
-                (0.2126 * working.r)
-                + (0.7152 * working.g)
-                + (0.0722 * working.b)
-            )
+            luminance = 0.2126 * working.r + 0.7152 * working.g + 0.0722 * working.b
             if (
                 saturation <= MONOCHROME_SATURATION_THRESHOLD
                 and luminance <= MONOCHROME_LUMINANCE_THRESHOLD
             ):
                 enhanced.set_at(
                     (x, y),
-                    (
-                        255,
-                        255,
-                        255,
-                        _clamp_channel(max(pixel.a, MIN_MONOCHROME_ALPHA)),
-                    ),
+                    (255, 255, 255, _clamp_channel(max(pixel.a, MIN_MONOCHROME_ALPHA))),
                 )
                 continue
-
-            red = luminance + ((working.r - luminance) * CONTRAST_MULTIPLIER)
-            green = luminance + ((working.g - luminance) * CONTRAST_MULTIPLIER)
-            blue = luminance + ((working.b - luminance) * CONTRAST_MULTIPLIER)
+            red = luminance + (working.r - luminance) * CONTRAST_MULTIPLIER
+            green = luminance + (working.g - luminance) * CONTRAST_MULTIPLIER
+            blue = luminance + (working.b - luminance) * CONTRAST_MULTIPLIER
             edge_alpha = _clamp_channel(
                 max(MIN_VISIBLE_ALPHA, pixel.a) * ALPHA_MULTIPLIER
             )
-
             enhanced.set_at(
                 (x, y),
                 (
@@ -111,38 +94,36 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[PranaySketchState]:
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[PranaySketchState]:
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
         initial_state = self._load_initial_state()
 
         def advance_state(
-            state: PranaySketchState,
-            frame_tick: object,
+            state: PranaySketchState, frame_tick: object
         ) -> PranaySketchState:
             return self._advance_state(
-                state=state,
-                elapsed_s=max(float(frame_tick.delta_s), 0.0),
+                state=state, elapsed_s=max(float(frame_tick.delta_s), 0.0)
             )
 
-        return pipe_in_background(
-            frame_ticks,
-            ops.scan(advance_state, seed=initial_state),
-            start_with_once(initial_state),
-            ops.share(),
+        return (
+            frame_ticks.scan(advance_state, seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     def _load_initial_state(self) -> PranaySketchState:
         if self._initial_state is not None:
             return self._initial_state
-
         layout = Loader.load_json(SEGMENT_LAYOUT_PATH)
         pieces = tuple(
-            self._create_piece(piece_layout)
-            for piece_layout in layout.get("pieces", [])
-            if isinstance(piece_layout, dict)
+            (
+                self._create_piece(piece_layout)
+                for piece_layout in layout.get("pieces", [])
+                if isinstance(piece_layout, dict)
+            )
         )
         active_bpm = self._resolve_active_bpm()
         beat_duration_s = 60.0 / active_bpm
@@ -175,18 +156,15 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
             center_y=float(layout["center_y"]),
             width=int(layout["width"]),
             height=int(layout["height"]),
-            bob_amplitude_px=1.6 + (index % 3) * 0.5,
-            sway_amplitude_px=1.2 + ((index + 1) % 3) * 0.55,
-            pulse_amplitude=0.04 + (index % 4) * 0.015,
+            bob_amplitude_px=1.6 + index % 3 * 0.5,
+            sway_amplitude_px=1.2 + (index + 1) % 3 * 0.55,
+            pulse_amplitude=0.04 + index % 4 * 0.015,
             phase_offset=index * 0.63,
             entrance_delay_seconds=index * PIECE_ENTRANCE_STAGGER_SECONDS,
         )
 
     def _advance_state(
-        self,
-        *,
-        state: PranaySketchState,
-        elapsed_s: float,
+        self, *, state: PranaySketchState, elapsed_s: float
     ) -> PranaySketchState:
         active_bpm = self._resolve_active_bpm()
         beat_duration_s = 60.0 / active_bpm
@@ -200,10 +178,8 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         beat_count = state.beat_count
         layout_flipped = state.layout_flipped
         burst_duration_s = beat_duration_s * self._burst_duration_beats
-
         if bar_burst_elapsed_s is not None and bar_burst_elapsed_s >= burst_duration_s:
             bar_burst_elapsed_s = None
-
         while beat_elapsed_s >= beat_duration_s:
             beat_elapsed_s -= beat_duration_s
             beat_count += 1
@@ -212,7 +188,6 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
                 layout_flip_elapsed_s = 0.0
             if beat_count % BAR_BURST_INTERVAL_BEATS == 0:
                 bar_burst_elapsed_s = 0.0
-
         return PranaySketchState(
             canvas_size=state.canvas_size,
             pieces=state.pieces,

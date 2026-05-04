@@ -1,4 +1,3 @@
-
 import numpy as np
 import pygame
 from pygame import Surface
@@ -21,11 +20,12 @@ class Life(StatefulBaseRenderer[LifeState]):
     def real_process(
         self,
         window: Surface,
-
         orientation: Orientation,
     ) -> None:
         # if 1, make white, else make black
         # We need to project these all to 3 dimensions
         updated_colors = np.repeat(self.state.grid[:, :, np.newaxis], 3, axis=2) * 255
         pygame.surfarray.blit_array(window.screen, updated_colors)
-        assert self.state.grid.shape == window.get_size(), "Grid size must match window size"
+        assert self.state.grid.shape == window.get_size(), (
+            "Grid size must match window size"
+        )

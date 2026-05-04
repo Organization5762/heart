@@ -6,7 +6,8 @@ from .biometrics import HeartRateLifecycle, HeartRateMeasurement  # noqa: F401
 from .display import DisplayFrame, RendererFrame  # noqa: F401
 from .flowtoy import FlowToyPacket  # noqa: F401
 from .messages import PhoneTextMessage  # noqa: F401
-from .motion import (AccelerometerVector, ForceMeasurement,  # noqa: F401
-                     MagnetometerVector)
+from .motion import AccelerometerVector  # noqa: F401
+from .motion import ForceMeasurement  # noqa: F401
+from .motion import MagnetometerVector  # noqa: F401
 from .radio import RadioPacket  # noqa: F401
 from .switch import SwitchButton, SwitchRotation  # noqa: F401

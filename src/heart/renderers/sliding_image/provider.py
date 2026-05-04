@@ -4,21 +4,16 @@ from dataclasses import replace
 from typing import cast
 
 import pygame
+from manyfold import ConstantNode, MergeNode, StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import pipe_in_background
 
 
 class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
-    def __init__(
-        self,
-        initial_state: SlidingImageState | None = None,
-    ) -> None:
+    def __init__(self, initial_state: SlidingImageState | None = None) -> None:
         self._initial_state = initial_state or SlidingImageState()
 
     def _initial_state_snapshot(self) -> SlidingImageState:
@@ -30,46 +25,40 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
     def advance_state(self, state: SlidingImageState, width: int) -> SlidingImageState:
         if width <= 0:
             return replace(state, width=width)
-
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[SlidingImageState]:
+    ) -> StreamNode[SlidingImageState]:
         if peripheral_manager is None:
             raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
+        window_stream = (
+            peripheral_manager.window.filter(lambda window: window is not None)
+            .map(lambda window: cast(pygame.Surface, window))
+            .map(lambda window: window.get_size()[0])
+            .distinct_until_changed()
 
-        window_stream = pipe_in_background(
-            peripheral_manager.window,
-            ops.filter(lambda window: window is not None),
-            ops.map(lambda window: cast(pygame.Surface, window)),
-            ops.map(lambda window: window.get_size()[0]),
-            ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = reactive.merge(
-            reactive.just(initial_state.width),
-            window_stream,
+        window_stream = MergeNode.merge(
+            ConstantNode(initial_state.width).observable(), window_stream
         )
-
-        return pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.with_latest_from(window_stream),
-            ops.map(lambda pair: pair[1]),
-            ops.scan(
+        return (
+            peripheral_manager.frame_tick_controller.observable()
+            .with_latest_from(window_stream)
+            .map(lambda pair: pair[1])
+            .scan(
                 lambda state, width: self.advance_state(state, width),
                 seed=initial_state,
-            ),
-            starting_value=initial_state,
+            )
+            .start_with(initial_state)
+
         )
 
 
 class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
-    def __init__(
-        self,
-        initial_state: SlidingRendererState | None = None,
-    ) -> None:
+    def __init__(self, initial_state: SlidingRendererState | None = None) -> None:
         self._initial_state = initial_state or SlidingRendererState()
 
     def _initial_state_snapshot(self) -> SlidingRendererState:
@@ -83,36 +72,35 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
     ) -> SlidingRendererState:
         if width <= 0:
             return replace(state, width=width)
-
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[SlidingRendererState]:
+    ) -> StreamNode[SlidingRendererState]:
         if peripheral_manager is None:
-            raise ValueError("SlidingRendererStateProvider requires a PeripheralManager")
+            raise ValueError(
+                "SlidingRendererStateProvider requires a PeripheralManager"
+            )
+        window_stream = (
+            peripheral_manager.window.filter(lambda window: window is not None)
+            .map(lambda window: cast(pygame.Surface, window))
+            .map(lambda window: window.get_size()[0])
+            .distinct_until_changed()
 
-        window_stream = pipe_in_background(
-            peripheral_manager.window,
-            ops.filter(lambda window: window is not None),
-            ops.map(lambda window: cast(pygame.Surface, window)),
-            ops.map(lambda window: window.get_size()[0]),
-            ops.distinct_until_changed(),
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = reactive.merge(
-            reactive.just(initial_state.width),
-            window_stream,
+        window_stream = MergeNode.merge(
+            ConstantNode(initial_state.width).observable(), window_stream
         )
-
-        return pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.with_latest_from(window_stream),
-            ops.map(lambda pair: pair[1]),
-            ops.scan(
+        return (
+            peripheral_manager.frame_tick_controller.observable()
+            .with_latest_from(window_stream)
+            .map(lambda pair: pair[1])
+            .scan(
                 lambda state, width: self.advance_state(state, width),
                 seed=initial_state,
-            ),
-            starting_value=initial_state,
+            )
+            .start_with(initial_state)
+
         )

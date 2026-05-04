@@ -1,18 +1,18 @@
-"""Tests for peripheral reactive event streams."""
+"""Tests for peripheral event streams."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
 
-from manyfold import Graph
+from manyfold import Graph, StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.utilities.reactive import Disposable
+from heart.peripheral.core.subscriptions import (CallbackObservable,
+                                                 NoopSubscription)
 
 
 class CountingPeripheral(Peripheral[int]):
@@ -21,16 +21,16 @@ class CountingPeripheral(Peripheral[int]):
     def __init__(self, counter: dict[str, int]) -> None:
         self._counter = counter
 
-    def _event_stream(self) -> reactive.Observable[int]:
-        def on_subscribe(observer: Any, scheduler: Any) -> Disposable:
+    def _event_stream(self) -> StreamNode[int]:
+        def on_subscribe(observer: Any, scheduler: Any) -> NoopSubscription:
             self._counter["subscriptions"] += 1
-            return Disposable()
+            return NoopSubscription()
 
-        return reactive.create(on_subscribe)
+        return CallbackObservable(on_subscribe)
 
 
 class TestPeripheralObserveSharing:
-    """Group tests for shared peripheral streams to keep reactive fan-out efficient."""
+    """Group tests for shared peripheral streams to avoid duplicate source work."""
 
     def test_observe_shares_subscription(self) -> None:
         """Ensure observe shares a single subscription so redundant polling is avoided for scalability."""
@@ -41,13 +41,36 @@ class TestPeripheralObserveSharing:
         subscription_a = stream.subscribe()
         subscription_b = stream.subscribe()
         try:
-            assert counter["subscriptions"] == 1, "Observe should share the underlying stream."
+            assert counter["subscriptions"] == 1, (
+                "Observe should share the underlying stream."
+            )
         finally:
             subscription_a.dispose()
             subscription_b.dispose()
 
 
 class TestGraphRouteStreamTransforms:
+    def test_callback_pipeline_connects_graph_route_to_python_sink(self) -> None:
+        graph = Graph()
+        route = runtime_route(
+            "test_event_stream_callback", "HeartTestEventStreamCallback"
+        )
+        stream = GraphRouteStream[int](graph, route)
+        observed: list[int] = []
+
+        connection = (
+            stream.map(lambda value: value + 1, name="increment")
+            .filter(lambda value: value > 2, name="greater-than-two")
+            .callback(observed.append, name="collect")
+        )
+        try:
+            stream.on_next(1)
+            stream.on_next(2)
+
+            assert observed == [3]
+        finally:
+            connection.remove()
+
     def test_pipe_delegates_operator_sharing_to_observable_pipeline(
         self,
     ) -> None:
@@ -60,11 +83,8 @@ class TestGraphRouteStreamTransforms:
             calls["mapper"] += 1
             return value + 1
 
-        transformed = stream.pipe(
-            reactive.operators.map(mapper),
-            reactive.operators.share(),
-        )
-        doubled = stream.pipe(reactive.operators.map(lambda value: value * 2))
+        transformed = stream.map(mapper)
+        doubled = stream.map(lambda value: value * 2)
         observed_a: list[int] = []
         observed_b: list[int] = []
         observed_doubled: list[int] = []

@@ -72,9 +72,9 @@ class SaturationPostProcessor(BasePostProcessor):
 
         image, pixels = _get_image_view(window.screen)
         img = image.astype(np.float32)
-        lum = (
-            0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2]
-        )[..., None]
+        lum = (0.299 * img[..., 0] + 0.587 * img[..., 1] + 0.114 * img[..., 2])[
+            ..., None
+        ]
         img_sat = lum + factor * (img - lum)
         image[:] = np.clip(img_sat, 0, 255).astype(np.uint8)
         del pixels
@@ -144,9 +144,7 @@ class EdgePostProcessor(BasePostProcessor):
 
         image, pixels = _get_image_view(window.screen)
         lum = (
-            0.299 * image[..., 0]
-            + 0.587 * image[..., 1]
-            + 0.114 * image[..., 2]
+            0.299 * image[..., 0] + 0.587 * image[..., 1] + 0.114 * image[..., 2]
         ).astype(np.int16)
 
         gx = np.abs(np.roll(lum, -1, 1) - np.roll(lum, 1, 1))

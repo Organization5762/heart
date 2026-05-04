@@ -91,14 +91,20 @@ class FakeWiringProfile(Enum):
 class TestHeartRgbMatrixDriverMatrixCompatibilityApi:
     """Validate the rgbmatrix-style wrapper so Python clients can reuse the common canvas flow without bypassing Rust."""
 
-    def _load_heart_rgb_matrix_driver(self, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    def _load_heart_rgb_matrix_driver(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> ModuleType:
         """Import the source tree package with a fake native backend so wrapper behavior stays isolated and deterministic."""
 
         for module_name in list(sys.modules):
-            if module_name == "heart_rgb_matrix_driver" or module_name.startswith("heart_rgb_matrix_driver."):
+            if module_name == "heart_rgb_matrix_driver" or module_name.startswith(
+                "heart_rgb_matrix_driver."
+            ):
                 monkeypatch.delitem(sys.modules, module_name, raising=False)
 
-        fake_native_module = ModuleType("heart_rgb_matrix_driver._heart_rgb_matrix_driver")
+        fake_native_module = ModuleType(
+            "heart_rgb_matrix_driver._heart_rgb_matrix_driver"
+        )
         fake_native_module.ColorOrder = FakeColorOrder
         fake_native_module.NativeMatrixDriver = FakeNativeMatrixDriver
         fake_native_module.NativeMatrixStats = FakeNativeMatrixStats
@@ -115,7 +121,9 @@ class TestHeartRgbMatrixDriverMatrixCompatibilityApi:
 
         monkeypatch.syspath_prepend(str(HEART_RGB_MATRIX_DRIVER_PYTHON_PATH))
         monkeypatch.setitem(
-            sys.modules, "heart_rgb_matrix_driver._heart_rgb_matrix_driver", fake_native_module
+            sys.modules,
+            "heart_rgb_matrix_driver._heart_rgb_matrix_driver",
+            fake_native_module,
         )
         return importlib.import_module("heart_rgb_matrix_driver")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import heart.utilities.reactive as reactive
+from manyfold import ConstantNode, MergeNode, StreamNode
+
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -9,9 +10,6 @@ from heart.peripheral.rubiks_connected_x import (
     RubiksConnectedXNotification, RubiksConnectedXPeripheral)
 from heart.renderers.rubiks_connected_x_debug.state import \
     RubiksConnectedXDebugState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 DEFAULT_STATUS_LINES = (
     "Rubik's Connected X debug mode",
@@ -26,19 +24,17 @@ class RubiksConnectedXDebugStateProvider(
     """Expose the latest raw cube notification as simple text lines."""
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactive.Observable[RubiksConnectedXDebugState]:
+        self, peripheral_manager: PeripheralManager
+    ) -> StreamNode[RubiksConnectedXDebugState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, RubiksConnectedXPeripheral)
         ]
         if not cube_peripherals:
-            return reactive.just(
+            return ConstantNode(
                 RubiksConnectedXDebugState(status_lines=DEFAULT_STATUS_LINES)
-            )
-
+            ).observable()
         first_peripheral = cube_peripherals[0]
         initial_state = RubiksConnectedXDebugState(
             status_lines=(
@@ -49,19 +45,20 @@ class RubiksConnectedXDebugStateProvider(
             )
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
-        merged = pipe_in_background(
-            reactive.merge(*observables),
-            ops.map(
+        merged = (
+            MergeNode.merge(*observables)
+            .map(
                 PeripheralMessageEnvelope[
                     RubiksConnectedXNotification
                 ].unwrap_peripheral
-            ),
+            )
+
         )
-        return pipe_in_background(
-            merged,
-            ops.scan(self._advance_state, seed=initial_state),
-            start_with_once(initial_state),
-            ops.share(),
+        return (
+            merged.scan(self._advance_state, seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     def _advance_state(
@@ -75,10 +72,7 @@ class RubiksConnectedXDebugStateProvider(
         parsed_message = notification.parsed_message
         if parsed_message is not None:
             if parsed_message.message_type is RubiksConnectedXMessageType.MOVE:
-                parsed_line = (
-                    "Parsed: "
-                    f"move={','.join(move.notation for move in parsed_message.moves)}"
-                )
+                parsed_line = f"Parsed: move={','.join((move.notation for move in parsed_message.moves))}"
             elif parsed_message.message_type is RubiksConnectedXMessageType.STATE:
                 parsed_line = "Parsed: full cube state sync"
             elif parsed_message.message_type is RubiksConnectedXMessageType.BATTERY:
@@ -86,13 +80,7 @@ class RubiksConnectedXDebugStateProvider(
             else:
                 parsed_line = f"Parsed: type={parsed_message.message_type.value}"
         elif parsed_packet is not None:
-            parsed_line = (
-                "Parsed: "
-                f"opcode={parsed_packet.opcode} "
-                f"face={parsed_packet.face_index} "
-                f"turn={parsed_packet.turn_code} "
-                f"checksum={'ok' if parsed_packet.is_checksum_valid else 'bad'}"
-            )
+            parsed_line = f"Parsed: opcode={parsed_packet.opcode} face={parsed_packet.face_index} turn={parsed_packet.turn_code} checksum={('ok' if parsed_packet.is_checksum_valid else 'bad')}"
         status_lines = (
             "Rubik's Connected X debug mode",
             f"Packets observed: {state.packet_count + 1}",

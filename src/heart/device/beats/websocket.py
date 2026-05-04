@@ -159,7 +159,9 @@ def decode_stream_envelope(frame: bytes) -> tuple[str, object] | None:
 
 def decode_control_message(message: str | bytes) -> ControlMessage | None:
     try:
-        parsed = json.loads(message.decode("utf-8") if isinstance(message, bytes) else message)
+        parsed = json.loads(
+            message.decode("utf-8") if isinstance(message, bytes) else message
+        )
     except (UnicodeDecodeError, json.JSONDecodeError):
         logger.debug("Ignoring non-JSON websocket control message.")
         return None
@@ -307,17 +309,17 @@ class BeatsWebSocketNode:
             maxsize=self.websocket._streaming_settings.queue_max_size
         )
 
-        def enqueue_frame(envelope: Any) -> None:
+        def enqueue_frame(frame: bytes) -> None:
             loop.call_soon_threadsafe(
                 self.websocket._enqueue_frame,
-                envelope.value,
+                frame,
                 broadcast_queue,
             )
 
         subscription = graph.observe(
             self.input_route,
             replay_latest=False,
-        ).subscribe(enqueue_frame)
+        ).callback(enqueue_frame)
         broadcast_task = asyncio.create_task(self._broadcast_worker(broadcast_queue))
         try:
             async with websockets.serve(
@@ -403,7 +405,9 @@ class WebSocket:
     _node_handle: ManagedGraphNodeHandle | None = field(default=None, init=False)
     _replay_lock: threading.Lock = field(default_factory=threading.Lock, init=False)
     _latest_frame: bytes | None = field(default=None, init=False)
-    _latest_peripheral_frames: dict[str, bytes] = field(default_factory=dict, init=False)
+    _latest_peripheral_frames: dict[str, bytes] = field(
+        default_factory=dict, init=False
+    )
     _control_handler: Callable[[ControlMessage], None] | None = field(
         default=None, init=False
     )
@@ -476,7 +480,9 @@ class WebSocket:
                 self._latest_frame = frame_bytes
                 return
             if kind == "peripheral" and isinstance(payload, PeripheralMessageEnvelope):
-                self._latest_peripheral_frames[_peripheral_cache_key(payload)] = frame_bytes
+                self._latest_peripheral_frames[_peripheral_cache_key(payload)] = (
+                    frame_bytes
+                )
 
     def _replay_frames(self) -> tuple[bytes, ...]:
         with self._replay_lock:
@@ -495,11 +501,17 @@ class WebSocket:
             queue.put_nowait(frame)
             return
 
-        if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.DROP_NEWEST:
+        if (
+            self._streaming_settings.overflow_strategy
+            == QueueOverflowStrategy.DROP_NEWEST
+        ):
             logger.debug("Dropping websocket frame because queue is full.")
             return
 
-        if self._streaming_settings.overflow_strategy == QueueOverflowStrategy.DROP_OLDEST:
+        if (
+            self._streaming_settings.overflow_strategy
+            == QueueOverflowStrategy.DROP_OLDEST
+        ):
             try:
                 queue.get_nowait()
             except asyncio.QueueEmpty:

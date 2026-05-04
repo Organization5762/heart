@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import heart.utilities.reactive as reactive
+from manyfold import StreamNode
+
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.text.state import TextRenderingState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 
 class TextRenderingProvider(ObservableProvider[TextRenderingState]):
@@ -32,7 +30,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactive.Observable[TextRenderingState]:
+    ) -> StreamNode[TextRenderingState]:
         initial_state = TextRenderingState(
             switch_state=None,
             text=self._text,
@@ -42,17 +40,15 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             x_location=self._x_location,
             y_location=self._y_location,
         )
-
-        return pipe_in_background(
-            peripheral_manager.get_main_switch_subscription(),
-            start_with_once(None),
-            ops.scan(
-                lambda state, switch_state: replace(
-                    state, switch_state=switch_state
-                ),
+        return (
+            peripheral_manager.get_main_switch_subscription()
+            .start_with(None)
+            .scan(
+                lambda state, switch_state: replace(state, switch_state=switch_state),
                 seed=initial_state,
-            ),
-            starting_value=initial_state,
+            )
+            .start_with(initial_state)
+
         )
 
     @classmethod

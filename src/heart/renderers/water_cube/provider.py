@@ -1,5 +1,5 @@
+from manyfold import StreamNode
 
-import heart.utilities.reactive as reactive
 from heart.device import Device
 from heart.peripheral.core.input import (AccelerometerController,
                                          AccelerometerDebugProfile)
@@ -7,9 +7,6 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
@@ -25,7 +22,7 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> reactive.Observable[WaterCubeState]:
+    ) -> StreamNode[WaterCubeState]:
         if self._accelerometer_debug_profile.should_use_debug_input():
             accel = self._accelerometer_debug_profile.observable()
         else:
@@ -35,14 +32,8 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
             return prev._step(
                 heights=prev.heights,
                 velocities=prev.velocities,
-                acceleration=acceleration
+                acceleration=acceleration,
             )
 
         initial = WaterCubeState.initial_state(self.device)
-
-        return pipe_in_background(
-            accel,
-            start_with_once(initial),
-            ops.scan(update_state),
-            ops.share(),
-        )
+        return accel.start_with(initial).scan(update_state)

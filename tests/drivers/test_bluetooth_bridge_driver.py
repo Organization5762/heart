@@ -58,7 +58,10 @@ services_module = driver_loader.make_module(
 STUBS = {
     "board": driver_loader.make_module("board", LED="led"),
     "digitalio": driver_loader.make_module(
-        "digitalio", DigitalInOut=FakeDigitalInOut, Direction=FakeDirection, Pull=FakePull
+        "digitalio",
+        DigitalInOut=FakeDigitalInOut,
+        Direction=FakeDirection,
+        Pull=FakePull,
     ),
     "adafruit_ble": driver_loader.make_module(
         "adafruit_ble",
@@ -71,6 +74,7 @@ STUBS = {
     "adafruit_ble.services": services_module,
     "adafruit_ble.services.nordic": services_nordic,
 }
+
 
 class StubBLE:
     def __init__(self):
@@ -157,7 +161,9 @@ def _decode_payload(bluetooth_bridge, payload_bytes: bytes):
 class TestDriversBluetoothBridgeDriver:
     """Group Drivers Bluetooth Bridge Driver tests so drivers bluetooth bridge driver behaviour stays reliable. This preserves confidence in drivers bluetooth bridge driver for end-to-end scenarios."""
 
-    def test_runtime_buffers_and_flushes_messages(self, bluetooth_bridge, runtime_factory):
+    def test_runtime_buffers_and_flushes_messages(
+        self, bluetooth_bridge, runtime_factory
+    ):
         """Verify that the runtime buffers payloads until BLE connects and then flushes them over UART. This preserves telemetry through connection drops so downstream consumers never miss events."""
         runtime, ble, uart, led, sleeper = runtime_factory(
             [
@@ -186,9 +192,9 @@ class TestDriversBluetoothBridgeDriver:
         runtime.run_once()
         assert len(uart.writes) == 2
 
-
-
-    def test_runtime_does_not_duplicate_buffer_entries(self, bluetooth_bridge, runtime_factory):
+    def test_runtime_does_not_duplicate_buffer_entries(
+        self, bluetooth_bridge, runtime_factory
+    ):
         """Verify that the runtime keeps a single buffered payload while the bridge remains disconnected. This avoids flooding limited memory and ensures reconnection sends each event once."""
         runtime, ble, uart, *_ = runtime_factory(
             [[{"event_type": "rotation", "data": 99}]]
@@ -201,14 +207,14 @@ class TestDriversBluetoothBridgeDriver:
         assert stored.endswith(bluetooth_bridge.END_OF_MESSAGE_DELIMETER)
         assert json.loads(stored[:-1]) == [{"event_type": "rotation", "data": 99}]
 
-
-
     def test_bluetooth_bridge_identify_query(self, monkeypatch, bluetooth_bridge):
         """Verify that respond_to_identify_query emits the device identity JSON payload. This supports fleet diagnostics by advertising device metadata to controllers."""
         stream = io.StringIO("Identify\n")
         outputs: list[str] = []
 
-        handled = bluetooth_bridge.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+        handled = bluetooth_bridge.respond_to_identify_query(
+            stdin=stream, print_fn=outputs.append
+        )
 
         assert handled is True
         payload = json.loads(outputs[0])
@@ -216,9 +222,9 @@ class TestDriversBluetoothBridgeDriver:
         assert payload["data"]["device_name"] == bluetooth_bridge.IDENTITY.device_name
         assert payload["data"]["device_id"] == "bluetooth-bridge-test-id"
 
-
-
-    def test_runtime_calls_identify_responder(self, monkeypatch, bluetooth_bridge, runtime_factory):
+    def test_runtime_calls_identify_responder(
+        self, monkeypatch, bluetooth_bridge, runtime_factory
+    ):
         """Verify that the runtime delegates identify handling to respond_to_identify_query. This keeps the runtime lightweight by routing protocol extensions through dedicated handlers."""
         calls = []
 

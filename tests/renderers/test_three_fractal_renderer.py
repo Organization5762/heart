@@ -192,7 +192,9 @@ class TestFractalScene:
         assert scene._peripheral_manager is None
         assert scene.initialized is False
 
-    def test_real_process_reinitializes_runtime_if_nested_runtime_was_reset(self) -> None:
+    def test_real_process_reinitializes_runtime_if_nested_runtime_was_reset(
+        self,
+    ) -> None:
         """Verify the scene heals a reset nested runtime before drawing so OpenGL exit and re-entry do not leave the wrapper pointing at cleared state."""
         scene = FractalScene(provider=Mock())
         runtime = _StubRuntime()

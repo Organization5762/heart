@@ -54,7 +54,9 @@ class TestExperimentalSharedMemory:
         """Verify that the shared memory watcher reflects images written by the frame writer. This confirms the IPC bridge works for external render processes to stream frames."""
         size = (4, 4)
         target = FrameBuffer(size=size)
-        watcher = SharedMemoryWatcher(tmp_path / "frame.mmap", target, poll_interval=0.0005)
+        watcher = SharedMemoryWatcher(
+            tmp_path / "frame.mmap", target, poll_interval=0.0005
+        )
         writer = SharedMemoryFrameWriter(tmp_path / "frame.mmap", size=size)
 
         try:
@@ -68,8 +70,6 @@ class TestExperimentalSharedMemory:
         finally:
             watcher.stop()
             writer.close()
-
-
 
     def test_writer_rejects_wrong_payload_size(self, tmp_path: Path) -> None:
         """Verify that SharedMemoryFrameWriter rejects byte payloads that are smaller than the frame size. This avoids corrupting shared memory by catching truncated writes early."""

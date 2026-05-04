@@ -27,7 +27,9 @@ def repo_root() -> Path:
 def heart_asset_path(*relative_parts: PathInput) -> Path:
     """Resolve a path inside ``src/heart/assets``."""
 
-    return repo_root() / "src" / "heart" / "assets" / _build_relative_path(relative_parts)
+    return (
+        repo_root() / "src" / "heart" / "assets" / _build_relative_path(relative_parts)
+    )
 
 
 def docs_asset_path(*relative_parts: PathInput) -> Path:

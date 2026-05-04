@@ -13,7 +13,12 @@ from heart.peripheral.radio import (RadioDriver, RawRadioPacket,
 class DummyDriver(RadioDriver):
     """Provide deterministic packet streams so FlowToy peripheral behavior stays testable."""
 
-    def __init__(self, packets: Iterator[RawRadioPacket] | None = None, *, port: str = "/dev/ttyACM0") -> None:
+    def __init__(
+        self,
+        packets: Iterator[RawRadioPacket] | None = None,
+        *,
+        port: str = "/dev/ttyACM0",
+    ) -> None:
         self._packets = list(packets or [])
         self.port = port
         self.closed = False
@@ -75,7 +80,9 @@ class TestFlowToyPeripheralDetectionAndStreaming:
             on_next=lambda envelope: observed.append(
                 (
                     envelope.peripheral_info,
-                    PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral(envelope),
+                    PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral(
+                        envelope
+                    ),
                 )
             )
         )
@@ -127,7 +134,29 @@ class TestFlowToyPeripheralDetectionAndStreaming:
             "modulation": "nrf24-shockburst",
             "crc_ok": True,
             "rssi_dbm": -42.0,
-            "payload": [0, 1, 2, 0, 0, 0, 1, 2, 3, 4, 10, 20, 30, 40, 50, 3, 0, 0, 2, 7, 2],
+            "payload": [
+                0,
+                1,
+                2,
+                0,
+                0,
+                0,
+                1,
+                2,
+                3,
+                4,
+                10,
+                20,
+                30,
+                40,
+                50,
+                3,
+                0,
+                0,
+                2,
+                7,
+                2,
+            ],
             "decoded": {
                 "schema": "flowtoy.sync.v1",
                 "group_id": 1,

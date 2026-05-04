@@ -58,8 +58,12 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
                 True,
                 False,
             )
-            self.ghost2 = pygame.transform.flip(load(ghost_blue if not state.blood else "scaredghost2.png"), True, False)
-            self.ghost3 = pygame.transform.flip(load("scaredghost1.png" if state.blood else ghost_red), True, False)
+            self.ghost2 = pygame.transform.flip(
+                load(ghost_blue if not state.blood else "scaredghost2.png"), True, False
+            )
+            self.ghost3 = pygame.transform.flip(
+                load("scaredghost1.png" if state.blood else ghost_red), True, False
+            )
         else:
             self.ghost1 = load(
                 "scaredghost1.png" if state.blood else f"{ghost_prefix}.png"
@@ -78,7 +82,9 @@ class PacmanGhostRenderer(StatefulBaseRenderer[PacmanGhostState]):
             self._load_sprites(state)
 
         pacman = Loader.load(
-            f"bloodpac{state.pacman_idx + 1}.png" if state.blood else f"pac{state.pacman_idx + 1}.png"
+            f"bloodpac{state.pacman_idx + 1}.png"
+            if state.blood
+            else f"pac{state.pacman_idx + 1}.png"
         )
         if (state.reverse and not state.blood) or (state.blood and not state.reverse):
             pacman = pygame.transform.flip(pacman, True, False)

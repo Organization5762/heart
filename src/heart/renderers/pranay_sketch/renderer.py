@@ -46,8 +46,10 @@ def _ease_out_cubic(value: float) -> float:
 def _ease_out_back(value: float) -> float:
     progress = _clamp01(value)
     overshoot = 1.70158
-    return 1.0 + (overshoot + 1.0) * pow(progress - 1.0, 3) + overshoot * pow(
-        progress - 1.0, 2
+    return (
+        1.0
+        + (overshoot + 1.0) * pow(progress - 1.0, 3)
+        + overshoot * pow(progress - 1.0, 2)
     )
 
 
@@ -152,7 +154,9 @@ class PranaySketchRenderer(StatefulBaseRenderer[PranaySketchState]):
         center_x_px = origin_x + (center_x / self.state.canvas_size) * canvas_size_px
         center_y_px = origin_y + (center_y / self.state.canvas_size) * canvas_size_px
         center_x_px += piece.sway_amplitude_px * math.sin(phase) * dance_mix
-        center_y_px += piece.bob_amplitude_px * math.sin((phase * 1.8) + 0.8) * dance_mix
+        center_y_px += (
+            piece.bob_amplitude_px * math.sin((phase * 1.8) + 0.8) * dance_mix
+        )
         center_y_px -= (1.0 - _ease_out_back(entrance_progress)) * PIECE_ENTRY_OFFSET_PX
 
         rotation = self._rotation_degrees(
@@ -197,7 +201,9 @@ class PranaySketchRenderer(StatefulBaseRenderer[PranaySketchState]):
         burst_duration_s = max(beat_duration_s * BAR_BURST_DURATION_BEATS, 0.001)
         burst_progress = _clamp01(burst_elapsed_s / burst_duration_s)
         burst_wave = math.sin(burst_progress * math.pi)
-        burst_angle = piece.phase_offset + (burst_progress * math.tau * BAR_BURST_ORBIT_TURNS)
+        burst_angle = piece.phase_offset + (
+            burst_progress * math.tau * BAR_BURST_ORBIT_TURNS
+        )
         return burst_wave, burst_angle
 
     def _interpolate_piece_x(

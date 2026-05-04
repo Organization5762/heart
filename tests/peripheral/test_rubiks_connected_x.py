@@ -68,7 +68,7 @@ class TestRubiksConnectedXHelpers:
             rubiks_connected_x_candidate_score(
                 "RubiksX_CDCF6B",
                 ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"],
-        )
+            )
             >= 6
         )
         assert rubiks_connected_x_candidate_score("Noise Cancelling Headphones") == 0
@@ -459,7 +459,9 @@ class TestRubiksConnectedXHelpers:
             return True
 
         async def fake_discover_candidates(*, include_all: bool):
-            raise AssertionError("BlueZ fallback should resolve before scanning candidates.")
+            raise AssertionError(
+                "BlueZ fallback should resolve before scanning candidates."
+            )
 
         monkeypatch.setattr(
             rubiks_connected_x_module.BleakScanner,

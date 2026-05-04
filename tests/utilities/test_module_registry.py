@@ -37,7 +37,11 @@ class TestDiscoverRegistry:
         try:
             registry = discover_registry(package_dir, "registry_pkg")
         finally:
-            for module_name in ["registry_pkg", "registry_pkg.valid", "registry_pkg._ghost"]:
+            for module_name in [
+                "registry_pkg",
+                "registry_pkg.valid",
+                "registry_pkg._ghost",
+            ]:
                 sys.modules.pop(module_name, None)
 
         assert list(registry) == ["valid"]

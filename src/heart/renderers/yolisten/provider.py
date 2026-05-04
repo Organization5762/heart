@@ -2,16 +2,14 @@ import random
 import time
 from dataclasses import replace
 
-import heart.utilities.reactive as reactive
+from manyfold import MergeNode, StreamNode
+
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
-from heart.utilities.reactive import operators as ops
-from heart.utilities.reactive_threads import (pipe_in_background,
-                                              start_with_once)
 
 logger = get_logger(__name__)
 
@@ -42,11 +40,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         rotation = 0.0
         if state.switch_state:
             rotation = state.switch_state.rotation_since_last_button_press
-        return replace(
-            state,
-            scroll_speed_offset=rotation,
-            should_calibrate=False,
-        )
+        return replace(state, scroll_speed_offset=rotation, should_calibrate=False)
 
     def scroll_speed_scale_factor(self, state: YoListenState) -> float:
         current_value = 0.0
@@ -70,9 +64,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             g = min(255, max(0, int(self.base_color.g * brightness_factor)))
             b = min(255, max(0, int(self.base_color.b * brightness_factor)))
             return replace(
-                state,
-                color=Color(r, g, b),
-                last_flicker_update=current_time,
+                state, color=Color(r, g, b), last_flicker_update=current_time
             )
         return state
 
@@ -89,51 +81,52 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         return state
 
     def observable(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> reactive.Observable[YoListenState]:
+        self, peripheral_manager: PeripheralManager
+    ) -> StreamNode[YoListenState]:
         initial_state = self.initial_state()
+        switch_updates = (
+            peripheral_manager.get_main_switch_subscription()
+            .map(
+                lambda switch_state: (
+                    lambda state: self.handle_switch_state(state, switch_state)
+                )
+            )
 
-        switch_updates = pipe_in_background(
-            peripheral_manager.get_main_switch_subscription(),
-            ops.map(lambda switch_state: lambda state: self.handle_switch_state(state, switch_state)),
         )
+        window_widths = (
+            peripheral_manager.window.filter(lambda window: window is not None)
+            .map(lambda window: window.get_width())
+            .distinct_until_changed()
+            .start_with(0)
 
-        window_widths = pipe_in_background(
-            peripheral_manager.window,
-            ops.filter(lambda window: window is not None),
-            ops.map(lambda window: window.get_width()),
-            ops.distinct_until_changed(),
-            start_with_once(0),
         )
 
         def advance(state: YoListenState, window_width: int) -> YoListenState:
             if state.should_calibrate:
                 state = self.calibrate_scroll_speed(state)
-
             state = self.update_flicker(
                 state,
                 time.monotonic(),
                 flicker_speed=self.flicker_speed,
                 flicker_intensity=self.flicker_intensity,
             )
-
-            scroll_speed = self.base_scroll_speed * self.scroll_speed_scale_factor(state)
+            scroll_speed = self.base_scroll_speed * self.scroll_speed_scale_factor(
+                state
+            )
             return self.advance_word_position(
-                state,
-                scroll_speed=scroll_speed,
-                window_width=window_width,
+                state, scroll_speed=scroll_speed, window_width=window_width
             )
 
-        tick_updates = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.with_latest_from(window_widths),
-            ops.map(lambda latest: lambda state: advance(state, latest[1])),
-        )
+        tick_updates = (
+            peripheral_manager.frame_tick_controller.observable()
+            .with_latest_from(window_widths)
+            .map(lambda latest: lambda state: advance(state, latest[1]))
 
-        return pipe_in_background(
-            reactive.merge(switch_updates, tick_updates),
-            ops.scan(lambda state, update: update(state), seed=initial_state),
-            start_with_once(initial_state),
-            ops.share(),
+        )
+        return (
+            MergeNode.merge(switch_updates, tick_updates)
+            .scan(lambda state, update: update(state), seed=initial_state)
+            .start_with(initial_state)
+
+
         )

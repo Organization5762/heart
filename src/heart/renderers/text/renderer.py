@@ -53,9 +53,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         else:
             state = self.state.switch_state.rotation_since_last_button_press
 
-        current_text_idx = state % len(
-            self.state.text
-        )
+        current_text_idx = state % len(self.state.text)
         return self.state.text[current_text_idx]
 
     def real_process(
@@ -90,9 +88,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             y_offset = 0
 
         antialias = (
-            PIXEL_FONT_ANTIALIAS
-            if self.state.font_name.endswith(".ttf")
-            else True
+            PIXEL_FONT_ANTIALIAS if self.state.font_name.endswith(".ttf") else True
         )
         line_height = font.get_linesize()
         for line in lines:

@@ -321,7 +321,9 @@ class DrawingPad(Peripheral[Any]):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _parse_payload(self, data: Mapping[str, Any], *, is_erase: bool) -> dict[str, Any]:
+    def _parse_payload(
+        self, data: Mapping[str, Any], *, is_erase: bool
+    ) -> dict[str, Any]:
         if "x" not in data or "y" not in data:
             raise ValueError("payload must contain 'x' and 'y'")
 
@@ -352,9 +354,7 @@ class DrawingPad(Peripheral[Any]):
             if sample.is_erase:
                 self._grid[row_idx][col_idx] = 0.0
             else:
-                self._grid[row_idx][col_idx] = max(
-                    0.0, min(1.0, sample.pressure)
-                )
+                self._grid[row_idx][col_idx] = max(0.0, min(1.0, sample.pressure))
 
         self._stylus_history.append(sample)
         self._publish_sample(sample)
@@ -403,13 +403,16 @@ class DrawingPad(Peripheral[Any]):
         self, centre_x: int, centre_y: int, radius_cells: int
     ) -> Iterable[tuple[int, int]]:
         for row_idx in range(
-            max(0, centre_y - radius_cells), min(self.resolution, centre_y + radius_cells + 1)
+            max(0, centre_y - radius_cells),
+            min(self.resolution, centre_y + radius_cells + 1),
         ):
             for col_idx in range(
                 max(0, centre_x - radius_cells),
                 min(self.resolution, centre_x + radius_cells + 1),
             ):
-                if self._within_radius(centre_x, centre_y, col_idx, row_idx, radius_cells):
+                if self._within_radius(
+                    centre_x, centre_y, col_idx, row_idx, radius_cells
+                ):
                     yield (row_idx, col_idx)
 
     @staticmethod

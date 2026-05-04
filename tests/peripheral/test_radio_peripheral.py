@@ -109,7 +109,7 @@ class TestRadioPacketPayloads:
             modulation="GFSK",
             crc_ok=True,
             rssi_dbm=-42.5,
-            payload=b"\x01\x02\xFF",
+            payload=b"\x01\x02\xff",
             decoded={"schema": "flowtoy.sync.v1"},
             metadata={"manufacturer": "FlowToys"},
         )
