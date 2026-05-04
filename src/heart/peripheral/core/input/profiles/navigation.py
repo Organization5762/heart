@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import TypeVar
 
 import pygame
-from manyfold import MergeNode, StreamNode
+from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
@@ -16,7 +16,6 @@ from heart.peripheral.core.input.gamepad import (
 from heart.peripheral.core.input.keyboard import KeyboardController
 from heart.peripheral.core.input.streams import (map_stream, merge_streams,
                                                  threshold_direction)
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import EventStream
 from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.switch import SwitchState
@@ -227,7 +226,7 @@ class NavigationProfile:
 
     def _switch_intents(self) -> StreamNode[NavigationIntent]:
         if self._switch_stream_factory is None:
-            return empty_node()
+            return EmptyNode().observable()
         switch_updates = self._switch_stream_factory()
         return MergeNode.merge(
             self._switch_browse_intents(switch_updates),

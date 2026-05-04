@@ -6,14 +6,13 @@ from functools import cached_property
 from typing import TYPE_CHECKING, cast
 
 import pygame
-from manyfold import (CombineLatestNode, Graph, MergeNode, StreamNode,
-                      TypedRoute)
+from manyfold import (CombineLatestNode, EmptyNode, Graph, MergeNode,
+                      StreamNode, TypedRoute)
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
@@ -74,7 +73,7 @@ class AccelerometerController:
             if isinstance(peripheral, (Accelerometer, FakeAccelerometer))
         ]
         if not streams:
-            return empty_node()
+            return EmptyNode().observable()
         merged = (
             MergeNode.merge(*streams)
             .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)

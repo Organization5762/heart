@@ -1,8 +1,7 @@
-from manyfold import MergeNode, StreamNode
+from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.switch import FakeSwitch, SwitchState
 
@@ -18,7 +17,7 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
             if isinstance(peripheral, FakeSwitch)
         ]
         if not main_switches:
-            return empty_node()
+            return EmptyNode().observable()
         result = (
             MergeNode.merge(*main_switches)
             .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
