@@ -20,11 +20,14 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.peripheral.core.manager import PeripheralManager
 GAMEPAD_POLL_INTERVAL_MS = 20
 DEFAULT_GAMEPAD_AXIS_DEAD_ZONE = 0.1
+SNAPSHOT_LOG_AXIS_THRESHOLD = 0.1
+logger = get_logger(__name__)
 
 
 class GamepadButton(StrEnum):
@@ -98,6 +101,17 @@ class GamepadController:
     def __init__(self, manager: "PeripheralManager", debug_tap: InputDebugTap) -> None:
         self._manager = manager
         self._debug_tap = debug_tap
+        self._last_logged_snapshot_state: (
+            tuple[
+                bool,
+                str | None,
+                tuple[str, ...],
+                tuple[str, ...],
+                tuple[tuple[str, float], ...],
+                tuple[int, int],
+            ]
+            | None
+        ) = None
 
     @cached_property
     def _snapshot_stream(self) -> StreamNode[GamepadSnapshot]:
@@ -277,7 +291,7 @@ class GamepadController:
             ),
         }
         dpad = self._read_dpad(gamepad, mapping)
-        return GamepadSnapshot(
+        snapshot = GamepadSnapshot(
             connected=True,
             identifier=gamepad.gamepad_identifier.value,
             buttons=buttons,
@@ -286,6 +300,8 @@ class GamepadController:
             dpad=dpad,
             timestamp_monotonic=time.monotonic(),
         )
+        self._log_snapshot_if_changed(snapshot)
+        return snapshot
 
     def _active_gamepad(self) -> Gamepad | None:
         for peripheral in self._manager.peripherals:
@@ -293,10 +309,50 @@ class GamepadController:
                 return peripheral
         return None
 
+    def _log_snapshot_if_changed(self, snapshot: GamepadSnapshot) -> None:
+        held_buttons = tuple(
+            button.value for button, is_held in snapshot.buttons.items() if is_held
+        )
+        tapped_buttons = tuple(button.value for button in snapshot.tapped_buttons)
+        active_axes = tuple(
+            sorted(
+                (
+                    axis.value,
+                    round(value, 2),
+                )
+                for axis, value in snapshot.axes.items()
+                if abs(value) >= SNAPSHOT_LOG_AXIS_THRESHOLD
+            )
+        )
+        snapshot_state = (
+            snapshot.connected,
+            snapshot.identifier,
+            held_buttons,
+            tapped_buttons,
+            active_axes,
+            (snapshot.dpad.x, snapshot.dpad.y),
+        )
+        if snapshot_state == self._last_logged_snapshot_state:
+            return
+        self._last_logged_snapshot_state = snapshot_state
+        logger.info(
+            "Gamepad mapped snapshot connected=%s identifier=%s held=%s tapped=%s axes=%s dpad=(%s,%s)",
+            snapshot.connected,
+            snapshot.identifier,
+            held_buttons,
+            tapped_buttons,
+            active_axes,
+            snapshot.dpad.x,
+            snapshot.dpad.y,
+        )
+
     @staticmethod
     def _mapping_for_gamepad(gamepad: Gamepad) -> SwitchLikeMapping:
         identifier = gamepad.gamepad_identifier
-        if identifier is GamepadIdentifier.SWITCH_PRO:
+        if identifier in {
+            GamepadIdentifier.SWITCH_PRO,
+            GamepadIdentifier.SWITCH_PRO_SHORT,
+        }:
             return SwitchProMapping()
         if Configuration.is_pi():
             return BitDoLite2Bluetooth()

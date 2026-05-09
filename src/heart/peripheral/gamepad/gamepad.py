@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import time
 from collections import defaultdict
@@ -23,6 +24,24 @@ INITIALIZATION_DELAY_SECONDS = 1.5
 DEFAULT_JOYSTICK_ID = 0
 DEFAULT_AXIS_DEAD_ZONE = 0.0
 DEFAULT_AXIS_THRESHOLD = 0.0
+RAW_LOG_AXIS_THRESHOLD = 0.05
+JOYSTICK_EVENT_TYPES = (
+    pygame.JOYAXISMOTION,
+    pygame.JOYBALLMOTION,
+    pygame.JOYHATMOTION,
+    pygame.JOYBUTTONUP,
+    pygame.JOYBUTTONDOWN,
+    pygame.JOYDEVICEADDED,
+    pygame.JOYDEVICEREMOVED,
+)
+DEFAULT_BLUETOOTH_GAMEPAD_MACS = (
+    "E4:17:D8:37:C3:40",
+    "E4:17:D8:37:FE:88",
+    "E4:17:D8:E9:76:C8",
+    "E4:17:D8:E9:99:B3",
+)
+BLUETOOTH_RECONNECT_INTERVAL_SECONDS = 30.0
+BLUETOOTH_CONNECT_TIMEOUT_SECONDS = 1.0
 GAMEPAD_GRAPH_OWNER = OwnerName("heart.gamepad")
 GAMEPAD_GRAPH_FAMILY = StreamFamily("peripheral")
 
@@ -71,6 +90,7 @@ class GamepadIdentifier(StrEnum):
     # so check that first when adding a controller type
     BIT_DO_LITE_2 = "8BitDo Lite 2"
     SWITCH_PRO = "Nintendo Switch Pro Controller"
+    SWITCH_PRO_SHORT = "Pro Controller"
 
 
 class Gamepad(Peripheral[Any]):
@@ -104,6 +124,10 @@ class Gamepad(Peripheral[Any]):
         self._dpad_curr_frame: tuple[float, float] = (0.0, 0.0)
 
         self._last_lifecycle_status: str | None = None
+        self._last_bluetooth_connect_attempt: float | None = None
+        self._last_logged_raw_state: tuple[
+            tuple[int, ...], tuple[tuple[str, float], ...], tuple[float, float]
+        ] | None = None
 
     def is_held(self, button_id: int) -> bool:
         return self._pressed_curr_frame[button_id]
@@ -184,6 +208,8 @@ class Gamepad(Peripheral[Any]):
         if not self.joystick:
             return
 
+        self._log_pygame_joystick_events()
+
         # Refresh Pygame's internal event queue so that joystick state is up-to-date
         # Without this, axes may appear stuck at their previous values (often -1),
         # and button states may not change, leading to the behaviour where the
@@ -199,7 +225,7 @@ class Gamepad(Peripheral[Any]):
 
         try:
             self._dpad_curr_frame = self.joystick.get_hat(0)
-        except Exception:
+        except pygame.error:
             pass
 
         for button_id in range(self.num_buttons):
@@ -227,6 +253,44 @@ class Gamepad(Peripheral[Any]):
                 t0 = self._press_time.pop(axis_key, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
+
+        active_buttons = tuple(
+            button_id
+            for button_id in range(self.num_buttons)
+            if self._pressed_curr_frame[button_id]
+        )
+        active_axes = tuple(
+            sorted(
+                (
+                    axis_key,
+                    round(axis_value, 2),
+                )
+                for axis_key, axis_value in self._axis_curr_frame.items()
+                if abs(axis_value) >= RAW_LOG_AXIS_THRESHOLD
+            )
+        )
+        raw_state = (active_buttons, active_axes, self._dpad_curr_frame)
+        if raw_state != self._last_logged_raw_state:
+            self._last_logged_raw_state = raw_state
+            logger.info(
+                "Gamepad raw state name=%s buttons=%s axes=%s hat=%s",
+                self.joystick.get_name(),
+                active_buttons,
+                active_axes,
+                self._dpad_curr_frame,
+            )
+
+    def _log_pygame_joystick_events(self) -> None:
+        for event in pygame.event.get(JOYSTICK_EVENT_TYPES):
+            logger.info(
+                "Gamepad pygame event type=%s attrs=%s",
+                pygame.event.event_name(event.type),
+                {
+                    key: value
+                    for key, value in event.__dict__.items()
+                    if key != "type"
+                },
+            )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
@@ -315,27 +379,60 @@ class Gamepad(Peripheral[Any]):
                 if cached_name is not None:
                     logger.info(f"{cached_name} disconnected")
 
-            # Todo: We're reaching unfathomable levels of hard-coding.
-            #  This will only work specifically with our pi4, and our 8bitdo
-            #  controller. We only know the mac address bc we've explicitly
-            #  paired the 8bitdo controller with the raspberry pi.
-            #  God help us if it ever unpairs.
-            if Configuration.is_pi():
-                if not Gamepad.gamepad_detected():
-                    result = subprocess.run(
-                        ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
-                        capture_output=True,
-                        text=True,
-                    )
-                    if result.returncode == 0:
-                        logger.info("Successfully connected to 8bitdo controller")
-                    else:
-                        logger.warning("Failed to connect to 8bitdo controller")
+            if Configuration.is_pi() and not Gamepad.gamepad_detected():
+                self._connect_bluetooth_gamepads()
 
         except KeyboardInterrupt:
             logger.info("Program terminated")
         except Exception:
             logger.debug("Unexpected error while reading gamepad state", exc_info=True)
+
+    def _connect_bluetooth_gamepads(self) -> None:
+        now = time.monotonic()
+        if (
+            self._last_bluetooth_connect_attempt is not None
+            and now - self._last_bluetooth_connect_attempt
+            < BLUETOOTH_RECONNECT_INTERVAL_SECONDS
+        ):
+            return
+        self._last_bluetooth_connect_attempt = now
+
+        for mac_address in DEFAULT_BLUETOOTH_GAMEPAD_MACS:
+            command = self._bluetooth_connect_command(mac_address)
+            if command is None:
+                return
+            try:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=BLUETOOTH_CONNECT_TIMEOUT_SECONDS,
+                )
+            except subprocess.TimeoutExpired:
+                logger.warning(
+                    "Timed out connecting to bluetooth gamepad %s",
+                    mac_address,
+                )
+                continue
+            if result.returncode == 0:
+                logger.info(
+                    "Requested connection to bluetooth gamepad %s",
+                    mac_address,
+                )
+            else:
+                logger.warning(
+                    "Failed to connect to bluetooth gamepad %s: %s",
+                    mac_address,
+                    (result.stderr or result.stdout).strip(),
+                )
+
+    @staticmethod
+    def _bluetooth_connect_command(mac_address: str) -> list[str] | None:
+        if shutil.which("bluetoothctl"):
+            return ["bluetoothctl", "connect", mac_address]
+        if shutil.which("blueutil"):
+            return ["blueutil", "--connect", mac_address]
+        return None
 
     def run(self) -> None:
         # Give pygame and USB subsystems time to fully initialize
