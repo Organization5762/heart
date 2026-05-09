@@ -8,16 +8,22 @@ from functools import cache, cached_property
 from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import CombineLatestNode, StreamNode, Timer
+from manyfold import StreamNode, Timer
 
-from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
-                                               InputDebugTap)
+from heart.peripheral.core.input.debug import (
+    InputDebugNode,
+    InputDebugStage,
+    InputDebugTap,
+)
+from heart.peripheral.core.streams import combine_latest_streams
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
-from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
-                                                          BitDoLite2Bluetooth,
-                                                          DpadType,
-                                                          SwitchLikeMapping,
-                                                          SwitchProMapping)
+from heart.peripheral.gamepad.peripheral_mappings import (
+    BitDoLite2,
+    BitDoLite2Bluetooth,
+    DpadType,
+    SwitchLikeMapping,
+    SwitchProMapping,
+)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -138,7 +144,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.button_held(button))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -158,7 +163,6 @@ class GamepadController:
                     button=button, timestamp_monotonic=snapshot.timestamp_monotonic
                 )
             )
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -176,7 +180,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -193,13 +196,11 @@ class GamepadController:
         axis_x = GamepadAxis.LEFT_X if stick_name == "left" else GamepadAxis.RIGHT_X
         axis_y = GamepadAxis.LEFT_Y if stick_name == "left" else GamepadAxis.RIGHT_Y
         stream = (
-            CombineLatestNode()
-            .observable(
+            combine_latest_streams(
                 self.axis_value(axis_x, dead_zone), self.axis_value(axis_y, dead_zone)
             )
             .map(lambda latest: GamepadStickValue(x=latest[0], y=latest[1]))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -218,7 +219,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.dpad)
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,

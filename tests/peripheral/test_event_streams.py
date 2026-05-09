@@ -5,14 +5,22 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from manyfold import Graph, StreamNode
+from manyfold import ConstantNode, Graph, StreamNode
 
-from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
-                                   PeripheralLocation,
-                                   PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 NoopSubscription)
+from heart.peripheral.core import (
+    Input,
+    Peripheral,
+    PeripheralInfo,
+    PeripheralLocation,
+    PeripheralMessageEnvelope,
+    PeripheralTag,
+)
+from heart.peripheral.core.streams import (
+    GraphRouteStream,
+    combine_latest_streams,
+    runtime_route,
+)
+from heart.peripheral.core.subscriptions import CallbackObservable, NoopSubscription
 
 
 class CountingPeripheral(Peripheral[int]):
@@ -27,6 +35,11 @@ class CountingPeripheral(Peripheral[int]):
             return NoopSubscription()
 
         return CallbackObservable(on_subscribe)
+
+
+class ConstantPeripheral(Peripheral[int]):
+    def _event_stream(self) -> StreamNode[int]:
+        return ConstantNode(5).observable()
 
 
 class TestPeripheralObserveSharing:
@@ -47,6 +60,16 @@ class TestPeripheralObserveSharing:
         finally:
             subscription_a.dispose()
             subscription_b.dispose()
+
+    def test_observe_emits_peripheral_message_values_not_graph_envelopes(self) -> None:
+        peripheral = ConstantPeripheral()
+        observed: list[PeripheralMessageEnvelope[int]] = []
+
+        subscription = peripheral.observe.subscribe(observed.append)
+        try:
+            assert [message.data for message in observed] == [5]
+        finally:
+            subscription.dispose()
 
 
 class TestGraphRouteStreamTransforms:
@@ -103,6 +126,27 @@ class TestGraphRouteStreamTransforms:
             subscription_a.dispose()
             subscription_b.dispose()
             subscription_doubled.dispose()
+
+    def test_combine_latest_streams_combines_without_reactivex_lock_contract(
+        self,
+    ) -> None:
+        left = GraphRouteStream[int](
+            Graph(), runtime_route("test_event_stream_left", "HeartTestLeft")
+        )
+        right = GraphRouteStream[float](
+            Graph(), runtime_route("test_event_stream_right", "HeartTestRight")
+        )
+        observed: list[tuple[int, float]] = []
+
+        subscription = combine_latest_streams(left, right).subscribe(observed.append)
+        try:
+            left.on_next(2)
+            right.on_next(3.5)
+            left.on_next(4)
+
+            assert observed == [(2, 3.5), (4, 3.5)]
+        finally:
+            subscription.dispose()
 
 
 class TestManyfoldSensorEnvelopeBridge:

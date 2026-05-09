@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 from functools import cached_property
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
-from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
-                      Schema, StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (
+    EmptyNode,
+    Graph,
+    Layer,
+    MergeNode,
+    OwnerName,
+    Plane,
+    Schema,
+    StreamFamily,
+    StreamName,
+    StreamNode,
+    TypedRoute,
+    Variant,
+    route,
+)
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
@@ -21,9 +33,52 @@ T = TypeVar("T")
 
 def _subscribe_source(source: Any, observer: Any) -> Any:
     def emit(value: Any) -> None:
-        observer.on_next(value.value if hasattr(value, "closed") else value)
+        observer.on_next(_unwrap_stream_value(value))
 
     return source.subscribe(emit, observer.on_error, observer.on_completed)
+
+
+def _unwrap_stream_value(value: Any) -> Any:
+    if hasattr(value, "closed") and hasattr(value, "value"):
+        return value.value
+    return value
+
+
+def combine_latest_streams(*sources: Any) -> StreamNode[tuple[Any, ...]]:
+    def subscribe(observer: Any) -> Any:
+        if not sources:
+            observer.on_next(())
+            return _NoopSubscription()
+
+        lock = RLock()
+        latest: list[Any] = [None] * len(sources)
+        ready = [False] * len(sources)
+
+        def make_on_next(index: int) -> Callable[[Any], None]:
+            def on_next(value: Any) -> None:
+                with lock:
+                    latest[index] = _unwrap_stream_value(value)
+                    ready[index] = True
+                    if not all(ready):
+                        return
+                    combined = tuple(latest)
+                observer.on_next(combined)
+
+            return on_next
+
+        subscriptions = [
+            source.subscribe(
+                make_on_next(index),
+                observer.on_error,
+                observer.on_completed,
+            )
+            for index, source in enumerate(sources)
+        ]
+        return _CompositeSubscription(subscriptions)
+
+    return cast(
+        StreamNode[tuple[Any, ...]], _materialize_stream(_DerivedStream(subscribe))
+    )
 
 
 def _stream_from_source(source: Any) -> "_DerivedStream":
@@ -595,9 +650,8 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
         if not observables:
             return EmptyNode().observable()
-        merged = (
-            MergeNode.merge(*observables)
-            .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
+        merged = MergeNode.merge(*observables).map(
+            PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
         return merged
 

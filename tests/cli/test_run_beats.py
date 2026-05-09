@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,13 +12,15 @@ from typer.testing import CliRunner
 
 from heart import loop
 from heart.cli.commands import run as run_module
-from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
-                                          FORWARD_TO_BEATS_ENV_VAR,
-                                          build_beats_env,
-                                          build_beats_websocket_url,
-                                          build_totem_run_command,
-                                          ensure_beats_dependencies,
-                                          resolve_beats_workspace)
+from heart.cli.commands.run_beats import (
+    BEATS_WEBSOCKET_ENV_VAR,
+    FORWARD_TO_BEATS_ENV_VAR,
+    build_beats_env,
+    build_beats_websocket_url,
+    build_totem_run_command,
+    ensure_beats_dependencies,
+    resolve_beats_workspace,
+)
 
 runner = CliRunner()
 
@@ -135,6 +138,25 @@ class TestEnsureBeatsDependencies:
 
 class TestRunCommandWithBeats:
     """Validate the opt-in Beats CLI path so default runtime startup stays independent from the UI bundle."""
+
+    def test_main_uses_full_cli_for_run_subcommand(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the console entrypoint leaves `totem run ...` on the multi-command app instead of collapsing it into a single-command parser."""
+
+        called = {"app": False}
+
+        def _fake_app() -> None:
+            called["app"] = True
+
+        monkeypatch.setattr(
+            sys, "argv", ["totem", "run", "--configuration", "lib_2025"]
+        )
+        monkeypatch.setattr(loop, "app", _fake_app)
+
+        loop.main()
+
+        assert called == {"app": True}
 
     def test_run_command_dispatches_to_beats_only_when_requested(
         self, monkeypatch: pytest.MonkeyPatch

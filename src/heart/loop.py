@@ -20,8 +20,7 @@ def _build_full_app() -> typer.Typer:
 
     from heart.cli.commands.bench_device import bench_device_command
     from heart.cli.commands.flowtoy import app as flowtoy_app
-    from heart.cli.commands.rubiks_connected_x import \
-        app as rubiks_connected_x_app
+    from heart.cli.commands.rubiks_connected_x import app as rubiks_connected_x_app
     from heart.cli.commands.run import run_command
     from heart.cli.commands.update_driver import update_driver_command
 
@@ -36,8 +35,7 @@ def _build_full_app() -> typer.Typer:
 def _build_rubiks_connected_x_only_app() -> typer.Typer:
     app = typer.Typer()
 
-    from heart.cli.commands.rubiks_connected_x import \
-        app as rubiks_connected_x_app
+    from heart.cli.commands.rubiks_connected_x import app as rubiks_connected_x_app
 
     app.add_typer(rubiks_connected_x_app, name="rubiks-connected-x")
     return app
@@ -73,14 +71,6 @@ def main() -> None:
         from heart.cli.commands.bench_device import bench_device_command
 
         command_app.command()(bench_device_command)
-        _run_isolated_app(command_app)
-        return
-
-    if len(sys.argv) > 1 and sys.argv[1] == "run":
-        command_app = typer.Typer()
-        from heart.cli.commands.run import run_command
-
-        command_app.command()(run_command)
         _run_isolated_app(command_app)
         return
 
