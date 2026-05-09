@@ -112,7 +112,7 @@ fractal:
 	@UV_CACHE_DIR=.uv-cache uv run python -c "from heart.renderers.three_fractal.renderer import main; main()"
 
 run:
-	@uv run totem run --configuration $(RUN_CONFIGURATION)
+	@FORWARD_TO_BEATS_APP=1 BEATS_WEBSOCKET_BIND_HOST=0.0.0.0 uv run totem run --configuration $(RUN_CONFIGURATION)
 
 debug-gamepad:
 	@UV_CACHE_DIR=.uv-cache uv run python scripts/debug/gamepad_probe.py

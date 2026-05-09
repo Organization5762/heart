@@ -3,7 +3,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import React, { useEffect, useState, useTransition } from "react";
+import React, { useEffect, useState } from "react";
 import { getAppVersion } from "../actions/app";
 import { AppSidebar } from "../components/app-sidebar";
 
@@ -16,12 +16,20 @@ export default function BaseLayout({
   children: React.ReactNode;
 }) {
   const [appVersion, setAppVersion] = useState("0.0.0");
-  const [, startGetAppVersion] = useTransition();
 
-  useEffect(
-    () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
-    [],
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    getAppVersion().then((version) => {
+      if (isMounted) {
+        setAppVersion(version);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <SidebarProvider>

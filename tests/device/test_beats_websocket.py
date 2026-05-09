@@ -4,6 +4,7 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import pytest
 from manyfold import Graph
 from websockets.exceptions import ConnectionClosedError
 
@@ -12,7 +13,8 @@ from heart.device.beats.websocket import (WebSocket,
                                           _encode_peripheral_message,
                                           beats_websocket_frame_route,
                                           decode_control_message,
-                                          decode_stream_envelope)
+                                          decode_stream_envelope,
+                                          websocket_bind_host, websocket_url)
 from heart.peripheral.core import (Input, PeripheralInfo, PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.encoding import (PeripheralPayloadEncoding,
@@ -55,6 +57,29 @@ class TestPeripheralEnvelopeEncoding:
         assert encoded.payload_encoding == beats_streaming_pb2.PROTOBUF
         assert encoded.payload_type == "heart.beats.streaming.Frame"
         assert encoded.payload == message.SerializeToString()
+
+
+class TestWebSocketConfiguration:
+    """Exercise websocket environment helpers so remote Beats clients can reach the runtime on the intended host."""
+
+    def test_websocket_url_uses_environment_host_and_port(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the advertised client URL respects environment overrides so remote UIs can connect to a Pi hostname."""
+
+        monkeypatch.setenv("BEATS_WEBSOCKET_HOST", "totem.local")
+        monkeypatch.setenv("BEATS_WEBSOCKET_PORT", "9001")
+
+        assert websocket_url() == "ws://totem.local:9001"
+
+    def test_websocket_bind_host_uses_dedicated_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the server bind host can differ from the client hostname so the runtime can listen on all interfaces while Beats connects via mDNS."""
+
+        monkeypatch.setenv("BEATS_WEBSOCKET_BIND_HOST", "0.0.0.0")
+
+        assert websocket_bind_host() == "0.0.0.0"
 
 
 class TestPeripheralPayloadEncoding:
@@ -269,6 +294,23 @@ class TestControlMessageDecoding:
         assert decoded.sensor_key == "accelerometer:debug:z"
         assert decoded.sensor_value == 12.5
         assert decoded.clear is False
+
+    def test_decodes_image_clear_control_messages(self) -> None:
+        """Verify image controls can explicitly clear temporary phone artwork without requiring an image payload."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "image_update",
+                    "clear": True,
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "image_update"
+        assert decoded.image_base64 is None
+        assert decoded.clear is True
 
 
 class TestWebSocketReplayCache:
