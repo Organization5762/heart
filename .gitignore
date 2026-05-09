@@ -12,6 +12,8 @@ ant_hr.log
 *.erc
 *.ini
 *.pkl
+scripts/pi_network.local.env
+scripts/pi_network_profiles.local.tsv
 .vscode
 .dev_install.stamp
 node_modules

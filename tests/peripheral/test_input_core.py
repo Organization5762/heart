@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -9,28 +10,44 @@ import pygame
 from manyfold import ConstantNode, Graph
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile,
-                                         BrowseIntent, CyclePaletteCommand,
-                                         ExternalSensorHub, FrameTick,
-                                         FrameTickController, GamepadAxis,
-                                         GamepadButton, GamepadButtonTapEvent,
-                                         GamepadController, GamepadDpadValue,
-                                         GamepadSnapshot, InputDebugStage,
-                                         InputDebugTap, KeyboardController,
-                                         KeyboardSnapshot,
-                                         MandelbrotControlProfile,
-                                         NavigationProfile,
-                                         SetOrientationCommand,
-                                         ToggleDebugCommand)
+from heart.peripheral.core.encoding import encode_peripheral_payload
+from heart.peripheral.core.input import (
+    AccelerometerController,
+    AccelerometerDebugProfile,
+    BrowseIntent,
+    CyclePaletteCommand,
+    ExternalSensorHub,
+    FrameTick,
+    FrameTickController,
+    GamepadAxis,
+    GamepadButton,
+    GamepadButtonTapEvent,
+    GamepadController,
+    GamepadDpadValue,
+    GamepadSnapshot,
+    InputDebugStage,
+    InputDebugTap,
+    KeyboardController,
+    KeyboardSnapshot,
+    MandelbrotControlProfile,
+    NavigationProfile,
+    SetOrientationCommand,
+    ToggleDebugCommand,
+)
 from heart.peripheral.core.input.accelerometer import (
-    ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
-from heart.peripheral.core.input.debug import InputDebugNode
+    ACCELERATION_ROUTE,
+    DEBUG_ACCELERATION_ROUTE,
+)
+from heart.peripheral.core.input.debug import InputDebugEnvelope, InputDebugNode
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.streams import EventStream
-from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
-                                       KeyPressedEvent, KeyReleasedEvent,
-                                       KeyState)
+from heart.peripheral.core.streams import EventStream, runtime_route
+from heart.peripheral.keyboard import (
+    KeyboardEvent,
+    KeyHeldEvent,
+    KeyPressedEvent,
+    KeyReleasedEvent,
+    KeyState,
+)
 from heart.peripheral.sensor import Acceleration, FakeAccelerometer
 from heart.peripheral.switch import SwitchState
 
@@ -169,6 +186,24 @@ class TestInputDebugTap:
         assert history[0].source_id == "navigation"
         assert history[0].upstream_ids == ("keyboard.pressed.down",)
         assert history[0].payload == 7
+
+    def test_debug_envelope_serializes_runtime_objects_for_streaming(self) -> None:
+        """Verify debug streaming does not deepcopy or JSON-encode raw Manyfold route objects."""
+        route = runtime_route("test.route", "HeartDebugTest")
+        envelope = InputDebugEnvelope(
+            stage=InputDebugStage.RAW,
+            stream_name="debug.route",
+            source_id="route",
+            timestamp_monotonic=1.0,
+            payload={"route": route},
+        )
+
+        payload = envelope.as_dict()
+
+        encoded = encode_peripheral_payload(payload)
+        decoded = json.loads(encoded.payload.decode("utf-8"))
+
+        assert decoded["payload"]["route"]["plane"] == "Plane.READ"
 
 
 class TestFrameTickController:
@@ -382,9 +417,7 @@ class TestKeyboardController:
         snapshots.emit(
             KeyboardSnapshot(pressed_keys=frozenset({pygame.K_a}), timestamp_ms=20.0)
         )
-        snapshots.emit(
-            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=100.0)
-        )
+        snapshots.emit(KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=100.0))
 
         assert [type(event) for event in events] == [
             KeyPressedEvent,
@@ -487,13 +520,9 @@ class TestNavigationProfile:
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=0.0))
         keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_LEFT, timestamp_ms=10.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=100.0))
-        keyboard_snapshots.emit(
-            _keyboard_snapshot(pygame.K_RIGHT, timestamp_ms=110.0)
-        )
+        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_RIGHT, timestamp_ms=110.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=200.0))
-        keyboard_snapshots.emit(
-            _keyboard_snapshot(pygame.K_DOWN, timestamp_ms=210.0)
-        )
+        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_DOWN, timestamp_ms=210.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=300.0))
         keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_UP, timestamp_ms=310.0))
 

@@ -6,6 +6,7 @@ from typing import Optional
 class DpadType(Enum):
     HAT = 0
     BUTTONS = 1
+    AXES = 2
 
 
 class SwitchLikeMapping(ABC):
@@ -36,6 +37,14 @@ class SwitchLikeMapping(ABC):
 
     @property
     def DPAD_RIGHT(self) -> Optional[int]:
+        return None
+
+    @property
+    def DPAD_AXIS_X(self) -> Optional[int]:
+        return None
+
+    @property
+    def DPAD_AXIS_Y(self) -> Optional[int]:
         return None
 
     # face buttons

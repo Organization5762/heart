@@ -35,3 +35,36 @@ class RenderImage(StatefulBaseRenderer[RenderImageState]):
             )
             self._scaled_size = self.state.window_size
         window.blit(self._scaled_image, (0, 0))
+
+
+class ContainRenderImage(RenderImage):
+    """Render an image using contain/letterbox scaling."""
+
+    def real_process(
+        self,
+        window: DisplayContext,
+        orientation: Orientation,
+    ) -> None:
+        del orientation
+        base_width, base_height = self.state.base_image.get_size()
+        target_width, target_height = window.get_size()
+        if base_width <= 0 or base_height <= 0 or target_width <= 0 or target_height <= 0:
+            return
+
+        scale = min(target_width / base_width, target_height / base_height)
+        scaled_size = (
+            max(1, round(base_width * scale)),
+            max(1, round(base_height * scale)),
+        )
+        if self._scaled_image is None or self._scaled_size != scaled_size:
+            self._scaled_image = pygame.transform.smoothscale(
+                self.state.base_image, scaled_size
+            )
+            self._scaled_size = scaled_size
+
+        offset = (
+            (target_width - scaled_size[0]) // 2,
+            (target_height - scaled_size[1]) // 2,
+        )
+        window.fill((0, 0, 0))
+        window.blit(self._scaled_image, offset)

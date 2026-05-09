@@ -1,5 +1,11 @@
 import { routeTree } from "@/routeTree.gen";
-import { createMemoryHistory, createRouter } from "@tanstack/react-router";
+import {
+  createBrowserHistory,
+  createHashHistory,
+  createMemoryHistory,
+  createRouter,
+} from "@tanstack/react-router";
+import { isElectronRuntime } from "@/utils/runtime";
 
 declare module "@tanstack/react-router" {
   interface Register {
@@ -7,10 +13,22 @@ declare module "@tanstack/react-router" {
   }
 }
 
+function buildRouterHistory() {
+  if (typeof window === "undefined") {
+    return createMemoryHistory({
+      initialEntries: ["/"],
+    });
+  }
+
+  if (!isElectronRuntime()) {
+    return createBrowserHistory();
+  }
+
+  return createHashHistory();
+}
+
 export const router = createRouter({
   defaultPendingMinMs: 0,
   routeTree,
-  history: createMemoryHistory({
-    initialEntries: ["/"],
-  }),
+  history: buildRouterHistory(),
 });

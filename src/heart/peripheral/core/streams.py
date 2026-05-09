@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 from functools import cached_property
-from threading import Lock
+from threading import Lock, RLock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
-from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
-                      Schema, StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (
+    EmptyNode,
+    Graph,
+    Layer,
+    MergeNode,
+    OwnerName,
+    Plane,
+    Schema,
+    StreamFamily,
+    StreamName,
+    StreamNode,
+    TypedRoute,
+    Variant,
+    route,
+)
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
@@ -21,9 +33,17 @@ T = TypeVar("T")
 
 def _subscribe_source(source: Any, observer: Any) -> Any:
     def emit(value: Any) -> None:
-        observer.on_next(value.value if hasattr(value, "closed") else value)
+        observer.on_next(_unwrap_stream_value(value))
 
     return source.subscribe(emit, observer.on_error, observer.on_completed)
+
+
+def _unwrap_stream_value(value: Any) -> Any:
+    if hasattr(value, "value") and (
+        hasattr(value, "closed") or type(value).__name__ == "TypedEnvelope"
+    ):
+        return value.value
+    return value
 
 
 def _stream_from_source(source: Any) -> "_DerivedStream":
@@ -32,6 +52,49 @@ def _stream_from_source(source: Any) -> "_DerivedStream":
 
 def _materialize_stream(source: Any) -> StreamNode[Any]:
     return cast(StreamNode[Any], _MaterializedStream(source))
+
+
+def combine_latest_streams(*sources: Any) -> StreamNode[tuple[Any, ...]]:
+    """Combine ObservableLike sources without relying on Rx internals.
+
+    `reactivex.combine_latest` assumes the first source exposes a context-manager
+    `.lock` attribute. Manyfold RoutePipeline handles unknown attributes via
+    `__getattr__`, so `.lock` resolves to a function and crashes at runtime.
+    """
+
+    def subscribe(observer: Any) -> Any:
+        lock = RLock()
+        latest: list[Any] = [None] * len(sources)
+        ready = [False] * len(sources)
+        completed = [False] * len(sources)
+        subscriptions: list[Any] = []
+
+        def emit_if_ready(index: int, value: Any) -> None:
+            with lock:
+                latest[index] = _unwrap_stream_value(value)
+                ready[index] = True
+                if all(ready):
+                    observer.on_next(tuple(latest))
+
+        def complete(index: int) -> None:
+            with lock:
+                completed[index] = True
+                if all(completed):
+                    observer.on_completed()
+
+        for index, source in enumerate(sources):
+            subscriptions.append(
+                source.subscribe(
+                    lambda value, index=index: emit_if_ready(index, value),
+                    observer.on_error,
+                    lambda index=index: complete(index),
+                )
+            )
+        return _CompositeSubscription(subscriptions)
+
+    return cast(
+        StreamNode[tuple[Any, ...]], _materialize_stream(_DerivedStream(subscribe))
+    )
 
 
 class EventStream(Generic[T]):
@@ -595,9 +658,8 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
         if not observables:
             return EmptyNode().observable()
-        merged = (
-            MergeNode.merge(*observables)
-            .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
+        merged = MergeNode.merge(*observables).map(
+            PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
         return merged
 

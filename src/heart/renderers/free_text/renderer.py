@@ -5,7 +5,8 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.free_text.provider import FreeTextStateProvider
+from heart.renderers.free_text.provider import (TEXT_PADDING_PX,
+                                                FreeTextStateProvider)
 from heart.renderers.free_text.state import FreeTextRendererState
 from heart.runtime.display_context import DisplayContext
 
@@ -18,6 +19,11 @@ class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
 
     def __init__(self, provider: FreeTextStateProvider | None = None) -> None:
         self._provider = provider or FreeTextStateProvider()
+        self._cached_text: str | None = None
+        self._cached_window_size: tuple[int, int] | None = None
+        self._cached_font: pygame.font.Font | None = None
+        self._cached_wrapped_lines: tuple[str, ...] = tuple()
+        self._cached_line_height = 0
         super().__init__(builder=self._provider)
         self.device_display_mode = DeviceDisplayMode.MIRRORED
 
@@ -37,22 +43,53 @@ class FreeTextRenderer(StatefulBaseRenderer[FreeTextRendererState]):
         if not state.text:
             return
 
-        font = self._current_font(state)
         window_width, window_height = window.get_size()
-
-        if not state.wrapped_lines:
+        font, wrapped_lines, line_height = self._layout_text(
+            text=state.text,
+            window_width=window_width,
+            window_height=window_height,
+        )
+        if not wrapped_lines:
             return
 
-        line_height = state.line_height or font.get_linesize()
-        max_lines_visible = max(1, window_height // line_height)
-        visible_lines = list(state.wrapped_lines[:max_lines_visible])
+        available_width = max(1, window_width - (TEXT_PADDING_PX * 2))
+        available_height = max(1, window_height - (TEXT_PADDING_PX * 2))
+        max_lines_visible = max(1, available_height // line_height)
+        visible_lines = list(wrapped_lines[:max_lines_visible])
 
         total_height = len(visible_lines) * line_height
-        y = (window_height - total_height) // 2
+        y = TEXT_PADDING_PX + max(0, (available_height - total_height) // 2)
 
         for line in visible_lines:
             rendered = font.render(line, TEXT_ANTIALIAS, TEXT_COLOR)
             text_width, _ = rendered.get_size()
-            x = (window_width - text_width) // 2
+            x = TEXT_PADDING_PX + max(0, (available_width - text_width) // 2)
             window.blit(rendered, (x, y))
             y += line_height
+
+    def _layout_text(
+        self,
+        *,
+        text: str,
+        window_width: int,
+        window_height: int,
+    ) -> tuple[pygame.font.Font, tuple[str, ...], int]:
+        window_size = (window_width, window_height)
+        if (
+            self._cached_text != text
+            or self._cached_window_size != window_size
+            or self._cached_font is None
+        ):
+            font, wrapped_lines, line_height = self._provider.fit_text_to_window(
+                text=text,
+                window_width=window_width,
+                window_height=window_height,
+            )
+            self._cached_text = text
+            self._cached_window_size = window_size
+            self._cached_font = font
+            self._cached_wrapped_lines = wrapped_lines
+            self._cached_line_height = line_height
+
+        assert self._cached_font is not None
+        return self._cached_font, self._cached_wrapped_lines, self._cached_line_height

@@ -8,6 +8,9 @@
   "scripts": {
     "build-storybook": "storybook build",
     "start": "electron-forge start",
+    "web": "vite --config vite.renderer.config.mts",
+    "build:web": "vite build --config vite.renderer.config.mts",
+    "preview:web": "vite preview --config vite.renderer.config.mts",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",

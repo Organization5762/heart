@@ -6,19 +6,46 @@ from enum import StrEnum
 from functools import cached_property
 from itertools import count
 from threading import Lock
-from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
-                    TypeVar, cast)
+from typing import (
+    Any,
+    Generic,
+    Iterator,
+    Mapping,
+    Self,
+    Sequence,
+    TypeAlias,
+    TypeVar,
+    cast,
+)
 
-from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
-from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
-                                SensorTag)
+from manyfold import (
+    EmptyNode,
+    Graph,
+    Layer,
+    OwnerName,
+    Plane,
+    Schema,
+    StreamFamily,
+    StreamName,
+    StreamNode,
+    TypedRoute,
+    Variant,
+    route,
+)
+from manyfold.sensor_io import SensorEvent, SensorIdentity, SensorLocation, SensorTag
 
 from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.utilities.logging import get_logger
 
 _OBSERVE_ROUTE_IDS = count(1)
+
+
+def _unwrap_graph_value(value: Any) -> Any:
+    if hasattr(value, "value") and (
+        hasattr(value, "closed") or type(value).__name__ == "TypedEnvelope"
+    ):
+        return value.value
+    return value
 
 
 @dataclass(slots=True)
@@ -184,7 +211,7 @@ class Peripheral(Generic[A]):
 
         def wrap(a: A) -> PeripheralMessageEnvelope[A]:
             return PeripheralMessageEnvelope[A](
-                data=a, peripheral_info=self.peripheral_info()
+                data=_unwrap_graph_value(a), peripheral_info=self.peripheral_info()
             )
 
         def subscribe(observer: Any, scheduler: Any = None) -> Any:
@@ -202,7 +229,7 @@ class Peripheral(Generic[A]):
                 output_subscription = graph.observe(
                     output_route,
                     replay_latest=False,
-                ).callback(observer.on_next)
+                ).callback(lambda value: observer.on_next(_unwrap_graph_value(value)))
 
                 if source_subscription is None:
                     source_subscription = graph.pipe(

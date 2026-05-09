@@ -1,9 +1,28 @@
-import { ipc } from "@/ipc/manager";
+import { isElectronRuntime } from "@/utils/runtime";
 
-export function getPlatform() {
-  return ipc.client.app.currentPlatfom();
+async function getIpcClient() {
+  const { ipc } = await import("@/ipc/manager");
+  return ipc.client;
 }
 
-export function getAppVersion() {
-  return ipc.client.app.appVersion();
+export async function getPlatform() {
+  if (isElectronRuntime()) {
+    const client = await getIpcClient();
+    return client.app.currentPlatfom();
+  }
+
+  if (typeof navigator !== "undefined" && navigator.platform) {
+    return navigator.platform;
+  }
+
+  return "web";
+}
+
+export async function getAppVersion() {
+  if (isElectronRuntime()) {
+    const client = await getIpcClient();
+    return client.app.appVersion();
+  }
+
+  return import.meta.env.VITE_BEATS_APP_VERSION?.trim() || "web";
 }

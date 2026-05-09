@@ -4,8 +4,8 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass
-from enum import StrEnum
+from dataclasses import dataclass, fields, is_dataclass
+from enum import Enum, StrEnum
 from math import ceil
 from typing import Any
 
@@ -34,9 +34,14 @@ class InputDebugEnvelope:
     upstream_ids: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["stage"] = self.stage.value
-        return payload
+        return {
+            "stage": self.stage.value,
+            "stream_name": self.stream_name,
+            "source_id": self.source_id,
+            "timestamp_monotonic": self.timestamp_monotonic,
+            "payload": _debug_payload(self.payload),
+            "upstream_ids": tuple(self.upstream_ids),
+        }
 
 
 SourceResolver = str | Callable[[Any], str]
@@ -141,6 +146,27 @@ def _payload_monotonic(value: Any) -> float | None:
     if isinstance(timestamp_ms, int | float):
         return float(timestamp_ms) / 1000.0
     return None
+
+
+def _debug_payload(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if is_dataclass(value):
+        return {
+            field.name: _debug_payload(getattr(value, field.name))
+            for field in fields(value)
+        }
+    if isinstance(value, dict):
+        return {str(key): _debug_payload(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_debug_payload(item) for item in value)
+    if isinstance(value, list):
+        return [_debug_payload(item) for item in value]
+    if isinstance(value, frozenset):
+        return tuple(sorted(_debug_payload(item) for item in value))
+    return repr(value)
 
 
 @dataclass(frozen=True, slots=True)

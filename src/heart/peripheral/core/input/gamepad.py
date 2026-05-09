@@ -8,22 +8,32 @@ from functools import cache, cached_property
 from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import CombineLatestNode, StreamNode, Timer
+from manyfold import StreamNode, Timer
 
-from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
-                                               InputDebugTap)
+from heart.peripheral.core.input.debug import (
+    InputDebugNode,
+    InputDebugStage,
+    InputDebugTap,
+)
+from heart.peripheral.core.streams import combine_latest_streams
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
-from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
-                                                          BitDoLite2Bluetooth,
-                                                          DpadType,
-                                                          SwitchLikeMapping,
-                                                          SwitchProMapping)
+from heart.peripheral.gamepad.peripheral_mappings import (
+    BitDoLite2,
+    BitDoLite2Bluetooth,
+    DpadType,
+    SwitchLikeMapping,
+    SwitchProMapping,
+)
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
     from heart.peripheral.core.manager import PeripheralManager
 GAMEPAD_POLL_INTERVAL_MS = 20
 DEFAULT_GAMEPAD_AXIS_DEAD_ZONE = 0.1
+DPAD_AXIS_THRESHOLD = 0.5
+SNAPSHOT_LOG_AXIS_THRESHOLD = 0.1
+logger = get_logger(__name__)
 
 
 class GamepadButton(StrEnum):
@@ -97,6 +107,17 @@ class GamepadController:
     def __init__(self, manager: "PeripheralManager", debug_tap: InputDebugTap) -> None:
         self._manager = manager
         self._debug_tap = debug_tap
+        self._last_logged_snapshot_state: (
+            tuple[
+                bool,
+                str | None,
+                tuple[str, ...],
+                tuple[str, ...],
+                tuple[tuple[str, float], ...],
+                tuple[int, int],
+            ]
+            | None
+        ) = None
 
     @cached_property
     def _snapshot_stream(self) -> StreamNode[GamepadSnapshot]:
@@ -124,7 +145,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.button_held(button))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -144,7 +164,6 @@ class GamepadController:
                     button=button, timestamp_monotonic=snapshot.timestamp_monotonic
                 )
             )
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -162,7 +181,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -179,13 +197,11 @@ class GamepadController:
         axis_x = GamepadAxis.LEFT_X if stick_name == "left" else GamepadAxis.RIGHT_X
         axis_y = GamepadAxis.LEFT_Y if stick_name == "left" else GamepadAxis.RIGHT_Y
         stream = (
-            CombineLatestNode()
-            .observable(
+            combine_latest_streams(
                 self.axis_value(axis_x, dead_zone), self.axis_value(axis_y, dead_zone)
             )
             .map(lambda latest: GamepadStickValue(x=latest[0], y=latest[1]))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -204,7 +220,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.dpad)
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -276,7 +291,7 @@ class GamepadController:
             ),
         }
         dpad = self._read_dpad(gamepad, mapping)
-        return GamepadSnapshot(
+        snapshot = GamepadSnapshot(
             connected=True,
             identifier=gamepad.gamepad_identifier.value,
             buttons=buttons,
@@ -285,6 +300,8 @@ class GamepadController:
             dpad=dpad,
             timestamp_monotonic=time.monotonic(),
         )
+        self._log_snapshot_if_changed(snapshot)
+        return snapshot
 
     def _active_gamepad(self) -> Gamepad | None:
         for peripheral in self._manager.peripherals:
@@ -292,10 +309,50 @@ class GamepadController:
                 return peripheral
         return None
 
+    def _log_snapshot_if_changed(self, snapshot: GamepadSnapshot) -> None:
+        held_buttons = tuple(
+            button.value for button, is_held in snapshot.buttons.items() if is_held
+        )
+        tapped_buttons = tuple(button.value for button in snapshot.tapped_buttons)
+        active_axes = tuple(
+            sorted(
+                (
+                    axis.value,
+                    round(value, 2),
+                )
+                for axis, value in snapshot.axes.items()
+                if abs(value) >= SNAPSHOT_LOG_AXIS_THRESHOLD
+            )
+        )
+        snapshot_state = (
+            snapshot.connected,
+            snapshot.identifier,
+            held_buttons,
+            tapped_buttons,
+            active_axes,
+            (snapshot.dpad.x, snapshot.dpad.y),
+        )
+        if snapshot_state == self._last_logged_snapshot_state:
+            return
+        self._last_logged_snapshot_state = snapshot_state
+        logger.info(
+            "Gamepad mapped snapshot connected=%s identifier=%s held=%s tapped=%s axes=%s dpad=(%s,%s)",
+            snapshot.connected,
+            snapshot.identifier,
+            held_buttons,
+            tapped_buttons,
+            active_axes,
+            snapshot.dpad.x,
+            snapshot.dpad.y,
+        )
+
     @staticmethod
     def _mapping_for_gamepad(gamepad: Gamepad) -> SwitchLikeMapping:
         identifier = gamepad.gamepad_identifier
-        if identifier is GamepadIdentifier.SWITCH_PRO:
+        if identifier in {
+            GamepadIdentifier.SWITCH_PRO,
+            GamepadIdentifier.SWITCH_PRO_SHORT,
+        }:
             return SwitchProMapping()
         if Configuration.is_pi():
             return BitDoLite2Bluetooth()
@@ -319,5 +376,15 @@ class GamepadController:
             y_dir = int(gamepad.is_held(mapping.DPAD_UP)) - int(
                 gamepad.is_held(mapping.DPAD_DOWN)
             )
+            return GamepadDpadValue(x=x_dir, y=y_dir)
+        if mapping.get_dpad_type() is DpadType.AXES:
+            axis_x = mapping.DPAD_AXIS_X
+            axis_y = mapping.DPAD_AXIS_Y
+            if axis_x is None or axis_y is None:
+                return GamepadDpadValue()
+            x_value = gamepad.axis_value(axis_x, dead_zone=DPAD_AXIS_THRESHOLD)
+            y_value = gamepad.axis_value(axis_y, dead_zone=DPAD_AXIS_THRESHOLD)
+            x_dir = 1 if x_value > 0 else (-1 if x_value < 0 else 0)
+            y_dir = -1 if y_value > 0 else (1 if y_value < 0 else 0)
             return GamepadDpadValue(x=x_dir, y=y_dir)
         return GamepadDpadValue()
