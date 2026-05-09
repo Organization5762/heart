@@ -1,0 +1,12 @@
+# SSID	priority	security	password
+# Keep real passwords in scripts/pi_network_profiles.local.tsv, which is gitignored.
+#
+# Priority convention:
+#   100 = primary home/dev Wi-Fi
+#    90 = secondary trusted Wi-Fi
+#    80 = venue/trusted open Wi-Fi
+#    10 = fallback hotspot, configured separately by setup_pi_network.sh
+#
+# Examples:
+# San Frantoria	90	wpa-psk	REPLACE_WITH_PASSWORD
+# The Commons WiFi by Meter	80	open
