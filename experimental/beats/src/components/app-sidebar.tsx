@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { getAppVersion } from "../actions/app";
 import {
   DISABLED_WEBSOCKET_LABEL,
@@ -93,16 +93,24 @@ const SIDEBAR_TOP_OFFSET_CLASS = "pt-[52px]";
 
 export function AppSidebar() {
   const [appVersion, setAppVersion] = useState("0.0.0");
-  const [, startGetAppVersion] = useTransition();
   const { isMobile, open, setOpenMobile } = useSidebar();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
 
-  useEffect(
-    () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
-    [],
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    getAppVersion().then((version) => {
+      if (isMounted) {
+        setAppVersion(version);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const isPathActive = (path: string) =>
     path === "/"

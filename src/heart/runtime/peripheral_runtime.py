@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import base64
+import io
 from typing import Any
 
 from manyfold import drain_frame_thread_queue
+import pygame
+from PIL import Image, ImageOps
 
+from heart import DeviceDisplayMode
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
 from heart.peripheral.core.manager import PeripheralManager
+from heart.renderers.free_text import FreeTextRenderer
+from heart.renderers.image import ContainRenderImage, SurfaceRenderImageStateProvider
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -18,6 +25,10 @@ CONTROL_COMMAND_BROWSE = "browse"
 CONTROL_COMMAND_ACTIVATE = "activate"
 CONTROL_COMMAND_ALTERNATE = "alternate_activate"
 CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
+CONTROL_COMMAND_TEXT_UPDATE = "text_update"
+CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
+PHONE_TEXT_DISPLAY_DURATION_SECONDS = 5.0
+PHONE_IMAGE_DISPLAY_DURATION_SECONDS = 5.0
 
 
 class PeripheralRuntime:
@@ -83,6 +94,17 @@ class PeripheralRuntime:
                 external_sensor_hub.set_value(sensor_key, sensor_value)
             except ValueError:
                 logger.warning("Ignoring invalid websocket sensor key: %s", sensor_key)
+            return
+        if control_message.command == CONTROL_COMMAND_TEXT_UPDATE:
+            self._present_phone_text_renderer(
+                text=None if control_message.clear else control_message.text
+            )
+            return
+        if control_message.command == CONTROL_COMMAND_IMAGE_UPDATE:
+            self._present_phone_image_renderer(
+                image_base64=control_message.image_base64,
+                image_mime_type=control_message.image_mime_type,
+            )
 
     def _streaming_envelope(
         self, envelope: InputDebugEnvelope
@@ -104,8 +126,68 @@ class PeripheralRuntime:
             data=envelope.as_dict(),
         )
 
+    def _present_phone_text_renderer(self, text: str | None) -> None:
+        from heart.runtime.game_loop import GameLoop
+
+        loop = GameLoop.get_game_loop()
+        if loop is None:
+            logger.debug("No active GameLoop available for phone text display.")
+            return
+
+        if not text:
+            loop.clear_temporary_renderer()
+            return
+
+        renderer = FreeTextRenderer()
+        renderer.set_text(text)
+        loop.present_temporary_renderer(
+            renderer,
+            duration_seconds=PHONE_TEXT_DISPLAY_DURATION_SECONDS,
+        )
+
+    def _present_phone_image_renderer(
+        self,
+        image_base64: str | None,
+        image_mime_type: str | None = None,
+    ) -> None:
+        from heart.runtime.game_loop import GameLoop
+
+        if not image_base64:
+            logger.debug("Ignoring empty phone image payload.")
+            return
+
+        loop = GameLoop.get_game_loop()
+        if loop is None:
+            logger.debug("No active GameLoop available for phone image display.")
+            return
+
+        try:
+            image_bytes = base64.b64decode(image_base64, validate=True)
+            with Image.open(io.BytesIO(image_bytes)) as uploaded_image:
+                normalized = ImageOps.exif_transpose(uploaded_image).convert("RGBA")
+                surface = pygame.image.fromstring(
+                    normalized.tobytes(),
+                    normalized.size,
+                    normalized.mode,
+                ).convert_alpha()
+        except Exception:
+            logger.exception("Failed to decode phone image payload.")
+            return
+
+        renderer = ContainRenderImage(
+            provider=SurfaceRenderImageStateProvider(base_image=surface)
+        )
+        renderer.device_display_mode = DeviceDisplayMode.MIRRORED
+        loop.present_temporary_renderer(
+            renderer,
+            duration_seconds=PHONE_IMAGE_DISPLAY_DURATION_SECONDS,
+        )
+
     def tick(self) -> None:
         drain_frame_thread_queue()
+        gamepad = self._peripheral_manager.get_gamepad()
+        if gamepad is not None:
+            gamepad.update()
         if self._peripheral_manager.clock.value is None:
             return
         self._peripheral_manager.frame_tick_controller.advance(

@@ -16,6 +16,7 @@ Provide an extensible runtime that drives an LED totem using pygame-based render
 The runtime packages two Typer CLIs: `totem` orchestrates configuration loading, render loops, and firmware updates, while `totem_debug` surfaces hardware diagnostics. Renderers run inside a pygame game loop, peripheral workers feed data through the `PeripheralManager`, and display services target either a local window or the LED matrix.
 
 ## Quick Start
+
 1. Create and activate a Python 3.11+ virtual environment.
 2. Install dependencies:
    ```bash
@@ -27,45 +28,72 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```
 4. Launch the default playlist with the Beats UI attached:
    ```bash
-   uv run totem run-beats --configuration lib_2025
+   uv run totem run --configuration lib_2025 --with-beats
    ```
-5. Launch a different playlist:
+5. Launch the default playlist with the browser-served Beats UI attached:
+   ```bash
+   uv run totem run --configuration lib_2025 --with-beats-web
+   ```
+6. Launch a different playlist:
    ```bash
    make run RUN_CONFIGURATION=your_configuration
    ```
-6. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
+7. Launch the Beats UI locally against a runtime already running on a Raspberry Pi:
+
+   ```bash
+   # On the Pi
+   FORWARD_TO_BEATS_APP=1 BEATS_WEBSOCKET_BIND_HOST=0.0.0.0 uv run totem run --configuration lib_2025
+
+   # On your laptop
+   uv run totem run --with-beats --remote-runtime --beats-runtime-host totem.local
+   ```
+
+8. Launch the browser-served Beats UI locally against a runtime already running on a Raspberry Pi:
+   ```bash
+   uv run totem run --with-beats-web --remote-runtime --beats-runtime-host totem.local
+   ```
+9. Review [docs/books/getting_started.md](docs/books/getting_started.md) for Raspberry Pi deployment, hardware wiring, and CLI options.
 
 ## Command-Line Interfaces
-| Command | Purpose |
-| --- | --- |
-| `totem` | Runs the runtime (`totem run`), updates firmware (`totem update-driver`), and manages renderer options. |
+
+| Command       | Purpose                                                                                                    |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `totem`       | Runs the runtime (`totem run`), updates firmware (`totem update-driver`), and manages renderer options.    |
 | `totem_debug` | Provides hardware diagnostics, including Bluetooth scanning, UART inspection, and accelerometer streaming. |
 
 Key `totem run` flags:
+
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--x11-forward` forces a pygame window even when the RGB matrix driver is active.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
-- `totem run-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
+- `totem run --with-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
+- `totem run --with-beats-web --configuration <name>` launches the streamed totem runtime and a LAN-visible Beats web UI together, wiring `FORWARD_TO_BEATS_APP=1`, `BEATS_WEBSOCKET_BIND_HOST=0.0.0.0`, and a Vite dev server on `http://localhost:5173`.
+- `totem run --with-beats --remote-runtime --beats-runtime-host totem.local` launches only the local Beats UI and points it at an existing runtime websocket on the Pi.
+- `totem run --with-beats-web --remote-runtime --beats-runtime-host totem.local` launches only the browser-served Beats UI and points it at an existing runtime websocket on the Pi.
 
 ## Architecture Summary
+
 - `heart/environment.py` defines the `GameLoop` responsible for frame pacing and peripheral coordination.
 - `heart.renderers` hosts animations, overlays, and HUDs that can be composed into playlists.
 - `heart.device` contains output adapters such as `LocalScreen` and `LEDMatrix`.
 - `heart.peripheral.core.manager.PeripheralManager` supervises switches, gamepads, heart-rate monitors, and other inputs.
 
 See the following references for deeper analysis:
+
 - [docs/library/runtime_systems.md](docs/library/runtime_systems.md) for loop orchestration details.
 - [docs/code_flow.md](docs/code_flow.md) for a diagram of launch and render paths.
 - [docs/library/tooling_and_configuration.md](docs/library/tooling_and_configuration.md) for playlist authoring guidance.
 - [docs/books/development_workflow.md](docs/books/development_workflow.md) for the devex snapshot workflow.
 
 ## Hardware Integration
+
 - `LEDMatrix` streams frames to the RGB matrix when `HEART_USE_ISOLATED_RENDERER=1`.
 - Bluetooth gamepads, switches, accelerometers, and heart-rate sensors publish data through the event bus managed by the peripheral subsystem.
 - `totem update-driver --name <driver>` flashes device firmware located in `drivers/`.
 - [docs/library/tooling_and_configuration.md](docs/library/tooling_and_configuration.md) documents debugging helpers for pairing controllers and inspecting UART traffic.
 
 ## Development Workflow
+
 - `make install` sets up the editable package and dev extras using `uv`.
 - `make run` starts `uv run totem run --configuration lib_2025`; override with `RUN_CONFIGURATION=<name>`.
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
@@ -75,6 +103,7 @@ See the following references for deeper analysis:
 - Keep collection and element variable names distinct (for example, `sensors` and `sensor`).
 
 The repository layout is summarised below:
+
 ```
 heart/
 ├── docs/                     # Architecture guides, dev logs, hardware notes
@@ -88,6 +117,7 @@ heart/
 ```
 
 ## Contributing
+
 1. Fork the repository and create a topic branch.
 2. Run `make format` and `make test` before pushing changes.
 3. Update documentation when introducing new renderers, configurations, or hardware capabilities. Re-render diagrams with `scripts/render_code_flow.py` when architecture changes.

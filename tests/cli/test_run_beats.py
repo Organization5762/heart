@@ -149,6 +149,9 @@ class TestRunCommandWithBeats:
             add_low_power_mode: bool,
             x11_forward: bool,
             install_beats_deps: bool,
+            local_runtime: bool,
+            beats_runtime_host: str,
+            beats_runtime_port: int,
             beats_workspace: Path,
         ) -> None:
             recorded_call.update(
@@ -157,6 +160,9 @@ class TestRunCommandWithBeats:
                     "add_low_power_mode": add_low_power_mode,
                     "x11_forward": x11_forward,
                     "install_beats_deps": install_beats_deps,
+                    "local_runtime": local_runtime,
+                    "beats_runtime_host": beats_runtime_host,
+                    "beats_runtime_port": beats_runtime_port,
                     "beats_workspace": beats_workspace,
                 }
             )
@@ -187,6 +193,9 @@ class TestRunCommandWithBeats:
             "add_low_power_mode": False,
             "x11_forward": True,
             "install_beats_deps": False,
+            "local_runtime": True,
+            "beats_runtime_host": "localhost",
+            "beats_runtime_port": 8765,
             "beats_workspace": Path("/tmp/beats"),
         }
 

@@ -5,6 +5,9 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 interface ImportMetaEnv {
+  readonly VITE_BEATS_APP_VERSION?: string;
+  readonly VITE_BEATS_WEBSOCKET_HOST?: string;
+  readonly VITE_BEATS_WEBSOCKET_PORT?: string;
   readonly VITE_BEATS_WEBSOCKET_URL?: string;
 }
 

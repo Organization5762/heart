@@ -17,8 +17,8 @@ import {
   getConfiguredBeatsWebSocketUrl,
 } from "@/config/websocket";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Binary, Mouse, RadioTower, ScanLine, Tv } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { Binary, Mouse, RadioTower, ScanLine, Smartphone, Tv } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const RECENT_DEVICE_LIMIT = 4;
 const RECENT_ACTIVITY_WINDOW_MS = 60_000;
@@ -39,6 +39,13 @@ const routeCards = [
       "Connected devices, event logs, and the latest payload snapshots in one technical catalog.",
     href: "/peripherals/connected",
     icon: Mouse,
+  },
+  {
+    title: "Phone Control",
+    description:
+      "A mobile-first control surface for browse and activate actions over the runtime websocket.",
+    href: "/phone",
+    icon: Smartphone,
   },
 ];
 
@@ -187,12 +194,20 @@ function HomePage() {
   const events = usePeripheralEvents();
   const [appVersion, setAppVersion] = useState("0.0.0");
   const [now, setNow] = useState(() => Date.now());
-  const [, startGetAppVersion] = useTransition();
 
-  useEffect(
-    () => startGetAppVersion(() => getAppVersion().then(setAppVersion)),
-    [],
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    getAppVersion().then((version) => {
+      if (isMounted) {
+        setAppVersion(version);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const intervalId = window.setInterval(

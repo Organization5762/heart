@@ -20,6 +20,8 @@ type WSContextValue = {
     browseStep?: number,
   ) => boolean;
   sendSensorControl: (sensorKey: string, sensorValue: number | null) => boolean;
+  sendTextControl: (text: string | null) => boolean;
+  sendImageControl: (imageBase64: string, imageMimeType: string) => boolean;
 };
 
 const WSContext = createContext<WSContextValue>({
@@ -27,6 +29,8 @@ const WSContext = createContext<WSContextValue>({
   readyState: WebSocket.CLOSED,
   sendNavigationControl: () => false,
   sendSensorControl: () => false,
+  sendTextControl: () => false,
+  sendImageControl: () => false,
 });
 
 interface WSProviderProps {
@@ -202,9 +206,53 @@ export function WSProvider({
     [],
   );
 
+  const sendTextControl = useCallback<WSContextValue["sendTextControl"]>((text) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+
+    ws.send(
+      JSON.stringify({
+        kind: "control",
+        command: "text_update",
+        text,
+        clear: text === null,
+      }),
+    );
+    return true;
+  }, []);
+
+  const sendImageControl = useCallback<WSContextValue["sendImageControl"]>(
+    (imageBase64, imageMimeType) => {
+      const ws = socketRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+
+      ws.send(
+        JSON.stringify({
+          kind: "control",
+          command: "image_update",
+          image_base64: imageBase64,
+          image_mime_type: imageMimeType,
+        }),
+      );
+      return true;
+    },
+    [],
+  );
+
   return (
     <WSContext.Provider
-      value={{ socket, readyState, sendNavigationControl, sendSensorControl }}
+      value={{
+        socket,
+        readyState,
+        sendNavigationControl,
+        sendSensorControl,
+        sendTextControl,
+        sendImageControl,
+      }}
     >
       {children}
     </WSContext.Provider>

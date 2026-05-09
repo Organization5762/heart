@@ -9,12 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PhoneControlRouteImport } from './routes/phone-control'
+import { Route as PhoneRouteImport } from './routes/phone'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StreamIndexRouteImport } from './routes/stream/index'
 import { Route as PeripheralsSnapshotsRouteImport } from './routes/peripherals/snapshots'
 import { Route as PeripheralsEventsRouteImport } from './routes/peripherals/events'
 import { Route as PeripheralsConnectedRouteImport } from './routes/peripherals/connected'
 
+const PhoneControlRoute = PhoneControlRouteImport.update({
+  id: '/phone-control',
+  path: '/phone-control',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PhoneRoute = PhoneRouteImport.update({
+  id: '/phone',
+  path: '/phone',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +55,8 @@ const PeripheralsConnectedRoute = PeripheralsConnectedRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/phone': typeof PhoneRoute
+  '/phone-control': typeof PhoneControlRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
   '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
@@ -50,6 +64,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/phone': typeof PhoneRoute
+  '/phone-control': typeof PhoneControlRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
   '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
@@ -58,6 +74,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/phone': typeof PhoneRoute
+  '/phone-control': typeof PhoneControlRoute
   '/peripherals/connected': typeof PeripheralsConnectedRoute
   '/peripherals/events': typeof PeripheralsEventsRoute
   '/peripherals/snapshots': typeof PeripheralsSnapshotsRoute
@@ -67,6 +85,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/phone'
+    | '/phone-control'
     | '/peripherals/connected'
     | '/peripherals/events'
     | '/peripherals/snapshots'
@@ -74,6 +94,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/phone'
+    | '/phone-control'
     | '/peripherals/connected'
     | '/peripherals/events'
     | '/peripherals/snapshots'
@@ -81,6 +103,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/phone'
+    | '/phone-control'
     | '/peripherals/connected'
     | '/peripherals/events'
     | '/peripherals/snapshots'
@@ -89,6 +113,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PhoneRoute: typeof PhoneRoute
+  PhoneControlRoute: typeof PhoneControlRoute
   PeripheralsConnectedRoute: typeof PeripheralsConnectedRoute
   PeripheralsEventsRoute: typeof PeripheralsEventsRoute
   PeripheralsSnapshotsRoute: typeof PeripheralsSnapshotsRoute
@@ -97,6 +123,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/phone-control': {
+      id: '/phone-control'
+      path: '/phone-control'
+      fullPath: '/phone-control'
+      preLoaderRoute: typeof PhoneControlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/phone': {
+      id: '/phone'
+      path: '/phone'
+      fullPath: '/phone'
+      preLoaderRoute: typeof PhoneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -137,6 +177,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PhoneRoute: PhoneRoute,
+  PhoneControlRoute: PhoneControlRoute,
   PeripheralsConnectedRoute: PeripheralsConnectedRoute,
   PeripheralsEventsRoute: PeripheralsEventsRoute,
   PeripheralsSnapshotsRoute: PeripheralsSnapshotsRoute,
