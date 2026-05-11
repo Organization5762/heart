@@ -384,18 +384,9 @@ class BeatsWebSocketNode:
             maxsize=self.websocket._streaming_settings.queue_max_size
         )
 
-        def enqueue_frame(frame: bytes) -> None:
-            loop.call_soon_threadsafe(
-                self.websocket._enqueue_frame,
-                frame,
-                broadcast_queue,
-            )
-
-        subscription = graph.observe(
-            self.input_route,
-            replay_latest=False,
-        ).callback(enqueue_frame)
         broadcast_task = asyncio.create_task(self._broadcast_worker(broadcast_queue))
+        self.websocket._broadcast_loop = loop
+        self.websocket._broadcast_queue = broadcast_queue
         try:
             async with websockets.serve(
                 self.websocket._handle_client,
@@ -434,7 +425,10 @@ class BeatsWebSocketNode:
             raise
         finally:
             self.websocket._server = None
-            subscription.dispose()
+            if self.websocket._broadcast_queue is broadcast_queue:
+                self.websocket._broadcast_queue = None
+            if self.websocket._broadcast_loop is loop:
+                self.websocket._broadcast_loop = None
             broadcast_task.cancel()
             await asyncio.gather(broadcast_task, return_exceptions=True)
 
@@ -483,6 +477,10 @@ class WebSocket:
     _latest_peripheral_frames: dict[str, bytes] = field(
         default_factory=dict, init=False
     )
+    _broadcast_loop: asyncio.AbstractEventLoop | None = field(
+        default=None, init=False
+    )
+    _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
     _control_handler: Callable[[ControlMessage], None] | None = field(
         default=None, init=False
     )
@@ -533,6 +531,11 @@ class WebSocket:
         control_message = decode_control_message(message)
         if control_message is None:
             return
+        logger.info(
+            "Received websocket control command=%s browse_step=%d",
+            control_message.command,
+            control_message.browse_step,
+        )
         if self._control_handler is None:
             logger.debug(
                 "Dropping websocket control command because no handler is registered."
@@ -545,7 +548,15 @@ class WebSocket:
         if frame_bytes is None:
             return
         self._cache_replay_frame(kind=kind, payload=payload, frame_bytes=frame_bytes)
+        self._broadcast_frame(frame_bytes)
         self._graph.publish(self._frame_route, frame_bytes)
+
+    def _broadcast_frame(self, frame: bytes) -> None:
+        loop = self._broadcast_loop
+        queue = self._broadcast_queue
+        if loop is None or queue is None:
+            return
+        loop.call_soon_threadsafe(self._enqueue_frame, frame, queue)
 
     def _cache_replay_frame(
         self, *, kind: str, payload: object, frame_bytes: bytes

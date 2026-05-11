@@ -2,12 +2,15 @@ import type { usePeripheralEvents } from "@/actions/ws/providers/PeripheralEvent
 
 const INPUT_DEBUG_STREAM_TAG = "input_debug_stream";
 const NAVIGATION_STREAM_NAME = "navigation.intent";
+const BEATS_CONTROL_PREFIX = "beats.control.";
 const ACTIVATE_SOURCES = new Set([
+  "beats.control.activate",
   "keyboard.down",
   "gamepad.south",
   "switch.button",
 ]);
 const ALTERNATE_SOURCES = new Set([
+  "beats.control.alternate",
   "keyboard.up",
   "gamepad.north",
   "switch.long_button",
@@ -86,6 +89,10 @@ export function summarizeNavigationTelemetry(
 }
 
 export function isNavigationPeripheralEvent(event: PeripheralEvent) {
+  if (event.msg.payload.peripheralInfo.id?.startsWith(BEATS_CONTROL_PREFIX)) {
+    return true;
+  }
+
   return (
     tagVariant(
       event.msg.payload.peripheralInfo.tags,
@@ -102,12 +109,15 @@ function toNavigationIntentSnapshot(
     return null;
   }
 
+  const nestedPayload = readObjectField(payload, "payload");
   const source =
+    readStringField(nestedPayload, "source") ??
     readStringField(payload, "source") ??
     readStringField(payload, "source_id") ??
     event.msg.payload.peripheralInfo.id ??
     "unknown";
-  const step = readNumberField(payload, "step");
+  const step =
+    readNumberField(nestedPayload, "step") ?? readNumberField(payload, "step");
 
   if (typeof step === "number" && Number.isFinite(step)) {
     return {
@@ -154,4 +164,9 @@ function readStringField(input: object, field: string) {
 function readNumberField(input: object, field: string) {
   const value = (input as Record<string, unknown>)[field];
   return typeof value === "number" ? value : null;
+}
+
+function readObjectField(input: object, field: string): object {
+  const value = (input as Record<string, unknown>)[field];
+  return value && typeof value === "object" ? value : {};
 }

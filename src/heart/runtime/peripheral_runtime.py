@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+from queue import Empty, SimpleQueue
 from typing import Any
 
 from manyfold import drain_frame_thread_queue
@@ -36,6 +37,7 @@ class PeripheralRuntime:
 
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
+        self._control_messages: SimpleQueue[Any] = SimpleQueue()
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -55,7 +57,7 @@ class PeripheralRuntime:
             return
 
         ws = websocket or _build_websocket()
-        ws.set_control_handler(self._handle_control_message)
+        ws.set_control_handler(self._queue_control_message)
         self._peripheral_manager.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
                 kind="peripheral",
@@ -63,7 +65,23 @@ class PeripheralRuntime:
             ),
         )
 
+    def _queue_control_message(self, control_message: Any) -> None:
+        self._control_messages.put(control_message)
+
+    def _drain_control_messages(self) -> None:
+        while True:
+            try:
+                control_message = self._control_messages.get_nowait()
+            except Empty:
+                return
+            self._handle_control_message(control_message)
+
     def _handle_control_message(self, control_message: Any) -> None:
+        logger.info(
+            "Applying websocket control command=%s browse_step=%d",
+            control_message.command,
+            control_message.browse_step,
+        )
         navigation = self._peripheral_manager.navigation_profile
         if control_message.command == CONTROL_COMMAND_BROWSE:
             navigation.inject_browse(
@@ -184,6 +202,7 @@ class PeripheralRuntime:
         )
 
     def tick(self) -> None:
+        self._drain_control_messages()
         drain_frame_thread_queue()
         gamepad = self._peripheral_manager.get_gamepad()
         if gamepad is not None:

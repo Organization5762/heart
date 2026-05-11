@@ -45,9 +45,13 @@ function navigationEvent(
 describe("summarizeNavigationTelemetry", () => {
   it("tracks pending browse offset until an activate commits it", () => {
     const summary = summarizeNavigationTelemetry([
-      navigationEvent(3000, { source: "keyboard.down" }),
-      navigationEvent(2000, { source: "keyboard.right", step: 1 }),
-      navigationEvent(1000, { source: "keyboard.right", step: 1 }),
+      navigationEvent(3000, { payload: { source: "beats.control.activate" } }),
+      navigationEvent(2000, {
+        payload: { source: "beats.control.browse", step: 1 },
+      }),
+      navigationEvent(1000, {
+        payload: { source: "beats.control.browse", step: 1 },
+      }),
     ] as Parameters<typeof summarizeNavigationTelemetry>[0]);
 
     expect(summary.pendingBrowseOffset).toBe(0);
@@ -59,8 +63,12 @@ describe("summarizeNavigationTelemetry", () => {
 
   it("resets pending browse state when alternate activate returns to select mode", () => {
     const summary = summarizeNavigationTelemetry([
-      navigationEvent(3000, { source: "keyboard.up" }),
-      navigationEvent(2000, { source: "keyboard.left", step: -1 }),
+      navigationEvent(3000, {
+        payload: { source: "beats.control.alternate" },
+      }),
+      navigationEvent(2000, {
+        payload: { source: "beats.control.browse", step: -1 },
+      }),
     ] as Parameters<typeof summarizeNavigationTelemetry>[0]);
 
     expect(summary.pendingBrowseOffset).toBe(0);
@@ -94,5 +102,27 @@ describe("summarizeNavigationTelemetry", () => {
     expect(
       (summary.lastIntent as NavigationIntentSnapshot | null)?.source,
     ).toBe("gamepad.south");
+  });
+
+  it("recognizes beats control peripheral ids even without debug tags", () => {
+    const summary = summarizeNavigationTelemetry([
+      {
+        ts: 1000,
+        msg: {
+          payload: {
+            peripheralInfo: {
+              id: "beats.control.browse",
+              tags: [],
+            },
+            data: {
+              payload: { source: "beats.control.browse", step: 1 },
+            },
+          },
+        },
+      },
+    ] as Parameters<typeof summarizeNavigationTelemetry>[0]);
+
+    expect(summary.browseCount).toBe(1);
+    expect(summary.lastIntent?.source).toBe("beats.control.browse");
   });
 });

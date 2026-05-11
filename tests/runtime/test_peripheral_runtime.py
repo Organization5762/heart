@@ -124,6 +124,9 @@ class TestPeripheralRuntimeStreaming:
         websocket.control_handler(ControlMessage(command="activate"))
         websocket.control_handler(ControlMessage(command="alternate_activate"))
 
+        assert manager.navigation_profile.injected == []
+        runtime._drain_control_messages()
+
         assert manager.navigation_profile.injected == [
             ("browse", 2, "beats.control.browse"),
             ("activate", 0, "beats.control.activate"),
@@ -155,6 +158,9 @@ class TestPeripheralRuntimeStreaming:
                 clear=True,
             )
         )
+
+        assert manager.external_sensor_hub.updates == []
+        runtime._drain_control_messages()
 
         assert manager.external_sensor_hub.updates == [
             ("set", "accelerometer:debug:z", 12.5),
