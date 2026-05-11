@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -21,6 +22,7 @@ from heart.renderers.slide_transition import SlideTransitionMode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -292,15 +294,28 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
         # Renderers may have different display modes, so we need to initialize them all.
         for completed, renderer in enumerate(initialization_renderers, start=1):
+            display_ready = False
             try:
                 with window.display_mode(renderer.device_display_mode):
+                    display_ready = True
                     renderer.initialize(window, peripheral_manager, orientation)
-            except Exception:
-                logger.exception(
-                    "Failed to initialize renderer %s",
-                    renderer.name,
-                )
-                raise
+            except Exception as exc:
+                if (
+                    not display_ready
+                    and renderer.device_display_mode == DeviceDisplayMode.OPENGL
+                    and not Configuration.render_crash_on_error()
+                ):
+                    logger.warning(
+                        "Skipping renderer %s; OpenGL display mode failed during initialization: %s",
+                        renderer.name,
+                        exc,
+                    )
+                else:
+                    logger.exception(
+                        "Failed to initialize renderer %s",
+                        renderer.name,
+                    )
+                    raise
             self._render_initialization_progress(
                 window,
                 completed=completed,

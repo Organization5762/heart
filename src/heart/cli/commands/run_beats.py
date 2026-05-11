@@ -9,12 +9,12 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.run import (DEFAULT_ADD_LOW_POWER_MODE,
-                                    DEFAULT_BEATS_WORKSPACE,
-                                    DEFAULT_CONFIGURATION,
-                                    DEFAULT_INSTALL_BEATS_DEPS,
-                                    DEFAULT_X11_FORWARD,
-                                    resolve_configuration_name)
+from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
+                                            DEFAULT_BEATS_WORKSPACE,
+                                            DEFAULT_CONFIGURATION,
+                                            DEFAULT_INSTALL_BEATS_DEPS,
+                                            resolve_configuration_name)
+from heart.device.beats.websocket import WEBSOCKET_HOST, WEBSOCKET_PORT
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,13 +32,8 @@ def run_beats_command(
     ] = DEFAULT_CONFIGURATION,
     add_low_power_mode: bool = typer.Option(
         DEFAULT_ADD_LOW_POWER_MODE,
-        "--add-low-power-mode",
+        "--add-low-power-mode/--no-add-low-power-mode",
         help="Add a low power mode",
-    ),
-    x11_forward: bool = typer.Option(
-        DEFAULT_X11_FORWARD,
-        "--x11-forward",
-        help="Use X11 forwarding for RGB display",
     ),
     install_beats_deps: bool = typer.Option(
         DEFAULT_INSTALL_BEATS_DEPS,
@@ -67,7 +62,6 @@ def run_beats_command(
     runtime_command = build_totem_run_command(
         configuration=configuration,
         add_low_power_mode=add_low_power_mode,
-        x11_forward=x11_forward,
     )
     beats_command = build_beats_start_command()
     runtime_env = build_runtime_env(os.environ.copy())
@@ -159,8 +153,6 @@ def ensure_beats_dependencies(beats_workspace: Path) -> None:
 def build_beats_websocket_url() -> str:
     """Build the websocket URL expected by the Beats UI."""
 
-    from heart.device.beats.websocket import WEBSOCKET_HOST, WEBSOCKET_PORT
-
     return f"ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}"
 
 
@@ -168,13 +160,10 @@ def build_totem_run_command(
     *,
     configuration: str,
     add_low_power_mode: bool,
-    x11_forward: bool,
 ) -> list[str]:
     """Build the runtime command that forwards frames into Beats."""
 
     command = ["uv", "run", "totem", "run", "--configuration", configuration]
-    if x11_forward:
-        command.append("--x11-forward")
     if not add_low_power_mode:
         command.append("--no-add-low-power-mode")
     return command

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_DIR="${HEART_REPO_DIR:-/home/michael/Desktop/heart}"
 ADDRESS="${HEART_RUBIKS_CONNECTED_X_ADDRESS:-}"
 ATTEMPTS="${HEART_RUBIKS_CONNECTED_X_CONNECT_ATTEMPTS:-5}"
 SLEEP_SECONDS="${HEART_RUBIKS_CONNECTED_X_CONNECT_SLEEP_SECONDS:-2}"
@@ -16,4 +17,5 @@ if [[ -n "${ADDRESS}" ]] && command -v bluetoothctl >/dev/null 2>&1; then
   done
 fi
 
-exec /usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py run --no-add-low-power-mode
+cd "${REPO_DIR}"
+exec make run

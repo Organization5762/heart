@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import pygame
 from manyfold import StreamNode, shutdown
+from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
                        GL_FLOAT, GL_LINEAR, GL_MODELVIEW, GL_NEAREST,
                        GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,
@@ -24,6 +25,7 @@ from pygame.math import lerp
 
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
+from heart.device.local import LocalScreen
 from heart.display.shaders.shader import Shader
 from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -43,6 +45,17 @@ DEFAULT_DEBUG_HEIGHT = 800
 DEFAULT_DEBUG_FPS = 60
 DEFAULT_DEBUG_LAYOUT = "rectangle"
 TRIGGER_ACTIVE_THRESHOLD = 0.5
+
+
+def _opengl_string(name: int, label: str) -> str:
+    try:
+        value = glGetString(name)
+    except GLError as exc:
+        logger.warning("Unable to read OpenGL %s: %s", label, exc)
+        return "unavailable"
+    if value is None:
+        return "unavailable"
+    return value.decode("utf-8", errors="replace")
 
 
 @dataclass
@@ -203,19 +216,19 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         """Initialize the fractal renderer with the given window size."""
         logger.info(
             "OpenGL Version: %s",
-            glGetString(GL_VERSION).decode("utf-8", errors="replace"),
+            _opengl_string(GL_VERSION, "version"),
         )
         logger.info(
             "OpenGL Vendor: %s",
-            glGetString(GL_VENDOR).decode("utf-8", errors="replace"),
+            _opengl_string(GL_VENDOR, "vendor"),
         )
         logger.info(
             "OpenGL Renderer: %s",
-            glGetString(GL_RENDERER).decode("utf-8", errors="replace"),
+            _opengl_string(GL_RENDERER, "renderer"),
         )
         logger.info(
             "OpenGL Shading Language Version: %s",
-            glGetString(GL_SHADING_LANGUAGE_VERSION).decode("utf-8", errors="replace"),
+            _opengl_string(GL_SHADING_LANGUAGE_VERSION, "shading language version"),
         )
 
         self.time_initialized = time.monotonic()
@@ -944,7 +957,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return min(d, dsphere) * 10.0 < 0
 
     def reset(self):
-        pygame.mouse.set_visible(True)
+        try:
+            pygame.mouse.set_visible(True)
+        except pygame.error:
+            logger.debug("Skipping fractal mouse reset; pygame video is not initialized")
         self.initialized = False
         self._auto_started = False
         self.mode = "auto"
@@ -978,6 +994,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         super().__init__(builder=self.provider)
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self._peripheral_manager: PeripheralManager | None = None
+        self._runtime_failed = False
 
     def initialize(
         self,
@@ -1007,12 +1024,22 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
     ) -> None:
         assert self._peripheral_manager is not None
         runtime = self.state.runtime
+        if self._runtime_failed:
+            return
         if not runtime.is_initialized():
-            runtime.initialize(
-                window=window,
-                peripheral_manager=self._peripheral_manager,
-                orientation=orientation,
-            )
+            try:
+                runtime.initialize(
+                    window=window,
+                    peripheral_manager=self._peripheral_manager,
+                    orientation=orientation,
+                )
+            except Exception as exc:
+                self._runtime_failed = True
+                logger.warning(
+                    "Disabling FractalScene; OpenGL runtime failed to initialize: %s",
+                    exc,
+                )
+                return
         runtime.real_process(
             window,
             orientation,
@@ -1023,6 +1050,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
             self.state.runtime.reset()
         self._initial_state = None
         self._peripheral_manager = None
+        self._runtime_failed = False
         super().reset()
 
 
@@ -1064,7 +1092,6 @@ def main() -> None:
         if args.layout == "cube"
         else Rectangle.with_layout(columns=1, rows=1)
     )
-    from heart.device.local import LocalScreen
 
     device = LocalScreen(width=args.width, height=args.height, orientation=orientation)
     container = build_runtime_container(device=device)

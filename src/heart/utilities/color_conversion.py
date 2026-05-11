@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
 from collections import OrderedDict
 from types import ModuleType
 from typing import cast
@@ -10,21 +11,21 @@ import numpy as np
 
 from heart.utilities.env import Configuration
 
+OPENCV_COLOR_CONVERSION_ENV_VAR = "HEART_USE_OPENCV_COLOR_CONVERSION"
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+
 
 def _load_cv2_module() -> ModuleType | None:
-    module: ModuleType | None = None
-    loader = importlib.util.find_spec("cv2")
-    if loader is None or loader.loader is None:
+    if importlib.util.find_spec("cv2") is None:
         return None
-    module = importlib.util.module_from_spec(loader)
     try:
-        loader.loader.exec_module(module)
+        return cast(ModuleType, importlib.import_module("cv2"))
     except Exception:  # pragma: no cover - runtime dependency issues
         return None
-    return module
 
 
-CV2_MODULE = _load_cv2_module()
+CV2_MODULE: ModuleType | None = None
+CV2_LOAD_ATTEMPTED = False
 
 HUE_SCALE = (6.0 / 179.0) - 6e-05
 CACHE_MAX_SIZE = Configuration.hsv_cache_max_size()
@@ -33,6 +34,24 @@ HSV_CALIBRATION_MODE = Configuration.hsv_calibration_mode()
 HSV_CALIBRATION_ENABLED = HSV_CALIBRATION_MODE != "off"
 HSV_CALIBRATION_STRICT = HSV_CALIBRATION_MODE == "strict"
 HSV_TO_BGR_CACHE: OrderedDict[tuple[int, int, int], np.ndarray] = OrderedDict()
+
+
+def _opencv_color_conversion_enabled() -> bool:
+    value = os.environ.get(OPENCV_COLOR_CONVERSION_ENV_VAR, "")
+    return value.strip().lower() in TRUTHY_ENV_VALUES
+
+
+def _cv2_module() -> ModuleType | None:
+    global CV2_LOAD_ATTEMPTED, CV2_MODULE
+
+    if CV2_MODULE is not None:
+        return CV2_MODULE
+    if CV2_LOAD_ATTEMPTED or not _opencv_color_conversion_enabled():
+        return None
+
+    CV2_LOAD_ATTEMPTED = True
+    CV2_MODULE = _load_cv2_module()
+    return CV2_MODULE
 
 
 def _numpy_hsv_from_bgr(image: np.ndarray) -> np.ndarray:
@@ -123,8 +142,9 @@ def _numpy_bgr_from_hsv(image: np.ndarray) -> np.ndarray:
 
 
 def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
-        return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_BGR2HSV))
+    cv2_module = _cv2_module()
+    if cv2_module is not None:
+        return cast(np.ndarray, cv2_module.cvtColor(image, cv2_module.COLOR_BGR2HSV))
 
     hsv = _numpy_hsv_from_bgr(image)
 
@@ -189,8 +209,9 @@ def _convert_bgr_to_hsv(image: np.ndarray) -> np.ndarray:
 
 
 def _convert_hsv_to_bgr(image: np.ndarray) -> np.ndarray:
-    if CV2_MODULE is not None:
-        return cast(np.ndarray, CV2_MODULE.cvtColor(image, CV2_MODULE.COLOR_HSV2BGR))
+    cv2_module = _cv2_module()
+    if cv2_module is not None:
+        return cast(np.ndarray, cv2_module.cvtColor(image, cv2_module.COLOR_HSV2BGR))
 
     result = _numpy_bgr_from_hsv(image)
 

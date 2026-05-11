@@ -10,8 +10,8 @@ from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
                     TypeVar, cast)
 
 from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+                      StreamFamily, StreamName, StreamNode, TypedEnvelope,
+                      TypedRoute, Variant, route)
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
@@ -182,9 +182,10 @@ class Peripheral(Generic[A]):
         map_subscription: Any | None = None
         source_subscription: Any | None = None
 
-        def wrap(a: A) -> PeripheralMessageEnvelope[A]:
+        def wrap(a: A | TypedEnvelope[A]) -> PeripheralMessageEnvelope[A]:
+            data = a.value if isinstance(a, TypedEnvelope) else a
             return PeripheralMessageEnvelope[A](
-                data=a, peripheral_info=self.peripheral_info()
+                data=data, peripheral_info=self.peripheral_info()
             )
 
         def subscribe(observer: Any, scheduler: Any = None) -> Any:

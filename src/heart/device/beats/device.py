@@ -1,6 +1,7 @@
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
+from typing import Protocol
 
 import pygame
 from PIL import Image
@@ -12,17 +13,20 @@ from heart.runtime.rendering.constants import RGBA_IMAGE_FORMAT
 STREAMED_SCREEN_SCALE_FACTOR = 4
 
 
+class FrameWebSocket(Protocol):
+    def send(self, kind: str, payload: bytes) -> None: ...
+
+
 @dataclass
 class StreamedScreen(Device):
+    websocket: FrameWebSocket | None = field(default=None, repr=False)
+
     def individual_display_size(self) -> tuple[int, int]:
         return (64, 64)
 
     @cached_property
     def scale_factor(self) -> int:
         return STREAMED_SCREEN_SCALE_FACTOR
-
-    def __post_init__(self) -> None:
-        self.websocket = WebSocket()
 
     def set_screen(self, screen: pygame.Surface) -> None:
         image_bytes = pygame.image.tostring(screen, RGBA_IMAGE_FORMAT)
@@ -50,7 +54,12 @@ class StreamedScreen(Device):
         image.save(buf, format="PNG")
         frame_bytes = buf.getvalue()
 
-        self.websocket.send(
+        self._websocket().send(
             kind="frame",
             payload=frame_bytes,
         )
+
+    def _websocket(self) -> FrameWebSocket:
+        if self.websocket is None:
+            self.websocket = WebSocket()
+        return self.websocket
