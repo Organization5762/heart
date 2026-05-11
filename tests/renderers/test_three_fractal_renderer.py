@@ -13,10 +13,11 @@ from heart.renderers.three_fractal.state import FractalSceneState
 
 
 class _StubRuntime:
-    def __init__(self) -> None:
+    def __init__(self, *, fail_initialize: bool = False) -> None:
         self.reset_calls = 0
         self.initialize_calls = 0
         self._initialized = True
+        self.fail_initialize = fail_initialize
 
     def reset(self) -> None:
         self.reset_calls += 1
@@ -26,6 +27,8 @@ class _StubRuntime:
 
     def initialize(self, *args, **kwargs) -> None:
         self.initialize_calls += 1
+        if self.fail_initialize:
+            raise RuntimeError("OpenGL unavailable")
         self._initialized = True
 
     def real_process(self, *args, **kwargs) -> None:
@@ -205,3 +208,17 @@ class TestFractalScene:
         scene.real_process(window=Mock(), orientation=Mock())
 
         assert runtime.initialize_calls == 1
+
+    def test_real_process_disables_runtime_after_initialization_failure(self) -> None:
+        """Verify unsupported OpenGL contexts do not throw every frame after fractal entry fails."""
+        scene = FractalScene(provider=Mock())
+        runtime = _StubRuntime(fail_initialize=True)
+        runtime._initialized = False
+        scene.set_state(FractalSceneState(runtime=runtime))
+        scene._peripheral_manager = Mock()
+
+        scene.real_process(window=Mock(), orientation=Mock())
+        scene.real_process(window=Mock(), orientation=Mock())
+
+        assert runtime.initialize_calls == 1
+        assert scene._runtime_failed is True

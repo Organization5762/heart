@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from queue import Empty, SimpleQueue
 from typing import Any
 
 from manyfold import drain_frame_thread_queue
 
+from heart.device.beats.websocket import WebSocket
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import InputDebugEnvelope
@@ -25,6 +27,7 @@ class PeripheralRuntime:
 
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
+        self._control_messages: SimpleQueue[Any] = SimpleQueue()
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -45,6 +48,10 @@ class PeripheralRuntime:
 
         ws = websocket or _build_websocket()
         ws.set_control_handler(self._handle_control_message)
+        if not Configuration.stream_beats_input_debug():
+            logger.debug("Beats input debug streaming disabled")
+            return
+
         self._peripheral_manager.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
                 kind="peripheral",
@@ -53,6 +60,17 @@ class PeripheralRuntime:
         )
 
     def _handle_control_message(self, control_message: Any) -> None:
+        self._control_messages.put(control_message)
+
+    def _drain_control_messages(self) -> None:
+        while True:
+            try:
+                control_message = self._control_messages.get_nowait()
+            except Empty:
+                return
+            self._apply_control_message(control_message)
+
+    def _apply_control_message(self, control_message: Any) -> None:
         navigation = self._peripheral_manager.navigation_profile
         if control_message.command == CONTROL_COMMAND_BROWSE:
             navigation.inject_browse(
@@ -106,6 +124,7 @@ class PeripheralRuntime:
 
     def tick(self) -> None:
         drain_frame_thread_queue()
+        self._drain_control_messages()
         if self._peripheral_manager.clock.value is None:
             return
         self._peripheral_manager.frame_tick_controller.advance(
@@ -116,7 +135,5 @@ class PeripheralRuntime:
 
 def _build_websocket() -> Any:
     """Construct the Beats websocket only when streaming is enabled."""
-
-    from heart.device.beats import WebSocket
 
     return WebSocket()

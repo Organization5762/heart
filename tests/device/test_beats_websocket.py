@@ -4,6 +4,9 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from manyfold import Graph
+from websockets.exceptions import ConnectionClosedError
+
 from heart.device.beats.proto import beats_streaming_pb2
 from heart.device.beats.websocket import (WebSocket,
                                           _encode_peripheral_message,
@@ -321,8 +324,6 @@ class TestWebSocketReplayCache:
 
     def test_send_publishes_encoded_frames_to_manyfold_route(self) -> None:
         """Verify outbound websocket frames cross the Manyfold route boundary before node delivery."""
-        from manyfold import Graph
-
         websocket = object.__new__(WebSocket)
         websocket._graph = Graph()
         websocket._frame_route = beats_websocket_frame_route()
@@ -340,14 +341,39 @@ class TestWebSocketReplayCache:
         decoded = decode_stream_envelope(seen[0])
         assert decoded == ("frame", b"frame-bytes")
 
+    def test_send_enqueues_live_frames_when_broadcast_loop_is_running(self) -> None:
+        """Verify connected clients receive live frames without waiting for reconnect replay."""
+        class _Loop:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def call_soon_threadsafe(self, callback, *args) -> None:
+                self.calls.append((callback, args))
+
+        websocket = object.__new__(WebSocket)
+        websocket._graph = Graph()
+        websocket._frame_route = beats_websocket_frame_route()
+        websocket._replay_lock = threading.Lock()
+        websocket._latest_frame = None
+        websocket._latest_peripheral_frames = {}
+        websocket._broadcast_loop = _Loop()
+        websocket._broadcast_queue = object()
+
+        websocket.send("frame", b"frame-bytes")
+
+        assert len(websocket._broadcast_loop.calls) == 1
+        callback, args = websocket._broadcast_loop.calls[0]
+        assert callback == websocket._enqueue_frame
+        decoded = decode_stream_envelope(args[0])
+        assert decoded == ("frame", b"frame-bytes")
+        assert args[1] is websocket._broadcast_queue
+
 
 class TestWebSocketDisconnectHandling:
     """Validate disconnect handling so expected client drops do not surface as server errors."""
 
     def test_handler_ignores_disconnect_during_replay_send(self) -> None:
         """Verify replay send disconnects are treated as normal closure so reconnect churn does not log handler failures."""
-        from websockets.exceptions import ConnectionClosedError
-
         websocket = object.__new__(WebSocket)
         websocket.clients = set()
         websocket._replay_lock = threading.Lock()

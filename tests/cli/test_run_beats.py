@@ -18,6 +18,7 @@ from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
                                           build_totem_run_command,
                                           ensure_beats_dependencies,
                                           resolve_beats_workspace)
+from heart.cli.commands.run_options import CONFIGURATION_OVERRIDE_ENV_VAR
 
 runner = CliRunner()
 
@@ -31,7 +32,6 @@ class TestRunBeatsCommandBuilders:
         command = build_totem_run_command(
             configuration="lib_2025",
             add_low_power_mode=False,
-            x11_forward=True,
         )
 
         assert command == [
@@ -41,7 +41,6 @@ class TestRunBeatsCommandBuilders:
             "run",
             "--configuration",
             "lib_2025",
-            "--x11-forward",
             "--no-add-low-power-mode",
         ]
 
@@ -147,7 +146,6 @@ class TestRunCommandWithBeats:
             *,
             configuration: str,
             add_low_power_mode: bool,
-            x11_forward: bool,
             install_beats_deps: bool,
             beats_workspace: Path,
         ) -> None:
@@ -155,7 +153,6 @@ class TestRunCommandWithBeats:
                 {
                     "configuration": configuration,
                     "add_low_power_mode": add_low_power_mode,
-                    "x11_forward": x11_forward,
                     "install_beats_deps": install_beats_deps,
                     "beats_workspace": beats_workspace,
                 }
@@ -174,7 +171,6 @@ class TestRunCommandWithBeats:
                 "--configuration",
                 "lib_2025",
                 "--no-add-low-power-mode",
-                "--x11-forward",
                 "--no-install-beats-deps",
                 "--beats-workspace",
                 "/tmp/beats",
@@ -185,18 +181,70 @@ class TestRunCommandWithBeats:
         assert recorded_call == {
             "configuration": "lib_2025",
             "add_low_power_mode": False,
-            "x11_forward": True,
             "install_beats_deps": False,
             "beats_workspace": Path("/tmp/beats"),
         }
 
-    def test_cli_hides_run_beats_subcommand(self) -> None:
-        """Verify the top-level CLI no longer advertises a separate Beats command so opt-in flows consistently use `run --with-beats`."""
+    def test_cli_exposes_run_beats_subcommand(self) -> None:
+        """Verify the top-level CLI advertises the documented Beats quick-start command."""
 
         result = runner.invoke(loop.app, ["--help"])
 
         assert result.exit_code == 0
-        assert "run-beats" not in result.stdout
+        assert "run-beats" in result.stdout
+
+    def test_run_beats_subcommand_dispatches_to_launcher(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify `totem run-beats` uses the supervised runtime-plus-UI launcher."""
+
+        recorded_call: dict[str, object] = {}
+
+        def _fake_run_supervised_processes(**kwargs: object) -> int:
+            recorded_call.update(kwargs)
+            return 0
+
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.ensure_beats_dependencies",
+            lambda beats_workspace: None,
+        )
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.validate_beats_workspace",
+            lambda beats_workspace: None,
+        )
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.beats_dependencies_installed",
+            lambda beats_workspace: True,
+        )
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_supervised_processes",
+            _fake_run_supervised_processes,
+        )
+
+        result = runner.invoke(
+            loop.app,
+            [
+                "run-beats",
+                "--configuration",
+                "lib_2025",
+                "--no-add-low-power-mode",
+                "--no-install-beats-deps",
+                "--beats-workspace",
+                "/tmp/beats",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert recorded_call["runtime_command"] == [
+            "uv",
+            "run",
+            "totem",
+            "run",
+            "--configuration",
+            "lib_2025",
+            "--no-add-low-power-mode",
+        ]
+        assert recorded_call["beats_workspace"] == Path("/tmp/beats")
 
     def test_run_command_skips_beats_launcher_by_default(
         self, monkeypatch: pytest.MonkeyPatch
@@ -206,7 +254,7 @@ class TestRunCommandWithBeats:
         monkeypatch.setattr(
             run_module,
             "build_game_loop_container",
-            lambda *, x11_forward: _FakeResolver(),
+            lambda: _FakeResolver(),
         )
 
         def _unexpected_run_beats_command(**kwargs: object) -> None:
@@ -230,10 +278,10 @@ class TestRunCommandWithBeats:
         monkeypatch.setattr(
             run_module,
             "build_game_loop_container",
-            lambda *, x11_forward: resolver,
+            lambda: resolver,
         )
         monkeypatch.setenv(
-            run_module.CONFIGURATION_OVERRIDE_ENV_VAR,
+            CONFIGURATION_OVERRIDE_ENV_VAR,
             "rubiks_connected_x_visualizer",
         )
 
@@ -254,7 +302,7 @@ class TestRunCommandWithBeats:
             recorded_call.update(kwargs)
 
         monkeypatch.setenv(
-            run_module.CONFIGURATION_OVERRIDE_ENV_VAR,
+            CONFIGURATION_OVERRIDE_ENV_VAR,
             "rubiks_connected_x_visualizer",
         )
         monkeypatch.setattr(

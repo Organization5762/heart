@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
-from manyfold import CombineLatestNode, MergeNode, StreamNode
+from manyfold import MergeNode, StreamNode
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
@@ -13,6 +13,7 @@ from heart.peripheral.core.input.gamepad import (
     GamepadController)
 from heart.peripheral.core.input.keyboard import KeyboardController
 from heart.peripheral.core.input.streams import map_stream
+from heart.peripheral.core.streams import combine_latest
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -141,7 +142,7 @@ class MandelbrotControlProfile:
 
     @cached_property
     def motion_state(self) -> StreamNode[MandelbrotMotionState]:
-        keyboard_state = CombineLatestNode().observable(
+        keyboard_state = combine_latest(
             self._keyboard.key_state(pygame.K_w),
             self._keyboard.key_state(pygame.K_s),
             self._keyboard.key_state(pygame.K_a),
@@ -151,7 +152,7 @@ class MandelbrotControlProfile:
             self._keyboard.key_state(pygame.K_j),
             self._keyboard.key_state(pygame.K_k),
         )
-        gamepad_state = CombineLatestNode().observable(
+        gamepad_state = combine_latest(
             self._gamepad.button_held(GamepadButton.EAST),
             self._gamepad.button_held(GamepadButton.HOME),
             self._gamepad.button_held(GamepadButton.PLUS),
@@ -163,8 +164,7 @@ class MandelbrotControlProfile:
             self._gamepad.stick_value("right", MANDELBROT_RIGHT_STICK_DEAD_ZONE),
         )
         stream = (
-            CombineLatestNode()
-            .observable(keyboard_state, gamepad_state)
+            combine_latest(keyboard_state, gamepad_state)
             .map(lambda latest: self._to_motion_state(*latest))
             .distinct_until_changed()
 
@@ -201,8 +201,7 @@ class MandelbrotControlProfile:
     @cached_property
     def _observable(self) -> StreamNode[MandelbrotControlState]:
         stream = (
-            CombineLatestNode()
-            .observable(self.motion_state, self._edge_state)
+            combine_latest(self.motion_state, self._edge_state)
             .map(lambda latest: self._to_compatibility_state(*latest))
             .distinct_until_changed()
 
@@ -295,9 +294,9 @@ class MandelbrotControlProfile:
         command: MandelbrotCommand,
     ) -> StreamNode[MandelbrotCommand]:
         return (
-            CombineLatestNode()
-            .observable(
-                self._gamepad.button_held(modifier), self._gamepad.button_held(primary)
+            combine_latest(
+                self._gamepad.button_held(modifier),
+                self._gamepad.button_held(primary),
             )
             .map(lambda latest: bool(latest[0]) and bool(latest[1]))
             .distinct_until_changed()

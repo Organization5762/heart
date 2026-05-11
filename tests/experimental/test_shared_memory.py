@@ -14,7 +14,7 @@ def _load_experimental_classes():
     if str(EXPERIMENTAL_SRC) not in sys.path:
         sys.path.insert(0, str(EXPERIMENTAL_SRC))
 
-    if not EXPERIMENTAL_SRC.exists():
+    if not (EXPERIMENTAL_SRC / "isolated_rendering" / "buffer.py").exists():
         pytest.skip(
             "experimental isolated_rendering sources are not available",
             allow_module_level=True,

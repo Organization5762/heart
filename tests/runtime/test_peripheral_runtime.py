@@ -81,11 +81,16 @@ class TestPeripheralRuntimeStreaming:
 
         runtime.configure_streaming()
 
-    def test_configure_streaming_emits_peripheral_envelopes(self) -> None:
+    def test_configure_streaming_emits_peripheral_envelopes(self, monkeypatch) -> None:
         """Verify debug tap events are wrapped as peripheral payloads so the Beats websocket can replay and decode them after reconnects."""
         manager = _PeripheralManagerStub()
         runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
         websocket = _WebSocketStub()
+
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.stream_beats_input_debug",
+            classmethod(lambda cls: True),
+        )
 
         runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
         manager.debug_tap.publish(
@@ -109,6 +114,23 @@ class TestPeripheralRuntimeStreaming:
         assert envelope.data["stream_name"] == "switch.tick"
         assert envelope.data["source_id"] == "switch-1"
 
+    def test_configure_streaming_leaves_input_debug_off_by_default(self) -> None:
+        """Keep Beats frame/control streaming lightweight unless debug telemetry is explicitly requested."""
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+
+        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        manager.debug_tap.publish(
+            stage=InputDebugStage.RAW,
+            stream_name="switch.tick",
+            source_id="switch-1",
+            payload={"rotation": 1},
+        )
+
+        assert websocket.control_handler is not None
+        assert websocket.sent == []
+
     def test_configure_streaming_maps_control_commands_into_navigation_injections(
         self,
     ) -> None:
@@ -123,6 +145,9 @@ class TestPeripheralRuntimeStreaming:
         websocket.control_handler(ControlMessage(command="browse", browse_step=2))
         websocket.control_handler(ControlMessage(command="activate"))
         websocket.control_handler(ControlMessage(command="alternate_activate"))
+
+        assert manager.navigation_profile.injected == []
+        runtime._drain_control_messages()
 
         assert manager.navigation_profile.injected == [
             ("browse", 2, "beats.control.browse"),
@@ -155,6 +180,9 @@ class TestPeripheralRuntimeStreaming:
                 clear=True,
             )
         )
+
+        assert manager.external_sensor_hub.updates == []
+        runtime._drain_control_messages()
 
         assert manager.external_sensor_hub.updates == [
             ("set", "accelerometer:debug:z", 12.5),

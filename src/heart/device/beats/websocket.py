@@ -308,6 +308,8 @@ class BeatsWebSocketNode:
         broadcast_queue: asyncio.Queue[bytes] = asyncio.Queue(
             maxsize=self.websocket._streaming_settings.queue_max_size
         )
+        self.websocket._broadcast_loop = loop
+        self.websocket._broadcast_queue = broadcast_queue
 
         def enqueue_frame(frame: bytes) -> None:
             loop.call_soon_threadsafe(
@@ -358,6 +360,8 @@ class BeatsWebSocketNode:
             )
             raise
         finally:
+            self.websocket._broadcast_loop = None
+            self.websocket._broadcast_queue = None
             self.websocket._server = None
             subscription.dispose()
             broadcast_task.cancel()
@@ -408,6 +412,8 @@ class WebSocket:
     _latest_peripheral_frames: dict[str, bytes] = field(
         default_factory=dict, init=False
     )
+    _broadcast_loop: Any | None = field(default=None, init=False)
+    _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
     _control_handler: Callable[[ControlMessage], None] | None = field(
         default=None, init=False
     )
@@ -470,7 +476,17 @@ class WebSocket:
         if frame_bytes is None:
             return
         self._cache_replay_frame(kind=kind, payload=payload, frame_bytes=frame_bytes)
+        if self._enqueue_live_frame(frame_bytes):
+            return
         self._graph.publish(self._frame_route, frame_bytes)
+
+    def _enqueue_live_frame(self, frame_bytes: bytes) -> bool:
+        loop = getattr(self, "_broadcast_loop", None)
+        queue = getattr(self, "_broadcast_queue", None)
+        if loop is None or queue is None:
+            return False
+        loop.call_soon_threadsafe(self._enqueue_frame, frame_bytes, queue)
+        return True
 
     def _cache_replay_frame(
         self, *, kind: str, payload: object, frame_bytes: bytes
