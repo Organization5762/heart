@@ -2,6 +2,33 @@
 
 ## 2026-05-12
 
+### Flatline baseline rejection
+
+#### What changed
+
+- Tightened [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so each capture summary now declares whether it contains enough LAT/CLK activity to qualify as a real HUB75 waveform.
+- Added a validity gate to the similarity score so invalid baseline/candidate pairs score `0.0` instead of falsely reporting a perfect electrical match.
+- Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a regression that rejects flatline-vs-flatline CSV pairs.
+
+#### Live observations
+
+- The current saved local artifacts in [`/Users/lampe/code/heart/.captures`](/Users/lampe/code/heart/.captures) are still only `2` samples each, with no LAT or CLK edges.
+- Before this change, those dead exports scored as `1.0` against each other, which made them unsafe as optimization baselines.
+- On `totem4`, the custom `rp1_hub75` module is loaded and `/dev/rp1-hub75` exists; `dmesg` still shows `RP1H_START_WORKER` only entering the external-vsync path, not an internal scan engine.
+- The Logic2 connector regressed to `Cannot switch sessions while recording` again during this run, so no fresh PIO baseline or bridged-kernel waveform could be exported.
+
+#### Interpretation
+
+- The most urgent measurement bug was not in the kernel worker; it was in the scoring loop accepting electrically dead captures as valid.
+- That is fixed locally now: until a capture shows at least two LAT rises, one row interval, and measurable CLK activity, it cannot serve as a baseline or candidate score anchor.
+- The bench is therefore blocked on Saleae session cleanup and channel recovery, not on rediscovering module load state.
+
+#### Validation
+
+- `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
+- `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260512-pio-baseline/digital.csv /Users/lampe/code/heart/.captures/20260512-rp1h-bridge/digital.csv`
+- `ssh michael@totem4.local 'grep -w rp1_hub75 /proc/modules; stat -c "devnode=%n mode=%a major=%t minor=%T" /dev/rp1-hub75; sudo -n dmesg | tail -n 40 | grep -i "rp1\\|hub75"'`
+
 ### Transport-only fail-fast follow-up
 
 #### What changed

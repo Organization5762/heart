@@ -2,6 +2,10 @@
 
 ## 2026-05-12
 
+- `TBD` `Reject flatline HUB75 baselines`
+  - Tightened [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so dead Saleae exports are marked invalid and gated out of the similarity score.
+  - Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a flatline-vs-flatline regression so bogus `1.0` matches stay blocked.
+  - Updated [`docs/hub75_kernel_tuning_log.md`](/Users/lampe/code/heart/docs/hub75_kernel_tuning_log.md) with the current Logic2 session blocker and validation results.
 - `a034299a` `Fail fast on transport-only rp1-hub75 path`
   - Changed [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so software-vsync is opt-in instead of default, and the backend now errors once frames queue without any present/vsync progress from a real worker.
   - Added the matching tuning knob in [`rust/heart_rgb_matrix_driver/src/runtime/tuning.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/tuning.rs) and documented the behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).

@@ -66,6 +66,8 @@ class Hub75SignalSummary:
     median_clk_high_ns: float | None
     median_clk_low_ns: float | None
     address_edges_per_lat: dict[str, float]
+    valid_hub75: bool
+    validity_issues: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -169,6 +171,12 @@ def summarize_hub75_capture(
     clk_periods = [later - earlier for earlier, later in zip(clk_rises, clk_rises[1:], strict=False)]
     clk_highs = _clock_high_durations(clk_rises, clk_falls)
     clk_lows = _clock_low_durations(clk_rises, clk_falls)
+    validity_issues = _validate_hub75_summary(
+        lat_rise_count=len(lat_rises),
+        interval_count=len(intervals),
+        median_clocks_per_row=float(median(clocks_per_row)) if clocks_per_row else 0.0,
+        median_clk_period_ns=_median_ns(clk_periods),
+    )
 
     return Hub75SignalSummary(
         sample_count=capture.sample_count,
@@ -183,6 +191,8 @@ def summarize_hub75_capture(
         median_clk_high_ns=_median_ns(clk_highs),
         median_clk_low_ns=_median_ns(clk_lows),
         address_edges_per_lat=address_edges_per_lat,
+        valid_hub75=not validity_issues,
+        validity_issues=validity_issues,
     )
 
 
@@ -252,10 +262,14 @@ def score_hub75_similarity(
         **control_scores,
         **timing_scores,
         **address_scores,
+        "baseline_valid_hub75": 1.0 if baseline.valid_hub75 else 0.0,
+        "candidate_valid_hub75": 1.0 if candidate.valid_hub75 else 0.0,
     }
-    control_similarity = _average(control_scores.values())
-    timing_similarity = _average(timing_scores.values())
-    address_similarity = _average(address_scores.values())
+    validity_gate = 1.0 if baseline.valid_hub75 and candidate.valid_hub75 else 0.0
+    feature_scores["validity_gate"] = validity_gate
+    control_similarity = _average(control_scores.values()) * validity_gate
+    timing_similarity = _average(timing_scores.values()) * validity_gate
+    address_similarity = _average(address_scores.values()) * validity_gate
     total = (
         control_similarity * 0.45
         + timing_similarity * 0.35
@@ -407,3 +421,22 @@ def _average(values: Sequence[float]) -> float:
     if not values:
         return 1.0
     return sum(values) / len(values)
+
+
+def _validate_hub75_summary(
+    *,
+    lat_rise_count: int,
+    interval_count: int,
+    median_clocks_per_row: float,
+    median_clk_period_ns: float | None,
+) -> tuple[str, ...]:
+    issues: list[str] = []
+    if lat_rise_count < 2:
+        issues.append("need_at_least_two_lat_edges")
+    if interval_count < 1:
+        issues.append("need_at_least_one_row_interval")
+    if median_clocks_per_row <= 0.0:
+        issues.append("need_clock_activity")
+    if median_clk_period_ns is None:
+        issues.append("need_clk_period")
+    return tuple(issues)

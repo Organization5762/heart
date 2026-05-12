@@ -28,6 +28,7 @@ class TestHub75LogicScore:
         summary = summarize_hub75_capture(capture, cols=4)
         score = score_hub75_similarity(summary, summary)
 
+        assert summary.valid_hub75 is True
         assert summary.row_clock_mismatch_count == 0
         assert summary.lat_while_output_enabled_count == 0
         assert score.total == pytest.approx(1.0)
@@ -76,11 +77,33 @@ class TestHub75LogicScore:
         candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
         score = score_hub75_similarity(baseline, candidate)
 
+        assert baseline.valid_hub75 is True
+        assert candidate.valid_hub75 is False
         assert candidate.lat_rise_count == 0
         assert candidate.interval_count == 0
-        assert score.feature_scores["lat_rise_count"] == 0.0
-        assert score.feature_scores["interval_count"] == 0.0
-        assert score.total < 0.2
+        assert "need_clock_activity" in candidate.validity_issues
+        assert score.feature_scores["candidate_valid_hub75"] == 0.0
+        assert score.feature_scores["validity_gate"] == 0.0
+        assert score.total == 0.0
+
+    def test_flatline_baseline_and_candidate_are_rejected(self, tmp_path: Path) -> None:
+        """Verify dead-capture pairs cannot masquerade as a perfect electrical match."""
+
+        baseline_path = tmp_path / "baseline.csv"
+        candidate_path = tmp_path / "candidate.csv"
+        _write_capture_csv(baseline_path, _build_flatline_rows())
+        _write_capture_csv(candidate_path, _build_flatline_rows())
+
+        baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
+        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        score = score_hub75_similarity(baseline, candidate)
+
+        assert baseline.valid_hub75 is False
+        assert candidate.valid_hub75 is False
+        assert score.feature_scores["baseline_valid_hub75"] == 0.0
+        assert score.feature_scores["candidate_valid_hub75"] == 0.0
+        assert score.feature_scores["validity_gate"] == 0.0
+        assert score.total == 0.0
 
 
 def _write_capture_csv(path: Path, rows: list[tuple[float, list[int]]]) -> None:
