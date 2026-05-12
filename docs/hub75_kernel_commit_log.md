@@ -2,7 +2,7 @@
 
 ## 2026-05-12
 
-- `TBD` `Reject flatline HUB75 baselines`
+- `767f6254` `Reject flatline HUB75 baselines`
   - Tightened [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so dead Saleae exports are marked invalid and gated out of the similarity score.
   - Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a flatline-vs-flatline regression so bogus `1.0` matches stay blocked.
   - Updated [`docs/hub75_kernel_tuning_log.md`](/Users/lampe/code/heart/docs/hub75_kernel_tuning_log.md) with the current Logic2 session blocker and validation results.

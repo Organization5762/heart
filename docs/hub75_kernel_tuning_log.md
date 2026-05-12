@@ -6,6 +6,7 @@
 
 #### What changed
 
+- Checkpoint commit: `767f6254` (`Reject flatline HUB75 baselines`)
 - Tightened [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so each capture summary now declares whether it contains enough LAT/CLK activity to qualify as a real HUB75 waveform.
 - Added a validity gate to the similarity score so invalid baseline/candidate pairs score `0.0` instead of falsely reporting a perfect electrical match.
 - Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a regression that rejects flatline-vs-flatline CSV pairs.
