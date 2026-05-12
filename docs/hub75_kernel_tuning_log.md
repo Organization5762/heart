@@ -6,6 +6,7 @@
 
 #### What changed
 
+- Checkpoint commit: `a034299a` (`Fail fast on transport-only rp1-hub75 path`)
 - Updated [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is now opt-in instead of default-on.
 - Added a runtime guard that errors after `8` queued frames with no `frames_presented` or `vsync_count` progress, configurable via `HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES`.
 - Documented that fail-fast behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).

@@ -2,7 +2,7 @@
 
 ## 2026-05-12
 
-- `pending` `Fail fast on transport-only rp1-hub75 paths`
+- `a034299a` `Fail fast on transport-only rp1-hub75 path`
   - Changed [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so software-vsync is opt-in instead of default, and the backend now errors once frames queue without any present/vsync progress from a real worker.
   - Added the matching tuning knob in [`rust/heart_rgb_matrix_driver/src/runtime/tuning.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/tuning.rs) and documented the behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).
 - `12c632a8` `Add RP1 HUB75 bridge bring-up helper`
