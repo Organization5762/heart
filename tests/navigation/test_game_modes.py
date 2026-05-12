@@ -287,6 +287,38 @@ class TestNavigationGameModes:
         assert mode_renderer.initialize_calls == 1
         assert post_processor.initialize_calls == 1
 
+    def test_initialize_registered_renderers_resets_modes_after_warmup(self) -> None:
+        """Verify startup warmup does not leave inactive gameplay renderers subscribed while browsing mode titles."""
+        game_modes = GameModes()
+        title_renderer = DummyRenderer("title")
+        mode_renderer = DummyRenderer("mode")
+        post_processor = DummyRenderer("post")
+        game_modes.set_state(
+            GameModeState(
+                entries=[
+                    ModeEntry(
+                        title_renderer=title_renderer,
+                        renderer=mode_renderer,
+                    )
+                ],
+                post_processors=[post_processor],
+            )
+        )
+        window = _make_window()
+        peripheral_manager = Mock()
+        orientation = Mock()
+
+        with patch.object(game_modes, "_render_initialization_progress"):
+            game_modes._initialize_registered_renderers(
+                window=window,
+                peripheral_manager=peripheral_manager,
+                orientation=orientation,
+            )
+
+        assert title_renderer.reset_calls == 0
+        assert mode_renderer.reset_calls == 1
+        assert post_processor.reset_calls == 0
+
     def test_register_mode_initializes_dynamic_renderers_after_startup(self) -> None:
         """Verify _register_mode reuses the stored initialization context so dynamically added pages can initialize without crashing after startup."""
         game_modes = GameModes()
