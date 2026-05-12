@@ -73,6 +73,7 @@ pub(crate) struct Rp1Hub75Backend {
     _mapping: MmapMapping,
     wait_timeout_ns: Option<i64>,
     signal_vsync_after_queue: bool,
+    require_progress_after_queued_frames: u32,
 }
 
 #[repr(C)]
@@ -289,11 +290,13 @@ impl Rp1Hub75Backend {
             .and_then(|value| value.parse::<i64>().ok());
         let signal_vsync_after_queue = std::env::var("HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE")
             .map(|value| value != "0")
-            .unwrap_or(true);
+            .unwrap_or(false);
         let worker_status_timeout_ms = std::env::var("HEART_RP1_HUB75_WORKER_STATUS_TIMEOUT_MS")
             .ok()
             .and_then(|value| value.parse::<u32>().ok())
             .unwrap_or(0);
+        let require_progress_after_queued_frames =
+            runtime_tuning().rp1_hub75_require_progress_after_queued_frames;
         start_worker(device.as_raw_fd(), worker_status_timeout_ms)?;
 
         Ok(Self {
@@ -302,6 +305,7 @@ impl Rp1Hub75Backend {
             _mapping: mapping,
             wait_timeout_ns,
             signal_vsync_after_queue,
+            require_progress_after_queued_frames,
         })
     }
 }
@@ -417,6 +421,7 @@ impl MatrixBackend for Rp1Hub75Backend {
         if self.signal_vsync_after_queue {
             let _ = self.signal_vsync()?;
         }
+        self.require_worker_progress()?;
         if let Some(timeout_ns) = self.wait_timeout_ns {
             self.wait_present(request.seq, timeout_ns)?;
         }
@@ -488,6 +493,24 @@ impl Rp1Hub75Backend {
         Ok(stats)
     }
 
+    fn require_worker_progress(&self) -> Result<(), String> {
+        let threshold = self.require_progress_after_queued_frames;
+        if self.signal_vsync_after_queue || threshold == 0 {
+            return Ok(());
+        }
+
+        let status = read_worker_status_fd(self.device.as_raw_fd())?;
+        if worker_progress_missing(&status, threshold) {
+            return Err(format!(
+                "RP1 HUB75 queued {} frames without any presented-frame or vsync progress. \
+This backend only packs into /dev/rp1-hub75; start a real RP1 display worker or set \
+HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE=1 only for explicit software-vsync bring-up.",
+                status.frames_queued
+            ));
+        }
+        Ok(())
+    }
+
     fn stop_worker(&self) -> Result<(), String> {
         let mut control = Rp1hWorkerControl {
             size: std::mem::size_of::<Rp1hWorkerControl>() as u32,
@@ -549,6 +572,10 @@ fn read_worker_status_fd(fd: RawFd) -> Result<Rp1Hub75WorkerStatus, String> {
         last_error: status.last_error,
         last_vsync_ns: status.last_vsync_ns,
     })
+}
+
+fn worker_progress_missing(status: &Rp1Hub75WorkerStatus, threshold: u32) -> bool {
+    status.frames_queued >= threshold && status.frames_presented == 0 && status.vsync_count == 0
 }
 
 impl MmapMapping {
@@ -658,5 +685,33 @@ mod tests {
         assert_eq!(RP1H_QUEUE_F_NONBLOCK, 1);
         assert_eq!(RP1H_QUEUE_F_REPLACE_PENDING, 2);
         assert_eq!(RP1H_WORKER_F_EXTERNAL_VSYNC, 1);
+    }
+
+    #[test]
+    fn worker_progress_check_requires_real_presentation() {
+        let status = Rp1Hub75WorkerStatus {
+            frames_queued: 8,
+            frames_presented: 0,
+            vsync_count: 0,
+            ..Rp1Hub75WorkerStatus::default()
+        };
+
+        assert!(worker_progress_missing(&status, 8));
+        assert!(!worker_progress_missing(&status, 9));
+    }
+
+    #[test]
+    fn worker_progress_check_allows_any_vsync_or_presented_frame() {
+        let mut status = Rp1Hub75WorkerStatus {
+            frames_queued: 64,
+            frames_presented: 0,
+            vsync_count: 1,
+            ..Rp1Hub75WorkerStatus::default()
+        };
+        assert!(!worker_progress_missing(&status, 8));
+
+        status.vsync_count = 0;
+        status.frames_presented = 1;
+        assert!(!worker_progress_missing(&status, 8));
     }
 }

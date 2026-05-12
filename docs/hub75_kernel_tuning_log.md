@@ -2,6 +2,32 @@
 
 ## 2026-05-12
 
+### Transport-only fail-fast follow-up
+
+#### What changed
+
+- Updated [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is now opt-in instead of default-on.
+- Added a runtime guard that errors after `8` queued frames with no `frames_presented` or `vsync_count` progress, configurable via `HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES`.
+- Documented that fail-fast behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).
+
+#### Live observations
+
+- The active `logic2` connector became unreliable in this session: triggered and timed captures both hung before export, so this run did not produce a fresh electrical baseline.
+- Existing fallback captures in [`/Users/lampe/code/heart/.captures`](/Users/lampe/code/heart/.captures) were not usable as baselines either:
+  both the saved PIO and `rp1h` CSVs contained only `2` samples and `0` observed edges on every control line.
+- The more important finding came from the code and docs, not the broken capture files:
+  `rp1-hub75` is still explicitly transport-only, and the Rust backend had been masking that fact by self-issuing software vsync by default.
+
+#### Interpretation
+
+- Before this change, `/dev/rp1-hub75` could appear healthy in userspace counters even when no RP1 timing worker was consuming the queue.
+- With software-vsync disabled by default and the progress gate in place, the current custom-kernel path now fails loudly instead of pretending a flatline path is electrically alive.
+- That is a prerequisite for honest 0..1 similarity tuning: the next waveform experiment must involve a real worker, not just the packer queue.
+
+#### Validation
+
+- `PYO3_PYTHON=/Users/lampe/.local/bin/python3.12 cargo test --manifest-path rust/heart_rgb_matrix_driver/Cargo.toml rp1_hub75 -- --nocapture`
+
 ### What changed
 
 - Checkpoint commit: `c8462ef8` (`Add HUB75 logic scoring harness`)

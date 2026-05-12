@@ -20,6 +20,7 @@ const HEART_PI5_SIMPLE_SCAN_POST_ADDR_TICKS_DEFAULT: u32 = 5;
 const HEART_PI5_SIMPLE_SCAN_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_POST_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
+const HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT: u32 = 8;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RuntimeTuning {
@@ -41,6 +42,8 @@ pub(crate) struct RuntimeTuning {
     pub(crate) pi5_simple_scan_post_latch_ticks: u32,
     /* Per-column low/high hold count for the simple explicit-word transport. */
     pub(crate) pi5_simple_scan_clock_hold_ticks: u32,
+    /* Fail fast when the kernel packer queues frames but no display worker retires them. */
+    pub(crate) rp1_hub75_require_progress_after_queued_frames: u32,
 }
 
 static HEART_RUNTIME_TUNING: OnceLock<RuntimeTuning> = OnceLock::new();
@@ -99,6 +102,11 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             "HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS",
             HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT,
             |value| value > 0,
+        ),
+        rp1_hub75_require_progress_after_queued_frames: parse_env_u32(
+            "HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES",
+            HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT,
+            |_| true,
         ),
     })
 }

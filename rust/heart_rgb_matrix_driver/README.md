@@ -45,7 +45,8 @@ UAPI's flat RGB888 layout and calls:
    each submitted image, using `RP1H_QUEUE_F_REPLACE_PENDING` so animation
    updates replace any unpresented pending frame
 1. optionally `ioctl(fd, RP1H_SIGNAL_VSYNC, &mut rp1h_vsync)` after queueing
-   when `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is set
+   only when `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE=1` is set for explicit
+   software-vsync bring-up
 1. optionally `ioctl(fd, RP1H_WAIT_PRESENT, &rp1h_wait_present)` when
    `HEART_RP1_HUB75_WAIT_PRESENT_TIMEOUT_NS` is set
 1. optionally `ioctl(fd, RP1H_GET_PRESENT_STATS, &mut rp1h_present_stats)` when
@@ -65,7 +66,9 @@ The display/worker side must call `RP1H_SIGNAL_VSYNC` at the safe frame
 boundary. That promotes the pending queued slot to the displayed slot and wakes
 optional `RP1H_WAIT_PRESENT` waiters. In the normal direct-RIO path this is
 handled by the display/worker side; the Rust-side environment switch is for
-software-vsync bring-up.
+software-vsync bring-up only and is disabled by default. The runtime now also
+fails fast once frames are queued without any present/vsync progress so the
+transport-only packer path cannot silently masquerade as a live display worker.
 
 ## High-Level Data Flow
 
