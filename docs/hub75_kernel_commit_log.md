@@ -2,6 +2,9 @@
 
 ## 2026-05-12
 
+- `12c632a8` `Add RP1 HUB75 bridge bring-up helper`
+  - Added [`scripts/rp1_hub75_bridge_state32.c`](/Users/lampe/code/heart/scripts/rp1_hub75_bridge_state32.c) as a standalone userspace bridge that consumes queued `STATE32` slots from `/dev/rp1-hub75`, copies the pending slot into RP1 shared SRAM, and heartbeats presentation with `RP1H_SIGNAL_VSYNC`.
+  - Updated [`docs/hub75_kernel_tuning_log.md`](/Users/lampe/code/heart/docs/hub75_kernel_tuning_log.md) with the live bridge results and the current Logic2 probe-mapping blocker.
 - `c8462ef8` `Add HUB75 logic scoring harness`
   - Added the repo-local Hub75 CSV scorer, synthetic regression tests, baseline manifest, and this tuning log scaffold.
 - `8e0ab946` `Tighten HUB75 silent-waveform scoring`
