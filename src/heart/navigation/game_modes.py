@@ -299,6 +299,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
                 with window.display_mode(renderer.device_display_mode):
                     display_ready = True
                     renderer.initialize(window, peripheral_manager, orientation)
+                    if self._should_reset_after_warmup(renderer):
+                        renderer.reset()
             except Exception as exc:
                 if (
                     not display_ready
@@ -321,6 +323,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
                 completed=completed,
                 total=total_renderers,
             )
+
+    def _should_reset_after_warmup(self, renderer: StatefulBaseRenderer) -> bool:
+        return any(entry.renderer is renderer for entry in self.state.entries)
 
     def _initialization_renderers(self) -> list[StatefulBaseRenderer]:
         return [
