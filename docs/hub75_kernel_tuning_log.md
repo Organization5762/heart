@@ -81,3 +81,42 @@
 - `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
 - `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'`
 - `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && rm -f /tmp/rp1h_loop.log && (sudo ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_loop.log 2>&1 &) ; sleep 0.5; pinctrl get 5,6,12,13,16,17,18,20,21,22,23,24,26,27; wait; tail -n 20 /tmp/rp1h_loop.log'`
+
+## 2026-05-12 Red-only device bring-up
+
+### What changed
+
+- Added a deterministic solid-color mode to [`rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs) via `HEART_RP1_HUB75_COLOR_LOOP_SOLID`.
+- Recorded the active Logic2 blocker in [`AGENTS.md`](/Users/lampe/code/heart/AGENTS.md) so future runs do not waste time rediscovering the `Cannot switch sessions while recording` failure mode.
+
+### Live kernel-path observations
+
+- The custom module on `totem4` is loaded and `/dev/rp1-hub75` exists as `0600 root:root`.
+- Running the red-only submitter under `sudo` with `HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red` succeeded:
+  - `submitted=1897`
+  - `submit_hz=1896.82`
+  - `words_per_frame=2048`
+  - `frames_presented=1896`
+  - `frames_dropped=0`
+- This is the first clean proof in this repo state that the misc-device path can be driven as a single-plane, fixed-red publication source suitable for a bridge worker.
+
+### Current blockers
+
+- Fresh Logic captures are still blocked by the local Logic2 session state. The connector returns `Cannot switch sessions while recording`, so no same-day PIO baseline or same-day kernel-path flatline capture could be exported in this run.
+- The local sandbox for this automation can edit [`/Users/lampe/code/heart`](/Users/lampe/code/heart) but not [`/Users/lampe/code/linux`](/Users/lampe/code/linux), so the intended `/dev/rp1-hub75` -> shared-SRAM bridge could not be landed directly in the kernel selftest tree from this session.
+
+### Next implementation step
+
+1. Land a small `rp1_hub75_bridge_state32` helper in `tools/testing/selftests/drivers/rp1-pio` that:
+   - opens `/dev/rp1-hub75`
+   - validates queued `STATE32`
+   - copies the pending slot's plane data into RP1 shared SRAM at `0xc000`
+   - calls `RP1H_SIGNAL_VSYNC` after each copy
+2. Run that bridge against the existing `state32-...` core1 worker while the red-only submitter queues frames through `/dev/rp1-hub75`.
+3. Once Logic2 capture is unblocked, score that bridged waveform against the known-good PIO baseline with the existing scorer.
+
+### Validation
+
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
+- `scp /Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs michael@totem4.local:/home/michael/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo env HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red ./target/debug/rp1_hub75_color_loop 1000 0'`
