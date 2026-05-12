@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-12",
+  "references": [
+    {
+      "name": "pio_known_good_red_pending_capture",
+      "kind": "pio",
+      "status": "pending-capture",
+      "capture_csv": null,
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'",
+      "notes": "No saved PIO logic capture was found in the local trees during this run, and local Saleae automation was not available for a fresh capture."
+    },
+    {
+      "name": "direct_rio_bootstrap_reference",
+      "kind": "bootstrap",
+      "status": "available",
+      "capture_csv": "/Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv",
+      "notes": "Temporary scoring bootstrap until a real PIO baseline capture is recorded with the same methodology."
+    }
+  ]
+}
