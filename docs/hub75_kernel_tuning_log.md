@@ -47,3 +47,37 @@
 
 - `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
 - `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/bad-clock/digital.csv`
+
+## 2026-05-12 Follow-up
+
+### What changed
+
+- Tightened [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so row-dependent metrics are gated on actual row activity.
+- Added a flatline regression to [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) so an electrically silent candidate scores near zero instead of looking partially healthy.
+
+### Live kernel-path observations
+
+- On `totem4`, building `rp1_hub75_color_loop` as `michael` and running it under `sudo` still submits frames successfully:
+  - `submitted=3702`
+  - `submit_hz=1850.74`
+  - `frames_presented=3701`
+  - `frames_dropped=0`
+- While that loop is running, `pinctrl get 5,6,12,13,16,17,18,20,21,22,23,24,26,27` shows the HUB75 pins staying in `PIO*` mux mode instead of moving under a GPIO-driving path. This matches the driver documentation: the current `/dev/rp1-hub75` path is still a packer/queue only, not a scan engine.
+
+### Logic capture status
+
+- The `logic2` connector can see the Saleae hardware, but starting a fresh capture failed with `Cannot switch sessions while recording`.
+- The legacy local Saleae Python path is still unavailable in this repo environment (`saleae` package missing, no local Logic app automation port), so this run could not yet record a fresh PIO baseline or a fresh kernel-path flatline capture.
+
+### Interpretation
+
+- The immediate blocker is no longer "module not loaded". The blocker is that the custom kernel route does not yet own or drive the HUB75 pins, so it cannot produce the electrical waveform we want to compare against the PIO baseline.
+- The next practical implementation step is to connect a real RP1-side consumer to the `/dev/rp1-hub75` queue, or extend the driver so `RP1H_START_WORKER` can launch a real scan worker instead of only accepting external software-vsync heartbeats.
+
+### Validation
+
+- `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
+- `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/bad-clock/digital.csv`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && rm -f /tmp/rp1h_loop.log && (sudo ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_loop.log 2>&1 &) ; sleep 0.5; pinctrl get 5,6,12,13,16,17,18,20,21,22,23,24,26,27; wait; tail -n 20 /tmp/rp1h_loop.log'`

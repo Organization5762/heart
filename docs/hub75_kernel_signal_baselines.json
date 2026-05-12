@@ -16,6 +16,14 @@
       "status": "available",
       "capture_csv": "/Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv",
       "notes": "Temporary scoring bootstrap until a real PIO baseline capture is recorded with the same methodology."
+    },
+    {
+      "name": "rp1_hub75_live_kernel_waveform",
+      "kind": "kernel",
+      "status": "blocked-no-pin-ownership",
+      "capture_csv": null,
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'",
+      "notes": "The current /dev/rp1-hub75 route queues and software-presents frames, but pinctrl still shows the HUB75 pins in PIO mux mode while it runs, so there is no fresh electrical capture to score yet."
     }
   ]
 }

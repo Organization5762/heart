@@ -64,6 +64,24 @@ class TestHub75LogicScore:
         assert score.total < 0.95
         assert score.feature_scores["active_address_edge_count"] < 1.0
 
+    def test_flatline_capture_scores_near_zero(self, tmp_path: Path) -> None:
+        """Verify an electrically silent candidate cannot score like a plausible HUB75 waveform."""
+
+        baseline_path = tmp_path / "baseline.csv"
+        candidate_path = tmp_path / "flatline.csv"
+        _write_capture_csv(baseline_path, _build_capture_rows())
+        _write_capture_csv(candidate_path, _build_flatline_rows())
+
+        baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
+        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        score = score_hub75_similarity(baseline, candidate)
+
+        assert candidate.lat_rise_count == 0
+        assert candidate.interval_count == 0
+        assert score.feature_scores["lat_rise_count"] == 0.0
+        assert score.feature_scores["interval_count"] == 0.0
+        assert score.total < 0.2
+
 
 def _write_capture_csv(path: Path, rows: list[tuple[float, list[int]]]) -> None:
     with path.open("w", newline="") as handle:
@@ -109,6 +127,16 @@ def _build_capture_rows(
         emit(OE=1)
 
     return samples
+
+
+def _build_flatline_rows(*, samples: int = 8) -> list[tuple[float, list[int]]]:
+    timestamp = 0.0
+    state = [0, 0, 1, 0, 0, 0, 0, 0]
+    capture_rows: list[tuple[float, list[int]]] = []
+    for _ in range(samples):
+        capture_rows.append((timestamp, state.copy()))
+        timestamp += 20e-9
+    return capture_rows
 
 
 def _address_state(row: int) -> dict[str, int]:

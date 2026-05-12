@@ -192,20 +192,32 @@ def score_hub75_similarity(
 ) -> Hub75SimilarityScore:
     """Return a normalized similarity score between two Hub75 captures."""
 
+    row_activity_similarity = min(
+        _count_similarity(baseline.lat_rise_count, candidate.lat_rise_count),
+        _count_similarity(baseline.interval_count, candidate.interval_count),
+    )
     control_scores = {
-        "row_clock_mismatch_count": _count_similarity(
+        "lat_rise_count": _count_similarity(
+            baseline.lat_rise_count,
+            candidate.lat_rise_count,
+        ),
+        "interval_count": _count_similarity(
+            baseline.interval_count,
+            candidate.interval_count,
+        ),
+        "row_clock_mismatch_count": row_activity_similarity * _count_similarity(
             baseline.row_clock_mismatch_count,
             candidate.row_clock_mismatch_count,
         ),
-        "lat_while_output_enabled_count": _count_similarity(
+        "lat_while_output_enabled_count": row_activity_similarity * _count_similarity(
             baseline.lat_while_output_enabled_count,
             candidate.lat_while_output_enabled_count,
         ),
-        "active_address_edge_count": _count_similarity(
+        "active_address_edge_count": row_activity_similarity * _count_similarity(
             baseline.active_address_edge_count,
             candidate.active_address_edge_count,
         ),
-        "median_clocks_per_row": _relative_similarity(
+        "median_clocks_per_row": row_activity_similarity * _relative_similarity(
             baseline.median_clocks_per_row,
             candidate.median_clocks_per_row,
             tolerance_fraction=0.02,
