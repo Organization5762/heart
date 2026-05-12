@@ -2,4 +2,5 @@
 
 ## 2026-05-12
 
-- Pending first checkpoint commit from the `heart` repo scoring/bootstrap work in this run.
+- `c8462ef8` `Add HUB75 logic scoring harness`
+  - Added the repo-local Hub75 CSV scorer, synthetic regression tests, baseline manifest, and this tuning log scaffold.

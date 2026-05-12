@@ -4,6 +4,7 @@
 
 ### What changed
 
+- Checkpoint commit: `c8462ef8` (`Add HUB75 logic scoring harness`)
 - Added [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) to summarize raw Logic CSV exports and score candidate captures against a baseline on a normalized `0..1` scale.
 - Added [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with focused synthetic timing regressions for extra clocks and address chatter while output is enabled.
 - Added [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) for ad hoc scoring against saved captures.
