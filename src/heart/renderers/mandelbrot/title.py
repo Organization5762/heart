@@ -29,17 +29,20 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
         orientation: Orientation,
     ) -> MandelbrotTitleState:
         mandelbrot = MandelbrotMode()
-        mandelbrot.initialize(
-            window,
-            peripheral_manager,
-            orientation,
-        )
-        mandelbrot._internal_process(
-            window,
-            peripheral_manager,
-            orientation,
-        )
-        first_image = window.screen.copy()
+        try:
+            mandelbrot.initialize(
+                window,
+                peripheral_manager,
+                orientation,
+            )
+            mandelbrot._internal_process(
+                window,
+                peripheral_manager,
+                orientation,
+            )
+            first_image = window.screen.copy()
+        finally:
+            mandelbrot.reset()
         return MandelbrotTitleState(image=first_image)
 
     def real_process(

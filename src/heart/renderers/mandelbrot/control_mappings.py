@@ -1,5 +1,7 @@
 from collections import deque
 
+from manyfold.graph import SubscriptionLike
+
 from heart.device import Cube, Rectangle
 from heart.peripheral.core.input import (CyclePaletteCommand,
                                          MandelbrotCommand,
@@ -23,8 +25,15 @@ class KeyboardControls:
         self.scene_controls = scene_controls
         self._latest_motion_state = MandelbrotMotionState()
         self._pending_commands: deque[MandelbrotCommand] = deque()
-        profile.motion_state.subscribe(on_next=self._set_latest_motion_state)
-        profile.command_events.subscribe(on_next=self._queue_command)
+        self._subscriptions: list[SubscriptionLike] = [
+            profile.motion_state.subscribe(on_next=self._set_latest_motion_state),
+            profile.command_events.subscribe(on_next=self._queue_command),
+        ]
+
+    def dispose(self) -> None:
+        for subscription in self._subscriptions:
+            subscription.dispose()
+        self._subscriptions.clear()
 
     def update(self) -> None:
         state = self._latest_motion_state
