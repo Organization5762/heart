@@ -58,6 +58,8 @@ class LogicChannelActivity:
     edge_count: int
     rise_count: int
     fall_count: int
+    initial_level: int
+    final_level: int
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,7 @@ class Hub75CaptureDiagnosis:
 
     summary: Hub75SignalSummary
     diagnosis: str
+    channel_activity: tuple[LogicChannelActivity, ...]
     active_channels: tuple[LogicChannelActivity, ...]
     mapped_signal_edge_counts: dict[str, int]
     notes: tuple[str, ...]
@@ -240,6 +243,7 @@ def diagnose_hub75_capture(
         return Hub75CaptureDiagnosis(
             summary=summary,
             diagnosis="valid_hub75",
+            channel_activity=all_channel_activity,
             active_channels=active_channels,
             mapped_signal_edge_counts=mapped_edge_counts,
             notes=(),
@@ -254,6 +258,7 @@ def diagnose_hub75_capture(
         return Hub75CaptureDiagnosis(
             summary=summary,
             diagnosis="possible_channel_map_mismatch",
+            channel_activity=all_channel_activity,
             active_channels=active_channels,
             mapped_signal_edge_counts=mapped_edge_counts,
             notes=(
@@ -262,16 +267,26 @@ def diagnose_hub75_capture(
             ),
         )
     if not active_channels:
+        static_high_channels = tuple(
+            activity.channel
+            for activity in all_channel_activity
+            if activity.initial_level == 1 and activity.final_level == 1
+        )
+        notes = ["no_edges_on_any_captured_channel"]
+        if static_high_channels:
+            notes.append("static_high_channels_present")
         return Hub75CaptureDiagnosis(
             summary=summary,
             diagnosis="electrically_silent",
+            channel_activity=all_channel_activity,
             active_channels=(),
             mapped_signal_edge_counts=mapped_edge_counts,
-            notes=("no_edges_on_any_captured_channel",),
+            notes=tuple(notes),
         )
     return Hub75CaptureDiagnosis(
         summary=summary,
         diagnosis="invalid_hub75_waveform",
+        channel_activity=all_channel_activity,
         active_channels=active_channels,
         mapped_signal_edge_counts=mapped_edge_counts,
         notes=summary.validity_issues,
@@ -391,12 +406,16 @@ def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ..
         rows = csv.reader(handle)
         header = next(rows)
         channel_count = len(header) - 1
+        initial_state: list[int] | None = None
+        final_state: list[int] | None = None
         previous_state: list[int] | None = None
         edges = [0] * channel_count
         rises = [0] * channel_count
         falls = [0] * channel_count
         for row in rows:
             state = [int(value) for value in row[1 : 1 + channel_count]]
+            if initial_state is None:
+                initial_state = state.copy()
             if previous_state is not None:
                 for channel, (old, new) in enumerate(zip(previous_state, state, strict=True)):
                     if old == new:
@@ -407,6 +426,11 @@ def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ..
                     else:
                         falls[channel] += 1
             previous_state = state
+            final_state = state.copy()
+
+    if initial_state is None or final_state is None:
+        msg = f"{path}: empty HUB75 logic CSV"
+        raise ValueError(msg)
 
     for channel in range(channel_count):
         activities.append(
@@ -415,6 +439,8 @@ def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ..
                 edge_count=edges[channel],
                 rise_count=rises[channel],
                 fall_count=falls[channel],
+                initial_level=initial_state[channel],
+                final_level=final_state[channel],
             )
         )
     return tuple(sorted(activities, key=lambda activity: (-activity.edge_count, activity.channel)))

@@ -1,5 +1,50 @@
 # HUB75 Kernel Tuning Log
 
+## 2026-05-13
+
+### Same-day capture-path recheck: instrumentation fault confirmed
+
+#### What changed
+
+- Extended [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so whole-capture diagnostics now preserve per-channel initial/final levels, not just edge counts.
+- Updated [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) to emit that per-channel activity in the JSON payload.
+- Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with assertions that electrically silent captures retain stable high/low state information instead of collapsing to an uninformative empty diagnosis.
+- Recorded the new live-capture artifacts in [`docs/hub75_kernel_signal_baselines.json`](/Users/lampe/code/heart/docs/hub75_kernel_signal_baselines.json) and the new bench rule in [`AGENTS.md`](/Users/lampe/code/heart/AGENTS.md).
+
+#### Live observations
+
+- On `totem4`, the custom module is still loaded and `/dev/rp1-hub75` exists:
+  `rp1_hub75 49152 0` and `crw------- root root /dev/rp1-hub75`.
+- A same-day PIO baseline rerun through Logic2 MCP still exported an electrically silent CSV on the expected `0..6` channel map:
+  [`/Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv`](/Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv).
+- A same-day all-16-channel discovery capture during that same known-good PIO run also showed zero edges across every Saleae digital channel, with only static highs on channels `9` and `11`:
+  [`/Users/lampe/code/heart/.captures/20260513-pio-all16-live/digital.csv`](/Users/lampe/code/heart/.captures/20260513-pio-all16-live/digital.csv).
+- A slower, more granular isolation test also failed the same way:
+  while `totem4` manually toggled expected HUB75 GPIO pins `13`, `5`, `6`, and `12`, the all-16-channel Logic2 export still showed zero observed edges and only the same static highs on channels `9` and `11`:
+  [`/Users/lampe/code/heart/.captures/20260513-manual-toggle-all16/digital.csv`](/Users/lampe/code/heart/.captures/20260513-manual-toggle-all16/digital.csv).
+
+#### Interpretation
+
+- This run did not uncover a kernel-waveform defect. It falsified the current measurement path itself.
+- Because a known-good PIO run and a slow manual GPIO toggle both look electrically dead to the analyzer, the next blocker is probe routing, fixture grounding, or Logic channel assignment, not RP1 worker timing.
+- The new diagnostic payload is now specific enough to prove that statement from saved artifacts alone:
+  the all-16-channel manual-toggle capture is `electrically_silent` with `static_high_channels_present`, and the only persistent highs are channels `9` and `11`.
+
+#### Concrete next directions
+
+1. Run a deliberate bench-side channel-identification pass that physically maps Saleae channels to the expected HUB75 or GPIO pins, starting with the currently stuck-high channels `9` and `11`.
+1. Verify analyzer ground and reference placement before reopening software tuning. The current artifacts are consistent with a disconnected probe bundle or a reference path issue.
+1. Once any real edge is visible again, rerun the same three captures in order:
+   known-good PIO on `0..6`, all-16 PIO discovery, then manual GPIO toggle sanity. Only after those pass should the kernel-path bridge resume.
+
+#### Validation
+
+- `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
+- `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv /Users/lampe/code/heart/.captures/20260513-manual-toggle-all16/digital.csv`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
+- Logic2 MCP timed captures on channels `0..6` and `0..15` at `250 MS/s` and `125 MS/s`
+- `ssh michael@totem4.local 'bash -lc '"'"'set -eu; for pin in 13 5 6 12; do pinctrl set $pin op dl; sleep 0.01; pinctrl set $pin dh; sleep 0.01; pinctrl set $pin dl; sleep 0.01; pinctrl set $pin ip pn; done'"'"''`
+
 ## 2026-05-12
 
 ### Capture diagnosis split: silent export vs map mismatch

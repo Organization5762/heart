@@ -120,6 +120,8 @@ class TestHub75LogicScore:
         assert diagnosis.mapped_signal_edge_counts["CLK"] == 0
         assert diagnosis.active_channels[0].channel == 8
         assert diagnosis.active_channels[-1].channel == 13
+        assert diagnosis.channel_activity[0].initial_level == 0
+        assert diagnosis.channel_activity[-1].final_level == 0
         assert diagnosis.notes == (
             "expected_mapped_channels_flat",
             "unmapped_channels_show_activity",
@@ -136,7 +138,12 @@ class TestHub75LogicScore:
         assert diagnosis.summary.valid_hub75 is False
         assert diagnosis.diagnosis == "electrically_silent"
         assert diagnosis.active_channels == ()
-        assert diagnosis.notes == ("no_edges_on_any_captured_channel",)
+        assert diagnosis.channel_activity[2].initial_level == 1
+        assert diagnosis.channel_activity[2].final_level == 1
+        assert diagnosis.notes == (
+            "no_edges_on_any_captured_channel",
+            "static_high_channels_present",
+        )
 
 
 def _write_capture_csv(

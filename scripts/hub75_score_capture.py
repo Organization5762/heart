@@ -58,6 +58,7 @@ def _summary_payload(summary: object) -> dict[str, object]:
 def _diagnosis_payload(diagnosis: object) -> dict[str, object]:
     return {
         "diagnosis": diagnosis.diagnosis,
+        "channel_activity": [activity.__dict__.copy() for activity in diagnosis.channel_activity],
         "mapped_signal_edge_counts": dict(sorted(diagnosis.mapped_signal_edge_counts.items())),
         "active_channels": [activity.__dict__.copy() for activity in diagnosis.active_channels],
         "notes": list(diagnosis.notes),
