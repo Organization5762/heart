@@ -118,6 +118,42 @@ class TestNavigationGameModes:
         assert result is transition
         transition.is_done.assert_called_once()
 
+    def test_active_renderer_resets_finished_transition(self) -> None:
+        """Verify completed slide transitions release their frame subscriptions before returning to title rendering."""
+        game_modes = _make_game_modes(count=2)
+        transition = Mock()
+        transition.is_done.return_value = True
+        game_modes.state.sliding_transition = transition
+
+        game_modes.state.mode_offset = 0
+        result = game_modes.state.active_renderer()
+
+        assert result is game_modes.state.entries[0].title_renderer
+        transition.reset.assert_called_once_with()
+        assert game_modes.state.sliding_transition is None
+
+    def test_active_renderer_resets_replaced_transition(self) -> None:
+        """Verify quick browse inputs do not leave abandoned slide transition subscriptions alive."""
+        game_modes = _make_game_modes(count=3)
+        previous_transition = Mock()
+        game_modes.state.sliding_transition = previous_transition
+
+        with (
+            patch("heart.navigation.SlideTransitionProvider") as provider_cls,
+            patch("heart.navigation.SlideTransitionRenderer") as slide_cls,
+        ):
+            provider = Mock()
+            new_transition = Mock()
+            provider_cls.return_value = provider
+            slide_cls.return_value = new_transition
+
+            game_modes.state.mode_offset = 1
+            result = game_modes.state.active_renderer()
+
+        assert result is new_transition
+        previous_transition.reset.assert_called_once_with()
+        assert game_modes.state.sliding_transition is new_transition
+
     def test_active_renderer_zero_offset_prefers_forward_steps_when_equal(self) -> None:
         """Verify that active_renderer prefers the forward direction when offsets are symmetric. This defines deterministic behaviour so inputs feel consistent."""
         game_modes = _make_game_modes(count=4)
@@ -228,9 +264,13 @@ class TestNavigationGameModes:
         """Verify activate commits the current browse offset so logical navigation events still enter the selected mode without switch-specific state."""
         game_modes = _make_game_modes(count=3)
         game_modes.state.mode_offset = 2
+        transition = Mock()
+        game_modes.state.sliding_transition = transition
 
         game_modes._handle_activate("activate")
 
+        transition.reset.assert_called_once_with()
+        assert game_modes.state.sliding_transition is None
         assert game_modes.state._active_mode_index == 2
         assert game_modes.state.mode_offset == 0
         assert game_modes.state.in_select_mode is False
@@ -241,9 +281,13 @@ class TestNavigationGameModes:
         """Verify alternate activate resets active renderers when leaving gameplay so navigation can back out cleanly through the logical profile."""
         game_modes = _make_game_modes(count=2)
         game_modes.state.in_select_mode = False
+        transition = Mock()
+        game_modes.state.sliding_transition = transition
 
         game_modes._handle_alternate_activate("alternate_activate")
 
+        transition.reset.assert_called_once_with()
+        assert game_modes.state.sliding_transition is None
         assert game_modes.state.in_select_mode is True
         assert all(
             entry.renderer.reset_calls == 1 for entry in game_modes.state.entries
