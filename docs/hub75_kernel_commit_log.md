@@ -2,6 +2,14 @@
 
 ## 2026-05-12
 
+## 2026-05-13
+
+- `18c1e89d` `Diagnose static-rail HUB75 captures`
+
+  - Extended [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so electrically silent captures now preserve per-channel initial/final levels, which exposes static-rail failures instead of reducing them to an empty flatline diagnosis.
+  - Updated [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) and [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) so the JSON payload and regression suite both cover the new static-level instrumentation path.
+  - Recorded the same-day live PIO recapture, all-16 discovery recapture, and slow manual GPIO-toggle failure in [`docs/hub75_kernel_signal_baselines.json`](/Users/lampe/code/heart/docs/hub75_kernel_signal_baselines.json), [`docs/hub75_kernel_tuning_log.md`](/Users/lampe/code/heart/docs/hub75_kernel_tuning_log.md), and [`AGENTS.md`](/Users/lampe/code/heart/AGENTS.md), establishing that the current blocker is analyzer/probe routing rather than kernel waveform shape.
+
 - `2d50adf4` `Diagnose silent HUB75 captures`
 
   - Added whole-capture diagnosis to [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so failed capture pairs now classify silent exports separately from channel-map mismatches and generic invalid HUB75 waveforms.
