@@ -135,7 +135,17 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self.scene_controls = None
         self.input_error = False
         self.initialized = False
+        self.clock = None
+        self.width = None
+        self.height = None
+        self.individual_screen_width = None
+        self.individual_screen_height = None
+        self.screens.clear()
         self._split_view_surfaces.clear()
+        self.cached_result = None
+        self.last_params = None
+        self.cached_julia_result = None
+        self.last_julia_params = None
         # if self.state is not None:
         #     self.state.reset()
         #     self.state.set_mode_auto()
