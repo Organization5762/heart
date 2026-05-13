@@ -127,6 +127,51 @@ class TestHub75LogicScore:
             "unmapped_channels_show_activity",
         )
 
+    def test_custom_signal_map_recovers_shifted_live_capture(self, tmp_path: Path) -> None:
+        """Verify alternate CLI mappings can score a shifted capture once channels are known."""
+
+        capture_path = tmp_path / "shifted.csv"
+        _write_capture_csv(
+            capture_path,
+            _shift_rows_to_columns(_build_capture_rows(), offset=8),
+            headers=_shifted_headers(),
+        )
+
+        capture = load_hub75_logic_csv(
+            capture_path,
+            signal_map={
+                "CLK": 8,
+                "LAT": 9,
+                "OE": 10,
+                "A": 11,
+                "B": 12,
+                "C": 13,
+                "D": 14,
+                "E": 15,
+            },
+        )
+        summary = summarize_hub75_capture(capture, cols=4)
+        diagnosis = diagnose_hub75_capture(
+            capture_path,
+            signal_map={
+                "CLK": 8,
+                "LAT": 9,
+                "OE": 10,
+                "A": 11,
+                "B": 12,
+                "C": 13,
+                "D": 14,
+                "E": 15,
+            },
+            cols=4,
+        )
+
+        assert summary.valid_hub75 is True
+        assert diagnosis.diagnosis == "valid_hub75"
+        assert diagnosis.mapped_signal_edge_counts["CLK"] > 0
+        assert diagnosis.active_channels[0].channel == 8
+        assert diagnosis.active_channels[-1].channel == 13
+
     def test_capture_diagnosis_flags_global_flatline(self, tmp_path: Path) -> None:
         """Verify a capture with no edges anywhere is classified as electrically silent."""
 

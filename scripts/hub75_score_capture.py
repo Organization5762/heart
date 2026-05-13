@@ -19,16 +19,34 @@ def main() -> int:
     parser.add_argument("baseline", help="baseline Saleae raw digital CSV export")
     parser.add_argument("candidate", help="candidate Saleae raw digital CSV export")
     parser.add_argument("--cols", type=int, default=64)
+    parser.add_argument(
+        "--signal",
+        action="append",
+        default=[],
+        metavar="NAME=CHANNEL",
+        help="Override one HUB75 signal mapping entry, for example --signal CLK=9.",
+    )
     args = parser.parse_args()
+    signal_map = _parse_signal_map(args.signal)
 
     baseline, candidate, score = score_hub75_capture_files(
         args.baseline,
         args.candidate,
+        signal_map=signal_map,
         cols=args.cols,
     )
-    baseline_diagnosis = diagnose_hub75_capture(args.baseline, cols=args.cols)
-    candidate_diagnosis = diagnose_hub75_capture(args.candidate, cols=args.cols)
+    baseline_diagnosis = diagnose_hub75_capture(
+        args.baseline,
+        signal_map=signal_map,
+        cols=args.cols,
+    )
+    candidate_diagnosis = diagnose_hub75_capture(
+        args.candidate,
+        signal_map=signal_map,
+        cols=args.cols,
+    )
     payload = {
+        "signal_map": dict(sorted((signal_map or {}).items())),
         "baseline": _summary_payload(baseline),
         "baseline_diagnosis": _diagnosis_payload(baseline_diagnosis),
         "candidate": _summary_payload(candidate),
@@ -45,6 +63,26 @@ def main() -> int:
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
+
+
+def _parse_signal_map(overrides: list[str]) -> dict[str, int] | None:
+    signal_map: dict[str, int] = {}
+    for override in overrides:
+        name, separator, channel_text = override.partition("=")
+        if not separator:
+            msg = f"invalid --signal override {override!r}; expected NAME=CHANNEL"
+            raise SystemExit(msg)
+        signal_name = name.strip().upper()
+        if not signal_name:
+            msg = f"invalid --signal override {override!r}; missing signal name"
+            raise SystemExit(msg)
+        try:
+            channel = int(channel_text.strip(), 0)
+        except ValueError as error:
+            msg = f"invalid --signal override {override!r}; channel must be an integer"
+            raise SystemExit(msg) from error
+        signal_map[signal_name] = channel
+    return signal_map or None
 
 
 def _summary_payload(summary: object) -> dict[str, object]:

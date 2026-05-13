@@ -1,5 +1,46 @@
 # HUB75 Kernel Tuning Log
 
+## 2026-05-12
+
+### Live capture recheck: bench still flat, scorer now accepts explicit remaps
+
+#### What changed
+
+- Updated [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) so the CLI now accepts repeated `--signal NAME=CHANNEL` overrides and includes the resolved signal map in its JSON payload.
+- Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a regression that proves a shifted live waveform becomes `valid_hub75` once the correct channel map is supplied.
+- Recorded two fresh Logic2 MCP captures under [`/Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16`](/Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16) and [`/Users/lampe/code/heart/.captures/20260512-manual-toggle-live-all16`](/Users/lampe/code/heart/.captures/20260512-manual-toggle-live-all16).
+
+#### Live observations
+
+- `totem4` still reports the custom module loaded and the misc node present:
+  `rp1_hub75 49152 0` and `crw------- 1 root root 10,123 /dev/rp1-hub75`.
+- A fresh known-good PIO run completed on `totem4` and reported `frames=1887 submits=1887 elapsed_s=10.005 hz=188.61 words=58176 pack_us=9906`, but the corresponding all-16 Logic2 export still contains only two samples and zero edges on every captured channel:
+  [`/Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16/digital.csv`](/Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16/digital.csv).
+- A direct `pinctrl` sanity check on `totem4` does change GPIO5 locally from `lo` to `hi`, confirming the command path itself works:
+  `5: op dl pn | lo` then `5: op dh pn | hi`.
+- Even with that bench-side control path available, the fresh all-16 manual-toggle capture still exported two static rows with no observed edges and only the same static highs on Logic channels `9` and `11`:
+  [`/Users/lampe/code/heart/.captures/20260512-manual-toggle-live-all16/digital.csv`](/Users/lampe/code/heart/.captures/20260512-manual-toggle-live-all16/digital.csv).
+
+#### Interpretation
+
+- This is still not a kernel-waveform failure. It is an instrumentation failure upstream of scoring.
+- The new CLI remap support is useful once the analyzer starts seeing real edges, but today it does not change the result because there is no observed activity to remap.
+- Per [`AGENTS.md`](/Users/lampe/code/heart/AGENTS.md), more kernel tuning should wait until a deliberate channel-identification pass shows at least one measured edge on the Logic capture.
+
+#### Concrete next directions
+
+1. Run a single-channel identification pass with one GPIO toggled at a time while probing the Saleae inputs physically, starting from the stuck-high Logic channels `9` and `11`.
+1. Once one measured edge exists, use `scripts/hub75_score_capture.py --signal ...` to test alternate channel maps directly against the shifted-capture workflow before resuming kernel waveform optimization.
+1. After the analyzer path is credible again, collect the three captures in order: known-good PIO baseline, one-pin GPIO sanity pulse, then the custom-kernel candidate.
+
+#### Validation
+
+- `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
+- `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv /Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16/digital.csv`
+- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
+- `ssh michael@totem4.local 'bash -lc '"'"'set -eu; pinctrl get 5; pinctrl set 5 op dl; pinctrl get 5; pinctrl set 5 dh; pinctrl get 5; pinctrl set 5 ip pn; pinctrl get 5'\"'\"''`
+- Logic2 MCP timed captures on channels `0..15` at `125 MS/s`
+
 ## 2026-05-13
 
 ### Same-day capture-path recheck: instrumentation fault confirmed
