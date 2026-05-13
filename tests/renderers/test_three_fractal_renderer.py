@@ -35,6 +35,38 @@ class _StubRuntime:
         return None
 
 
+class _Subscription:
+    def __init__(self) -> None:
+        self.dispose_calls = 0
+
+    def dispose(self) -> None:
+        self.dispose_calls += 1
+
+
+class _SnapshotStream:
+    def __init__(self) -> None:
+        self.subscriptions: list[_Subscription] = []
+
+    def subscribe(self, **_kwargs) -> _Subscription:
+        subscription = _Subscription()
+        self.subscriptions.append(subscription)
+        return subscription
+
+
+class _SnapshotController:
+    def __init__(self) -> None:
+        self.stream = _SnapshotStream()
+
+    def snapshot_stream(self) -> _SnapshotStream:
+        return self.stream
+
+
+class _PeripheralManager:
+    def __init__(self) -> None:
+        self.keyboard_controller = _SnapshotController()
+        self.gamepad_controller = _SnapshotController()
+
+
 class TestFractalRuntime:
     """Ensure fractal runtime cleanup is explicit so OpenGL modes do not poison later renderer lifecycles."""
 
@@ -67,6 +99,56 @@ class TestFractalRuntime:
 
         window.configure_window.assert_not_called()
 
+    def test_reset_disposes_snapshot_subscriptions(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify repeated fractal entry and exit does not accumulate live input listeners."""
+        runtime = FractalRuntime()
+        window = Mock()
+        window.get_size.return_value = (64, 64)
+        window.clock = Mock()
+        manager = _PeripheralManager()
+
+        monkeypatch.setattr(
+            "heart.renderers.three_fractal.renderer.glGetString",
+            lambda _value: b"mock",
+        )
+        monkeypatch.setattr(runtime, "_render", lambda: None)
+        monkeypatch.setattr(runtime, "_center_mouse", lambda: None)
+        monkeypatch.setattr(pygame.mouse, "set_visible", lambda _visible: None)
+
+        runtime._create_initial_state(
+            window=window,
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+        runtime.reset()
+
+        keyboard_subscription = manager.keyboard_controller.stream.subscriptions[0]
+        gamepad_subscription = manager.gamepad_controller.stream.subscriptions[0]
+        assert keyboard_subscription.dispose_calls == 1
+        assert gamepad_subscription.dispose_calls == 1
+        assert runtime._input_subscriptions == []
+
+    def test_reset_deletes_owned_tiled_gl_texture(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify runtime reset releases textures allocated during fractal initialization."""
+        runtime = FractalRuntime()
+        runtime.display_texture = 11
+        deleted_textures: list[int] = []
+        monkeypatch.setattr(pygame.mouse, "set_visible", lambda _visible: None)
+        monkeypatch.setattr(
+            "heart.renderers.three_fractal.renderer.glDeleteTextures",
+            lambda textures: deleted_textures.extend(textures),
+        )
+
+        runtime.reset()
+
+        assert deleted_textures == [11]
+
     def test_reset_clears_cached_window_state(
         self,
         monkeypatch,
@@ -90,6 +172,10 @@ class TestFractalRuntime:
         runtime._auto_started = True
         visibility_calls: list[bool] = []
         monkeypatch.setattr(pygame.mouse, "set_visible", visibility_calls.append)
+        monkeypatch.setattr(
+            "heart.renderers.three_fractal.renderer.glDeleteTextures",
+            lambda *_args: None,
+        )
 
         runtime.reset()
 
@@ -115,7 +201,6 @@ class TestFractalRuntime:
         assert runtime.mat is None
         assert runtime.prevMat is None
         assert runtime.display_texture is None
-        assert runtime.framebuffer_texture is None
         assert runtime.pixels is None
 
     def test_is_initialized_rejects_partial_tiled_runtime_state(self) -> None:

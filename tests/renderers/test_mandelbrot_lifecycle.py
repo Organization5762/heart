@@ -8,6 +8,7 @@ import pygame
 
 from heart.device import Rectangle
 from heart.device.local import LocalScreen
+from heart.peripheral.core.input import MandelbrotMotionState
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.mandelbrot.control_mappings import KeyboardControls
 from heart.renderers.mandelbrot.scene import MandelbrotMode
@@ -15,7 +16,8 @@ from heart.runtime.display_context import DisplayContext
 
 
 class _Subscription:
-    def __init__(self) -> None:
+    def __init__(self, on_next=None) -> None:
+        self.on_next = on_next or (lambda _value: None)
         self.dispose_calls = 0
 
     def dispose(self) -> None:
@@ -26,8 +28,9 @@ class _Stream:
     def __init__(self) -> None:
         self.subscriptions: list[_Subscription] = []
 
-    def subscribe(self, **_kwargs) -> _Subscription:
-        subscription = _Subscription()
+    def subscribe(self, observer=None, *, on_next=None, **_kwargs) -> _Subscription:
+        callback = on_next or observer
+        subscription = _Subscription(callback)
         self.subscriptions.append(subscription)
         return subscription
 
@@ -36,6 +39,17 @@ class _MandelbrotProfile:
     def __init__(self) -> None:
         self.motion_state = _Stream()
         self.command_events = _Stream()
+
+
+class _PressedKeys:
+    def __init__(self, *pressed_keys: int) -> None:
+        self._pressed_keys = set(pressed_keys)
+
+    def __len__(self) -> int:
+        return 512
+
+    def __getitem__(self, key: int) -> bool:
+        return key in self._pressed_keys
 
 
 def _build_mandelbrot_runtime() -> tuple[
@@ -70,6 +84,39 @@ class TestMandelbrotLifecycle:
         assert profile.motion_state.subscriptions[0].dispose_calls == 1
         assert profile.command_events.subscriptions[0].dispose_calls == 1
 
+    def test_keyboard_controls_fall_back_to_current_pressed_keys(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify Mandelbrot keyboard movement still works if stream state is stale after re-entry."""
+        profile = _MandelbrotProfile()
+        scene_controls = Mock()
+        monkeypatch.setattr(pygame.event, "pump", lambda: None)
+        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys(pygame.K_d))
+
+        controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
+        controls.update()
+
+        scene_controls._move.assert_called_once_with(1.0, 0.0, multiplier=1.0)
+
+    def test_keyboard_controls_prefers_stream_motion_when_present(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify the direct keyboard fallback does not double-apply active stream motion."""
+        profile = _MandelbrotProfile()
+        scene_controls = Mock()
+        monkeypatch.setattr(pygame.event, "pump", lambda: None)
+        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys(pygame.K_d))
+
+        controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
+        profile.motion_state.subscriptions[0].on_next(
+            MandelbrotMotionState(move_x=1.0, move_multiplier=2.0)
+        )
+        controls.update()
+
+        scene_controls._move.assert_called_once_with(1.0, 0.0, multiplier=2.0)
+
     def test_reset_disposes_keyboard_controls(self) -> None:
         """Verify renderer reset releases Mandelbrot controls before the next scene entry."""
         renderer = MandelbrotMode()
@@ -77,6 +124,20 @@ class TestMandelbrotLifecycle:
         renderer.keyboard_controls = keyboard_controls
         renderer.scene_controls = Mock()
         renderer.input_error = True
+        renderer.clock = Mock()
+        renderer.width = 64
+        renderer.height = 32
+        renderer.individual_screen_width = 16
+        renderer.individual_screen_height = 32
+        renderer.screens[(0, 0)] = pygame.Surface((64, 32))
+        renderer._split_view_surfaces[(32, 32)] = (
+            pygame.Surface((32, 32)),
+            pygame.Surface((32, 32)),
+        )
+        renderer.cached_result = object()
+        renderer.last_params = object()
+        renderer.cached_julia_result = object()
+        renderer.last_julia_params = object()
 
         renderer.reset()
 
@@ -84,6 +145,17 @@ class TestMandelbrotLifecycle:
         assert renderer.keyboard_controls is None
         assert renderer.scene_controls is None
         assert renderer.input_error is False
+        assert renderer.clock is None
+        assert renderer.width is None
+        assert renderer.height is None
+        assert renderer.individual_screen_width is None
+        assert renderer.individual_screen_height is None
+        assert renderer.screens == {}
+        assert renderer._split_view_surfaces == {}
+        assert renderer.cached_result is None
+        assert renderer.last_params is None
+        assert renderer.cached_julia_result is None
+        assert renderer.last_julia_params is None
 
     def test_input_grace_period_does_not_reset_renderer(self, monkeypatch) -> None:
         """Verify the startup input grace period does not masquerade as an input-device failure."""

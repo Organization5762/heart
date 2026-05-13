@@ -748,6 +748,48 @@ class TestMandelbrotControlProfile:
             envelope.stream_name == "mandelbrot.command" for envelope in tap.snapshot()
         )
 
+    def test_motion_state_uses_gamepad_snapshot_without_keyboard_tick(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify gamepad movement is not blocked waiting for derived keyboard/gamepad view streams."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
+        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: gamepad_snapshots)
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+        motion_states: list[tuple[float, float, float, float]] = []
+
+        profile.motion_state.subscribe(
+            lambda state: motion_states.append(
+                (state.move_x, state.move_y, state.pan_x, state.pan_y)
+            )
+        )
+
+        gamepad_snapshots.emit(
+            _gamepad_snapshot(
+                dpad=GamepadDpadValue(x=1, y=-1),
+                axes={
+                    GamepadAxis.LEFT_X: 0.5,
+                    GamepadAxis.LEFT_Y: -0.25,
+                    GamepadAxis.RIGHT_X: 0.6,
+                    GamepadAxis.RIGHT_Y: -0.7,
+                    GamepadAxis.TRIGGER_LEFT: 0.0,
+                    GamepadAxis.TRIGGER_RIGHT: 0.0,
+                },
+                timestamp_monotonic=2.0,
+            )
+        )
+
+        assert motion_states[-1] == (1.5, 1.25, 0.6, 0.7)
+
 
 class TestAccelerometerDebugProfile:
     """Group accelerometer debug-profile tests so keyboard motion debugging stays deterministic across scenes."""
