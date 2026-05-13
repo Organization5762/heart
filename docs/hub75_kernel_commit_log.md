@@ -4,6 +4,12 @@
 
 ## 2026-05-13
 
+- `f0e59843` `Add HUB75 signal-map scoring override`
+
+  - Updated [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) so the scorer CLI now accepts repeated `--signal NAME=CHANNEL` overrides and reports the resolved signal map in its JSON payload.
+  - Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with a regression that proves a shifted capture becomes `valid_hub75` once the correct channel map is supplied.
+  - Recorded the fresh May 12, 2026 PIO and manual-toggle flatline captures in [`docs/hub75_kernel_tuning_log.md`](/Users/lampe/code/heart/docs/hub75_kernel_tuning_log.md) and [`docs/hub75_kernel_signal_baselines.json`](/Users/lampe/code/heart/docs/hub75_kernel_signal_baselines.json), preserving the current bench-side blocker and the next concrete channel-identification step.
+
 - `18c1e89d` `Diagnose static-rail HUB75 captures`
 
   - Extended [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so electrically silent captures now preserve per-channel initial/final levels, which exposes static-rail failures instead of reducing them to an empty flatline diagnosis.
