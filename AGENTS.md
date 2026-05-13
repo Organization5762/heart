@@ -9,3 +9,4 @@
 
 ## Recurring Bench Issues
 - Saleae Logic2 capture can fail with `Cannot switch sessions while recording`. Before capture-based HUB75 validation, stop or close the active Logic2 recording session so connector-driven captures can start cleanly.
+- Repo-local Saleae capture preflight can fail when the selected interpreter lacks the `saleae` package or no local Logic app is installed. Run preflight before trusting a dead CSV, and use whole-capture diagnostics to separate a silent export from a bad channel map.

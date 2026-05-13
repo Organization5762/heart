@@ -2,6 +2,41 @@
 
 ## 2026-05-12
 
+### Capture diagnosis split: silent export vs map mismatch
+
+#### What changed
+
+- Added whole-capture diagnosis helpers to [`src/heart/utilities/hub75_logic_score.py`](/Users/lampe/code/heart/src/heart/utilities/hub75_logic_score.py) so failed `0..1` similarity runs now distinguish:
+  - `electrically_silent`
+  - `possible_channel_map_mismatch`
+  - `invalid_hub75_waveform`
+- Extended [`tests/utilities/test_hub75_logic_score.py`](/Users/lampe/code/heart/tests/utilities/test_hub75_logic_score.py) with explicit regressions for a globally silent CSV and a synthetically shifted live waveform on unmapped channels.
+- Updated [`scripts/hub75_score_capture.py`](/Users/lampe/code/heart/scripts/hub75_score_capture.py) to emit those diagnoses alongside the existing similarity payload.
+
+#### Live observations
+
+- The local Logic automation preflight still fails in this environment:
+  - Python package `saleae` missing in the selected interpreter
+  - no local Logic app found in the standard install paths
+- The saved artifacts in [`/Users/lampe/code/heart/.captures`](/Users/lampe/code/heart/.captures) remain unusable as electrical baselines, but the new diagnosis is more specific than before:
+  - [`20260512-pio-baseline/digital.csv`](/Users/lampe/code/heart/.captures/20260512-pio-baseline/digital.csv) diagnoses as `electrically_silent`
+  - [`20260512-rp1h-bridge/digital.csv`](/Users/lampe/code/heart/.captures/20260512-rp1h-bridge/digital.csv) diagnoses as `electrically_silent`
+  - [`20260512-all-channels/digital.csv`](/Users/lampe/code/heart/.captures/20260512-all-channels/digital.csv) also shows zero edges across every captured column, so the current saved exports are not merely suffering from a `0..6` signal-map mismatch inside the CSV itself
+- That means the immediate artifact problem is upstream of the scorer:
+  either the Saleae session/export path captured no real transitions, or the probe/run timing did not coincide with a live drive window.
+
+#### Interpretation
+
+- The scorer is now strong enough to reject two distinct false positives:
+  dead-capture similarity and live-but-miswired channel maps.
+- For the current saved artifacts, the result is the first case, not the second one. The next measurement loop therefore needs a fresh capture path more than another scoring tweak.
+
+#### Validation
+
+- `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
+- `./.venv/bin/python scripts/hub75_score_capture.py .captures/20260512-pio-baseline/digital.csv .captures/20260512-rp1h-bridge/digital.csv`
+- `./.venv/bin/python -c "from pathlib import Path; import sys; sys.path.insert(0, str(Path('src').resolve())); from heart.utilities.hub75_logic_score import summarize_logic_channels; print(summarize_logic_channels('.captures/20260512-all-channels/digital.csv')[:8])"`
+
 ### Flatline baseline rejection
 
 #### What changed
@@ -95,8 +130,8 @@
 ### Next experiments
 
 1. Restore or replace local Logic automation so the new scorer can compare a fresh PIO capture against a fresh `rp1-hub75` capture.
-2. Fix `/dev/rp1-hub75` access semantics for non-root runtime use, either with a device-mode policy or a userspace wrapper that is explicit and reproducible.
-3. Once capture is live, run the red-only kernel submitter and the known-good PIO submitter through the same CSV scorer, then optimize the kernel path for `>=1000 Hz` without regressing control ordering or clock-shape similarity.
+1. Fix `/dev/rp1-hub75` access semantics for non-root runtime use, either with a device-mode policy or a userspace wrapper that is explicit and reproducible.
+1. Once capture is live, run the red-only kernel submitter and the known-good PIO submitter through the same CSV scorer, then optimize the kernel path for `>=1000 Hz` without regressing control ordering or clock-shape similarity.
 
 ### Validation
 
@@ -167,8 +202,8 @@
    - validates queued `STATE32`
    - copies the pending slot's plane data into RP1 shared SRAM at `0xc000`
    - calls `RP1H_SIGNAL_VSYNC` after each copy
-2. Run that bridge against the existing `state32-...` core1 worker while the red-only submitter queues frames through `/dev/rp1-hub75`.
-3. Once Logic2 capture is unblocked, score that bridged waveform against the known-good PIO baseline with the existing scorer.
+1. Run that bridge against the existing `state32-...` core1 worker while the red-only submitter queues frames through `/dev/rp1-hub75`.
+1. Once Logic2 capture is unblocked, score that bridged waveform against the known-good PIO baseline with the existing scorer.
 
 ### Validation
 
@@ -205,10 +240,10 @@
 ### Next implementation directions
 
 1. Fix the Saleae probe/channel mapping before treating any new live similarity score as meaningful. The quickest next move is a deliberate channel-identification pass, not more waveform tuning.
-2. Once capture is trustworthy, record a one-plane PIO baseline and a one-plane bridged-kernel capture under the same threshold/channel map, then score those with the existing `0..1` harness.
-3. If the live one-plane waveform is clean, move the bridge boundary inward:
+1. Once capture is trustworthy, record a one-plane PIO baseline and a one-plane bridged-kernel capture under the same threshold/channel map, then score those with the existing `0..1` harness.
+1. If the live one-plane waveform is clean, move the bridge boundary inward:
    either expose the pending slot more explicitly in the UAPI header or land an RP1-side/in-kernel consumer so the queue no longer depends on a polling userspace copier.
-4. After the one-plane bridge is electrically proven, revisit higher PWM publication, because the current `0xc000` publication workaround is only sized for the one-plane bring-up shape.
+1. After the one-plane bridge is electrically proven, revisit higher PWM publication, because the current `0xc000` publication workaround is only sized for the one-plane bring-up shape.
 
 ### Validation
 

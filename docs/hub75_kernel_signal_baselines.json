@@ -5,10 +5,10 @@
     {
       "name": "pio_known_good_red_pending_capture",
       "kind": "pio",
-      "status": "pending-capture",
-      "capture_csv": null,
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-pio-baseline/digital.csv",
       "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'",
-      "notes": "No saved PIO logic capture was found in the local trees during this run, and local Saleae automation was not available for a fresh capture."
+      "notes": "A saved CSV now exists locally, but the new diagnosis path classifies it as electrically silent with zero edges on every captured column, so it is not yet a valid baseline."
     },
     {
       "name": "direct_rio_bootstrap_reference",
@@ -20,10 +20,17 @@
     {
       "name": "rp1_hub75_live_kernel_waveform",
       "kind": "kernel",
-      "status": "blocked-no-pin-ownership",
-      "capture_csv": null,
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-rp1h-bridge/digital.csv",
       "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'",
-      "notes": "The current /dev/rp1-hub75 route queues and software-presents frames, but pinctrl still shows the HUB75 pins in PIO mux mode while it runs, so there is no fresh electrical capture to score yet."
+      "notes": "The bridged kernel route has a saved CSV locally, but that export is also electrically silent across every captured column, so it cannot yet serve as a live similarity candidate."
+    },
+    {
+      "name": "all_channel_probe_sanity_capture",
+      "kind": "diagnostic",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-all-channels/digital.csv",
+      "notes": "The all-channel discovery export is also electrically silent, which argues against a simple 0..6 signal-map mistake inside the existing saved CSVs."
     }
   ]
 }

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 from bisect import bisect_left, bisect_right
 from collections.abc import Mapping, Sequence
-import csv
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
@@ -51,6 +51,16 @@ class Hub75LogicCapture:
 
 
 @dataclass(frozen=True)
+class LogicChannelActivity:
+    """Per-channel edge summary for whole-capture diagnostics."""
+
+    channel: int
+    edge_count: int
+    rise_count: int
+    fall_count: int
+
+
+@dataclass(frozen=True)
 class Hub75SignalSummary:
     """Condensed timing and ordering metrics for one capture."""
 
@@ -79,6 +89,17 @@ class Hub75SimilarityScore:
     timing_similarity: float
     address_similarity: float
     feature_scores: dict[str, float]
+
+
+@dataclass(frozen=True)
+class Hub75CaptureDiagnosis:
+    """Explain whether an invalid capture looks silent or mis-mapped."""
+
+    summary: Hub75SignalSummary
+    diagnosis: str
+    active_channels: tuple[LogicChannelActivity, ...]
+    mapped_signal_edge_counts: dict[str, int]
+    notes: tuple[str, ...]
 
 
 def load_hub75_logic_csv(
@@ -196,6 +217,67 @@ def summarize_hub75_capture(
     )
 
 
+def diagnose_hub75_capture(
+    path: str | Path,
+    *,
+    signal_map: Mapping[str, int] | None = None,
+    cols: int = 64,
+) -> Hub75CaptureDiagnosis:
+    """Classify whether a capture is valid, silent, or likely channel-mismapped."""
+
+    capture = load_hub75_logic_csv(path, signal_map)
+    summary = summarize_hub75_capture(capture, cols=cols)
+    all_channel_activity = summarize_logic_channels(path)
+    mapped_edge_counts = {
+        signal: len(capture.edges[channel])
+        for signal, channel in capture.signal_map.items()
+    }
+    active_channels = tuple(
+        activity for activity in all_channel_activity if activity.edge_count > 0
+    )
+
+    if summary.valid_hub75:
+        return Hub75CaptureDiagnosis(
+            summary=summary,
+            diagnosis="valid_hub75",
+            active_channels=active_channels,
+            mapped_signal_edge_counts=mapped_edge_counts,
+            notes=(),
+        )
+
+    mapped_channels = set(capture.signal_map.values())
+    unexpected_active_channels = tuple(
+        activity for activity in active_channels if activity.channel not in mapped_channels
+    )
+    mapped_edge_total = sum(mapped_edge_counts.values())
+    if mapped_edge_total == 0 and unexpected_active_channels:
+        return Hub75CaptureDiagnosis(
+            summary=summary,
+            diagnosis="possible_channel_map_mismatch",
+            active_channels=active_channels,
+            mapped_signal_edge_counts=mapped_edge_counts,
+            notes=(
+                "expected_mapped_channels_flat",
+                "unmapped_channels_show_activity",
+            ),
+        )
+    if not active_channels:
+        return Hub75CaptureDiagnosis(
+            summary=summary,
+            diagnosis="electrically_silent",
+            active_channels=(),
+            mapped_signal_edge_counts=mapped_edge_counts,
+            notes=("no_edges_on_any_captured_channel",),
+        )
+    return Hub75CaptureDiagnosis(
+        summary=summary,
+        diagnosis="invalid_hub75_waveform",
+        active_channels=active_channels,
+        mapped_signal_edge_counts=mapped_edge_counts,
+        notes=summary.validity_issues,
+    )
+
+
 def score_hub75_similarity(
     baseline: Hub75SignalSummary,
     candidate: Hub75SignalSummary,
@@ -299,6 +381,43 @@ def score_hub75_capture_files(
     candidate_summary = summarize_hub75_capture(candidate_capture, cols=cols)
     score = score_hub75_similarity(baseline_summary, candidate_summary)
     return baseline_summary, candidate_summary, score
+
+
+def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ...]:
+    """Return edge counts for every captured CSV column, regardless of mapping."""
+
+    activities: list[LogicChannelActivity] = []
+    with Path(path).open(newline="") as handle:
+        rows = csv.reader(handle)
+        header = next(rows)
+        channel_count = len(header) - 1
+        previous_state: list[int] | None = None
+        edges = [0] * channel_count
+        rises = [0] * channel_count
+        falls = [0] * channel_count
+        for row in rows:
+            state = [int(value) for value in row[1 : 1 + channel_count]]
+            if previous_state is not None:
+                for channel, (old, new) in enumerate(zip(previous_state, state, strict=True)):
+                    if old == new:
+                        continue
+                    edges[channel] += 1
+                    if new:
+                        rises[channel] += 1
+                    else:
+                        falls[channel] += 1
+            previous_state = state
+
+    for channel in range(channel_count):
+        activities.append(
+            LogicChannelActivity(
+                channel=channel,
+                edge_count=edges[channel],
+                rise_count=rises[channel],
+                fall_count=falls[channel],
+            )
+        )
+    return tuple(sorted(activities, key=lambda activity: (-activity.edge_count, activity.channel)))
 
 
 def _resolve_signal_map(

@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from heart.utilities.hub75_logic_score import score_hub75_capture_files
+from heart.utilities.hub75_logic_score import diagnose_hub75_capture
 
 
 def main() -> int:
@@ -25,9 +26,13 @@ def main() -> int:
         args.candidate,
         cols=args.cols,
     )
+    baseline_diagnosis = diagnose_hub75_capture(args.baseline, cols=args.cols)
+    candidate_diagnosis = diagnose_hub75_capture(args.candidate, cols=args.cols)
     payload = {
         "baseline": _summary_payload(baseline),
+        "baseline_diagnosis": _diagnosis_payload(baseline_diagnosis),
         "candidate": _summary_payload(candidate),
+        "candidate_diagnosis": _diagnosis_payload(candidate_diagnosis),
         "score": {
             "total": round(score.total, 6),
             "control_similarity": round(score.control_similarity, 6),
@@ -48,6 +53,15 @@ def _summary_payload(summary: object) -> dict[str, object]:
         sorted(summary_dict["address_edges_per_lat"].items())
     )
     return summary_dict
+
+
+def _diagnosis_payload(diagnosis: object) -> dict[str, object]:
+    return {
+        "diagnosis": diagnosis.diagnosis,
+        "mapped_signal_edge_counts": dict(sorted(diagnosis.mapped_signal_edge_counts.items())),
+        "active_channels": [activity.__dict__.copy() for activity in diagnosis.active_channels],
+        "notes": list(diagnosis.notes),
+    }
 
 
 if __name__ == "__main__":

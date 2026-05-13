@@ -5,12 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from heart.utilities.hub75_logic_score import (
-    load_hub75_logic_csv,
-    score_hub75_similarity,
-    summarize_hub75_capture,
-)
-
+from heart.utilities.hub75_logic_score import (diagnose_hub75_capture,
+                                               load_hub75_logic_csv,
+                                               score_hub75_similarity,
+                                               summarize_hub75_capture)
 
 DEFAULT_HEADERS = ("Time [s]", "CLK", "LAT", "OE", "A", "B", "C", "D", "E")
 
@@ -105,11 +103,51 @@ class TestHub75LogicScore:
         assert score.feature_scores["validity_gate"] == 0.0
         assert score.total == 0.0
 
+    def test_capture_diagnosis_flags_unmapped_live_channels(self, tmp_path: Path) -> None:
+        """Verify live edges on unexpected channels are classified as a map mismatch."""
 
-def _write_capture_csv(path: Path, rows: list[tuple[float, list[int]]]) -> None:
+        capture_path = tmp_path / "shifted.csv"
+        _write_capture_csv(
+            capture_path,
+            _shift_rows_to_columns(_build_capture_rows(), offset=8),
+            headers=_shifted_headers(),
+        )
+
+        diagnosis = diagnose_hub75_capture(capture_path, cols=4)
+
+        assert diagnosis.summary.valid_hub75 is False
+        assert diagnosis.diagnosis == "possible_channel_map_mismatch"
+        assert diagnosis.mapped_signal_edge_counts["CLK"] == 0
+        assert diagnosis.active_channels[0].channel == 8
+        assert diagnosis.active_channels[-1].channel == 13
+        assert diagnosis.notes == (
+            "expected_mapped_channels_flat",
+            "unmapped_channels_show_activity",
+        )
+
+    def test_capture_diagnosis_flags_global_flatline(self, tmp_path: Path) -> None:
+        """Verify a capture with no edges anywhere is classified as electrically silent."""
+
+        capture_path = tmp_path / "flatline.csv"
+        _write_capture_csv(capture_path, _build_flatline_rows())
+
+        diagnosis = diagnose_hub75_capture(capture_path, cols=4)
+
+        assert diagnosis.summary.valid_hub75 is False
+        assert diagnosis.diagnosis == "electrically_silent"
+        assert diagnosis.active_channels == ()
+        assert diagnosis.notes == ("no_edges_on_any_captured_channel",)
+
+
+def _write_capture_csv(
+    path: Path,
+    rows: list[tuple[float, list[int]]],
+    *,
+    headers: tuple[str, ...] = DEFAULT_HEADERS,
+) -> None:
     with path.open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(DEFAULT_HEADERS)
+        writer.writerow(headers)
         for timestamp, state in rows:
             writer.writerow([f"{timestamp:.9f}", *state])
 
@@ -174,3 +212,37 @@ def _address_state(row: int) -> dict[str, int]:
 
 def _column_index(name: str) -> int:
     return DEFAULT_HEADERS.index(name) - 1
+
+
+def _shifted_headers() -> tuple[str, ...]:
+    return (
+        "Time [s]",
+        "X0",
+        "X1",
+        "X2",
+        "X3",
+        "X4",
+        "X5",
+        "X6",
+        "X7",
+        "CLK",
+        "LAT",
+        "OE",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+    )
+
+
+def _shift_rows_to_columns(
+    rows: list[tuple[float, list[int]]],
+    *,
+    offset: int,
+) -> list[tuple[float, list[int]]]:
+    shifted_rows: list[tuple[float, list[int]]] = []
+    for timestamp, state in rows:
+        shifted_state = [0] * offset + state
+        shifted_rows.append((timestamp, shifted_state))
+    return shifted_rows
