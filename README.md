@@ -28,11 +28,20 @@ The runtime packages two Typer CLIs: `totem` orchestrates configuration loading,
    ```
 4. Launch the default playlist with the Beats UI attached:
    ```bash
-   uv run totem run-beats --configuration lib_2025
+   uv run totem run --configuration lib_2025 --with-beats
    ```
 5. Launch a different playlist:
    ```bash
    make run RUN_CONFIGURATION=your_configuration
+   ```
+6. Launch the Beats UI locally against a runtime already running on a Raspberry Pi:
+
+   ```bash
+   # On the Pi
+   make run
+
+   # On your laptop
+   uv run totem run --with-beats --remote-runtime --beats-runtime-host totem.local
    ```
 
 ## Command-Line Interfaces
@@ -46,7 +55,8 @@ Key `totem run` flags:
 
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
-- `totem run-beats --configuration <name>` launches the streamed totem runtime and the Beats Electron UI together, wiring `FORWARD_TO_BEATS_APP=1` and `VITE_BEATS_WEBSOCKET_URL=ws://localhost:8765` automatically.
+- `totem run --with-beats --configuration <name>` launches the streamed totem runtime and a LAN-visible Beats web UI together, wiring `FORWARD_TO_BEATS_APP=1`, `BEATS_WEBSOCKET_BIND_HOST=0.0.0.0`, and a Vite dev server on `http://localhost:5173`.
+- `totem run --with-beats --remote-runtime --beats-runtime-host totem.local` launches only the browser-served Beats UI and points it at an existing runtime websocket on the Pi.
 
 ## Architecture Summary
 
@@ -72,7 +82,7 @@ See the following references for deeper analysis:
 ## Development Workflow
 
 - `make install` sets up the editable package and dev extras using `uv`.
-- `make run` starts `uv run totem run --configuration lib_2025`; override with `RUN_CONFIGURATION=<name>`.
+- `make run` starts `uv run totem run --configuration lib_2025` with Beats streaming enabled on `0.0.0.0:8765`; override with `RUN_CONFIGURATION=<name>`.
 - `make format` applies Ruff, isort, Black, docformatter, and mdformat; run before committing.
 - `make test` executes the pytest suite.
 - `make check` verifies formatting and linting without applying fixes.

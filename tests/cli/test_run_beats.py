@@ -11,10 +11,11 @@ from typer.testing import CliRunner
 
 from heart import loop
 from heart.cli.commands import run as run_module
-from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENV_VAR,
+from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_HOST_ENV_VAR,
+                                          BEATS_WEBSOCKET_PORT_ENV_VAR,
+                                          BEATS_WEBSOCKET_URL_ENV_VAR,
                                           FORWARD_TO_BEATS_ENV_VAR,
-                                          build_beats_env,
-                                          build_beats_websocket_url,
+                                          build_beats_web_env,
                                           build_totem_run_command,
                                           ensure_beats_dependencies,
                                           resolve_beats_workspace)
@@ -44,13 +45,18 @@ class TestRunBeatsCommandBuilders:
             "--no-add-low-power-mode",
         ]
 
-    def test_build_beats_env_sets_websocket_url(self) -> None:
-        """Verify the Beats app receives a websocket URL so the UI can attach to the runtime stream immediately on boot."""
+    def test_build_beats_web_env_sets_websocket_host_and_port(self) -> None:
+        """Verify the Beats web app receives websocket settings so it can attach to the runtime stream immediately on boot."""
 
-        websocket_url = build_beats_websocket_url()
-        env = build_beats_env({"PATH": "/bin"}, websocket_url=websocket_url)
+        env = build_beats_web_env(
+            {"PATH": "/bin", BEATS_WEBSOCKET_URL_ENV_VAR: "ws://stale:8765"},
+            websocket_host="totem.local",
+            websocket_port=9876,
+        )
 
-        assert env[BEATS_WEBSOCKET_ENV_VAR] == websocket_url
+        assert env[BEATS_WEBSOCKET_HOST_ENV_VAR] == "totem.local"
+        assert env[BEATS_WEBSOCKET_PORT_ENV_VAR] == "9876"
+        assert BEATS_WEBSOCKET_URL_ENV_VAR not in env
         assert env["PATH"] == "/bin"
 
     def test_resolve_beats_workspace_uses_repo_root_for_relative_paths(self) -> None:
@@ -133,34 +139,44 @@ class TestEnsureBeatsDependencies:
 
 
 class TestRunCommandWithBeats:
-    """Validate the opt-in Beats CLI path so default runtime startup stays independent from the UI bundle."""
+    """Validate the opt-in Beats web CLI path so default runtime startup stays independent from the UI bundle."""
 
     def test_run_command_dispatches_to_beats_only_when_requested(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify `--with-beats` delegates into the Beats launcher so the UI starts only for explicitly requested sessions."""
+        """Verify `--with-beats` delegates into the Beats web launcher so the UI starts only for explicitly requested sessions."""
 
         recorded_call: dict[str, object] = {}
 
-        def _fake_run_beats_command(
+        def _fake_run_beats_web_command(
             *,
             configuration: str,
             add_low_power_mode: bool,
             install_beats_deps: bool,
+            local_runtime: bool,
+            beats_runtime_host: str,
+            beats_runtime_port: int,
             beats_workspace: Path,
+            web_host: str,
+            web_port: int,
         ) -> None:
             recorded_call.update(
                 {
                     "configuration": configuration,
                     "add_low_power_mode": add_low_power_mode,
                     "install_beats_deps": install_beats_deps,
+                    "local_runtime": local_runtime,
+                    "beats_runtime_host": beats_runtime_host,
+                    "beats_runtime_port": beats_runtime_port,
                     "beats_workspace": beats_workspace,
+                    "web_host": web_host,
+                    "web_port": web_port,
                 }
             )
 
         monkeypatch.setattr(
-            "heart.cli.commands.run_beats.run_beats_command",
-            _fake_run_beats_command,
+            "heart.cli.commands.run_beats.run_beats_web_command",
+            _fake_run_beats_web_command,
         )
 
         result = runner.invoke(
@@ -182,11 +198,16 @@ class TestRunCommandWithBeats:
             "configuration": "lib_2025",
             "add_low_power_mode": False,
             "install_beats_deps": False,
+            "local_runtime": True,
+            "beats_runtime_host": "localhost",
+            "beats_runtime_port": 8765,
             "beats_workspace": Path("/tmp/beats"),
+            "web_host": "0.0.0.0",
+            "web_port": 5173,
         }
 
     def test_cli_exposes_run_beats_subcommand(self) -> None:
-        """Verify the top-level CLI advertises the documented Beats quick-start command."""
+        """Verify the top-level CLI advertises the documented Beats web quick-start command."""
 
         result = runner.invoke(loop.app, ["--help"])
 
@@ -196,7 +217,7 @@ class TestRunCommandWithBeats:
     def test_run_beats_subcommand_dispatches_to_launcher(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify `totem run-beats` uses the supervised runtime-plus-UI launcher."""
+        """Verify `totem run-beats` uses the supervised runtime-plus-web-UI launcher."""
 
         recorded_call: dict[str, object] = {}
 
@@ -245,6 +266,7 @@ class TestRunCommandWithBeats:
             "--no-add-low-power-mode",
         ]
         assert recorded_call["beats_workspace"] == Path("/tmp/beats")
+        assert recorded_call["ui_label"] == "Beats Web UI"
 
     def test_run_command_skips_beats_launcher_by_default(
         self, monkeypatch: pytest.MonkeyPatch
@@ -257,14 +279,14 @@ class TestRunCommandWithBeats:
             lambda: _FakeResolver(),
         )
 
-        def _unexpected_run_beats_command(**kwargs: object) -> None:
+        def _unexpected_run_beats_web_command(**kwargs: object) -> None:
             raise AssertionError(
                 "run_beats_command should not execute without --with-beats"
             )
 
         monkeypatch.setattr(
-            "heart.cli.commands.run_beats.run_beats_command",
-            _unexpected_run_beats_command,
+            "heart.cli.commands.run_beats.run_beats_web_command",
+            _unexpected_run_beats_web_command,
         )
 
         run_module.run_command()
@@ -298,7 +320,7 @@ class TestRunCommandWithBeats:
 
         recorded_call: dict[str, object] = {}
 
-        def _fake_run_beats_command(**kwargs: object) -> None:
+        def _fake_run_beats_web_command(**kwargs: object) -> None:
             recorded_call.update(kwargs)
 
         monkeypatch.setenv(
@@ -306,13 +328,32 @@ class TestRunCommandWithBeats:
             "rubiks_connected_x_visualizer",
         )
         monkeypatch.setattr(
-            "heart.cli.commands.run_beats.run_beats_command",
-            _fake_run_beats_command,
+            "heart.cli.commands.run_beats.run_beats_web_command",
+            _fake_run_beats_web_command,
         )
 
         run_module.run_command(with_beats=True)
 
         assert recorded_call["configuration"] == "rubiks_connected_x_visualizer"
+
+    def test_run_command_keeps_with_beats_web_as_alias(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the old web-specific flag stays as a compatibility alias after Beats becomes web-only."""
+
+        recorded_call: dict[str, object] = {}
+
+        def _fake_run_beats_web_command(**kwargs: object) -> None:
+            recorded_call.update(kwargs)
+
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_beats_web_command",
+            _fake_run_beats_web_command,
+        )
+
+        run_module.run_command(with_beats_web=True)
+
+        assert recorded_call["configuration"] == "lib_2025"
 
 
 class _FakeResolver:

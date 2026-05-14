@@ -10,7 +10,7 @@
         worker-src 'self' blob:;
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
-        connect-src 'self' https://cdn.jsdelivr.net ws://localhost:5173 http://localhost:5173 ws://localhost:8765 http://localhost:8765;
+        connect-src 'self' https://cdn.jsdelivr.net http: https: ws: wss:;
         font-src 'self' data:;
       "
     />

@@ -19,6 +19,8 @@ DEFAULT_IGNORE_PATTERNS=(
   ".ruff_cache/"
   ".mypy_cache/"
   "node_modules/"
+  "experimental/"
+  "rust/"
   "target/"
   ".vite/"
   "dist/"

@@ -4,26 +4,45 @@ import os
 import signal
 import subprocess
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
+                                            DEFAULT_BEATS_RUNTIME_HOST,
+                                            DEFAULT_BEATS_RUNTIME_PORT,
+                                            DEFAULT_BEATS_WEB_HOST,
+                                            DEFAULT_BEATS_WEB_PORT,
                                             DEFAULT_BEATS_WORKSPACE,
                                             DEFAULT_CONFIGURATION,
                                             DEFAULT_INSTALL_BEATS_DEPS,
+                                            DEFAULT_LOCAL_BEATS_RUNTIME,
                                             resolve_configuration_name)
-from heart.device.beats.websocket import WEBSOCKET_HOST, WEBSOCKET_PORT
+from heart.device.beats.websocket import DEFAULT_WEBSOCKET_HOST
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_BEATS_START_SCRIPT = "start"
+DEFAULT_BEATS_WEB_START_SCRIPT = "web"
 FORWARD_TO_BEATS_ENV_VAR = "FORWARD_TO_BEATS_APP"
-BEATS_WEBSOCKET_ENV_VAR = "VITE_BEATS_WEBSOCKET_URL"
+BEATS_WEBSOCKET_HOST_ENV_VAR = "VITE_BEATS_WEBSOCKET_HOST"
+BEATS_WEBSOCKET_PORT_ENV_VAR = "VITE_BEATS_WEBSOCKET_PORT"
+BEATS_WEBSOCKET_URL_ENV_VAR = "VITE_BEATS_WEBSOCKET_URL"
+RUNTIME_WEBSOCKET_PORT_ENV_VAR = "BEATS_WEBSOCKET_PORT"
+WEBSOCKET_BIND_HOST_ENV_VAR = "BEATS_WEBSOCKET_BIND_HOST"
+LAN_BIND_HOST = "0.0.0.0"
 PROCESS_POLL_INTERVAL_SECONDS = 0.5
 PROCESS_SHUTDOWN_TIMEOUT_SECONDS = 5.0
+_SIGHUP = getattr(signal, "SIGHUP", None)
+SIGNAL_EXIT_CODES = {
+    signal.SIGINT: 130,
+    signal.SIGTERM: 143,
+}
+if _SIGHUP is not None:
+    SIGNAL_EXIT_CODES[_SIGHUP] = 129
 
 
 def run_beats_command(
@@ -40,10 +59,53 @@ def run_beats_command(
         "--install-beats-deps/--no-install-beats-deps",
         help="Install Beats node dependencies when node_modules is missing.",
     ),
+    local_runtime: bool = typer.Option(
+        DEFAULT_LOCAL_BEATS_RUNTIME,
+        "--local-runtime/--remote-runtime",
+        help="Start the local runtime or connect the Beats UI to an already running runtime.",
+    ),
+    beats_runtime_host: str = typer.Option(
+        DEFAULT_BEATS_RUNTIME_HOST,
+        "--beats-runtime-host",
+        help="Hostname the Beats UI should use when opening the runtime websocket.",
+    ),
+    beats_runtime_port: int = typer.Option(
+        DEFAULT_BEATS_RUNTIME_PORT,
+        "--beats-runtime-port",
+        min=1,
+        help="Port the Beats UI should use when opening the runtime websocket.",
+    ),
     beats_workspace: Annotated[
         Path, typer.Option("--beats-workspace")
     ] = DEFAULT_BEATS_WORKSPACE,
 ) -> None:
+    """Launch the browser-served Beats UI and, by default, a local runtime."""
+
+    run_beats_web_command(
+        configuration=configuration,
+        add_low_power_mode=add_low_power_mode,
+        install_beats_deps=install_beats_deps,
+        local_runtime=local_runtime,
+        beats_runtime_host=beats_runtime_host,
+        beats_runtime_port=beats_runtime_port,
+        beats_workspace=beats_workspace,
+    )
+
+
+def run_beats_web_command(
+    *,
+    configuration: str = DEFAULT_CONFIGURATION,
+    add_low_power_mode: bool = DEFAULT_ADD_LOW_POWER_MODE,
+    install_beats_deps: bool = DEFAULT_INSTALL_BEATS_DEPS,
+    local_runtime: bool = DEFAULT_LOCAL_BEATS_RUNTIME,
+    beats_runtime_host: str = DEFAULT_BEATS_RUNTIME_HOST,
+    beats_runtime_port: int = DEFAULT_BEATS_RUNTIME_PORT,
+    beats_workspace: Path = DEFAULT_BEATS_WORKSPACE,
+    web_host: str = DEFAULT_BEATS_WEB_HOST,
+    web_port: int = DEFAULT_BEATS_WEB_PORT,
+) -> None:
+    """Launch the browser-served Beats UI."""
+
     configuration = resolve_configuration_name(configuration)
     repo_root = resolve_repo_root()
     resolved_beats_workspace = resolve_beats_workspace(repo_root, beats_workspace)
@@ -58,23 +120,46 @@ def run_beats_command(
         )
         raise typer.Exit(code=1)
 
-    websocket_url = build_beats_websocket_url()
-    runtime_command = build_totem_run_command(
-        configuration=configuration,
-        add_low_power_mode=add_low_power_mode,
+    beats_command = build_beats_web_command(host=web_host, port=web_port)
+    beats_env = build_beats_web_env(
+        os.environ.copy(),
+        websocket_host=beats_runtime_host,
+        websocket_port=beats_runtime_port,
     )
-    beats_command = build_beats_start_command()
-    runtime_env = build_runtime_env(os.environ.copy())
-    beats_env = build_beats_env(os.environ.copy(), websocket_url=websocket_url)
+    logger.info(
+        "Beats web UI will be served on http://localhost:%d. Use your machine's LAN IP with the same port from another device on the same Wi-Fi.",
+        web_port,
+    )
 
-    exit_code = run_supervised_processes(
-        repo_root=repo_root,
-        runtime_command=runtime_command,
-        runtime_env=runtime_env,
-        beats_workspace=resolved_beats_workspace,
-        beats_command=beats_command,
-        beats_env=beats_env,
-    )
+    if local_runtime:
+        runtime_command = build_totem_run_command(
+            configuration=configuration,
+            add_low_power_mode=add_low_power_mode,
+        )
+        runtime_env = build_runtime_env(
+            os.environ.copy(),
+            websocket_bind_host=LAN_BIND_HOST,
+            websocket_port=beats_runtime_port,
+        )
+        exit_code = run_supervised_processes(
+            repo_root=repo_root,
+            runtime_command=runtime_command,
+            runtime_env=runtime_env,
+            beats_workspace=resolved_beats_workspace,
+            beats_command=beats_command,
+            beats_env=beats_env,
+            ui_label="Beats Web UI",
+            startup_message=(
+                "Starting Beats Web UI. Open the served URL in a desktop browser or on a phone connected to the same Wi-Fi network."
+            ),
+        )
+    else:
+        exit_code = run_single_process(
+            process_label="Beats Web UI",
+            command=beats_command,
+            cwd=resolved_beats_workspace,
+            env=beats_env,
+        )
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
 
@@ -150,12 +235,6 @@ def ensure_beats_dependencies(beats_workspace: Path) -> None:
     raise typer.Exit(code=result.returncode)
 
 
-def build_beats_websocket_url() -> str:
-    """Build the websocket URL expected by the Beats UI."""
-
-    return f"ws://{WEBSOCKET_HOST}:{WEBSOCKET_PORT}"
-
-
 def build_totem_run_command(
     *,
     configuration: str,
@@ -169,29 +248,56 @@ def build_totem_run_command(
     return command
 
 
-def build_beats_start_command() -> list[str]:
-    """Build the command that launches the Beats Electron app."""
+def build_beats_web_command(*, host: str, port: int) -> list[str]:
+    """Build the command that launches the browser-served Beats UI."""
 
-    return ["npm", "run", DEFAULT_BEATS_START_SCRIPT]
+    return [
+        "npm",
+        "run",
+        DEFAULT_BEATS_WEB_START_SCRIPT,
+        "--",
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--strictPort",
+    ]
 
 
-def build_runtime_env(base_env: dict[str, str]) -> dict[str, str]:
+def build_runtime_env(
+    base_env: dict[str, str],
+    *,
+    websocket_bind_host: str | None = None,
+    websocket_port: int | None = None,
+) -> dict[str, str]:
     """Prepare runtime environment variables for Beats forwarding."""
 
     runtime_env = dict(base_env)
     runtime_env[FORWARD_TO_BEATS_ENV_VAR] = "1"
+    if websocket_bind_host is not None:
+        runtime_env[WEBSOCKET_BIND_HOST_ENV_VAR] = websocket_bind_host
+    if websocket_port is not None:
+        runtime_env[RUNTIME_WEBSOCKET_PORT_ENV_VAR] = str(websocket_port)
     return runtime_env
 
 
-def build_beats_env(
+def build_beats_web_env(
     base_env: dict[str, str],
     *,
-    websocket_url: str,
+    websocket_host: str,
+    websocket_port: int,
 ) -> dict[str, str]:
-    """Prepare Beats environment variables for websocket connectivity."""
+    """Prepare web Beats environment variables for websocket connectivity."""
 
     beats_env = dict(base_env)
-    beats_env[BEATS_WEBSOCKET_ENV_VAR] = websocket_url
+    beats_env[BEATS_WEBSOCKET_PORT_ENV_VAR] = str(websocket_port)
+
+    if websocket_host not in {DEFAULT_WEBSOCKET_HOST, "127.0.0.1"}:
+        beats_env[BEATS_WEBSOCKET_HOST_ENV_VAR] = websocket_host
+    else:
+        beats_env.pop(BEATS_WEBSOCKET_HOST_ENV_VAR, None)
+
+    beats_env.pop(BEATS_WEBSOCKET_URL_ENV_VAR, None)
     return beats_env
 
 
@@ -203,14 +309,19 @@ def run_supervised_processes(
     beats_workspace: Path,
     beats_command: list[str],
     beats_env: dict[str, str],
+    ui_label: str = "Beats UI",
+    startup_message: str | None = None,
 ) -> int:
-    """Launch the runtime and Beats UI together and stop both when either exits."""
+    """Launch the runtime and a Beats-facing UI together."""
 
     logger.info("Starting totem runtime: %s", " ".join(runtime_command))
     runtime_process = spawn_process(runtime_command, cwd=repo_root, env=runtime_env)
+    beats_process: subprocess.Popen[bytes] | None = None
 
     try:
-        logger.info("Starting Beats UI: %s", " ".join(beats_command))
+        if startup_message is not None:
+            logger.info(startup_message)
+        logger.info("Starting %s: %s", ui_label, " ".join(beats_command))
         beats_process = spawn_process(
             beats_command,
             cwd=beats_workspace,
@@ -220,25 +331,62 @@ def run_supervised_processes(
         terminate_process(runtime_process)
         raise
 
-    try:
-        while True:
-            runtime_return_code = runtime_process.poll()
-            if runtime_return_code is not None:
-                logger.info("Totem runtime exited with code %d", runtime_return_code)
-                return runtime_return_code
+    with install_supervisor_signal_handlers() as received_signal:
+        try:
+            while True:
+                runtime_return_code = runtime_process.poll()
+                if runtime_return_code is not None:
+                    logger.info("Totem runtime exited with code %d", runtime_return_code)
+                    return runtime_return_code
 
-            beats_return_code = beats_process.poll()
-            if beats_return_code is not None:
-                logger.info("Beats UI exited with code %d", beats_return_code)
-                return beats_return_code
+                assert beats_process is not None
+                beats_return_code = beats_process.poll()
+                if beats_return_code is not None:
+                    logger.info("%s exited with code %d", ui_label, beats_return_code)
+                    return beats_return_code
 
-            time.sleep(PROCESS_POLL_INTERVAL_SECONDS)
-    except KeyboardInterrupt:
-        logger.info("Stopping totem runtime and Beats UI.")
-        return 130
-    finally:
-        terminate_process(beats_process)
-        terminate_process(runtime_process)
+                time.sleep(PROCESS_POLL_INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            logger.info(
+                "Stopping totem runtime and %s after %s.",
+                ui_label,
+                signal_name(received_signal),
+            )
+            return signal_exit_code(received_signal)
+        finally:
+            if beats_process is not None:
+                terminate_process(beats_process)
+            terminate_process(runtime_process)
+
+
+def run_single_process(
+    *,
+    process_label: str,
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str],
+) -> int:
+    """Launch one long-running process and keep it alive until it exits."""
+
+    logger.info("Starting %s: %s", process_label, " ".join(command))
+    process = spawn_process(command, cwd=cwd, env=env)
+    with install_supervisor_signal_handlers() as received_signal:
+        try:
+            while True:
+                return_code = process.poll()
+                if return_code is not None:
+                    logger.info("%s exited with code %d", process_label, return_code)
+                    return return_code
+                time.sleep(PROCESS_POLL_INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            logger.info(
+                "Stopping %s after %s.",
+                process_label,
+                signal_name(received_signal),
+            )
+            return signal_exit_code(received_signal)
+        finally:
+            terminate_process(process)
 
 
 def spawn_process(
@@ -249,12 +397,18 @@ def spawn_process(
 ) -> subprocess.Popen[bytes]:
     """Spawn a long-running subprocess in its own process group."""
 
+    popen_kwargs: dict[str, object] = {
+        "cwd": cwd,
+        "env": env,
+    }
+    if os.name == "posix":
+        popen_kwargs["process_group"] = 0
+    else:
+        popen_kwargs["start_new_session"] = True
     try:
         return subprocess.Popen(
             command,
-            cwd=cwd,
-            env=env,
-            start_new_session=True,
+            **popen_kwargs,
         )
     except OSError:
         logger.exception("Failed to launch process: %s", " ".join(command))
@@ -264,18 +418,71 @@ def spawn_process(
 def terminate_process(process: subprocess.Popen[bytes]) -> None:
     """Terminate a process tree without leaving child processes behind."""
 
-    if process.poll() is not None:
-        return
-
     try:
         if hasattr(os, "killpg"):
             os.killpg(process.pid, signal.SIGTERM)
         else:
+            if process.poll() is not None:
+                return
             process.terminate()
         process.wait(timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS)
+    except ProcessLookupError:
+        return
     except subprocess.TimeoutExpired:
         if hasattr(os, "killpg"):
-            os.killpg(process.pid, signal.SIGKILL)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return
         else:
             process.kill()
         process.wait(timeout=PROCESS_SHUTDOWN_TIMEOUT_SECONDS)
+
+
+def _normalize_signal(signum: int | list[int] | None) -> int | None:
+    if isinstance(signum, list):
+        if not signum:
+            return None
+        return signum[-1]
+    return signum
+
+
+def signal_name(signum: int | list[int] | None) -> str:
+    signum = _normalize_signal(signum)
+    if signum is None:
+        return "KeyboardInterrupt"
+    try:
+        return signal.Signals(signum).name
+    except ValueError:
+        return f"signal {signum}"
+
+
+def signal_exit_code(signum: int | list[int] | None) -> int:
+    signum = _normalize_signal(signum)
+    if signum is None:
+        return 130
+    return SIGNAL_EXIT_CODES.get(signum, 128 + signum)
+
+
+@contextmanager
+def install_supervisor_signal_handlers() -> Iterator[list[int]]:
+    received: list[int] = []
+    handled_signals = [signal.SIGINT, signal.SIGTERM]
+    if _SIGHUP is not None:
+        handled_signals.append(_SIGHUP)
+
+    previous_handlers: dict[int, object] = {}
+
+    def _handle_signal(signum: int, _frame: object) -> None:
+        received.append(signum)
+        raise KeyboardInterrupt
+
+    for handled_signal in handled_signals:
+        previous_handlers[handled_signal] = signal.getsignal(handled_signal)
+        signal.signal(handled_signal, _handle_signal)
+
+    try:
+        yield received
+    finally:
+        for handled_signal, previous_handler in previous_handlers.items():
+            signal.signal(handled_signal, previous_handler)

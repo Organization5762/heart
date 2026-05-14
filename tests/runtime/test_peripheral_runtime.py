@@ -53,6 +53,14 @@ class _WebSocketStub:
         self.control_handler = handler
 
 
+class _TemporaryRendererLoop:
+    def __init__(self) -> None:
+        self.clear_count = 0
+
+    def clear_temporary_renderer(self) -> None:
+        self.clear_count += 1
+
+
 class TestPeripheralRuntimeStreaming:
     """Exercise peripheral runtime stream bridging so Beats receives structured reconnect-safe peripheral payloads."""
 
@@ -188,3 +196,22 @@ class TestPeripheralRuntimeStreaming:
             ("set", "accelerometer:debug:z", 12.5),
             ("clear", "accelerometer:debug:z", None),
         ]
+
+    def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:
+        """Verify image clear controls remove a transient phone image instead of leaving stale artwork on screen."""
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+        loop = _TemporaryRendererLoop()
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.get_active_game_loop",
+            lambda: loop,
+        )
+
+        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        assert websocket.control_handler is not None
+
+        websocket.control_handler(ControlMessage(command="image_update", clear=True))
+        runtime._drain_control_messages()
+
+        assert loop.clear_count == 1
