@@ -24,16 +24,6 @@ INITIALIZATION_DELAY_SECONDS = 1.5
 DEFAULT_JOYSTICK_ID = 0
 DEFAULT_AXIS_DEAD_ZONE = 0.0
 DEFAULT_AXIS_THRESHOLD = 0.0
-RAW_LOG_AXIS_THRESHOLD = 0.05
-JOYSTICK_EVENT_TYPES = (
-    pygame.JOYAXISMOTION,
-    pygame.JOYBALLMOTION,
-    pygame.JOYHATMOTION,
-    pygame.JOYBUTTONUP,
-    pygame.JOYBUTTONDOWN,
-    pygame.JOYDEVICEADDED,
-    pygame.JOYDEVICEREMOVED,
-)
 DEFAULT_BLUETOOTH_GAMEPAD_MACS = (
     "E4:17:D8:37:C3:40",
     "E4:17:D8:37:FE:88",
@@ -125,9 +115,6 @@ class Gamepad(Peripheral[Any]):
 
         self._last_lifecycle_status: str | None = None
         self._last_bluetooth_connect_attempt: float | None = None
-        self._last_logged_raw_state: tuple[
-            tuple[int, ...], tuple[tuple[str, float], ...], tuple[float, float]
-        ] | None = None
 
     def is_held(self, button_id: int) -> bool:
         return self._pressed_curr_frame[button_id]
@@ -208,8 +195,6 @@ class Gamepad(Peripheral[Any]):
         if not self.joystick:
             return
 
-        self._log_pygame_joystick_events()
-
         # Refresh Pygame's internal event queue so that joystick state is up-to-date
         # Without this, axes may appear stuck at their previous values (often -1),
         # and button states may not change, leading to the behaviour where the
@@ -253,44 +238,6 @@ class Gamepad(Peripheral[Any]):
                 t0 = self._press_time.pop(axis_key, None)
                 if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
                     self._tap_flag[axis_key] = True
-
-        active_buttons = tuple(
-            button_id
-            for button_id in range(self.num_buttons)
-            if self._pressed_curr_frame[button_id]
-        )
-        active_axes = tuple(
-            sorted(
-                (
-                    axis_key,
-                    round(axis_value, 2),
-                )
-                for axis_key, axis_value in self._axis_curr_frame.items()
-                if abs(axis_value) >= RAW_LOG_AXIS_THRESHOLD
-            )
-        )
-        raw_state = (active_buttons, active_axes, self._dpad_curr_frame)
-        if raw_state != self._last_logged_raw_state:
-            self._last_logged_raw_state = raw_state
-            logger.info(
-                "Gamepad raw state name=%s buttons=%s axes=%s hat=%s",
-                self.joystick.get_name(),
-                active_buttons,
-                active_axes,
-                self._dpad_curr_frame,
-            )
-
-    def _log_pygame_joystick_events(self) -> None:
-        for event in pygame.event.get(JOYSTICK_EVENT_TYPES):
-            logger.info(
-                "Gamepad pygame event type=%s attrs=%s",
-                pygame.event.event_name(event.type),
-                {
-                    key: value
-                    for key, value in event.__dict__.items()
-                    if key != "type"
-                },
-            )
 
     @classmethod
     def detect(cls) -> Iterator[Self]:
