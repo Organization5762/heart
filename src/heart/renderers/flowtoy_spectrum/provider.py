@@ -41,7 +41,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
 
         )
         tick_updates = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .map(
                 lambda frame_tick: (
                     lambda state: self._advance(state, frame_tick.delta_s)

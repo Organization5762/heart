@@ -3,27 +3,22 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import (CombineLatestNode, Graph, MergeNode, StreamNode,
-                      TypedRoute)
+from manyfold import CombineLatestNode, Graph, StreamNode, TypedRoute
 
-from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import CompositeSubscription
-from heart.peripheral.sensor import (Acceleration, Accelerometer,
-                                     FakeAccelerometer)
+from heart.peripheral.sensor import Acceleration
 from heart.utilities.env import Configuration
 
 if TYPE_CHECKING:
     from heart.peripheral.core.input.frame import FrameTickController
     from heart.peripheral.core.input.keyboard import KeyboardController
-    from heart.peripheral.core.manager import PeripheralManager
 ACCELEROMETER_POLL_INTERVAL_MS = 10
 DEBUG_ACCEL_SCALE = 1.5
 DEBUG_ACCEL_Z_BIAS = 0.7
@@ -59,40 +54,21 @@ class AccelerometerMergeNode:
 
 
 class AccelerometerController:
-    def __init__(self, manager: "PeripheralManager", debug_tap: InputDebugTap) -> None:
-        self._manager = manager
-        self._debug_tap = debug_tap
-        self._graph = manager.graph
+    def __init__(
+        self,
+        *,
+        graph: Graph,
+        source_stream: StreamNode[Acceleration],
+    ) -> None:
+        self._graph = graph
+        self._source_stream = source_stream
         self._stream = GraphRouteStream[Acceleration](self._graph, ACCELERATION_ROUTE)
         self._merge_subscription: CompositeSubscription | None = None
-
-    @cached_property
-    def _source_observable(self) -> StreamNode[Acceleration]:
-        streams = [
-            peripheral.observe
-            for peripheral in self._manager.peripherals
-            if isinstance(peripheral, (Accelerometer, FakeAccelerometer))
-        ]
-        if not streams:
-            return empty_node()
-        merged = (
-            MergeNode.merge(*streams)
-            .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)
-            .filter(lambda value: value is not None)
-            .map(lambda value: cast(Acceleration, value))
-
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.RAW,
-            stream_name="accelerometer.vector",
-            source_id="accelerometer",
-        ).connect(merged)
 
     def node(self) -> GraphRouteStream[Acceleration]:
         if self._merge_subscription is None:
             self._merge_subscription = AccelerometerMergeNode(
-                source_streams=(self._source_observable,),
+                source_streams=(self._source_stream,),
                 output_route=ACCELERATION_ROUTE,
             ).install(self._graph)
         return self._stream

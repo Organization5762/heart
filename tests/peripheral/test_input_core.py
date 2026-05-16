@@ -6,21 +6,19 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pygame
-from manyfold import ConstantNode, Graph
+from manyfold import ConstantNode, Graph, StreamNode
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile,
+from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
                                          ExternalSensorHub, FrameTick,
                                          FrameTickController, GamepadAxis,
                                          GamepadButton, GamepadButtonTapEvent,
                                          GamepadController, GamepadDpadValue,
                                          GamepadSnapshot, InputDebugStage,
-                                         InputDebugTap, KeyboardController,
-                                         KeyboardSnapshot,
+                                         InputDebugTap, InputIO,
+                                         KeyboardController, KeyboardSnapshot,
                                          MandelbrotControlProfile,
-                                         NavigationProfile,
                                          SetOrientationCommand,
                                          ToggleDebugCommand)
 from heart.peripheral.core.input.accelerometer import (
@@ -32,7 +30,7 @@ from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
 from heart.peripheral.sensor import Acceleration, FakeAccelerometer
-from heart.peripheral.switch import SwitchState
+from heart.peripheral.switch import BaseSwitch, SwitchState
 
 
 class _StubClock:
@@ -57,6 +55,15 @@ class _ConfigurationLoaderStub:
 class _NoopSubscription:
     def dispose(self) -> None:
         pass
+
+
+class _SwitchProbe(BaseSwitch):
+    def __init__(self, stream: EventStream[SwitchState]) -> None:
+        super().__init__()
+        self._stream = stream
+
+    def _event_stream(self) -> StreamNode[SwitchState]:
+        return self._stream.observable()
 
 
 class _ImmediateTimerNode:
@@ -450,18 +457,13 @@ class TestNavigationProfile:
         monkeypatch,
     ) -> None:
         """Verify equivalent keyboard and gamepad inputs emit the same navigation outputs so scene navigation remains device-agnostic."""
-        tap = InputDebugTap()
-        keyboard = KeyboardController(tap)
-        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
+        tap = io.debug_tap
         keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
         gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
-        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
-        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: gamepad_snapshots)
-        profile = NavigationProfile(
-            keyboard_controller=keyboard,
-            gamepad_controller=gamepad,
-            debug_tap=tap,
-        )
+        monkeypatch.setattr(io.keyboard, "snapshot_stream", lambda: keyboard_snapshots)
+        monkeypatch.setattr(io.gamepad, "snapshot_stream", lambda: gamepad_snapshots)
+        profile = io.navigation
         intents: list[tuple[str, str, int]] = []
         browse: list[int] = []
         activate: list[str] = []
@@ -540,16 +542,12 @@ class TestNavigationProfile:
 
     def test_profile_maps_switch_edges_to_logical_navigation_events(self) -> None:
         """Verify switch rotation and button edges flow into the shared navigation profile so switch-only deployments still browse and activate scenes."""
-        tap = InputDebugTap()
-        keyboard = KeyboardController(tap)
-        gamepad = GamepadController(manager=object(), debug_tap=tap)
         switch_updates: EventStream[SwitchState] = EventStream()
-        profile = NavigationProfile(
-            keyboard_controller=keyboard,
-            gamepad_controller=gamepad,
-            debug_tap=tap,
-            switch_stream_factory=lambda: switch_updates,
+        io = InputIO(
+            graph=Graph(),
+            peripheral_source=lambda: (_SwitchProbe(switch_updates),),
         )
+        profile = io.navigation
         intents: list[tuple[str, str, int]] = []
 
         profile.intents.subscribe(
@@ -575,16 +573,12 @@ class TestNavigationProfile:
 
     def test_subscribe_events_binds_requested_navigation_handlers(self) -> None:
         """Verify subscribe_events wires the requested logical handlers in one place so navigation consumers do not duplicate subscription setup."""
-        tap = InputDebugTap()
-        keyboard = KeyboardController(tap)
-        gamepad = GamepadController(manager=object(), debug_tap=tap)
         switch_updates: EventStream[SwitchState] = EventStream()
-        profile = NavigationProfile(
-            keyboard_controller=keyboard,
-            gamepad_controller=gamepad,
-            debug_tap=tap,
-            switch_stream_factory=lambda: switch_updates,
+        io = InputIO(
+            graph=Graph(),
+            peripheral_source=lambda: (_SwitchProbe(switch_updates),),
         )
+        profile = io.navigation
         browse: list[int] = []
         activate: list[str] = []
         alternate: list[str] = []
@@ -738,7 +732,6 @@ class TestAccelerometerDebugProfile:
         monkeypatch,
     ) -> None:
         """Verify physical accelerometer input is exposed through a graph route handle instead of only a raw stream."""
-        tap = InputDebugTap()
         accelerometer = FakeAccelerometer()
         source: EventStream[Acceleration | None] = EventStream()
         monkeypatch.setattr(accelerometer, "_event_stream", lambda: source)
@@ -747,16 +740,16 @@ class TestAccelerometerDebugProfile:
         )
         manager.register(accelerometer)
         graph = manager.graph
-        controller = AccelerometerController(manager=manager, debug_tap=tap)
         observed: list[Acceleration] = []
 
-        controller.node().subscribe(observed.append)
+        manager.input_io.physical_acceleration().subscribe(observed.append)
         source.emit(Acceleration(x=1.0, y=2.0, z=3.0))
 
         assert observed == [Acceleration(x=1.0, y=2.0, z=3.0)]
         latest = graph.latest(ACCELERATION_ROUTE)
         assert latest is not None
         assert latest.value == observed[-1]
+        assert isinstance(manager.input_io, InputIO)
 
     def test_profile_emits_keyboard_tilt_and_space_impulse(
         self,

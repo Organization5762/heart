@@ -28,7 +28,7 @@ class TestChannelDiffusionRenderer:
             initial_center, np.array([255, 255, 255], dtype=np.uint8)
         )
 
-        manager.frame_tick_controller.advance(clock)
+        manager.input_io.frame_ticks.advance(clock)
         renderer._internal_process(window, manager, orientation)
 
         expected = np.zeros((3, 3, 3), dtype=np.uint8)

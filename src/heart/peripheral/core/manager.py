@@ -5,14 +5,7 @@ from manyfold import Graph
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile,
-                                         ExternalSensorHub,
-                                         FrameTickController,
-                                         GamepadController, InputDebugTap,
-                                         KeyboardController,
-                                         MandelbrotControlProfile,
-                                         NavigationProfile)
+from heart.peripheral.core.input import InputIO
 from heart.peripheral.core.streams import GraphRouteStream, PeripheralStreams
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
@@ -48,37 +41,9 @@ class PeripheralManager:
             )
         )
         self._streams = PeripheralStreams(self._graph, self._iter_peripherals)
-        self._debug_tap = InputDebugTap()
-        self._frame_tick_controller = FrameTickController(
-            self._debug_tap,
+        self._input_io = InputIO(
             graph=self._graph,
-        )
-        self._keyboard_controller = KeyboardController(self._debug_tap)
-        self._gamepad_controller = GamepadController(self, self._debug_tap)
-        self._external_sensor_hub = ExternalSensorHub(
-            self._debug_tap, graph=self._graph
-        )
-        self._navigation_profile = NavigationProfile(
-            keyboard_controller=self._keyboard_controller,
-            gamepad_controller=self._gamepad_controller,
-            debug_tap=self._debug_tap,
-            switch_stream_factory=self.get_physical_main_switch_subscription,
-        )
-        self._accelerometer_controller = AccelerometerController(
-            manager=self,
-            debug_tap=self._debug_tap,
-        )
-        self._accelerometer_debug_profile = AccelerometerDebugProfile(
-            keyboard_controller=self._keyboard_controller,
-            frame_tick_controller=self._frame_tick_controller,
-            debug_tap=self._debug_tap,
-            external_sensor_hub=self._external_sensor_hub,
-            graph=self._graph,
-        )
-        self._mandelbrot_control_profile = MandelbrotControlProfile(
-            keyboard_controller=self._keyboard_controller,
-            gamepad_controller=self._gamepad_controller,
-            debug_tap=self._debug_tap,
+            peripheral_source=self._iter_peripherals,
         )
 
     @property
@@ -155,14 +120,6 @@ class PeripheralManager:
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
 
-    def get_main_switch_subscription(self) -> Any:
-        return self._streams.main_switch_subscription()
-
-    def get_physical_main_switch_subscription(
-        self,
-    ) -> Any:
-        return self._streams.physical_main_switch_subscription()
-
     def bluetooth_switch(self) -> BluetoothSwitch | None:
         for peripheral in self._peripherals:
             if isinstance(peripheral, BluetoothSwitch):
@@ -188,37 +145,5 @@ class PeripheralManager:
         return self._streams.clock
 
     @property
-    def debug_tap(self) -> InputDebugTap:
-        return self._debug_tap
-
-    @property
-    def frame_tick_controller(self) -> FrameTickController:
-        return self._frame_tick_controller
-
-    @property
-    def keyboard_controller(self) -> KeyboardController:
-        return self._keyboard_controller
-
-    @property
-    def gamepad_controller(self) -> GamepadController:
-        return self._gamepad_controller
-
-    @property
-    def navigation_profile(self) -> NavigationProfile:
-        return self._navigation_profile
-
-    @property
-    def external_sensor_hub(self) -> ExternalSensorHub:
-        return self._external_sensor_hub
-
-    @property
-    def accelerometer_controller(self) -> AccelerometerController:
-        return self._accelerometer_controller
-
-    @property
-    def accelerometer_debug_profile(self) -> AccelerometerDebugProfile:
-        return self._accelerometer_debug_profile
-
-    @property
-    def mandelbrot_control_profile(self) -> MandelbrotControlProfile:
-        return self._mandelbrot_control_profile
+    def input_io(self) -> InputIO:
+        return self._input_io

@@ -45,7 +45,7 @@ class PeripheralRuntime:
 
         ws = websocket or _build_websocket()
         ws.set_control_handler(self._handle_control_message)
-        self._peripheral_manager.debug_tap.observable().subscribe(
+        self._peripheral_manager.input_io.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
                 kind="peripheral",
                 payload=self._streaming_envelope(envelope),
@@ -53,7 +53,7 @@ class PeripheralRuntime:
         )
 
     def _handle_control_message(self, control_message: Any) -> None:
-        navigation = self._peripheral_manager.navigation_profile
+        navigation = self._peripheral_manager.input_io.navigation
         if control_message.command == CONTROL_COMMAND_BROWSE:
             navigation.inject_browse(
                 control_message.browse_step,
@@ -69,7 +69,7 @@ class PeripheralRuntime:
             )
             return
         if control_message.command == CONTROL_COMMAND_SENSOR_UPDATE:
-            external_sensor_hub = self._peripheral_manager.external_sensor_hub
+            external_sensor_hub = self._peripheral_manager.input_io.external_sensors
             sensor_key = control_message.sensor_key
             if sensor_key is None:
                 return
@@ -108,7 +108,7 @@ class PeripheralRuntime:
         drain_frame_thread_queue()
         if self._peripheral_manager.clock.value is None:
             return
-        self._peripheral_manager.frame_tick_controller.advance(
+        self._peripheral_manager.input_io.frame_ticks.advance(
             self._peripheral_manager.clock.value
         )
         self._peripheral_manager.game_tick.on_next(True)

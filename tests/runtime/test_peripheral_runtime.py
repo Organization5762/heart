@@ -11,9 +11,14 @@ from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
 
 class _PeripheralManagerStub:
     def __init__(self) -> None:
+        self.input_io = _InputIOStub()
+
+
+class _InputIOStub:
+    def __init__(self) -> None:
         self.debug_tap = InputDebugTap()
-        self.navigation_profile = _NavigationProfileStub()
-        self.external_sensor_hub = _ExternalSensorHubStub()
+        self.navigation = _NavigationProfileStub()
+        self.external_sensors = _ExternalSensorHubStub()
 
 
 class _NavigationProfileStub:
@@ -88,7 +93,7 @@ class TestPeripheralRuntimeStreaming:
         websocket = _WebSocketStub()
 
         runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
-        manager.debug_tap.publish(
+        manager.input_io.debug_tap.publish(
             stage=InputDebugStage.RAW,
             stream_name="switch.tick",
             source_id="switch-1",
@@ -124,7 +129,7 @@ class TestPeripheralRuntimeStreaming:
         websocket.control_handler(ControlMessage(command="activate"))
         websocket.control_handler(ControlMessage(command="alternate_activate"))
 
-        assert manager.navigation_profile.injected == [
+        assert manager.input_io.navigation.injected == [
             ("browse", 2, "beats.control.browse"),
             ("activate", 0, "beats.control.activate"),
             ("alternate_activate", 0, "beats.control.alternate"),
@@ -156,7 +161,7 @@ class TestPeripheralRuntimeStreaming:
             )
         )
 
-        assert manager.external_sensor_hub.updates == [
+        assert manager.input_io.external_sensors.updates == [
             ("set", "accelerometer:debug:z", 12.5),
             ("clear", "accelerometer:debug:z", None),
         ]

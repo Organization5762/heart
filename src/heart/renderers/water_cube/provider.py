@@ -1,8 +1,6 @@
 from manyfold import StreamNode
 
 from heart.device import Device
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
@@ -12,21 +10,17 @@ from heart.renderers.water_cube.state import WaterCubeState
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
     def __init__(
         self,
-        accelerometer_controller: AccelerometerController,
-        accelerometer_debug_profile: AccelerometerDebugProfile,
         device: Device,
     ):
-        self._accelerometer_controller = accelerometer_controller
-        self._accelerometer_debug_profile = accelerometer_debug_profile
         self.device = device
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[WaterCubeState]:
-        if self._accelerometer_debug_profile.should_use_debug_input():
-            accel = self._accelerometer_debug_profile.observable()
-        else:
-            accel = self._accelerometer_controller.observable()
+        if peripheral_manager is None:
+            msg = "WaterCubeStateProvider requires a PeripheralManager"
+            raise ValueError(msg)
+        accel = peripheral_manager.input_io.active_acceleration()
 
         def update_state(prev: WaterCubeState, acceleration: Acceleration):
             return prev._step(

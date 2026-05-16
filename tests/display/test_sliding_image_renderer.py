@@ -21,7 +21,7 @@ def test_reset_preserves_cached_surface(
     renderer = SlidingImage("banner.png", speed=4)
     manager.window.on_next(window)
     renderer.initialize(window, manager, orientation)
-    manager.frame_tick_controller.advance(clock)
+    manager.input_io.frame_ticks.advance(clock)
 
     initial_state = renderer.state
     assert initial_state.width == window.get_width()
@@ -30,7 +30,7 @@ def test_reset_preserves_cached_surface(
 
     window.fill((0, 0, 0, 0))
     offset_before = renderer.state.offset
-    manager.frame_tick_controller.advance(clock)
+    manager.input_io.frame_ticks.advance(clock)
     renderer._internal_process(window, manager, orientation)
     processed_state = renderer.state
     assert (
@@ -46,12 +46,12 @@ def test_reset_preserves_cached_surface(
     after_reset_state = renderer.state
     assert after_reset_state.offset == after_reset_state.speed
     assert after_reset_state.speed == 4
-    manager.frame_tick_controller.advance(clock)
+    manager.input_io.frame_ticks.advance(clock)
     assert renderer.state.width == processed_state.width
 
     window.fill((0, 0, 0, 0))
     offset_before_second = renderer.state.offset
-    manager.frame_tick_controller.advance(clock)
+    manager.input_io.frame_ticks.advance(clock)
     renderer._internal_process(window, manager, orientation)
     after_second_process_state = renderer.state
     assert (

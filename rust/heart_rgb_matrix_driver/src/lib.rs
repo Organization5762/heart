@@ -23,6 +23,10 @@ pub use crate::runtime::{
     PackedScanFrameStats, Pi5ScanConfig, Pi5ScanTiming, Pi5SimpleProbeMode, Pi5SimpleProbeSession,
     Rp1Hub75PresentStats, Rp1Hub75Stats, Rp1Hub75WorkerStatus, WiringProfile as ProbeWiringProfile,
 };
+pub use crate::runtime::{
+    ColorOrder as RuntimeColorOrder, MatrixDriverCore as RuntimeMatrixDriver,
+    MatrixDriverError as RuntimeMatrixDriverError,
+};
 
 fn to_py_runtime_error(error: MatrixDriverError) -> PyErr {
     match error {

@@ -1,5 +1,9 @@
+use std::sync::OnceLock;
+
 use super::types::Pi5ScanConfig;
 const RAW_PIN_WORD_SHIFT: u32 = 0;
+static RAW_WORD_NO_SHIFT: OnceLock<bool> = OnceLock::new();
+static TERMINAL_BLANK_TICKS: OnceLock<usize> = OnceLock::new();
 
 pub(crate) fn build_raw_group_words_for_rgba(
     config: &Pi5ScanConfig,
@@ -94,7 +98,29 @@ fn repeat_word(words: &mut Vec<u32>, word: u32, count: usize) {
 }
 
 fn raw_word_to_out_word(word: u32) -> u32 {
-    (word & 0x0fff_ffff) << 4
+    let word = word & 0x0fff_ffff;
+    if *RAW_WORD_NO_SHIFT.get_or_init(|| {
+        std::env::var("HEART_PI5_SIMPLE_SCAN_RAW_WORD_NO_SHIFT")
+            .map(|value| value != "0")
+            .unwrap_or(false)
+    }) {
+        word
+    } else {
+        word << 4
+    }
+}
+
+pub(crate) fn terminal_blank_ticks() -> usize {
+    *TERMINAL_BLANK_TICKS.get_or_init(|| {
+        std::env::var("HEART_PI5_SIMPLE_SCAN_TERMINAL_BLANK_TICKS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0)
+    })
+}
+
+pub(crate) fn terminal_blank_word_for_config(config: &Pi5ScanConfig) -> u32 {
+    raw_word_to_out_word(config.pinout().oe_inactive_bits(RAW_PIN_WORD_SHIFT))
 }
 
 fn scan_pixel_bits(

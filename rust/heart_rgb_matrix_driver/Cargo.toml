@@ -28,6 +28,10 @@ name = "rp1_hub75_stats"
 path = "src/bin/rp1_hub75_stats.rs"
 
 [[bin]]
+name = "rp1_hub75_color_loop"
+path = "src/bin/rp1_hub75_color_loop.rs"
+
+[[bin]]
 name = "stub_gen"
 path = "src/bin/stub_gen.rs"
 required-features = ["stubgen"]

@@ -258,10 +258,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         self.shader.set(self.sphere_radius_var, self.BASE_RADIUS)
         self.last_frame_time = time.monotonic()
-        peripheral_manager.keyboard_controller.snapshot_stream().subscribe(
+        peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
             on_next=self._set_keyboard_snapshot
         )
-        peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
+        peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
             on_next=self._set_gamepad_snapshot
         )
         return FractalRuntimeState(peripheral_manager=peripheral_manager)

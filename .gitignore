@@ -19,6 +19,7 @@ node_modules
 .heart
 .hypothesis
 **/target
+.captures
 
 # Native extension build outputs must be built per target platform.
 *.abi3.so

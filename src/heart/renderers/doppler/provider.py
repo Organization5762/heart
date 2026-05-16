@@ -75,7 +75,7 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[DopplerState]:
         frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable()
+            self._peripheral_manager.input_io.frame_tick_stream()
         )
         initial_state = self._initial_state()
 

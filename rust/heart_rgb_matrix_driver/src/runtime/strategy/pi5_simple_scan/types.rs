@@ -1,6 +1,9 @@
 use std::time::{Duration, Instant};
 
-use super::experimental::{build_raw_group_words_for_rgba, raw_group_word_count};
+use super::experimental::{
+    build_raw_group_words_for_rgba, raw_group_word_count, terminal_blank_ticks,
+    terminal_blank_word_for_config,
+};
 use crate::runtime::config::{expected_rgba_size, WiringProfile};
 use crate::runtime::pi5_pinout::Pi5ScanPinout;
 use crate::runtime::tuning::runtime_tuning;
@@ -234,6 +237,11 @@ impl PackedScanFrame {
                     plane_index,
                 )?);
             }
+        }
+        let terminal_blank_ticks = terminal_blank_ticks();
+        if terminal_blank_ticks > 0 {
+            let terminal_blank_word = terminal_blank_word_for_config(config);
+            words.extend(std::iter::repeat(terminal_blank_word).take(terminal_blank_ticks));
         }
 
         Ok((

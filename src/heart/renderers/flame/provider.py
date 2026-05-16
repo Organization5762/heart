@@ -20,7 +20,7 @@ class FlameStateProvider(ObservableProvider[FlameState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[FlameState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
         )
 
         def to_state(frame_tick: object) -> FlameState:

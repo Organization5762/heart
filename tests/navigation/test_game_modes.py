@@ -291,7 +291,7 @@ class TestNavigationGameModes:
         game_modes.set_state(GameModeState())
         window = _make_window()
         peripheral_manager = Mock()
-        peripheral_manager.navigation_profile.subscribe_events = Mock()
+        peripheral_manager.input_io.navigation.subscribe_events = Mock()
         orientation = Mock()
 
         game_modes.initialize(

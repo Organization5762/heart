@@ -100,12 +100,12 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             peripheral_manager=peripheral_manager
         )
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
         )
         if self.disable_input:
             switch_updates = empty_node()
         else:
-            switches = peripheral_manager.get_main_switch_subscription()
+            switches = peripheral_manager.input_io.main_switch_stream()
             switch_updates = switches.map(
                 lambda switch_state: (
                     lambda state: self.handle_switch(state, switch_state)

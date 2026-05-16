@@ -163,12 +163,10 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             state = GameModeState()
         if not state.post_processors:
             state.post_processors.extend(self._default_post_processors())
-        self._navigation_subscription = (
-            peripheral_manager.navigation_profile.subscribe_events(
-                on_browse_delta=self._handle_browse_delta,
-                on_activate=self._handle_activate,
-                on_alternate_activate=self._handle_alternate_activate,
-            )
+        self._navigation_subscription = peripheral_manager.input_io.navigation.subscribe_events(
+            on_browse_delta=self._handle_browse_delta,
+            on_activate=self._handle_activate,
+            on_alternate_activate=self._handle_alternate_activate,
         )
         return state
 

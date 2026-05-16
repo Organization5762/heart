@@ -79,7 +79,7 @@ class TestFlowToySpectrumStateProvider:
             )
 
             clock = stub_clock_factory(250)
-            manager.frame_tick_controller.advance(clock)
+            manager.input_io.frame_ticks.advance(clock)
         finally:
             subscription.dispose()
 

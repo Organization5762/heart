@@ -48,10 +48,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     ) -> MultiSceneState:
         state = MultiSceneState(current_button_value=0, offset_of_button_value=None)
         self.set_state(state)
-        self._navigation_subscription = (
-            peripheral_manager.navigation_profile.subscribe_events(
-                on_activate=self._process_activate,
-            )
+        self._navigation_subscription = peripheral_manager.input_io.navigation.subscribe_events(
+            on_activate=self._process_activate,
         )
 
         for scene in self.scenes:

@@ -277,7 +277,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         self, peripheral_manager: PeripheralManager, *, initial_state: HilbertCurveState
     ) -> StreamNode[HilbertCurveState]:
         return (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .map(lambda _: time.monotonic())
             .scan(lambda state, now: self.advance(state, now=now), seed=initial_state)
             .start_with(initial_state)

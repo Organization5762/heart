@@ -35,14 +35,24 @@ fn main() -> Result<(), String> {
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|value| *value >= 1)
         .unwrap_or(1);
+    let pwm_bits = env::var("HEART_PI5_SIMPLE_PROBE_PWM_BITS")
+        .ok()
+        .and_then(|value| value.parse::<u8>().ok())
+        .filter(|value| (1..=11).contains(value))
+        .unwrap_or(5);
+    let clock_divider = env::var("HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER")
+        .ok()
+        .and_then(|value| value.parse::<f32>().ok())
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .unwrap_or(1.0);
     let wiring = wiring()?;
     let mode = Pi5SimpleProbeMode::RawBytePull;
     probe_log(format!(
-        "starting mode={mode:?} wiring={wiring:?} seconds={seconds} frame_copies={frame_copies} panel=64x64 chain_length=1 parallel=1 pwm_bits=5"
+        "starting mode={mode:?} wiring={wiring:?} seconds={seconds} frame_copies={frame_copies} panel=64x64 chain_length=1 parallel=1 pwm_bits={pwm_bits} clock_divider={clock_divider}"
     ));
     let config = Pi5ScanConfig::from_matrix_config(wiring, 64, 64, 1, 1)?
-        .with_pwm_bits(5)?
-        .with_clock_divider(1.0)?;
+        .with_pwm_bits(pwm_bits)?
+        .with_clock_divider(clock_divider)?;
     probe_log(format!(
         "resolved config width={} height={} row_pairs={} timing={:?}",
         config.width()?,

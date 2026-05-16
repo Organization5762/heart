@@ -4,15 +4,12 @@ from functools import cached_property
 from threading import Lock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
-from manyfold import (Graph, Layer, MergeNode, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+from manyfold import (Graph, Layer, OwnerName, Plane, Schema, StreamFamily,
+                      StreamName, StreamNode, TypedRoute, Variant, route)
 from manyfold.graph import RoutePipeline
 
-from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
-from heart.peripheral.core.nodes import empty_node
+from heart.peripheral.core import Peripheral
 from heart.peripheral.core.subscriptions import CallbackObservable
-from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
@@ -577,30 +574,6 @@ class PeripheralStreams:
     def __init__(self, graph: Graph, peripheral_source: PeripheralSource) -> None:
         self._graph = graph
         self._peripheral_source = peripheral_source
-
-    def main_switch_subscription(self) -> StreamNode[SwitchState]:
-        return self._switch_subscription(include_fake_switches=True)
-
-    def physical_main_switch_subscription(self) -> StreamNode[SwitchState]:
-        return self._switch_subscription(include_fake_switches=False)
-
-    def _switch_subscription(
-        self, *, include_fake_switches: bool
-    ) -> StreamNode[SwitchState]:
-        main_switches = [
-            peripheral
-            for peripheral in self._peripheral_source()
-            if isinstance(peripheral, BaseSwitch)
-            and (include_fake_switches or not isinstance(peripheral, FakeSwitch))
-        ]
-        observables = [peripheral.observe for peripheral in main_switches]
-        if not observables:
-            return empty_node()
-        merged = (
-            MergeNode.merge(*observables)
-            .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
-        )
-        return merged
 
     @cached_property
     def game_tick(self) -> GraphRouteStream[Any]:

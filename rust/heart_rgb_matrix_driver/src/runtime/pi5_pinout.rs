@@ -1,8 +1,11 @@
 use std::collections::BTreeSet;
+use std::sync::OnceLock;
 
 use super::config::WiringProfile;
 
 const LEGACY_OE_SYNC_GPIO: u32 = 4;
+static FIXED_ROW_PAIR: OnceLock<Option<usize>> = OnceLock::new();
+static OE_ACTIVE_HIGH: OnceLock<bool> = OnceLock::new();
 
 fn probe_log(message: impl AsRef<str>) {
     if std::env::var("HEART_PI5_SIMPLE_PROBE_LOG")
@@ -56,6 +59,7 @@ impl Pi5ScanPinout {
     }
 
     pub(crate) fn address_bits(&self, row_pair: usize, pin_word_shift: u32) -> u32 {
+        let row_pair = fixed_row_pair().unwrap_or(row_pair);
         let mut bits = 0_u32;
         for (bit_index, gpio) in self.addr_gpios.iter().enumerate() {
             if (row_pair & (1 << bit_index)) != 0 {
@@ -66,16 +70,19 @@ impl Pi5ScanPinout {
     }
 
     pub(crate) fn oe_inactive_bits(&self, pin_word_shift: u32) -> u32 {
-        let mut bits = 0_u32;
-        bits |= 1_u32 << (self.oe_gpio - pin_word_shift);
-        if self.oe_gpio == 18_u32 && LEGACY_OE_SYNC_GPIO >= pin_word_shift {
-            bits |= 1_u32 << (LEGACY_OE_SYNC_GPIO - pin_word_shift);
+        if oe_active_high() {
+            0
+        } else {
+            self.oe_bits(pin_word_shift)
         }
-        bits
     }
 
-    pub(crate) fn oe_active_bits(&self, _pin_word_shift: u32) -> u32 {
-        0
+    pub(crate) fn oe_active_bits(&self, pin_word_shift: u32) -> u32 {
+        if oe_active_high() {
+            self.oe_bits(pin_word_shift)
+        } else {
+            0
+        }
     }
 
     pub(crate) fn lat_bits(&self, pin_word_shift: u32) -> u32 {
@@ -89,4 +96,29 @@ impl Pi5ScanPinout {
     pub(crate) fn clock_gpio(&self) -> u32 {
         self.clock_gpio
     }
+
+    fn oe_bits(&self, pin_word_shift: u32) -> u32 {
+        let mut bits = 0_u32;
+        bits |= 1_u32 << (self.oe_gpio - pin_word_shift);
+        if self.oe_gpio == 18_u32 && LEGACY_OE_SYNC_GPIO >= pin_word_shift {
+            bits |= 1_u32 << (LEGACY_OE_SYNC_GPIO - pin_word_shift);
+        }
+        bits
+    }
+}
+
+fn fixed_row_pair() -> Option<usize> {
+    *FIXED_ROW_PAIR.get_or_init(|| {
+        std::env::var("HEART_PI5_SIMPLE_SCAN_FIXED_ROW_PAIR")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+    })
+}
+
+fn oe_active_high() -> bool {
+    *OE_ACTIVE_HIGH.get_or_init(|| {
+        std::env::var("HEART_PI5_SIMPLE_SCAN_OE_ACTIVE_HIGH")
+            .map(|value| value != "0")
+            .unwrap_or(false)
+    })
 }

@@ -57,12 +57,12 @@ class TestDisplayThreeDGlassesRenderer:
         renderer.initialize(window, manager, orientation)
 
         first_clock = stub_clock_factory(0)
-        manager.frame_tick_controller.advance(first_clock)
+        manager.input_io.frame_ticks.advance(first_clock)
         renderer._internal_process(window, manager, orientation)
         frame_one = pygame.surfarray.array3d(window).copy()
 
         second_clock = stub_clock_factory(150)
-        manager.frame_tick_controller.advance(second_clock)
+        manager.input_io.frame_ticks.advance(second_clock)
         renderer._internal_process(window, manager, orientation)
         frame_two = pygame.surfarray.array3d(window).copy()
 

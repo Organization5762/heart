@@ -69,7 +69,7 @@ class TestSlidingImageMarbleOutputs:
             )
             manager = PeripheralManager()
             monkeypatch.setattr(
-                manager.frame_tick_controller,
+                manager.input_io.frame_ticks,
                 "observable",
                 lambda: tick_stream,
             )

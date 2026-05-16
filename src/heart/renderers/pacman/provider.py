@@ -33,7 +33,7 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
             width=self._width, height=self._height, blood=True
         )
         return (
-            self._peripheral_manager.frame_tick_controller.observable()
+            self._peripheral_manager.input_io.frame_tick_stream()
             .scan(lambda state, _: self._next_state(state), seed=initial_state)
             .start_with(initial_state)
 

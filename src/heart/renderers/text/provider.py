@@ -41,7 +41,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=self._y_location,
         )
         return (
-            peripheral_manager.get_main_switch_subscription()
+            peripheral_manager.input_io.main_switch_stream()
             .start_with(None)
             .scan(
                 lambda state, switch_state: replace(state, switch_state=switch_state),
