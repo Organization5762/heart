@@ -10,7 +10,8 @@ from manyfold import Graph, StreamNode
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.core.streams import GraphRouteStream, runtime_route
+from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
+                                           combine_latest, runtime_route)
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  NoopSubscription)
 
@@ -27,6 +28,16 @@ class CountingPeripheral(Peripheral[int]):
             return NoopSubscription()
 
         return CallbackObservable(on_subscribe)
+
+
+class EmittingPeripheral(Peripheral[int]):
+    """Peripheral backed by a controllable event stream for envelope tests."""
+
+    def __init__(self) -> None:
+        self.events: EventStream[int] = EventStream()
+
+    def _event_stream(self) -> StreamNode[int]:
+        return self.events
 
 
 class TestPeripheralObserveSharing:
@@ -48,8 +59,40 @@ class TestPeripheralObserveSharing:
             subscription_a.dispose()
             subscription_b.dispose()
 
+    def test_observe_unwraps_graph_pipeline_envelopes(self) -> None:
+        """Ensure peripheral observers receive domain payloads instead of Manyfold route envelopes."""
+        peripheral = EmittingPeripheral()
+        observed: list[PeripheralMessageEnvelope[int]] = []
+
+        subscription = peripheral.observe.subscribe(observed.append)
+        try:
+            peripheral.events.emit(7)
+
+            assert observed
+            assert observed[-1].data == 7
+        finally:
+            subscription.dispose()
+
 
 class TestGraphRouteStreamTransforms:
+    def test_combine_latest_accepts_graph_route_stream_sources(self) -> None:
+        graph = Graph()
+        route_a = runtime_route("test_event_stream_combine_a", "HeartCombineA")
+        route_b = runtime_route("test_event_stream_combine_b", "HeartCombineB")
+        stream_a = GraphRouteStream[int](graph, route_a)
+        stream_b = GraphRouteStream[int](graph, route_b)
+        observed: list[tuple[int, int]] = []
+
+        subscription = combine_latest(stream_a, stream_b).subscribe(observed.append)
+        try:
+            stream_a.on_next(1)
+            stream_b.on_next(2)
+            stream_a.on_next(3)
+
+            assert observed == [(1, 2), (3, 2)]
+        finally:
+            subscription.dispose()
+
     def test_callback_pipeline_connects_graph_route_to_python_sink(self) -> None:
         graph = Graph()
         route = runtime_route(

@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import Any, TypeVar, cast
 
 import pygame
-from manyfold import Graph, MergeNode, StreamNode
+from manyfold import EmptyNode, Graph, MergeNode, StreamNode
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.core.input.accelerometer import (
@@ -27,7 +27,6 @@ from heart.peripheral.core.input.profiles.navigation import (
     NavigationProfile)
 from heart.peripheral.core.input.streams import (map_stream, merge_streams,
                                                  threshold_direction)
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.streams import EventStream, GraphRouteStream
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
@@ -124,7 +123,7 @@ class InputIO:
             and (include_fake_switches or not isinstance(peripheral, FakeSwitch))
         ]
         if not streams:
-            return empty_node()
+            return EmptyNode().observable()
         return MergeNode.merge(*streams).map(
             PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
@@ -137,7 +136,7 @@ class InputIO:
             if isinstance(peripheral, (Accelerometer, FakeAccelerometer))
         ]
         if not streams:
-            return empty_node()
+            return EmptyNode().observable()
         merged = (
             MergeNode.merge(*streams)
             .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)

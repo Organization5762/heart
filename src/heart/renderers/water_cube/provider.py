@@ -22,12 +22,14 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
             raise ValueError(msg)
         accel = peripheral_manager.input_io.active_acceleration()
 
-        def update_state(prev: WaterCubeState, acceleration: Acceleration):
-            return prev._step(
-                heights=prev.heights,
-                velocities=prev.velocities,
-                acceleration=acceleration,
-            )
-
         initial = WaterCubeState.initial_state(self.device)
-        return accel.start_with(initial).scan(update_state)
+        return accel.scan(self._advance_state, seed=initial).start_with(initial)
+
+    def _advance_state(
+        self, prev: WaterCubeState, acceleration: Acceleration | None
+    ) -> WaterCubeState:
+        return prev._step(
+            heights=prev.heights,
+            velocities=prev.velocities,
+            acceleration=acceleration,
+        )

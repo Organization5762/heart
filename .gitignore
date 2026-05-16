@@ -3,6 +3,7 @@ heart.egg-info
 __pycache__
 build/
 .venv
+.idea
 .cargo-home*
 **/.DS_Store
 bluetooth.log

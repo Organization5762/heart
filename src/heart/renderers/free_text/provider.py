@@ -12,14 +12,16 @@ from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
-FONT_SIZE_MAX = 12
+FONT_SIZE_MAX = 30
 FONT_SIZE_MIN = 6
 INITIAL_FONT_SIZE = 10
+DEFAULT_TEXT = ""
+TEXT_PADDING_PX = 4
 
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
     def __init__(self) -> None:
-        self._text = BehaviorSubject("Waiting for text...")
+        self._text = BehaviorSubject(DEFAULT_TEXT)
         self._font_cache: dict[int, pygame.font.Font] = {}
         self._font_size_max: int = FONT_SIZE_MAX
         self._font_size_min: int = FONT_SIZE_MIN
@@ -86,10 +88,12 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
         if window_width <= 0 or window_height <= 0:
             font = self.get_font(self._initial_font_size)
             return (self._initial_font_size, [], font.get_linesize())
+        available_width = max(1, window_width - (TEXT_PADDING_PX * 2))
+        available_height = max(1, window_height - (TEXT_PADDING_PX * 2))
         for size in range(self._font_size_max, self._font_size_min - 1, -1):
             font_candidate = self.get_font(size)
             char_width = max(1, font_candidate.size("M")[0])
-            max_chars_per_line = max(1, window_width // char_width)
+            max_chars_per_line = max(1, available_width // char_width)
             wrapped: list[str] = []
             for paragraph in text.split("\n"):
                 wrapped_lines = textwrap.wrap(
@@ -102,11 +106,14 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
                 if line_width_px > max_line_width_px:
                     max_line_width_px = line_width_px
             total_height_px = len(wrapped) * font_candidate.get_linesize()
-            if max_line_width_px <= window_width and total_height_px <= window_height:
+            if (
+                max_line_width_px <= available_width
+                and total_height_px <= available_height
+            ):
                 return (size, wrapped, font_candidate.get_linesize())
         fallback_font = self.get_font(self._font_size_min)
         char_width = max(1, fallback_font.size("M")[0])
-        max_chars_per_line = max(1, window_width // char_width)
+        max_chars_per_line = max(1, available_width // char_width)
         wrapped: list[str] = []
         for paragraph in text.split("\n"):
             wrapped_lines = textwrap.wrap(
@@ -114,3 +121,13 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             ) or [""]
             wrapped.extend(wrapped_lines)
         return (self._font_size_min, wrapped, fallback_font.get_linesize())
+
+    def fit_text_to_window(
+        self, text: str, window_width: int, window_height: int
+    ) -> tuple[pygame.font.Font, tuple[str, ...], int]:
+        font_size, wrapped_lines, line_height = self._fit_font_and_wrap(
+            text=text,
+            window_width=window_width,
+            window_height=window_height,
+        )
+        return self.get_font(font_size), tuple(wrapped_lines), line_height

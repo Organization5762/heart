@@ -2,30 +2,32 @@ import argparse
 import math
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pygame
 from manyfold import StreamNode, shutdown
-from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_FALSE,
-                       GL_FLOAT, GL_LINEAR, GL_MODELVIEW, GL_NEAREST,
-                       GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,
-                       GL_SHADING_LANGUAGE_VERSION, GL_TEXTURE_2D,
+from manyfold.graph import SubscriptionLike
+from OpenGL.error import GLError
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
+                       GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
+                       GL_RGBA, GL_SHADING_LANGUAGE_VERSION, GL_TEXTURE_2D,
                        GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
-                       GL_TRIANGLE_STRIP, GL_UNSIGNED_BYTE, GL_VENDOR,
-                       GL_VERSION, glBegin, glBindTexture, glClear, glDisable,
-                       glDrawArrays, glEnable, glEnableVertexAttribArray,
-                       glEnd, glGenTextures, glGetString, glGetUniformLocation,
+                       GL_UNSIGNED_BYTE, GL_VENDOR, GL_VERSION, glBegin,
+                       glBindTexture, glClear, glDeleteTextures, glDisable,
+                       glEnable, glEnd, glGenTextures, glGetString,
                        glLoadIdentity, glMatrixMode, glOrtho, glReadPixels,
                        glTexCoord2f, glTexImage2D, glTexParameteri,
-                       glTexSubImage2D, glUniform1f, glUniform2fv,
-                       glUniform3fv, glUniformMatrix4fv, glUseProgram,
-                       glVertex2f, glVertexAttribPointer, glViewport)
+                       glTexSubImage2D, glUseProgram, glVertex2f, glViewport)
 from pygame.math import lerp
 
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
-from heart.display.shaders.shader import Shader
-from heart.display.shaders.util import _UNIFORMS, get_global, set_global_float
+from heart.device.local import LocalScreen
+from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
+                                              UniformValue)
+from heart.display.shaders.shader_templates.three_fractal import \
+    __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
@@ -43,6 +45,17 @@ DEFAULT_DEBUG_HEIGHT = 800
 DEFAULT_DEBUG_FPS = 60
 DEFAULT_DEBUG_LAYOUT = "rectangle"
 TRIGGER_ACTIVE_THRESHOLD = 0.5
+
+
+def _opengl_string(name: int, label: str) -> str:
+    try:
+        value = glGetString(name)
+    except GLError as exc:
+        logger.warning("Unable to read OpenGL %s: %s", label, exc)
+        return "unavailable"
+    if value is None:
+        return "unavailable"
+    return value.decode("utf-8", errors="replace")
 
 
 @dataclass
@@ -69,10 +82,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         self.max_velocity = 2.0
 
-        self.matID = None
-        self.prevMatID = None
-        self.resID = None
-        self.ipdID = None
         self.prevMat = None
 
         self.window_size = None
@@ -88,7 +97,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self._HI_BASE = 1.2
         self.active_radius = self.BASE_RADIUS
 
-        self.shader: Shader | None = None
+        self.shader_runtime = FullscreenShaderRuntime()
 
         self.last_frame_time = None
         self.delta_real_time = None
@@ -111,7 +120,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         # For rendering to the provided surface
         self.target_surface = None
-        self.framebuffer_texture = None
+        self.display_texture = None
+        self.pixels = None
         self.surface_array = None
 
         self.initialized = False
@@ -123,6 +133,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
         self._trigger_right_prev_active = False
+        self._input_subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
         if not super().is_initialized():
@@ -130,6 +141,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if (
             self.shader is None
             or self.program is None
+            or not self.shader_runtime.is_initialized()
             or self.clock is None
             or self.mat is None
             or self.prevMat is None
@@ -146,52 +158,35 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             return False
         return True
 
-    def _init_uniforms(self):
-        set_global_float(self.sphere_radius_var)
+    @property
+    def shader(self) -> FullscreenShaderRuntime | None:
+        if self.shader_runtime.is_initialized():
+            return self.shader_runtime
+        return None
+
+    @shader.setter
+    def shader(self, value) -> None:
+        if value is None:
+            self.shader_runtime.reset()
+
+    def _shader_uniforms(self) -> dict[str, UniformValue]:
+        return {
+            "iMat": self.mat,
+            "iPrevMat": self.prevMat,
+            "iResolution": self.window_size,
+            "iIPD": 0.04,
+            "_s_radius": self.active_radius,
+        }
 
     def _render(self):
-        # Create and compile shader
-        self._init_uniforms()
-
-        self.shader = Shader()
-        self.program = self.shader.create()
+        template_path = Path(shader_template_location).parent
+        self.shader_runtime.initialize(
+            vertex_path=template_path / "vert.glsl",
+            fragment_path=template_path / "frag_gen.glsl",
+            attribute_name="vPosition",
+        )
+        self.program = self.shader_runtime.program
         logger.info("Compiled shader.")
-
-        # Get uniform locations
-        self.matID = glGetUniformLocation(self.program, "iMat")
-        self.prevMatID = glGetUniformLocation(self.program, "iPrevMat")
-        self.resID = glGetUniformLocation(self.program, "iResolution")
-        self.ipdID = glGetUniformLocation(self.program, "iIPD")
-
-        # Set uniforms
-        glUseProgram(self.program)
-        glUniform2fv(self.resID, 1, self.window_size)
-        glUniform1f(self.ipdID, 0.04)
-
-        # Create and bind fullscreen quad
-        fullscreen_quad = np.array(
-            [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 0.0],
-            dtype=np.float32,
-        )
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, fullscreen_quad)
-        glEnableVertexAttribArray(0)
-
-        # Create a texture to copy OpenGL rendering to for Pygame
-        self.framebuffer_texture = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.framebuffer_texture)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA,
-            self.window_size[0],
-            self.window_size[1],
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            None,
-        )
 
     # Modified initialize to use the provided window
     def _create_initial_state(
@@ -203,19 +198,19 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         """Initialize the fractal renderer with the given window size."""
         logger.info(
             "OpenGL Version: %s",
-            glGetString(GL_VERSION).decode("utf-8", errors="replace"),
+            _opengl_string(GL_VERSION, "version"),
         )
         logger.info(
             "OpenGL Vendor: %s",
-            glGetString(GL_VENDOR).decode("utf-8", errors="replace"),
+            _opengl_string(GL_VENDOR, "vendor"),
         )
         logger.info(
             "OpenGL Renderer: %s",
-            glGetString(GL_RENDERER).decode("utf-8", errors="replace"),
+            _opengl_string(GL_RENDERER, "renderer"),
         )
         logger.info(
             "OpenGL Shading Language Version: %s",
-            glGetString(GL_SHADING_LANGUAGE_VERSION).decode("utf-8", errors="replace"),
+            _opengl_string(GL_SHADING_LANGUAGE_VERSION, "shading language version"),
         )
 
         self.time_initialized = time.monotonic()
@@ -256,14 +251,15 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.prevMat = np.copy(self.mat)
         self.last_update_time = time.monotonic()
 
-        self.shader.set(self.sphere_radius_var, self.BASE_RADIUS)
         self.last_frame_time = time.monotonic()
-        peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
-            on_next=self._set_keyboard_snapshot
-        )
-        peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
-            on_next=self._set_gamepad_snapshot
-        )
+        self._input_subscriptions = [
+            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
+                on_next=self._set_keyboard_snapshot
+            ),
+            peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
+                on_next=self._set_gamepad_snapshot
+            ),
+        ]
         return FractalRuntimeState(peripheral_manager=peripheral_manager)
 
         self.mode = "auto"
@@ -294,79 +290,21 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             None,
         )
 
-    def _apply_pending_uniforms(self):
-        """Apply any pending uniform changes to the active shader program."""
-        for key, val in self.shader.pending_uniforms.items():
-            if key in _UNIFORMS:
-                val = _UNIFORMS[key]
-            _UNIFORMS[key] = val
-            if key in self.shader.keys:
-                key_id = self.shader.keys[key]
-                try:
-                    if type(val) is float:
-                        glUniform1f(key_id, val)
-                    else:
-                        glUniform3fv(key_id, 1, val)
-                except Exception as e:
-                    logger.exception("Error setting uniform %s: %s", key, e)
-
-            # Clear pending uniforms after applying
-            self.shader.pending_uniforms = {}
-
     def render_fractal(self):
         """Render the fractal scene."""
         assert self.program is not None
-        glUseProgram(self.program)
-
-        # Apply any pending uniforms
-        self._apply_pending_uniforms()
-
-        # Set camera matrix uniform
-        glUniformMatrix4fv(self.matID, 1, False, self.mat)
-        glUniformMatrix4fv(self.prevMatID, 1, False, self.prevMat)
-
-        # Draw
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        assert self.window_size is not None
+        self.shader_runtime.draw(
+            uniforms=self._shader_uniforms(),
+            viewport_size=self.window_size,
+            clear_mask=None,
+        )
 
     def render_to_surface(self):
         """Copy the OpenGL rendering to the Pygame surface."""
-        # Read pixels from framebuffer
-
-        if self.tiled_mode:
-            # glReadPixels(0, 0, self.render_size[0], self.render_size[1],
-            glReadPixels(
-                0,
-                0,
-                self.real_window_size[0],
-                self.real_window_size[1],
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                self.surface_array,
-            )
-        else:
-            glReadPixels(
-                0,
-                0,
-                self.window_size[0],
-                self.window_size[1],
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                self.surface_array,
-            )
-
-        # Convert to format suitable for Pygame surface
-        # Note: OpenGL coordinates start from bottom-left, Pygame from top-left
-        # So we need to flip the image vertically
-        flipped_array = np.flipud(self.surface_array)
-        # flipped_array = self.surface_array
-
-        # Create a Pygame surface from the pixel data
-        surf = pygame.surfarray.make_surface(
-            np.transpose(flipped_array[:, :, :3], (1, 0, 2))
-        )
-
-        # Blit to the target surface
-        self.target_surface.blit(surf, (0, 0))
+        size = self.real_window_size if self.tiled_mode else self.window_size
+        self.shader_runtime.read_to_surface(self.target_surface, size=size)
+        self.surface_array = self.shader_runtime.pixel_buffer
 
     def render_tiled(self):
         """Render the texture tiled across the screen."""
@@ -411,7 +349,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
             glTexCoord2f(0, 1)
             glVertex2f(x, tile_height)
-            self._apply_pending_uniforms()
             glEnd()
 
         # Read pixels for rendering to Pygame surface
@@ -734,19 +671,20 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                 )
             else:
                 target = self.BASE_RADIUS
-                self.active_radius = lerp(
-                    self.active_radius,
-                    target,
-                    self.delta_real_time * self.INFLATE_SPEED,
-                )
+                try:
+                    lerp_weight = 1.0 - math.exp(-self.INFLATE_SPEED * self.delta_real_time)
+                    self.active_radius = lerp(
+                        self.active_radius,
+                        target,
+                        lerp_weight,
+                    )
+                except Exception:
+                    logger.warning("Could not update active radius", exc_info=True)
+
         except Exception as e:
             # TODO: Very occasionally this raises an exception for some reason, no idea why
             self.active_radius = self.BASE_RADIUS
             logger.exception("Failed to update active radius: %s", e)
-
-        if not self.tiled_mode:
-            # eagerly apply the uniforms
-            self.shader.set("s_radius", self.active_radius)
 
         # rotations
         if self._is_key_down(pygame.K_q):
@@ -864,10 +802,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         # Render either in normal or tiled mode
         if self.tiled_mode:
-            # queue uniforms to send to shader
-            self.shader.set("s_radius", self.active_radius, lazy=True)
-            # self.shader.set("_orbit_color", to_vec3(self.active_color), lazy=True)
-
             # Set viewport to the small render size
             glViewport(0, 0, self.render_size[0], self.render_size[1])
 
@@ -924,8 +858,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         # copy origin
         p = np.copy(self.mat[3])
 
-        # get radius uniform val
-        r = get_global(self.sphere_radius_var)
+        r = self.active_radius
 
         # sphere center
         c = np.array([1.0, 1.0, 1.0], dtype=np.float32)
@@ -944,16 +877,20 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return min(d, dsphere) * 10.0 < 0
 
     def reset(self):
-        pygame.mouse.set_visible(True)
+        try:
+            pygame.mouse.set_visible(True)
+        except pygame.error:
+            logger.debug("Skipping fractal mouse reset; pygame video is not initialized")
+        self._dispose_input_subscriptions()
+        self._delete_gl_texture(getattr(self, "display_texture", None))
         self.initialized = False
         self._auto_started = False
         self.mode = "auto"
-        self.shader = None
+        self.shader_runtime.reset()
         self.program = None
         self.mat = None
         self.prevMat = None
         self.display_texture = None
-        self.framebuffer_texture = None
         self.pixels = None
         self.target_surface = None
         self.clock = None
@@ -970,6 +907,20 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.time_initialized = None
         self._trigger_right_prev_active = False
 
+    def _dispose_input_subscriptions(self) -> None:
+        for subscription in self._input_subscriptions:
+            subscription.dispose()
+        self._input_subscriptions.clear()
+
+    @staticmethod
+    def _delete_gl_texture(texture_id: int | None) -> None:
+        if texture_id is None:
+            return
+        try:
+            glDeleteTextures([texture_id])
+        except GLError:
+            logger.debug("Skipping fractal texture delete; OpenGL context is unavailable")
+
 
 class FractalScene(StatefulBaseRenderer[FractalSceneState]):
     def __init__(self, provider: FractalSceneProvider) -> None:
@@ -978,6 +929,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         super().__init__(builder=self.provider)
         self.device_display_mode = DeviceDisplayMode.OPENGL
         self._peripheral_manager: PeripheralManager | None = None
+        self._runtime_failed = False
 
     def initialize(
         self,
@@ -1007,12 +959,22 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
     ) -> None:
         assert self._peripheral_manager is not None
         runtime = self.state.runtime
+        if self._runtime_failed:
+            return
         if not runtime.is_initialized():
-            runtime.initialize(
-                window=window,
-                peripheral_manager=self._peripheral_manager,
-                orientation=orientation,
-            )
+            try:
+                runtime.initialize(
+                    window=window,
+                    peripheral_manager=self._peripheral_manager,
+                    orientation=orientation,
+                )
+            except Exception as exc:
+                self._runtime_failed = True
+                logger.warning(
+                    "Disabling FractalScene; OpenGL runtime failed to initialize: %s",
+                    exc,
+                )
+                return
         runtime.real_process(
             window,
             orientation,
@@ -1023,6 +985,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
             self.state.runtime.reset()
         self._initial_state = None
         self._peripheral_manager = None
+        self._runtime_failed = False
         super().reset()
 
 
@@ -1064,7 +1027,6 @@ def main() -> None:
         if args.layout == "cube"
         else Rectangle.with_layout(columns=1, rows=1)
     )
-    from heart.device.local import LocalScreen
 
     device = LocalScreen(width=args.width, height=args.height, orientation=orientation)
     container = build_runtime_container(device=device)

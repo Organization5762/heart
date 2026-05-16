@@ -8,7 +8,7 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, Self
 
 import serial
 from bleak.backends.device import BLEDevice
-from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
+from manyfold import (DetectionNode, EmptyNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
                       Schema, StreamFamily, StreamName, StreamNode, Timer,
                       TypedRoute, Variant, route)
@@ -21,7 +21,6 @@ from heart.peripheral.bluetooth import UartListener
 from heart.peripheral.core import (Peripheral, PeripheralEventNode,
                                    PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
-from heart.peripheral.core.nodes import empty_node
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  CallbackSubscription,
                                                  NoopSubscription)
@@ -328,7 +327,7 @@ class FakeSwitch(BaseSwitch):
 
     def _event_stream(self) -> PeripheralEventNode[SwitchState]:
         if Configuration.is_pi() and (not Configuration.is_x11_forward()):
-            return empty_node()
+            return EmptyNode().observable()
         else:
             result = (
                 Timer(period=timedelta(milliseconds=10))

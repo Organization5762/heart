@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -21,6 +22,7 @@ from heart.renderers.slide_transition import SlideTransitionMode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.text import TextRendering
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -81,6 +83,7 @@ class GameModeState:
             from heart.navigation import (  # avoids circular imports for patching
                 SlideTransitionProvider, SlideTransitionRenderer)
 
+            self._reset_sliding_transition()
             slide_dir = self._resolve_slide_direction(
                 last_scene_index, mode_index, transition_mode=self.transition_mode
             )
@@ -103,7 +106,7 @@ class GameModeState:
 
         if self.sliding_transition is not None:
             if self.sliding_transition.is_done():
-                self.sliding_transition = None
+                self._reset_sliding_transition()
             else:
                 return self.sliding_transition
 
@@ -128,6 +131,11 @@ class GameModeState:
         forward_steps = (mode_index - last_scene_index) % len(self.entries)
         backward_steps = (last_scene_index - mode_index) % len(self.entries)
         return 1 if forward_steps <= backward_steps else -1
+
+    def _reset_sliding_transition(self) -> None:
+        if self.sliding_transition is not None:
+            self.sliding_transition.reset()
+            self.sliding_transition = None
 
 
 class GameModes(StatefulBaseRenderer[GameModeState]):
@@ -265,6 +273,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def _handle_activate(self, _event: object) -> None:
         if not self.state.in_select_mode:
             return
+        self.state._reset_sliding_transition()
         self.state._active_mode_index += self.state.mode_offset
         self.state.mode_offset = 0
         self.state.in_select_mode = False
@@ -272,6 +281,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
     def _handle_alternate_activate(self, _event: object) -> None:
         if self.state.in_select_mode:
             return
+        self.state._reset_sliding_transition()
         for entry in self.state.entries:
             entry.renderer.reset()
         for renderer in self.state.post_processors:
@@ -290,20 +300,38 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
         # Renderers may have different display modes, so we need to initialize them all.
         for completed, renderer in enumerate(initialization_renderers, start=1):
+            display_ready = False
             try:
                 with window.display_mode(renderer.device_display_mode):
+                    display_ready = True
                     renderer.initialize(window, peripheral_manager, orientation)
-            except Exception:
-                logger.exception(
-                    "Failed to initialize renderer %s",
-                    renderer.name,
-                )
-                raise
+                    if self._should_reset_after_warmup(renderer):
+                        renderer.reset()
+            except Exception as exc:
+                if (
+                    not display_ready
+                    and renderer.device_display_mode == DeviceDisplayMode.OPENGL
+                    and not Configuration.render_crash_on_error()
+                ):
+                    logger.warning(
+                        "Skipping renderer %s; OpenGL display mode failed during initialization: %s",
+                        renderer.name,
+                        exc,
+                    )
+                else:
+                    logger.exception(
+                        "Failed to initialize renderer %s",
+                        renderer.name,
+                    )
+                    raise
             self._render_initialization_progress(
                 window,
                 completed=completed,
                 total=total_renderers,
             )
+
+    def _should_reset_after_warmup(self, renderer: StatefulBaseRenderer) -> bool:
+        return any(entry.renderer is renderer for entry in self.state.entries)
 
     def _initialization_renderers(self) -> list[StatefulBaseRenderer]:
         return [

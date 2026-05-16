@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -10,6 +11,7 @@ from manyfold import shutdown
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.runtime.active_game_loop import set_active_game_loop
 from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
@@ -48,6 +50,8 @@ class GameLoop:
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
         self.edge_thresh = EDGE_THRESHOLD
+        self._temporary_renderer: "StatefulBaseRenderer[Any]" | None = None
+        self._temporary_renderer_deadline_monotonic: float | None = None
 
     def _one_loop(
         self,
@@ -125,6 +129,7 @@ class GameLoop:
     def set_game_loop(cls, loop: "GameLoop") -> None:
         global ACTIVE_GAME_LOOP
         ACTIVE_GAME_LOOP = loop
+        set_active_game_loop(loop)
 
     def start(self) -> None:
         logger.info("Starting GameLoop")
@@ -180,9 +185,27 @@ class GameLoop:
         return self.components.display.clock
 
     def _select_renderers(self) -> list["StatefulBaseRenderer[Any]"]:
+        temporary_renderer = self._active_temporary_renderer()
+        if temporary_renderer is not None:
+            return [temporary_renderer]
         base_renderers = self.components.game_modes.get_renderers()
         renderers = list(base_renderers) if base_renderers else []
         return renderers
+
+    def present_temporary_renderer(
+        self,
+        renderer: "StatefulBaseRenderer[Any]",
+        *,
+        duration_seconds: float,
+    ) -> None:
+        self._clear_temporary_renderer()
+        self._temporary_renderer = renderer
+        self._temporary_renderer_deadline_monotonic = time.monotonic() + max(
+            0.0, duration_seconds
+        )
+
+    def clear_temporary_renderer(self) -> None:
+        self._clear_temporary_renderer()
 
     @property
     def peripheral_manager(self):
@@ -290,6 +313,33 @@ class GameLoop:
 
     def _ensure_display_initialized(self) -> None:
         self.components.display.ensure_initialized()
+
+    def _active_temporary_renderer(self) -> "StatefulBaseRenderer[Any]" | None:
+        renderer = self._temporary_renderer
+        deadline = self._temporary_renderer_deadline_monotonic
+        if renderer is None or deadline is None:
+            return None
+
+        if time.monotonic() >= deadline:
+            self._clear_temporary_renderer()
+            return None
+
+        if not renderer.initialized:
+            self._ensure_display_initialized()
+            renderer.initialize(
+                window=self.components.display,
+                peripheral_manager=self.components.peripheral_manager,
+                orientation=self.device.orientation,
+            )
+
+        return renderer
+
+    def _clear_temporary_renderer(self) -> None:
+        renderer = self._temporary_renderer
+        self._temporary_renderer = None
+        self._temporary_renderer_deadline_monotonic = None
+        if renderer is not None:
+            renderer.reset()
 
     def _run_main_loop(self) -> None:
         if self.components.display.clock is None:

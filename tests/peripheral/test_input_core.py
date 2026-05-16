@@ -25,7 +25,7 @@ from heart.peripheral.core.input.accelerometer import (
     ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.streams import EventStream, runtime_route
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -176,6 +176,31 @@ class TestInputDebugTap:
         assert history[0].source_id == "navigation"
         assert history[0].upstream_ids == ("keyboard.pressed.down",)
         assert history[0].payload == 7
+
+    def test_route_pipeline_instrumentation_preserves_payloads(self) -> None:
+        """Verify instrumented Manyfold route streams still emit raw payloads so renderer subscribers never receive TypedEnvelope wrappers."""
+        tap = InputDebugTap()
+        graph = Graph()
+        route_ref = runtime_route("keyboard.snapshot.test", "KeyboardSnapshot")
+        source = graph.observe(route_ref, replay_latest=False)
+        snapshot = KeyboardSnapshot(
+            pressed_keys=frozenset({pygame.K_y}),
+            timestamp_ms=123.0,
+        )
+        observed: list[KeyboardSnapshot] = []
+
+        InputDebugNode(
+            tap=tap,
+            stage=InputDebugStage.RAW,
+            stream_name="keyboard.snapshot",
+            source_id="keyboard",
+        ).connect(source).subscribe(observed.append)
+        graph.publish(route_ref, snapshot)
+
+        history = tap.snapshot()
+
+        assert observed == [snapshot]
+        assert history[-1].payload == snapshot
 
 
 class TestFrameTickController:
@@ -389,9 +414,7 @@ class TestKeyboardController:
         snapshots.emit(
             KeyboardSnapshot(pressed_keys=frozenset({pygame.K_a}), timestamp_ms=20.0)
         )
-        snapshots.emit(
-            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=100.0)
-        )
+        snapshots.emit(KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=100.0))
 
         assert [type(event) for event in events] == [
             KeyPressedEvent,
@@ -489,13 +512,9 @@ class TestNavigationProfile:
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=0.0))
         keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_LEFT, timestamp_ms=10.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=100.0))
-        keyboard_snapshots.emit(
-            _keyboard_snapshot(pygame.K_RIGHT, timestamp_ms=110.0)
-        )
+        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_RIGHT, timestamp_ms=110.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=200.0))
-        keyboard_snapshots.emit(
-            _keyboard_snapshot(pygame.K_DOWN, timestamp_ms=210.0)
-        )
+        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_DOWN, timestamp_ms=210.0))
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=300.0))
         keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_UP, timestamp_ms=310.0))
 
@@ -722,6 +741,48 @@ class TestMandelbrotControlProfile:
         assert any(
             envelope.stream_name == "mandelbrot.command" for envelope in tap.snapshot()
         )
+
+    def test_motion_state_uses_gamepad_snapshot_without_keyboard_tick(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify gamepad movement is not blocked waiting for derived keyboard/gamepad view streams."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
+        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: gamepad_snapshots)
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+        motion_states: list[tuple[float, float, float, float]] = []
+
+        profile.motion_state.subscribe(
+            lambda state: motion_states.append(
+                (state.move_x, state.move_y, state.pan_x, state.pan_y)
+            )
+        )
+
+        gamepad_snapshots.emit(
+            _gamepad_snapshot(
+                dpad=GamepadDpadValue(x=1, y=-1),
+                axes={
+                    GamepadAxis.LEFT_X: 0.5,
+                    GamepadAxis.LEFT_Y: -0.25,
+                    GamepadAxis.RIGHT_X: 0.6,
+                    GamepadAxis.RIGHT_Y: -0.7,
+                    GamepadAxis.TRIGGER_LEFT: 0.0,
+                    GamepadAxis.TRIGGER_RIGHT: 0.0,
+                },
+                timestamp_monotonic=2.0,
+            )
+        )
+
+        assert motion_states[-1] == (1.5, 1.25, 0.6, 0.7)
 
 
 class TestAccelerometerDebugProfile:

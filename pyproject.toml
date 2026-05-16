@@ -102,7 +102,6 @@ ignore = ["E501", "F403", "F405"]
 "src/heart/display/shaders/shader.py" = ["F403", "F405"]
 "src/heart/renderers/three_fractal.py" = ["F403", "F405"]
 "src/heart/device/beats/proto/beats_streaming_pb2.py" = ["E712", "F821"]
-"src/heart/peripheral/proto/peripheral_payloads_pb2.py" = ["E712", "F821"]
 "src/heart/peripheral/proto/input_events_pb2.py" = ["E712", "F821"]
 
 

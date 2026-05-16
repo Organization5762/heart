@@ -1,6 +1,7 @@
 import asyncio
 import atexit
 import json
+import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,12 +25,16 @@ from heart.peripheral.core.encoding import (PeripheralPayloadDecodingError,
                                             PeripheralPayloadEncoding,
                                             decode_peripheral_payload,
                                             encode_peripheral_payload)
+from heart.utilities.env.parsing import _env_int
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 beats_streaming_pb2 = cast(Any, _beats_streaming_pb2)
-WEBSOCKET_HOST = "localhost"
-WEBSOCKET_PORT = 8765
+DEFAULT_WEBSOCKET_HOST = "localhost"
+DEFAULT_WEBSOCKET_BIND_HOST = "localhost"
+DEFAULT_WEBSOCKET_PORT = 8765
+WEBSOCKET_HOST = DEFAULT_WEBSOCKET_HOST
+WEBSOCKET_PORT = DEFAULT_WEBSOCKET_PORT
 WEBSOCKET_PING_INTERVAL_SECONDS = 20
 WEBSOCKET_RETRY_DELAY_SECONDS = 1.0
 CONTROL_MESSAGE_KIND = "control"
@@ -37,6 +42,9 @@ CONTROL_COMMAND_BROWSE = "browse"
 CONTROL_COMMAND_ACTIVATE = "activate"
 CONTROL_COMMAND_ALTERNATE = "alternate_activate"
 CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
+CONTROL_COMMAND_TEXT_UPDATE = "text_update"
+CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
+MAX_CONTROL_IMAGE_BASE64_LENGTH = 2_000_000
 BEATS_WEBSOCKET_OWNER = OwnerName("heart.beats.websocket")
 BEATS_WEBSOCKET_FAMILY = StreamFamily("beats")
 
@@ -47,7 +55,36 @@ class ControlMessage:
     browse_step: int = 0
     sensor_key: str | None = None
     sensor_value: float | None = None
+    text: str | None = None
+    image_base64: str | None = None
+    image_mime_type: str | None = None
     clear: bool = False
+
+
+def websocket_host() -> str:
+    value = os.environ.get("BEATS_WEBSOCKET_HOST", DEFAULT_WEBSOCKET_HOST).strip()
+    return value or DEFAULT_WEBSOCKET_HOST
+
+
+def websocket_bind_host() -> str:
+    value = os.environ.get(
+        "BEATS_WEBSOCKET_BIND_HOST", DEFAULT_WEBSOCKET_BIND_HOST
+    ).strip()
+    return value or DEFAULT_WEBSOCKET_BIND_HOST
+
+
+def websocket_port() -> int:
+    return _env_int(
+        "BEATS_WEBSOCKET_PORT",
+        default=DEFAULT_WEBSOCKET_PORT,
+        minimum=1,
+    )
+
+
+def websocket_url(*, host: str | None = None, port: int | None = None) -> str:
+    resolved_host = host or websocket_host()
+    resolved_port = port if port is not None else websocket_port()
+    return f"ws://{resolved_host}:{resolved_port}"
 
 
 def _encode_peripheral_message(
@@ -179,6 +216,8 @@ def decode_control_message(message: str | bytes) -> ControlMessage | None:
         CONTROL_COMMAND_ACTIVATE,
         CONTROL_COMMAND_ALTERNATE,
         CONTROL_COMMAND_SENSOR_UPDATE,
+        CONTROL_COMMAND_TEXT_UPDATE,
+        CONTROL_COMMAND_IMAGE_UPDATE,
     }:
         logger.warning("Unknown websocket control command: %s.", command)
         return None
@@ -206,6 +245,42 @@ def decode_control_message(message: str | bytes) -> ControlMessage | None:
             browse_step=browse_step,
             sensor_key=sensor_key,
             sensor_value=float(sensor_value) if sensor_value is not None else None,
+            clear=clear,
+        )
+
+    if command == CONTROL_COMMAND_TEXT_UPDATE:
+        text = parsed.get("text")
+        if not clear and not isinstance(text, str):
+            logger.warning("Invalid websocket text payload: %r.", text)
+            return None
+        return ControlMessage(
+            command=command,
+            browse_step=browse_step,
+            text=text if isinstance(text, str) else None,
+            clear=clear,
+        )
+
+    if command == CONTROL_COMMAND_IMAGE_UPDATE:
+        image_base64 = parsed.get("image_base64")
+        image_mime_type = parsed.get("image_mime_type")
+        if not clear:
+            if not isinstance(image_base64, str) or not image_base64:
+                logger.warning("Invalid websocket image payload.")
+                return None
+            if len(image_base64) > MAX_CONTROL_IMAGE_BASE64_LENGTH:
+                logger.warning("Websocket image payload is too large.")
+                return None
+            if image_mime_type is not None and not isinstance(image_mime_type, str):
+                logger.warning(
+                    "Invalid websocket image MIME type: %r.",
+                    image_mime_type,
+                )
+                return None
+        return ControlMessage(
+            command=command,
+            browse_step=browse_step,
+            image_base64=image_base64 if isinstance(image_base64, str) else None,
+            image_mime_type=image_mime_type if isinstance(image_mime_type, str) else None,
             clear=clear,
         )
 
@@ -284,8 +359,8 @@ def beats_websocket_error_route() -> TypedRoute[BaseException]:
 @dataclass
 class BeatsWebSocketNode:
     websocket: "WebSocket"
-    host: str = WEBSOCKET_HOST
-    port: int = WEBSOCKET_PORT
+    host: str = field(default_factory=websocket_bind_host)
+    port: int = field(default_factory=websocket_port)
     ping_interval: int = WEBSOCKET_PING_INTERVAL_SECONDS
     retry_delay: float = WEBSOCKET_RETRY_DELAY_SECONDS
     input_route: TypedRoute[bytes] = field(default_factory=beats_websocket_frame_route)
@@ -308,6 +383,8 @@ class BeatsWebSocketNode:
         broadcast_queue: asyncio.Queue[bytes] = asyncio.Queue(
             maxsize=self.websocket._streaming_settings.queue_max_size
         )
+        self.websocket._broadcast_loop = loop
+        self.websocket._broadcast_queue = broadcast_queue
 
         def enqueue_frame(frame: bytes) -> None:
             loop.call_soon_threadsafe(
@@ -358,6 +435,8 @@ class BeatsWebSocketNode:
             )
             raise
         finally:
+            self.websocket._broadcast_loop = None
+            self.websocket._broadcast_queue = None
             self.websocket._server = None
             subscription.dispose()
             broadcast_task.cancel()
@@ -408,6 +487,8 @@ class WebSocket:
     _latest_peripheral_frames: dict[str, bytes] = field(
         default_factory=dict, init=False
     )
+    _broadcast_loop: Any | None = field(default=None, init=False)
+    _broadcast_queue: asyncio.Queue[bytes] | None = field(default=None, init=False)
     _control_handler: Callable[[ControlMessage], None] | None = field(
         default=None, init=False
     )
@@ -470,7 +551,17 @@ class WebSocket:
         if frame_bytes is None:
             return
         self._cache_replay_frame(kind=kind, payload=payload, frame_bytes=frame_bytes)
+        if self._enqueue_live_frame(frame_bytes):
+            return
         self._graph.publish(self._frame_route, frame_bytes)
+
+    def _enqueue_live_frame(self, frame_bytes: bytes) -> bool:
+        loop = getattr(self, "_broadcast_loop", None)
+        queue = getattr(self, "_broadcast_queue", None)
+        if loop is None or queue is None:
+            return False
+        loop.call_soon_threadsafe(self._enqueue_frame, frame_bytes, queue)
+        return True
 
     def _cache_replay_frame(
         self, *, kind: str, payload: object, frame_bytes: bytes

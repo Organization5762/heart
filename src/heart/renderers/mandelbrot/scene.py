@@ -129,17 +129,32 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         return self.palette_arrays[self.state.palette_index]
 
     def reset(self):
+        if self.keyboard_controls is not None:
+            self.keyboard_controls.dispose()
+            self.keyboard_controls = None
+        self.scene_controls = None
+        self.input_error = False
         self.initialized = False
+        self.clock = None
+        self.width = None
+        self.height = None
+        self.individual_screen_width = None
+        self.individual_screen_height = None
+        self.screens.clear()
         self._split_view_surfaces.clear()
+        self.cached_result = None
+        self.last_params = None
+        self.cached_julia_result = None
+        self.last_julia_params = None
         # if self.state is not None:
         #     self.state.reset()
         #     self.state.set_mode_auto()
 
-    def process_input(self) -> bool:
-        # when we first enter the scene, ignore input for a bit
-        if time.monotonic() - self.time_initialized < 0.5:
-            return False
+    def _is_input_grace_period(self) -> bool:
+        assert self.time_initialized is not None
+        return time.monotonic() - self.time_initialized < 0.5
 
+    def process_input(self) -> bool:
         assert self.keyboard_controls is not None
         self.keyboard_controls.update()
         # if connected := self.gamepad.is_connected():
@@ -168,12 +183,16 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         orientation: Orientation,
     ) -> None:
         try:
-            gamepad_connected = self.process_input()
-            if not gamepad_connected:
+            input_available = True
+            # When we first enter the scene, ignore input briefly without treating
+            # the grace period as a failed input device.
+            if not self._is_input_grace_period():
+                input_available = self.process_input()
+            if not input_available:
                 if not self.input_error:
                     self.reset()
                     self.state.set_mode_auto()
-            self.input_error = not gamepad_connected
+            self.input_error = not input_available
         except Exception as e:
             logger.exception("Error processing input; resetting. %s", e)
             if not self.input_error:

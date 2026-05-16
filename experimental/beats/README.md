@@ -7,7 +7,7 @@ contributors can make consistent layout and styling decisions.
 
 ## Component previews
 
-Use Storybook to inspect components without launching the Electron shell.
+Use Storybook to inspect components without launching the web app.
 
 - Run `npm install --package-lock=false` if dependencies are not installed.
 - Run `npm run storybook` to start the preview server on port `6006`.

@@ -6,12 +6,13 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import CombineLatestNode, Graph, StreamNode, TypedRoute
+from manyfold import Graph, StreamNode, TypedRoute
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
-from heart.peripheral.core.streams import GraphRouteStream, runtime_route
+from heart.peripheral.core.streams import (GraphRouteStream, combine_latest,
+                                           runtime_route)
 from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.sensor import Acceleration
 from heart.utilities.env import Configuration
@@ -102,7 +103,7 @@ class AccelerometerDebugProfile:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
-        key_states = CombineLatestNode().observable(
+        key_states = combine_latest(
             self._keyboard_controller.key_state(pygame.K_a),
             self._keyboard_controller.key_state(pygame.K_d),
             self._keyboard_controller.key_state(pygame.K_w),

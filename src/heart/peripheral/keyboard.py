@@ -5,10 +5,9 @@ from functools import cache
 from typing import Any, Iterator, Self, cast
 
 import pygame
-from manyfold import Timer
+from manyfold import EmptyNode, Timer
 
 from heart.peripheral.core import Peripheral, PeripheralEventNode
-from heart.peripheral.core.nodes import empty_node
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -80,7 +79,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             return result
 
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            return empty_node()
+            return EmptyNode().observable()
 
         return (
             Timer(period=timedelta(milliseconds=5))

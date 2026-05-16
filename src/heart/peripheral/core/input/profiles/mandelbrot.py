@@ -4,15 +4,17 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
-from manyfold import CombineLatestNode, MergeNode, StreamNode
+from manyfold import MergeNode, StreamNode
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
-    GamepadController)
-from heart.peripheral.core.input.keyboard import KeyboardController
+    GamepadController, GamepadSnapshot)
+from heart.peripheral.core.input.keyboard import (KeyboardController,
+                                                  KeyboardSnapshot)
 from heart.peripheral.core.input.streams import map_stream
+from heart.peripheral.core.streams import combine_latest
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -141,31 +143,16 @@ class MandelbrotControlProfile:
 
     @cached_property
     def motion_state(self) -> StreamNode[MandelbrotMotionState]:
-        keyboard_state = CombineLatestNode().observable(
-            self._keyboard.key_state(pygame.K_w),
-            self._keyboard.key_state(pygame.K_s),
-            self._keyboard.key_state(pygame.K_a),
-            self._keyboard.key_state(pygame.K_d),
-            self._keyboard.key_state(pygame.K_q),
-            self._keyboard.key_state(pygame.K_e),
-            self._keyboard.key_state(pygame.K_j),
-            self._keyboard.key_state(pygame.K_k),
-        )
-        gamepad_state = CombineLatestNode().observable(
-            self._gamepad.button_held(GamepadButton.EAST),
-            self._gamepad.button_held(GamepadButton.HOME),
-            self._gamepad.button_held(GamepadButton.PLUS),
-            self._gamepad.button_held(GamepadButton.MINUS),
-            self._gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT, 0.0),
-            self._gamepad.axis_value(GamepadAxis.TRIGGER_LEFT, 0.0),
-            self._gamepad.dpad_value(),
-            self._gamepad.stick_value("left", DEFAULT_GAMEPAD_AXIS_DEAD_ZONE),
-            self._gamepad.stick_value("right", MANDELBROT_RIGHT_STICK_DEAD_ZONE),
-        )
         stream = (
-            CombineLatestNode()
-            .observable(keyboard_state, gamepad_state)
-            .map(lambda latest: self._to_motion_state(*latest))
+            combine_latest(
+                self._keyboard.snapshot_stream().start_with(
+                    KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+                ),
+                self._gamepad.snapshot_stream().start_with(
+                    GamepadSnapshot(connected=False, identifier=None)
+                ),
+            )
+            .map(lambda latest: self._to_motion_state_from_snapshots(*latest))
             .distinct_until_changed()
 
         )
@@ -201,8 +188,7 @@ class MandelbrotControlProfile:
     @cached_property
     def _observable(self) -> StreamNode[MandelbrotControlState]:
         stream = (
-            CombineLatestNode()
-            .observable(self.motion_state, self._edge_state)
+            combine_latest(self.motion_state, self._edge_state)
             .map(lambda latest: self._to_compatibility_state(*latest))
             .distinct_until_changed()
 
@@ -295,9 +281,9 @@ class MandelbrotControlProfile:
         command: MandelbrotCommand,
     ) -> StreamNode[MandelbrotCommand]:
         return (
-            CombineLatestNode()
-            .observable(
-                self._gamepad.button_held(modifier), self._gamepad.button_held(primary)
+            combine_latest(
+                self._gamepad.button_held(modifier),
+                self._gamepad.button_held(primary),
             )
             .map(lambda latest: bool(latest[0]) and bool(latest[1]))
             .distinct_until_changed()
@@ -394,37 +380,53 @@ class MandelbrotControlProfile:
             palette_delta=command.palette_delta,
         )
 
-    def _to_motion_state(
-        self, keyboard_state: tuple[object, ...], gamepad_state: tuple[object, ...]
+    def _to_motion_state_from_snapshots(
+        self, keyboard_snapshot: KeyboardSnapshot, gamepad_snapshot: GamepadSnapshot
     ) -> MandelbrotMotionState:
-        key_w, key_s, key_a, key_d, key_q, key_e, key_j, key_k = keyboard_state
-        (
-            button_b_held,
-            button_home_held,
-            button_plus_held,
-            button_minus_held,
-            trigger_right,
-            trigger_left,
-            dpad,
-            left_stick,
-            right_stick,
-        ) = gamepad_state
-        keyboard_move_x = float(key_d.pressed) - float(key_a.pressed)
-        keyboard_move_y = float(key_s.pressed) - float(key_w.pressed)
-        zoom_in = bool(key_e.pressed) or trigger_right > 0.0
-        zoom_out = bool(key_q.pressed) or trigger_left > 0.0
-        increase_iterations = bool(key_j.pressed) or (
+        pressed_keys = keyboard_snapshot.pressed_keys
+        keyboard_move_x = float(pygame.K_d in pressed_keys) - float(
+            pygame.K_a in pressed_keys
+        )
+        keyboard_move_y = float(pygame.K_s in pressed_keys) - float(
+            pygame.K_w in pressed_keys
+        )
+        trigger_right = gamepad_snapshot.axis_value(
+            GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0
+        )
+        trigger_left = gamepad_snapshot.axis_value(
+            GamepadAxis.TRIGGER_LEFT, dead_zone=0.0
+        )
+        left_stick_x = gamepad_snapshot.axis_value(
+            GamepadAxis.LEFT_X, dead_zone=DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
+        )
+        left_stick_y = gamepad_snapshot.axis_value(
+            GamepadAxis.LEFT_Y, dead_zone=DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
+        )
+        right_stick_x = gamepad_snapshot.axis_value(
+            GamepadAxis.RIGHT_X, dead_zone=MANDELBROT_RIGHT_STICK_DEAD_ZONE
+        )
+        right_stick_y = gamepad_snapshot.axis_value(
+            GamepadAxis.RIGHT_Y, dead_zone=MANDELBROT_RIGHT_STICK_DEAD_ZONE
+        )
+        button_b_held = gamepad_snapshot.button_held(GamepadButton.EAST)
+        button_home_held = gamepad_snapshot.button_held(GamepadButton.HOME)
+        button_plus_held = gamepad_snapshot.button_held(GamepadButton.PLUS)
+        button_minus_held = gamepad_snapshot.button_held(GamepadButton.MINUS)
+        dpad = gamepad_snapshot.dpad
+        zoom_in = pygame.K_e in pressed_keys or trigger_right > 0.0
+        zoom_out = pygame.K_q in pressed_keys or trigger_left > 0.0
+        increase_iterations = pygame.K_j in pressed_keys or (
             not button_home_held and bool(button_plus_held)
         )
-        decrease_iterations = bool(key_k.pressed) or (
+        decrease_iterations = pygame.K_k in pressed_keys or (
             not button_home_held and bool(button_minus_held)
         )
         move_multiplier = 2.0 if button_b_held else 1.0
         return MandelbrotMotionState(
-            move_x=keyboard_move_x + dpad.x + left_stick.x,
-            move_y=keyboard_move_y - dpad.y - left_stick.y,
-            pan_x=right_stick.x,
-            pan_y=-right_stick.y,
+            move_x=keyboard_move_x + dpad.x + left_stick_x,
+            move_y=keyboard_move_y - dpad.y - left_stick_y,
+            pan_x=right_stick_x,
+            pan_y=-right_stick_y,
             move_multiplier=move_multiplier,
             home_modifier=bool(button_home_held),
             plus_held=bool(button_plus_held),
