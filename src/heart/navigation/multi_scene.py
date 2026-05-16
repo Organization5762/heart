@@ -38,7 +38,9 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         index = self._active_scene_index()
-        return [*self.scenes[index].get_renderers()]
+        active_scene = self.scenes[index]
+        self.device_display_mode = active_scene.device_display_mode
+        return [*active_scene.get_renderers()]
 
     def _create_initial_state(
         self,
@@ -57,9 +59,18 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         for scene in self.scenes:
             scene.initialize(window, peripheral_manager, orientation)
 
+        if self.scenes:
+            self.device_display_mode = self.scenes[
+                self._active_scene_index()
+            ].device_display_mode
+
         return state
 
     def real_process(self, window: DisplayContext, orientation: Orientation) -> None:
+        if self.scenes:
+            self.device_display_mode = self.scenes[
+                self._active_scene_index()
+            ].device_display_mode
         for render in self.get_renderers():
             render.real_process(window=window, orientation=orientation)
 

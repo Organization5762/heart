@@ -4,6 +4,7 @@ from pathlib import Path
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription, Size,
                                          SpritesheetLoop)
+from heart.renderers.vibe.oppi_renderer import OppiRenderer
 
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
@@ -32,22 +33,24 @@ class VibeState:
         frame_size: int,
         frame_count: int,
         duration_ms: int,
+        frame_height: int | None = None,
     ) -> list[FrameDescription]:
+        resolved_frame_height = frame_height or frame_size
         return [
             FrameDescription(
                 frame=BoundingBox(
                     x=frame_index * frame_size,
                     y=0,
                     w=frame_size,
-                    h=frame_size,
+                    h=resolved_frame_height,
                 ),
                 spriteSourceSize=BoundingBox(
                     x=0,
                     y=0,
                     w=frame_size,
-                    h=frame_size,
+                    h=resolved_frame_height,
                 ),
-                sourceSize=Size(w=frame_size, h=frame_size),
+                sourceSize=Size(w=frame_size, h=resolved_frame_height),
                 duration=duration_ms,
                 rotated=False,
                 trimmed=False,
@@ -94,5 +97,6 @@ class VibeState:
                     SUN_FRAME_DURATION_MS,
                 ),
             ),
+            OppiRenderer(),
         ]
         return VibeState(scenes=scenes)
