@@ -46,6 +46,7 @@ class GameLoop:
 
         self.max_fps = max_fps
         self.components = self._load_components()
+        self.peripheral_runtime_enabled = True
 
         # Lampe controller
         self.feedback_buffer: np.ndarray | None = None
@@ -150,8 +151,11 @@ class GameLoop:
         self._initialize_game_modes()
         logger.info("Ensuring display is initialized.")
         self._ensure_display_initialized()
-        logger.info("Configuring streaming.")
-        self.components.peripheral_runtime.configure_streaming()
+        if self.peripheral_runtime_enabled:
+            logger.info("Configuring streaming.")
+            self.components.peripheral_runtime.configure_streaming()
+        else:
+            logger.info("Peripheral runtime disabled; skipping streaming configuration.")
 
         try:
             self._run_main_loop()
@@ -287,9 +291,12 @@ class GameLoop:
         self._set_singleton()
         logger.info("Preparing display initialization.")
         self._initialize_screen()
-        logger.info("Preparing peripheral detection.")
-        self.components.peripheral_runtime.detect_and_start()
-        logger.info("Peripheral detection complete.")
+        if self.peripheral_runtime_enabled:
+            logger.info("Preparing peripheral detection.")
+            self.components.peripheral_runtime.detect_and_start()
+            logger.info("Peripheral detection complete.")
+        else:
+            logger.info("Peripheral runtime disabled; skipping peripheral detection.")
         self.initialized = True
 
     def _dim_display(self) -> None:
@@ -345,7 +352,8 @@ class GameLoop:
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
         while self.running:
-            self.components.peripheral_runtime.tick()
+            if self.peripheral_runtime_enabled:
+                self.components.peripheral_runtime.tick()
             self.running = self.components.event_handler.handle_events()
             self._preprocess_setup()  # can't dim display each time
             renderers = self._select_renderers()
@@ -354,7 +362,8 @@ class GameLoop:
 
             self.components.display.clock.tick(self.max_fps)
 
-            self.components.peripheral_runtime.tick()
-            self.components.peripheral_manager.clock.on_next(
-                self.components.display.clock
-            )
+            if self.peripheral_runtime_enabled:
+                self.components.peripheral_runtime.tick()
+                self.components.peripheral_manager.clock.on_next(
+                    self.components.display.clock
+                )
