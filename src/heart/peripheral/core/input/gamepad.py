@@ -215,16 +215,22 @@ class GamepadController:
             upstream_ids=("gamepad.snapshot",),
         ).connect(stream)
 
-    def _sample(self) -> GamepadSnapshot:
-        gamepad = self._active_gamepad()
-        if gamepad is None:
-            return GamepadSnapshot(
-                connected=False, identifier=None, timestamp_monotonic=time.monotonic()
+    def snapshots(self) -> tuple[GamepadSnapshot, ...]:
+        return tuple(
+            self.snapshot_for_gamepad(gamepad)
+            for gamepad in sorted(
+                self._gamepads(),
+                key=lambda candidate: candidate.joystick_id,
             )
+        )
+
+    def snapshot_for_gamepad(self, gamepad: Gamepad) -> GamepadSnapshot:
         gamepad.update()
         if not gamepad.is_connected():
             return GamepadSnapshot(
-                connected=False, identifier=None, timestamp_monotonic=time.monotonic()
+                connected=False,
+                identifier=None,
+                timestamp_monotonic=time.monotonic(),
             )
         mapping = self._mapping_for_gamepad(gamepad)
         buttons = {
@@ -287,11 +293,23 @@ class GamepadController:
             timestamp_monotonic=time.monotonic(),
         )
 
+    def _sample(self) -> GamepadSnapshot:
+        gamepad = self._active_gamepad()
+        if gamepad is None:
+            return GamepadSnapshot(
+                connected=False, identifier=None, timestamp_monotonic=time.monotonic()
+            )
+        return self.snapshot_for_gamepad(gamepad)
+
     def _active_gamepad(self) -> Gamepad | None:
-        for peripheral in self._manager.peripherals:
-            if isinstance(peripheral, Gamepad):
-                return peripheral
-        return None
+        return next(iter(self._gamepads()), None)
+
+    def _gamepads(self) -> tuple[Gamepad, ...]:
+        return tuple(
+            peripheral
+            for peripheral in self._manager.peripherals
+            if isinstance(peripheral, Gamepad)
+        )
 
     @staticmethod
     def _mapping_for_gamepad(gamepad: Gamepad) -> SwitchLikeMapping:
@@ -314,6 +332,13 @@ class GamepadController:
                 return GamepadDpadValue()
             return GamepadDpadValue(x=int(x_dir), y=int(y_dir))
         if mapping.get_dpad_type() is DpadType.BUTTONS:
+            if (
+                mapping.DPAD_RIGHT is None
+                or mapping.DPAD_LEFT is None
+                or mapping.DPAD_UP is None
+                or mapping.DPAD_DOWN is None
+            ):
+                return GamepadDpadValue()
             x_dir = int(gamepad.is_held(mapping.DPAD_RIGHT)) - int(
                 gamepad.is_held(mapping.DPAD_LEFT)
             )

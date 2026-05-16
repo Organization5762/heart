@@ -233,7 +233,12 @@ class Gamepad(Peripheral[Any]):
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
-            yield cls()
+            joystick_count = pygame.joystick.get_count()
+            if joystick_count == 0:
+                yield cls()
+                return
+            for joystick_id in range(joystick_count):
+                yield cls(joystick_id=joystick_id)
         except pygame.error:
             logger.exception("Error initializing joystick module")
             return
@@ -297,9 +302,10 @@ class Gamepad(Peripheral[Any]):
 
     def _read_from_gamepad(self, interval: int) -> None:
         try:
-            while Gamepad.gamepad_detected() and not self.is_connected():
+            joystick_count = pygame.joystick.get_count()
+            if self.joystick_id < joystick_count and not self.is_connected():
                 try:
-                    self.joystick = pygame.joystick.Joystick(0)
+                    self.joystick = pygame.joystick.Joystick(self.joystick_id)
                     self.joystick.init()
                     logger.info(f"{self.joystick.get_name()} ready")
                 except pygame.error as e:
@@ -309,7 +315,7 @@ class Gamepad(Peripheral[Any]):
                 except Exception:
                     pass
 
-            if not Gamepad.gamepad_detected() and self.is_connected():
+            if self.joystick_id >= joystick_count and self.is_connected():
                 cached_name = self.joystick.get_name() if self.joystick else None
                 self.reset()
                 if cached_name is not None:
@@ -321,7 +327,7 @@ class Gamepad(Peripheral[Any]):
             #  paired the 8bitdo controller with the raspberry pi.
             #  God help us if it ever unpairs.
             if Configuration.is_pi():
-                if not Gamepad.gamepad_detected():
+                if self.joystick_id == DEFAULT_JOYSTICK_ID and joystick_count == 0:
                     result = subprocess.run(
                         ["bluetoothctl", "connect", "E4:17:D8:37:C3:40"],
                         capture_output=True,

@@ -368,6 +368,47 @@ class TestManyfoldAccelerometerConfiguration:
 class TestManyfoldGamepadConfiguration:
     """Cover default graph-node factories so gamepad discovery stays Manyfold-owned."""
 
+    def test_detect_yields_one_gamepad_per_connected_controller(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setattr("pygame.joystick.quit", lambda: None)
+        monkeypatch.setattr("pygame.joystick.init", lambda: None)
+        monkeypatch.setattr("pygame.joystick.get_count", lambda: 2)
+
+        detected = list(Gamepad.detect())
+
+        assert [gamepad.joystick_id for gamepad in detected] == [0, 1]
+
+    def test_reader_connects_configured_joystick_id(
+        self,
+        monkeypatch,
+    ) -> None:
+        connected_ids: list[int] = []
+
+        class _Joystick:
+            def __init__(self, joystick_id: int) -> None:
+                connected_ids.append(joystick_id)
+
+            def init(self) -> None:
+                pass
+
+            def get_name(self) -> str:
+                return "test controller"
+
+        monkeypatch.setattr("pygame.joystick.get_count", lambda: 2)
+        monkeypatch.setattr("pygame.joystick.Joystick", _Joystick)
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+
+        gamepad = Gamepad(joystick_id=1)
+        gamepad._read_from_gamepad(0)
+
+        assert connected_ids == [1]
+        assert gamepad.is_connected()
+
     def test_gamepad_detection_node_publishes_detection_event(
         self,
         monkeypatch,
