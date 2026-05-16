@@ -5,21 +5,10 @@ from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription, Size,
                                          SpritesheetLoop)
 
-TUBE_SHEET_PATH = Path("vibe") / "tube_64x64_spritesheet.png"
-NO_LEGS_SHEET_PATH = Path("vibe") / "no_legs_128x128_spritesheet.png"
-SUNSLEEPER_SHEET_PATH = Path("vibe") / "sunsleeper_256x256_spritesheet.png"
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
 HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
-TUBE_FRAME_SIZE = 64
-TUBE_FRAME_COUNT = 29
-TUBE_FRAME_DURATION_MS = 250
-NO_LEGS_FRAME_SIZE = 128
-NO_LEGS_FRAME_COUNT = 14
-NO_LEGS_FRAME_DURATION_MS = 250
-SUNSLEEPER_FRAME_SIZE = 256
-SUNSLEEPER_FRAME_COUNT = 48
-SUNSLEEPER_FRAME_DURATION_MS = 274
+SUN_SHEET_PATH = Path("vibe") / "sun_64x64_spritesheet.png"
 SUNSLEEPER2_FRAME_SIZE = 64
 SUNSLEEPER2_FRAME_COUNT = 48
 SUNSLEEPER2_FRAME_DURATION_MS = 274
@@ -29,6 +18,9 @@ TREE_FRAME_DURATION_MS = 67
 HEART_FRAME_SIZE = 64
 HEART_FRAME_COUNT = 44
 HEART_FRAME_DURATION_MS = 30
+SUN_FRAME_SIZE = 64
+SUN_FRAME_COUNT = 60
+SUN_FRAME_DURATION_MS = 30
 
 
 @dataclass
@@ -67,33 +59,6 @@ class VibeState:
     def build() -> "VibeState":
         scenes: list[StatefulBaseRenderer] = [
             SpritesheetLoop(
-                sheet_file_path=str(TUBE_SHEET_PATH),
-                disable_input=True,
-                frame_data=VibeState._frame_data(
-                    TUBE_FRAME_SIZE,
-                    TUBE_FRAME_COUNT,
-                    TUBE_FRAME_DURATION_MS,
-                ),
-            ),
-            SpritesheetLoop(
-                sheet_file_path=str(NO_LEGS_SHEET_PATH),
-                disable_input=True,
-                frame_data=VibeState._frame_data(
-                    NO_LEGS_FRAME_SIZE,
-                    NO_LEGS_FRAME_COUNT,
-                    NO_LEGS_FRAME_DURATION_MS,
-                ),
-            ),
-            SpritesheetLoop(
-                sheet_file_path=str(SUNSLEEPER_SHEET_PATH),
-                disable_input=True,
-                frame_data=VibeState._frame_data(
-                    SUNSLEEPER_FRAME_SIZE,
-                    SUNSLEEPER_FRAME_COUNT,
-                    SUNSLEEPER_FRAME_DURATION_MS,
-                ),
-            ),
-            SpritesheetLoop(
                 sheet_file_path=str(SUNSLEEPER2_SHEET_PATH),
                 disable_input=True,
                 frame_data=VibeState._frame_data(
@@ -118,6 +83,15 @@ class VibeState:
                     HEART_FRAME_SIZE,
                     HEART_FRAME_COUNT,
                     HEART_FRAME_DURATION_MS,
+                ),
+            ),
+            SpritesheetLoop(
+                sheet_file_path=str(SUN_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    SUN_FRAME_SIZE,
+                    SUN_FRAME_COUNT,
+                    SUN_FRAME_DURATION_MS,
                 ),
             ),
         ]
