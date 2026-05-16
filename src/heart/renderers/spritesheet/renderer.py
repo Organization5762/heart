@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pygame
+
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.renderers import StatefulBaseRenderer
@@ -54,6 +56,7 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
 
         self.provider = resolved_provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self._brightness = 1.0
         super().__init__(builder=self.provider)
 
     @classmethod
@@ -80,6 +83,10 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         )
         return cls(provider)
 
+    def brightness(self, value: float) -> SpritesheetLoop:
+        self._brightness = value
+        return self
+
     def real_process(
         self,
         window: DisplayContext,
@@ -100,6 +107,16 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
                 int(screen_height * self.provider.image_scale),
             ),
         )
+
+        if self._brightness != 1.0:
+            brightness_level = max(0, min(255, round(255 * self._brightness)))
+            adjusted = scaled.copy()
+            adjusted.fill(
+                (brightness_level, brightness_level, brightness_level),
+                special_flags=pygame.BLEND_RGB_MULT,
+            )
+            scaled = adjusted
+
         center_x = (screen_width - scaled.get_width()) // 2
         center_y = (screen_height - scaled.get_height()) // 2
 
