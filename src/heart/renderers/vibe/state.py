@@ -10,6 +10,7 @@ NO_LEGS_SHEET_PATH = Path("vibe") / "no_legs_128x128_spritesheet.png"
 SUNSLEEPER_SHEET_PATH = Path("vibe") / "sunsleeper_256x256_spritesheet.png"
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
+HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
 TUBE_FRAME_SIZE = 64
 TUBE_FRAME_COUNT = 29
 TUBE_FRAME_DURATION_MS = 250
@@ -25,6 +26,9 @@ SUNSLEEPER2_FRAME_DURATION_MS = 274
 TREE_FRAME_SIZE = 384
 TREE_FRAME_COUNT = 19
 TREE_FRAME_DURATION_MS = 67
+HEART_FRAME_SIZE = 64
+HEART_FRAME_COUNT = 44
+HEART_FRAME_DURATION_MS = 30
 
 
 @dataclass
@@ -105,6 +109,15 @@ class VibeState:
                     TREE_FRAME_SIZE,
                     TREE_FRAME_COUNT,
                     TREE_FRAME_DURATION_MS,
+                ),
+            ),
+            SpritesheetLoop(
+                sheet_file_path=str(HEART_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    HEART_FRAME_SIZE,
+                    HEART_FRAME_COUNT,
+                    HEART_FRAME_DURATION_MS,
                 ),
             ),
         ]
