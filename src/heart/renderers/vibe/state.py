@@ -22,6 +22,7 @@ HEART_FRAME_DURATION_MS = 30
 SUN_FRAME_SIZE = 64
 SUN_FRAME_COUNT = 60
 SUN_FRAME_DURATION_MS = 30
+SUN2_BRIGHTNESS = 0.8
 
 
 @dataclass
@@ -97,6 +98,15 @@ class VibeState:
                     SUN_FRAME_DURATION_MS,
                 ),
             ),
+            SpritesheetLoop(
+                sheet_file_path=str(SUN_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    SUN_FRAME_SIZE,
+                    SUN_FRAME_COUNT,
+                    SUN_FRAME_DURATION_MS,
+                ),
+            ).brightness(SUN2_BRIGHTNESS),
             OppiRenderer(),
         ]
         return VibeState(scenes=scenes)
