@@ -4,12 +4,14 @@ from pathlib import Path
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription, Size,
                                          SpritesheetLoop)
+from heart.renderers.vibe.overmono_runner import OvermonoRunner
 from heart.renderers.vibe.oppi_renderer import OppiRenderer
 
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
 HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
 SUN_SHEET_PATH = Path("vibe") / "sun_64x64_spritesheet.png"
+OVERMONO_SHEET_PATH = Path("vibe") / "overmono_64x64_spritesheet.png"
 SUNSLEEPER2_FRAME_SIZE = 64
 SUNSLEEPER2_FRAME_COUNT = 48
 SUNSLEEPER2_FRAME_DURATION_MS = 274
@@ -23,6 +25,9 @@ SUN_FRAME_SIZE = 64
 SUN_FRAME_COUNT = 60
 SUN_FRAME_DURATION_MS = 30
 SUN2_BRIGHTNESS = 0.8
+OVERMONO_FRAME_SIZE = 64
+OVERMONO_FRAME_COUNT = 2
+OVERMONO_FRAME_DURATION_MS = 375
 
 
 @dataclass
@@ -107,6 +112,16 @@ class VibeState:
                     SUN_FRAME_DURATION_MS,
                 ),
             ).brightness(SUN2_BRIGHTNESS),
+            SpritesheetLoop(
+                sheet_file_path=str(OVERMONO_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    OVERMONO_FRAME_SIZE,
+                    OVERMONO_FRAME_COUNT,
+                    OVERMONO_FRAME_DURATION_MS,
+                ),
+            ),
+            OvermonoRunner(),
             OppiRenderer(),
         ]
         return VibeState(scenes=scenes)
