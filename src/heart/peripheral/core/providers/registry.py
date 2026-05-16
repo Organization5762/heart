@@ -22,9 +22,7 @@ def register_provider(key: ProviderKey, provider: ProviderValue) -> None:
         _register_container_provider(container, key, provider)
 
 
-def register_singleton_provider(
-    key: ProviderKey, provider: ProviderValue
-) -> None:
+def register_singleton_provider(key: ProviderKey, provider: ProviderValue) -> None:
     register_provider(key, Singleton(provider))
 
 

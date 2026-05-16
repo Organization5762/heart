@@ -27,9 +27,15 @@ class TestPeripheralIrSensorArray:
         queue = IRArrayDMAQueue(buffer_size=2)
 
         samples = [
-            IRSample(frame_id=1, sensor_index=0, timestamp=0.001, level=1, duration_us=500),
-            IRSample(frame_id=1, sensor_index=1, timestamp=0.0015, level=0, duration_us=750),
-            IRSample(frame_id=2, sensor_index=0, timestamp=0.002, level=1, duration_us=900),
+            IRSample(
+                frame_id=1, sensor_index=0, timestamp=0.001, level=1, duration_us=500
+            ),
+            IRSample(
+                frame_id=1, sensor_index=1, timestamp=0.0015, level=0, duration_us=750
+            ),
+            IRSample(
+                frame_id=2, sensor_index=0, timestamp=0.002, level=1, duration_us=900
+            ),
         ]
 
         for sample in samples:
@@ -45,8 +51,6 @@ class TestPeripheralIrSensorArray:
         assert second is not None
         assert second.buffer_id == 1
         assert second.samples == (samples[2],)
-
-
 
     def test_multilateration_solver_converges_on_known_point(self):
         """Verify that multilateration solver converges on known point. This keeps the system behaviour reliable for operators."""

@@ -5,15 +5,11 @@ from functools import cache
 from typing import Any, Iterator, Self, cast
 
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold import EmptyNode, Timer
 
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Peripheral, PeripheralEventNode
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (input_scheduler,
-                                               interval_in_background,
-                                               pipe_in_main_thread)
 
 logger = get_logger(__name__)
 
@@ -63,7 +59,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             cls.get(pygame.K_UP),
             cls.get(pygame.K_DOWN),
             cls.get(pygame.K_LEFT),
-            cls.get(pygame.K_RIGHT)
+            cls.get(pygame.K_RIGHT),
         ]
 
     @classmethod
@@ -71,7 +67,7 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
     def get(cls, key: int) -> Self:
         return cls(key)
 
-    def _event_stream(self) -> reactivex.Observable[KeyboardEvent]:
+    def _event_stream(self) -> PeripheralEventNode[KeyboardEvent]:
         """
         Periodically sample keyboard state as KeyboardEvent edges.
 
@@ -83,18 +79,14 @@ class KeyboardKey(Peripheral[KeyboardEvent]):
             return result
 
         if Configuration.is_pi() and not Configuration.is_x11_forward():
-            # empty() is typed as Observable[NoReturn | Never] so we cast it
-            # to keep type checkers happy about the return type.
-            return cast(reactivex.Observable[KeyboardEvent], reactivex.empty())
+            return EmptyNode().observable()
 
-        return pipe_in_main_thread(
-            interval_in_background(
-                period=timedelta(milliseconds=5),
-                scheduler=input_scheduler(),
-            ),
-            ops.map(_poll),
-            ops.filter(lambda event: event is not None),
-            ops.map(lambda event: cast(KeyboardEvent, event)),
+        return (
+            Timer(period=timedelta(milliseconds=5))
+            .then_on_main_thread()
+            .map(_poll)
+            .filter(lambda event: event is not None)
+            .map(lambda event: cast(KeyboardEvent, event))
         )
 
     def _check_if_pressed(self) -> KeyboardEvent | None:

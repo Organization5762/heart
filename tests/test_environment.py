@@ -1,4 +1,3 @@
-
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
@@ -27,8 +26,4 @@ class TestEnvironment:
             )
 
         # https://chatgpt.com/share/68056214-a5e4-8001-8fd0-ca966dbecf9b
-        benchmark(
-            lambda: loop._one_loop(
-                mode.renderers
-            )
-        )
+        benchmark(lambda: loop._one_loop(mode.renderers))

@@ -8,8 +8,35 @@ SEMGREP_CONFIG ?= semgrep.yml
 SEMGREP_TARGETS ?= src
 SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --metrics=off --disable-version-check
 SEMGREP_EXTRA_ARGS ?=
+DEBUG_PANEL_ROWS ?= 64
+DEBUG_PANEL_COLS ?= 64
+DEBUG_CHAIN_LENGTH ?= 1
+DEBUG_PARALLEL ?= 1
+PIO_BENCH_CHAIN_LENGTH ?= 1
+PIO_BENCH_FRAME_COUNT ?= 64
+PIO_BENCH_ITERATIONS ?= 5
+PIO_BENCH_PANEL_COLS ?= 64
+PIO_BENCH_PANEL_ROWS ?= 64
+PIO_BENCH_PARALLEL ?= 1
+PIO_BENCH_PIPELINE_DEPTH ?= 2
+PIO_BENCH_PWM_BITS ?= 11
+PIO_BENCH_SCAN_CLOCK_DIVIDER ?= 1.0
+PIO_BENCH_SCAN_LSB_DWELL_TICKS ?= 2
 PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
-.PHONY: install pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session fractal
+.PHONY: install bootstrap-native debug-matrix-pinctrl test-matrix-pinctrl pi_install format check semgrep test build check-harness build-info doctor focus focus-watch dev-session fractal run debug-gamepad
+
+bootstrap-native:
+	@bash scripts/bootstrap_native_runtime.sh
+
+debug-matrix-pinctrl:
+	@uv run python -m heart.device.rgb_display.debug \
+		--panel-rows $(DEBUG_PANEL_ROWS) \
+		--panel-cols $(DEBUG_PANEL_COLS) \
+		--chain-length $(DEBUG_CHAIN_LENGTH) \
+		--parallel $(DEBUG_PARALLEL)
+
+test-matrix-pinctrl:
+	@HEART_RUN_PI5_PINCTRL_TESTS=1 uv run pytest -n0 tests/device/test_rgb_display_pinctrl_debug.py
 
 install:
 	@set -e; \
@@ -85,11 +112,11 @@ fractal:
 	@UV_CACHE_DIR=.uv-cache uv run python -c "from heart.renderers.three_fractal.renderer import main; main()"
 
 run:
-	@uv run totem run --configuration $(RUN_CONFIGURATION)
+	@FORWARD_TO_BEATS_APP=1 BEATS_WEBSOCKET_BIND_HOST=0.0.0.0 uv run totem run --configuration $(RUN_CONFIGURATION)
 
 debug-gamepad:
 	@UV_CACHE_DIR=.uv-cache uv run python scripts/debug/gamepad_probe.py
 
 pi_install:
 	@sudo bash packages/heart-device-manager/src/heart_device_manager/install_rgb_matrix.sh
-	@sudo uv pip install --system -e . --break-system-packages
+	@sudo uv pip install --system -e '.[native]' --break-system-packages

@@ -1,24 +1,69 @@
 import subprocess
 import time
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from enum import StrEnum
 from typing import Any, Iterator, Self
 
 import pygame.joystick
+from manyfold import (DetectionNode, Layer, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, Timer, TypedRoute, Variant,
+                      route)
+from manyfold.sensor_io import SensorEvent, sensor_event_schema
 from pygame.event import Event
 
-from heart.peripheral.core import Peripheral, events
+from heart.peripheral.core import (Peripheral, PeripheralInfo, PeripheralTag,
+                                   events)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import (interval_in_background,
-                                               pipe_in_main_thread)
 
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
 DEFAULT_JOYSTICK_ID = 0
 DEFAULT_AXIS_DEAD_ZONE = 0.0
 DEFAULT_AXIS_THRESHOLD = 0.0
+GAMEPAD_GRAPH_OWNER = OwnerName("heart.gamepad")
+GAMEPAD_GRAPH_FAMILY = StreamFamily("peripheral")
+
+
+def gamepad_detection_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=GAMEPAD_GRAPH_OWNER,
+        family=GAMEPAD_GRAPH_FAMILY,
+        stream=StreamName("detected"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartGamepadDetectionEvent"),
+    )
+
+
+def gamepad_exception_schema() -> Schema[BaseException]:
+    def encode(exc: BaseException) -> bytes:
+        return f"{type(exc).__name__}:{exc}".encode("utf-8")
+
+    def decode(payload: bytes) -> BaseException:
+        return RuntimeError(payload.decode("utf-8"))
+
+    return Schema(
+        schema_id="PythonException",
+        version=1,
+        encode=encode,
+        decode=decode,
+    )
+
+
+def gamepad_error_route() -> TypedRoute[BaseException]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=GAMEPAD_GRAPH_OWNER,
+        family=GAMEPAD_GRAPH_FAMILY,
+        stream=StreamName("errors"),
+        variant=Variant.Meta,
+        schema=gamepad_exception_schema(),
+    )
 
 
 class GamepadIdentifier(StrEnum):
@@ -193,6 +238,56 @@ class Gamepad(Peripheral[Any]):
             logger.exception("Error initializing joystick module")
             return
 
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        detector: Callable[[], Iterable["Gamepad"]] | None = None,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or gamepad_detection_route()
+
+        def mapper(peripheral: "Gamepad") -> SensorEvent:
+            joystick_name = None
+            if peripheral.joystick is not None:
+                joystick_name = peripheral.joystick.get_name()
+            return SensorEvent(
+                event_type="peripheral.gamepad.detected",
+                data={
+                    "joystick_id": peripheral.joystick_id,
+                    "connected": peripheral.is_connected(),
+                    "name": joystick_name,
+                },
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        return DetectionNode(
+            name="heart-gamepad-detection",
+            detector=detector or cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            error_route=gamepad_error_route(),
+            group="gamepad-detection",
+            start_immediately=start_immediately,
+        )
+
+    def peripheral_info(self) -> PeripheralInfo:
+        tags = [
+            PeripheralTag(name="input_variant", variant="gamepad"),
+        ]
+        if self.joystick is not None:
+            tags.append(
+                PeripheralTag(name="gamepad_name", variant=self.joystick.get_name())
+            )
+        return PeripheralInfo(
+            id=f"gamepad:{self.joystick_id}",
+            tags=tags,
+        )
+
     def is_connected(self) -> bool:
         return self.joystick is not None
 
@@ -249,12 +344,10 @@ class Gamepad(Peripheral[Any]):
 
         # macOS AppKit requires SDL event and joystick APIs to run on the process
         # main thread, so route both polling loops through the frame-thread queue.
-        pipe_in_main_thread(
-            interval_in_background(period=timedelta(seconds=1))
-        ).subscribe(
+        Timer(period=timedelta(seconds=1)).then_on_main_thread().subscribe(
             on_next=self._read_from_gamepad,
         )
 
-        pipe_in_main_thread(
-            interval_in_background(period=timedelta(milliseconds=20))
-        ).subscribe(on_next=lambda _: self._update())
+        Timer(period=timedelta(milliseconds=20)).then_on_main_thread().subscribe(
+            on_next=lambda _: self._update()
+        )

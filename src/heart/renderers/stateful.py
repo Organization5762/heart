@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Generic
 
-from reactivex import Observable
-from reactivex.disposable import Disposable
+from manyfold import StreamNode
+from manyfold.graph import SubscriptionLike
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -22,12 +22,14 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         **kwargs,
     ) -> None:
         if builder is not None and state is not None:
-            raise ValueError("StatefulBaseRenderer accepts a builder or state, not both")
+            raise ValueError(
+                "StatefulBaseRenderer accepts a builder or state, not both"
+            )
 
         self.builder = builder or (
             StaticStateProvider(state) if state is not None else None
         )
-        self._subscription: Disposable | None = None
+        self._subscription: SubscriptionLike | None = None
         super().__init__(*args, **kwargs)
         if state is not None:
             self.set_state(state)
@@ -36,7 +38,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def state_observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> Observable[StateT]:
+    ) -> StreamNode[StateT]:
         assert self.builder is not None
         return self.builder.observable(peripheral_manager)
 

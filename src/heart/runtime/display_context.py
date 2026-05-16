@@ -29,7 +29,9 @@ class DisplayContext:
         self._ensure_mode(device_display_mode)
 
     @contextmanager
-    def display_mode(self, device_display_mode: DeviceDisplayMode) -> Iterator[DisplayContext]:
+    def display_mode(
+        self, device_display_mode: DeviceDisplayMode
+    ) -> Iterator[DisplayContext]:
         self._ensure_can_configure_display()
         previous_mode = self.last_render_mode
         changed = self._ensure_mode(device_display_mode)
@@ -45,14 +47,15 @@ class DisplayContext:
             raise
 
     def initialize(self) -> None:
+        logger.info("Initializing pygame display context.")
         pygame.init()
         if self.screen is None:
-            self._apply_mode(
-                DeviceDisplayMode.FULL.to_pygame_mode()
-            )
+            self._apply_mode(DeviceDisplayMode.FULL.to_pygame_mode())
         if Configuration.is_pi() and not Configuration.is_x11_forward():
+            logger.info("Enabling input grab for Pi display context.")
             pygame.event.set_grab(True)
         self.clock = pygame.time.Clock()
+        logger.info("Pygame display context initialized.")
 
     def ensure_initialized(self) -> None:
         if self.clock is None or self.screen is None:
@@ -75,10 +78,12 @@ class DisplayContext:
         return True
 
     def _apply_mode(self, target_mode: int) -> None:
+        logger.info("Applying pygame display mode %s.", target_mode)
         pygame.display.init()
         new_screen = pygame.display.set_mode(self._display_size(), target_mode)
         self.set_screen(new_screen)
         self.last_render_mode = target_mode
+        logger.info("Applied pygame display mode %s.", target_mode)
 
     def _display_size(self) -> tuple[int, int]:
         return self.device.scaled_display_size()
@@ -86,7 +91,9 @@ class DisplayContext:
     def _ensure_can_configure_display(self) -> None:
         if self.can_configure_display:
             return
-        raise RuntimeError("Scratch DisplayContext instances cannot change display modes")
+        raise RuntimeError(
+            "Scratch DisplayContext instances cannot change display modes"
+        )
 
     # Emulate screen
     def get_size(self) -> tuple[int, int]:

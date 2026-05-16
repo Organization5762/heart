@@ -1,6 +1,6 @@
 from typing import Any, Iterable
 
-import reactivex
+from manyfold import Graph
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
@@ -13,10 +13,10 @@ from heart.peripheral.core.input import (AccelerometerController,
                                          KeyboardController,
                                          MandelbrotControlProfile,
                                          NavigationProfile)
-from heart.peripheral.core.streams import PeripheralStreams
+from heart.peripheral.core.streams import GraphRouteStream, PeripheralStreams
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
-from heart.peripheral.switch import BluetoothSwitch, SwitchState
+from heart.peripheral.switch import BluetoothSwitch
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,21 +33,31 @@ class PeripheralManager:
         configuration_loader: PeripheralConfigurationLoader | None = None,
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
+        self._graph = Graph()
+        self._graph_node_handles: list[Any] = []
         self._started = False
         if configuration_loader and (configuration or configuration_registry):
             raise ValueError(
                 "Provide configuration_loader or configuration/configuration_registry, not both."
             )
-        self._configuration_loader = configuration_loader or PeripheralConfigurationLoader(
-            configuration=configuration,
-            registry=configuration_registry,
+        self._configuration_loader = (
+            configuration_loader
+            or PeripheralConfigurationLoader(
+                configuration=configuration,
+                registry=configuration_registry,
+            )
         )
-        self._streams = PeripheralStreams(self._iter_peripherals)
+        self._streams = PeripheralStreams(self._graph, self._iter_peripherals)
         self._debug_tap = InputDebugTap()
-        self._frame_tick_controller = FrameTickController(self._debug_tap)
+        self._frame_tick_controller = FrameTickController(
+            self._debug_tap,
+            graph=self._graph,
+        )
         self._keyboard_controller = KeyboardController(self._debug_tap)
         self._gamepad_controller = GamepadController(self, self._debug_tap)
-        self._external_sensor_hub = ExternalSensorHub(self._debug_tap)
+        self._external_sensor_hub = ExternalSensorHub(
+            self._debug_tap, graph=self._graph
+        )
         self._navigation_profile = NavigationProfile(
             keyboard_controller=self._keyboard_controller,
             gamepad_controller=self._gamepad_controller,
@@ -63,6 +73,7 @@ class PeripheralManager:
             frame_tick_controller=self._frame_tick_controller,
             debug_tap=self._debug_tap,
             external_sensor_hub=self._external_sensor_hub,
+            graph=self._graph,
         )
         self._mandelbrot_control_profile = MandelbrotControlProfile(
             keyboard_controller=self._keyboard_controller,
@@ -82,19 +93,42 @@ class PeripheralManager:
     def configuration_registry(self) -> PeripheralConfigurationRegistry:
         return self._configuration_loader.registry
 
+    @property
+    def graph(self) -> Graph:
+        return self._graph
+
+    @property
+    def graph_node_handles(self) -> tuple[Any, ...]:
+        return tuple(self._graph_node_handles)
+
     def detect(self) -> None:
-        for peripheral in self._iter_detected_peripherals():
+        configuration = self._ensure_configuration()
+        for peripheral in self._iter_detected_peripherals(configuration):
             self._register_peripheral(peripheral)
 
-        self._ensure_configuration()
+        for graph_node_factory in configuration.graph_nodes:
+            graph_node = graph_node_factory(
+                start_immediately=True,
+                on_detect=lambda peripheral, _access: self._register_peripheral(
+                    peripheral
+                ),
+            )
+            handle = graph_node.install(self._graph)
+            self._graph_node_handles.append(handle)
+            node_handle = getattr(handle, "node_handle", None)
+            if node_handle is not None:
+                node_handle.join()
 
     def register(self, peripheral: Peripheral[Any]) -> None:
         """Manually register ``peripheral`` with the manager."""
 
         self._register_peripheral(peripheral)
 
-    def _iter_detected_peripherals(self) -> Iterable[Peripheral[Any]]:
-        for detector in self._ensure_configuration().detectors:
+    def _iter_detected_peripherals(
+        self,
+        configuration: PeripheralConfiguration,
+    ) -> Iterable[Peripheral[Any]]:
+        for detector in configuration.detectors:
             yield from detector()
 
     def _ensure_configuration(self) -> PeripheralConfiguration:
@@ -112,13 +146,21 @@ class PeripheralManager:
             logger.info(f"Attempting to start peripheral '{peripheral}'")
             peripheral.run()
 
+    def stop(self) -> None:
+        for handle in reversed(self._graph_node_handles):
+            dispose = getattr(handle, "dispose", None)
+            if dispose is not None:
+                dispose(timeout=1.0)
+
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         self._peripherals.append(peripheral)
 
-    def get_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+    def get_main_switch_subscription(self) -> Any:
         return self._streams.main_switch_subscription()
 
-    def get_physical_main_switch_subscription(self) -> reactivex.Observable[SwitchState]:
+    def get_physical_main_switch_subscription(
+        self,
+    ) -> Any:
         return self._streams.physical_main_switch_subscription()
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
@@ -134,15 +176,15 @@ class PeripheralManager:
         return None
 
     @property
-    def game_tick(self) -> reactivex.Subject[Any]:
+    def game_tick(self) -> GraphRouteStream[Any]:
         return self._streams.game_tick
 
     @property
-    def window(self) -> reactivex.Subject[Any]:
+    def window(self) -> GraphRouteStream[Any]:
         return self._streams.window
 
     @property
-    def clock(self) -> reactivex.Subject[Any]:
+    def clock(self) -> GraphRouteStream[Any]:
         return self._streams.clock
 
     @property

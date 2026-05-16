@@ -58,5 +58,9 @@ class SystemConfiguration:
         return _env_flag("FORWARD_TO_BEATS_APP", default=False)
 
     @classmethod
+    def stream_beats_input_debug(cls) -> bool:
+        return _env_flag("BEATS_STREAM_INPUT_DEBUG", default=False)
+
+    @classmethod
     def peripheral_configuration(cls) -> str:
         return os.environ.get("PERIPHERAL_CONFIGURATION", "default")

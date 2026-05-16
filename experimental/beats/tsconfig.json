@@ -28,7 +28,6 @@
     "src/**/*",
     ".storybook/**/*",
     "./package.json",
-    "./forge.config.ts",
     "*.mts",
     "vite.renderer.config.mts"
   ]

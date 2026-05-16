@@ -2,18 +2,19 @@
 
 import pygame
 import pytest
-from reactivex.subject import BehaviorSubject
+from manyfold import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
-from heart.peripheral.core.input import FrameTick
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription,
                                          LoopPhase, Size, SpritesheetLoop)
 from heart.runtime.display_context import DisplayContext
 
 
-class _StubSpritesheet:
+class _SpriteSheetProbe:
     def __init__(self) -> None:
         self.calls: list[tuple[int, int, int, int]] = []
 
@@ -33,69 +34,23 @@ class _StubSpritesheet:
         return pygame.transform.scale(image, size)
 
 
-class _StubGamepad:
-    def __init__(self, *, connected: bool = False) -> None:
-        self._connected = connected
-        self.axis_thresholds: dict[int, bool] = {}
-        self.held_buttons: dict[int, bool] = {}
-
-    def is_connected(self) -> bool:
-        return self._connected
-
-    def axis_passed_threshold(self, axis: int) -> bool:
-        return self.axis_thresholds.get(axis, False)
-
-    def is_held(self, button: int) -> bool:
-        return self.held_buttons.get(button, False)
+def _peripheral_manager(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    gamepad: Gamepad | None = None,
+) -> tuple[PeripheralManager, BehaviorSubject[SwitchState]]:
+    manager = PeripheralManager()
+    switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
+    monkeypatch.setattr(manager, "get_main_switch_subscription", lambda: switch_stream)
+    if gamepad is not None:
+        manager.register(gamepad)
+    return manager, switch_stream
 
 
-class _StubPeripheralManager:
-    class _StubFrameTickController:
-        def __init__(self) -> None:
-            self._stream = BehaviorSubject(
-                FrameTick(
-                    frame_index=0,
-                    delta_ms=0.0,
-                    delta_s=0.0,
-                    monotonic_s=0.0,
-                    fps=None,
-                )
-            )
-            self._frame_index = 1
-
-        def observable(self):
-            return self._stream
-
-        def emit(self, *, delta_ms: float) -> None:
-            self._stream.on_next(
-                FrameTick(
-                    frame_index=self._frame_index,
-                    delta_ms=delta_ms,
-                    delta_s=delta_ms / 1000.0,
-                    monotonic_s=float(self._frame_index),
-                    fps=None,
-                )
-            )
-            self._frame_index += 1
-
-    def __init__(
-        self,
-        *,
-        switch_state: SwitchState | None = None,
-        gamepad: _StubGamepad | None = None,
-    ) -> None:
-        self._switch_state = switch_state or SwitchState(0, 0, 0, 0, 0)
-        self._gamepad = gamepad
-        self._switch_stream = BehaviorSubject(self._switch_state)
-        self.frame_tick_controller = self._StubFrameTickController()
-
-    def get_main_switch_subscription(self):
-        return self._switch_stream
-
-    def get_gamepad(self):
-        if self._gamepad is None:
-            raise ValueError("No gamepad available")
-        return self._gamepad
+def _advance_frame(
+    manager: PeripheralManager, clock_factory, *, delta_ms: float
+) -> None:
+    manager.frame_tick_controller.advance(clock_factory(int(delta_ms)))
 
 
 @pytest.fixture
@@ -136,8 +91,8 @@ class TestSpritesheetLoopProvider:
     ) -> None:
         """Ensure boomerang loops stay within frame bounds so animations remain stable."""
 
-        manager = _StubPeripheralManager()
-        spritesheet = _StubSpritesheet()
+        manager, _ = _peripheral_manager(monkeypatch)
+        spritesheet = _SpriteSheetProbe()
         monkeypatch.setattr(
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
@@ -152,7 +107,7 @@ class TestSpritesheetLoopProvider:
 
         history = []
         for _ in range(15):
-            manager.frame_tick_controller.emit(delta_ms=150.0)
+            _advance_frame(manager, stub_clock_factory, delta_ms=150.0)
             history.append(renderer.state)
 
         assert all(0 <= state.current_frame < len(frame_data) for state in history)
@@ -170,9 +125,9 @@ class TestSpritesheetLoopProvider:
     ) -> None:
         """Confirm reset/reinitialize cycles keep spritesheet assets attached for continuity."""
 
-        gamepad = _StubGamepad()
-        manager = _StubPeripheralManager(gamepad=gamepad)
-        spritesheet = _StubSpritesheet()
+        gamepad = Gamepad()
+        manager, _ = _peripheral_manager(monkeypatch, gamepad=gamepad)
+        spritesheet = _SpriteSheetProbe()
         monkeypatch.setattr(
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
@@ -184,7 +139,7 @@ class TestSpritesheetLoopProvider:
             frame_data=frame_data,
         )
         renderer.initialize(window, manager, orientation)
-        manager.frame_tick_controller.emit(delta_ms=0.0)
+        _advance_frame(manager, stub_clock_factory, delta_ms=0.0)
 
         renderer.reset()
         renderer.initialize(window, manager, orientation)
@@ -205,13 +160,12 @@ class TestSpritesheetLoopProvider:
         frame_data: list[FrameDescription],
         window: DisplayContext,
         orientation: Rectangle,
-        stub_clock_factory,
     ) -> None:
         """Verify switch rotation updates duration scaling to keep input-driven pacing responsive."""
 
-        gamepad = _StubGamepad()
-        manager = _StubPeripheralManager(gamepad=gamepad)
-        spritesheet = _StubSpritesheet()
+        gamepad = Gamepad()
+        manager, switch_stream = _peripheral_manager(monkeypatch, gamepad=gamepad)
+        spritesheet = _SpriteSheetProbe()
         monkeypatch.setattr(
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
@@ -224,14 +178,14 @@ class TestSpritesheetLoopProvider:
         )
         renderer.initialize(window, manager, orientation)
 
-        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))
-        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 25, 0))
+        switch_stream.on_next(SwitchState(0, 0, 0, 10, 0))
+        switch_stream.on_next(SwitchState(0, 0, 0, 25, 0))
 
         state_after_increase = renderer.state
         assert state_after_increase.duration_scale == pytest.approx(0.10)
         assert state_after_increase.last_switch_rotation == 25
 
-        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 5, 0))
+        switch_stream.on_next(SwitchState(0, 0, 0, 5, 0))
         state_after_decrease = renderer.state
         assert state_after_decrease.duration_scale == pytest.approx(0.05)
         assert state_after_decrease.last_switch_rotation == 5
@@ -242,12 +196,11 @@ class TestSpritesheetLoopProvider:
         frame_data: list[FrameDescription],
         window: DisplayContext,
         orientation: Rectangle,
-        stub_clock_factory,
     ) -> None:
         """Ensure switch events do not mutate state when input handling is disabled."""
 
-        manager = _StubPeripheralManager()
-        spritesheet = _StubSpritesheet()
+        manager, switch_stream = _peripheral_manager(monkeypatch)
+        spritesheet = _SpriteSheetProbe()
         monkeypatch.setattr(
             assets_loader.Loader, "load_spirtesheet", lambda path: spritesheet
         )
@@ -261,5 +214,5 @@ class TestSpritesheetLoopProvider:
         renderer.initialize(window, manager, orientation)
 
         initial_state = renderer.state
-        manager.get_main_switch_subscription().on_next(SwitchState(0, 0, 0, 10, 0))
+        switch_stream.on_next(SwitchState(0, 0, 0, 10, 0))
         assert renderer.state == initial_state

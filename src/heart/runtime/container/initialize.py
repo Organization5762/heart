@@ -66,7 +66,10 @@ def configure_runtime_container(
         override_keys,
     )
     _define_default(
-        container, PeripheralManager, Singleton(_build_peripheral_manager), override_keys
+        container,
+        PeripheralManager,
+        Singleton(_build_peripheral_manager),
+        override_keys,
     )
     _define_default(
         container, InputDebugTap, Singleton(_resolve_input_debug_tap), override_keys
@@ -114,7 +117,10 @@ def configure_runtime_container(
         override_keys,
     )
     _define_default(
-        container, ConfigurationRegistry, Singleton(ConfigurationRegistry), override_keys
+        container,
+        ConfigurationRegistry,
+        Singleton(ConfigurationRegistry),
+        override_keys,
     )
     _define_default(container, DisplayContext, Singleton(DisplayContext), override_keys)
     _define_default(

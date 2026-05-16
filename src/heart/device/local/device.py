@@ -25,7 +25,6 @@ class LocalScreen(Device):
         result = max(min(width // current_width, height // current_height), 1)
         return max(result // 3, 1)
 
-
     def set_screen(self, screen: pygame.Surface) -> None:
         screen = pygame.transform.scale(screen, self.individual_display_size())
 
@@ -43,7 +42,6 @@ class LocalScreen(Device):
         )
 
 
-
 _SURFACE_MODES = {
     "P",
     "RGB",
@@ -54,7 +52,9 @@ _SURFACE_MODES = {
 }
 
 
-def _normalize_surface_mode(mode: str) -> Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"]:
+def _normalize_surface_mode(
+    mode: str,
+) -> Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"]:
     if mode not in _SURFACE_MODES:
         raise ValueError(f"Unsupported image mode for pygame surface: {mode}")
     return cast(Literal["P", "RGB", "RGBX", "RGBA", "ARGB", "BGRA"], mode)

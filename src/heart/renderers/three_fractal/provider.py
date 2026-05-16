@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import reactivex
+from manyfold import ConstantNode, StreamNode
 
 from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager
@@ -16,7 +16,6 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
     def initial_state(
         self,
         window: DisplayContext,
-
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> FractalSceneState:
@@ -27,5 +26,5 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
 
     def observable(
         self, *, initial_state: FractalSceneState
-    ) -> reactivex.Observable[FractalSceneState]:
-        return reactivex.just(initial_state)
+    ) -> StreamNode[FractalSceneState]:
+        return ConstantNode(initial_state).observable()

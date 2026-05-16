@@ -1,4 +1,4 @@
-import reactivex
+from manyfold import StreamNode
 
 from heart.peripheral.core.input import AccelerometerController
 from heart.peripheral.core.providers import ObservableProvider
@@ -13,5 +13,5 @@ class AllAccelerometersProvider(ObservableProvider[Acceleration]):
 
     def observable(
         self, *args: object, **kwargs: object
-    ) -> reactivex.Observable[Acceleration]:
+    ) -> StreamNode[Acceleration]:
         return self._controller.observable()

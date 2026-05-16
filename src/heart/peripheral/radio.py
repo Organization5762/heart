@@ -9,10 +9,15 @@ import time
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping
 
-import reactivex
-from reactivex.subject import Subject
+from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
+                      ManagedGraphNodeHandle, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, StreamNode, TypedRoute,
+                      Variant, route)
+from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
+                                SensorEvent, StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Input, Peripheral
+from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.radio import RadioPacket
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
@@ -36,6 +41,63 @@ FLOWTOY_WAKE_EVENT = "peripheral.radio.flowtoy.wake"
 FLOWTOY_POWER_OFF_EVENT = "peripheral.radio.flowtoy.power_off"
 FLOWTOY_SET_WIFI_EVENT = "peripheral.radio.flowtoy.set_wifi"
 FLOWTOY_SET_GLOBAL_CONFIG_EVENT = "peripheral.radio.flowtoy.set_global_config"
+RADIO_GRAPH_OWNER = OwnerName("heart.radio")
+RADIO_GRAPH_FAMILY = StreamFamily("peripheral")
+
+
+class PyserialUnavailableError(RuntimeError):
+    """Raised when the serial radio driver is used without pyserial."""
+
+
+def radio_packet_event_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RADIO_GRAPH_OWNER,
+        family=RADIO_GRAPH_FAMILY,
+        stream=StreamName("packets"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartRadioPacketEvent"),
+    )
+
+
+def radio_exception_schema() -> Schema[BaseException]:
+    def encode(exc: BaseException) -> bytes:
+        return f"{type(exc).__name__}:{exc}".encode("utf-8")
+
+    def decode(payload: bytes) -> BaseException:
+        return RuntimeError(payload.decode("utf-8"))
+
+    return Schema(
+        schema_id="PythonException",
+        version=1,
+        encode=encode,
+        decode=decode,
+    )
+
+
+def radio_error_route() -> TypedRoute[BaseException]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RADIO_GRAPH_OWNER,
+        family=RADIO_GRAPH_FAMILY,
+        stream=StreamName("errors"),
+        variant=Variant.Meta,
+        schema=radio_exception_schema(),
+    )
+
+
+def radio_detection_route() -> TypedRoute[SensorEvent]:
+    return route(
+        plane=Plane.Read,
+        layer=Layer.Logical,
+        owner=RADIO_GRAPH_OWNER,
+        family=RADIO_GRAPH_FAMILY,
+        stream=StreamName("detected"),
+        variant=Variant.Meta,
+        schema=sensor_event_schema("HeartRadioDetectionEvent"),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,11 +243,11 @@ class SerialRadioDriver(RadioDriver):
         self._reconnect_delay = max(0.0, reconnect_delay)
         self._serial_module = serial_module or serial
         if self._serial_module is None:
-            raise ModuleNotFoundError(
+            raise PyserialUnavailableError(
                 "pyserial is required for SerialRadioDriver but is not installed"
             )
 
-        self._stop_event = threading.Event()
+        self._stop_token = StopToken(group=f"radio:{port}")
         self._handle_lock = threading.Lock()
         self._active_handle: Any | None = None
 
@@ -196,7 +258,7 @@ class SerialRadioDriver(RadioDriver):
     def packets(self) -> Iterator[RawRadioPacket]:
         """Yield packets until :meth:`close` is invoked."""
 
-        while not self._stop_event.is_set():
+        while not self._stop_token.is_set():
             try:
                 with self._open_serial() as handle:
                     with self._handle_lock:
@@ -207,11 +269,11 @@ class SerialRadioDriver(RadioDriver):
                         with self._handle_lock:
                             if self._active_handle is handle:
                                 self._active_handle = None
-            except ModuleNotFoundError:
+            except PyserialUnavailableError:
                 raise
             except Exception:  # pragma: no cover - defensive reconnect loop
                 logger.exception("Radio serial driver failed; retrying")
-                if self._stop_event.wait(self._reconnect_delay):
+                if self._stop_token.wait(self._reconnect_delay):
                     break
 
     def send_raw_command(self, command: str) -> None:
@@ -263,7 +325,7 @@ class SerialRadioDriver(RadioDriver):
             )
 
     def close(self) -> None:
-        self._stop_event.set()
+        self._stop_token.set()
         with self._handle_lock:
             handle = self._active_handle
         if handle is None:
@@ -271,7 +333,9 @@ class SerialRadioDriver(RadioDriver):
         try:
             handle.close()
         except Exception:
-            logger.debug("Ignoring serial close failure for %s", self._port, exc_info=True)
+            logger.debug(
+                "Ignoring serial close failure for %s", self._port, exc_info=True
+            )
 
     @classmethod
     def detect(cls) -> Iterator["SerialRadioDriver"]:
@@ -291,14 +355,14 @@ class SerialRadioDriver(RadioDriver):
                 continue
             try:
                 yield cls(port=port)
-            except ModuleNotFoundError:
+            except PyserialUnavailableError:
                 logger.debug(
                     "pyserial missing while initialising SerialRadioDriver for %s", port
                 )
 
     def _open_serial(self) -> Any:  # pragma: no cover - thin wrapper around pyserial
         if self._serial_module is None:
-            raise ModuleNotFoundError(
+            raise PyserialUnavailableError(
                 "pyserial is required for SerialRadioDriver but is not installed"
             )
         return self._serial_module.Serial(
@@ -316,7 +380,7 @@ class SerialRadioDriver(RadioDriver):
             handle.reset_input_buffer()
 
     def _drain_serial(self, handle: Any) -> Iterator[RawRadioPacket]:
-        while not self._stop_event.is_set():
+        while not self._stop_token.is_set():
             raw = handle.readline()
             if not raw:
                 continue
@@ -456,35 +520,131 @@ class RadioPeripheral(Peripheral[RadioPacket]):
     ) -> None:
         super().__init__()
         self._driver = driver
-        self._stop_event = threading.Event()
+        self._stop_token = StopToken(group="radio-peripheral")
         self._latest_packet: RawRadioPacket | None = None
-        self._packet_subject: Subject[RadioPacket] = Subject()
+        self._packet_stream: EventStream[RadioPacket] = EventStream()
 
     @classmethod
     def detect(cls) -> Iterator["RadioPeripheral"]:
         for driver in SerialRadioDriver.detect():
             yield cls(driver=driver)
 
-    def _event_stream(self) -> reactivex.Observable[RadioPacket]:
-        return self._packet_subject
+    @classmethod
+    def detection_node(
+        cls,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        packet_output_route: TypedRoute[SensorEvent] | None = None,
+        packet_error_route: TypedRoute[BaseException] | None = None,
+        spawn_sources: bool = False,
+        on_detect: Any | None = None,
+        start_immediately: bool = True,
+    ) -> DetectionNode:
+        resolved_output_route = output_route or radio_detection_route()
+        resolved_packet_output_route = packet_output_route or radio_packet_event_route()
+
+        def mapper(peripheral: "RadioPeripheral") -> SensorEvent:
+            return SensorEvent(
+                event_type="peripheral.radio.detected",
+                data={"driver": type(peripheral._driver).__name__},
+                observed_at=time.time(),
+                identity=peripheral.peripheral_info().to_sensor_identity(),
+            )
+
+        def spawn(peripheral: "RadioPeripheral", access: Any) -> None:
+            if not spawn_sources:
+                return
+            access.own(
+                peripheral.install_node(
+                    access.graph,
+                    output_route=resolved_packet_output_route,
+                    error_route=packet_error_route or radio_error_route(),
+                )
+            )
+
+        return DetectionNode(
+            name="heart-radio-detection",
+            detector=cls.detect,
+            output_route=resolved_output_route,
+            mapper=mapper,
+            on_detect=on_detect,
+            spawn=spawn,
+            error_route=radio_error_route(),
+            group="radio-detection",
+            start_immediately=start_immediately,
+        )
+
+    def _event_stream(self) -> StreamNode[RadioPacket]:
+        return self._packet_stream.observable()
 
     @property
     def latest_packet(self) -> RawRadioPacket | None:
         return self._latest_packet
 
     def stop(self) -> None:
-        self._stop_event.set()
+        self._stop_token.set()
         try:
             self._driver.close()
         except Exception:
             logger.debug("Ignoring error while closing radio driver", exc_info=True)
 
     def run(self) -> None:
-        for packet in self._driver.packets():
-            if self._stop_event.is_set():
-                break
-            self.process_packet(packet)
-        self._stop_event.clear()
+        def _drain_packets(stop: StopToken) -> None:
+            for packet in self._driver.packets():
+                if stop.is_set():
+                    break
+                self.process_packet(packet)
+            stop.set()
+
+        loop = ManagedRunLoop(
+            body=_drain_packets,
+            backoff=BackoffPolicy.fixed(DEFAULT_RADIO_RECONNECT_DELAY_SECONDS),
+            on_error=lambda _exc, _attempt: logger.exception(
+                "Radio peripheral failed; retrying"
+            ),
+            group="radio-peripheral",
+        )
+        try:
+            loop.run(self._stop_token)
+        finally:
+            self._stop_token = StopToken(group="radio-peripheral")
+
+    def install_node(
+        self,
+        graph: Graph,
+        *,
+        output_route: TypedRoute[SensorEvent] | None = None,
+        error_route: TypedRoute[BaseException] | None = None,
+        retry: RetryPolicy | None = None,
+        backoff: BackoffPolicy | None = None,
+        start_immediately: bool = True,
+    ) -> ManagedGraphNodeHandle:
+        """Install this radio peripheral as a self-running Manyfold graph node."""
+
+        resolved_output_route = output_route or radio_packet_event_route()
+
+        def _body(stop: StopToken, graph: Graph) -> None:
+            for packet in self._driver.packets():
+                if stop.is_set():
+                    break
+                self.process_packet(packet)
+                graph.publish(
+                    resolved_output_route,
+                    self._radio_packet_to_sensor_event(packet),
+                )
+            stop.set()
+
+        return ManagedGraphNode(
+            name="heart-radio-peripheral",
+            body=_body,
+            output_routes=(resolved_output_route,),
+            error_route=error_route or radio_error_route(),
+            retry=retry or RetryPolicy(max_attempts=1_000_000),
+            backoff=backoff
+            or BackoffPolicy.fixed(DEFAULT_RADIO_RECONNECT_DELAY_SECONDS),
+            group="radio-peripheral",
+            start_immediately=start_immediately,
+        ).install(graph)
 
     def process_packet(self, packet: RawRadioPacket) -> None:
         radio_packet = RadioPacket(
@@ -500,7 +660,24 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             metadata=packet.metadata,
         )
         self._latest_packet = packet
-        self._packet_subject.on_next(radio_packet)
+        self._packet_stream.emit(radio_packet)
+
+    def _radio_packet_to_sensor_event(self, packet: RawRadioPacket) -> SensorEvent:
+        radio_packet = RadioPacket(
+            protocol=packet.protocol,
+            frequency_hz=packet.frequency_hz,
+            channel=packet.channel,
+            bitrate_kbps=packet.bitrate_kbps,
+            modulation=packet.modulation,
+            crc_ok=packet.crc_ok,
+            rssi_dbm=packet.rssi_dbm,
+            payload=packet.payload,
+            decoded=packet.decoded,
+            metadata=packet.metadata,
+        )
+        return radio_packet.to_input().to_sensor_event(
+            identity=self.peripheral_info().to_sensor_identity()
+        )
 
     def handle_input(self, input: Input) -> None:
         data = input.data
@@ -559,7 +736,9 @@ class RadioPeripheral(Peripheral[RadioPacket]):
             key = _mapping_value(data, "key", "name")
             value = _mapping_int(data, "value")
             if not isinstance(key, str) or not key:
-                logger.debug("Ignoring malformed Flowtoys global config payload: %s", data)
+                logger.debug(
+                    "Ignoring malformed Flowtoys global config payload: %s", data
+                )
                 return
             self.set_flow_toy_global_config(key=key, value=value)
 
@@ -575,7 +754,9 @@ class RadioPeripheral(Peripheral[RadioPacket]):
     def reset_flow_toy_sync(self) -> None:
         self.send_raw_command("a")
 
-    def wake_flow_toys(self, *, group_id: int = 0, group_is_public: bool = False) -> None:
+    def wake_flow_toys(
+        self, *, group_id: int = 0, group_is_public: bool = False
+    ) -> None:
         prefix = "W" if group_is_public else "w"
         self.send_raw_command(f"{prefix}{int(group_id)}")
 

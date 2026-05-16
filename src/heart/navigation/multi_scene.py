@@ -28,8 +28,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     ) -> None:
         super().__init__()
         self.scenes = [
-            resolve_renderer_spec(scene, renderer_resolver)
-            for scene in scenes
+            resolve_renderer_spec(scene, renderer_resolver) for scene in scenes
         ]
         self._navigation_subscription = None
         scene_names = [scene.name for scene in self.scenes]
@@ -60,9 +59,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
 
         return state
 
-    def real_process(
-        self, window: DisplayContext, orientation: Orientation
-    ) -> None:
+    def real_process(self, window: DisplayContext, orientation: Orientation) -> None:
         for render in self.get_renderers():
             render.real_process(window=window, orientation=orientation)
 

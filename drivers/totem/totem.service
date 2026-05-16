@@ -6,15 +6,39 @@ After=multi-user.target
 Type=simple
 User=root
 Group=root
+WorkingDirectory=/
+Environment=HEART_REPO_DIR=/home/michael/Desktop/heart
+Environment=PATH=/root/.local/bin:/home/michael/.local/bin:/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=DISPLAY=:1
+Environment=MOCK_SWITCH=1
+Environment=PERIPHERAL_CONFIGURATION=default
+Environment=HEART_DEVICE_LAYOUT=rectangle
+Environment=HEART_LAYOUT_COLUMNS=1
+Environment=HEART_LAYOUT_ROWS=4
+Environment=PYTHONUNBUFFERED=1
+Environment=FORWARD_TO_BEATS_APP=0
+Environment=HEART_DISABLE_PHONE_TEXT=1
+Environment=HEART_RUBIKS_CONNECTED_X_AUTODETECT=1
+Environment=HEART_RUBIKS_CONNECTED_X_PREFERRED_NAME=RubiksX_CDCF6B
+EnvironmentFile=-/etc/default/totem
+ExecStartPre=-/usr/bin/pkill -f "uv run totem run"
+ExecStartPre=-/usr/bin/pkill -f "totem run"
+ExecStartPre=-/usr/bin/pkill -f "src/heart/loop.py run"
+ExecStartPre=-/usr/bin/pkill -f "Xvfb.*:1"
 # Use the helper script to set up Xvfb
 ExecStartPre=/usr/local/bin/setup-xvfb.sh
-# Start the main app (no need for sudo as we're already running as root)
-ExecStart=/usr/bin/python3 /home/michael/Desktop/heart/src/heart/loop.py run --configuration lib_2025
+# Start the main app through the same Makefile target used manually.
+ExecStart=/bin/bash /usr/local/bin/start-heart.sh
 # Kill Xvfb on shutdown
-ExecStop=/usr/bin/pkill Xvfb || true
-Restart=on-failure
-RestartSec=5s
+ExecStop=-/usr/bin/pkill -f "Xvfb.*:1"
+ExecStopPost=-/usr/bin/pkill -f "uv run totem run"
+ExecStopPost=-/usr/bin/pkill -f "totem run"
+ExecStopPost=-/usr/bin/pkill -f "src/heart/loop.py run"
+KillMode=control-group
+TimeoutStopSec=15s
+SendSIGKILL=yes
+Restart=always
+RestartSec=3s
 
 [Install]
 WantedBy=multi-user.target

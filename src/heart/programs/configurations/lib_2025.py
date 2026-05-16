@@ -16,8 +16,10 @@ from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
+from heart.renderers.palette_tunnel import PaletteTunnelScene
 from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.random_pixel import RandomPixel
+from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
@@ -61,6 +63,9 @@ def configure(loop: GameLoop) -> None:
     sphere_mode = loop.add_mode("3d fractal")
     sphere_mode.add_renderer(FractalScene)
 
+    palette_tunnel_mode = loop.add_mode("palette\ntunnel")
+    palette_tunnel_mode.add_renderer(PaletteTunnelScene())
+
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene)
 
@@ -79,6 +84,8 @@ def configure(loop: GameLoop) -> None:
         )
     )
     mario_mode.add_renderer(MarioRenderer)
+
+    add_rock_paper_scissors_mode(loop, randomness=randomness)
 
     def multicolor_renderer() -> MulticolorRenderer:
         return loop.resolve(MulticolorRenderer)
@@ -101,7 +108,9 @@ def configure(loop: GameLoop) -> None:
         loop.compose(
             [
                 multicolor_renderer(),
-                SpritesheetLoop(sheet_file_path="ness.png", metadata_file_path="ness.json"),
+                SpritesheetLoop(
+                    sheet_file_path="ness.png", metadata_file_path="ness.json"
+                ),
             ]
         )
     )
@@ -144,7 +153,6 @@ def configure(loop: GameLoop) -> None:
 
     pranay_mode = loop.add_mode(PRANAY_SKETCH_MODE_TITLE)
     pranay_mode.add_renderer(PranaySketchRenderer())
-
     friend_beacon_mode = loop.add_mode("friend\nbeacon")
     friend_beacon_mode.add_renderer(
         MultiScene(
@@ -192,7 +200,7 @@ def configure(loop: GameLoop) -> None:
     tixyland_factory = loop.resolve(TixylandFactory)
 
     def build_tixyland(
-        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray]
+        fn: Callable[[float, np.ndarray, np.ndarray, np.ndarray], np.ndarray],
     ) -> Tixyland:
         return tixyland_factory(fn)
 

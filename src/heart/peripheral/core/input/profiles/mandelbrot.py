@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
-import reactivex
-from reactivex import operators as ops
+from manyfold import MergeNode, StreamNode
 
-from heart.peripheral.core.input.debug import (InputDebugStage, InputDebugTap,
-                                               instrument_input_stream)
+from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
+                                               InputDebugTap)
 from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
-    GamepadController)
-from heart.peripheral.core.input.keyboard import KeyboardController
-from heart.utilities.reactivex_threads import pipe_in_background
+    GamepadController, GamepadSnapshot)
+from heart.peripheral.core.input.keyboard import KeyboardController, KeyboardSnapshot
+from heart.peripheral.core.input.streams import map_stream
+from heart.peripheral.core.streams import combine_latest
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -141,173 +141,125 @@ class MandelbrotControlProfile:
         self._debug_tap = debug_tap
 
     @cached_property
-    def motion_state(self) -> reactivex.Observable[MandelbrotMotionState]:
-        keyboard_state = reactivex.combine_latest(
-            self._keyboard.key_state(pygame.K_w),
-            self._keyboard.key_state(pygame.K_s),
-            self._keyboard.key_state(pygame.K_a),
-            self._keyboard.key_state(pygame.K_d),
-            self._keyboard.key_state(pygame.K_q),
-            self._keyboard.key_state(pygame.K_e),
-            self._keyboard.key_state(pygame.K_j),
-            self._keyboard.key_state(pygame.K_k),
-        )
-        gamepad_state = reactivex.combine_latest(
-            self._gamepad.button_held(GamepadButton.EAST),
-            self._gamepad.button_held(GamepadButton.HOME),
-            self._gamepad.button_held(GamepadButton.PLUS),
-            self._gamepad.button_held(GamepadButton.MINUS),
-            self._gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT, 0.0),
-            self._gamepad.axis_value(GamepadAxis.TRIGGER_LEFT, 0.0),
-            self._gamepad.dpad_value(),
-            self._gamepad.stick_value("left", DEFAULT_GAMEPAD_AXIS_DEAD_ZONE),
-            self._gamepad.stick_value("right", MANDELBROT_RIGHT_STICK_DEAD_ZONE),
-        )
+    def motion_state(self) -> StreamNode[MandelbrotMotionState]:
+        stream = (
+            combine_latest(
+                self._keyboard.snapshot_stream().start_with(
+                    KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+                ),
+                self._gamepad.snapshot_stream().start_with(
+                    GamepadSnapshot(connected=False, identifier=None)
+                ),
+            )
+            .map(lambda latest: self._to_motion_state_from_snapshots(*latest))
+            .distinct_until_changed()
 
-        stream = pipe_in_background(
-            reactivex.combine_latest(keyboard_state, gamepad_state),
-            ops.map(lambda latest: self._to_motion_state(*latest)),
-            ops.distinct_until_changed(),
         )
-        return instrument_input_stream(
-            stream,
+        return InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
             stream_name="mandelbrot.motion_state",
             source_id="mandelbrot.motion",
             upstream_ids=("keyboard", "gamepad"),
-        )
+        ).connect(stream)
 
     @cached_property
-    def command_events(self) -> reactivex.Observable[MandelbrotCommand]:
-        stream = pipe_in_background(
-            reactivex.merge(
-                self._keyboard_command_streams(),
-                self._gamepad_command_streams(),
-            ),
+    def command_events(self) -> StreamNode[MandelbrotCommand]:
+        stream = MergeNode.merge(
+            self._keyboard_command_streams(), self._gamepad_command_streams()
         )
-        return instrument_input_stream(
-            stream,
+        return InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
             stream_name="mandelbrot.command",
             source_id=lambda command: command.source,
             upstream_ids=("keyboard", "gamepad"),
+        ).connect(stream)
+
+    @cached_property
+    def _edge_state(self) -> StreamNode[MandelbrotEdgeState]:
+        return (
+            self.command_events.scan(self._apply_command, seed=MandelbrotEdgeState())
+            .start_with(MandelbrotEdgeState())
+
         )
 
     @cached_property
-    def _edge_state(self) -> reactivex.Observable[MandelbrotEdgeState]:
-        return pipe_in_background(
-            self.command_events,
-            ops.scan(self._apply_command, seed=MandelbrotEdgeState()),
-            ops.start_with(MandelbrotEdgeState()),
-        )
+    def _observable(self) -> StreamNode[MandelbrotControlState]:
+        stream = (
+            combine_latest(self.motion_state, self._edge_state)
+            .map(lambda latest: self._to_compatibility_state(*latest))
+            .distinct_until_changed()
 
-    @cached_property
-    def _observable(self) -> reactivex.Observable[MandelbrotControlState]:
-        stream = pipe_in_background(
-            reactivex.combine_latest(self.motion_state, self._edge_state),
-            ops.map(lambda latest: self._to_compatibility_state(*latest)),
-            ops.distinct_until_changed(),
         )
-        return instrument_input_stream(
-            stream,
+        return InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
             stream_name="mandelbrot.controls",
             source_id="mandelbrot",
             upstream_ids=("mandelbrot.motion_state", "mandelbrot.command"),
-        )
+        ).connect(stream)
 
-    def observable(self) -> reactivex.Observable[MandelbrotControlState]:
+    def observable(self) -> StreamNode[MandelbrotControlState]:
         return self._observable
 
-    def _keyboard_command_streams(self) -> reactivex.Observable[MandelbrotCommand]:
-        return reactivex.merge(
-            self._keyboard.key_pressed(pygame.K_LEFTBRACKET).pipe(
-                ops.map(
-                    lambda _event: PreviousViewModeCommand(
-                        source="keyboard.left_bracket",
-                    )
-                )
+    def _keyboard_command_streams(self) -> StreamNode[MandelbrotCommand]:
+        return MergeNode.merge(
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_LEFTBRACKET),
+                lambda _event: PreviousViewModeCommand(source="keyboard.left_bracket"),
             ),
-            self._keyboard.key_pressed(pygame.K_RIGHTBRACKET).pipe(
-                ops.map(
-                    lambda _event: NextViewModeCommand(
-                        source="keyboard.right_bracket",
-                    )
-                )
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_RIGHTBRACKET),
+                lambda _event: NextViewModeCommand(source="keyboard.right_bracket"),
             ),
-            self._keyboard.key_pressed(pygame.K_i).pipe(
-                ops.map(
-                    lambda _event: ToggleDebugCommand(
-                        source="keyboard.i",
-                    )
-                )
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_i),
+                lambda _event: ToggleDebugCommand(source="keyboard.i"),
             ),
-            self._keyboard.key_pressed(pygame.K_p).pipe(
-                ops.map(
-                    lambda _event: ToggleFpsCommand(
-                        source="keyboard.p",
-                    )
-                )
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_p),
+                lambda _event: ToggleFpsCommand(source="keyboard.p"),
             ),
-            self._keyboard.key_pressed(pygame.K_0).pipe(
-                ops.map(
-                    lambda _event: SetOrientationCommand(
-                        source="keyboard.0",
-                        orientation_kind="rectangle",
-                    )
-                )
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_0),
+                lambda _event: SetOrientationCommand(
+                    source="keyboard.0", orientation_kind="rectangle"
+                ),
             ),
-            self._keyboard.key_pressed(pygame.K_9).pipe(
-                ops.map(
-                    lambda _event: SetOrientationCommand(
-                        source="keyboard.9",
-                        orientation_kind="cube",
-                    )
-                )
+            map_stream(
+                self._keyboard.key_pressed(pygame.K_9),
+                lambda _event: SetOrientationCommand(
+                    source="keyboard.9", orientation_kind="cube"
+                ),
             ),
         )
 
-    def _gamepad_command_streams(self) -> reactivex.Observable[MandelbrotCommand]:
-        return reactivex.merge(
-            self._gamepad.button_tapped(GamepadButton.ZR).pipe(
-                ops.map(
-                    lambda _button: NextViewModeCommand(
-                        source="gamepad.zr",
-                    )
-                )
+    def _gamepad_command_streams(self) -> StreamNode[MandelbrotCommand]:
+        return MergeNode.merge(
+            map_stream(
+                self._gamepad.button_tapped(GamepadButton.ZR),
+                lambda _button: NextViewModeCommand(source="gamepad.zr"),
             ),
-            self._gamepad.button_tapped(GamepadButton.ZL).pipe(
-                ops.map(
-                    lambda _button: PreviousViewModeCommand(
-                        source="gamepad.zl",
-                    )
-                )
+            map_stream(
+                self._gamepad.button_tapped(GamepadButton.ZL),
+                lambda _button: PreviousViewModeCommand(source="gamepad.zl"),
             ),
-            self._gamepad.button_tapped(GamepadButton.HOME).pipe(
-                ops.map(
-                    lambda _button: ToggleAutoModeCommand(
-                        source="gamepad.home",
-                    )
-                )
+            map_stream(
+                self._gamepad.button_tapped(GamepadButton.HOME),
+                lambda _button: ToggleAutoModeCommand(source="gamepad.home"),
             ),
-            self._gamepad.button_tapped(GamepadButton.NORTH).pipe(
-                ops.map(
-                    lambda _button: CyclePaletteCommand(
-                        source="gamepad.north",
-                        palette_delta=1,
-                    )
-                )
+            map_stream(
+                self._gamepad.button_tapped(GamepadButton.NORTH),
+                lambda _button: CyclePaletteCommand(
+                    source="gamepad.north", palette_delta=1
+                ),
             ),
-            self._gamepad.button_tapped(GamepadButton.WEST).pipe(
-                ops.map(
-                    lambda _button: CyclePaletteCommand(
-                        source="gamepad.west",
-                        palette_delta=-1,
-                    )
-                )
+            map_stream(
+                self._gamepad.button_tapped(GamepadButton.WEST),
+                lambda _button: CyclePaletteCommand(
+                    source="gamepad.west", palette_delta=-1
+                ),
             ),
             self._combo_command(
                 GamepadButton.HOME,
@@ -326,22 +278,21 @@ class MandelbrotControlProfile:
         modifier: GamepadButton,
         primary: GamepadButton,
         command: MandelbrotCommand,
-    ) -> reactivex.Observable[MandelbrotCommand]:
-        return pipe_in_background(
-            reactivex.combine_latest(
+    ) -> StreamNode[MandelbrotCommand]:
+        return (
+            combine_latest(
                 self._gamepad.button_held(modifier),
                 self._gamepad.button_held(primary),
-            ),
-            ops.map(lambda latest: bool(latest[0]) and bool(latest[1])),
-            ops.distinct_until_changed(),
-            ops.filter(bool),
-            ops.map(lambda _active: command),
+            )
+            .map(lambda latest: bool(latest[0]) and bool(latest[1]))
+            .distinct_until_changed()
+            .filter(bool)
+            .map(lambda _active: command)
+
         )
 
     def _apply_command(
-        self,
-        state: MandelbrotEdgeState,
-        command: MandelbrotCommand,
+        self, state: MandelbrotEdgeState, command: MandelbrotCommand
     ) -> MandelbrotEdgeState:
         if isinstance(command, NextViewModeCommand):
             return MandelbrotEdgeState(
@@ -428,50 +379,53 @@ class MandelbrotControlProfile:
             palette_delta=command.palette_delta,
         )
 
-    def _to_motion_state(
-        self,
-        keyboard_state: tuple[object, ...],
-        gamepad_state: tuple[object, ...],
+    def _to_motion_state_from_snapshots(
+        self, keyboard_snapshot: KeyboardSnapshot, gamepad_snapshot: GamepadSnapshot
     ) -> MandelbrotMotionState:
-        (
-            key_w,
-            key_s,
-            key_a,
-            key_d,
-            key_q,
-            key_e,
-            key_j,
-            key_k,
-        ) = keyboard_state
-        (
-            button_b_held,
-            button_home_held,
-            button_plus_held,
-            button_minus_held,
-            trigger_right,
-            trigger_left,
-            dpad,
-            left_stick,
-            right_stick,
-        ) = gamepad_state
-
-        keyboard_move_x = float(key_d.pressed) - float(key_a.pressed)
-        keyboard_move_y = float(key_s.pressed) - float(key_w.pressed)
-        zoom_in = bool(key_e.pressed) or trigger_right > 0.0
-        zoom_out = bool(key_q.pressed) or trigger_left > 0.0
-        increase_iterations = bool(key_j.pressed) or (
+        pressed_keys = keyboard_snapshot.pressed_keys
+        keyboard_move_x = float(pygame.K_d in pressed_keys) - float(
+            pygame.K_a in pressed_keys
+        )
+        keyboard_move_y = float(pygame.K_s in pressed_keys) - float(
+            pygame.K_w in pressed_keys
+        )
+        trigger_right = gamepad_snapshot.axis_value(
+            GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0
+        )
+        trigger_left = gamepad_snapshot.axis_value(
+            GamepadAxis.TRIGGER_LEFT, dead_zone=0.0
+        )
+        left_stick_x = gamepad_snapshot.axis_value(
+            GamepadAxis.LEFT_X, dead_zone=DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
+        )
+        left_stick_y = gamepad_snapshot.axis_value(
+            GamepadAxis.LEFT_Y, dead_zone=DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
+        )
+        right_stick_x = gamepad_snapshot.axis_value(
+            GamepadAxis.RIGHT_X, dead_zone=MANDELBROT_RIGHT_STICK_DEAD_ZONE
+        )
+        right_stick_y = gamepad_snapshot.axis_value(
+            GamepadAxis.RIGHT_Y, dead_zone=MANDELBROT_RIGHT_STICK_DEAD_ZONE
+        )
+        button_b_held = gamepad_snapshot.button_held(GamepadButton.EAST)
+        button_home_held = gamepad_snapshot.button_held(GamepadButton.HOME)
+        button_plus_held = gamepad_snapshot.button_held(GamepadButton.PLUS)
+        button_minus_held = gamepad_snapshot.button_held(GamepadButton.MINUS)
+        dpad = gamepad_snapshot.dpad
+        zoom_in = pygame.K_e in pressed_keys or trigger_right > 0.0
+        zoom_out = pygame.K_q in pressed_keys or trigger_left > 0.0
+        increase_iterations = pygame.K_j in pressed_keys or (
             not button_home_held and bool(button_plus_held)
         )
-        decrease_iterations = bool(key_k.pressed) or (
+        decrease_iterations = pygame.K_k in pressed_keys or (
             not button_home_held and bool(button_minus_held)
         )
         move_multiplier = 2.0 if button_b_held else 1.0
-
         return MandelbrotMotionState(
-            move_x=keyboard_move_x + dpad.x + left_stick.x,
-            move_y=keyboard_move_y - dpad.y - left_stick.y,
-            pan_x=right_stick.x,
-            pan_y=-right_stick.y,
+            move_x=keyboard_move_x + dpad.x + left_stick_x,
+            move_y=keyboard_move_y - dpad.y + left_stick_y,
+            pan_x=right_stick_x,
+            pan_y=-right_stick_y,
             move_multiplier=move_multiplier,
             home_modifier=bool(button_home_held),
             plus_held=bool(button_plus_held),
@@ -483,9 +437,7 @@ class MandelbrotControlProfile:
         )
 
     def _to_compatibility_state(
-        self,
-        motion_state: MandelbrotMotionState,
-        edge_state: MandelbrotEdgeState,
+        self, motion_state: MandelbrotMotionState, edge_state: MandelbrotEdgeState
     ) -> MandelbrotControlState:
         return MandelbrotControlState(
             move_x=motion_state.move_x,

@@ -107,9 +107,7 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     def __init__(self) -> None:
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
-        self.mandelbrot_interior_strategy = (
-            Configuration.mandelbrot_interior_strategy()
-        )
+        self.mandelbrot_interior_strategy = Configuration.mandelbrot_interior_strategy()
         self.use_mandelbrot_interior = (
             self.mandelbrot_interior_strategy == MandelbrotInteriorStrategy.CARDIOID
         )
@@ -117,7 +115,6 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     def _create_initial_state(
         self,
         window: Surface,
-
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> CubeMandelbrotState:
@@ -164,7 +161,6 @@ class CubeMandelbrotRenderer(StatefulBaseRenderer[CubeMandelbrotState]):
     def real_process(
         self,
         window: Surface,
-
         orientation: Orientation,
     ) -> None:
         elapsed = time.monotonic() - self.state.start_time

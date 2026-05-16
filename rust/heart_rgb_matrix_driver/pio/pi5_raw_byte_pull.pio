@@ -1,0 +1,6 @@
+.program raw_byte_pull
+
+.wrap_target
+    pull
+    out pins, 28
+.wrap

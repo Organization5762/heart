@@ -4,6 +4,8 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from manyfold import Graph
+from manyfold.sensor_io import BackoffPolicy, RetryPolicy
 
 from heart.peripheral.core import Input, PeripheralMessageEnvelope
 from heart.peripheral.input_payloads import RadioPacket
@@ -14,7 +16,9 @@ from heart.peripheral.radio import (FLOWTOY_PATTERN_EVENT,
                                     FLOWTOY_SYNC_EVENT, FLOWTOY_WAKE_EVENT,
                                     FlowToyPattern, RadioDriver,
                                     RadioPeripheral, RawRadioPacket,
-                                    SerialRadioDriver)
+                                    SerialRadioDriver, radio_detection_route,
+                                    radio_error_route,
+                                    radio_packet_event_route)
 
 
 class DummyDriver(RadioDriver):
@@ -33,6 +37,17 @@ class DummyDriver(RadioDriver):
 
     def close(self) -> None:
         self.closed = True
+
+
+class FailingDriver(RadioDriver):
+    """Raise from packet iteration so graph node error routes can be tested."""
+
+    def packets(self) -> Iterator[RawRadioPacket]:
+        raise RuntimeError("radio unavailable")
+        yield RawRadioPacket()
+
+    def send_raw_command(self, command: str) -> None:
+        raise AssertionError(f"unexpected command: {command}")
 
 
 class FakeSerialHandle:
@@ -94,7 +109,7 @@ class TestRadioPacketPayloads:
             modulation="GFSK",
             crc_ok=True,
             rssi_dbm=-42.5,
-            payload=b"\x01\x02\xFF",
+            payload=b"\x01\x02\xff",
             decoded={"schema": "flowtoy.sync.v1"},
             metadata={"manufacturer": "FlowToys"},
         )
@@ -175,6 +190,142 @@ class TestRadioPeripheralDetectionAndStreaming:
                 metadata={"source": "bridge"},
             )
         ]
+
+    def test_install_node_publishes_packets_to_manyfold_route(self) -> None:
+        """Ensure the graph-native radio node publishes packet events without requiring .observe consumers."""
+        packet = RawRadioPacket(
+            payload=b"\x10\x20",
+            protocol="flowtoy",
+            rssi_dbm=-51.0,
+        )
+        peripheral = RadioPeripheral(driver=DummyDriver(packets=iter([packet])))
+        graph = Graph()
+        output = radio_packet_event_route()
+
+        handle = peripheral.install_node(
+            graph,
+            output_route=output,
+            start_immediately=False,
+        )
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(output)
+        assert latest is not None
+        assert latest.value.event_type == RadioPacket.EVENT_TYPE
+        assert latest.value.data["payload"] == [16, 32]
+        assert latest.value.data["protocol"] == "flowtoy"
+        assert peripheral.latest_packet == packet
+
+    def test_install_node_publishes_exceptions_to_error_route(self) -> None:
+        """Ensure managed node failures become route data for functional health handling."""
+        peripheral = RadioPeripheral(driver=FailingDriver())
+        graph = Graph()
+        errors = radio_error_route()
+
+        handle = peripheral.install_node(
+            graph,
+            error_route=errors,
+            retry=RetryPolicy(max_attempts=1),
+            backoff=BackoffPolicy.none(),
+            start_immediately=False,
+        )
+        with pytest.raises(RuntimeError, match="radio unavailable"):
+            handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(errors)
+        assert latest is not None
+        assert isinstance(latest.value, RuntimeError)
+        assert "radio unavailable" in str(latest.value)
+
+    def test_detection_node_publishes_only_when_radios_are_detected(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure radio detection becomes a graph signal without forcing downstream streams to fire."""
+        detected_peripheral = RadioPeripheral(driver=DummyDriver())
+
+        def _detect(cls) -> Iterator[RadioPeripheral]:
+            yield detected_peripheral
+
+        monkeypatch.setattr(RadioPeripheral, "detect", classmethod(_detect))
+        graph = Graph()
+        route = radio_detection_route()
+        registered: list[RadioPeripheral] = []
+
+        handle = RadioPeripheral.detection_node(
+            output_route=route,
+            on_detect=lambda peripheral, _graph: registered.append(peripheral),
+            start_immediately=False,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(route)
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.radio.detected"
+        assert latest.value.data["driver"] == "DummyDriver"
+        assert registered == [detected_peripheral]
+
+    def test_detection_node_stays_silent_when_no_radios_are_detected(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure absent hardware is represented by no route emission."""
+
+        def _detect(cls) -> Iterator[RadioPeripheral]:
+            return
+            yield RadioPeripheral(driver=DummyDriver())
+
+        monkeypatch.setattr(RadioPeripheral, "detect", classmethod(_detect))
+        graph = Graph()
+        route = radio_detection_route()
+
+        handle = RadioPeripheral.detection_node(
+            output_route=route,
+            start_immediately=False,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        assert graph.latest(route) is None
+
+    def test_detection_node_can_spawn_detected_radio_packet_sources(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Ensure detection can install source nodes while renderers still own filtering."""
+        packet = RawRadioPacket(payload=b"\x01", protocol="flowtoy")
+        detected_peripheral = RadioPeripheral(
+            driver=DummyDriver(packets=iter([packet]))
+        )
+
+        def _detect(cls) -> Iterator[RadioPeripheral]:
+            yield detected_peripheral
+
+        monkeypatch.setattr(RadioPeripheral, "detect", classmethod(_detect))
+        graph = Graph()
+        detection_route = radio_detection_route()
+        packet_route = radio_packet_event_route()
+
+        handle = RadioPeripheral.detection_node(
+            output_route=detection_route,
+            packet_output_route=packet_route,
+            spawn_sources=True,
+            start_immediately=False,
+        ).install(graph)
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+        assert len(handle.spawned_handles) == 1
+        spawned = handle.spawned_handles[0]
+        spawned.loop_handle.loop.run(spawned.loop_handle.token)
+
+        latest_detection = graph.latest(detection_route)
+        latest_packet = graph.latest(packet_route)
+        assert latest_detection is not None
+        assert latest_packet is not None
+        assert latest_detection.value.event_type == "peripheral.radio.detected"
+        assert latest_packet.value.event_type == RadioPacket.EVENT_TYPE
+        assert latest_packet.value.data["payload"] == [1]
 
 
 class TestRadioPeripheralFlowToyCommands:

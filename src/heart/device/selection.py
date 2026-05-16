@@ -1,14 +1,18 @@
 import os
+from pathlib import Path
 
 from heart.device import Cube, Device, Orientation, Rectangle
+from heart.device.beats.device import StreamedScreen
 from heart.device.local import LocalScreen
+from heart.device.rgb_display.device import LEDMatrix
 from heart.utilities.env import Configuration, DeviceLayoutMode
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+RP1_HUB75_DEVICE_PATH = Path("/dev/rp1-hub75")
 
 
-def select_device(*, x11_forward: bool) -> Device:
+def select_device() -> Device:
     orientation = _select_orientation()
     panel_width = Configuration.panel_columns()
     panel_height = Configuration.panel_rows()
@@ -17,10 +21,7 @@ def select_device(*, x11_forward: bool) -> Device:
     if streamed_device is not None:
         return streamed_device
 
-    isolated_device = _select_isolated_renderer_device(
-        orientation=orientation,
-        x11_forward=x11_forward,
-    )
+    isolated_device = _select_isolated_renderer_device(orientation=orientation)
     if isolated_device is not None:
         return isolated_device
 
@@ -48,7 +49,6 @@ def _select_orientation() -> Orientation:
 def _select_streamed_device(orientation: Orientation) -> Device | None:
     if not Configuration.forward_to_beats_app():
         return None
-    from heart.device.beats import StreamedScreen
 
     if orientation.get_type() is not Cube:
         logger.info(
@@ -58,14 +58,9 @@ def _select_streamed_device(orientation: Orientation) -> Device | None:
     return StreamedScreen(orientation=Cube.sides())
 
 
-def _select_isolated_renderer_device(
-    *, orientation: Orientation, x11_forward: bool
-) -> Device | None:
+def _select_isolated_renderer_device(*, orientation: Orientation) -> Device | None:
     if not Configuration.use_isolated_renderer():
         return None
-    if x11_forward:
-        logger.warning("USE_ISOLATED_RENDERER enabled; ignoring x11_forward flag")
-    from heart.device.rgb_display import LEDMatrix
 
     return LEDMatrix(orientation=orientation)
 
@@ -86,13 +81,53 @@ def _select_pi_device(
     if Configuration.is_x11_forward():
         # This makes it work on Pi when no screens are connected.
         # You need to setup X11 forwarding with XQuartz to do that.
-        logger.warning("X11_FORWARD set, running with `LocalScreen`")
-        return LocalScreen(
-            width=panel_width,
-            height=panel_height,
+        return _select_pi_local_screen(
             orientation=orientation,
+            panel_width=panel_width,
+            panel_height=panel_height,
+            reason="X11_FORWARD set",
         )
 
-    from heart.device.rgb_display import LEDMatrix
+    if pi_info is not None and pi_info.version >= 5 and not _rp1_hub75_device_exists():
+        return _select_pi_local_screen(
+            orientation=orientation,
+            panel_width=panel_width,
+            panel_height=panel_height,
+            reason=f"{RP1_HUB75_DEVICE_PATH} is not present",
+        )
 
-    return LEDMatrix(orientation=orientation)
+    try:
+        return LEDMatrix(orientation=orientation)
+    except RuntimeError as exc:
+        if _is_missing_native_matrix_runtime(exc):
+            return _select_pi_local_screen(
+                orientation=orientation,
+                panel_width=panel_width,
+                panel_height=panel_height,
+                reason=str(exc),
+            )
+        raise
+
+
+def _rp1_hub75_device_exists() -> bool:
+    return RP1_HUB75_DEVICE_PATH.exists()
+
+
+def _is_missing_native_matrix_runtime(error: RuntimeError) -> bool:
+    return "heart-rgb-matrix-driver" in str(error)
+
+
+def _select_pi_local_screen(
+    *,
+    orientation: Orientation,
+    panel_width: int,
+    panel_height: int,
+    reason: str,
+) -> LocalScreen:
+    os.environ["X11_FORWARD"] = "1"
+    logger.warning("%s; running with LocalScreen.", reason)
+    return LocalScreen(
+        width=panel_width,
+        height=panel_height,
+        orientation=orientation,
+    )

@@ -1,28 +1,26 @@
 from __future__ import annotations
 
 import pygame
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import BehaviorSubject
+from manyfold import BehaviorSubject, StreamNode
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers.flame.state import FlameState
-from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class FlameStateProvider(ObservableProvider[FlameState]):
     def __init__(self) -> None:
         self._initial_time = pygame.time.get_ticks() * 2 / 1000.0
-        self._initial_state = FlameState(time_seconds=self._initial_time, dt_seconds=0.0)
+        self._initial_state = FlameState(
+            time_seconds=self._initial_time, dt_seconds=0.0
+        )
         self._latest_state = BehaviorSubject(self._initial_state)
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[FlameState]:
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[FlameState]:
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
 
         def to_state(frame_tick: object) -> FlameState:
@@ -31,12 +29,12 @@ class FlameStateProvider(ObservableProvider[FlameState]):
                 dt_seconds=max(frame_tick.delta_s, 1.0 / 120.0),
             )
 
-        return pipe_in_background(
-            frame_ticks,
-            ops.map(to_state),
-            ops.do_action(self._latest_state.on_next),
-            ops.start_with(self._initial_state),
-            ops.share(),
+        return (
+            frame_ticks.map(to_state)
+            .do_action(self._latest_state.on_next)
+            .start_with(self._initial_state)
+
+
         )
 
     @property

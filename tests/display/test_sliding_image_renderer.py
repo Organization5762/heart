@@ -6,7 +6,9 @@ from heart.assets.loader import Loader
 from heart.renderers.sliding_image import SlidingImage
 
 
-def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_clock_factory) -> None:
+def test_reset_preserves_cached_surface(
+    monkeypatch, orientation, manager, stub_clock_factory
+) -> None:
     """Ensure SlidingImage keeps its cached surface across resets so scene transitions do not blank marquee banners."""
 
     base_surface = pygame.Surface((32, 8), pygame.SRCALPHA)
@@ -31,11 +33,11 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     manager.frame_tick_controller.advance(clock)
     renderer._internal_process(window, manager, orientation)
     processed_state = renderer.state
-    assert processed_state.offset == (
-        offset_before + processed_state.speed
-    ) % processed_state.width
+    assert (
+        processed_state.offset
+        == (offset_before + processed_state.speed) % processed_state.width
+    )
     assert window.get_at((0, 0))[:3] == (10, 20, 30)
-
 
     renderer.reset()
 
@@ -52,7 +54,9 @@ def test_reset_preserves_cached_surface(monkeypatch, orientation, manager, stub_
     manager.frame_tick_controller.advance(clock)
     renderer._internal_process(window, manager, orientation)
     after_second_process_state = renderer.state
-    assert after_second_process_state.offset == (
-        offset_before_second + after_second_process_state.speed
-    ) % after_second_process_state.width
+    assert (
+        after_second_process_state.offset
+        == (offset_before_second + after_second_process_state.speed)
+        % after_second_process_state.width
+    )
     assert window.get_at((0, 0))[:3] == (10, 20, 30)

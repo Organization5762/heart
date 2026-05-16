@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import time
+
 import numpy as np
+from manyfold import Graph
 from PIL import Image
 
-from heart.peripheral.led_matrix import LEDMatrixDisplay
+from heart.peripheral.led_matrix import (LEDMatrixDisplay,
+                                         display_frame_event_route)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+
 
 def _solid_image(width: int, height: int, *, value: int) -> Image.Image:
     array = np.full((height, width, 3), value, dtype=np.uint8)
@@ -41,3 +46,34 @@ class TestPeripheralLedMatrixDisplay:
         subscription.dispose()
 
         assert received == [frame]
+
+    def test_install_node_publishes_frames_to_manyfold_route(self) -> None:
+        """Verify that rendered matrix frames are available as graph events."""
+        peripheral = LEDMatrixDisplay(width=2, height=2)
+        image = _solid_image(2, 2, value=9)
+        graph = Graph()
+
+        handle = peripheral.install_node(graph)
+        try:
+            deadline = time.monotonic() + 1.0
+            latest = None
+            frame = None
+            while time.monotonic() < deadline:
+                frame = peripheral.publish_image(image)
+                latest = graph.latest(display_frame_event_route())
+                if latest is not None:
+                    break
+                time.sleep(0.01)
+        finally:
+            handle.dispose()
+
+        assert frame is not None
+        assert latest is not None
+        assert latest.value.event_type == "peripheral.display.frame"
+        assert latest.value.sequence_number == frame.frame_id
+        assert latest.value.identity.id == "led_matrix_2x2"
+        assert latest.value.data["frame_id"] == frame.frame_id
+        assert latest.value.data["width"] == frame.width
+        assert latest.value.data["height"] == frame.height
+        assert latest.value.data["mode"] == frame.mode
+        assert latest.value.data["data"] == frame.data

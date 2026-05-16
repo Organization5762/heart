@@ -1,16 +1,15 @@
 import asyncio
-import atexit
 import functools
 import json
 import logging
-import threading
-import time
 from collections import deque
-from typing import Any, Iterator, NoReturn, cast
+from typing import Any, Iterator, cast
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
+from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
+                                ManagedRunLoopHandle, StopToken)
 
 from heart.peripheral.uart_buffer import UartMessageBuffer
 from heart.utilities.env import Configuration
@@ -38,6 +37,7 @@ class UartListener:
         "_log_controller",
         "_bytes_received",
         "_messages_received",
+        "_loop_handle",
     )
 
     def __init__(self, device: BLEDevice) -> None:
@@ -52,6 +52,7 @@ class UartListener:
         self._log_controller = get_logging_controller()
         self._bytes_received = 0
         self._messages_received = 0
+        self._loop_handle: ManagedRunLoopHandle | None = None
 
     @classmethod
     async def _discover_devices(cls) -> list[BLEDevice]:
@@ -64,25 +65,26 @@ class UartListener:
         ]
 
     def start(self) -> None:
+        if self._loop_handle is not None and self._loop_handle.thread.is_alive():
+            return
         self._logger.debug("Starting UART listener thread for %s", self.device.address)
 
-        def _run_listener() -> None:
-            try:
-                asyncio.run(self.connect_and_listen())
-            except Exception:
-                self.disconnected = True
-                self._logger.exception("UART listener thread terminated unexpectedly.")
-
-        t = threading.Thread(
-            target=_run_listener,
-            name=f"UartListener-{self.device.address}",
+        loop = ManagedRunLoop(
+            body=lambda stop: asyncio.run(self.connect_and_listen(stop)),
+            backoff=BackoffPolicy.fixed(RECONNECT_DELAY_SECONDS),
+            on_error=self._log_listener_error,
+            group=f"ble-uart:{self.device.address}",
         )
-        atexit.register(t.join, timeout=1)
-        t.start()
+        self._loop_handle = loop.start_thread(
+            name=f"UartListener-{self.device.address}",
+            daemon=True,
+        )
 
     def close(self) -> None:
         self._logger.debug("Closing UART listener for %s", self.device.address)
         self.disconnected = True
+        if self._loop_handle is not None:
+            self._loop_handle.stop()
 
     def consume_events(self) -> Iterator[dict[str, Any]]:
         while self.events:
@@ -90,12 +92,16 @@ class UartListener:
                 raise RuntimeError("Device disconnected")
             yield self.events.popleft()
 
-    async def connect_and_listen(self) -> NoReturn:
-        self._logger.info("Found a device, starting listener loop")
-        await self.__start_listener_loop(self.device)
+    def _log_listener_error(self, _exc: BaseException, _attempt: int) -> None:
+        self.disconnected = True
+        self._logger.exception("UART listener thread terminated unexpectedly.")
 
-    async def __start_listener_loop(self, device: BLEDevice) -> NoReturn:
-        while True:
+    async def connect_and_listen(self, stop: StopToken) -> None:
+        self._logger.info("Found a device, starting listener loop")
+        await self.__start_listener_loop(self.device, stop)
+
+    async def __start_listener_loop(self, device: BLEDevice, stop: StopToken) -> None:
+        while not stop.is_set():
             # We still tend to loe a decent amount of data (~5 seconds worth)
             # as part of the reconnection process, but if the timeout is infrequent enough it would be hard to notice
             self._logger.info(
@@ -119,9 +125,13 @@ class UartListener:
                 await client.start_notify(
                     NOTIFICATION_CHANNEL, callback=self.__callback
                 )
-                await asyncio.sleep(SINGLE_CLIENT_TIMEOUT_SECONDS)
+                await self.__sleep_until_stop(stop, SINGLE_CLIENT_TIMEOUT_SECONDS)
             # On failure, wait a bit before retrying
-            time.sleep(RECONNECT_DELAY_SECONDS)
+            if await self.__sleep_until_stop(stop, RECONNECT_DELAY_SECONDS):
+                return
+
+    async def __sleep_until_stop(self, stop: StopToken, delay: float) -> bool:
+        return await asyncio.to_thread(stop.wait, delay)
 
     @functools.cache
     def __get_client(self, device: BLEDevice) -> BleakClient:

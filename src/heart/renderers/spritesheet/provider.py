@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-import reactivex
-from reactivex import operators as ops
+from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
@@ -16,7 +15,6 @@ from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
 from heart.utilities.env import Configuration
-from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
@@ -40,34 +38,28 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.skip_last_frame = skip_last_frame
-
+        self._last_state: SpritesheetLoopState | None = None
         assert frame_data is not None or metadata_file_path is not None, (
             "Must provide either frame_data or metadata_file_path"
         )
-
         self.frames: dict[LoopPhase, list[KeyFrame]] = {
             LoopPhase.START: [],
             LoopPhase.LOOP: [],
             LoopPhase.END: [],
         }
-
         if frame_data is None:
             frame_data = Loader.load_json(metadata_file_path)
             for key in frame_data["frames"]:
                 frame_obj = FrameDescription.from_dict(frame_data["frames"][key])
                 frame = frame_obj.frame
                 parsed_tag, _ = key.split(" ", 1)
-                tag = LoopPhase(parsed_tag) if parsed_tag in LoopPhase._value2member_map_ else LoopPhase.LOOP
+                tag = (
+                    LoopPhase(parsed_tag)
+                    if parsed_tag in LoopPhase._value2member_map_
+                    else LoopPhase.LOOP
+                )
                 self.frames[tag].append(
-                    KeyFrame(
-                        (
-                            frame.x,
-                            frame.y,
-                            frame.w,
-                            frame.h,
-                        ),
-                        frame_obj.duration,
-                    )
+                    KeyFrame((frame.x, frame.y, frame.w, frame.h), frame_obj.duration)
                 )
         else:
             for frame_description in frame_data:
@@ -82,14 +74,11 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                         frame_description.duration,
                     )
                 )
-
         has_start = len(self.frames[LoopPhase.START]) > 0
         self.initial_phase = LoopPhase.START if has_start else LoopPhase.LOOP
 
     def initial_state(
-        self,
-        *,
-        peripheral_manager: PeripheralManager,
+        self, *, peripheral_manager: PeripheralManager
     ) -> SpritesheetLoopState:
         gamepad = None
         if not self.disable_input:
@@ -105,54 +94,53 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SpritesheetLoopState]:
-        initial_state = self.initial_state(peripheral_manager=peripheral_manager)
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[SpritesheetLoopState]:
+        initial_state = self._last_state or self.initial_state(
+            peripheral_manager=peripheral_manager
         )
-
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
+        )
         if self.disable_input:
-            switch_updates = reactivex.empty()
+            switch_updates = EmptyNode().observable()
         else:
             switches = peripheral_manager.get_main_switch_subscription()
-            switch_updates = pipe_in_background(
-                switches,
-                ops.map(lambda switch_state: lambda state: self.handle_switch(state, switch_state))
-            )
-
-        tick_updates = pipe_in_background(
-            frame_ticks,
-            ops.map(
-                lambda frame_tick: lambda state: self.advance(
-                    state,
-                    elapsed_ms=frame_tick.delta_ms,
+            switch_updates = switches.map(
+                lambda switch_state: (
+                    lambda state: self.handle_switch(state, switch_state)
                 )
-            ),
+            )
+        tick_updates = frame_ticks.map(
+            lambda frame_tick: (
+                lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
+            )
+        )
+        return (
+            MergeNode.merge(switch_updates, tick_updates)
+            .scan(lambda state, update: update(state), seed=initial_state)
+            .start_with(initial_state)
+            .do_action(self._remember_state)
+
+
         )
 
-        return pipe_in_background(
-            reactivex.merge(switch_updates, tick_updates),
-            ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
-            ops.share(),
-        )
+    def _remember_state(self, state: SpritesheetLoopState) -> None:
+        self._last_state = state
 
-    def handle_switch(self, state: SpritesheetLoopState, switch_state: SwitchState) -> SpritesheetLoopState:
+    def handle_switch(
+        self, state: SpritesheetLoopState, switch_state: SwitchState
+    ) -> SpritesheetLoopState:
         if self.disable_input:
             return state
-
         duration_scale = state.duration_scale
         last_rotation = state.last_switch_rotation
         current_rotation = switch_state.rotation_since_last_button_press
         if last_rotation is None:
             last_rotation = current_rotation
-        else:
-            if current_rotation > last_rotation:
-                duration_scale += 0.05
-            elif current_rotation < last_rotation:
-                duration_scale -= 0.05
-
+        elif current_rotation > last_rotation:
+            duration_scale += 0.05
+        elif current_rotation < last_rotation:
+            duration_scale -= 0.05
         return replace(
             state,
             duration_scale=duration_scale,
@@ -163,16 +151,13 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     def _apply_gamepad_input(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
         if self.disable_input:
             return state
-
         gamepad = state.gamepad
         if gamepad is None or not gamepad.is_connected():
             return state
-
         mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
         duration_scale = state.duration_scale
         accelerate = False
         decelerate = False
-
         try:
             accelerate = bool(gamepad.is_held(mapping.BUTTON_PLUS)) or bool(
                 gamepad.axis_passed_threshold(mapping.AXIS_R)
@@ -182,19 +167,14 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             )
         except Exception:
             return state
-
-        if accelerate and not decelerate:
+        if accelerate and (not decelerate):
             duration_scale += 0.005
-        elif decelerate and not accelerate:
+        elif decelerate and (not accelerate):
             duration_scale -= 0.005
         return replace(state, duration_scale=duration_scale)
 
     def _next_frame(
-        self,
-        state: SpritesheetLoopState,
-        *,
-        kf_duration: float,
-        elapsed_ms: float,
+        self, state: SpritesheetLoopState, *, kf_duration: float, elapsed_ms: float
     ) -> SpritesheetLoopState:
         current_frame = state.current_frame
         loop_count = state.loop_count
@@ -202,15 +182,14 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         reverse_direction = state.reverse_direction
         previous_elapsed = state.time_since_last_update
         time_since_last_update = (previous_elapsed or 0) + elapsed_ms
-
         if previous_elapsed is None or time_since_last_update > kf_duration:
             if self.boomerang and phase == LoopPhase.LOOP:
-                current_frame = current_frame - 1 if reverse_direction else current_frame + 1
+                current_frame = (
+                    current_frame - 1 if reverse_direction else current_frame + 1
+                )
             else:
                 current_frame += 1
-
             time_since_last_update = 0
-
             if self.boomerang and phase == LoopPhase.LOOP:
                 if current_frame >= len(self.frames[phase]) - 1:
                     reverse_direction = True
@@ -219,7 +198,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                     reverse_direction = False
                     current_frame = 0
                     loop_count += 1
-                    if loop_count >= 4:
+                    if loop_count >= 3:
                         loop_count = 0
                         if len(self.frames[LoopPhase.END]) > 0:
                             phase = LoopPhase.END
@@ -244,7 +223,6 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                             phase = LoopPhase.START
                 elif phase == LoopPhase.END:
                     phase = LoopPhase.START
-
         return replace(
             state,
             current_frame=current_frame,
@@ -258,13 +236,11 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         self, state: SpritesheetLoopState, *, elapsed_ms: float
     ) -> SpritesheetLoopState:
         state = self._apply_gamepad_input(state)
-
         current_kf = self.frames[state.phase][state.current_frame]
         if self.disable_input:
             kf_duration = current_kf.duration
         else:
             kf_duration = current_kf.duration * (1 - state.duration_scale)
-
         return self._next_frame(state, kf_duration=kf_duration, elapsed_ms=elapsed_ms)
 
     def reset_state(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
@@ -313,7 +289,6 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                     trimmed=False,
                 )
             )
-
         return cls(
             sheet_file_path=sheet_file_path,
             metadata_file_path=None,

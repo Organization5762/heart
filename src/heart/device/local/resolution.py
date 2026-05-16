@@ -31,7 +31,9 @@ class DisplayResolutionProvider(ABC):
         """Return the detected display resolution."""
 
     def _command_failure_message(self, error: Exception) -> str:
-        return f"Could not detect display resolution: {error}. Using default resolution."
+        return (
+            f"Could not detect display resolution: {error}. Using default resolution."
+        )
 
 
 class MacDisplayResolutionProvider(DisplayResolutionProvider):
@@ -101,7 +103,9 @@ class FallbackDisplayResolutionProvider(DisplayResolutionProvider):
     """Fallback provider when no platform specific implementation exists."""
 
     def get_resolution(self) -> tuple[int, int, float]:
-        logger.info("Display resolution detection not supported. Using default resolution.")
+        logger.info(
+            "Display resolution detection not supported. Using default resolution."
+        )
         return self.DEFAULT_RESOLUTION
 
     def _detect_resolution(self) -> tuple[int, int, float]:

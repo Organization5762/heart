@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from importlib import import_module
+from importlib.util import find_spec
 
 from google.protobuf import symbol_database
 from google.protobuf.message import Message
 
+from heart.peripheral.core import protobuf_catalog
 from heart.peripheral.core.protobuf_types import PeripheralPayloadType
 from heart.utilities.logging import get_logger
 
@@ -30,15 +33,17 @@ class ProtobufTypeRegistry:
             module_path = self._resolve_module_path(payload_type_value)
             if module_path is None:
                 return None
-            try:
-                module = import_module(module_path)
-            except ModuleNotFoundError:
+            if module_path in sys.modules:
+                module = sys.modules[module_path]
+            elif find_spec(module_path) is None:
                 logger.warning(
                     "Failed to import protobuf module '%s' for payload type '%s'.",
                     module_path,
                     payload_type_value,
                 )
                 return None
+            else:
+                module = import_module(module_path)
             register_hook = getattr(module, "register_protobuf_types", None)
             if callable(register_hook):
                 try:
@@ -78,8 +83,4 @@ def _normalize_payload_type(payload_type: str | PeripheralPayloadType) -> str:
 
 
 protobuf_registry = ProtobufTypeRegistry()
-
-from heart.peripheral.core import \
-    protobuf_catalog as _protobuf_catalog  # noqa: E402
-
-_protobuf_catalog.register_protobuf_catalog(protobuf_registry)
+protobuf_catalog.register_protobuf_catalog(protobuf_registry)

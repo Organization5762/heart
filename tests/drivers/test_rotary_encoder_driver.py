@@ -41,7 +41,9 @@ class StubRotaryModule:
 
 STUBS = {
     "board": make_module("board", ROTA="rota", ROTB="rotb", SWITCH="switch"),
-    "rotaryio": make_module("rotaryio", IncrementalEncoder=StubRotaryModule.IncrementalEncoder),
+    "rotaryio": make_module(
+        "rotaryio", IncrementalEncoder=StubRotaryModule.IncrementalEncoder
+    ),
     "digitalio": digitalio_stub,
 }
 
@@ -80,7 +82,9 @@ class TestDriversRotaryEncoderDriver:
         """Verify that create_handler uses the provided modules to configure the rotary encoder handler. This keeps hardware abstraction swappable so deployments can tailor pin assignments."""
         StubDigitalInOut.instances.clear()
         handler = rotary_driver.create_handler(
-            board_module=make_module("board", ROTA="rota", ROTB="rotb", SWITCH="switch"),
+            board_module=make_module(
+                "board", ROTA="rota", ROTB="rotb", SWITCH="switch"
+            ),
             rotary_module=StubRotaryModule,
             digital_in_out_cls=StubDigitalInOut,
             direction=FakeDirection,
@@ -93,21 +97,19 @@ class TestDriversRotaryEncoderDriver:
         assert created_switch.direction == FakeDirection.INPUT
         assert created_switch.pull == FakePull.DOWN
 
-
-
     def test_read_events_returns_handler_values(self, rotary_driver):
         """Verify that read_events returns the events produced by the handler iterable. This ensures driver plumbing forwards physical interactions without modification."""
         handler = StubHandler(["event1", "event2"])
         assert rotary_driver.read_events(handler) == ["event1", "event2"]
-
-
 
     def test_rotary_driver_emits_identity_payload(self, rotary_driver):
         """Verify that respond_to_identify_query prints the rotary encoder driver identity payload. This aids device discovery so orchestration tools can label encoder modules."""
         stream = io.StringIO("Identify\n")
         outputs: list[str] = []
 
-        handled = rotary_driver.respond_to_identify_query(stdin=stream, print_fn=outputs.append)
+        handled = rotary_driver.respond_to_identify_query(
+            stdin=stream, print_fn=outputs.append
+        )
 
         assert handled is True
         payload = json.loads(outputs[0])

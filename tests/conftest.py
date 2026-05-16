@@ -55,15 +55,6 @@ def dummy_sdl_video_driver(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def default_reactivex_stream_coalesce_window(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Disable stream coalescing for deterministic reactive tests; mutates env vars per test."""
-
-    monkeypatch.setenv("HEART_RX_STREAM_COALESCE_WINDOW_MS", "0")
-    yield
-
-@pytest.fixture(autouse=True)
 def init_pygame() -> None:
     pygame.init()
     yield
@@ -146,6 +137,7 @@ def device(orientation) -> Device:
 @pytest.fixture()
 def manager() -> PeripheralManager:
     return PeripheralManager()
+
 
 @pytest.fixture()
 def resolver(device: Device) -> RuntimeContainer:

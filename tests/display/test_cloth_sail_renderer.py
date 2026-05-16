@@ -88,12 +88,8 @@ class TestClothSailRenderer:
         """Verify process hands pygame a contiguous RGB buffer to avoid SDL segfaults when OpenGL fallbacks engage."""
 
         _install_fake_opengl(monkeypatch)
-        monkeypatch.delitem(
-            sys.modules, "heart.renderers.cloth_sail", raising=False
-        )
-        cloth_module = importlib.import_module(
-            "heart.renderers.cloth_sail"
-        )
+        monkeypatch.delitem(sys.modules, "heart.renderers.cloth_sail", raising=False)
+        cloth_module = importlib.import_module("heart.renderers.cloth_sail")
         ClothSailRenderer = cloth_module.ClothSailRenderer
 
         renderer = ClothSailRenderer()

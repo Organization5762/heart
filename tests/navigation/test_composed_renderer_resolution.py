@@ -1,6 +1,5 @@
 """Validate Lagom-backed renderer resolution in composed navigation helpers."""
 
-
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer

@@ -22,8 +22,6 @@ class TestUtilitiesSignal:
         peak_frequency = freqs[int(np.argmax(magnitudes))]
         assert peak_frequency == 5.0
 
-
-
     def test_dominant_frequency_matches_fft(self) -> None:
         """Verify that dominant frequency matches fft. This supports analytics accuracy for monitoring."""
         sample_rate = 200.0
@@ -33,8 +31,6 @@ class TestUtilitiesSignal:
         assert frequency == 20.0
         assert magnitude > 0.0
 
-
-
     def test_cross_correlation_detects_zero_lag(self) -> None:
         """Verify that cross correlation detects zero lag. This supports analytics accuracy for monitoring."""
         a = np.array([1.0, 2.0, 3.0, 4.0])
@@ -42,8 +38,6 @@ class TestUtilitiesSignal:
         lags, correlation = cross_correlation(a, b)
         zero_index = int(np.where(lags == 0)[0][0])
         assert correlation[zero_index] == pytest.approx(1.0)
-
-
 
     def test_hilbert_envelope_matches_absolute_for_constant(self) -> None:
         """Verify that hilbert envelope matches absolute for constant. This keeps the system behaviour reliable for operators."""

@@ -15,7 +15,7 @@ class TestDriverUpdateConfiguration:
         sketch_path.mkdir(parents=True)
         settings_path = tmp_path / "settings.toml"
         settings_path.write_text(
-            '\n'.join(
+            "\n".join(
                 [
                     'ARDUINO_BOARD_MANAGER_URLS="https://example.invalid/package_index.json"',
                     'ARDUINO_CORE="adafruit:nrf52"',
@@ -50,7 +50,7 @@ class TestDriverUpdateConfiguration:
         """Verify Arduino default mode requires sketch metadata so auto mode cannot silently select a flashing path with no firmware to build."""
         settings_path = tmp_path / "settings.toml"
         settings_path.write_text(
-            '\n'.join(
+            "\n".join(
                 [
                     'CIRCUIT_PY_BOOT_NAME="BOOT"',
                     'CIRCUIT_PY_DRIVER_LIBS=""',

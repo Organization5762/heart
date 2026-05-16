@@ -9,11 +9,9 @@ from enum import StrEnum
 from math import ceil
 from typing import Any
 
-import reactivex
-from reactivex import operators as ops
-from reactivex.subject import Subject
+from manyfold import StreamNode
 
-from heart.utilities.reactivex_threads import pipe_in_background
+from heart.peripheral.core.streams import EventStream
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
 DEFAULT_LATENCY_HISTORY_SIZE = 512
@@ -66,7 +64,7 @@ class InputDebugTap:
         self._history: deque[InputDebugEnvelope] = deque(maxlen=history_size)
         self._latency_history: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
-        self._subject: Subject[InputDebugEnvelope] = Subject()
+        self._stream: EventStream[InputDebugEnvelope] = EventStream()
 
     def publish(
         self,
@@ -87,10 +85,10 @@ class InputDebugTap:
         )
         with self._lock:
             self._history.append(envelope)
-        self._subject.on_next(envelope)
+        self._stream.emit(envelope)
 
-    def observable(self) -> reactivex.Observable[InputDebugEnvelope]:
-        return pipe_in_background(self._subject)
+    def observable(self) -> StreamNode[InputDebugEnvelope]:
+        return self._stream.observable()
 
     def snapshot(self) -> tuple[InputDebugEnvelope, ...]:
         with self._lock:
@@ -99,8 +97,7 @@ class InputDebugTap:
     def record_latency(self, stream_name: str, delay_s: float) -> None:
         with self._lock:
             history = self._latency_history.setdefault(
-                stream_name,
-                deque(maxlen=self._latency_history_size),
+                stream_name, deque(maxlen=self._latency_history_size)
             )
             history.append(max(delay_s, 0.0))
 
@@ -126,7 +123,7 @@ def _latency_stats(history: tuple[float, ...]) -> InputLatencyStats:
 
     return InputLatencyStats(
         count=len(ordered),
-        p50_ms=percentile(0.50),
+        p50_ms=percentile(0.5),
         p95_ms=percentile(0.95),
         p99_ms=percentile(0.99),
         max_ms=max(ordered) * 1000.0,
@@ -146,30 +143,41 @@ def _payload_monotonic(value: Any) -> float | None:
     return None
 
 
-def instrument_input_stream(
-    source: reactivex.Observable[Any],
-    *,
-    tap: InputDebugTap,
-    stage: InputDebugStage,
-    stream_name: str,
-    source_id: SourceResolver,
-    upstream_ids: Iterable[str] = (),
-) -> reactivex.Observable[Any]:
-    """Attach debug tap side effects to ``source`` without changing its payloads."""
+@dataclass(frozen=True, slots=True)
+class InputDebugNode:
+    """Tap input emissions without changing the stream payloads."""
 
-    upstream_ids_tuple = tuple(upstream_ids)
+    tap: InputDebugTap
+    stage: InputDebugStage
+    stream_name: str
+    source_id: SourceResolver
+    upstream_ids: Iterable[str] = ()
 
-    def _publish(value: Any) -> None:
-        resolved_source = source_id(value) if callable(source_id) else source_id
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "upstream_ids", tuple(self.upstream_ids))
+
+    def observable(self, source: StreamNode[Any]) -> StreamNode[Any]:
+        if hasattr(source, "do_action"):
+            return source.do_action(on_next=self._publish)
+        stream = source.map(lambda value: self._publish(value) or value)
+        return stream
+
+    def connect(self, source: StreamNode[Any]) -> StreamNode[Any]:
+        return self.observable(source)
+
+    def _publish(self, value: Any) -> None:
+        resolved_source = (
+            self.source_id(value) if callable(self.source_id) else self.source_id
+        )
         payload_monotonic = _payload_monotonic(value)
         if payload_monotonic is not None:
-            tap.record_latency(stream_name, time.monotonic() - payload_monotonic)
-        tap.publish(
-            stage=stage,
-            stream_name=stream_name,
+            self.tap.record_latency(
+                self.stream_name, time.monotonic() - payload_monotonic
+            )
+        self.tap.publish(
+            stage=self.stage,
+            stream_name=self.stream_name,
             source_id=resolved_source,
             payload=value,
-            upstream_ids=upstream_ids_tuple,
+            upstream_ids=self.upstream_ids,
         )
-
-    return pipe_in_background(source, ops.do_action(on_next=_publish))

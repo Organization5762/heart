@@ -1,0 +1,16 @@
+[build-system]
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "heart-rgb-matrix-driver"
+version = "0.1.0"
+description = "PyO3 scene-management bridge for the Heart runtime."
+readme = "README.md"
+requires-python = ">=3.11"
+
+[tool.maturin]
+features = ["python-extension"]
+module-name = "heart_rgb_matrix_driver._heart_rgb_matrix_driver"
+profile = "release"
+python-source = "python"

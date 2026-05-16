@@ -4,12 +4,21 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import StrEnum
 from functools import cached_property
-from typing import Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar
+from itertools import count
+from threading import Lock
+from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeAlias,
+                    TypeVar, cast)
 
-import reactivex
-from reactivex import operators as ops
+from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane, Schema,
+                      StreamFamily, StreamName, StreamNode, TypedEnvelope,
+                      TypedRoute, Variant, route)
+from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
+                                SensorTag)
 
+from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.utilities.logging import get_logger
+
+_OBSERVE_ROUTE_IDS = count(1)
 
 
 @dataclass(slots=True)
@@ -20,20 +29,38 @@ class Input:
     data: Any
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def to_sensor_event(
+        self,
+        *,
+        identity: SensorIdentity | None = None,
+        sequence_number: int | None = None,
+    ) -> SensorEvent:
+        return SensorEvent(
+            event_type=self.event_type,
+            data=self.data,
+            observed_at=self.timestamp.timestamp(),
+            identity=identity or SensorIdentity(),
+            sequence_number=sequence_number,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class InputDescriptor:
     """Describe an input a peripheral or provider expects to consume."""
 
     name: str
-    stream: reactivex.Observable[Any]
+    stream: StreamNode[Any]
     payload_type: type[Any] | None = None
     description: str | None = None
 
+
 A = TypeVar("A")
+PeripheralEventNode: TypeAlias = StreamNode[A]
+
 
 class PeripheralGroup(StrEnum):
     MAIN_SWITCH = "MAIN_SWITCH"
+
 
 @dataclass
 class PeripheralTag:
@@ -47,6 +74,13 @@ class PeripheralTag:
     variant: str
     metadata: dict[str, str] = field(default_factory=dict)
 
+    def to_sensor_tag(self) -> SensorTag:
+        return SensorTag(
+            name=self.name,
+            variant=self.variant,
+            metadata=dict(self.metadata),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PeripheralLocation:
@@ -57,12 +91,28 @@ class PeripheralLocation:
     z: float = 0.0
     time: datetime | None = None
 
+    def to_sensor_location(self) -> SensorLocation:
+        return SensorLocation(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            timestamp=None if self.time is None else self.time.timestamp(),
+        )
+
 
 @dataclass
 class PeripheralInfo:
     id: str | None = None
     tags: Sequence[PeripheralTag] = field(default_factory=list)
     location: PeripheralLocation = field(default_factory=PeripheralLocation)
+
+    def to_sensor_identity(self) -> SensorIdentity:
+        return SensorIdentity(
+            id=self.id,
+            tags=tuple(tag.to_sensor_tag() for tag in self.tags),
+            location=self.location.to_sensor_location(),
+        )
+
 
 @dataclass
 class PeripheralMessageEnvelope(Generic[A]):
@@ -73,13 +123,30 @@ class PeripheralMessageEnvelope(Generic[A]):
     def unwrap_peripheral(cls, wrapper: PeripheralMessageEnvelope[A]) -> A:
         return wrapper.data
 
+    def to_sensor_event(
+        self,
+        *,
+        event_type: str,
+        observed_at: datetime | None = None,
+        sequence_number: int | None = None,
+    ) -> SensorEvent:
+        timestamp = observed_at or datetime.now(timezone.utc)
+        return SensorEvent(
+            event_type=event_type,
+            data=self.data,
+            observed_at=timestamp.timestamp(),
+            identity=self.peripheral_info.to_sensor_identity(),
+            sequence_number=sequence_number,
+        )
+
+
 class Peripheral(Generic[A]):
     """Abstract base class for all peripherals."""
 
     _logger = get_logger(__name__)
 
-    def _event_stream(self) -> reactivex.Observable[A]:
-        return reactivex.empty()
+    def _event_stream(self) -> PeripheralEventNode[A]:
+        return EmptyNode().observable()
 
     def peripheral_info(self) -> PeripheralInfo:
         # Default implementation returns a generic PeripheralInfo instance
@@ -88,18 +155,66 @@ class Peripheral(Generic[A]):
         return PeripheralInfo()
 
     @cached_property
-    def observe(
-        self
-    ) -> reactivex.Observable[PeripheralMessageEnvelope[A]]:
-        def wrap(a: A) -> PeripheralMessageEnvelope[A]:
+    def observe(self) -> StreamNode[PeripheralMessageEnvelope[A]]:
+        graph = Graph()
+        route_id = next(_OBSERVE_ROUTE_IDS)
+        route_name = f"peripheral.{type(self).__name__}.{route_id}"
+        schema_id = f"Heart{type(self).__name__}PeripheralObserve"
+        source_route: TypedRoute[A] = route(
+            plane=Plane.Read,
+            layer=Layer.Logical,
+            owner=OwnerName("heart.transforms"),
+            family=StreamFamily("transform"),
+            stream=StreamName(f"{route_name}.source"),
+            variant=Variant.State,
+            schema=Schema.any(f"{schema_id}Source"),
+        )
+        output_route: TypedRoute[PeripheralMessageEnvelope[A]] = route(
+            plane=Plane.Read,
+            layer=Layer.Logical,
+            owner=OwnerName("heart.transforms"),
+            family=StreamFamily("transform"),
+            stream=StreamName(f"{route_name}.output"),
+            variant=Variant.State,
+            schema=Schema.any(f"{schema_id}Output"),
+        )
+        lock = Lock()
+        map_subscription: Any | None = None
+        source_subscription: Any | None = None
+
+        def wrap(a: A | TypedEnvelope[A]) -> PeripheralMessageEnvelope[A]:
+            data = a.value if isinstance(a, TypedEnvelope) else a
             return PeripheralMessageEnvelope[A](
-                data=a,
-                peripheral_info=self.peripheral_info()
+                data=data, peripheral_info=self.peripheral_info()
             )
 
-        return self._event_stream().pipe(
-            ops.map(wrap),
-            ops.share(),
+        def subscribe(observer: Any, scheduler: Any = None) -> Any:
+            nonlocal map_subscription, source_subscription
+
+            with lock:
+                if map_subscription is None:
+                    map_subscription = graph.stateful_map(
+                        source_route,
+                        initial_state=None,
+                        step=lambda state, value: (state, wrap(value)),
+                        output=output_route,
+                    )
+
+                output_subscription = graph.observe(
+                    output_route,
+                    replay_latest=False,
+                ).callback(observer.on_next)
+
+                if source_subscription is None:
+                    source_subscription = graph.pipe(
+                        cast(Any, self._event_stream()),
+                        source_route,
+                    )
+
+            return output_subscription
+
+        return cast(
+            StreamNode[PeripheralMessageEnvelope[A]], CallbackObservable(subscribe)
         )
 
     @classmethod

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pygame
-import reactivex
+from manyfold import StreamNode
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
@@ -32,7 +32,7 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[HilbertCurveState]:
+    ) -> StreamNode[HilbertCurveState]:
         if self._initial_state is None:
             raise ValueError("HilbertScene requires an initial state")
         return self.provider.observable(
@@ -48,4 +48,6 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
         state = self.state
         window.screen.fill((0, 0, 0))
         if len(state.frame_curve) > 1:
-            pygame.draw.lines(window.screen, self.line_color, False, state.frame_curve, 1)
+            pygame.draw.lines(
+                window.screen, self.line_color, False, state.frame_curve, 1
+            )

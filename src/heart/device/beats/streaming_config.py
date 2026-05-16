@@ -33,12 +33,13 @@ class BeatsStreamingConfiguration:
 
     @classmethod
     def _overflow_strategy(cls) -> QueueOverflowStrategy:
-        raw = os.environ.get("BEATS_STREAM_QUEUE_OVERFLOW", "drop_oldest").strip().lower()
+        raw = (
+            os.environ.get("BEATS_STREAM_QUEUE_OVERFLOW", "drop_oldest").strip().lower()
+        )
         try:
             return QueueOverflowStrategy(raw)
         except ValueError as exc:
             options = ", ".join(strategy.value for strategy in QueueOverflowStrategy)
             raise ValueError(
-                "BEATS_STREAM_QUEUE_OVERFLOW must be one of "
-                f"{options}."
+                f"BEATS_STREAM_QUEUE_OVERFLOW must be one of {options}."
             ) from exc

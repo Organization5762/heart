@@ -20,7 +20,7 @@ class TestUartMessageBuffer:
         assert messages == [b'{"alpha": 1}']
         assert buffer.buffer_size == len(b'{"beta": ')
 
-        messages = list(buffer.append(b'2}\n'))
+        messages = list(buffer.append(b"2}\n"))
         assert messages == [b'{"beta": 2}']
         assert buffer.buffer_size == 0
 
@@ -33,6 +33,6 @@ class TestUartMessageBuffer:
         assert messages == ['{"ok": true}']
         assert buffer.buffer_size == len('{"pending":')
 
-        messages = list(buffer.append(b' false}\n'))
+        messages = list(buffer.append(b" false}\n"))
         assert messages == ['{"pending": false}']
         assert buffer.buffer_size == 0

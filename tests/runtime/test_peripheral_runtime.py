@@ -2,26 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from reactivex.subject import Subject
-
 from heart.device.beats.websocket import ControlMessage
-from heart.peripheral.core.input import InputDebugEnvelope, InputDebugStage
+from heart.peripheral.core.input import InputDebugStage, InputDebugTap
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
                                               PeripheralRuntime)
 
 
-class _DebugTapStub:
-    def __init__(self) -> None:
-        self.subject: Subject[InputDebugEnvelope] = Subject()
-
-    def observable(self) -> Subject[InputDebugEnvelope]:
-        return self.subject
-
-
 class _PeripheralManagerStub:
     def __init__(self) -> None:
-        self.debug_tap = _DebugTapStub()
+        self.debug_tap = InputDebugTap()
         self.navigation_profile = _NavigationProfileStub()
         self.external_sensor_hub = _ExternalSensorHubStub()
 
@@ -63,6 +53,14 @@ class _WebSocketStub:
         self.control_handler = handler
 
 
+class _TemporaryRendererLoop:
+    def __init__(self) -> None:
+        self.clear_count = 0
+
+    def clear_temporary_renderer(self) -> None:
+        self.clear_count += 1
+
+
 class TestPeripheralRuntimeStreaming:
     """Exercise peripheral runtime stream bridging so Beats receives structured reconnect-safe peripheral payloads."""
 
@@ -80,7 +78,9 @@ class TestPeripheralRuntimeStreaming:
         )
 
         def _unexpected_websocket() -> object:
-            raise AssertionError("WebSocket should not be constructed without Beats forwarding")
+            raise AssertionError(
+                "WebSocket should not be constructed without Beats forwarding"
+            )
 
         monkeypatch.setattr(
             "heart.runtime.peripheral_runtime._build_websocket",
@@ -89,24 +89,26 @@ class TestPeripheralRuntimeStreaming:
 
         runtime.configure_streaming()
 
-    def test_configure_streaming_emits_peripheral_envelopes(self) -> None:
+    def test_configure_streaming_emits_peripheral_envelopes(self, monkeypatch) -> None:
         """Verify debug tap events are wrapped as peripheral payloads so the Beats websocket can replay and decode them after reconnects."""
         manager = _PeripheralManagerStub()
         runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
         websocket = _WebSocketStub()
 
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.stream_beats_input_debug",
+            classmethod(lambda cls: True),
+        )
+
         runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
-        manager.debug_tap.subject.on_next(
-            InputDebugEnvelope(
-                stage=InputDebugStage.RAW,
-                stream_name="switch.tick",
-                source_id="switch-1",
-                timestamp_monotonic=12.5,
-                payload={
-                    "rotation": 1,
-                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
-                },
-            )
+        manager.debug_tap.publish(
+            stage=InputDebugStage.RAW,
+            stream_name="switch.tick",
+            source_id="switch-1",
+            payload={
+                "rotation": 1,
+                "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+            },
         )
 
         assert len(websocket.sent) == 1
@@ -119,6 +121,23 @@ class TestPeripheralRuntimeStreaming:
         assert envelope.peripheral_info.tags[1].variant == "switch.tick"
         assert envelope.data["stream_name"] == "switch.tick"
         assert envelope.data["source_id"] == "switch-1"
+
+    def test_configure_streaming_leaves_input_debug_off_by_default(self) -> None:
+        """Keep Beats frame/control streaming lightweight unless debug telemetry is explicitly requested."""
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+
+        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        manager.debug_tap.publish(
+            stage=InputDebugStage.RAW,
+            stream_name="switch.tick",
+            source_id="switch-1",
+            payload={"rotation": 1},
+        )
+
+        assert websocket.control_handler is not None
+        assert websocket.sent == []
 
     def test_configure_streaming_maps_control_commands_into_navigation_injections(
         self,
@@ -134,6 +153,9 @@ class TestPeripheralRuntimeStreaming:
         websocket.control_handler(ControlMessage(command="browse", browse_step=2))
         websocket.control_handler(ControlMessage(command="activate"))
         websocket.control_handler(ControlMessage(command="alternate_activate"))
+
+        assert manager.navigation_profile.injected == []
+        runtime._drain_control_messages()
 
         assert manager.navigation_profile.injected == [
             ("browse", 2, "beats.control.browse"),
@@ -167,7 +189,29 @@ class TestPeripheralRuntimeStreaming:
             )
         )
 
+        assert manager.external_sensor_hub.updates == []
+        runtime._drain_control_messages()
+
         assert manager.external_sensor_hub.updates == [
             ("set", "accelerometer:debug:z", 12.5),
             ("clear", "accelerometer:debug:z", None),
         ]
+
+    def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:
+        """Verify image clear controls remove a transient phone image instead of leaving stale artwork on screen."""
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+        loop = _TemporaryRendererLoop()
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.get_active_game_loop",
+            lambda: loop,
+        )
+
+        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        assert websocket.control_handler is not None
+
+        websocket.control_handler(ControlMessage(command="image_update", clear=True))
+        runtime._drain_control_messages()
+
+        assert loop.clear_count == 1

@@ -73,7 +73,6 @@ class LSystem(StatefulBaseRenderer[LSystemState]):
     def real_process(
         self,
         window: Surface,
-
         orientation: Orientation,
     ) -> None:
         self._draw_grammar(window, self.state.grammar)

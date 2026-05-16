@@ -19,6 +19,11 @@ DEFAULT_IGNORE_PATTERNS=(
   ".ruff_cache/"
   ".mypy_cache/"
   "node_modules/"
+  "experimental/"
+  "rust/"
+  "target/"
+  ".vite/"
+  "dist/"
 )
 
 print_usage() {
@@ -217,7 +222,10 @@ fi
 RSYNC_FLAGS=(-az --delete)
 declare -a RSYNC_PREFIX=()
 if [[ -n "$SSH_KEY_PATH" && -f "$SSH_KEY_PATH" ]]; then
-  RSYNC_FLAGS+=(-e "ssh -i $SSH_KEY_PATH -o IdentitiesOnly=yes")
+  RSYNC_FLAGS+=(
+    -e
+    "ssh -i $SSH_KEY_PATH -o IdentitiesOnly=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+  )
 elif [[ -n "$REMOTE_PASS" ]]; then
   if command_exists sshpass; then
     RSYNC_PREFIX=(sshpass -p "$REMOTE_PASS")

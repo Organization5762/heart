@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import reactivex
+from manyfold import ConstantNode
 
 from heart.renderers.hilbert_curve.provider import (compute_zoom_target_scale,
                                                     hilbert_curve_points_numba)
@@ -29,7 +29,7 @@ class _StubHilbertProvider:
 
     def observable(self, peripheral_manager, *, initial_state: _StubHilbertState):
         self.observable_initial_states.append(initial_state)
-        return reactivex.just(initial_state)
+        return ConstantNode(initial_state).observable()
 
 
 class TestHilbertScene:

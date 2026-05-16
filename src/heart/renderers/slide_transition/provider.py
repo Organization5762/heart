@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-import reactivex
-from reactivex import operators as ops
+from manyfold import StreamNode
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -13,11 +12,9 @@ from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
                                                     DEFAULT_STATIC_MASK_STEPS,
                                                     SlideTransitionMode,
                                                     SlideTransitionState)
-from heart.utilities.reactivex_threads import pipe_in_background
 
 if TYPE_CHECKING:
     pass
-
 DEFAULT_SLIDE_DURATION_MS = 333
 MIN_SLIDE_DURATION_MS = 1
 
@@ -47,34 +44,30 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: SlideTransitionState,
-    ) -> reactivex.Observable[SlideTransitionState]:
-        return pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.scan(
+    ) -> StreamNode[SlideTransitionState]:
+        return (
+            peripheral_manager.frame_tick_controller.observable()
+            .scan(
                 lambda state, frame_tick: self._advance(
                     state=state,
                     elapsed_ms=frame_tick.delta_ms,
                     slide_duration_ms=self.slide_duration_ms,
                 ),
                 seed=initial_state,
-            ),
-            ops.start_with(initial_state),
-            ops.share(),
+            )
+            .start_with(initial_state)
+
+
         )
 
     @staticmethod
     def _advance(
-        *,
-        state: SlideTransitionState,
-        elapsed_ms: float,
-        slide_duration_ms: int,
+        *, state: SlideTransitionState, elapsed_ms: float, slide_duration_ms: int
     ) -> SlideTransitionState:
         if not state.sliding:
             return state
-
         delta_ms = max(float(elapsed_ms), 0.0)
-        current_location = state.fraction_offset + (delta_ms / slide_duration_ms)
+        current_location = state.fraction_offset + delta_ms / slide_duration_ms
         if current_location >= 1:
             return replace(state, fraction_offset=1.0, sliding=False)
-
         return replace(state, fraction_offset=current_location, sliding=True)

@@ -7,7 +7,9 @@ from heart.utilities import logging_control
 
 class StubLogger:
     def __init__(self) -> None:
-        self.records: list[tuple[int, str, tuple[object, ...], dict[str, object] | None]] = []
+        self.records: list[
+            tuple[int, str, tuple[object, ...], dict[str, object] | None]
+        ] = []
 
     def log(
         self,
@@ -80,7 +82,9 @@ def reset_logging_controller_cache() -> None:
     logging_control.get_logging_controller.cache_clear()  # type: ignore[attr-defined]
 
 
-def test_logging_controller_respects_rule_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_logging_controller_respects_rule_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Confirm rule overrides adjust fallback levels so operators can tune alerting."""
     monkeypatch.setenv("HEART_LOG_RULES", "render.loop=none:WARNING:none")
     controller = logging_control.get_logging_controller()

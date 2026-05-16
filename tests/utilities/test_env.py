@@ -11,7 +11,7 @@ import pytest
 from heart.device.isolated_render import DEFAULT_SOCKET_PATH
 from heart.utilities.env import (AssetCacheStrategy, BleUartBufferStrategy,
                                  Configuration, FrameExportStrategy,
-                                 ReactivexStreamConnectMode, get_device_ports)
+                                 get_device_ports)
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +31,9 @@ def _clear_env(monkeypatch: pytest.MonkeyPatch, *names: str) -> None:
 class TestUtilitiesEnv:
     """Group Utilities Env tests so utilities env behaviour stays reliable. This preserves confidence in utilities env for end-to-end scenarios."""
 
-    def test_isolated_renderer_socket_prefers_explicit_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_isolated_renderer_socket_prefers_explicit_path(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that isolated renderer socket prefers explicit path. This keeps rendering behaviour consistent across scenes."""
         monkeypatch.setenv("ISOLATED_RENDER_SOCKET", "/tmp/custom.sock")
         _clear_env(
@@ -42,9 +44,9 @@ class TestUtilitiesEnv:
 
         assert Configuration.isolated_renderer_socket() == "/tmp/custom.sock"
 
-
-
-    def test_isolated_renderer_socket_empty_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_isolated_renderer_socket_empty_string(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that isolated renderer socket empty string. This keeps rendering behaviour consistent across scenes."""
         monkeypatch.setenv("ISOLATED_RENDER_SOCKET", "")
         _clear_env(
@@ -54,8 +56,6 @@ class TestUtilitiesEnv:
         )
 
         assert Configuration.isolated_renderer_socket() is None
-
-
 
     def test_isolated_renderer_socket_defaults_to_named_socket(
         self,
@@ -71,8 +71,6 @@ class TestUtilitiesEnv:
 
         assert Configuration.isolated_renderer_socket() == DEFAULT_SOCKET_PATH
 
-
-
     def test_isolated_renderer_socket_delegates_to_tcp_settings(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -85,9 +83,9 @@ class TestUtilitiesEnv:
         assert Configuration.isolated_renderer_tcp_address() == ("127.0.0.1", 9000)
         assert Configuration.isolated_renderer_socket() is None
 
-
-
-    def test_isolated_renderer_tcp_address_requires_both(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_isolated_renderer_tcp_address_requires_both(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that isolated renderer tcp address requires both. This keeps rendering behaviour consistent across scenes."""
         monkeypatch.setenv("ISOLATED_RENDER_HOST", "127.0.0.1")
         monkeypatch.delenv("ISOLATED_RENDER_PORT", raising=False)
@@ -101,8 +99,6 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.isolated_renderer_tcp_address()
 
-
-
     def test_isolated_renderer_tcp_address_requires_integer_port(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -114,18 +110,18 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.isolated_renderer_tcp_address()
 
-
-
-    def test_isolated_renderer_tcp_address_returns_tuple(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_isolated_renderer_tcp_address_returns_tuple(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that isolated renderer tcp address returns tuple. This keeps rendering behaviour consistent across scenes."""
         monkeypatch.setenv("ISOLATED_RENDER_HOST", "example.com")
         monkeypatch.setenv("ISOLATED_RENDER_PORT", "1234")
 
         assert Configuration.isolated_renderer_tcp_address() == ("example.com", 1234)
 
-
-
-    def test_is_debug_mode_recognizes_truthy_tokens(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_is_debug_mode_recognizes_truthy_tokens(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Ensure debug mode helper recognises canonical truthy tokens so feature flags behave reliably."""
 
         monkeypatch.setenv("DEBUG_MODE", " yes ")
@@ -149,13 +145,13 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("FORWARD_TO_BEATS_MAP", "true")
         assert Configuration.forward_to_beats_app() is False
 
-
-    def test_asset_cache_strategy_defaults_all(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_asset_cache_strategy_defaults_all(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify asset cache strategy defaults to all. This keeps IO reuse enabled without explicit tuning."""
         _clear_env(monkeypatch, "HEART_ASSET_CACHE_STRATEGY")
 
         assert Configuration.asset_cache_strategy() == AssetCacheStrategy.ALL
-
 
     def test_asset_cache_strategy_rejects_invalid_value(
         self, monkeypatch: pytest.MonkeyPatch
@@ -166,12 +162,13 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.asset_cache_strategy()
 
-    def test_asset_cache_strategy_accepts_images(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_asset_cache_strategy_accepts_images(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify asset cache strategy accepts images. This keeps image IO caching configurable."""
         monkeypatch.setenv("HEART_ASSET_CACHE_STRATEGY", "images")
 
         assert Configuration.asset_cache_strategy() == AssetCacheStrategy.IMAGES
-
 
     def test_ble_uart_buffer_strategy_defaults_bytes(
         self, monkeypatch: pytest.MonkeyPatch
@@ -180,7 +177,6 @@ class TestUtilitiesEnv:
         _clear_env(monkeypatch, "HEART_BLE_UART_BUFFER_STRATEGY")
 
         assert Configuration.ble_uart_buffer_strategy() == BleUartBufferStrategy.BYTES
-
 
     def test_ble_uart_buffer_strategy_rejects_invalid_value(
         self, monkeypatch: pytest.MonkeyPatch
@@ -191,13 +187,13 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.ble_uart_buffer_strategy()
 
-
-    def test_asset_cache_max_entries_defaults_to_64(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_asset_cache_max_entries_defaults_to_64(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify asset cache max entries defaults to 64. This provides bounded caching without extra config."""
         _clear_env(monkeypatch, "HEART_ASSET_CACHE_MAX_ENTRIES")
 
         assert Configuration.asset_cache_max_entries() == 64
-
 
     def test_asset_cache_max_entries_rejects_non_integer(
         self, monkeypatch: pytest.MonkeyPatch
@@ -208,7 +204,6 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.asset_cache_max_entries()
 
-
     def test_asset_cache_max_entries_rejects_negative(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -217,7 +212,6 @@ class TestUtilitiesEnv:
 
         with pytest.raises(ValueError):
             Configuration.asset_cache_max_entries()
-
 
     def test_render_crash_on_error_defaults_disabled(
         self, monkeypatch: pytest.MonkeyPatch
@@ -257,7 +251,6 @@ class TestUtilitiesEnv:
 
         assert Configuration.frame_export_strategy() == FrameExportStrategy.BUFFER
 
-
     def test_frame_export_strategy_rejects_invalid_value(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -267,115 +260,18 @@ class TestUtilitiesEnv:
         with pytest.raises(ValueError):
             Configuration.frame_export_strategy()
 
-    def test_reactivex_background_max_workers_defaults_to_four(
+    def test_get_device_ports_prefers_symlink_directory(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify background worker count defaults to four so shared background scheduling stays bounded without extra configuration."""
-        _clear_env(monkeypatch, "HEART_RX_BACKGROUND_MAX_WORKERS")
-
-        assert Configuration.reactivex_background_max_workers() == 4
-
-    def test_reactivex_background_max_workers_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify background worker count reads the environment so shared scheduler capacity is measurable and configurable."""
-        monkeypatch.setenv("HEART_RX_BACKGROUND_MAX_WORKERS", "6")
-
-        assert Configuration.reactivex_background_max_workers() == 6
-
-    def test_reactivex_blocking_io_max_workers_defaults_to_two(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify blocking-IO worker count defaults to two so slow readers stay isolated without spawning unbounded workers."""
-        _clear_env(monkeypatch, "HEART_RX_BLOCKING_IO_MAX_WORKERS")
-
-        assert Configuration.reactivex_blocking_io_max_workers() == 2
-
-    def test_reactivex_blocking_io_max_workers_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify blocking-IO worker count reads the environment so serial and BLE isolation can be tuned deliberately."""
-        monkeypatch.setenv("HEART_RX_BLOCKING_IO_MAX_WORKERS", "3")
-
-        assert Configuration.reactivex_blocking_io_max_workers() == 3
-
-    def test_reactivex_input_max_workers_defaults_to_two(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify input worker count defaults to two so polling stays isolated without extra configuration."""
-        _clear_env(monkeypatch, "HEART_RX_INPUT_MAX_WORKERS")
-
-        assert Configuration.reactivex_input_max_workers() == 2
-
-    def test_reactivex_input_max_workers_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify input worker count reads the environment so polling capacity changes affect runtime behaviour intentionally."""
-        monkeypatch.setenv("HEART_RX_INPUT_MAX_WORKERS", "5")
-
-        assert Configuration.reactivex_input_max_workers() == 5
-
-    def test_reactivex_stream_refcount_grace_defaults_to_zero(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount grace defaults to zero so streams disconnect promptly unless tuned for churn."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_GRACE_MS")
-
-        assert Configuration.reactivex_stream_refcount_grace_ms() == 0
-
-    def test_reactivex_stream_refcount_grace_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount grace reads the environment value so churn protection remains configurable."""
-        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_GRACE_MS", "25")
-
-        assert Configuration.reactivex_stream_refcount_grace_ms() == 25
-
-    def test_reactivex_stream_refcount_min_subscribers_defaults_to_one(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount min subscribers defaults to one so share behaviour remains unchanged by default."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS")
-
-        assert Configuration.reactivex_stream_refcount_min_subscribers() == 1
-
-    def test_reactivex_stream_refcount_min_subscribers_reads_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify refcount min subscribers reads the environment value so connection thresholds are configurable."""
-        monkeypatch.setenv("HEART_RX_STREAM_REFCOUNT_MIN_SUBSCRIBERS", "2")
-
-        assert Configuration.reactivex_stream_refcount_min_subscribers() == 2
-
-    def test_reactivex_stream_connect_mode_defaults_lazy(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify stream connect mode defaults to lazy to avoid missing immediate emissions."""
-        _clear_env(monkeypatch, "HEART_RX_STREAM_CONNECT_MODE")
-
-        assert (
-            Configuration.reactivex_stream_connect_mode()
-            == ReactivexStreamConnectMode.LAZY
-        )
-
-    def test_reactivex_stream_connect_mode_rejects_invalid_value(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify invalid stream connect modes fail fast to keep configuration errors visible."""
-        monkeypatch.setenv("HEART_RX_STREAM_CONNECT_MODE", "nope")
-
-        with pytest.raises(ValueError):
-            Configuration.reactivex_stream_connect_mode()
-
-
-    def test_get_device_ports_prefers_symlink_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify that get device ports prefers symlink directory. This keeps connectivity configuration robust."""
         fake_entries = [
             Path("/dev/serial/by-id/ttyHeart-123"),
             Path("/dev/serial/by-id/other"),
         ]
 
-        monkeypatch.setenv("ISOLATED_RENDER_HOST", "")  # ensure unrelated env noise is absent
+        monkeypatch.setenv(
+            "ISOLATED_RENDER_HOST", ""
+        )  # ensure unrelated env noise is absent
         monkeypatch.setenv("ISOLATED_RENDER_PORT", "")
 
         monkeypatch.setattr("heart.utilities.env.ports.Path.exists", lambda self: True)
@@ -388,16 +284,20 @@ class TestUtilitiesEnv:
 
         assert ports == ["/dev/serial/by-id/ttyHeart-123"]
 
-
-
-    def test_get_device_ports_falls_back_when_directory_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_get_device_ports_falls_back_when_directory_empty(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that get device ports falls back when directory lacks matches to keep discovery resilient."""
 
         def fake_comports() -> Iterator[SimpleNamespace]:
             return iter(
                 [
-                    SimpleNamespace(device="/dev/cu.usbserial-0001", description="Heart Foo"),
-                    SimpleNamespace(device="/dev/cu.Bluetooth-Incoming-Port", description="Other"),
+                    SimpleNamespace(
+                        device="/dev/cu.usbserial-0001", description="Heart Foo"
+                    ),
+                    SimpleNamespace(
+                        device="/dev/cu.Bluetooth-Incoming-Port", description="Other"
+                    ),
                 ]
             )
 
@@ -406,7 +306,9 @@ class TestUtilitiesEnv:
             "heart.utilities.env.ports.Path.iterdir",
             lambda self: iter([Path("/dev/serial/by-id/other-device")]),
         )
-        monkeypatch.setattr("heart.utilities.env.ports.platform.system", lambda: "Darwin")
+        monkeypatch.setattr(
+            "heart.utilities.env.ports.platform.system", lambda: "Darwin"
+        )
         monkeypatch.setattr(
             "heart.utilities.env.ports.serial.tools.list_ports.comports",
             fake_comports,
@@ -416,20 +318,28 @@ class TestUtilitiesEnv:
 
         assert ports == ["/dev/cu.usbserial-0001"]
 
-
-    def test_get_device_ports_fallback_to_serial(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_get_device_ports_fallback_to_serial(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Verify that get device ports fallback to serial. This keeps connectivity configuration robust."""
+
         def fake_comports() -> Iterator[SimpleNamespace]:
             return iter(
                 [
-                    SimpleNamespace(device="/dev/cu.usbserial-0001", description="Heart Foo"),
-                    SimpleNamespace(device="/dev/cu.Bluetooth-Incoming-Port", description="Other"),
+                    SimpleNamespace(
+                        device="/dev/cu.usbserial-0001", description="Heart Foo"
+                    ),
+                    SimpleNamespace(
+                        device="/dev/cu.Bluetooth-Incoming-Port", description="Other"
+                    ),
                 ]
             )
 
         monkeypatch.setattr("heart.utilities.env.ports.Path.exists", lambda self: False)
 
-        monkeypatch.setattr("heart.utilities.env.ports.platform.system", lambda: "Darwin")
+        monkeypatch.setattr(
+            "heart.utilities.env.ports.platform.system", lambda: "Darwin"
+        )
         monkeypatch.setattr(
             "heart.utilities.env.ports.serial.tools.list_ports.comports",
             fake_comports,

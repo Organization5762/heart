@@ -37,7 +37,9 @@ class WaterTitleScreen(StatefulBaseRenderer[WaterTitleScreenState]):
 
         window.screen.fill((0, 0, 0))
 
-        self.face_px = window.device.scaled_display_size()[0] // orientation.layout.columns
+        self.face_px = (
+            window.device.scaled_display_size()[0] // orientation.layout.columns
+        )
         self.cube_px_w = self.face_px * orientation.layout.columns
         self.cube_px_h = self.face_px * orientation.layout.rows
         self.water_level = self.face_px // 2  # Half full

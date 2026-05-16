@@ -1,8 +1,7 @@
 import random
 from dataclasses import replace
 
-import reactivex
-from reactivex import operators as ops
+from manyfold import MergeNode, StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
@@ -12,7 +11,6 @@ from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
-from heart.utilities.reactivex_threads import pipe_in_background
 
 
 class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
@@ -39,7 +37,6 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
                     frame_obj["duration"],
                 )
             )
-
         self.initial_phase = (
             LoopPhase.START if len(self.frames[LoopPhase.START]) > 0 else LoopPhase.LOOP
         )
@@ -53,41 +50,32 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> reactivex.Observable[SpritesheetLoopRandomState]:
-        frame_ticks = pipe_in_background(
-            peripheral_manager.frame_tick_controller.observable(),
-            ops.share(),
+    ) -> StreamNode[SpritesheetLoopRandomState]:
+        frame_ticks = (
+            peripheral_manager.frame_tick_controller.observable()
         )
         switches = peripheral_manager.get_main_switch_subscription()
-        switch_updates = pipe_in_background(
-            switches,
-            ops.map(
-                lambda switch_state: lambda state: self.handle_switch_state(
-                    state, switch_state
-                )
+        switch_updates = switches.map(
+            lambda switch_state: (
+                lambda state: self.handle_switch_state(state, switch_state)
             )
         )
-        tick_updates = pipe_in_background(
-            frame_ticks,
-            ops.map(
-                lambda latest: lambda state: self.next_state(
-                    state=state,
-                    elapsed_ms=latest.delta_ms,
-                )
-            ),
+        tick_updates = frame_ticks.map(
+            lambda latest: (
+                lambda state: self.next_state(state=state, elapsed_ms=latest.delta_ms)
+            )
         )
         initial_state = self.initial_state()
-        return pipe_in_background(
-            reactivex.merge(switch_updates, tick_updates),
-            ops.scan(lambda state, update: update(state), seed=initial_state),
-            ops.start_with(initial_state),
-            ops.share(),
+        return (
+            MergeNode.merge(switch_updates, tick_updates)
+            .scan(lambda state, update: update(state), seed=initial_state)
+            .start_with(initial_state)
+
+
         )
 
     def handle_switch_state(
-        self,
-        state: SpritesheetLoopRandomState,
-        switch_state: SwitchState | None,
+        self, state: SpritesheetLoopRandomState, switch_state: SwitchState | None
     ) -> SpritesheetLoopRandomState:
         return replace(state, switch_state=switch_state)
 
@@ -95,17 +83,16 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         current_value = 0
         if state.switch_state:
             current_value = state.switch_state.rotation_since_last_button_press
-        return current_value / 20.00
+        return current_value / 20.0
 
     def next_state(
-        self,
-        state: SpritesheetLoopRandomState,
-        elapsed_ms: float,
+        self, state: SpritesheetLoopRandomState, elapsed_ms: float
     ) -> SpritesheetLoopRandomState:
         current_phase_frames = self.frames[state.phase]
         current_kf = current_phase_frames[state.current_frame]
-        kf_duration = current_kf.duration - (
-            current_kf.duration * self.duration_scale_factor(state)
+        kf_duration = (
+            current_kf.duration
+            - current_kf.duration * self.duration_scale_factor(state)
         )
         time_since_last = state.time_since_last_update
         next_frame = state.current_frame
@@ -116,7 +103,6 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
                 next_frame = 0
                 next_screen = self._rng.randint(0, self.screen_count - 1)
             time_since_last = 0
-
         time_since_last = (time_since_last or 0) + elapsed_ms
         return replace(
             state,

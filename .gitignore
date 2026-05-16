@@ -3,6 +3,7 @@ heart.egg-info
 __pycache__
 build/
 .venv
+.idea
 .cargo-home*
 **/.DS_Store
 bluetooth.log
@@ -19,3 +20,10 @@ node_modules
 .heart
 .hypothesis
 **/target
+
+# Native extension build outputs must be built per target platform.
+*.abi3.so
+*.so
+*.dylib
+*.dll
+*.pyd

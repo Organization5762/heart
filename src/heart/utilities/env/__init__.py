@@ -10,10 +10,6 @@ from heart.utilities.env.enums import \
     FrameExportStrategy as FrameExportStrategy
 from heart.utilities.env.enums import LifeRuleStrategy as LifeRuleStrategy
 from heart.utilities.env.enums import LifeUpdateStrategy as LifeUpdateStrategy
-from heart.utilities.env.enums import \
-    ReactivexStreamConnectMode as ReactivexStreamConnectMode
-from heart.utilities.env.enums import \
-    ReactivexStreamShareStrategy as ReactivexStreamShareStrategy
 from heart.utilities.env.enums import RenderTileStrategy as RenderTileStrategy
 from heart.utilities.env.enums import \
     SpritesheetFrameCacheStrategy as SpritesheetFrameCacheStrategy

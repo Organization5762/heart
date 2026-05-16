@@ -1,5 +1,4 @@
 import { ThemeMode } from "@/types/theme-mode";
-import { ipc } from "@/ipc/manager";
 import { LOCAL_STORAGE_KEYS } from "@/constants";
 
 export interface ThemePreferences {
@@ -7,11 +6,32 @@ export interface ThemePreferences {
   local: ThemeMode | null;
 }
 
+function getStoredTheme(): ThemeMode | null {
+  return localStorage.getItem(LOCAL_STORAGE_KEYS.THEME) as ThemeMode | null;
+}
+
+function resolveSystemTheme(): "dark" | "light" {
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+
+  return "light";
+}
+
+function resolveDarkMode(mode: ThemeMode): boolean {
+  if (mode === "system") {
+    return resolveSystemTheme() === "dark";
+  }
+
+  return mode === "dark";
+}
+
 export async function getCurrentTheme(): Promise<ThemePreferences> {
-  const currentTheme = await ipc.client.theme.getCurrentThemeMode();
-  const localTheme = localStorage.getItem(
-    LOCAL_STORAGE_KEYS.THEME,
-  ) as ThemeMode | null;
+  const currentTheme = resolveSystemTheme();
+  const localTheme = getStoredTheme();
 
   return {
     system: currentTheme,
@@ -20,24 +40,22 @@ export async function getCurrentTheme(): Promise<ThemePreferences> {
 }
 
 export async function setTheme(newTheme: ThemeMode) {
-  const isDarkMode = newTheme === "dark";
-  await ipc.client.theme.setThemeMode(newTheme);
   localStorage.setItem(LOCAL_STORAGE_KEYS.THEME, newTheme);
-  updateDocumentTheme(isDarkMode);
+  updateDocumentTheme(resolveDarkMode(newTheme));
 }
 
 export async function toggleTheme() {
-  const isDarkMode = await ipc.client.theme.toggleThemeMode();
-  const newTheme = isDarkMode ? "dark" : "light";
-
-  updateDocumentTheme(isDarkMode);
+  const newTheme = document.documentElement.classList.contains("dark")
+    ? "light"
+    : "dark";
+  updateDocumentTheme(newTheme === "dark");
   localStorage.setItem(LOCAL_STORAGE_KEYS.THEME, newTheme);
 }
 
 export async function syncWithLocalTheme() {
   const { local } = await getCurrentTheme();
   if (!local) {
-    setTheme("system");
+    await setTheme("system");
     return;
   }
 

@@ -1,9 +1,11 @@
-import { ipc } from "@/ipc/manager";
+export async function getPlatform() {
+  if (typeof navigator !== "undefined" && navigator.platform) {
+    return navigator.platform;
+  }
 
-export function getPlatform() {
-  return ipc.client.app.currentPlatfom();
+  return "web";
 }
 
-export function getAppVersion() {
-  return ipc.client.app.appVersion();
+export async function getAppVersion() {
+  return import.meta.env.VITE_BEATS_APP_VERSION?.trim() || "web";
 }
