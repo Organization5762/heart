@@ -37,6 +37,8 @@ class CubePongState:
     paddle_one_y: float
     paddle_two_y: float
     balls: tuple[CubePongBall, CubePongBall]
+    player_one_score: int = 0
+    player_two_score: int = 0
     losing_player: int | None = None
     reset_remaining_s: float = 0.0
 
@@ -61,6 +63,21 @@ ROUTES = {
 
 
 def new_cube_pong_round(screen_width: int, screen_height: int) -> CubePongState:
+    return _new_cube_pong_round(
+        screen_width,
+        screen_height,
+        player_one_score=0,
+        player_two_score=0,
+    )
+
+
+def _new_cube_pong_round(
+    screen_width: int,
+    screen_height: int,
+    *,
+    player_one_score: int,
+    player_two_score: int,
+) -> CubePongState:
     paddle_one_x, paddle_two_x = paddle_path_x(screen_width)
     radius = ball_radius(screen_width)
     paddle_width, _ = paddle_size(screen_width, screen_height)
@@ -89,6 +106,8 @@ def new_cube_pong_round(screen_width: int, screen_height: int) -> CubePongState:
                 vy=-vertical_speed,
             ),
         ),
+        player_one_score=player_one_score,
+        player_two_score=player_two_score,
     )
 
 
@@ -101,13 +120,20 @@ def advance_cube_pong_state(
     if state.losing_player is not None:
         remaining = state.reset_remaining_s - delta_s
         if remaining <= 0:
-            return new_cube_pong_round(state.screen_width, state.screen_height)
+            return _new_cube_pong_round(
+                state.screen_width,
+                state.screen_height,
+                player_one_score=state.player_one_score,
+                player_two_score=state.player_two_score,
+            )
         return CubePongState(
             screen_width=state.screen_width,
             screen_height=state.screen_height,
             paddle_one_y=state.paddle_one_y,
             paddle_two_y=state.paddle_two_y,
             balls=state.balls,
+            player_one_score=state.player_one_score,
+            player_two_score=state.player_two_score,
             losing_player=state.losing_player,
             reset_remaining_s=remaining,
         )
@@ -142,6 +168,12 @@ def advance_cube_pong_state(
         )
         balls.append(next_ball)
         if losing_player is not None:
+            player_one_score = state.player_one_score
+            player_two_score = state.player_two_score
+            if losing_player == PLAYER_ONE:
+                player_two_score += 1
+            else:
+                player_one_score += 1
             updated_balls = [state.balls[0], state.balls[1]]
             for index, updated_ball in enumerate(balls):
                 updated_balls[index] = updated_ball
@@ -151,6 +183,8 @@ def advance_cube_pong_state(
                 paddle_one_y=paddle_one_y,
                 paddle_two_y=paddle_two_y,
                 balls=(updated_balls[0], updated_balls[1]),
+                player_one_score=player_one_score,
+                player_two_score=player_two_score,
                 losing_player=losing_player,
                 reset_remaining_s=ROUND_RESET_HOLD_S,
             )
@@ -161,6 +195,8 @@ def advance_cube_pong_state(
         paddle_one_y=paddle_one_y,
         paddle_two_y=paddle_two_y,
         balls=(balls[0], balls[1]),
+        player_one_score=state.player_one_score,
+        player_two_score=state.player_two_score,
     )
 
 

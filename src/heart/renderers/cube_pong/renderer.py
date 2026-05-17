@@ -1,27 +1,58 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from pathlib import Path
+
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.gamepad import Gamepad
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.cube_pong.state import (
-    PLAYER_ONE, CubePongControls, CubePongState, advance_cube_pong_state,
-    ball_radius, face_position_for_ball, new_cube_pong_round, paddle_path_x,
-    paddle_size)
+    PLAYER_ONE, PLAYER_TWO, CubePongControls, CubePongState,
+    advance_cube_pong_state, ball_radius, face_position_for_ball,
+    new_cube_pong_round, paddle_path_x, paddle_size)
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.logging import get_logger
 
 BACKGROUND_COLOR = (4, 5, 8)
 SEAM_COLOR = (32, 38, 48)
 CENTER_MARK_COLOR = (24, 31, 39)
-PADDLE_ONE_COLOR = (69, 214, 255)
-PADDLE_TWO_COLOR = (255, 105, 160)
+PINK_CONTROLLER_COLOR = (255, 105, 160)
+TEAL_CONTROLLER_COLOR = (69, 214, 255)
+PADDLE_ONE_COLOR = PINK_CONTROLLER_COLOR
+PADDLE_TWO_COLOR = TEAL_CONTROLLER_COLOR
 BALL_COLORS = ((250, 245, 128), (139, 255, 180))
 LOSS_FLASH_COLOR = (105, 10, 24)
 KEYBOARD_CONTROL_STEP = 1.0
 GAMEPAD_DEAD_ZONE = 0.15
+LINUX_JOYSTICK_SYSFS = Path("/sys/class/input")
+SCORE_FONT_SCALE = 0.38
+logger = get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class PongControllerBinding:
+    player: int
+    mac_address: str
+    color_name: str
+
+
+PONG_CONTROLLER_BINDINGS: tuple[PongControllerBinding, ...] = (
+    PongControllerBinding(
+        player=PLAYER_ONE,
+        mac_address="E4:17:D8:91:15:35",  # Pink 8BitDo Lite 2 controller.
+        color_name="pink",
+    ),
+    PongControllerBinding(
+        player=PLAYER_TWO,
+        mac_address="E4:17:D8:58:22:8A",  # Teal 8BitDo Lite 2 controller.
+        color_name="teal",
+    ),
+)
 
 
 class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
@@ -29,6 +60,8 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
         self._peripheral_manager: PeripheralManager | None = None
+        self._fonts: dict[int, pygame.font.Font] = {}
+        self._last_logged_controller_signature: dict[int, tuple[object, ...]] = {}
 
     def _create_initial_state(
         self,
@@ -58,6 +91,7 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         self._draw_face_guides(window, state)
         if state.losing_player is not None:
             self._draw_loss_flash(window, state)
+        self._draw_scores(window, state)
         self._draw_paddles(window, state)
         self._draw_balls(window, state)
 
@@ -121,6 +155,48 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
             color=PADDLE_TWO_COLOR,
         )
 
+    def _draw_scores(self, window: DisplayContext, state: CubePongState) -> None:
+        if window.screen is None:
+            raise RuntimeError("CubePongRenderer requires an initialized display")
+        self._draw_score(
+            window.screen,
+            score=state.player_one_score,
+            color=PADDLE_ONE_COLOR,
+            center_x=state.screen_width // 2,
+            top=2,
+        )
+        self._draw_score(
+            window.screen,
+            score=state.player_two_score,
+            color=PADDLE_TWO_COLOR,
+            center_x=round(state.screen_width * 2.5),
+            top=2,
+        )
+
+    def _draw_score(
+        self,
+        screen: pygame.Surface,
+        *,
+        score: int,
+        color: tuple[int, int, int],
+        center_x: int,
+        top: int,
+    ) -> None:
+        font_size = max(18, round(screen.get_height() * SCORE_FONT_SCALE))
+        surface = self._font(font_size).render(str(score), False, color)
+        rect = surface.get_rect()
+        rect.midtop = (center_x, top)
+        screen.blit(surface, rect)
+
+    def _font(self, size: int) -> pygame.font.Font:
+        if not pygame.font.get_init():
+            pygame.font.init()
+        font = self._fonts.get(size)
+        if font is None:
+            font = pygame.font.Font(None, size)
+            self._fonts[size] = font
+        return font
+
     def _draw_paddle(
         self,
         window: DisplayContext,
@@ -156,11 +232,13 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         pad_one = 0.0
         pad_two = 0.0
         if self._peripheral_manager is not None:
-            snapshots = self._peripheral_manager.gamepad_controller.snapshots(
-                consume_taps=False
-            )
-            connected = tuple(snapshot for snapshot in snapshots if snapshot.connected)
-            if len(connected) >= 2:
+            assigned, connected = self._assigned_controller_snapshots()
+            if assigned:
+                if PLAYER_ONE in assigned:
+                    pad_one = self._left_control(assigned[PLAYER_ONE])
+                if PLAYER_TWO in assigned:
+                    pad_two = self._left_control(assigned[PLAYER_TWO])
+            elif len(connected) >= 2:
                 pad_one = self._left_control(connected[0])
                 pad_two = self._left_control(connected[1])
             elif len(connected) == 1:
@@ -171,6 +249,78 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         return CubePongControls(
             player_one=keyboard_one if keyboard_one != 0 else pad_one,
             player_two=keyboard_two if keyboard_two != 0 else pad_two,
+        )
+
+    def _assigned_controller_snapshots(
+        self,
+    ) -> tuple[dict[int, GamepadSnapshot], tuple[GamepadSnapshot, ...]]:
+        if self._peripheral_manager is None:
+            return {}, ()
+        controller = self._peripheral_manager.gamepad_controller
+        bindings_by_mac = {
+            _normalize_bluetooth_mac(binding.mac_address): binding
+            for binding in PONG_CONTROLLER_BINDINGS
+        }
+        assigned: dict[int, GamepadSnapshot] = {}
+        connected: list[GamepadSnapshot] = []
+        unassigned: list[GamepadSnapshot] = []
+        for gamepad in sorted(
+            self._gamepads(),
+            key=lambda candidate: candidate.joystick_id,
+        ):
+            snapshot = controller.snapshot_for_gamepad(gamepad, consume_taps=False)
+            if not snapshot.connected:
+                continue
+            connected.append(snapshot)
+            mac_address = _bluetooth_mac_for_gamepad(gamepad)
+            binding = bindings_by_mac.get(_normalize_bluetooth_mac(mac_address or ""))
+            if binding is None:
+                unassigned.append(snapshot)
+                continue
+            assigned[binding.player] = snapshot
+            self._log_controller_input(binding, mac_address, gamepad, snapshot)
+
+        for player in (PLAYER_ONE, PLAYER_TWO):
+            if player not in assigned and unassigned:
+                assigned[player] = unassigned.pop(0)
+        return assigned, tuple(connected)
+
+    def _gamepads(self) -> tuple[Gamepad, ...]:
+        if self._peripheral_manager is None:
+            return ()
+        return tuple(
+            peripheral
+            for peripheral in self._peripheral_manager.peripherals
+            if isinstance(peripheral, Gamepad)
+        )
+
+    def _log_controller_input(
+        self,
+        binding: PongControllerBinding,
+        mac_address: str | None,
+        gamepad: Gamepad,
+        snapshot: GamepadSnapshot,
+    ) -> None:
+        left_y = round(snapshot.axes.get(GamepadAxis.LEFT_Y, 0.0), 2)
+        signature = (
+            binding.color_name,
+            mac_address,
+            snapshot.dpad.y,
+            left_y if abs(left_y) >= GAMEPAD_DEAD_ZONE else 0.0,
+        )
+        if signature == self._last_logged_controller_signature.get(binding.player):
+            return
+        self._last_logged_controller_signature[binding.player] = signature
+        if snapshot.dpad.y == 0 and abs(left_y) < GAMEPAD_DEAD_ZONE:
+            return
+        logger.info(
+            "cube_pong.controller player=%s color=%s mac=%s joystick_id=%s dpad_y=%s left_y=%.2f",
+            binding.player,
+            binding.color_name,
+            mac_address,
+            gamepad.joystick_id,
+            snapshot.dpad.y,
+            left_y,
         )
 
     def _left_control(self, snapshot: GamepadSnapshot) -> float:
@@ -218,3 +368,15 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         columns = max(1, orientation.layout.columns)
         rows = max(1, orientation.layout.rows)
         return max(1, width // columns), max(1, height // rows)
+
+
+def _bluetooth_mac_for_gamepad(gamepad: Gamepad) -> str | None:
+    joystick_path = LINUX_JOYSTICK_SYSFS / f"js{gamepad.joystick_id}"
+    try:
+        return (joystick_path / "device" / "uniq").read_text().strip()
+    except OSError:
+        return None
+
+
+def _normalize_bluetooth_mac(mac_address: str) -> str:
+    return mac_address.replace(":", "").lower()
