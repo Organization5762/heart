@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import StrEnum
@@ -294,15 +295,54 @@ class GamepadController:
         )
 
     def _sample(self) -> GamepadSnapshot:
-        gamepad = self._active_gamepad()
-        if gamepad is None:
+        return self._aggregate_snapshots(self.snapshots())
+
+    @staticmethod
+    def _aggregate_snapshots(snapshots: tuple[GamepadSnapshot, ...]) -> GamepadSnapshot:
+        connected = tuple(snapshot for snapshot in snapshots if snapshot.connected)
+        if not connected:
             return GamepadSnapshot(
                 connected=False, identifier=None, timestamp_monotonic=time.monotonic()
             )
-        return self.snapshot_for_gamepad(gamepad)
-
-    def _active_gamepad(self) -> Gamepad | None:
-        return next(iter(self._gamepads()), None)
+        buttons = {
+            button: any(snapshot.button_held(button) for snapshot in connected)
+            for button in GamepadButton
+        }
+        tapped_buttons = frozenset(
+            button
+            for button in GamepadButton
+            if any(snapshot.button_tapped(button) for snapshot in connected)
+        )
+        axes = {
+            axis: max(
+                (snapshot.axes.get(axis, 0.0) for snapshot in connected),
+                key=abs,
+            )
+            for axis in GamepadAxis
+        }
+        dpad = GamepadDpadValue(
+            x=_dominant_dpad_axis(snapshot.dpad.x for snapshot in connected),
+            y=_dominant_dpad_axis(snapshot.dpad.y for snapshot in connected),
+        )
+        identifiers = tuple(
+            identifier
+            for identifier in (snapshot.identifier for snapshot in connected)
+            if identifier is not None
+        )
+        identifier = (
+            identifiers[0] if len(identifiers) == 1 else f"{len(connected)} gamepads"
+        )
+        return GamepadSnapshot(
+            connected=True,
+            identifier=identifier,
+            buttons=buttons,
+            tapped_buttons=tapped_buttons,
+            axes=axes,
+            dpad=dpad,
+            timestamp_monotonic=max(
+                snapshot.timestamp_monotonic for snapshot in connected
+            ),
+        )
 
     def _gamepads(self) -> tuple[Gamepad, ...]:
         return tuple(
@@ -347,3 +387,10 @@ class GamepadController:
             )
             return GamepadDpadValue(x=x_dir, y=y_dir)
         return GamepadDpadValue()
+
+
+def _dominant_dpad_axis(values: Iterable[int]) -> int:
+    for value in values:
+        if value != 0:
+            return int(value)
+    return 0

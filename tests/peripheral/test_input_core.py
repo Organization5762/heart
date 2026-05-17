@@ -28,6 +28,7 @@ from heart.peripheral.core.input.accelerometer import (
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream, runtime_route
+from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -424,6 +425,49 @@ class TestKeyboardController:
 
 class TestGamepadController:
     """Group gamepad controller tests so button, axis, and stick views remain reusable across renderers and profiles."""
+
+    def test_sample_aggregates_all_connected_gamepads(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify shared controls such as navigation respond to any connected gamepad while snapshots stay per controller."""
+
+        class _Manager:
+            peripherals = (Gamepad(joystick_id=1), Gamepad(joystick_id=0))
+
+        tap = InputDebugTap()
+        controller = GamepadController(manager=_Manager(), debug_tap=tap)
+
+        def _snapshot_for_gamepad(gamepad: Gamepad) -> GamepadSnapshot:
+            if gamepad.joystick_id == 0:
+                return _gamepad_snapshot(
+                    buttons={GamepadButton.SOUTH: True},
+                    tapped_buttons=frozenset({GamepadButton.SOUTH}),
+                    axes={GamepadAxis.LEFT_X: -0.25},
+                    timestamp_monotonic=1.0,
+                )
+            return _gamepad_snapshot(
+                buttons={GamepadButton.NORTH: True},
+                tapped_buttons=frozenset({GamepadButton.NORTH}),
+                axes={GamepadAxis.LEFT_X: 0.9},
+                dpad=GamepadDpadValue(x=1),
+                timestamp_monotonic=2.0,
+            )
+
+        monkeypatch.setattr(controller, "snapshot_for_gamepad", _snapshot_for_gamepad)
+
+        snapshots = controller.snapshots()
+        aggregate = controller._sample()
+
+        assert [snapshot.timestamp_monotonic for snapshot in snapshots] == [1.0, 2.0]
+        assert aggregate.identifier == "2 gamepads"
+        assert aggregate.button_held(GamepadButton.SOUTH)
+        assert aggregate.button_held(GamepadButton.NORTH)
+        assert aggregate.button_tapped(GamepadButton.SOUTH)
+        assert aggregate.button_tapped(GamepadButton.NORTH)
+        assert aggregate.axis_value(GamepadAxis.LEFT_X) == 0.9
+        assert aggregate.dpad == GamepadDpadValue(x=1)
+        assert aggregate.timestamp_monotonic == 2.0
 
     def test_views_project_shared_snapshot_state(
         self,
