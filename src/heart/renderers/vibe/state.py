@@ -10,6 +10,7 @@ from heart.renderers.vibe.overmono_runner import OvermonoRunner
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
 HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
+FLOWER_SHEET_PATH = Path("vibe") / "flower_64x64_spritesheet.png"
 SUN_SHEET_PATH = Path("vibe") / "sun_64x64_spritesheet.png"
 OVERMONO_SHEET_PATH = Path("vibe") / "overmono_64x64_spritesheet.png"
 SARA_SHEET_PATH = Path("vibe") / "sara_64x64_spritesheet.png"
@@ -22,6 +23,9 @@ TREE_FRAME_DURATION_MS = 67
 HEART_FRAME_SIZE = 64
 HEART_FRAME_COUNT = 44
 HEART_FRAME_DURATION_MS = 30
+FLOWER_FRAME_SIZE = 64
+FLOWER_FRAME_COUNT = 60
+FLOWER_FRAME_DURATION_MS = 30
 SUN_FRAME_SIZE = 64
 SUN_FRAME_COUNT = 60
 SUN_FRAME_DURATION_MS = 30
@@ -96,6 +100,15 @@ class VibeState:
                     HEART_FRAME_SIZE,
                     HEART_FRAME_COUNT,
                     HEART_FRAME_DURATION_MS,
+                ),
+            ),
+            SpritesheetLoop(
+                sheet_file_path=str(FLOWER_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    FLOWER_FRAME_SIZE,
+                    FLOWER_FRAME_COUNT,
+                    FLOWER_FRAME_DURATION_MS,
                 ),
             ),
             SpritesheetLoop(
