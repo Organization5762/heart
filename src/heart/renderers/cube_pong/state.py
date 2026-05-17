@@ -13,6 +13,8 @@ ROUND_RESET_HOLD_S = 1.0
 class CubePongRoute:
     name: str
     faces: tuple[int, int, int]
+    start_player: int
+    end_player: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,10 +56,14 @@ ROUTES = {
     ROUTE_ACROSS_SCREEN_TWO: CubePongRoute(
         name=ROUTE_ACROSS_SCREEN_TWO,
         faces=(0, 1, 2),
+        start_player=PLAYER_ONE,
+        end_player=PLAYER_TWO,
     ),
     ROUTE_ACROSS_SCREEN_FOUR: CubePongRoute(
         name=ROUTE_ACROSS_SCREEN_FOUR,
-        faces=(0, 3, 2),
+        faces=(2, 3, 0),
+        start_player=PLAYER_TWO,
+        end_player=PLAYER_ONE,
     ),
 }
 
@@ -100,9 +106,9 @@ def _new_cube_pong_round(
             ),
             CubePongBall(
                 route_name=ROUTE_ACROSS_SCREEN_FOUR,
-                x=paddle_two_x - start_offset,
+                x=paddle_one_x + start_offset,
                 y=screen_height * 0.65,
-                vx=-ball_speed,
+                vx=ball_speed,
                 vy=-vertical_speed,
             ),
         ),
@@ -255,16 +261,28 @@ def _advance_ball(
     paddle_width, paddle_height = paddle_size(screen_width, screen_height)
     half_width = paddle_width / 2
     max_speed = base_ball_speed(screen_width) * 1.45
+    route = ROUTES[ball.route_name]
 
     if next_vx > 0:
+        defending_player = route.end_player
+        defending_paddle_y = _paddle_y_for_player(
+            defending_player,
+            paddle_one_y,
+            paddle_two_y,
+        )
         contact_x = paddle_two_x - half_width - radius
         missed_x = paddle_two_x + half_width + radius
         if ball.x <= contact_x <= next_x:
-            hit_offset = _hit_offset(next_y, paddle_two_y, paddle_height, radius)
+            hit_offset = _hit_offset(
+                next_y,
+                defending_paddle_y,
+                paddle_height,
+                radius,
+            )
             if hit_offset is None:
                 return (
                     CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
-                    PLAYER_TWO,
+                    defending_player,
                 )
             next_x = contact_x
             next_vx = -min(abs(next_vx) * 1.02, max_speed)
@@ -272,17 +290,28 @@ def _advance_ball(
         elif next_x > missed_x:
             return (
                 CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
-                PLAYER_TWO,
+                defending_player,
             )
     else:
+        defending_player = route.start_player
+        defending_paddle_y = _paddle_y_for_player(
+            defending_player,
+            paddle_one_y,
+            paddle_two_y,
+        )
         contact_x = paddle_one_x + half_width + radius
         missed_x = paddle_one_x - half_width - radius
         if ball.x >= contact_x >= next_x:
-            hit_offset = _hit_offset(next_y, paddle_one_y, paddle_height, radius)
+            hit_offset = _hit_offset(
+                next_y,
+                defending_paddle_y,
+                paddle_height,
+                radius,
+            )
             if hit_offset is None:
                 return (
                     CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
-                    PLAYER_ONE,
+                    defending_player,
                 )
             next_x = contact_x
             next_vx = min(abs(next_vx) * 1.02, max_speed)
@@ -290,7 +319,7 @@ def _advance_ball(
         elif next_x < missed_x:
             return (
                 CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
-                PLAYER_ONE,
+                defending_player,
             )
 
     return CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy), None
@@ -308,6 +337,14 @@ def _move_paddle(
     half_height = paddle_height / 2
     next_y = current_y + _clamp(control, -1.0, 1.0) * paddle_speed * delta_s
     return _clamp(next_y, half_height, screen_height - half_height)
+
+
+def _paddle_y_for_player(
+    player: int,
+    paddle_one_y: float,
+    paddle_two_y: float,
+) -> float:
+    return paddle_one_y if player == PLAYER_ONE else paddle_two_y
 
 
 def _hit_offset(

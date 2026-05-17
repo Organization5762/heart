@@ -9,10 +9,10 @@ from heart.renderers.cube_pong.renderer import (PADDLE_ONE_COLOR,
                                                 PADDLE_TWO_COLOR,
                                                 CubePongRenderer)
 from heart.renderers.cube_pong.state import (
-    PLAYER_ONE, PLAYER_TWO, ROUTE_ACROSS_SCREEN_FOUR, CubePongBall,
-    CubePongControls, CubePongState, advance_cube_pong_state, base_ball_speed,
-    face_position_for_ball, new_cube_pong_round, paddle_path_x,
-    paddle_size)
+    PLAYER_ONE, PLAYER_TWO, ROUTE_ACROSS_SCREEN_FOUR,
+    ROUTE_ACROSS_SCREEN_TWO, CubePongBall, CubePongControls,
+    CubePongState, advance_cube_pong_state, base_ball_speed,
+    face_position_for_ball, new_cube_pong_round, paddle_path_x, paddle_size)
 from heart.runtime.display_context import DisplayContext
 
 
@@ -26,11 +26,87 @@ class _Clock:
 
 def test_new_round_starts_two_synchronized_opposite_balls() -> None:
     state = new_cube_pong_round(64, 64)
+    ball_one_position = face_position_for_ball(state.balls[0], 64)
+    ball_two_position = face_position_for_ball(state.balls[1], 64)
 
     assert len(state.balls) == 2
-    assert state.balls[0].vx == -state.balls[1].vx
+    assert state.balls[0].vx == state.balls[1].vx
     assert state.balls[0].vx == base_ball_speed(64)
-    assert state.balls[0].x < state.balls[1].x
+    assert ball_one_position is not None
+    assert ball_two_position is not None
+    assert ball_one_position.face_index == 0
+    assert ball_one_position.x > 32
+    assert ball_two_position.face_index == 2
+    assert ball_two_position.x > 32
+
+
+def test_routes_put_balls_on_opposite_sides_of_each_paddle() -> None:
+    screen_width = 64
+    paddle_one_x, paddle_two_x = paddle_path_x(screen_width)
+    paddle_width, _ = paddle_size(screen_width, 64)
+    radius = 3
+    offset = radius + (paddle_width / 2) + 1
+    route_two_player_one_side = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_TWO,
+            x=paddle_one_x + offset,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        screen_width,
+    )
+    route_two_player_two_side = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_TWO,
+            x=paddle_two_x - offset,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        screen_width,
+    )
+    route_four_player_two_side = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_FOUR,
+            x=paddle_one_x + offset,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        screen_width,
+    )
+    route_four_player_one_side = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_FOUR,
+            x=paddle_two_x - offset,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        screen_width,
+    )
+
+    assert route_two_player_one_side is not None
+    assert route_two_player_two_side is not None
+    assert route_four_player_two_side is not None
+    assert route_four_player_one_side is not None
+    assert (route_two_player_one_side.face_index, route_two_player_one_side.x > 32) == (
+        0,
+        True,
+    )
+    assert (route_four_player_one_side.face_index, route_four_player_one_side.x < 32) == (
+        0,
+        True,
+    )
+    assert (route_two_player_two_side.face_index, route_two_player_two_side.x < 32) == (
+        2,
+        True,
+    )
+    assert (route_four_player_two_side.face_index, route_four_player_two_side.x > 32) == (
+        2,
+        True,
+    )
 
 
 def test_screen_four_route_maps_middle_segment_to_fourth_face() -> None:
@@ -48,6 +124,34 @@ def test_screen_four_route_maps_middle_segment_to_fourth_face() -> None:
     assert position.face_index == 3
     assert position.x == 32
     assert position.y == 20
+
+
+def test_screen_four_route_wraps_from_player_two_to_player_one() -> None:
+    player_two_position = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_FOUR,
+            x=32,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        64,
+    )
+    player_one_position = face_position_for_ball(
+        CubePongBall(
+            route_name=ROUTE_ACROSS_SCREEN_FOUR,
+            x=160,
+            y=20,
+            vx=1,
+            vy=0,
+        ),
+        64,
+    )
+
+    assert player_two_position is not None
+    assert player_one_position is not None
+    assert player_two_position.face_index == 2
+    assert player_one_position.face_index == 0
 
 
 def test_ball_bounces_when_it_reaches_center_paddle() -> None:
