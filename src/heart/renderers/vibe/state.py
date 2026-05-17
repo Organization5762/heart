@@ -13,6 +13,7 @@ TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
 HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
 FLOWER_SHEET_PATH = Path("vibe") / "flower_64x64_spritesheet.png"
 SUN_SHEET_PATH = Path("vibe") / "sun_64x64_spritesheet.png"
+SPACE_SHEET_PATH = Path("vibe") / "space_64x64_spritesheet.png"
 OVERMONO_SHEET_PATH = Path("vibe") / "overmono_64x64_spritesheet.png"
 SARA_SHEET_PATH = Path("vibe") / "sara_64x64_spritesheet.png"
 SUNSLEEPER2_FRAME_SIZE = 64
@@ -30,6 +31,9 @@ FLOWER_FRAME_DURATION_MS = 30
 SUN_FRAME_SIZE = 64
 SUN_FRAME_COUNT = 60
 SUN_FRAME_DURATION_MS = 30
+SPACE_FRAME_SIZE = 64
+SPACE_FRAME_COUNT = 30
+SPACE_FRAME_DURATION_MS = 140
 SUN2_BRIGHTNESS = 0.8
 OVERMONO_FRAME_SIZE = 64
 OVERMONO_FRAME_COUNT = 2
@@ -131,6 +135,15 @@ class VibeState:
                     SUN_FRAME_DURATION_MS,
                 ),
             ).brightness(SUN2_BRIGHTNESS),
+            SpritesheetLoop(
+                sheet_file_path=str(SPACE_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    SPACE_FRAME_SIZE,
+                    SPACE_FRAME_COUNT,
+                    SPACE_FRAME_DURATION_MS,
+                ),
+            ),
             SpritesheetLoop(
                 sheet_file_path=str(OVERMONO_SHEET_PATH),
                 disable_input=True,
