@@ -9,14 +9,10 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Cube
-from heart.peripheral.core.input import (
-    GamepadAxis,
-    GamepadDpadValue,
-    GamepadSnapshot,
-    KeyboardSnapshot,
-)
-from heart.renderers.palette_tunnel.renderer import PaletteTunnelScene
-from heart.renderers.palette_tunnel.renderer import MOUSE_SCALE
+from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
+                                         GamepadSnapshot, KeyboardSnapshot)
+from heart.renderers.palette_tunnel.renderer import (MOUSE_SCALE,
+                                                     PaletteTunnelScene)
 
 
 class _Subscription:
