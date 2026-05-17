@@ -134,3 +134,17 @@ class TestTetrisRenderer:
         assert controls.hard_drop is True
         assert controls.hold is True
         assert controls.rotate_ccw is False
+
+    def test_controller_mapping_leaves_north_for_navigation_exit(self) -> None:
+        renderer = TetrisRenderer(rng=random.Random(1))
+        controls = renderer._controls_for_snapshot(
+            TetrisInputMemory(),
+            DirectGamepadSnapshot(
+                connected=True,
+                identifier="test",
+                tapped_buttons=frozenset({GamepadButton.NORTH}),
+            ),
+            elapsed_ms=16,
+        )
+
+        assert controls == TetrisControls()
