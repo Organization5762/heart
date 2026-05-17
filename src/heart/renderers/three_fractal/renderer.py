@@ -10,8 +10,8 @@ from manyfold import StreamNode, shutdown
 from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
-                       GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER, GL_RGBA,
-                       GL_SHADING_LANGUAGE_VERSION, GL_TEXTURE_2D,
+                       GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
+                       GL_RGBA, GL_SHADING_LANGUAGE_VERSION, GL_TEXTURE_2D,
                        GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
                        GL_UNSIGNED_BYTE, GL_VENDOR, GL_VERSION, glBegin,
                        glBindTexture, glClear, glDeleteTextures, glDisable,
@@ -24,8 +24,10 @@ from pygame.math import lerp
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
 from heart.device.local import LocalScreen
-from heart.display.shaders.fullscreen import FullscreenShaderRuntime, UniformValue
-from heart.display.shaders.shader_templates.three_fractal import __file__ as shader_template_location
+from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
+                                              UniformValue)
+from heart.display.shaders.shader_templates.three_fractal import \
+    __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager

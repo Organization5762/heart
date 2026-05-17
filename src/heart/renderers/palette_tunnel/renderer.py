@@ -8,51 +8,24 @@ import numpy as np
 import pygame
 from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
-from OpenGL.GL import (
-    GL_COLOR_BUFFER_BIT,
-    GL_DEPTH_BUFFER_BIT,
-    GL_MODELVIEW,
-    GL_NEAREST,
-    GL_PROJECTION,
-    GL_QUADS,
-    GL_RGBA,
-    GL_TEXTURE_2D,
-    GL_TEXTURE_MAG_FILTER,
-    GL_TEXTURE_MIN_FILTER,
-    GL_UNSIGNED_BYTE,
-    glBegin,
-    glBindTexture,
-    glClear,
-    glDeleteTextures,
-    glDisable,
-    glEnable,
-    glEnd,
-    glGenTextures,
-    glLoadIdentity,
-    glMatrixMode,
-    glOrtho,
-    glReadPixels,
-    glTexCoord2f,
-    glTexImage2D,
-    glTexParameteri,
-    glTexSubImage2D,
-    glUseProgram,
-    glVertex2f,
-    glViewport,
-)
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
+                       GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RGBA,
+                       GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                       GL_TEXTURE_MIN_FILTER, GL_UNSIGNED_BYTE, glBegin,
+                       glBindTexture, glClear, glDeleteTextures, glDisable,
+                       glEnable, glEnd, glGenTextures, glLoadIdentity,
+                       glMatrixMode, glOrtho, glReadPixels, glTexCoord2f,
+                       glTexImage2D, glTexParameteri, glTexSubImage2D,
+                       glUseProgram, glVertex2f, glViewport)
 
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation
-from heart.display.shaders.fullscreen import FullscreenShaderRuntime, UniformValue
-from heart.display.shaders.shader_templates.palette_tunnel import (
-    __file__ as shader_template_location,
-)
-from heart.peripheral.core.input import (
-    GamepadAxis,
-    GamepadButton,
-    GamepadSnapshot,
-    KeyboardSnapshot,
-)
+from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
+                                              UniformValue)
+from heart.display.shaders.shader_templates.palette_tunnel import \
+    __file__ as shader_template_location
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
