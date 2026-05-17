@@ -6,6 +6,7 @@ from heart.renderers.spritesheet import (BoundingBox, FrameDescription, Size,
                                          SpritesheetLoop)
 from heart.renderers.vibe.overmono_runner import OvermonoRunner
 from heart.renderers.vibe.oppi_renderer import OppiRenderer
+from heart.renderers.vibe.zed_renderer import ZedRenderer
 
 SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
@@ -111,6 +112,7 @@ class VibeState:
                     FLOWER_FRAME_DURATION_MS,
                 ),
             ),
+            ZedRenderer(),
             SpritesheetLoop(
                 sheet_file_path=str(SUN_SHEET_PATH),
                 disable_input=True,
