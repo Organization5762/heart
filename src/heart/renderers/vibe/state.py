@@ -125,6 +125,7 @@ class VibeState:
                     OVERMONO_FRAME_DURATION_MS,
                 ),
             ),
+            OvermonoRunner(),
             SpritesheetLoop(
                 sheet_file_path=str(SARA_SHEET_PATH),
                 disable_input=True,
@@ -134,7 +135,6 @@ class VibeState:
                     SARA_FRAME_DURATION_MS,
                 ),
             ),
-            OvermonoRunner(),
             OppiRenderer(),
         ]
         return VibeState(scenes=scenes)
