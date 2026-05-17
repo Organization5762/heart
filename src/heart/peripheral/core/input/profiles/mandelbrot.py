@@ -11,7 +11,8 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
 from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
     GamepadController, GamepadSnapshot)
-from heart.peripheral.core.input.keyboard import KeyboardController, KeyboardSnapshot
+from heart.peripheral.core.input.keyboard import (KeyboardController,
+                                                  KeyboardSnapshot)
 from heart.peripheral.core.input.streams import map_stream
 from heart.peripheral.core.streams import combine_latest
 
@@ -423,7 +424,7 @@ class MandelbrotControlProfile:
         move_multiplier = 2.0 if button_b_held else 1.0
         return MandelbrotMotionState(
             move_x=keyboard_move_x + dpad.x + left_stick_x,
-            move_y=keyboard_move_y - dpad.y + left_stick_y,
+            move_y=keyboard_move_y - dpad.y - left_stick_y,
             pan_x=right_stick_x,
             pan_y=-right_stick_y,
             move_multiplier=move_multiplier,
