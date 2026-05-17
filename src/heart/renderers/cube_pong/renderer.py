@@ -156,7 +156,9 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         pad_one = 0.0
         pad_two = 0.0
         if self._peripheral_manager is not None:
-            snapshots = self._peripheral_manager.gamepad_controller.snapshots()
+            snapshots = self._peripheral_manager.gamepad_controller.snapshots(
+                consume_taps=False
+            )
             connected = tuple(snapshot for snapshot in snapshots if snapshot.connected)
             if len(connected) >= 2:
                 pad_one = self._left_control(connected[0])

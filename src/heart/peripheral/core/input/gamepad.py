@@ -216,16 +216,21 @@ class GamepadController:
             upstream_ids=("gamepad.snapshot",),
         ).connect(stream)
 
-    def snapshots(self) -> tuple[GamepadSnapshot, ...]:
+    def snapshots(self, *, consume_taps: bool = True) -> tuple[GamepadSnapshot, ...]:
         return tuple(
-            self.snapshot_for_gamepad(gamepad)
+            self.snapshot_for_gamepad(gamepad, consume_taps=consume_taps)
             for gamepad in sorted(
                 self._gamepads(),
                 key=lambda candidate: candidate.joystick_id,
             )
         )
 
-    def snapshot_for_gamepad(self, gamepad: Gamepad) -> GamepadSnapshot:
+    def snapshot_for_gamepad(
+        self,
+        gamepad: Gamepad,
+        *,
+        consume_taps: bool = True,
+    ) -> GamepadSnapshot:
         gamepad.update()
         if not gamepad.is_connected():
             return GamepadSnapshot(
@@ -249,25 +254,8 @@ class GamepadController:
             GamepadButton.L3: gamepad.is_held(mapping.BUTTON_L3),
             GamepadButton.R3: gamepad.is_held(mapping.BUTTON_R3),
         }
-        tapped_buttons = frozenset(
-            (
-                button
-                for button, button_id in {
-                    GamepadButton.SOUTH: mapping.BUTTON_B,
-                    GamepadButton.EAST: mapping.BUTTON_A,
-                    GamepadButton.WEST: mapping.BUTTON_Y,
-                    GamepadButton.NORTH: mapping.BUTTON_X,
-                    GamepadButton.PLUS: mapping.BUTTON_PLUS,
-                    GamepadButton.MINUS: mapping.BUTTON_MINUS,
-                    GamepadButton.HOME: mapping.BUTTON_HOME,
-                    GamepadButton.CAPTURE: mapping.BUTTON_CAPTURE,
-                    GamepadButton.ZL: mapping.BUTTON_ZL,
-                    GamepadButton.ZR: mapping.BUTTON_ZR,
-                    GamepadButton.L3: mapping.BUTTON_L3,
-                    GamepadButton.R3: mapping.BUTTON_R3,
-                }.items()
-                if button_id >= 0 and gamepad.was_tapped(button_id)
-            )
+        tapped_buttons = (
+            self._read_tapped_buttons(gamepad, mapping) if consume_taps else frozenset()
         )
         axes = {
             GamepadAxis.LEFT_X: gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.0),
@@ -296,6 +284,32 @@ class GamepadController:
 
     def _sample(self) -> GamepadSnapshot:
         return self._aggregate_snapshots(self.snapshots())
+
+    @staticmethod
+    def _read_tapped_buttons(
+        gamepad: Gamepad,
+        mapping: SwitchLikeMapping,
+    ) -> frozenset[GamepadButton]:
+        return frozenset(
+            (
+                button
+                for button, button_id in {
+                    GamepadButton.SOUTH: mapping.BUTTON_B,
+                    GamepadButton.EAST: mapping.BUTTON_A,
+                    GamepadButton.WEST: mapping.BUTTON_Y,
+                    GamepadButton.NORTH: mapping.BUTTON_X,
+                    GamepadButton.PLUS: mapping.BUTTON_PLUS,
+                    GamepadButton.MINUS: mapping.BUTTON_MINUS,
+                    GamepadButton.HOME: mapping.BUTTON_HOME,
+                    GamepadButton.CAPTURE: mapping.BUTTON_CAPTURE,
+                    GamepadButton.ZL: mapping.BUTTON_ZL,
+                    GamepadButton.ZR: mapping.BUTTON_ZR,
+                    GamepadButton.L3: mapping.BUTTON_L3,
+                    GamepadButton.R3: mapping.BUTTON_R3,
+                }.items()
+                if button_id >= 0 and gamepad.was_tapped(button_id)
+            )
+        )
 
     @staticmethod
     def _aggregate_snapshots(snapshots: tuple[GamepadSnapshot, ...]) -> GamepadSnapshot:

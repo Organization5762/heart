@@ -28,7 +28,7 @@ from heart.peripheral.core.input.accelerometer import (
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream, runtime_route
-from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -438,7 +438,12 @@ class TestGamepadController:
         tap = InputDebugTap()
         controller = GamepadController(manager=_Manager(), debug_tap=tap)
 
-        def _snapshot_for_gamepad(gamepad: Gamepad) -> GamepadSnapshot:
+        def _snapshot_for_gamepad(
+            gamepad: Gamepad,
+            *,
+            consume_taps: bool = True,
+        ) -> GamepadSnapshot:
+            del consume_taps
             if gamepad.joystick_id == 0:
                 return _gamepad_snapshot(
                     buttons={GamepadButton.SOUTH: True},
@@ -468,6 +473,49 @@ class TestGamepadController:
         assert aggregate.axis_value(GamepadAxis.LEFT_X) == 0.9
         assert aggregate.dpad == GamepadDpadValue(x=1)
         assert aggregate.timestamp_monotonic == 2.0
+
+    def test_snapshots_can_skip_consuming_tap_flags(self) -> None:
+        """Verify game renderers can read per-controller motion without stealing menu button taps."""
+
+        class _Gamepad(Gamepad):
+            def __init__(self) -> None:
+                super().__init__()
+                self.update_count = 0
+                self.tap_reads = 0
+
+            def update(self) -> None:
+                self.update_count += 1
+
+            def is_connected(self) -> bool:
+                return True
+
+            @property
+            def gamepad_identifier(self):
+                return GamepadIdentifier.BIT_DO_LITE_2
+
+            def is_held(self, button_id: int) -> bool:
+                return button_id == 0
+
+            def was_tapped(self, button_id: int) -> bool:
+                self.tap_reads += 1
+                return True
+
+        class _Manager:
+            def __init__(self, gamepad: Gamepad) -> None:
+                self.peripherals = (gamepad,)
+
+        tap = InputDebugTap()
+        raw_gamepad = _Gamepad()
+        controller = GamepadController(manager=_Manager(raw_gamepad), debug_tap=tap)
+
+        non_consuming = controller.snapshots(consume_taps=False)[0]
+        assert non_consuming.tapped_buttons == frozenset()
+        assert raw_gamepad.tap_reads == 0
+
+        consuming = controller.snapshots()[0]
+
+        assert raw_gamepad.tap_reads > 0
+        assert consuming.button_tapped(GamepadButton.SOUTH)
 
     def test_views_project_shared_snapshot_state(
         self,
