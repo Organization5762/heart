@@ -10,6 +10,7 @@ SUNSLEEPER2_SHEET_PATH = Path("vibe") / "sunsleeper_64x64_spritesheet.png"
 TREE_SHEET_PATH = Path("vibe") / "tree_384x384_spritesheet.png"
 HEART_SHEET_PATH = Path("vibe") / "heart_64x64_spritesheet.png"
 SUN_SHEET_PATH = Path("vibe") / "sun_64x64_spritesheet.png"
+SPACE_SHEET_PATH = Path("vibe") / "space_64x64_spritesheet.png"
 SUNSLEEPER2_FRAME_SIZE = 64
 SUNSLEEPER2_FRAME_COUNT = 48
 SUNSLEEPER2_FRAME_DURATION_MS = 274
@@ -22,6 +23,9 @@ HEART_FRAME_DURATION_MS = 30
 SUN_FRAME_SIZE = 64
 SUN_FRAME_COUNT = 60
 SUN_FRAME_DURATION_MS = 30
+SPACE_FRAME_SIZE = 64
+SPACE_FRAME_COUNT = 30
+SPACE_FRAME_DURATION_MS = 140
 
 
 @dataclass
@@ -95,6 +99,15 @@ class VibeState:
                     SUN_FRAME_SIZE,
                     SUN_FRAME_COUNT,
                     SUN_FRAME_DURATION_MS,
+                ),
+            ),
+            SpritesheetLoop(
+                sheet_file_path=str(SPACE_SHEET_PATH),
+                disable_input=True,
+                frame_data=VibeState._frame_data(
+                    SPACE_FRAME_SIZE,
+                    SPACE_FRAME_COUNT,
+                    SPACE_FRAME_DURATION_MS,
                 ),
             ),
             OppiRenderer(),
