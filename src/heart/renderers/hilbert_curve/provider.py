@@ -167,7 +167,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
         self.hold_duration = hold_duration
         self.zoom_duration = zoom_duration
         self.zoom_hold_duration = zoom_hold_duration
-        self.subset_exponent = subset_exponent or max_order + 4
+        self.subset_exponent = subset_exponent or max_order + 5
 
     def initial_state(self, *, width: int, height: int) -> HilbertCurveState:
         current_order = 1
@@ -208,8 +208,9 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             state.current_curve, state.target_curve, alpha
         )
         hold_duration = (
-            self.hold_duration if state.current_order < self.max_order - 2 else 0
+            self.hold_duration if state.current_order < self.max_order else 0
         )
+        # hold_duration = self.hold_duration
         if alpha < 1.0 or elapsed < self.morph_duration + hold_duration:
             return replace(state, frame_curve=frame_curve)
         if state.next_order == self.max_order:
