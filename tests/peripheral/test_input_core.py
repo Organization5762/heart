@@ -788,7 +788,46 @@ class TestMandelbrotControlProfile:
             )
         )
 
-        assert motion_states[-1] == (1.5, 1.25, 0.6, 0.7)
+        assert motion_states[-1] == (1.5, 0.75, 0.6, 0.7)
+
+    def test_left_stick_y_matches_keyboard_movement_direction(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Keep Mandelbrot left-stick vertical motion aligned with W/S movement."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
+        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: gamepad_snapshots)
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+        motion_states: list[tuple[float, float]] = []
+
+        profile.motion_state.subscribe(
+            lambda state: motion_states.append((state.move_x, state.move_y))
+        )
+
+        gamepad_snapshots.emit(
+            _gamepad_snapshot(
+                axes={
+                    GamepadAxis.LEFT_X: 0.0,
+                    GamepadAxis.LEFT_Y: -0.5,
+                    GamepadAxis.RIGHT_X: 0.0,
+                    GamepadAxis.RIGHT_Y: 0.0,
+                    GamepadAxis.TRIGGER_LEFT: 0.0,
+                    GamepadAxis.TRIGGER_RIGHT: 0.0,
+                },
+                timestamp_monotonic=2.0,
+            )
+        )
+
+        assert motion_states[-1] == (0.0, -0.5)
 
 
 class TestAccelerometerDebugProfile:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import argparse
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pygame
+from manyfold import shutdown
 from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
@@ -19,7 +21,8 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        glUseProgram, glVertex2f, glViewport)
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Orientation
+from heart.device import Cube, Orientation, Rectangle
+from heart.device.local import LocalScreen
 from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
                                               UniformValue)
 from heart.display.shaders.shader_templates.mandelbulb import \
@@ -28,8 +31,16 @@ from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
+from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.peripheral_runtime import PeripheralRuntime
+from heart.utilities.logging import get_logger
 
+logger = get_logger(__name__)
+DEFAULT_DEBUG_WIDTH = 2048
+DEFAULT_DEBUG_HEIGHT = 1200
+DEFAULT_DEBUG_FPS = 60
+DEFAULT_DEBUG_LAYOUT = "rectangle"
 GAMEPAD_DEAD_ZONE = 0.12
 ORBIT_RADIANS_PER_SECOND = 1.4
 AUTO_ORBIT_RADIANS_PER_SECOND = 0.12
@@ -44,7 +55,7 @@ MAX_PHASE_SPEED = 8.0
 PHASE_SPEED_UNITS_PER_SECOND = 1.5
 POWER_EASE_PER_SECOND = 8.0
 DEFAULT_CAMERA_DISTANCE = 3.0
-MIN_CAMERA_DISTANCE = 1.8
+MIN_CAMERA_DISTANCE = 2.2
 MAX_CAMERA_DISTANCE = 6.0
 MIN_CAMERA_PITCH = -1.1
 MAX_CAMERA_PITCH = 1.1
@@ -522,3 +533,96 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         if span <= 0.0:
             return MIN_POWER
         return ((value - MIN_POWER) % span) + MIN_POWER
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the Mandelbulb renderer directly in a local debug window.",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULT_DEBUG_WIDTH,
+        help="Window width in pixels.",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULT_DEBUG_HEIGHT,
+        help="Window height in pixels.",
+    )
+    parser.add_argument(
+        "--fps",
+        type=int,
+        default=DEFAULT_DEBUG_FPS,
+        help="Frame cap for the debug loop.",
+    )
+    parser.add_argument(
+        "--layout",
+        choices=(DEFAULT_DEBUG_LAYOUT, "cube"),
+        default=DEFAULT_DEBUG_LAYOUT,
+        help="Render as a single rectangle or use the cube tiling path.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = _parse_args()
+    orientation = (
+        Cube.sides()
+        if args.layout == "cube"
+        else Rectangle.with_layout(columns=1, rows=1)
+    )
+
+    device = LocalScreen(width=args.width, height=args.height, orientation=orientation)
+    container = build_runtime_container(device=device)
+    peripheral_manager = container.resolve(PeripheralManager)
+    peripheral_runtime = container.resolve(PeripheralRuntime)
+    display = container.resolve(DisplayContext)
+    scene = MandelbulbScene()
+
+    logger.info(
+        "Starting standalone Mandelbulb debug window width=%s height=%s layout=%s fps=%s",
+        args.width,
+        args.height,
+        args.layout,
+        args.fps,
+    )
+
+    display.initialize()
+    display.configure_window(DeviceDisplayMode.OPENGL)
+    peripheral_manager.detect()
+    peripheral_manager.start()
+
+    running = True
+    try:
+        scene.initialize(
+            window=display,
+            peripheral_manager=peripheral_manager,
+            orientation=orientation,
+        )
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+            peripheral_runtime.tick()
+            scene.real_process(window=display, orientation=orientation)
+            pygame.display.flip()
+            if display.clock is None:
+                raise RuntimeError(
+                    "Standalone Mandelbulb debug loop did not initialize a clock"
+                )
+            display.clock.tick(args.fps)
+            peripheral_runtime.tick()
+        scene.reset()
+    finally:
+        shutdown.on_next(True)
+        shutdown.on_completed()
+        shutdown.dispose()
+        pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
