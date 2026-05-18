@@ -12,6 +12,7 @@ from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
 from heart.renderers.kirby import KirbyScene
 from heart.renderers.life.renderer import Life
+from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
 from heart.renderers.mario.renderer import MarioRenderer
@@ -62,6 +63,9 @@ def configure(loop: GameLoop) -> None:
 
     sphere_mode = loop.add_mode("3d fractal")
     sphere_mode.add_renderer(FractalScene)
+
+    mandelbulb_mode = loop.add_mode("mandel\nbulb")
+    mandelbulb_mode.add_renderer(MandelbulbScene())
 
     palette_tunnel_mode = loop.add_mode("palette\ntunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
