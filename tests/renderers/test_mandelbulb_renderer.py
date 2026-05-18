@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import Mock
 
 import pygame
@@ -9,10 +10,17 @@ import numpy as np
 
 from heart import DeviceDisplayMode
 from heart.device import Cube
+from heart.display.shaders.shader_templates.mandelbulb import \
+    __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
-from heart.renderers.mandelbulb.renderer import (BASE_POWER, MAX_POWER, MIN_POWER,
+from heart.renderers.mandelbulb.renderer import (BASE_PHASE_SPEED, BASE_POWER,
+                                                 COLOR_MODE_COUNT,
+                                                 DEFAULT_CAMERA_DISTANCE,
+                                                 DEFAULT_COLOR_MODE, MAX_POWER,
+                                                 MIN_PHASE_SPEED, MIN_POWER,
                                                  MORPH_POWER_DELTA,
+                                                 POWER_UNITS_PER_SECOND,
                                                  MandelbulbScene)
 
 
@@ -114,6 +122,31 @@ def _window(width: int = 100, height: int = 80) -> Mock:
 
 
 class TestMandelbulbScene:
+    def test_shader_object_spin_uses_pauseable_auto_yaw(self) -> None:
+        shader_source = (Path(shader_template_location).parent / "frag.glsl").read_text(
+            encoding="utf-8"
+        )
+
+        assert "rotateY(p, uAutoYaw" in shader_source
+        assert "rotateY(p, iTime * 0.2)" not in shader_source
+        assert "sin(iTime * 0.4)" not in shader_source
+
+    def test_shader_maps_right_stick_to_quadrant_palette(self) -> None:
+        shader_source = (Path(shader_template_location).parent / "frag.glsl").read_text(
+            encoding="utf-8"
+        )
+
+        assert "vec3 quadrantPalette(vec2 color_vector, float orbit)" in shader_source
+        assert "vec3 warm = tintedPalette" in shader_source
+        assert "vec3 cyan = tintedPalette" in shader_source
+        assert "vec3 violet = tintedPalette" in shader_source
+        assert "vec3 acid = tintedPalette" in shader_source
+        assert "vec3 angleWheelPalette(vec2 color_vector, float orbit)" in shader_source
+        assert "vec3 denseBandPalette(vec2 color_vector, float orbit)" in shader_source
+        assert "vec3 prismPalette(vec2 color_vector, float orbit)" in shader_source
+        assert "vec3 stick_palette = stickPalette(uColorVector, orbit)" in shader_source
+        assert "uColorMode < 0.5" in shader_source
+
     def test_constructor_uses_opengl_display_mode(self) -> None:
         scene = MandelbulbScene()
 
@@ -135,12 +168,14 @@ class TestMandelbulbScene:
         assert render_call["uniforms"]["iResolution"] == (100, 80)
         assert render_call["uniforms"]["iTime"] >= 0.0
         assert render_call["uniforms"]["uCameraDistance"] == 3.0
-        assert render_call["uniforms"]["uPower"] == 8.0
+        assert render_call["uniforms"]["uPower"] == BASE_POWER
+        assert render_call["uniforms"]["uColorMode"] == float(DEFAULT_COLOR_MODE)
         np.testing.assert_array_equal(
             render_call["uniforms"]["uColorVector"],
             np.zeros((2,), dtype=np.float32),
         )
-        assert render_call["uniforms"]["uPhaseShift"] == 1.0
+        assert render_call["uniforms"]["uPhaseTime"] > 0.0
+        assert render_call["uniforms"]["uAutoYaw"] > 0.0
 
     def test_keyboard_and_gamepad_update_interactive_uniforms(self) -> None:
         scene = MandelbulbScene()
@@ -160,6 +195,7 @@ class TestMandelbulbScene:
                         pygame.K_SPACE,
                         pygame.K_d,
                         pygame.K_c,
+                        pygame.K_o,
                     }
                 ),
                 timestamp_ms=1.0,
@@ -190,7 +226,83 @@ class TestMandelbulbScene:
         assert uniforms["uColorPhase"] > 0.0
         assert uniforms["uColorVector"][0] > 0.0
         assert uniforms["uColorVector"][1] > 0.0
-        assert uniforms["uPhaseShift"] == 0.0
+        assert uniforms["uColorMode"] == float(DEFAULT_COLOR_MODE)
+        assert uniforms["uPhaseTime"] == 0.0
+        assert uniforms["uAutoYaw"] == 0.0
+
+    def test_phase_toggle_pauses_and_resumes_without_phase_jump(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        scene.real_process(window=window, orientation=Mock())
+        moving_phase = shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"]
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                tapped_buttons=frozenset({GamepadButton.WEST}),
+                timestamp_monotonic=1.0,
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+        paused_phase = shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"]
+        scene.real_process(window=window, orientation=Mock())
+
+        assert paused_phase == moving_phase
+        assert shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"] == paused_phase
+
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                tapped_buttons=frozenset({GamepadButton.WEST}),
+                timestamp_monotonic=2.0,
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"] > paused_phase
+
+    def test_left_stick_click_pauses_and_resumes_auto_orbit_without_jump(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        scene.real_process(window=window, orientation=Mock())
+        moving_yaw = shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"]
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                tapped_buttons=frozenset({GamepadButton.L3}),
+                timestamp_monotonic=1.0,
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+        paused_yaw = shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"]
+        scene.real_process(window=window, orientation=Mock())
+
+        assert paused_yaw == moving_yaw
+        assert shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"] == paused_yaw
+
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                tapped_buttons=frozenset({GamepadButton.L3}),
+                timestamp_monotonic=2.0,
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"] > paused_yaw
 
     def test_right_stick_color_vector_is_sticky(self) -> None:
         scene = MandelbulbScene()
@@ -222,6 +334,46 @@ class TestMandelbulbScene:
             shader_runtime.render_calls[-1]["uniforms"]["uColorVector"],
             selected,
         )
+
+    def test_right_stick_click_cycles_color_mode_once_per_tap(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                tapped_buttons=frozenset({GamepadButton.R3}),
+                timestamp_monotonic=1.0,
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.color_mode == (DEFAULT_COLOR_MODE + 1) % COLOR_MODE_COUNT
+        assert shader_runtime.render_calls[-1]["uniforms"]["uColorMode"] == float(
+            scene.color_mode
+        )
+
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.color_mode == (DEFAULT_COLOR_MODE + 1) % COLOR_MODE_COUNT
+
+        for timestamp in range(2, COLOR_MODE_COUNT + 2):
+            manager.gamepad_controller.stream.emit(
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="pad",
+                    tapped_buttons=frozenset({GamepadButton.R3}),
+                    timestamp_monotonic=float(timestamp),
+                )
+            )
+            scene.real_process(window=window, orientation=Mock())
+
+        assert scene.color_mode == (DEFAULT_COLOR_MODE + 1) % COLOR_MODE_COUNT
 
     def test_morph_button_temporarily_wraps_from_current_target_power(self) -> None:
         scene = MandelbulbScene()
@@ -276,8 +428,8 @@ class TestMandelbulbScene:
         scene.real_process(window=window, orientation=Mock())
 
         uniforms = shader_runtime.render_calls[-1]["uniforms"]
-        assert scene.target_power > 8.0
-        assert 8.0 < uniforms["uPower"] < scene.target_power
+        assert scene.target_power > BASE_POWER
+        assert BASE_POWER < uniforms["uPower"] < scene.target_power
         assert uniforms["uCameraDistance"] == 3.0
 
         scene.target_power = MIN_POWER + 0.05
@@ -292,6 +444,109 @@ class TestMandelbulbScene:
         scene.real_process(window=window, orientation=Mock())
 
         assert scene.target_power == MIN_POWER
+
+    def test_trigger_power_input_normalizes_signed_trigger_axes(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                axes={
+                    GamepadAxis.TRIGGER_RIGHT: -1.0,
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                },
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.target_power == BASE_POWER
+
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                axes={
+                    GamepadAxis.TRIGGER_RIGHT: 1.0,
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                },
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.target_power == BASE_POWER + POWER_UNITS_PER_SECOND * 0.1
+
+    def test_plus_minus_adjust_phase_speed_without_zooming(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                buttons={GamepadButton.PLUS: True},
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        fast_phase = shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"]
+        assert scene.phase_speed > BASE_PHASE_SPEED
+        assert fast_phase > 0.1
+        assert shader_runtime.render_calls[-1]["uniforms"]["uCameraDistance"] == 3.0
+
+        scene.phase_speed = MIN_PHASE_SPEED + 0.01
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                buttons={GamepadButton.MINUS: True},
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.phase_speed == MIN_PHASE_SPEED
+
+    def test_zl_zr_zoom_without_changing_phase_speed(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+        manager = _PeripheralManager()
+
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                buttons={GamepadButton.ZR: True},
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.camera_distance < DEFAULT_CAMERA_DISTANCE
+        assert scene.phase_speed == BASE_PHASE_SPEED
+
+        scene.camera_distance = DEFAULT_CAMERA_DISTANCE
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                buttons={GamepadButton.ZL: True},
+            )
+        )
+        scene.real_process(window=window, orientation=Mock())
+
+        assert scene.camera_distance > DEFAULT_CAMERA_DISTANCE
+        assert scene.phase_speed == BASE_PHASE_SPEED
 
     def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
         scene = MandelbulbScene()
@@ -420,7 +675,9 @@ class TestMandelbulbScene:
         assert scene.tiled_mode is False
         assert scene.display_texture is None
         assert scene.tile_pixels is None
-        assert scene.target_power == 8.0
+        assert scene.target_power == BASE_POWER
+        assert scene.color_mode == DEFAULT_COLOR_MODE
+        assert scene.phase_speed == BASE_PHASE_SPEED
         assert scene.morph_target_power == (
             (BASE_POWER + MORPH_POWER_DELTA - MIN_POWER) % (MAX_POWER - MIN_POWER)
         ) + MIN_POWER

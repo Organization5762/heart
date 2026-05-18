@@ -64,7 +64,7 @@ def configure(loop: GameLoop) -> None:
     sphere_mode = loop.add_mode("3d fractal")
     sphere_mode.add_renderer(FractalScene)
 
-    mandelbulb_mode = loop.add_mode("mandel\nbulb")
+    mandelbulb_mode = loop.add_mode("mandelbulb")
     mandelbulb_mode.add_renderer(MandelbulbScene())
 
     palette_tunnel_mode = loop.add_mode("palette\ntunnel")
