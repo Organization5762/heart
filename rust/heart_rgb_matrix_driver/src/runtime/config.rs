@@ -81,6 +81,8 @@ impl MatrixConfigNative {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WiringProfile {
     AdafruitHatPwm,
+    ElectroDragonP0,
+    Regular,
 }
 
 impl TryFrom<&str> for WiringProfile {
@@ -89,6 +91,8 @@ impl TryFrom<&str> for WiringProfile {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "adafruit_hat_pwm" => Ok(Self::AdafruitHatPwm),
+            "electrodragon" | "electrodragon_p0" => Ok(Self::ElectroDragonP0),
+            "regular" => Ok(Self::Regular),
             _ => Err(format!("Unsupported wiring profile '{value}'.")),
         }
     }

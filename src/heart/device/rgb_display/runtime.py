@@ -14,6 +14,7 @@ from heart.utilities.optional_imports import optional_import
 MATRIX_RUNTIME_MODULE = "heart_rgb_matrix_driver"
 NATIVE_BACKEND = "native"
 BACKEND_ENV_VAR = "HEART_RGB_DISPLAY_BACKEND"
+HARDWARE_MAPPING_ENV_VAR = "HEART_RGB_MATRIX_HARDWARE_MAPPING"
 
 logger = get_logger(__name__)
 
@@ -70,8 +71,21 @@ def build_matrix_config(native_module: ModuleType, orientation: Orientation) -> 
         raise RuntimeError(
             f"Native matrix runtime module {MATRIX_RUNTIME_MODULE} is missing configuration types."
         )
+    hardware_mapping = os.environ.get(HARDWARE_MAPPING_ENV_VAR, "adafruit_hat_pwm")
+    wiring_attr = {
+        "adafruit-hat-pwm": "AdafruitHatPwm",
+        "adafruit_hat_pwm": "AdafruitHatPwm",
+        "electrodragon": "ElectroDragonP0",
+        "electrodragon-p0": "ElectroDragonP0",
+        "electrodragon_p0": "ElectroDragonP0",
+        "regular": "Regular",
+    }.get(hardware_mapping)
+    if wiring_attr is None:
+        raise RuntimeError(
+            f"Unsupported {HARDWARE_MAPPING_ENV_VAR}={hardware_mapping!r}."
+        )
     return config_type(
-        wiring=wiring_profile.AdafruitHatPwm,
+        wiring=getattr(wiring_profile, wiring_attr),
         panel_rows=Configuration.panel_rows(),
         panel_cols=Configuration.panel_columns(),
         chain_length=orientation.layout.columns,

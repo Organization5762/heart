@@ -22,6 +22,8 @@ DEFAULT_SIGNAL_MAP = {
     "E": 7,
 }
 HUB75_ADDRESS_SIGNALS = ("A", "B", "C", "D", "E")
+OE_LONG_BLANK_THRESHOLD_NS = 10_000.0
+CLK_LONG_PERIOD_THRESHOLD_NS = 10_000.0
 
 
 @dataclass(frozen=True)
@@ -77,7 +79,32 @@ class Hub75SignalSummary:
     median_clk_period_ns: float | None
     median_clk_high_ns: float | None
     median_clk_low_ns: float | None
+    p99_clk_period_ns: float | None
+    max_clk_period_ns: float | None
+    p99_clk_high_ns: float | None
+    max_clk_high_ns: float | None
+    p99_clk_low_ns: float | None
+    max_clk_low_ns: float | None
+    long_clk_period_threshold_ns: float
+    long_clk_period_count: int
+    median_long_clk_period_intervals: float | None
+    oe_active_fraction: float
+    oe_blank_fraction: float
+    median_oe_active_ns: float | None
+    median_oe_blank_ns: float | None
+    p90_oe_blank_ns: float | None
+    p99_oe_blank_ns: float | None
+    max_oe_blank_ns: float | None
+    p90_oe_active_ns: float | None
+    p99_oe_active_ns: float | None
+    max_oe_active_ns: float | None
+    long_oe_blank_threshold_ns: float
+    long_oe_blank_count: int
+    median_long_oe_blank_period_intervals: float | None
     address_edges_per_lat: dict[str, float]
+    address_edge_counts: dict[str, int]
+    p99_address_edge_interval_ns: dict[str, float | None]
+    max_address_edge_interval_ns: dict[str, float | None]
     valid_hub75: bool
     validity_issues: tuple[str, ...]
 
@@ -192,9 +219,46 @@ def summarize_hub75_capture(
 
     row_clock_mismatch_count = sum(1 for count in clocks_per_row if count != cols)
     address_edges_per_lat = _address_edges_per_lat(capture, lat_rises)
+    address_edge_counts = _signal_edge_counts(capture, HUB75_ADDRESS_SIGNALS)
+    address_edge_intervals = _signal_edge_intervals(capture, HUB75_ADDRESS_SIGNALS)
     clk_periods = [later - earlier for earlier, later in zip(clk_rises, clk_rises[1:], strict=False)]
     clk_highs = _clock_high_durations(clk_rises, clk_falls)
     clk_lows = _clock_low_durations(clk_rises, clk_falls)
+    long_clk_period_indexes = [
+        index
+        for index, duration in enumerate(clk_periods)
+        if duration * 1_000_000_000.0 > CLK_LONG_PERIOD_THRESHOLD_NS
+    ]
+    long_clk_periods = [
+        later - earlier
+        for earlier, later in zip(
+            long_clk_period_indexes,
+            long_clk_period_indexes[1:],
+            strict=False,
+        )
+    ]
+    oe_durations = _level_durations(
+        initial_level=capture.initial_state[capture.signal_map["OE"]],
+        edges=capture.edges[capture.signal_map["OE"]],
+        first_timestamp=capture.first_timestamp,
+        last_timestamp=capture.last_timestamp,
+    )
+    oe_active_time = sum(oe_durations[0])
+    oe_blank_time = sum(oe_durations[1])
+    oe_total_time = oe_active_time + oe_blank_time
+    long_oe_blank_indexes = [
+        index
+        for index, duration in enumerate(oe_durations[1])
+        if duration * 1_000_000_000.0 > OE_LONG_BLANK_THRESHOLD_NS
+    ]
+    long_oe_blank_periods = [
+        later - earlier
+        for earlier, later in zip(
+            long_oe_blank_indexes,
+            long_oe_blank_indexes[1:],
+            strict=False,
+        )
+    ]
     validity_issues = _validate_hub75_summary(
         lat_rise_count=len(lat_rises),
         interval_count=len(intervals),
@@ -214,7 +278,42 @@ def summarize_hub75_capture(
         median_clk_period_ns=_median_ns(clk_periods),
         median_clk_high_ns=_median_ns(clk_highs),
         median_clk_low_ns=_median_ns(clk_lows),
+        p99_clk_period_ns=_percentile_ns(clk_periods, 0.99),
+        max_clk_period_ns=_max_ns(clk_periods),
+        p99_clk_high_ns=_percentile_ns(clk_highs, 0.99),
+        max_clk_high_ns=_max_ns(clk_highs),
+        p99_clk_low_ns=_percentile_ns(clk_lows, 0.99),
+        max_clk_low_ns=_max_ns(clk_lows),
+        long_clk_period_threshold_ns=CLK_LONG_PERIOD_THRESHOLD_NS,
+        long_clk_period_count=len(long_clk_period_indexes),
+        median_long_clk_period_intervals=(
+            float(median(long_clk_periods)) if long_clk_periods else None
+        ),
+        oe_active_fraction=oe_active_time / oe_total_time if oe_total_time else 0.0,
+        oe_blank_fraction=oe_blank_time / oe_total_time if oe_total_time else 0.0,
+        median_oe_active_ns=_median_ns(oe_durations[0]),
+        median_oe_blank_ns=_median_ns(oe_durations[1]),
+        p90_oe_blank_ns=_percentile_ns(oe_durations[1], 0.90),
+        p99_oe_blank_ns=_percentile_ns(oe_durations[1], 0.99),
+        max_oe_blank_ns=_max_ns(oe_durations[1]),
+        p90_oe_active_ns=_percentile_ns(oe_durations[0], 0.90),
+        p99_oe_active_ns=_percentile_ns(oe_durations[0], 0.99),
+        max_oe_active_ns=_max_ns(oe_durations[0]),
+        long_oe_blank_threshold_ns=OE_LONG_BLANK_THRESHOLD_NS,
+        long_oe_blank_count=len(long_oe_blank_indexes),
+        median_long_oe_blank_period_intervals=(
+            float(median(long_oe_blank_periods)) if long_oe_blank_periods else None
+        ),
         address_edges_per_lat=address_edges_per_lat,
+        address_edge_counts=address_edge_counts,
+        p99_address_edge_interval_ns={
+            signal: _percentile_ns(intervals, 0.99)
+            for signal, intervals in address_edge_intervals.items()
+        },
+        max_address_edge_interval_ns={
+            signal: _max_ns(intervals)
+            for signal, intervals in address_edge_intervals.items()
+        },
         valid_hub75=not validity_issues,
         validity_issues=validity_issues,
     )
@@ -329,6 +428,11 @@ def score_hub75_similarity(
             candidate.median_clocks_per_row,
             tolerance_fraction=0.02,
         ),
+        "oe_active_fraction": _relative_similarity(
+            baseline.oe_active_fraction,
+            candidate.oe_active_fraction,
+            tolerance_fraction=0.05,
+        ),
     }
     timing_scores = {
         "median_clk_period_ns": _relative_similarity(
@@ -346,6 +450,44 @@ def score_hub75_similarity(
             candidate.median_clk_low_ns,
             tolerance_fraction=0.20,
         ),
+        "p99_clk_period_ns": _relative_similarity(
+            baseline.p99_clk_period_ns,
+            candidate.p99_clk_period_ns,
+            tolerance_fraction=0.25,
+        ),
+        "max_clk_period_ns": _relative_similarity(
+            baseline.max_clk_period_ns,
+            candidate.max_clk_period_ns,
+            tolerance_fraction=0.25,
+        ),
+        "long_clk_period_count": _count_similarity(
+            baseline.long_clk_period_count,
+            candidate.long_clk_period_count,
+        ),
+        "median_oe_active_ns": _relative_similarity(
+            baseline.median_oe_active_ns,
+            candidate.median_oe_active_ns,
+            tolerance_fraction=0.25,
+        ),
+        "median_oe_blank_ns": _relative_similarity(
+            baseline.median_oe_blank_ns,
+            candidate.median_oe_blank_ns,
+            tolerance_fraction=0.25,
+        ),
+        "p99_oe_blank_ns": _relative_similarity(
+            baseline.p99_oe_blank_ns,
+            candidate.p99_oe_blank_ns,
+            tolerance_fraction=0.25,
+        ),
+        "max_oe_blank_ns": _relative_similarity(
+            baseline.max_oe_blank_ns,
+            candidate.max_oe_blank_ns,
+            tolerance_fraction=0.25,
+        ),
+        "long_oe_blank_count": _count_similarity(
+            baseline.long_oe_blank_count,
+            candidate.long_oe_blank_count,
+        ),
     }
     address_scores = {
         f"address_edges_per_lat_{signal.lower()}": _relative_similarity(
@@ -355,6 +497,25 @@ def score_hub75_similarity(
         )
         for signal in baseline.address_edges_per_lat
     }
+    address_scores.update(
+        {
+            f"address_edge_count_{signal.lower()}": _count_similarity(
+                baseline.address_edge_counts.get(signal, 0),
+                candidate.address_edge_counts.get(signal, 0),
+            )
+            for signal in baseline.address_edge_counts
+        }
+    )
+    address_scores.update(
+        {
+            f"max_address_edge_interval_ns_{signal.lower()}": _relative_similarity(
+                baseline.max_address_edge_interval_ns.get(signal),
+                candidate.max_address_edge_interval_ns.get(signal),
+                tolerance_fraction=0.50,
+            )
+            for signal in baseline.max_address_edge_interval_ns
+        }
+    )
     feature_scores = {
         **control_scores,
         **timing_scores,
@@ -495,6 +656,26 @@ def _clock_low_durations(clk_rises: Sequence[float], clk_falls: Sequence[float])
     return durations
 
 
+def _level_durations(
+    *,
+    initial_level: int,
+    edges: Sequence[float],
+    first_timestamp: float,
+    last_timestamp: float,
+) -> dict[int, list[float]]:
+    durations: dict[int, list[float]] = {0: [], 1: []}
+    level = initial_level
+    run_start = first_timestamp
+    for edge in edges:
+        if edge > run_start:
+            durations[level].append(edge - run_start)
+        level ^= 1
+        run_start = edge
+    if last_timestamp > run_start:
+        durations[level].append(last_timestamp - run_start)
+    return durations
+
+
 def _address_edges_per_lat(
     capture: Hub75LogicCapture,
     lat_rises: Sequence[float],
@@ -509,6 +690,34 @@ def _address_edges_per_lat(
         channel = capture.signal_map[signal]
         ratios[signal] = len(capture.edges[channel]) / lat_edge_count
     return ratios
+
+
+def _signal_edge_counts(
+    capture: Hub75LogicCapture,
+    signals: Sequence[str],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for signal in signals:
+        if signal not in capture.signal_map:
+            continue
+        counts[signal] = len(capture.edges[capture.signal_map[signal]])
+    return counts
+
+
+def _signal_edge_intervals(
+    capture: Hub75LogicCapture,
+    signals: Sequence[str],
+) -> dict[str, list[float]]:
+    intervals: dict[str, list[float]] = {}
+    for signal in signals:
+        if signal not in capture.signal_map:
+            continue
+        edges = capture.edges[capture.signal_map[signal]]
+        intervals[signal] = [
+            later - earlier
+            for earlier, later in zip(edges, edges[1:], strict=False)
+        ]
+    return intervals
 
 
 def _count_address_edges_while_output_enabled(
@@ -538,6 +747,20 @@ def _median_ns(values: Sequence[float]) -> float | None:
     if not values:
         return None
     return median(values) * 1_000_000_000.0
+
+
+def _percentile_ns(values: Sequence[float], percentile: float) -> float | None:
+    if not values:
+        return None
+    sorted_values = sorted(values)
+    index = int((len(sorted_values) - 1) * percentile)
+    return sorted_values[index] * 1_000_000_000.0
+
+
+def _max_ns(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return max(values) * 1_000_000_000.0
 
 
 def _count_similarity(baseline: int, candidate: int) -> float:

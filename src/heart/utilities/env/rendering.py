@@ -9,6 +9,7 @@ from heart.utilities.env.enums import (FrameArrayStrategy, FrameExportStrategy,
 from heart.utilities.env.parsing import _env_flag, _env_int, _env_optional_int
 
 DEFAULT_RENDER_CRASH_ON_ERROR = False
+DEFAULT_RUNTIME_MAX_FPS = 120
 
 
 class RenderingConfiguration:
@@ -79,6 +80,14 @@ class RenderingConfiguration:
         return _env_flag(
             "HEART_RENDER_CRASH_ON_ERROR",
             default=DEFAULT_RENDER_CRASH_ON_ERROR,
+        )
+
+    @classmethod
+    def runtime_max_fps(cls) -> int:
+        return _env_int(
+            "HEART_RUNTIME_MAX_FPS",
+            default=DEFAULT_RUNTIME_MAX_FPS,
+            minimum=1,
         )
 
     @classmethod

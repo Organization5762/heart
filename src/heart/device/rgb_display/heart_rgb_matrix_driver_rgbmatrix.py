@@ -41,6 +41,9 @@ DEFAULT_ROWS: Final[int] = 32
 HARDWARE_MAPPING_TO_WIRING_ATTR: Final[dict[str, str]] = {
     "adafruit-hat": "AdafruitHat",
     "adafruit-hat-pwm": "AdafruitHatPwm",
+    "electrodragon": "ElectroDragonP0",
+    "electrodragon-p0": "ElectroDragonP0",
+    "regular": "Regular",
 }
 LED_RGB_SEQUENCE_TO_COLOR_ORDER_ATTR: Final[dict[str, str]] = {
     "GBR": "GBR",

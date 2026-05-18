@@ -20,6 +20,8 @@ fn wiring() -> Result<WiringProfile, String> {
         .as_str()
     {
         "adafruit_hat_pwm" | "pwm" => Ok(WiringProfile::AdafruitHatPwm),
+        "electrodragon" | "electrodragon_p0" => Ok(WiringProfile::ElectroDragonP0),
+        "regular" => Ok(WiringProfile::Regular),
         other => Err(format!("Unsupported HEART_PI5_SIMPLE_PROBE_WIRING={other}")),
     }
 }

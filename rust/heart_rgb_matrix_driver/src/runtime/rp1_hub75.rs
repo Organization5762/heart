@@ -1,6 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::OpenOptionsExt;
+use std::sync::atomic::{fence, Ordering};
 use std::time::Duration;
 
 use super::backend::MatrixBackend;
@@ -10,6 +11,8 @@ use super::tuning::runtime_tuning;
 
 const RP1H_DEVICE_PATH: &str = "/dev/rp1-hub75";
 const RP1H_MAPPING_ADAFRUIT_HAT_PWM: u8 = 0;
+const RP1H_MAPPING_ELECTRODRAGON_P0: u8 = 1;
+const RP1H_MAPPING_REGULAR: u8 = 2;
 const RP1H_FORMAT_RGB888: u8 = 0;
 #[allow(dead_code)]
 const RP1H_STREAM_RIO32: u32 = 0;
@@ -35,6 +38,9 @@ const RP1H_GET_PRESENT_STATS: libc::c_ulong = ior::<Rp1hPresentStats>(b'H', 0x46
 const RP1H_START_WORKER: libc::c_ulong = iow::<Rp1hWorkerControl>(b'H', 0x47);
 const RP1H_STOP_WORKER: libc::c_ulong = iow::<Rp1hWorkerControl>(b'H', 0x48);
 const RP1H_GET_WORKER_STATUS: libc::c_ulong = ior::<Rp1hWorkerStatus>(b'H', 0x49);
+const RP1_SRAM_HOST_BASE: libc::off_t = 0x1f00400000;
+const RP1_SRAM_MAP_SIZE: usize = 0x10000;
+const EXTERNAL_SRAM_SLOT_OFFSET_ENV: &str = "HEART_RP1_HUB75_EXTERNAL_SRAM_SLOT_OFFSET";
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -63,14 +69,18 @@ struct Rp1hConfig {
     addr_line_count: u32,
     slot_count: u32,
     slot_stride_bytes: u32,
-    reserved1: [u32; 2],
+    reserved1: u32,
+    dwell_shift_limit: u32,
 }
 
 #[derive(Debug)]
 pub(crate) struct Rp1Hub75Backend {
     device: File,
     config: Rp1hConfig,
-    _mapping: MmapMapping,
+    mapping: MmapMapping,
+    external_sram_slot: Option<SramSlotPublisher>,
+    frame_loader: Rp1Hub75FrameLoader,
+    worker_started: bool,
     wait_timeout_ns: Option<i64>,
     signal_vsync_after_queue: bool,
     require_progress_after_queued_frames: u32,
@@ -179,6 +189,46 @@ struct Rp1hWorkerStatus {
     reserved0: [u32; 4],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct Rp1hMmapHeader {
+    magic: u32,
+    version: u16,
+    header_size: u16,
+    cols: u16,
+    rows: u16,
+    pwm_bits: u8,
+    mapping: u8,
+    format: u8,
+    reserved0: u8,
+    flags: u32,
+    frame_seq: u32,
+    words_offset: u32,
+    words_per_frame: u32,
+    pins: [u32; 14],
+    dwell: [u32; 11],
+    stream_format: u32,
+    bits_per_pixel: u32,
+    row_pairs: u32,
+    plane_count: u32,
+    panel_count: u32,
+    words_per_row_plane: u32,
+    bytes_per_row_plane: u32,
+    words_per_row_plane_aligned: u32,
+    bytes_per_row_plane_aligned: u32,
+    lane_count: u32,
+    chain_length: u32,
+    addr_line_count: u32,
+    slot_count: u32,
+    slot_stride_bytes: u32,
+    producer_head: u32,
+    consumer_tail: u32,
+    buffer_dma_addr_lo: u32,
+    buffer_dma_addr_hi: u32,
+    slot_dma_addr_lo: [u32; 2],
+    slot_dma_addr_hi: [u32; 2],
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Rp1Hub75PresentStats {
     pub frames_queued: u32,
@@ -215,46 +265,85 @@ struct MmapMapping {
     len: usize,
 }
 
+#[derive(Debug)]
+struct SramSlotPublisher {
+    _device: File,
+    mapping: MmapMapping,
+    offset: usize,
+    dwell_shift_limit: u32,
+}
+
+#[derive(Debug)]
+enum Rp1Hub75FrameLoader {
+    Direct {
+        frame_bytes: u32,
+    },
+    RegularHorizontalLanes {
+        buffer: Vec<u8>,
+        input_frame_bytes: usize,
+        input_width: usize,
+        panel_rows: usize,
+        output_width: usize,
+    },
+    RegularStackedLanes {
+        buffer: Vec<u8>,
+        input_frame_bytes: usize,
+        input_width: usize,
+        active_height: usize,
+    },
+}
+
 impl Rp1Hub75Backend {
     pub(crate) fn new(config: &MatrixConfigNative) -> Result<Self, String> {
-        if config.wiring != WiringProfile::AdafruitHatPwm {
-            return Err(
-                "RP1 HUB75 backend only supports the Adafruit HAT PWM mapping.".to_string(),
-            );
-        }
-        if config.chain_length != 1 {
+        let mapping = rp1h_mapping_for_wiring(config.wiring);
+        let external_sram_slot_offset = parse_optional_usize(EXTERNAL_SRAM_SLOT_OFFSET_ENV)?;
+        if config.chain_length != 1
+            && external_sram_slot_offset.is_none()
+            && config.wiring != WiringProfile::Regular
+        {
             return Err(
                 "RP1 HUB75 packer currently requires chain_length=1; use parallel panels instead."
                     .to_string(),
             );
         }
 
-        let panel_count = config.panel_count()?;
-        let frame_len = config.frame_len()?;
-        let frame_bytes = u32::try_from(frame_len)
-            .map_err(|_| "RP1 HUB75 frame size exceeds 32-bit UAPI length.".to_string())?;
+        let frame_loader = Rp1Hub75FrameLoader::for_config(config, external_sram_slot_offset)?;
+        let frame_bytes = frame_loader.queue_frame_bytes();
         let pwm_bits = runtime_tuning()
             .pi5_simple_scan_default_pwm_bits
             .min(11)
             .max(1);
+        let dwell_shift_limit = runtime_tuning().rp1_hub75_dwell_shift_limit;
+
+        let (cols, rows, panel_count, lane_count, chain_length) =
+            if external_sram_slot_offset.is_some() && config.wiring != WiringProfile::Regular {
+                (
+                    u16::try_from(config.width()?)
+                        .map_err(|_| "RP1 HUB75 external SRAM width exceeds u16.".to_string())?,
+                    u16::try_from(config.height()?)
+                        .map_err(|_| "RP1 HUB75 external SRAM height exceeds u16.".to_string())?,
+                    1,
+                    1,
+                    1,
+                )
+            } else {
+                rp1h_geometry_for_config(config)?
+            };
 
         let mut rp1_config = Rp1hConfig {
             size: std::mem::size_of::<Rp1hConfig>() as u32,
-            cols: config.panel_cols,
-            rows: config.panel_rows,
+            cols,
+            rows,
             pwm_bits,
-            mapping: RP1H_MAPPING_ADAFRUIT_HAT_PWM,
+            mapping,
             format: RP1H_FORMAT_RGB888,
-            flags: if config.panel_rows >= 64 {
-                RP1H_F_E_LINE_PRESENT
-            } else {
-                0
-            },
+            flags: if rows >= 64 { RP1H_F_E_LINE_PRESENT } else { 0 },
             stream_format: RP1H_STREAM_STATE32,
             panel_count,
-            lane_count: panel_count,
-            chain_length: 1,
+            lane_count,
+            chain_length,
             slot_count: RP1H_SLOT_COUNT,
+            dwell_shift_limit,
             ..Rp1hConfig::default()
         };
 
@@ -284,7 +373,17 @@ impl Rp1Hub75Backend {
             ));
         }
 
-        let mapping = MmapMapping::new(device.as_raw_fd(), rp1_config.mmap_size)?;
+        let mapping = MmapMapping::new(
+            device.as_raw_fd(),
+            usize::try_from(rp1_config.mmap_size)
+                .map_err(|_| "RP1 HUB75 mmap size exceeds host usize.".to_string())?,
+            libc::PROT_READ,
+            0,
+            RP1H_DEVICE_PATH,
+        )?;
+        let external_sram_slot = external_sram_slot_offset
+            .map(|offset| SramSlotPublisher::new(offset, rp1_config.dwell_shift_limit))
+            .transpose()?;
         let wait_timeout_ns = std::env::var("HEART_RP1_HUB75_WAIT_PRESENT_TIMEOUT_NS")
             .ok()
             .and_then(|value| value.parse::<i64>().ok());
@@ -297,12 +396,18 @@ impl Rp1Hub75Backend {
             .unwrap_or(0);
         let require_progress_after_queued_frames =
             runtime_tuning().rp1_hub75_require_progress_after_queued_frames;
-        start_worker(device.as_raw_fd(), worker_status_timeout_ms)?;
+        let worker_started = external_sram_slot.is_none();
+        if worker_started {
+            start_worker(device.as_raw_fd(), worker_status_timeout_ms)?;
+        }
 
         Ok(Self {
             device,
             config: rp1_config,
-            _mapping: mapping,
+            mapping,
+            external_sram_slot,
+            frame_loader,
+            worker_started,
             wait_timeout_ns,
             signal_vsync_after_queue,
             require_progress_after_queued_frames,
@@ -396,13 +501,14 @@ impl MatrixBackend for Rp1Hub75Backend {
     }
 
     fn render(&mut self, frame: &FrameBuffer) -> Result<(), String> {
+        let (frame_data, frame_len) = self.frame_loader.prepare(frame.as_slice())?;
         let mut request = Rp1hQueueFrame {
             size: std::mem::size_of::<Rp1hQueueFrame>() as u32,
-            length: u32::try_from(frame.as_slice().len())
+            length: u32::try_from(frame_len)
                 .map_err(|_| "RP1 HUB75 frame length exceeds 32-bit UAPI length.".to_string())?,
             flags: RP1H_QUEUE_F_REPLACE_PENDING,
             slot_index: 0,
-            data: frame.as_slice().as_ptr() as u64,
+            data: frame_data as u64,
             seq: 0,
             reserved0: 0,
         };
@@ -418,10 +524,16 @@ impl MatrixBackend for Rp1Hub75Backend {
             &mut request,
             "RP1H_QUEUE_FRAME",
         )?;
+        if let Some(external_sram_slot) = &self.external_sram_slot {
+            let slot_dma = self.slot_dma_addr(request.slot_index)?;
+            external_sram_slot.publish(slot_dma)?;
+        }
         if self.signal_vsync_after_queue {
             let _ = self.signal_vsync()?;
         }
-        self.require_worker_progress()?;
+        if self.external_sram_slot.is_none() {
+            self.require_worker_progress()?;
+        }
         if let Some(timeout_ns) = self.wait_timeout_ns {
             self.wait_present(request.seq, timeout_ns)?;
         }
@@ -493,6 +605,25 @@ impl Rp1Hub75Backend {
         Ok(stats)
     }
 
+    fn slot_dma_addr(&self, slot_index: u32) -> Result<u64, String> {
+        let header = self.mapping.header()?;
+        if slot_index >= header.slot_count || slot_index as usize >= header.slot_dma_addr_lo.len() {
+            return Err(format!(
+                "RP1 HUB75 queued slot {slot_index} outside slot_count {}.",
+                header.slot_count
+            ));
+        }
+        let index = slot_index as usize;
+        let slot_dma = u64::from(header.slot_dma_addr_lo[index])
+            | (u64::from(header.slot_dma_addr_hi[index]) << 32);
+        if slot_dma == 0 {
+            return Err(format!(
+                "RP1 HUB75 queued slot {slot_index} has no DMA address; update/reload rp1-hub75.ko before external SRAM scanner use."
+            ));
+        }
+        Ok(slot_dma)
+    }
+
     fn require_worker_progress(&self) -> Result<(), String> {
         let threshold = self.require_progress_after_queued_frames;
         if self.signal_vsync_after_queue || threshold == 0 {
@@ -530,7 +661,9 @@ HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE=1 only for explicit software-vsync brin
 
 impl Drop for Rp1Hub75Backend {
     fn drop(&mut self) {
-        let _ = self.stop_worker();
+        if self.worker_started {
+            let _ = self.stop_worker();
+        }
     }
 }
 
@@ -578,30 +711,280 @@ fn worker_progress_missing(status: &Rp1Hub75WorkerStatus, threshold: u32) -> boo
     status.frames_queued >= threshold && status.frames_presented == 0 && status.vsync_count == 0
 }
 
+fn rp1h_mapping_for_wiring(wiring: WiringProfile) -> u8 {
+    match wiring {
+        WiringProfile::AdafruitHatPwm => RP1H_MAPPING_ADAFRUIT_HAT_PWM,
+        WiringProfile::ElectroDragonP0 => RP1H_MAPPING_ELECTRODRAGON_P0,
+        WiringProfile::Regular => RP1H_MAPPING_REGULAR,
+    }
+}
+
+fn rp1h_geometry_for_config(
+    config: &MatrixConfigNative,
+) -> Result<(u16, u16, u32, u32, u32), String> {
+    if config.wiring == WiringProfile::Regular {
+        let horizontal_logical_input = config.chain_length == 4 && config.parallel == 1;
+        let stacked_or_hzeller_input =
+            config.chain_length == 2 && (config.parallel == 2 || config.parallel == 3);
+        if !horizontal_logical_input && !stacked_or_hzeller_input {
+            return Err(
+                "RP1 HUB75 regular profile currently supports logical chain_length=4 parallel=1 or chain_length=2 with parallel=2/3.".to_string(),
+            );
+        }
+        return Ok((config.panel_cols, config.panel_rows, 4, 2, 2));
+    }
+
+    let panel_count = config.panel_count()?;
+    Ok((
+        config.panel_cols,
+        config.panel_rows,
+        panel_count,
+        panel_count,
+        1,
+    ))
+}
+
+impl Rp1Hub75FrameLoader {
+    fn for_config(
+        config: &MatrixConfigNative,
+        _external_sram_slot_offset: Option<usize>,
+    ) -> Result<Self, String> {
+        let input_frame_bytes = config.frame_len()?;
+        if config.wiring != WiringProfile::Regular {
+            let frame_bytes = u32::try_from(input_frame_bytes)
+                .map_err(|_| "RP1 HUB75 frame size exceeds 32-bit UAPI length.".to_string())?;
+            return Ok(Self::Direct { frame_bytes });
+        }
+        let input_width = usize::try_from(config.width()?)
+            .map_err(|_| "RP1 HUB75 regular input width exceeds host usize.".to_string())?;
+        let input_height = usize::try_from(config.height()?)
+            .map_err(|_| "RP1 HUB75 regular input height exceeds host usize.".to_string())?;
+        let output_width = usize::from(config.panel_cols) * 2;
+        let active_height = usize::from(config.panel_rows) * 2;
+        if config.chain_length == 4 && config.parallel == 1 {
+            if input_width != output_width * 2 || input_height != usize::from(config.panel_rows) {
+                return Err(format!(
+                    "RP1 HUB75 regular horizontal loader expected {}x{} input, received {input_width}x{input_height}.",
+                    output_width * 2,
+                    config.panel_rows
+                ));
+            }
+            let queue_frame_bytes = expected_rgb888_size_usize(output_width, active_height)?;
+            return Ok(Self::RegularHorizontalLanes {
+                buffer: vec![0; queue_frame_bytes],
+                input_frame_bytes,
+                input_width,
+                panel_rows: usize::from(config.panel_rows),
+                output_width,
+            });
+        }
+        if config.chain_length != 2 || input_height < active_height {
+            return Err(format!(
+                "RP1 HUB75 regular loader needs at least {active_height} active input rows, received {input_height}."
+            ));
+        }
+        if input_width != output_width {
+            return Err(format!(
+                "RP1 HUB75 regular stacked loader expected width {output_width}, received {input_width}."
+            ));
+        }
+        let queue_frame_bytes = expected_rgb888_size_usize(output_width, active_height)?;
+        Ok(Self::RegularStackedLanes {
+            buffer: vec![0; queue_frame_bytes],
+            input_frame_bytes,
+            input_width,
+            active_height,
+        })
+    }
+
+    fn queue_frame_bytes(&self) -> u32 {
+        match self {
+            Self::Direct { frame_bytes } => *frame_bytes,
+            Self::RegularHorizontalLanes { buffer, .. } => buffer.len() as u32,
+            Self::RegularStackedLanes { buffer, .. } => buffer.len() as u32,
+        }
+    }
+
+    fn prepare(&mut self, frame: &[u8]) -> Result<(*const u8, usize), String> {
+        match self {
+            Self::Direct { frame_bytes } => {
+                let expected = usize::try_from(*frame_bytes)
+                    .map_err(|_| "RP1 HUB75 direct frame size exceeds host usize.".to_string())?;
+                if frame.len() != expected {
+                    return Err(format!(
+                        "RP1 HUB75 expected {expected} RGB888 bytes but received {}.",
+                        frame.len()
+                    ));
+                }
+                Ok((frame.as_ptr(), frame.len()))
+            }
+            Self::RegularHorizontalLanes {
+                buffer,
+                input_frame_bytes,
+                input_width,
+                panel_rows,
+                output_width,
+            } => {
+                if frame.len() != *input_frame_bytes {
+                    return Err(format!(
+                        "RP1 HUB75 regular horizontal loader expected {input_frame_bytes} RGB888 bytes but received {}.",
+                        frame.len()
+                    ));
+                }
+                copy_regular_horizontal_lanes(
+                    frame,
+                    buffer,
+                    *input_width,
+                    *panel_rows,
+                    *output_width,
+                )?;
+                Ok((buffer.as_ptr(), buffer.len()))
+            }
+            Self::RegularStackedLanes {
+                buffer,
+                input_frame_bytes,
+                input_width,
+                active_height,
+            } => {
+                if frame.len() != *input_frame_bytes {
+                    return Err(format!(
+                        "RP1 HUB75 regular loader expected {input_frame_bytes} RGB888 bytes but received {}.",
+                        frame.len()
+                    ));
+                }
+                copy_regular_active_lanes(frame, buffer, *input_width, *active_height)?;
+                Ok((buffer.as_ptr(), buffer.len()))
+            }
+        }
+    }
+}
+
+fn expected_rgb888_size_usize(width: usize, height: usize) -> Result<usize, String> {
+    width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(3))
+        .ok_or_else(|| "Matrix RGB888 frame size exceeds supported dimensions.".to_string())
+}
+
+fn copy_regular_active_lanes(
+    source: &[u8],
+    destination: &mut [u8],
+    width: usize,
+    active_height: usize,
+) -> Result<(), String> {
+    let active_bytes = expected_rgb888_size_usize(width, active_height)?;
+    if destination.len() != active_bytes {
+        return Err(format!(
+            "RP1 HUB75 regular destination has {} bytes but needs {active_bytes}.",
+            destination.len()
+        ));
+    }
+    if source.len() < active_bytes {
+        return Err(format!(
+            "RP1 HUB75 regular source has {} bytes but needs at least {active_bytes}.",
+            source.len()
+        ));
+    }
+    destination.copy_from_slice(&source[..active_bytes]);
+    Ok(())
+}
+
+fn copy_regular_horizontal_lanes(
+    source: &[u8],
+    destination: &mut [u8],
+    input_width: usize,
+    panel_rows: usize,
+    output_width: usize,
+) -> Result<(), String> {
+    let output_height = panel_rows.checked_mul(2).ok_or_else(|| {
+        "RP1 HUB75 regular output height exceeds supported dimensions.".to_string()
+    })?;
+    let output_bytes = expected_rgb888_size_usize(output_width, output_height)?;
+    let input_bytes = expected_rgb888_size_usize(input_width, panel_rows)?;
+    if source.len() != input_bytes {
+        return Err(format!(
+            "RP1 HUB75 regular horizontal source has {} bytes but needs {input_bytes}.",
+            source.len()
+        ));
+    }
+    if destination.len() != output_bytes {
+        return Err(format!(
+            "RP1 HUB75 regular horizontal destination has {} bytes but needs {output_bytes}.",
+            destination.len()
+        ));
+    }
+
+    let row_bytes = output_width
+        .checked_mul(3)
+        .ok_or_else(|| "RP1 HUB75 regular row width exceeds supported dimensions.".to_string())?;
+    let input_row_bytes = input_width.checked_mul(3).ok_or_else(|| {
+        "RP1 HUB75 regular input row width exceeds supported dimensions.".to_string()
+    })?;
+    for row in 0..panel_rows {
+        let src_row = row * input_row_bytes;
+        let dst_lane0 = row * row_bytes;
+        let dst_lane1 = (row + panel_rows) * row_bytes;
+        destination[dst_lane0..dst_lane0 + row_bytes]
+            .copy_from_slice(&source[src_row..src_row + row_bytes]);
+        destination[dst_lane1..dst_lane1 + row_bytes]
+            .copy_from_slice(&source[src_row + row_bytes..src_row + row_bytes * 2]);
+    }
+    Ok(())
+}
+
 impl MmapMapping {
-    fn new(fd: RawFd, mmap_size: u32) -> Result<Self, String> {
-        let len = usize::try_from(mmap_size)
-            .map_err(|_| "RP1 HUB75 mmap size exceeds host usize.".to_string())?;
+    fn new(
+        fd: RawFd,
+        len: usize,
+        prot: i32,
+        offset: libc::off_t,
+        label: &str,
+    ) -> Result<Self, String> {
         let addr = unsafe {
             libc::mmap(
                 std::ptr::null_mut(),
                 len,
-                libc::PROT_READ,
+                prot,
                 libc::MAP_SHARED,
                 fd,
-                0,
+                offset,
             )
         };
         if addr == libc::MAP_FAILED {
-            return Err(format!(
-                "mmap {RP1H_DEVICE_PATH}: {}",
-                std::io::Error::last_os_error()
-            ));
+            return Err(format!("mmap {label}: {}", std::io::Error::last_os_error()));
         }
         Ok(Self {
             addr: addr as usize,
             len,
         })
+    }
+
+    fn header(&self) -> Result<Rp1hMmapHeader, String> {
+        if self.len < std::mem::size_of::<Rp1hMmapHeader>() {
+            return Err(format!(
+                "RP1 HUB75 mmap is too small for header: len={} header={}.",
+                self.len,
+                std::mem::size_of::<Rp1hMmapHeader>()
+            ));
+        }
+        Ok(unsafe { std::ptr::read_volatile(self.addr as *const Rp1hMmapHeader) })
+    }
+
+    fn write32(&self, offset: usize, value: u32) -> Result<(), String> {
+        if offset
+            .checked_add(std::mem::size_of::<u32>())
+            .filter(|end| *end <= self.len)
+            .is_none()
+        {
+            return Err(format!(
+                "RP1 SRAM write offset 0x{offset:x} exceeds mapped size 0x{:x}.",
+                self.len
+            ));
+        }
+        unsafe {
+            std::ptr::write_volatile((self.addr as *mut u8).add(offset).cast::<u32>(), value);
+        }
+        Ok(())
     }
 }
 
@@ -648,6 +1031,77 @@ fn xioctl<T>(fd: RawFd, request: libc::c_ulong, arg: &mut T, label: &str) -> Res
     Ok(ret)
 }
 
+impl SramSlotPublisher {
+    fn new(offset: usize, dwell_shift_limit: u32) -> Result<Self, String> {
+        if offset
+            .checked_add(16)
+            .filter(|end| *end <= RP1_SRAM_MAP_SIZE)
+            .is_none()
+        {
+            return Err(format!(
+                "{EXTERNAL_SRAM_SLOT_OFFSET_ENV}=0x{offset:x} leaves no room for the 16-byte slot control block."
+            ));
+        }
+        let device = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_SYNC)
+            .open("/dev/mem")
+            .map_err(|error| format!("open /dev/mem for RP1 HUB75 external SRAM slot: {error}"))?;
+        let mapping = MmapMapping::new(
+            device.as_raw_fd(),
+            RP1_SRAM_MAP_SIZE,
+            libc::PROT_READ | libc::PROT_WRITE,
+            RP1_SRAM_HOST_BASE,
+            "RP1 SRAM host window",
+        )?;
+        Ok(Self {
+            _device: device,
+            mapping,
+            offset,
+            dwell_shift_limit,
+        })
+    }
+
+    fn publish(&self, slot_dma: u64) -> Result<(), String> {
+        self.mapping.write32(self.offset, slot_dma as u32)?;
+        self.mapping
+            .write32(self.offset + 4, (slot_dma >> 32) as u32)?;
+        self.mapping.write32(self.offset + 8, 0)?;
+        self.mapping
+            .write32(self.offset + 12, self.dwell_shift_limit)?;
+        fence(Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+fn parse_optional_usize(key: &str) -> Result<Option<usize>, String> {
+    let Some(raw) = std::env::var_os(key) else {
+        return Ok(None);
+    };
+    let value = raw
+        .to_str()
+        .ok_or_else(|| format!("{key} must be valid UTF-8."))?
+        .trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    parse_usize(value)
+        .map(Some)
+        .ok_or_else(|| format!("{key} must be an integer or hex value, got {value:?}."))
+}
+
+fn parse_usize(value: &str) -> Option<usize> {
+    if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        usize::from_str_radix(hex, 16).ok()
+    } else {
+        value.parse::<usize>().ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -663,6 +1117,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<Rp1hPresentStats>(), 36);
         assert_eq!(std::mem::size_of::<Rp1hWorkerControl>(), 32);
         assert_eq!(std::mem::size_of::<Rp1hWorkerStatus>(), 80);
+        assert_eq!(std::mem::size_of::<Rp1hMmapHeader>(), 220);
         assert_eq!(RP1H_CONFIG, 0xc058_4840);
         assert_eq!(RP1H_PACK_FRAME, 0x4010_4841);
         assert_eq!(RP1H_GET_STATS, 0x8018_4842);
@@ -713,5 +1168,68 @@ mod tests {
         status.vsync_count = 0;
         status.frames_presented = 1;
         assert!(!worker_progress_missing(&status, 8));
+    }
+
+    #[test]
+    fn regular_active_loader_keeps_first_two_lanes_and_drops_third() {
+        let config = MatrixConfigNative::new(
+            WiringProfile::Regular,
+            2,
+            2,
+            2,
+            3,
+            super::super::config::ColorOrder::Rgb,
+        )
+        .unwrap();
+        let mut loader = Rp1Hub75FrameLoader::for_config(&config, None).unwrap();
+        let input: Vec<u8> = (0..72).collect();
+
+        let (ptr, len) = loader.prepare(&input).unwrap();
+        let copied = unsafe { std::slice::from_raw_parts(ptr, len) };
+
+        assert_eq!(len, 48);
+        assert_eq!(copied, &input[..48]);
+    }
+
+    #[test]
+    fn regular_geometry_uses_two_active_lanes_for_horizontal_chain4() {
+        let config = MatrixConfigNative::new(
+            WiringProfile::Regular,
+            64,
+            64,
+            4,
+            1,
+            super::super::config::ColorOrder::Rgb,
+        )
+        .unwrap();
+
+        assert_eq!(
+            rp1h_geometry_for_config(&config).unwrap(),
+            (64, 64, 4, 2, 2)
+        );
+    }
+
+    #[test]
+    fn regular_horizontal_loader_reshapes_four_panels_to_two_lanes() {
+        let config = MatrixConfigNative::new(
+            WiringProfile::Regular,
+            2,
+            2,
+            4,
+            1,
+            super::super::config::ColorOrder::Rgb,
+        )
+        .unwrap();
+        let mut loader = Rp1Hub75FrameLoader::for_config(&config, None).unwrap();
+        let input: Vec<u8> = (0..48).collect();
+
+        let (ptr, len) = loader.prepare(&input).unwrap();
+        let copied = unsafe { std::slice::from_raw_parts(ptr, len) };
+
+        assert_eq!(len, 48);
+        assert_eq!(&copied[0..12], &input[0..12]);
+        assert_eq!(&copied[12..24], &input[24..36]);
+        assert_eq!(&copied[24..36], &input[12..24]);
+        assert_eq!(&copied[36..48], &input[36..48]);
     }
 }

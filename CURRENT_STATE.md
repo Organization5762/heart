@@ -10,6 +10,8 @@ without regressing the working E-address-line fix.
 - Custom Linux/selftest tree: `/Users/lampe/code/linux`
 - Active selftest path:
   `/Users/lampe/code/linux/tools/testing/selftests/drivers/rp1-pio`
+- SRAM/source-buffer map:
+  `/Users/lampe/code/heart/docs/RP1_HUB75_SRAM_MAP.md`
 - Target panel host: `michael@totem4.local`
 - Staged target path on `totem4`: `/home/michael/rp1-pio`
 - Panel work is currently focused on `totem4`.
@@ -27,6 +29,13 @@ Important distinction: `/dev/rp1-hub75` currently exposes the custom kernel
 interface/counters, but the visible panel output in this session came from the
 RP1 core1 selftest/direct `PROC_RIO` path launched by
 `rp1_hub75_run_candidate.sh`, not from a full kernel-worker GPIO driver.
+
+Important SRAM rule: do not pick RP1 shared-SRAM source offsets by trial and
+error. The core1 launcher uses `0x20007000`, payloads load at `0x20008000`, and
+the firmware mailbox occupies `0x2000ff00..0x2000ffff`. `0x2000c000` only worked
+for smaller payloads and overlaps the mailbox with a 16 KiB source buffer;
+`0x20004000` overlaps firmware/launcher territory. Check
+`docs/RP1_HUB75_SRAM_MAP.md` before changing any source base.
 
 Fresh confirmation from this run:
 
@@ -340,6 +349,41 @@ four times. This gives 512 possible colors per pixel instead of the previous
 8-color RGB111 mode. Hzeller-style PWM11 color would need a higher-depth source
 format or a different compact expander.
 
+Latest Pi5/RP1 tuning update:
+
+- A Pi4-oriented GPIO strategy is the wrong model for this path. Pi4 needs
+  slower two-step set/clear GPIO sequencing and tends to settle around
+  1-1.5 MHz stable HUB75 clocks. Pi5/RP1 should use direct/full-word RIO output
+  where possible, because it can force the output word instead of only OR/clear
+  individual bits.
+- Pi5 RIO-specific tuning facts now being used:
+  - Peripheral base is `0x1f00000000`; GPIO control/RIO/pad-control offsets are
+    `0xd0000`, `0xe0000`, and `0xf0000`.
+  - GPIO function `0x05` selects RIO control.
+  - RIO aliases are normal, XOR at `+0x1000`, SET at `+0x2000`, and CLR at
+    `+0x3000`.
+  - Pad drive is bits `5:4`; fast slew is bit `0`.
+  - A tight RIO XOR loop can produce roughly `25 ns` pulses without explicit
+    memory barriers, so dynamic-scene slowdown should be treated as a
+    memory/source-expansion problem before a GPIO-speed problem.
+- Added an experimental direct-output RGB888 row-major worker:
+  `rgb888cache-rowmajor-outfast-frame8-dwell4-warm16-addr2slow-clkfast-latoe2slow-lat2-addrnop4-preclk0`.
+  It uses full `RIO_OUT` pixel words, fast CLK pad slew, and a shorter
+  address-stage guard.
+- On `totem1`, the outfast red-bit-stripe Saleae capture was electrically valid
+  enough for parity inspection and the scanner reported about `7238` per-panel
+  FPS when the source frame was static.
+- On `totem4`, the same outfast worker reported about `7080` per-panel FPS with
+  no active host writer touching the source buffer.
+- With the animated `sun_64x64.rgb` player writing RGB888 frames every 30 ms,
+  `totem4` dropped to about `214` per-panel FPS. That means the current limiter
+  is not GPIO edge timing; it is the RP1 worker repeatedly re-reading and
+  re-expanding shared-SRAM RGB888 source data while the host is publishing
+  frames.
+- The next full-color direction is therefore to consume kernel-prepacked
+  row-major bitplanes/state32, not to add more GPIO settle padding to the
+  RGB888 source expander.
+
 The latest blank-panel suspicion on `totem4` is an OE pinout mismatch: the
 scanner sequenced GPIO18, while the physical HUB75 adapter may listen to GPIO4.
 The current experimental fix mirrors OE onto GPIO4 in the state32 path. Confirm
@@ -356,5 +400,8 @@ the same compatibility behavior to the kernel worker.
 - If 3 bits per channel is not enough, the next bigger step is RGB444 or a more
   efficient bitplane scanner, but that will require more shared memory or a
   different compact format/expander.
+- For RGB888/PWM-depth work, prioritize the kernel row-major/CIE-prepacked
+  state32 path. Avoid tuning by adding Pi4-style slowdown or long settle NOPs
+  unless a Saleae capture shows an actual receiver timing violation.
 - Keep `/dev/rp1-hub75` testing separate. Do not expect it to produce GPIO
   output until the kernel worker path actually drives pins.

@@ -36,7 +36,7 @@ dependencies = [
     "heart-device-manager",
     "heart-firmware-io",
     "lagom",
-    "manyfold>=0.1.19",
+    "manyfold>=0.1.33",
     "moderngl",
     "numba",
     "numpy",

@@ -2,6 +2,9 @@ from heart.peripheral.core.input.accelerometer import \
     AccelerometerController as AccelerometerController
 from heart.peripheral.core.input.accelerometer import \
     AccelerometerDebugProfile as AccelerometerDebugProfile
+from heart.peripheral.core.input.color import \
+    ColorInputProfile as ColorInputProfile
+from heart.peripheral.core.input.color import ColorSnapshot as ColorSnapshot
 from heart.peripheral.core.input.debug import \
     InputDebugEnvelope as InputDebugEnvelope
 from heart.peripheral.core.input.debug import InputDebugNode as InputDebugNode
@@ -30,6 +33,8 @@ from heart.peripheral.core.input.keyboard import \
     KeyboardController as KeyboardController
 from heart.peripheral.core.input.keyboard import \
     KeyboardSnapshot as KeyboardSnapshot
+from heart.peripheral.core.input.peripheral_inputs import \
+    PeripheralInputBus as PeripheralInputBus
 from heart.peripheral.core.input.profiles.mandelbrot import \
     CyclePaletteCommand as CyclePaletteCommand
 from heart.peripheral.core.input.profiles.mandelbrot import \

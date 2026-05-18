@@ -16,6 +16,7 @@ from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class GameLoop:
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
-        self.max_fps = max_fps
+        self.max_fps = min(max_fps, Configuration.runtime_max_fps())
         self.components = self._load_components()
 
         # Lampe controller
@@ -174,7 +175,7 @@ class GameLoop:
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
         self.components.display.set_clock(clock)
-        self.components.peripheral_manager.clock.on_next(self.components.display.clock)
+        self.components.peripheral_runtime.set_clock(self.components.display.clock)
 
     @property
     def screen(self) -> pygame.Surface | None:
@@ -345,7 +346,7 @@ class GameLoop:
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
         while self.running:
-            self.components.peripheral_runtime.tick()
+            self.components.peripheral_runtime.poll()
             self.running = self.components.event_handler.handle_events()
             self._preprocess_setup()  # can't dim display each time
             renderers = self._select_renderers()
@@ -353,8 +354,6 @@ class GameLoop:
             # self._render_pacer.pace(render_start, 20)
 
             self.components.display.clock.tick(self.max_fps)
-
-            self.components.peripheral_runtime.tick()
-            self.components.peripheral_manager.clock.on_next(
+            self.components.peripheral_runtime.advance_frame(
                 self.components.display.clock
             )

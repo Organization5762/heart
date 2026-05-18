@@ -41,6 +41,7 @@ class PeripheralRuntime:
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
+        self._frame_clock: pygame.time.Clock | None = None
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -198,18 +199,28 @@ class PeripheralRuntime:
             duration_seconds=PHONE_IMAGE_DISPLAY_DURATION_SECONDS,
         )
 
-    def tick(self) -> None:
+    def poll(self) -> None:
         drain_frame_thread_queue()
         self._drain_control_messages()
         gamepad = self._peripheral_manager.get_gamepad()
         if gamepad is not None:
             gamepad.update()
-        if self._peripheral_manager.clock.value is None:
+
+    def set_clock(self, clock: pygame.time.Clock | None) -> None:
+        self._frame_clock = clock
+
+    def advance_frame(self, clock: pygame.time.Clock | None = None) -> None:
+        if clock is not None:
+            self._frame_clock = clock
+        if self._frame_clock is None:
             return
         self._peripheral_manager.input_io.frame_ticks.advance(
-            self._peripheral_manager.clock.value
+            self._frame_clock
         )
-        self._peripheral_manager.game_tick.on_next(True)
+
+    def tick(self) -> None:
+        self.poll()
+        self.advance_frame()
 
 
 def _build_websocket() -> Any:

@@ -21,6 +21,7 @@ const HEART_PI5_SIMPLE_SCAN_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_POST_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
 const HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT: u32 = 8;
+const HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT: u32 = 7;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RuntimeTuning {
@@ -44,6 +45,8 @@ pub(crate) struct RuntimeTuning {
     pub(crate) pi5_simple_scan_clock_hold_ticks: u32,
     /* Fail fast when the kernel packer queues frames but no display worker retires them. */
     pub(crate) rp1_hub75_require_progress_after_queued_frames: u32,
+    /* Maximum binary-PWM dwell exponent used by the RP1 HUB75 scanner. */
+    pub(crate) rp1_hub75_dwell_shift_limit: u32,
 }
 
 static HEART_RUNTIME_TUNING: OnceLock<RuntimeTuning> = OnceLock::new();
@@ -107,6 +110,11 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             "HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES",
             HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT,
             |_| true,
+        ),
+        rp1_hub75_dwell_shift_limit: parse_env_u32(
+            "HEART_RP1_HUB75_DWELL_SHIFT_LIMIT",
+            HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT,
+            |value| value <= 10,
         ),
     })
 }

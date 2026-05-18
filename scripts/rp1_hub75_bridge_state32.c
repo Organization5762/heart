@@ -14,6 +14,7 @@
 #define RP1H_MAGIC 0x52314837U
 #define RP1H_VERSION 1
 #define RP1H_MAX_PWM_BITS 11
+#define RP1H_MAX_SLOTS 2
 
 #define RP1H_WORKER_F_EXTERNAL_VSYNC (1U << 0)
 #define RP1H_STREAM_STATE32 3U
@@ -24,13 +25,13 @@
 #define RP1H_START_WORKER _IOW(RP1H_IOC_MAGIC, 0x47, struct rp1h_worker_control)
 
 #define RP1_SRAM_HOST_BASE 0x1f00400000ULL
-#define RP1_SRAM_MAP_SIZE 0x10000U
+#define RP1_SRAM_MAP_SIZE 0x30000U
 
 #define DEFAULT_DEVICE_PATH "/dev/rp1-hub75"
 #define DEFAULT_RUN_SECONDS 10.0
 #define DEFAULT_ROWS 64U
 #define DEFAULT_COLS 64U
-#define DEFAULT_PWM_BITS 1U
+#define DEFAULT_PWM_BITS 11U
 #define DEFAULT_SLOT_COUNT 2U
 #define DEFAULT_SRAM_OFFSET 0xc000U
 #define DEFAULT_STATUS_TIMEOUT_MS 250U
@@ -107,6 +108,10 @@ struct rp1h_mmap_header {
 	uint32_t slot_stride_bytes;
 	uint32_t producer_head;
 	uint32_t consumer_tail;
+	uint32_t buffer_dma_addr_lo;
+	uint32_t buffer_dma_addr_hi;
+	uint32_t slot_dma_addr_lo[RP1H_MAX_SLOTS];
+	uint32_t slot_dma_addr_hi[RP1H_MAX_SLOTS];
 };
 
 static uint32_t page_align_u32(uint32_t value)
@@ -160,6 +165,9 @@ int main(int argc, char **argv)
 	uint32_t pwm_bits = DEFAULT_PWM_BITS;
 	uint32_t slot_count = DEFAULT_SLOT_COUNT;
 	uint32_t sram_offset = DEFAULT_SRAM_OFFSET;
+	uint32_t configured_slot_count;
+	uint32_t configured_slot_stride_bytes;
+	uint32_t configured_words_offset;
 	uint32_t mmap_size;
 	uint32_t bytes_per_frame;
 	struct rp1h_worker_control worker_ctl = {
@@ -271,6 +279,9 @@ int main(int argc, char **argv)
 		close(dev_fd);
 		return 1;
 	}
+	configured_slot_count = hdr->slot_count;
+	configured_slot_stride_bytes = hdr->slot_stride_bytes;
+	configured_words_offset = hdr->words_offset;
 
 	if (ioctl(dev_fd, RP1H_START_WORKER, &worker_ctl) != 0) {
 		perror("RP1H_START_WORKER");
@@ -321,16 +332,17 @@ int main(int argc, char **argv)
 			usleep(500);
 			continue;
 		}
-		if (pending_slot >= hdr->slot_count) {
-			fprintf(stderr, "invalid pending_slot=%u\n", pending_slot);
+		if (pending_slot >= configured_slot_count) {
+			fprintf(stderr, "invalid pending_slot=%u slot_count=%u\n",
+				pending_slot, configured_slot_count);
 			munmap(sram_map, RP1_SRAM_MAP_SIZE);
 			munmap(map, mmap_size);
 			close(dev_fd);
 			return 1;
 		}
 
-		slot_base = (const uint8_t *)map + hdr->words_offset +
-			    pending_slot * hdr->slot_stride_bytes;
+		slot_base = (const uint8_t *)map + configured_words_offset +
+			    pending_slot * configured_slot_stride_bytes;
 		memcpy((void *)(rp1_sram + sram_offset), slot_base, bytes_per_frame);
 
 		if (ioctl(dev_fd, RP1H_SIGNAL_VSYNC, &vsync) != 0) {

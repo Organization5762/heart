@@ -411,7 +411,7 @@ impl NativeMatrixDriver {
     fn submit_rgba(&self, data: &Bound<'_, PyBytes>, width: u32, height: u32) -> PyResult<()> {
         self.with_driver(|driver| {
             driver
-                .submit_rgba(data.as_bytes().to_vec(), width, height)
+                .submit_rgba(data.as_bytes(), width, height)
                 .map_err(to_py_runtime_error)
         })
     }
@@ -472,16 +472,34 @@ impl NativeWiringProfile {
         }
     }
 
+    #[classattr]
+    fn ElectroDragonP0() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::ElectroDragonP0,
+        }
+    }
+
+    #[classattr]
+    fn Regular() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::Regular,
+        }
+    }
+
     #[getter]
     fn value(&self) -> &'static str {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "adafruit_hat_pwm",
+            WiringProfile::ElectroDragonP0 => "electrodragon_p0",
+            WiringProfile::Regular => "regular",
         }
     }
 
     fn __repr__(&self) -> String {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "WiringProfile.AdafruitHatPwm".to_string(),
+            WiringProfile::ElectroDragonP0 => "WiringProfile.ElectroDragonP0".to_string(),
+            WiringProfile::Regular => "WiringProfile.Regular".to_string(),
         }
     }
 }

@@ -11,6 +11,7 @@ from manyfold import EmptyNode, Graph, MergeNode, StreamNode
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.core.input.accelerometer import (
     AccelerometerController, AccelerometerDebugProfile)
+from heart.peripheral.core.input.color import ColorInputProfile
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
@@ -20,6 +21,7 @@ from heart.peripheral.core.input.gamepad import (
     GamepadController, GamepadSnapshot)
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
+from heart.peripheral.core.input.peripheral_inputs import PeripheralInputBus
 from heart.peripheral.core.input.profiles.mandelbrot import (
     MandelbrotControlProfile, MandelbrotControlState)
 from heart.peripheral.core.input.profiles.navigation import (
@@ -27,12 +29,14 @@ from heart.peripheral.core.input.profiles.navigation import (
     NavigationProfile)
 from heart.peripheral.core.input.streams import (map_stream, merge_streams,
                                                  threshold_direction)
-from heart.peripheral.core.streams import EventStream, GraphRouteStream
+from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
+                                           runtime_route)
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
 NAVIGATION_STICK_THRESHOLD = 0.6
+FINAL_FRAME_ROUTE = runtime_route("window", "HeartRuntimeWindow")
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 TNavigationIntent = TypeVar("TNavigationIntent", bound=NavigationIntent)
 
@@ -68,6 +72,20 @@ class InputIO:
     @cached_property
     def external_sensors(self) -> ExternalSensorHub:
         return ExternalSensorHub(self.debug_tap, graph=self.graph)
+
+    @cached_property
+    def peripheral_inputs(self) -> PeripheralInputBus:
+        return PeripheralInputBus(
+            debug_tap=self.debug_tap,
+            peripheral_source=self.peripheral_source,
+        )
+
+    @cached_property
+    def color(self) -> ColorInputProfile:
+        return ColorInputProfile(
+            final_frames=self.final_frame_stream(),
+            debug_tap=self.debug_tap,
+        )
 
     @cached_property
     def injected_navigation_intents(self) -> EventStream[NavigationIntent]:
@@ -158,6 +176,9 @@ class InputIO:
 
     def frame_tick_stream(self) -> StreamNode[FrameTick]:
         return self.frame_ticks.observable()
+
+    def final_frame_stream(self) -> GraphRouteStream[pygame.Surface]:
+        return GraphRouteStream(self.graph, FINAL_FRAME_ROUTE)
 
     def physical_acceleration(self) -> GraphRouteStream[Acceleration]:
         return self.accelerometer.node()

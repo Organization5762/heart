@@ -1,0 +1,13 @@
+[Unit]
+Description=Totem performance tuning
+DefaultDependencies=no
+After=local-fs.target sysinit.target
+Before=multi-user.target totem.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-totem-performance.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,4 @@
+use std::env;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -14,8 +15,9 @@ fn main() -> Result<(), String> {
     let duration = parse_duration_ms(1, Duration::from_secs(10))?;
     let interval = parse_duration_ms(2, Duration::from_millis(1))?;
     let solid = parse_solid_color()?;
+    let wiring = parse_wiring()?;
     let driver = RuntimeMatrixDriver::new(
-        ProbeWiringProfile::AdafruitHatPwm,
+        wiring,
         HEIGHT as u16,
         WIDTH as u16,
         1,
@@ -29,8 +31,9 @@ fn main() -> Result<(), String> {
     while start.elapsed() < duration {
         let (red, green, blue) =
             solid.unwrap_or_else(|| COLORS[(submitted as usize) % COLORS.len()]);
+        let frame = solid_rgba(red, green, blue);
         driver
-            .submit_rgba(solid_rgba(red, green, blue), WIDTH, HEIGHT)
+            .submit_rgba(&frame, WIDTH, HEIGHT)
             .map_err(format_driver_error)?;
         submitted += 1;
         if !interval.is_zero() {
@@ -79,6 +82,19 @@ fn main() -> Result<(), String> {
         worker.last_error
     );
     Ok(())
+}
+
+fn parse_wiring() -> Result<ProbeWiringProfile, String> {
+    match env::var("HEART_RGB_MATRIX_WIRING")
+        .unwrap_or_else(|_| "adafruit_hat_pwm".to_string())
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "adafruit_hat_pwm" | "pwm" => Ok(ProbeWiringProfile::AdafruitHatPwm),
+        "electrodragon" | "electrodragon_p0" => Ok(ProbeWiringProfile::ElectroDragonP0),
+        "regular" => Ok(ProbeWiringProfile::Regular),
+        other => Err(format!("Unsupported HEART_RGB_MATRIX_WIRING={other}")),
+    }
 }
 
 fn parse_duration_ms(index: usize, default: Duration) -> Result<Duration, String> {

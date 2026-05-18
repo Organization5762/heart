@@ -4,6 +4,8 @@ TOOL_LIST_FILE = scripts/harness_tools.txt
 TOOLS := $(shell scripts/list_harness_tools.sh $(TOOL_LIST_FILE))
 BUILD_ARGS ?=
 RUN_CONFIGURATION ?= lib_2025
+FORWARD_TO_BEATS_APP ?= 0
+BEATS_WEBSOCKET_BIND_HOST ?= 0.0.0.0
 SEMGREP_CONFIG ?= semgrep.yml
 SEMGREP_TARGETS ?= src
 SEMGREP_ARGS ?= --config $(SEMGREP_CONFIG) --metrics=off --disable-version-check
@@ -112,7 +114,7 @@ fractal:
 	@UV_CACHE_DIR=.uv-cache uv run python -c "from heart.renderers.three_fractal.renderer import main; main()"
 
 run:
-	@FORWARD_TO_BEATS_APP=1 BEATS_WEBSOCKET_BIND_HOST=0.0.0.0 uv run totem run --configuration $(RUN_CONFIGURATION)
+	@FORWARD_TO_BEATS_APP=$(FORWARD_TO_BEATS_APP) BEATS_WEBSOCKET_BIND_HOST=$(BEATS_WEBSOCKET_BIND_HOST) uv run totem run --configuration $(RUN_CONFIGURATION)
 
 debug-gamepad:
 	@UV_CACHE_DIR=.uv-cache uv run python scripts/debug/gamepad_probe.py

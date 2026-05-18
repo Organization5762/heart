@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Iterator, Mapping
 from typing import Any
 
 from manyfold import StreamNode
 
-from heart.peripheral.core import PeripheralInfo, PeripheralTag
+from heart.peripheral.core import Input, PeripheralInfo, PeripheralTag
+from heart.peripheral.core.input.color import ColorSnapshot
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.subscriptions import NoopSubscription
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
-from heart.peripheral.radio import (RadioPeripheral, RawRadioPacket,
-                                    SerialRadioDriver)
+from heart.peripheral.radio import (FLOWTOY_PATTERN_EVENT, RadioPeripheral,
+                                    RawRadioPacket, SerialRadioDriver)
 from heart.utilities.logging import get_logger
 
 FLOWTOY_INPUT_VARIANT = "flowtoy"
 FLOWTOY_PERIPHERAL_ID_PREFIX = "flowtoy"
 PORT_SANITIZE_PATTERN = re.compile(r"[^a-zA-Z0-9]+")
+FLOWTOY_COLOR_ACTIVE_FLAGS = 0b0000_1110
 
 logger = get_logger(__name__)
 
@@ -141,3 +146,61 @@ class FlowToyPeripheral(RadioPeripheral):
                 continue
             metadata[key] = str(value)
         return metadata
+
+
+def bind_flowtoy_color_control(
+    peripheral_manager: PeripheralManager,
+    *,
+    group_id: int = 0,
+    group_is_public: bool = False,
+    page: int = 0,
+    mode: int = 0,
+    min_interval_s: float = 0.25,
+    rgb_delta: int = 8,
+) -> Any:
+    """Bind final-frame color snapshots to FlowToy pattern commands."""
+
+    if not any(
+        isinstance(peripheral, RadioPeripheral)
+        for peripheral in peripheral_manager.peripherals
+    ):
+        return NoopSubscription()
+
+    last_sent_at = 0.0
+    last_rgb: tuple[int, int, int] | None = None
+
+    def mapper(snapshot: ColorSnapshot) -> Input | None:
+        nonlocal last_rgb, last_sent_at
+        rgb = tuple(int(component) for component in snapshot.average_rgb)
+        now = time.monotonic()
+        if last_rgb is not None:
+            delta = max(abs(left - right) for left, right in zip(rgb, last_rgb))
+            if delta < rgb_delta:
+                return None
+            if now - last_sent_at < min_interval_s:
+                return None
+        last_rgb = rgb
+        last_sent_at = now
+        return Input(
+            event_type=FLOWTOY_PATTERN_EVENT,
+            data={
+                "group_id": int(group_id),
+                "group_is_public": bool(group_is_public),
+                "page": int(page),
+                "mode": int(mode),
+                "actives": FLOWTOY_COLOR_ACTIVE_FLAGS,
+                "hue_offset": _flowtoy_byte(snapshot.hue),
+                "saturation": _flowtoy_byte(snapshot.saturation),
+                "brightness": _flowtoy_byte(snapshot.brightness),
+            },
+        )
+
+    return peripheral_manager.input_io.peripheral_inputs.bind(
+        peripheral_manager.input_io.color.snapshot(),
+        mapper,
+        target=lambda peripheral: isinstance(peripheral, RadioPeripheral),
+    )
+
+
+def _flowtoy_byte(value: float) -> int:
+    return max(0, min(255, int(round(float(value) * 255.0))))

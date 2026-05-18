@@ -708,7 +708,7 @@ requires-dist = [
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
     { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", directory = "rust/heart_rgb_matrix_driver" },
     { name = "lagom" },
-    { name = "manyfold", specifier = ">=0.1.19" },
+    { name = "manyfold", specifier = ">=0.1.33" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
@@ -1057,17 +1057,17 @@ wheels = [
 
 [[package]]
 name = "manyfold"
-version = "0.1.19"
+version = "0.1.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "reactivex" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/de/c202db6c7c3cae2e478ff71f9cbedc54267087321d404a1b08c64aee6e82/manyfold-0.1.19.tar.gz", hash = "sha256:b6f8a6ee7df0e9318f18f6d98a9105b72ce675b2882041c5efe444b738f53159", size = 2379326, upload-time = "2026-05-03T18:33:25.066Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/34/f21a8250436281dd68562f17eb372bd908954415f716cc73a359b7ffbec8/manyfold-0.1.33.tar.gz", hash = "sha256:95b6ae34124c7a80631bef05b51cfb124cf7248366345f9bf7d984ebc6e0ff88", size = 2382370, upload-time = "2026-05-17T02:55:41.429Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/76/69df8a9bd6592a43edf24f31912f1217a19af9a60151dd4d909f19536ff9/manyfold-0.1.19-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5a799d6bfbfc3bcf33123d03cd704322ba1c87636534e81f34f8f494cf10451a", size = 520131, upload-time = "2026-05-03T18:33:18.921Z" },
-    { url = "https://files.pythonhosted.org/packages/67/8c/76f67494406d5f3e3c349c39025583674915ab978e1da1957d977c029c3e/manyfold-0.1.19-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:ea131b32edd064b518d3d5d713fa0848c370eb3f59da64c830f3c1680059c25b", size = 512926, upload-time = "2026-05-03T18:33:20.617Z" },
-    { url = "https://files.pythonhosted.org/packages/ca/52/729b3ac843c0ac5841f9029c8e11752866079593cc275b1ff04a82569dcd/manyfold-0.1.19-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:68765f2ded0146797986a903ff6a4b3f4a175d05aefde49ef7efe4cb42f36155", size = 559179, upload-time = "2026-05-03T18:33:21.874Z" },
-    { url = "https://files.pythonhosted.org/packages/b3/3d/e7747ebdf67a5d3a678ed8dca60e1c45c55a75bee53001f2cc6dc109ff4c/manyfold-0.1.19-cp310-abi3-win_amd64.whl", hash = "sha256:362c27aee1f1d8e71eb1cb19608fb17f67aeebc87be1d42bfe767f7d76c88250", size = 397579, upload-time = "2026-05-03T18:33:23.485Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/bc/06d7b7d9eb382630a37e8b9ca1c4cfe1080faa263ca5b08107f6f1d0dee2/manyfold-0.1.33-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:173466880acd36f714f0c1b4e76dc7632866a4dce883c549062e5e57b39ad5cc", size = 522564, upload-time = "2026-05-17T02:55:33.253Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/4e/f715c9700089f929c417293fdc6cd381e3632bd753f8efe39219c4a9b998/manyfold-0.1.33-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:7c960e97da0d857a306638dc2f93dc7a47c1de2ded91838d2f96c96558899934", size = 515550, upload-time = "2026-05-17T02:55:35.34Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/41/62ea44b22cbb73c9a92b04045651c27f7f91226b3d27cee7f2e0fef95810/manyfold-0.1.33-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9695a41de5531690143ffedc4923254bc3595bf7c645b666ec6cd43586ca7e7b", size = 561622, upload-time = "2026-05-17T02:55:37.419Z" },
+    { url = "https://files.pythonhosted.org/packages/10/c6/fb4ae77eafe0492f2f2071b360f477344801e40c17d2e0dc1808288dcd5a/manyfold-0.1.33-cp310-abi3-win_amd64.whl", hash = "sha256:5e88568a0a64208c280f124bcf6505b830b62899643afa4a4d8e123f789079df", size = 399742, upload-time = "2026-05-17T02:55:39.288Z" },
 ]
 
 [[package]]

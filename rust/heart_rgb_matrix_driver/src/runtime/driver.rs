@@ -127,7 +127,7 @@ impl MatrixDriverCore {
 
     pub fn submit_rgba(
         &self,
-        data: Vec<u8>,
+        data: &[u8],
         width: u32,
         height: u32,
     ) -> Result<(), MatrixDriverError> {

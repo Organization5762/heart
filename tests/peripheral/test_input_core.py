@@ -9,6 +9,7 @@ import pygame
 from manyfold import ConstantNode, Graph, StreamNode
 
 from heart.peripheral.configuration import PeripheralConfiguration
+from heart.peripheral.core import Input, Peripheral
 from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          BrowseIntent, CyclePaletteCommand,
                                          ExternalSensorHub, FrameTick,
@@ -24,6 +25,8 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile,
 from heart.peripheral.core.input.accelerometer import (
     ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
 from heart.peripheral.core.input.debug import InputDebugNode
+from heart.peripheral.core.input.peripheral_inputs import \
+    PERIPHERAL_INPUT_DISPATCH_STREAM
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream, runtime_route
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
@@ -64,6 +67,15 @@ class _SwitchProbe(BaseSwitch):
 
     def _event_stream(self) -> StreamNode[SwitchState]:
         return self._stream.observable()
+
+
+class _InputProbe(Peripheral[int]):
+    def __init__(self, *, accepts: bool = True) -> None:
+        self.accepts = accepts
+        self.inputs: list[Input] = []
+
+    def handle_input(self, input: Input) -> None:
+        self.inputs.append(input)
 
 
 class _ImmediateTimerNode:
@@ -618,6 +630,99 @@ class TestNavigationProfile:
         assert browse == [3]
         assert activate == ["activate"]
         assert alternate == ["alternate"]
+
+
+class TestPeripheralInputBus:
+    def test_bind_dispatches_mapped_inputs_to_matching_peripherals(self) -> None:
+        source: EventStream[int] = EventStream()
+        matching = _InputProbe(accepts=True)
+        ignored = _InputProbe(accepts=False)
+        io = InputIO(
+            graph=Graph(),
+            peripheral_source=lambda: (matching, ignored),
+        )
+
+        subscription = io.peripheral_inputs.bind(
+            source,
+            lambda value: Input(
+                event_type="test.input",
+                data={"value": value},
+            ),
+            target=lambda peripheral: getattr(peripheral, "accepts", False),
+        )
+        try:
+            source.emit(7)
+        finally:
+            subscription.dispose()
+
+        assert [input_event.data for input_event in matching.inputs] == [{"value": 7}]
+        assert ignored.inputs == []
+        assert (
+            io.debug_tap.snapshot()[-1].stream_name
+            == PERIPHERAL_INPUT_DISPATCH_STREAM
+        )
+
+    def test_bind_without_targets_does_not_subscribe_to_source(self) -> None:
+        source: EventStream[int] = EventStream()
+        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
+        calls: list[int] = []
+
+        subscription = io.peripheral_inputs.bind(
+            source.map(lambda value: calls.append(value) or value),
+            lambda value: Input(event_type="test.input", data=value),
+        )
+        try:
+            source.emit(1)
+        finally:
+            subscription.dispose()
+
+        assert calls == []
+
+
+class TestColorInputProfile:
+    def test_color_streams_derive_average_rgb_and_hsv_from_final_frame(self) -> None:
+        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
+        surface = pygame.Surface((2, 2))
+        surface.fill((255, 0, 0))
+        average_rgb: list[tuple[int, int, int]] = []
+        hue: list[float] = []
+        saturation: list[float] = []
+        brightness: list[float] = []
+
+        subscriptions = [
+            io.color.average_rgb().subscribe(average_rgb.append),
+            io.color.hue().subscribe(hue.append),
+            io.color.saturation().subscribe(saturation.append),
+            io.color.brightness().subscribe(brightness.append),
+        ]
+        try:
+            io.final_frame_stream().emit(surface)
+        finally:
+            for subscription in subscriptions:
+                subscription.dispose()
+
+        assert average_rgb == [(255, 0, 0)]
+        assert hue == [0.0]
+        assert saturation == [1.0]
+        assert brightness == [1.0]
+
+    def test_color_snapshot_is_not_computed_without_subscribers(
+        self,
+        monkeypatch,
+    ) -> None:
+        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
+        surface = pygame.Surface((1, 1))
+        calls: list[pygame.Surface] = []
+
+        def average_color(candidate: pygame.Surface) -> tuple[int, int, int, int]:
+            calls.append(candidate)
+            return (0, 0, 0, 255)
+
+        monkeypatch.setattr(pygame.transform, "average_color", average_color)
+
+        io.final_frame_stream().emit(surface)
+
+        assert calls == []
 
 
 class TestMandelbrotControlProfile:

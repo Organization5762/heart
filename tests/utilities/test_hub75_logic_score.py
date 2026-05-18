@@ -29,6 +29,18 @@ class TestHub75LogicScore:
         assert summary.valid_hub75 is True
         assert summary.row_clock_mismatch_count == 0
         assert summary.lat_while_output_enabled_count == 0
+        assert 0.0 < summary.oe_active_fraction < 1.0
+        assert summary.oe_active_fraction + summary.oe_blank_fraction == pytest.approx(1.0)
+        assert summary.median_oe_active_ns is not None
+        assert summary.median_oe_blank_ns is not None
+        assert summary.p99_oe_blank_ns is not None
+        assert summary.max_oe_blank_ns is not None
+        assert summary.long_oe_blank_count == 0
+        assert summary.p99_clk_period_ns is not None
+        assert summary.max_clk_period_ns is not None
+        assert summary.long_clk_period_count == 0
+        assert summary.address_edge_counts["A"] > 0
+        assert summary.max_address_edge_interval_ns["A"] is not None
         assert score.total == pytest.approx(1.0)
 
     def test_extra_clock_pulse_reduces_similarity(self, tmp_path: Path) -> None:
@@ -62,6 +74,55 @@ class TestHub75LogicScore:
         assert candidate.active_address_edge_count > 0
         assert score.total < 0.95
         assert score.feature_scores["active_address_edge_count"] < 1.0
+
+    def test_oe_duty_changes_reduce_similarity(self, tmp_path: Path) -> None:
+        """Verify duration-based OE duty is included in electrical scoring."""
+
+        baseline_path = tmp_path / "baseline.csv"
+        candidate_path = tmp_path / "candidate.csv"
+        _write_capture_csv(baseline_path, _build_capture_rows())
+        _write_capture_csv(candidate_path, _build_capture_rows(oe_blank_padding_ticks=5))
+
+        baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
+        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        score = score_hub75_similarity(baseline, candidate)
+
+        assert candidate.oe_active_fraction < baseline.oe_active_fraction
+        assert score.feature_scores["oe_active_fraction"] < 1.0
+
+    def test_oe_blank_outliers_are_summarized_and_penalized(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify rare OE-blank stalls are visible even when median blank stays stable."""
+
+        baseline_path = tmp_path / "baseline.csv"
+        candidate_path = tmp_path / "candidate.csv"
+        _write_capture_csv(baseline_path, _build_capture_rows(rows=7))
+        _write_capture_csv(
+            candidate_path,
+            _build_capture_rows(
+                rows=7,
+                long_oe_blank_rows=(1, 4),
+                long_oe_blank_padding_ticks=600,
+            ),
+        )
+
+        baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
+        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        score = score_hub75_similarity(baseline, candidate)
+
+        assert baseline.long_oe_blank_count == 0
+        assert candidate.long_oe_blank_count == 2
+        assert candidate.median_long_oe_blank_period_intervals == pytest.approx(3.0)
+        assert candidate.long_clk_period_count >= 2
+        assert candidate.max_clk_period_ns is not None
+        assert candidate.max_clk_period_ns > candidate.long_clk_period_threshold_ns
+        assert candidate.max_oe_blank_ns is not None
+        assert candidate.max_oe_blank_ns > candidate.long_oe_blank_threshold_ns
+        assert score.feature_scores["max_oe_blank_ns"] < 1.0
+        assert score.feature_scores["long_oe_blank_count"] < 1.0
+        assert score.feature_scores["max_clk_period_ns"] < 1.0
+        assert score.feature_scores["long_clk_period_count"] < 1.0
 
     def test_flatline_capture_scores_near_zero(self, tmp_path: Path) -> None:
         """Verify an electrically silent candidate cannot score like a plausible HUB75 waveform."""
@@ -210,6 +271,9 @@ def _build_capture_rows(
     cols: int = 4,
     extra_clock_row: int | None = None,
     active_address_glitch_row: int | None = None,
+    oe_blank_padding_ticks: int = 0,
+    long_oe_blank_rows: tuple[int, ...] = (),
+    long_oe_blank_padding_ticks: int = 0,
 ) -> list[tuple[float, list[int]]]:
     timestamp = 0.0
     state = [0, 0, 1, 0, 0, 0, 0, 0]
@@ -238,6 +302,11 @@ def _build_capture_rows(
             emit(A=1 - state[_column_index("A")])
             emit(A=1 - state[_column_index("A")])
         emit(OE=1)
+        for _ in range(oe_blank_padding_ticks):
+            emit()
+        if row in long_oe_blank_rows:
+            for _ in range(long_oe_blank_padding_ticks):
+                emit()
 
     return samples
 
