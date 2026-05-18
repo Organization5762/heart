@@ -5,8 +5,8 @@ from threading import Lock
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
-                      Schema, StreamFamily, StreamName, StreamNode,
-                      TypedEnvelope, TypedRoute, Variant, route)
+                      RouteRetentionPolicy, Schema, StreamFamily, StreamName,
+                      StreamNode, TypedEnvelope, TypedRoute, Variant, route)
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
@@ -18,6 +18,12 @@ PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
+LATEST_ONLY_RETENTION = RouteRetentionPolicy(
+    latest_replay_policy="latest_only",
+    replay_window="latest",
+    payload_retention_policy="separate_store",
+    history_limit=1,
+)
 
 
 def unwrap_stream_value(value: Any) -> Any:
@@ -532,6 +538,7 @@ class GraphRouteStream(Generic[T]):
     def __init__(self, graph: Graph, route_ref: TypedRoute[T]) -> None:
         self._graph = graph
         self._route = route_ref
+        self._graph.configure_retention(route_ref, LATEST_ONLY_RETENTION)
 
     @property
     def value(self) -> T | None:

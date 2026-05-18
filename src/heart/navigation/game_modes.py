@@ -256,6 +256,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         active_renderer = self.state.active_renderer()
+        self._initialize_active_renderer_if_needed(active_renderer)
         return active_renderer.get_renderers()
 
     def get_post_processors(self) -> list[StatefulBaseRenderer]:
@@ -279,6 +280,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.state._active_mode_index += self.state.mode_offset
         self.state.mode_offset = 0
         self.state.in_select_mode = False
+        self._initialize_active_renderer_if_needed(self._active_mode_entry().renderer)
 
     def _handle_alternate_activate(self, _event: object) -> None:
         if self.state.in_select_mode:
@@ -426,6 +428,25 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             HueShiftPostProcessor(),
             EdgePostProcessor(),
         ]
+
+    def _initialize_active_renderer_if_needed(
+        self,
+        renderer: StatefulBaseRenderer,
+    ) -> None:
+        if renderer.initialized or self._initialization_context is None:
+            return
+        context = self._initialization_context
+        with context.window.display_mode(renderer.device_display_mode):
+            renderer.initialize(
+                context.window,
+                context.peripheral_manager,
+                context.orientation,
+            )
+
+    def _active_mode_entry(self) -> ModeEntry:
+        offset = self.state._active_mode_index + self.state.mode_offset
+        mode_index = offset % len(self.state.entries)
+        return self.state.entries[mode_index]
 
     def _build_title_renderer(
         self,

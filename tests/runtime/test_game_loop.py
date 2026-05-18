@@ -52,3 +52,16 @@ class TestGameLoop:
         loop._one_loop([])
 
         assert presented_screens == [loop.components.display.screen]
+
+    def test_max_fps_can_be_overridden_by_environment(
+        self,
+        device,
+        resolver,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Allow runtime perf experiments without editing code or changing the default cap."""
+        monkeypatch.setenv("HEART_MAX_FPS", "60")
+
+        loop = GameLoop(device=device, resolver=resolver)
+
+        assert loop.max_fps == 60
