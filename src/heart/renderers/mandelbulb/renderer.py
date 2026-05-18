@@ -32,19 +32,26 @@ from heart.runtime.display_context import DisplayContext
 
 GAMEPAD_DEAD_ZONE = 0.12
 ORBIT_RADIANS_PER_SECOND = 1.4
+AUTO_ORBIT_RADIANS_PER_SECOND = 0.12
 ZOOM_UNITS_PER_SECOND = 1.4
 COLOR_PHASE_PER_SECOND = 1.2
 COLOR_VECTOR_EASE_PER_SECOND = 12.0
+DEFAULT_COLOR_MODE = 1
+COLOR_MODE_COUNT = 4
+BASE_PHASE_SPEED = 1.0
+MIN_PHASE_SPEED = 0.1
+MAX_PHASE_SPEED = 8.0
+PHASE_SPEED_UNITS_PER_SECOND = 1.5
 POWER_EASE_PER_SECOND = 8.0
 DEFAULT_CAMERA_DISTANCE = 3.0
 MIN_CAMERA_DISTANCE = 1.8
 MAX_CAMERA_DISTANCE = 6.0
 MIN_CAMERA_PITCH = -1.1
 MAX_CAMERA_PITCH = 1.1
-BASE_POWER = 6.0
+BASE_POWER = 4.0
 MIN_POWER = 1.0
 MAX_POWER = 12.0
-POWER_UNITS_PER_SECOND = 1.0
+POWER_UNITS_PER_SECOND = 0.9
 MORPH_POWER_DELTA = 2.0
 MORPH_EASE_PER_SECOND = 18.0
 
@@ -72,13 +79,21 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self.morph_target_power = self._wrapped_power(BASE_POWER + MORPH_POWER_DELTA)
         self.color_phase = 0.0
         self.color_vector = np.zeros((2,), dtype=np.float32)
+        self.color_mode = DEFAULT_COLOR_MODE
+        self.phase_time = 0.0
+        self.phase_speed = BASE_PHASE_SPEED
         self.phase_shift_enabled = True
+        self.auto_orbit_yaw = 0.0
+        self.auto_orbit_enabled = True
         self._keyboard_snapshot = KeyboardSnapshot(
             pressed_keys=frozenset(),
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
         self._key_pressed_last_frame: dict[int, bool] = {}
+        self._last_phase_toggle_snapshot_time: float | None = None
+        self._last_auto_orbit_toggle_snapshot_time: float | None = None
+        self._last_color_mode_toggle_snapshot_time: float | None = None
         self._subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
@@ -150,13 +165,21 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self.morph_target_power = self._wrapped_power(BASE_POWER + MORPH_POWER_DELTA)
         self.color_phase = 0.0
         self.color_vector = np.zeros((2,), dtype=np.float32)
+        self.color_mode = DEFAULT_COLOR_MODE
+        self.phase_time = 0.0
+        self.phase_speed = BASE_PHASE_SPEED
         self.phase_shift_enabled = True
+        self.auto_orbit_yaw = 0.0
+        self.auto_orbit_enabled = True
         self._keyboard_snapshot = KeyboardSnapshot(
             pressed_keys=frozenset(),
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
         self._key_pressed_last_frame.clear()
+        self._last_phase_toggle_snapshot_time = None
+        self._last_auto_orbit_toggle_snapshot_time = None
+        self._last_color_mode_toggle_snapshot_time = None
         self.initialized = False
         super().reset()
 
@@ -175,12 +198,30 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             "uPower": self.power,
             "uColorPhase": self.color_phase,
             "uColorVector": self.color_vector,
-            "uPhaseShift": float(self.phase_shift_enabled),
+            "uColorMode": float(self.color_mode),
+            "uPhaseTime": self.phase_time,
+            "uAutoYaw": self.auto_orbit_yaw,
         }
 
     def _process_input(self, clock: pygame.time.Clock | None) -> None:
         elapsed_s = self._elapsed_seconds(clock)
         keys = self._keyboard_snapshot.pressed_keys
+        self._process_toggles(keys)
+        phase_speed_delta = (
+            float(self._gamepad_snapshot.button_held(GamepadButton.PLUS))
+            - float(self._gamepad_snapshot.button_held(GamepadButton.MINUS))
+        )
+        self.phase_speed = self._clamp(
+            self.phase_speed
+            + phase_speed_delta * PHASE_SPEED_UNITS_PER_SECOND * elapsed_s,
+            MIN_PHASE_SPEED,
+            MAX_PHASE_SPEED,
+        )
+        if self.phase_shift_enabled:
+            self.phase_time += elapsed_s * self.phase_speed
+        if self.auto_orbit_enabled:
+            self.auto_orbit_yaw += AUTO_ORBIT_RADIANS_PER_SECOND * elapsed_s
+
         orbit_x = (
             float(pygame.K_RIGHT in keys)
             - float(pygame.K_LEFT in keys)
@@ -208,9 +249,9 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             float(pygame.K_s in keys)
             - float(pygame.K_w in keys)
         )
-        if self._gamepad_snapshot.button_held(GamepadButton.MINUS):
+        if self._gamepad_snapshot.button_held(GamepadButton.ZL):
             zoom += 1.0
-        if self._gamepad_snapshot.button_held(GamepadButton.PLUS):
+        if self._gamepad_snapshot.button_held(GamepadButton.ZR):
             zoom -= 1.0
         self.camera_distance = self._clamp(
             self.camera_distance + zoom * ZOOM_UNITS_PER_SECOND * elapsed_s,
@@ -218,16 +259,12 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             MAX_CAMERA_DISTANCE,
         )
 
+        trigger_right = self._trigger_pressure(GamepadAxis.TRIGGER_RIGHT)
+        trigger_left = self._trigger_pressure(GamepadAxis.TRIGGER_LEFT)
         power_delta = (
             -float(pygame.K_LSHIFT in keys or pygame.K_RSHIFT in keys)
-            + self._gamepad_snapshot.axis_value(
-                GamepadAxis.TRIGGER_RIGHT,
-                dead_zone=0.0,
-            )
-            - self._gamepad_snapshot.axis_value(
-                GamepadAxis.TRIGGER_LEFT,
-                dead_zone=0.0,
-            )
+            + trigger_right
+            - trigger_left
         )
         if self._gamepad_snapshot.button_held(GamepadButton.EAST):
             power_delta -= 1.0
@@ -252,8 +289,13 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self.color_phase += color_scrub * COLOR_PHASE_PER_SECOND * elapsed_s
         self._update_color_vector(elapsed_s)
 
+    def _process_toggles(self, keys: frozenset[int]) -> None:
         if self._phase_toggle_tapped(keys):
             self.phase_shift_enabled = not self.phase_shift_enabled
+        if self._auto_orbit_toggle_tapped(keys):
+            self.auto_orbit_enabled = not self.auto_orbit_enabled
+        if self._color_mode_toggle_tapped():
+            self.color_mode = (self.color_mode + 1) % COLOR_MODE_COUNT
 
     def _update_color_vector(self, elapsed_s: float) -> None:
         raw_vector = np.array(
@@ -286,7 +328,53 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             False,
         )
         self._key_pressed_last_frame[pygame.K_c] = keyboard_pressed
-        return keyboard_tapped or self._gamepad_snapshot.button_tapped(GamepadButton.WEST)
+        gamepad_tapped = self._gamepad_tapped_once(
+            button=GamepadButton.WEST,
+            last_timestamp=self._last_phase_toggle_snapshot_time,
+        )
+        if gamepad_tapped:
+            self._last_phase_toggle_snapshot_time = (
+                self._gamepad_snapshot.timestamp_monotonic
+            )
+        return keyboard_tapped or gamepad_tapped
+
+    def _auto_orbit_toggle_tapped(self, keys: frozenset[int]) -> bool:
+        keyboard_pressed = pygame.K_o in keys
+        keyboard_tapped = keyboard_pressed and not self._key_pressed_last_frame.get(
+            pygame.K_o,
+            False,
+        )
+        self._key_pressed_last_frame[pygame.K_o] = keyboard_pressed
+        gamepad_tapped = self._gamepad_tapped_once(
+            button=GamepadButton.L3,
+            last_timestamp=self._last_auto_orbit_toggle_snapshot_time,
+        )
+        if gamepad_tapped:
+            self._last_auto_orbit_toggle_snapshot_time = (
+                self._gamepad_snapshot.timestamp_monotonic
+            )
+        return keyboard_tapped or gamepad_tapped
+
+    def _color_mode_toggle_tapped(self) -> bool:
+        gamepad_tapped = self._gamepad_tapped_once(
+            button=GamepadButton.R3,
+            last_timestamp=self._last_color_mode_toggle_snapshot_time,
+        )
+        if gamepad_tapped:
+            self._last_color_mode_toggle_snapshot_time = (
+                self._gamepad_snapshot.timestamp_monotonic
+            )
+        return gamepad_tapped
+
+    def _gamepad_tapped_once(
+        self,
+        *,
+        button: GamepadButton,
+        last_timestamp: float | None,
+    ) -> bool:
+        if not self._gamepad_snapshot.button_tapped(button):
+            return False
+        return self._gamepad_snapshot.timestamp_monotonic != last_timestamp
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
@@ -298,6 +386,12 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         return pygame.K_SPACE in keys or self._gamepad_snapshot.button_held(
             GamepadButton.SOUTH
         )
+
+    def _trigger_pressure(self, axis: GamepadAxis) -> float:
+        raw_value = self._gamepad_snapshot.axis_value(axis, dead_zone=0.0)
+        if raw_value < 0.0:
+            return self._clamp((raw_value + 1.0) * 0.5, 0.0, 1.0)
+        return self._clamp(raw_value, 0.0, 1.0)
 
     def _render_tiled(self, window: DisplayContext) -> None:
         assert self.render_size is not None
