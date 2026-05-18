@@ -424,7 +424,7 @@ class MandelbrotControlProfile:
         move_multiplier = 2.0 if button_b_held else 1.0
         return MandelbrotMotionState(
             move_x=keyboard_move_x + dpad.x + left_stick_x,
-            move_y=keyboard_move_y - dpad.y - left_stick_y,
+            move_y=keyboard_move_y - dpad.y + left_stick_y,
             pan_x=right_stick_x,
             pan_y=-right_stick_y,
             move_multiplier=move_multiplier,
