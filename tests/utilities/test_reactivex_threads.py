@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import threading
+import time
+from datetime import timedelta
 
 import pytest
 import reactivex
@@ -14,8 +16,9 @@ from reactivex.subject import Subject
 from heart.utilities.reactivex_threads import (
     FRAME_THREAD_LATENCY_STREAM, background_scheduler, blocking_io_scheduler,
     delivery_latency_snapshot, drain_frame_thread_queue, input_scheduler,
-    on_frame_thread, pipe_in_main_thread,
+    interval_in_background, on_frame_thread, pipe_in_main_thread,
     reset_reactivex_threading_state_for_tests, scheduler_diagnostics)
+from heart.utilities.reactivex_threads import shutdown_reactivex_threading
 
 
 @pytest.fixture(autouse=True)
@@ -110,3 +113,43 @@ class TestSchedulerIsolation:
             "blocking_io_max_workers": 3,
             "input_max_workers": 5,
         }
+
+    def test_shutdown_reactivex_threading_stops_interval_scheduler(self) -> None:
+        """Verify runtime shutdown disposes the shared interval scheduler so Ctrl-C does not wait on its non-daemon thread."""
+
+        ticked = threading.Event()
+        interval_in_background(period=timedelta(milliseconds=10)).subscribe(
+            lambda _: ticked.set()
+        )
+
+        assert ticked.wait(timeout=0.5)
+        assert any(
+            thread.name == "reactivex-interval" for thread in threading.enumerate()
+        )
+
+        shutdown_reactivex_threading()
+
+        deadline = time.monotonic() + 0.5
+        while time.monotonic() < deadline:
+            if not any(
+                thread.name == "reactivex-interval"
+                for thread in threading.enumerate()
+            ):
+                break
+            time.sleep(0.01)
+
+        assert not any(
+            thread.name == "reactivex-interval" for thread in threading.enumerate()
+        )
+
+    def test_shutdown_reactivex_threading_resets_shutdown_signal(self) -> None:
+        """Verify a later runtime can create fresh interval streams after a prior shutdown sequence completed."""
+
+        shutdown_reactivex_threading()
+
+        restarted = threading.Event()
+        interval_in_background(period=timedelta(milliseconds=10)).subscribe(
+            lambda _: restarted.set()
+        )
+
+        assert restarted.wait(timeout=0.5)

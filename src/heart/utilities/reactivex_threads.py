@@ -365,7 +365,12 @@ def scheduler_diagnostics() -> dict[str, int | None]:
     }
 
 
-def reset_reactivex_threading_state_for_tests() -> None:
+def _replace_shutdown_signal() -> None:
+    global shutdown
+    shutdown = Subject()
+
+
+def _dispose_shared_scheduler_state(*, clear_latency_history: bool) -> None:
     global _FRAME_THREAD_IDENT
     for state in (
         _BACKGROUND_SCHEDULER,
@@ -381,7 +386,26 @@ def reset_reactivex_threading_state_for_tests() -> None:
     with _FRAME_THREAD_QUEUE_LOCK:
         _FRAME_THREAD_QUEUE.clear()
     _FRAME_THREAD_IDENT = None
-    _LATENCY_RECORDER.clear()
+    if clear_latency_history:
+        _LATENCY_RECORDER.clear()
+
+
+def shutdown_reactivex_threading() -> None:
+    """Stop shared Rx schedulers so non-daemon worker threads can exit promptly."""
+
+    active_shutdown = shutdown
+    active_shutdown.on_next(True)
+    active_shutdown.on_completed()
+    _dispose_shared_scheduler_state(clear_latency_history=False)
+    active_shutdown.dispose()
+    _replace_shutdown_signal()
+
+
+def reset_reactivex_threading_state_for_tests() -> None:
+    active_shutdown = shutdown
+    _dispose_shared_scheduler_state(clear_latency_history=True)
+    active_shutdown.dispose()
+    _replace_shutdown_signal()
 
 
 def share_sequence(sequence: Iterable[T]) -> Observable[T]:

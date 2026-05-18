@@ -14,7 +14,7 @@ from heart.runtime.container import (build_runtime_container,
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import shutdown
+from heart.utilities.reactivex_threads import shutdown_reactivex_threading
 
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
@@ -152,9 +152,7 @@ class GameLoop:
             logger.info("Shutting down GameLoop.")
 
             # SHut down the IO threads
-            shutdown.on_next(True)
-            shutdown.on_completed()
-            shutdown.dispose()
+            shutdown_reactivex_threading()
 
             pygame.quit()
 

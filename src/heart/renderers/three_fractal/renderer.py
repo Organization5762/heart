@@ -36,7 +36,7 @@ from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 from heart.utilities.logging import get_logger
-from heart.utilities.reactivex_threads import shutdown
+from heart.utilities.reactivex_threads import shutdown_reactivex_threading
 
 logger = get_logger(__name__)
 DEFAULT_DEBUG_WIDTH = 800
@@ -1110,9 +1110,7 @@ def main() -> None:
             peripheral_runtime.tick()
         runtime.reset()
     finally:
-        shutdown.on_next(True)
-        shutdown.on_completed()
-        shutdown.dispose()
+        shutdown_reactivex_threading()
         pygame.quit()
 
 
