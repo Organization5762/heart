@@ -56,27 +56,19 @@ def main() -> None:
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "update-driver":
-        app = typer.Typer()
+        command_app = typer.Typer()
         from heart.cli.commands.update_driver import update_driver_command
 
-        app.command(name="update-driver")(update_driver_command)
-        app()
+        command_app.command(name="update-driver")(update_driver_command)
+        command_app()
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "bench-device":
-        app = typer.Typer()
+        command_app = typer.Typer()
         from heart.cli.commands.bench_device import bench_device_command
 
-        app.command(name="bench-device")(bench_device_command)
-        app()
-        return
-
-    if len(sys.argv) > 1 and sys.argv[1] == "run":
-        app = typer.Typer()
-        from heart.cli.commands.run import run_command
-
-        app.command(name="run")(run_command)
-        app()
+        command_app.command(name="bench-device")(bench_device_command)
+        command_app()
         return
 
     app()

@@ -15,7 +15,7 @@ GRID_SIZE = 16
 BOMB_FUSE_MS = 1800.0
 BOMB_RANGE = 3
 FLAME_TTL_MS = 300.0
-PLAYER_STEP_MS = 120.0
+PLAYER_STEP_MS = 95.0
 SOFT_BLOCK_DENSITY = 0.42
 SPAWN_CLEAR_CELLS: frozenset[Coord] = frozenset(
     {
@@ -64,6 +64,8 @@ class BombermanState:
     phase: GamePhase = "playing"
     bomb_button_held: bool = False
     move_cooldown_ms: float = 0.0
+    queued_movement: Direction | None = None
+    held_movement: Direction | None = None
     cleared_blocks: int = 0
 
 
@@ -127,6 +129,8 @@ def advance_bomberman_state(
             phase=state.phase,
             bomb_button_held=command.bomb_held,
             move_cooldown_ms=max(0.0, state.move_cooldown_ms - frame.delta_ms),
+            queued_movement=state.queued_movement,
+            held_movement=command.movement,
             cleared_blocks=state.cleared_blocks,
         )
 
@@ -161,15 +165,26 @@ def advance_bomberman_state(
         bombs = (*bombs, BombermanBomb(position=player.position))
 
     move_cooldown_ms = max(0.0, state.move_cooldown_ms - frame.delta_ms)
-    if phase == "playing" and command.movement is not None:
-        player, move_cooldown_ms = _advance_player(
-            player=player,
-            movement=command.movement,
-            move_cooldown_ms=move_cooldown_ms,
-            walls=state.walls,
-            soft_blocks=soft_blocks,
-            bombs=bombs,
-        )
+    movement_pressed = state.held_movement is None and command.movement is not None
+    queued_movement = state.queued_movement or (
+        command.movement if movement_pressed else None
+    )
+    if phase == "playing" and queued_movement is not None:
+        if move_cooldown_ms > 0:
+            player = BombermanPlayer(
+                position=player.position,
+                facing=queued_movement,
+            )
+        else:
+            player, move_cooldown_ms = _advance_player(
+                player=player,
+                movement=queued_movement,
+                move_cooldown_ms=move_cooldown_ms,
+                walls=state.walls,
+                soft_blocks=soft_blocks,
+                bombs=bombs,
+            )
+            queued_movement = None
 
     if phase == "playing" and not soft_blocks:
         phase = "cleared"
@@ -183,6 +198,8 @@ def advance_bomberman_state(
         phase=phase,
         bomb_button_held=command.bomb_held,
         move_cooldown_ms=move_cooldown_ms,
+        queued_movement=queued_movement,
+        held_movement=command.movement,
         cleared_blocks=cleared_blocks,
     )
 

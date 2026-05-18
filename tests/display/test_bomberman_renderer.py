@@ -7,7 +7,9 @@ from heart.device import Rectangle
 from heart.peripheral.core.input import (FrameTick, GamepadDpadValue,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.streams import EventStream
 from heart.renderers.bomberman import BombermanRenderer
+from heart.renderers.bomberman.provider import BombermanStateProvider
 from heart.renderers.bomberman.state import (BOMB_FUSE_MS, BombermanBomb,
                                              BombermanInput, BombermanPlayer,
                                              BombermanState,
@@ -42,8 +44,13 @@ class TestBombermanState:
         assert moved.player.position == (2, 1)
         assert moved.player.facing == (1, 0)
 
-        blocked = advance_bomberman_state(
+        released = advance_bomberman_state(
             moved,
+            _frame(16.0),
+            BombermanInput(),
+        )
+        blocked = advance_bomberman_state(
+            released,
             _frame(200.0),
             BombermanInput(movement=(0, 1)),
         )
@@ -92,6 +99,70 @@ class TestBombermanState:
         assert len(held.bombs) == 1
         assert held.bombs[0].remaining_ms == BOMB_FUSE_MS - 16.0
 
+    def test_quick_direction_tap_buffers_until_step_cooldown_ends(self) -> None:
+        state = create_initial_bomberman_state(
+            rng=random.Random(1),
+            soft_block_density=0.0,
+        )
+        state = replace(state, soft_blocks=frozenset({(14, 14)}))
+
+        moved = advance_bomberman_state(
+            state,
+            _frame(16.0),
+            BombermanInput(movement=(1, 0)),
+        )
+        neutral = advance_bomberman_state(
+            moved,
+            _frame(16.0),
+            BombermanInput(),
+        )
+        buffered = advance_bomberman_state(
+            neutral,
+            _frame(16.0),
+            BombermanInput(movement=(-1, 0)),
+        )
+        released = advance_bomberman_state(
+            buffered,
+            _frame(100.0),
+            BombermanInput(),
+        )
+
+        assert buffered.player.position == (2, 1)
+        assert buffered.player.facing == (-1, 0)
+        assert released.player.position == (1, 1)
+
+    def test_held_direction_does_not_repeat_without_release(self) -> None:
+        state = create_initial_bomberman_state(
+            rng=random.Random(1),
+            soft_block_density=0.0,
+        )
+        state = replace(state, soft_blocks=frozenset({(14, 14)}))
+
+        moved = advance_bomberman_state(
+            state,
+            _frame(16.0),
+            BombermanInput(movement=(1, 0)),
+        )
+        held = advance_bomberman_state(
+            moved,
+            _frame(200.0),
+            BombermanInput(movement=(1, 0)),
+        )
+        released = advance_bomberman_state(
+            held,
+            _frame(16.0),
+            BombermanInput(),
+        )
+        pressed_again = advance_bomberman_state(
+            released,
+            _frame(16.0),
+            BombermanInput(movement=(1, 0)),
+        )
+
+        assert moved.player.position == (2, 1)
+        assert held.player.position == (2, 1)
+        assert pressed_again.player.position == (3, 1)
+
     def test_gamepad_dpad_maps_to_grid_direction(self) -> None:
         command = input_from_snapshots(
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
@@ -106,6 +177,42 @@ class TestBombermanState:
 
 
 class TestBombermanRenderer:
+    def test_provider_applies_latest_gamepad_input_on_frame_tick(
+        self,
+        monkeypatch,
+        stub_clock_factory,
+    ) -> None:
+        manager = PeripheralManager()
+        keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
+        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
+        monkeypatch.setattr(
+            manager.keyboard_controller,
+            "snapshot_stream",
+            lambda: keyboard_snapshots.observable(),
+        )
+        monkeypatch.setattr(
+            manager.gamepad_controller,
+            "snapshot_stream",
+            lambda: gamepad_snapshots.observable(),
+        )
+        provider = BombermanStateProvider(
+            rng=random.Random(1),
+            soft_block_density=0.0,
+        )
+        states = []
+
+        provider.observable(manager).subscribe(states.append)
+        gamepad_snapshots.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="8bitdo",
+                dpad=GamepadDpadValue(x=1),
+            )
+        )
+        manager.frame_tick_controller.advance(stub_clock_factory(16))
+
+        assert states[-1].player.position == (2, 1)
+
     def test_renderer_paints_16_by_16_board(self, device) -> None:
         surface = pygame.Surface((64, 64), pygame.SRCALPHA)
         window = DisplayContext(

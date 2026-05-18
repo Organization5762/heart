@@ -142,6 +142,13 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self._initialization_context: GameModeInitializationContext | None = None
         self._renderer_resolver = renderer_resolver
         self._navigation_subscription = None
+        self.navigation_enabled = True
+
+    def disable_navigation(self) -> None:
+        self.navigation_enabled = False
+        if self._navigation_subscription is not None:
+            self._navigation_subscription.dispose()
+            self._navigation_subscription = None
 
     def _create_initial_state(
         self,
@@ -163,13 +170,14 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             state = GameModeState()
         if not state.post_processors:
             state.post_processors.extend(self._default_post_processors())
-        self._navigation_subscription = (
-            peripheral_manager.navigation_profile.subscribe_events(
-                on_browse_delta=self._handle_browse_delta,
-                on_activate=self._handle_activate,
-                on_alternate_activate=self._handle_alternate_activate,
+        if self.navigation_enabled:
+            self._navigation_subscription = (
+                peripheral_manager.navigation_profile.subscribe_events(
+                    on_browse_delta=self._handle_browse_delta,
+                    on_activate=self._handle_activate,
+                    on_alternate_activate=self._handle_alternate_activate,
+                )
             )
-        )
         return state
 
     def _register_mode(
