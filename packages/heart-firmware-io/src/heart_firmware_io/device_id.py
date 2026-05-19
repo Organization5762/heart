@@ -2,33 +2,34 @@
 
 from __future__ import annotations
 
-import importlib
 import os
-from pathlib import Path
-from types import ModuleType
-from typing import Callable, Mapping, TextIO
+
+try:
+    import microcontroller
+except ImportError:  # pragma: no cover - CPython fallback
+    microcontroller = None
 
 DEVICE_ID_ENV_VAR = "HEART_DEVICE_ID"
 DEVICE_ID_PATH_ENV_VAR = "HEART_DEVICE_ID_PATH"
 DEFAULT_DEVICE_ID_FILENAME = "device_id.txt"
-DEFAULT_DEVICE_ID_PATH = Path("/") / DEFAULT_DEVICE_ID_FILENAME
+DEFAULT_DEVICE_ID_PATH = "/" + DEFAULT_DEVICE_ID_FILENAME
 
 
-def default_device_id_path(env: Mapping[str, str] | None = None) -> Path:
+def default_device_id_path(env=None) -> str:
     """Return the filesystem path used to persist device identifiers."""
 
-    env_mapping = env or os.environ
+    env_mapping = env or getattr(os, "environ", {})
     configured = env_mapping.get(DEVICE_ID_PATH_ENV_VAR)
     if configured:
-        return Path(configured)
+        return configured
     return DEFAULT_DEVICE_ID_PATH
 
 
 def persistent_device_id(
     *,
-    storage_path: Path | str | None = None,
-    env: Mapping[str, str] | None = None,
-    opener: Callable[[str | Path, str], TextIO] | None = None,
+    storage_path=None,
+    env=None,
+    opener=None,
     microcontroller_module=None,
 ) -> str:
     """Return a device identifier that remains stable across boots.
@@ -45,8 +46,12 @@ def persistent_device_id(
     requiring the environment variable.
     """
 
-    env_mapping = env or os.environ
-    path = Path(storage_path) if storage_path else default_device_id_path(env_mapping)
+    env_mapping = env or getattr(os, "environ", {})
+    path = (
+        _pathlike_to_string(storage_path)
+        if storage_path
+        else default_device_id_path(env_mapping)
+    )
     opener_fn = opener or open
 
     existing = _read_device_id(path, opener_fn)
@@ -67,12 +72,10 @@ def persistent_device_id(
     return candidate
 
 
-def _hardware_device_uid(microcontroller_module: ModuleType | None = None) -> str | None:
-    module = microcontroller_module
+def _hardware_device_uid(microcontroller_module=None) -> str | None:
+    module = microcontroller_module or microcontroller
     if module is None:
-        if importlib.util.find_spec("microcontroller") is None:  # pragma: no cover - hardware only
-            return None
-        module = importlib.import_module("microcontroller")
+        return None
 
     cpu = getattr(module, "cpu", None)
     uid = getattr(cpu, "uid", None) if cpu is not None else None
@@ -100,8 +103,8 @@ def _random_device_id() -> str:
 
 
 def _read_device_id(
-    path: Path | None,
-    opener: Callable[[str | Path, str], TextIO],
+    path: str | None,
+    opener,
 ) -> str | None:
     if not path:
         return None
@@ -115,8 +118,8 @@ def _read_device_id(
     return raw or None
 
 
-def _write_device_id(path: Path, value: str, opener: Callable[[str | Path, str], TextIO]) -> None:
-    _ensure_directory(path.parent)
+def _write_device_id(path: str, value: str, opener) -> None:
+    _ensure_directory(_parent_directory(path))
 
     try:
         with opener(path, "w") as handle:
@@ -125,11 +128,22 @@ def _write_device_id(path: Path, value: str, opener: Callable[[str | Path, str],
         return
 
 
-def _ensure_directory(path: Path) -> None:
-    if path in (Path("."), Path("/")):
+def _ensure_directory(path: str) -> None:
+    if path in ("", ".", "/"):
         return
 
     try:
-        path.mkdir(parents=True, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
     except OSError:
         return
+
+
+def _pathlike_to_string(path) -> str:
+    try:
+        return os.fspath(path)
+    except AttributeError:
+        return str(path)
+
+
+def _parent_directory(path: str) -> str:
+    return path.rsplit("/", 1)[0] if "/" in path else ""

@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import sys
-from types import ModuleType
-from typing import Callable, Iterable, Mapping, TextIO
 
 from heart_firmware_io import constants
 
-supervisor: ModuleType | None
-if importlib.util.find_spec("supervisor") is not None:  # pragma: no cover - exercised on hardware
-    supervisor = importlib.import_module("supervisor")
-else:  # pragma: no cover - supervisor is unavailable on CPython
+try:
+    import importlib
+except ImportError:  # pragma: no cover - CircuitPython fallback
+    importlib = None
+
+try:
+    import supervisor
+except ImportError:  # pragma: no cover - supervisor is unavailable on CPython
     supervisor = None
 
 
@@ -29,14 +30,14 @@ class Identity:
         firmware_commit: str,
         device_id: str,
         *,
-        metadata: Mapping[str, str] | None = None,
+        metadata=None,
     ) -> None:
         self.device_name = device_name
         self.firmware_commit = firmware_commit
         self.device_id = device_id
         self._metadata = dict(metadata or {})
 
-    def as_payload(self) -> Mapping[str, str]:
+    def as_payload(self):
         payload = {
             "device_name": self.device_name,
             "firmware_commit": self.firmware_commit,
@@ -66,8 +67,8 @@ def default_firmware_commit(default: str = DEFAULT_FIRMWARE_COMMIT) -> str:
 def poll_and_respond(
     identity: Identity,
     *,
-    stdin: TextIO | None = None,
-    print_fn: Callable[[str], None] = print,
+    stdin=None,
+    print_fn=print,
 ) -> bool:
     """Respond to any pending serial queries.
 
@@ -89,11 +90,23 @@ def _format_identity_payload(identity: Identity) -> str:
     return json.dumps({"event_type": constants.DEVICE_IDENTIFY, "data": identity.as_payload()})
 
 
-def _iter_serial_queries(*, stdin: TextIO | None) -> Iterable[str]:
+def _iter_serial_queries(*, stdin):
     provided_stream = stdin
     stream = stdin or sys.stdin
     if stream is None:
         return []
+
+    if provided_stream is None:
+        available = _serial_bytes_available_count()
+        if available <= 0:
+            return []
+        try:
+            raw = stream.read(available)
+        except OSError:
+            return []
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", errors="ignore")
+        return [line.strip() for line in raw.splitlines() if line.strip()]
 
     queries = []
     while _serial_bytes_available(stdin_provided=provided_stream is not None):
@@ -110,6 +123,24 @@ def _iter_serial_queries(*, stdin: TextIO | None) -> Iterable[str]:
             queries.append(stripped)
 
     return queries
+
+
+def _serial_bytes_available_count() -> int:
+    if supervisor is None:
+        return 0
+
+    runtime = getattr(supervisor, "runtime", None)
+    if runtime is None:
+        return 0
+
+    available = getattr(runtime, "serial_bytes_available", None)
+    if available is None:
+        return 0
+
+    try:
+        return int(available)
+    except Exception:  # pragma: no cover - defensive fallback
+        return 0
 
 
 def _serial_bytes_available(*, stdin_provided: bool) -> bool:
@@ -142,7 +173,7 @@ def _extract_command(raw: str) -> str | None:
     except ValueError:
         return raw
 
-    if isinstance(parsed, Mapping):
+    if isinstance(parsed, dict):
         candidate = parsed.get("query") or parsed.get("command")
         if isinstance(candidate, str):
             return candidate
@@ -151,6 +182,8 @@ def _extract_command(raw: str) -> str | None:
 
 
 def _commit_from_generated_module() -> str | None:
+    if importlib is None:
+        return None
     if importlib.util.find_spec("heart_firmware_build") is None:
         return None
     module = importlib.import_module("heart_firmware_build")
@@ -162,6 +195,8 @@ def _commit_from_generated_module() -> str | None:
 
 
 def _commit_from_git(default: str) -> str | None:
+    if importlib is None:
+        return None
     if importlib.util.find_spec("subprocess") is None:  # pragma: no cover - hardware environments
         return None
     subprocess = importlib.import_module("subprocess")
