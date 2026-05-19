@@ -19,6 +19,12 @@ from heart.peripheral.core.streams import combine_latest
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
 
+def _trigger_pressure(raw_value: float) -> float:
+    if raw_value < 0.0:
+        return max(0.0, min(1.0, (raw_value + 1.0) * 0.5))
+    return max(0.0, min(1.0, raw_value))
+
+
 @dataclass(frozen=True, slots=True)
 class MandelbrotEdgeState:
     next_view_mode_revision: int = 0
@@ -203,6 +209,12 @@ class MandelbrotControlProfile:
 
     def observable(self) -> StreamNode[MandelbrotControlState]:
         return self._observable
+
+    def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
+        return self._to_motion_state_from_snapshots(
+            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
+            self._gamepad.sample(include_tapped_buttons=False),
+        )
 
     def _keyboard_command_streams(self) -> StreamNode[MandelbrotCommand]:
         return MergeNode.merge(
@@ -413,8 +425,8 @@ class MandelbrotControlProfile:
         button_plus_held = gamepad_snapshot.button_held(GamepadButton.PLUS)
         button_minus_held = gamepad_snapshot.button_held(GamepadButton.MINUS)
         dpad = gamepad_snapshot.dpad
-        zoom_in = pygame.K_e in pressed_keys or trigger_right > 0.0
-        zoom_out = pygame.K_q in pressed_keys or trigger_left > 0.0
+        zoom_in = pygame.K_e in pressed_keys or _trigger_pressure(trigger_right) > 0.0
+        zoom_out = pygame.K_q in pressed_keys or _trigger_pressure(trigger_left) > 0.0
         increase_iterations = pygame.K_j in pressed_keys or (
             not button_home_held and bool(button_plus_held)
         )

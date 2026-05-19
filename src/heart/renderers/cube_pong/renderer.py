@@ -11,10 +11,13 @@ from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.cube_pong.state import (
-    PLAYER_ONE, PLAYER_TWO, CubePongControls, CubePongState,
-    advance_cube_pong_state, ball_radius, face_position_for_ball,
-    new_cube_pong_round, paddle_path_x, paddle_size)
+from heart.renderers.cube_pong.state import (PLAYER_ONE, PLAYER_TWO,
+                                             CubePongControls, CubePongState,
+                                             advance_cube_pong_state,
+                                             ball_radius,
+                                             face_position_for_ball,
+                                             new_cube_pong_round,
+                                             paddle_path_x, paddle_size)
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 

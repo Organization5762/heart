@@ -6,7 +6,8 @@ from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.audio_storm import AudioStormScene
-from heart.renderers.bouncing_ball import BouncingBallRenderer
+from heart.renderers.bouncing_ball import (BouncingBallRenderer,
+                                           BouncingBallStateProvider)
 from heart.renderers.controller_pairing import ControllerPairingRenderer
 from heart.renderers.cube_pong import add_cube_pong_mode
 from heart.renderers.hilbert_curve import HilbertScene
@@ -23,13 +24,13 @@ from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.renderers.tetris import TetrisRenderer
 from heart.renderers.text import TextRendering
 from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.vibe import VibeScene
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
-from heart.renderers.tetris import TetrisRenderer
 from heart.runtime.game_loop import GameLoop
 
 TITLE_TILE_HEIGHT_PX = 64
@@ -49,7 +50,7 @@ def centered_text_title(text: str) -> TextRendering:
     return centered_text(
         text=text,
         font_size=TITLE_FONT_SIZE,
-        color=Color(255, 255, 255),
+        color=Color.kirby(),
         line_height_px=TITLE_LINE_HEIGHT_PX,
         line_spacing_px=TITLE_LINE_SPACING_PX,
     )
@@ -127,7 +128,7 @@ def configure(loop: GameLoop) -> None:
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
-    bouncing_ball_mode.add_renderer(BouncingBallRenderer())
+    bouncing_ball_mode.add_renderer(BouncingBallRenderer(BouncingBallStateProvider()))
 
     vibe_mode = loop.add_mode(VibeScene.title_scene())
     vibe_mode.add_renderer(VibeScene())
