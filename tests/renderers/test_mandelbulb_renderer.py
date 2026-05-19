@@ -14,6 +14,7 @@ from heart.display.shaders.shader_templates.mandelbulb import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
+from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.mandelbulb.renderer import (BASE_PHASE_SPEED, BASE_POWER,
                                                  COLOR_MODE_COUNT,
                                                  DEFAULT_CAMERA_DISTANCE,
@@ -54,10 +55,15 @@ class _SnapshotController:
         return self.stream
 
 
+class _InputIO:
+    def __init__(self) -> None:
+        self.keyboard = _SnapshotController()
+        self.gamepad = _SnapshotController()
+
+
 class _PeripheralManager:
     def __init__(self) -> None:
-        self.keyboard_controller = _SnapshotController()
-        self.gamepad_controller = _SnapshotController()
+        self.input_io = _InputIO()
 
 
 class _Clock:
@@ -177,6 +183,20 @@ class TestMandelbulbScene:
         assert render_call["uniforms"]["uPhaseTime"] > 0.0
         assert render_call["uniforms"]["uAutoYaw"] > 0.0
 
+    def test_initializes_with_real_peripheral_manager_input_io(self) -> None:
+        scene = MandelbulbScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        window = _window()
+
+        scene.initialize(
+            window=window,
+            peripheral_manager=PeripheralManager(),
+            orientation=Mock(),
+        )
+
+        assert scene.is_initialized() is True
+
     def test_keyboard_and_gamepad_update_interactive_uniforms(self) -> None:
         scene = MandelbulbScene()
         shader_runtime = _ShaderRuntime()
@@ -185,7 +205,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.keyboard_controller.stream.emit(
+        manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(
                 pressed_keys=frozenset(
                     {
@@ -201,7 +221,7 @@ class TestMandelbulbScene:
                 timestamp_ms=1.0,
             )
         )
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -240,7 +260,7 @@ class TestMandelbulbScene:
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
         scene.real_process(window=window, orientation=Mock())
         moving_phase = shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"]
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -255,7 +275,7 @@ class TestMandelbulbScene:
         assert paused_phase == moving_phase
         assert shader_runtime.render_calls[-1]["uniforms"]["uPhaseTime"] == paused_phase
 
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -277,7 +297,7 @@ class TestMandelbulbScene:
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
         scene.real_process(window=window, orientation=Mock())
         moving_yaw = shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"]
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -292,7 +312,7 @@ class TestMandelbulbScene:
         assert paused_yaw == moving_yaw
         assert shader_runtime.render_calls[-1]["uniforms"]["uAutoYaw"] == paused_yaw
 
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -312,7 +332,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -325,7 +345,7 @@ class TestMandelbulbScene:
         scene.real_process(window=window, orientation=Mock())
         selected = shader_runtime.render_calls[-1]["uniforms"]["uColorVector"].copy()
 
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(connected=True, identifier="pad")
         )
         scene.real_process(window=window, orientation=Mock())
@@ -343,7 +363,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -363,7 +383,7 @@ class TestMandelbulbScene:
         assert scene.color_mode == (DEFAULT_COLOR_MODE + 1) % COLOR_MODE_COUNT
 
         for timestamp in range(2, COLOR_MODE_COUNT + 2):
-            manager.gamepad_controller.stream.emit(
+            manager.input_io.gamepad.stream.emit(
                 GamepadSnapshot(
                     connected=True,
                     identifier="pad",
@@ -385,7 +405,7 @@ class TestMandelbulbScene:
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
         scene.target_power = 10.0
         scene.power = 10.0
-        manager.keyboard_controller.stream.emit(
+        manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(
                 pressed_keys=frozenset({pygame.K_SPACE}),
                 timestamp_ms=1.0,
@@ -401,7 +421,7 @@ class TestMandelbulbScene:
         assert scene.target_power == 10.0
         assert expected_morph_target < uniforms["uPower"] < 10.0
 
-        manager.keyboard_controller.stream.emit(
+        manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=2.0)
         )
         scene.real_process(window=window, orientation=Mock())
@@ -418,7 +438,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -434,7 +454,7 @@ class TestMandelbulbScene:
 
         scene.target_power = MIN_POWER + 0.05
         scene.power = MIN_POWER + 0.05
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -453,7 +473,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -467,7 +487,7 @@ class TestMandelbulbScene:
 
         assert scene.target_power == BASE_POWER
 
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -489,7 +509,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -504,7 +524,7 @@ class TestMandelbulbScene:
         assert shader_runtime.render_calls[-1]["uniforms"]["uCameraDistance"] == 3.0
 
         scene.phase_speed = MIN_PHASE_SPEED + 0.01
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -523,7 +543,7 @@ class TestMandelbulbScene:
         manager = _PeripheralManager()
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -536,7 +556,7 @@ class TestMandelbulbScene:
         assert scene.phase_speed == BASE_PHASE_SPEED
 
         scene.camera_distance = DEFAULT_CAMERA_DISTANCE
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -664,8 +684,8 @@ class TestMandelbulbScene:
         scene.display_texture = 11
         scene.reset()
 
-        keyboard_subscription = manager.keyboard_controller.stream.subscriptions[0][0]
-        gamepad_subscription = manager.gamepad_controller.stream.subscriptions[0][0]
+        keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
+        gamepad_subscription = manager.input_io.gamepad.stream.subscriptions[0][0]
         assert keyboard_subscription.dispose_calls == 1
         assert gamepad_subscription.dispose_calls == 1
         assert deleted_textures == [11]

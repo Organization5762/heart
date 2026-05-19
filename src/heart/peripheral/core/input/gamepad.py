@@ -98,6 +98,9 @@ class GamepadController:
     def __init__(self, manager: "PeripheralManager", debug_tap: InputDebugTap) -> None:
         self._manager = manager
         self._debug_tap = debug_tap
+        self._snapshot_streams_by_joystick_id: dict[
+            int, StreamNode[GamepadSnapshot]
+        ] = {}
 
     @cached_property
     def _snapshot_stream(self) -> StreamNode[GamepadSnapshot]:
@@ -116,8 +119,36 @@ class GamepadController:
             ),
         ).connect(stream)
 
-    def snapshot_stream(self) -> StreamNode[GamepadSnapshot]:
+    def snapshot_stream(
+        self,
+        joystick_id: int | None = None,
+    ) -> StreamNode[GamepadSnapshot]:
+        if joystick_id is not None:
+            return self._snapshot_stream_for_joystick_id(joystick_id)
         return self._snapshot_stream
+
+    def _snapshot_stream_for_joystick_id(
+        self,
+        joystick_id: int,
+    ) -> StreamNode[GamepadSnapshot]:
+        if joystick_id not in self._snapshot_streams_by_joystick_id:
+            stream = (
+                Timer(period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS))
+                .then_on_main_thread()
+                .map(lambda _: self._sample(joystick_id=joystick_id))
+                .distinct_until_changed()
+            )
+            self._snapshot_streams_by_joystick_id[joystick_id] = InputDebugNode(
+                tap=self._debug_tap,
+                stage=InputDebugStage.RAW,
+                stream_name=f"gamepad.snapshot.{joystick_id}",
+                source_id=lambda snapshot: (
+                    f"gamepad:{joystick_id}"
+                    if snapshot.connected
+                    else f"gamepad:{joystick_id}:none"
+                ),
+            ).connect(stream)
+        return self._snapshot_streams_by_joystick_id[joystick_id]
 
     @cache
     def button_held(self, button: GamepadButton) -> StreamNode[bool]:
@@ -125,7 +156,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.button_held(button))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -145,7 +175,6 @@ class GamepadController:
                     button=button, timestamp_monotonic=snapshot.timestamp_monotonic
                 )
             )
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -163,7 +192,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -186,7 +214,6 @@ class GamepadController:
             )
             .map(lambda latest: GamepadStickValue(x=latest[0], y=latest[1]))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -205,7 +232,6 @@ class GamepadController:
             self.snapshot_stream()
             .map(lambda snapshot: snapshot.dpad)
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -215,15 +241,31 @@ class GamepadController:
             upstream_ids=("gamepad.snapshot",),
         ).connect(stream)
 
-    def sample(self) -> GamepadSnapshot:
-        return self._sample()
+    def sample(self, joystick_id: int | None = None) -> GamepadSnapshot:
+        return self._sample(joystick_id=joystick_id)
 
-    def _sample(self) -> GamepadSnapshot:
-        gamepad = self._active_gamepad()
-        if gamepad is None:
+    def _sample(self, joystick_id: int | None = None) -> GamepadSnapshot:
+        if joystick_id is not None:
+            gamepad = self._gamepad(joystick_id)
+            if gamepad is None:
+                return GamepadSnapshot(
+                    connected=False,
+                    identifier=None,
+                    timestamp_monotonic=time.monotonic(),
+                )
+            return self._sample_gamepad(gamepad)
+        snapshots = [
+            snapshot
+            for gamepad in self._gamepads()
+            if (snapshot := self._sample_gamepad(gamepad)).connected
+        ]
+        if not snapshots:
             return GamepadSnapshot(
                 connected=False, identifier=None, timestamp_monotonic=time.monotonic()
             )
+        return self._combine_snapshots(snapshots)
+
+    def _sample_gamepad(self, gamepad: Gamepad) -> GamepadSnapshot:
         gamepad.update()
         if not gamepad.is_connected():
             return GamepadSnapshot(
@@ -290,11 +332,65 @@ class GamepadController:
             timestamp_monotonic=time.monotonic(),
         )
 
-    def _active_gamepad(self) -> Gamepad | None:
+    def _gamepads(self) -> tuple[Gamepad, ...]:
+        gamepads: list[Gamepad] = []
         for peripheral in self._manager.peripherals:
             if isinstance(peripheral, Gamepad):
-                return peripheral
+                gamepads.append(peripheral)
+        return tuple(gamepads)
+
+    def _gamepad(self, joystick_id: int) -> Gamepad | None:
+        for gamepad in self._gamepads():
+            if gamepad.joystick_id == joystick_id:
+                return gamepad
         return None
+
+    def _combine_snapshots(
+        self,
+        snapshots: list[GamepadSnapshot],
+    ) -> GamepadSnapshot:
+        return GamepadSnapshot(
+            connected=True,
+            identifier="+".join(
+                snapshot.identifier or "unknown" for snapshot in snapshots
+            ),
+            buttons=self._combine_buttons(snapshots),
+            tapped_buttons=frozenset().union(
+                *(snapshot.tapped_buttons for snapshot in snapshots)
+            ),
+            axes=self._combine_axes(snapshots),
+            dpad=self._combine_dpad(snapshots),
+            timestamp_monotonic=max(
+                snapshot.timestamp_monotonic for snapshot in snapshots
+            ),
+        )
+
+    @staticmethod
+    def _combine_buttons(
+        snapshots: list[GamepadSnapshot],
+    ) -> dict[GamepadButton, bool]:
+        return {
+            button: any(snapshot.button_held(button) for snapshot in snapshots)
+            for button in GamepadButton
+        }
+
+    @staticmethod
+    def _combine_axes(
+        snapshots: list[GamepadSnapshot],
+    ) -> dict[GamepadAxis, float]:
+        return {
+            axis: max(
+                (snapshot.axes.get(axis, 0.0) for snapshot in snapshots),
+                key=abs,
+            )
+            for axis in GamepadAxis
+        }
+
+    @staticmethod
+    def _combine_dpad(snapshots: list[GamepadSnapshot]) -> GamepadDpadValue:
+        x = max(-1, min(1, sum(snapshot.dpad.x for snapshot in snapshots)))
+        y = max(-1, min(1, sum(snapshot.dpad.y for snapshot in snapshots)))
+        return GamepadDpadValue(x=x, y=y)
 
     @staticmethod
     def _mapping_for_gamepad(gamepad: Gamepad) -> SwitchLikeMapping:
