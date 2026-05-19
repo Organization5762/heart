@@ -11,6 +11,7 @@ import json
 import time
 
 import board
+import busio
 from adafruit_lis2mdl import LIS2MDL
 from adafruit_lsm6ds import Rate
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
@@ -23,6 +24,20 @@ DEFAULT_WAIT_BETWEEN_PAYLOADS_SECONDS: float = 0.1
 DEFAULT_MIN_CHANGE_THRESHOLD: float = 0.1
 DEBUG = False
 DEVICE_NAME = "sensor-bus"
+RUN_MODULE_NAMES = {"__main__", "code"}
+LSM303_ACCEL_ADDRESSES = (0x19,)
+LIS2MDL_ADDRESSES = (0x1E,)
+ISM330DHCX_ADDRESSES = (0x6A, 0x6B)
+
+
+def create_i2c_bus():
+    """Return the configured sensor I2C bus for STEMMA/Qwiic wiring."""
+    if hasattr(board, "STEMMA_I2C"):
+        try:
+            return board.STEMMA_I2C()
+        except Exception as exc:  # noqa: BLE001
+            _debug("Failed to initialize board.STEMMA_I2C(): %s" % exc)
+    return busio.I2C(board.RX, board.TX)
 
 
 def _debug(message: str) -> None:
@@ -115,18 +130,46 @@ def connect_to_sensors(i2c):
         ISM330DHCX: An instance of the ISM330DHCX sensor.
 
     """
+    scanned_addresses = _scan_i2c_addresses(i2c)
     sensor_factories = [
-        LSM303_Accel,
-        LIS2MDL,
-        ISM330DHCX,
+        (LSM303_Accel, LSM303_ACCEL_ADDRESSES),
+        (LIS2MDL, LIS2MDL_ADDRESSES),
+        (ISM330DHCX, ISM330DHCX_ADDRESSES),
     ]
     sensors = []
-    for sensor_factory in sensor_factories:
+    for sensor_factory, expected_addresses in sensor_factories:
+        if scanned_addresses is not None and not _has_any_address(
+            scanned_addresses, expected_addresses
+        ):
+            _debug(
+                "Skipping sensor %s; addresses %s not present"
+                % (sensor_factory.__name__, expected_addresses)
+            )
+            continue
         try:
             sensors.append(sensor_factory(i2c))
         except Exception as exc:  # noqa: BLE001
-            _debug(f"Failed to initialize sensor {sensor_factory.__name__}: {exc}")
+            _debug("Failed to initialize sensor %s: %s" % (sensor_factory.__name__, exc))
     return sensors
+
+
+def _scan_i2c_addresses(i2c):
+    if not hasattr(i2c, "try_lock") or not hasattr(i2c, "scan"):
+        return None
+    try:
+        while not i2c.try_lock():
+            time.sleep(0.01)
+        try:
+            return tuple(i2c.scan())
+        finally:
+            i2c.unlock()
+    except Exception as exc:  # noqa: BLE001
+        _debug("Failed to scan I2C bus: %s" % exc)
+        return None
+
+
+def _has_any_address(scanned_addresses, expected_addresses) -> bool:
+    return any(address in scanned_addresses for address in expected_addresses)
 
 
 class SensorReader:
@@ -180,7 +223,7 @@ def main() -> None:
         OSError: If an error occurs during sensor data reading or connection.
 
     """
-    i2c = board.STEMMA_I2C()
+    i2c = create_i2c_bus()
     sensors = connect_to_sensors(i2c=i2c)
 
     # This assumes two things:
@@ -210,5 +253,5 @@ def main() -> None:
             time.sleep(WAIT_BEFORE_TRYING_TO_CONNECT_TO_SENSOR_SECONDS)
 
 
-if __name__ == "__main__":
+if __name__ in RUN_MODULE_NAMES:
     main()

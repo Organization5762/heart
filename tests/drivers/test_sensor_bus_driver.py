@@ -14,6 +14,7 @@ class FakeRate:
 
 STUBS = {
     "board": make_module("board"),
+    "busio": make_module("busio"),
     "adafruit_lis2mdl": make_module("adafruit_lis2mdl", LIS2MDL=object),
     "adafruit_lsm6ds": make_module("adafruit_lsm6ds", Rate=FakeRate),
     "adafruit_lsm6ds.ism330dhcx": make_module(
@@ -64,6 +65,22 @@ class StubGyroSensor:
         return self.current
 
 
+class StubI2CBus:
+    def __init__(self, addresses):
+        self.addresses = addresses
+        self.locked = False
+
+    def try_lock(self):
+        self.locked = True
+        return True
+
+    def scan(self):
+        return self.addresses
+
+    def unlock(self):
+        self.locked = False
+
+
 class TestDriversSensorBusDriver:
     """Group Drivers Sensor Bus Driver tests so drivers sensor bus driver behaviour stays reliable. This preserves confidence in drivers sensor bus driver for end-to-end scenarios."""
 
@@ -89,6 +106,18 @@ class TestDriversSensorBusDriver:
             == sensor_bus.Rate.string[sensor_bus.Rate.RATE_104_HZ]
         )
 
+    def test_create_i2c_bus_falls_back_to_kb2040_rx_tx(self, sensor_bus):
+        """Verify KB2040 boards without STEMMA_I2C use the documented RX/TX I2C pins."""
+        calls = []
+        sensor_bus.board.RX = "rx"
+        sensor_bus.board.TX = "tx"
+        sensor_bus.busio.I2C = lambda scl, sda: calls.append((scl, sda)) or "i2c"
+
+        i2c = sensor_bus.create_i2c_bus()
+
+        assert i2c == "i2c"
+        assert calls == [("rx", "tx")]
+
     def test_connect_to_sensors_skips_failures(self, monkeypatch, sensor_bus):
         """Verify that connect_to_sensors ignores constructors that fail and returns only the working sensors. This keeps initialization resilient so one bad component does not break the stack."""
         created = []
@@ -108,6 +137,30 @@ class TestDriversSensorBusDriver:
         sensors = sensor_bus.connect_to_sensors("i2c-bus")
         assert len(sensors) == 2
         assert created == [("GoodSensor", "i2c-bus"), ("GoodSensor", "i2c-bus")]
+
+    def test_connect_to_sensors_skips_missing_i2c_addresses(
+        self, monkeypatch, sensor_bus
+    ):
+        """Verify driver construction is gated by scan results so absent devices cannot block startup."""
+        created = []
+
+        class Sensor:
+            def __init__(self, i2c):
+                created.append((self.__class__.__name__, i2c))
+
+        class UnexpectedSensor:
+            def __init__(self, i2c):
+                raise AssertionError("unexpected constructor")
+
+        monkeypatch.setattr(sensor_bus, "LSM303_Accel", Sensor)
+        monkeypatch.setattr(sensor_bus, "LIS2MDL", Sensor)
+        monkeypatch.setattr(sensor_bus, "ISM330DHCX", UnexpectedSensor)
+
+        i2c = StubI2CBus([0x19, 0x1E])
+        sensors = sensor_bus.connect_to_sensors(i2c)
+
+        assert len(sensors) == 2
+        assert created == [("Sensor", i2c), ("Sensor", i2c)]
 
     def test_sensor_reader_emits_when_change_exceeds_threshold(self, sensor_bus):
         """Verify that SensorReader yields events only when the change exceeds the configured threshold. This filters out sensor noise so downstream analytics highlight meaningful movement."""
