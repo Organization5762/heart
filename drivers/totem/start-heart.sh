@@ -9,7 +9,7 @@ SCAN_SECONDS="${HEART_RUBIKS_CONNECTED_X_SCAN_SECONDS:-20}"
 RP1_PIO_DIR="${HEART_RP1_HUB75_RP1_PIO_DIR:-/home/michael/rp1-pio}"
 RP1_SRAM_SLOT_OFFSET="${HEART_RP1_HUB75_EXTERNAL_SRAM_SLOT_OFFSET:-0xb800}"
 RP1_SCANNER_CANDIDATE="${HEART_RP1_HUB75_SCANNER_CANDIDATE:-state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2}"
-RP1_SCANNER_PWM_BITS="${HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS:-8}"
+RP1_SCANNER_PWM_BITS="${HEART_RP1_HUB75_SCANNER_PWM_BITS:-${HEART_RP1_HUB75_PWM_BITS:-${HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS:-8}}}"
 RP1_SCANNER_MEASURE_SECONDS="${HEART_RP1_HUB75_SCANNER_MEASURE_SECONDS:-2}"
 RP1_SCANNER_BOOT_TIMEOUT_SECONDS="${HEART_RP1_HUB75_SCANNER_BOOT_TIMEOUT_SECONDS:-120}"
 RP1_EXTERNAL_SCANNER="${HEART_RP1_HUB75_EXTERNAL_SCANNER:-0}"
@@ -136,7 +136,7 @@ if [[ "${frame_seen}" != "1" || "${slot_low}" == "0x00000000" || "${slot_high}" 
   exit 3
 fi
 if ! slot_meta_matches_scanner_pwm "${slot_meta:-0x00000000}"; then
-  log "refusing scanner PWM mismatch: scanner pwm=${RP1_SCANNER_PWM_BITS} expected slot meta=${RP1_EXPECTED_SLOT_META} observed slot meta=${slot_meta:-0x00000000}. Set HEART_RP1_HUB75_PWM_BITS and HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS to the same value."
+  log "refusing scanner PWM mismatch: scanner pwm=${RP1_SCANNER_PWM_BITS} expected slot meta=${RP1_EXPECTED_SLOT_META} observed slot meta=${slot_meta:-0x00000000}. Set HEART_RP1_HUB75_PWM_BITS for normal operation; use HEART_RP1_HUB75_SCANNER_PWM_BITS only for intentional mismatch experiments."
   exit 4
 fi
 

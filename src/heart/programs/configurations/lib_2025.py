@@ -6,6 +6,7 @@ from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.artist import ArtistScene
+from heart.renderers.audio_storm import AudioStormScene
 from heart.renderers.combined_bpm_screen import CombinedBpmScreen
 from heart.renderers.heart_title_screen import HeartTitleScreen
 from heart.renderers.hilbert_curve import HilbertScene
@@ -69,6 +70,9 @@ def configure(loop: GameLoop) -> None:
 
     palette_tunnel_mode = loop.add_mode("palette\ntunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
+
+    audio_storm_mode = loop.add_mode("spectrum")
+    audio_storm_mode.add_renderer(AudioStormScene())
 
     hilbert_mode = loop.add_mode("hilbert")
     hilbert_mode.add_renderer(HilbertScene)

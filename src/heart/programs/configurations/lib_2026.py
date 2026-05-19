@@ -5,6 +5,7 @@ import numpy as np
 from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
+from heart.renderers.audio_storm import AudioStormScene
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
 from heart.renderers.kirby import KirbyScene
@@ -93,7 +94,7 @@ def configure(loop: GameLoop) -> None:
                 TextRendering(
                     text=["mandelbrot"],
                     font="Grand9K Pixel.ttf",
-                    font_size=14,
+                    font_size=12,
                     color=Color(255, 255, 255),
                     y_location=0.55,
                 ),
@@ -107,6 +108,9 @@ def configure(loop: GameLoop) -> None:
 
     palette_tunnel_mode = loop.add_mode(centered_text_title("palette\ntunnel"))
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
+
+    audio_storm_mode = loop.add_mode(centered_text_title("spectrum"))
+    audio_storm_mode.add_renderer(AudioStormScene())
 
     hilbert_mode = loop.add_mode(centered_text_title("hilbert"))
     hilbert_mode.add_renderer(HilbertScene)

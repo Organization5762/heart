@@ -236,6 +236,12 @@ scan half.
 
 Expected proof after launch:
 
+`HEART_RP1_HUB75_PWM_BITS` is the normal Heart-controlled PWM source of
+truth. Scanner scripts derive their PWM from that value unless
+`HEART_RP1_HUB75_SCANNER_PWM_BITS` is set for an intentional mismatch test.
+The scanner refuses to start when the app-published handshake word does not
+match the scanner PWM.
+
 | Check | Expected value |
 | --- | --- |
 | `0xb800` | nonzero slot DMA low word |
