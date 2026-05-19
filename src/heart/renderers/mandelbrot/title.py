@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Orientation
+from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
@@ -18,9 +18,7 @@ class MandelbrotTitleState:
 class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
     def __init__(self):
         super().__init__()
-        # Match the real Mandelbrot scene geometry so the preview is framed
-        # the same way as the mode users enter from the selector.
-        self.device_display_mode = DeviceDisplayMode.FULL
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
 
     def _create_initial_state(
         self,
@@ -28,17 +26,19 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> MandelbrotTitleState:
+        del orientation
         mandelbrot = MandelbrotMode()
+        preview_orientation = Rectangle.with_layout(columns=1, rows=1)
         try:
             mandelbrot.initialize(
                 window,
                 peripheral_manager,
-                orientation,
+                preview_orientation,
             )
             mandelbrot._internal_process(
                 window,
                 peripheral_manager,
-                orientation,
+                preview_orientation,
             )
             first_image = window.screen.copy()
         finally:
