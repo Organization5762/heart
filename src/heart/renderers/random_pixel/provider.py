@@ -75,18 +75,18 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         next_color = self._color.value or Color.random()
         return RandomPixelState(color=next_color, pixels=self._random_pixels())
 
-    def _random_pixels(self) -> tuple[tuple[int, int], ...]:
+    def _random_pixels(self) -> np.ndarray:
         if self._rng is None:
-            pixels = self._numpy_rng.integers(
+            return self._numpy_rng.integers(
                 low=(0, 0),
                 high=(self._width, self._height),
                 size=(self._num_pixels, 2),
                 dtype=np.int16,
             )
-            return tuple(map(tuple, pixels.tolist()))
-        return tuple(
-            (
-                (self._rng.randrange(self._width), self._rng.randrange(self._height))
-                for _ in range(self._num_pixels)
+        pixels = np.empty((self._num_pixels, 2), dtype=np.int16)
+        for index in range(self._num_pixels):
+            pixels[index] = (
+                self._rng.randrange(self._width),
+                self._rng.randrange(self._height),
             )
-        )
+        return pixels

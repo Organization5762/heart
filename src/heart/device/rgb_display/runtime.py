@@ -85,9 +85,10 @@ def build_matrix_config(native_module: ModuleType, orientation: Orientation) -> 
         raise RuntimeError(
             f"Native matrix runtime module {MATRIX_RUNTIME_MODULE} is missing configuration types."
         )
-    hardware_mapping = os.environ.get(HARDWARE_MAPPING_ENV_VAR, "adafruit_hat_pwm")
+    hardware_mapping = os.environ.get(HARDWARE_MAPPING_ENV_VAR, "three-port-active")
     wiring = _resolve_wiring_profile(wiring_profile, hardware_mapping)
-    if wiring == wiring_profile.ThreePortActive and (
+    three_port_active = getattr(wiring_profile, "ThreePortActive", None)
+    if three_port_active is not None and wiring == three_port_active and (
         orientation.layout.columns != 4 or orientation.layout.rows != 1
     ):
         raise RuntimeError(

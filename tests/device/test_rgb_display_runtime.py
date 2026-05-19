@@ -70,6 +70,7 @@ class TestRgbDisplayRuntime:
 
         monkeypatch.setenv("HEART_PANEL_ROWS", "32")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
         native_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
             WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
@@ -110,15 +111,15 @@ class TestRgbDisplayRuntime:
         )
 
         config = build_matrix_config(
-            native_module, Rectangle.with_layout(columns=2, rows=2)
+            native_module, Rectangle.with_layout(columns=4, rows=1)
         )
 
         assert config == FakeMatrixConfig(
             wiring="three-port-active",
             panel_rows=64,
             panel_cols=64,
-            chain_length=2,
-            parallel=2,
+            chain_length=4,
+            parallel=1,
             color_order="rgb",
         )
 
@@ -154,6 +155,7 @@ class TestRgbDisplayRuntime:
         )
         monkeypatch.setenv("HEART_PANEL_ROWS", "16")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "32")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
 
         driver = build_matrix_driver(Rectangle.with_layout(columns=4, rows=1))
 
@@ -181,6 +183,7 @@ class TestRgbDisplayRuntime:
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
         monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "native")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
         monkeypatch.setattr(
             "heart.device.rgb_display.runtime.optional_import",
             lambda *_args, **_kwargs: fake_module,

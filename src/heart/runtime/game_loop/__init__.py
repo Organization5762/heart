@@ -65,6 +65,7 @@ class GameLoop:
         render_surface = self.render_frame(renderers)
         if render_surface is not None:
             self._apply_post_processors(render_surface)
+            self.components.display.screen.fill("black")
             self.components.display.blit(render_surface, (0, 0))
             pygame.display.flip()
             self.device.set_screen(self.components.display.screen)

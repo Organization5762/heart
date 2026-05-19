@@ -285,6 +285,7 @@ install_supervisor_files() {
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-app.sh" /usr/local/bin/heart-supervisor-app.sh
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-rp1-scanner.sh" /usr/local/bin/heart-supervisor-rp1-scanner.sh
   printf 'KERNEL=="rp1-hub75", GROUP="gpio", MODE="0660"\n' | run_root tee /etc/udev/rules.d/99-rp1-hub75.rules >/dev/null
+  printf 'rp1_hub75\n' | run_root tee /etc/modules-load.d/rp1-hub75.conf >/dev/null
   run_root udevadm control --reload-rules || true
   run_root udevadm trigger --name-match=rp1-hub75 || true
   run_root install -m 0644 "${TOTEM_DRIVER_DIR}/totem-performance.service" /etc/systemd/system/totem-performance.service
