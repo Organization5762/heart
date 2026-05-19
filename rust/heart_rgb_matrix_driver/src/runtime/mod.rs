@@ -6,6 +6,7 @@ mod pi5_pinout;
 mod pi5_pio_programs_generated;
 mod queue;
 mod rp1_hub75;
+mod rp1_sram_rgb888;
 mod stats;
 pub mod strategy;
 mod tuning;

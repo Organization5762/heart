@@ -28,7 +28,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             .start_with(initial_size)
 
         )
-        ticks = peripheral_manager.frame_tick_controller.observable()
+        ticks = peripheral_manager.input_io.frame_tick_stream()
 
         def build_stream(
             size: tuple[int, int],

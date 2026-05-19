@@ -2,8 +2,6 @@ from manyfold import StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.sensor import Acceleration
@@ -18,13 +16,9 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         self,
         metadata_file_path: str,
         sheet_file_path: str,
-        accelerometer_controller: AccelerometerController,
-        accelerometer_debug_profile: AccelerometerDebugProfile,
     ):
         self.metadata_file_path = metadata_file_path
         self.file = sheet_file_path
-        self._accelerometer_controller = accelerometer_controller
-        self._accelerometer_debug_profile = accelerometer_debug_profile
         frame_data = Loader.load_json(self.metadata_file_path)
         self.frames = []
         for key in frame_data["frames"]:
@@ -88,14 +82,10 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[MarioRendererState]:
         initial = self._create_initial_state()
-        if self._accelerometer_debug_profile.should_use_debug_input():
-            acceleration_source = self._accelerometer_debug_profile.node()
-        else:
-            acceleration_source = self._accelerometer_controller.node()
-        accelerations = acceleration_source.start_with(None)
-        frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable()
+        accelerations = peripheral_manager.input_io.active_acceleration().start_with(
+            None
         )
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         return (
             frame_ticks.with_latest_from(accelerations)
             .scan(

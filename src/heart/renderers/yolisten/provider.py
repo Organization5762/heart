@@ -85,7 +85,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
     ) -> StreamNode[YoListenState]:
         initial_state = self.initial_state()
         switch_updates = (
-            peripheral_manager.get_main_switch_subscription()
+            peripheral_manager.input_io.main_switch_stream()
             .map(
                 lambda switch_state: (
                     lambda state: self.handle_switch_state(state, switch_state)
@@ -118,7 +118,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             )
 
         tick_updates = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .with_latest_from(window_widths)
             .map(lambda latest: lambda state: advance(state, latest[1]))
 

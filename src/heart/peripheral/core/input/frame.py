@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from typing import cast
 
 import pygame
-from manyfold import Graph, StreamNode, TypedRoute
+from manyfold import Graph, StreamNode
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.peripheral.core.streams import GraphRouteStream, runtime_route
+from heart.peripheral.core.streams import EventStream
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,18 +20,12 @@ class FrameTick:
     fps: float | None = None
 
 
-FRAME_TICK_ROUTE: TypedRoute[FrameTick] = runtime_route(
-    "frame.tick",
-    "HeartFrameTick",
-)
-
-
 class FrameTickController:
     def __init__(self, debug_tap: InputDebugTap, graph: Graph | None = None) -> None:
+        del graph
         self._debug_tap = debug_tap
         self._frame_index = 0
-        self._graph = graph or Graph()
-        self._stream = GraphRouteStream[FrameTick](self._graph, FRAME_TICK_ROUTE)
+        self._stream: EventStream[FrameTick] = EventStream()
 
     def advance(self, clock: pygame.time.Clock) -> FrameTick:
         fps = float(clock.get_fps())
@@ -50,8 +44,8 @@ class FrameTickController:
             source_id="frame",
             payload=frame,
         )
-        self._stream.on_next(frame)
+        self._stream.emit(frame)
         return frame
 
     def observable(self) -> StreamNode[FrameTick]:
-        return cast(StreamNode[FrameTick], self._stream)
+        return cast(StreamNode[FrameTick], self._stream.observable())

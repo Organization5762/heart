@@ -20,12 +20,26 @@ const HEART_PI5_SIMPLE_SCAN_POST_ADDR_TICKS_DEFAULT: u32 = 5;
 const HEART_PI5_SIMPLE_SCAN_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_POST_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
+const HEART_RP1_HUB75_PWM_BITS_DEFAULT: u8 = 11;
+const HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT: u32 = 8;
+const HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT: u32 = 7;
+const HEART_RGB_MATRIX_BRIGHTNESS_DEFAULT: f32 = 1.0;
+const HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS_DEFAULT: u8 = 8;
+const HEART_RGB_MATRIX_GAMMA_DEFAULT: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RuntimeTuning {
     pub(crate) matrix_simulated_refresh_interval_ms: u64,
     pub(crate) matrix_pi4_refresh_interval_ms: u64,
     pub(crate) matrix_max_pending_frames: usize,
+    /*
+     * Normalized pre-packer brightness scalar applied to submitted RGB frames.
+     * The effective scalar is normalized against binary-PWM dwell so
+     * final_light ~= input_rgb * brightness_scalar * sum(active_bitplane_dwell).
+     */
+    pub(crate) matrix_brightness: f32,
+    pub(crate) matrix_brightness_reference_pwm_bits: u8,
+    pub(crate) matrix_gamma: f32,
     pub(crate) parallel_color_remap_threshold_bytes: usize,
     /* Default PWM bit depth used when building a Pi 5 scan config. */
     pub(crate) pi5_simple_scan_default_pwm_bits: u8,
@@ -41,6 +55,12 @@ pub(crate) struct RuntimeTuning {
     pub(crate) pi5_simple_scan_post_latch_ticks: u32,
     /* Per-column low/high hold count for the simple explicit-word transport. */
     pub(crate) pi5_simple_scan_clock_hold_ticks: u32,
+    /* PWM bit depth used by the RP1 HUB75 kernel packer and scanner path. */
+    pub(crate) rp1_hub75_pwm_bits: u8,
+    /* Fail fast when the kernel packer queues frames but no display worker retires them. */
+    pub(crate) rp1_hub75_require_progress_after_queued_frames: u32,
+    /* Maximum binary-PWM dwell exponent used by the RP1 HUB75 scanner. */
+    pub(crate) rp1_hub75_dwell_shift_limit: u32,
 }
 
 static HEART_RUNTIME_TUNING: OnceLock<RuntimeTuning> = OnceLock::new();
@@ -60,6 +80,21 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
         matrix_max_pending_frames: parse_env_usize("HEART_MATRIX_MAX_PENDING_FRAMES", 2, |value| {
             value > 0
         }),
+        matrix_brightness: parse_env_f32(
+            "HEART_RGB_MATRIX_BRIGHTNESS",
+            HEART_RGB_MATRIX_BRIGHTNESS_DEFAULT,
+            |value| value.is_finite() && (0.0..=1.0).contains(&value),
+        ),
+        matrix_brightness_reference_pwm_bits: parse_env_u8(
+            "HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS",
+            HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS_DEFAULT,
+            |value| (1..=11).contains(&value),
+        ),
+        matrix_gamma: parse_env_f32(
+            "HEART_RGB_MATRIX_GAMMA",
+            HEART_RGB_MATRIX_GAMMA_DEFAULT,
+            |value| value.is_finite() && (0.25..=4.0).contains(&value),
+        ),
         parallel_color_remap_threshold_bytes: parse_env_usize(
             "HEART_PARALLEL_COLOR_REMAP_THRESHOLD_BYTES",
             256 * 1024,
@@ -100,7 +135,42 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT,
             |value| value > 0,
         ),
+        rp1_hub75_pwm_bits: parse_env_u8(
+            "HEART_RP1_HUB75_PWM_BITS",
+            HEART_RP1_HUB75_PWM_BITS_DEFAULT,
+            |value| (1..=11).contains(&value),
+        ),
+        rp1_hub75_require_progress_after_queued_frames: parse_env_u32(
+            "HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES",
+            HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT,
+            |_| true,
+        ),
+        rp1_hub75_dwell_shift_limit: parse_env_u32(
+            "HEART_RP1_HUB75_DWELL_SHIFT_LIMIT",
+            HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT,
+            |value| value <= 10,
+        ),
     })
+}
+
+impl RuntimeTuning {
+    pub(crate) fn matrix_effective_brightness(&self) -> f32 {
+        let reference_dwell = rp1_hub75_dwell_sum(
+            self.matrix_brightness_reference_pwm_bits,
+            self.rp1_hub75_dwell_shift_limit,
+        );
+        let active_dwell =
+            rp1_hub75_dwell_sum(self.rp1_hub75_pwm_bits, self.rp1_hub75_dwell_shift_limit);
+        let dwell_ratio = reference_dwell as f32 / active_dwell as f32;
+
+        (self.matrix_brightness * dwell_ratio).clamp(0.0, 1.0)
+    }
+}
+
+pub(crate) fn rp1_hub75_dwell_sum(pwm_bits: u8, dwell_shift_limit: u32) -> u32 {
+    (0..u32::from(pwm_bits))
+        .map(|plane| 1_u32 << plane.min(dwell_shift_limit))
+        .sum()
 }
 
 pub(crate) fn frame_pool_size() -> usize {
@@ -145,4 +215,67 @@ fn parse_env_f32(key: &str, default: f32, validator: impl Fn(f32) -> bool) -> f3
         .and_then(|value| value.parse::<f32>().ok())
         .filter(|value| validator(*value))
         .unwrap_or(default)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rp1_hub75_dwell_sum_matches_binary_pwm_with_shift_limit() {
+        assert_eq!(HEART_RP1_HUB75_PWM_BITS_DEFAULT, 11);
+        assert_eq!(rp1_hub75_dwell_sum(6, 7), 63);
+        assert_eq!(rp1_hub75_dwell_sum(8, 7), 255);
+        assert_eq!(rp1_hub75_dwell_sum(11, 7), 639);
+    }
+
+    #[test]
+    fn matrix_effective_brightness_normalizes_against_reference_dwell() {
+        let tuning = RuntimeTuning {
+            matrix_simulated_refresh_interval_ms: 16,
+            matrix_pi4_refresh_interval_ms: 16,
+            matrix_max_pending_frames: 2,
+            matrix_brightness: 1.0,
+            matrix_brightness_reference_pwm_bits: 8,
+            matrix_gamma: 1.0,
+            parallel_color_remap_threshold_bytes: 256 * 1024,
+            pi5_simple_scan_default_pwm_bits: 11,
+            pi5_simple_scan_lsb_dwell_ticks: 1,
+            pi5_simple_scan_clock_divider: 200.0 / 27.0,
+            pi5_simple_scan_post_addr_ticks: 5,
+            pi5_simple_scan_latch_ticks: 1,
+            pi5_simple_scan_post_latch_ticks: 1,
+            pi5_simple_scan_clock_hold_ticks: 1,
+            rp1_hub75_pwm_bits: 11,
+            rp1_hub75_require_progress_after_queued_frames: 8,
+            rp1_hub75_dwell_shift_limit: 7,
+        };
+
+        assert!((tuning.matrix_effective_brightness() - (255.0 / 639.0)).abs() < 0.0001);
+    }
+
+    #[test]
+    fn matrix_effective_brightness_clamps_reference_brighter_than_active_pwm() {
+        let tuning = RuntimeTuning {
+            matrix_simulated_refresh_interval_ms: 16,
+            matrix_pi4_refresh_interval_ms: 16,
+            matrix_max_pending_frames: 2,
+            matrix_brightness: 1.0,
+            matrix_brightness_reference_pwm_bits: 8,
+            matrix_gamma: 1.0,
+            parallel_color_remap_threshold_bytes: 256 * 1024,
+            pi5_simple_scan_default_pwm_bits: 11,
+            pi5_simple_scan_lsb_dwell_ticks: 1,
+            pi5_simple_scan_clock_divider: 200.0 / 27.0,
+            pi5_simple_scan_post_addr_ticks: 5,
+            pi5_simple_scan_latch_ticks: 1,
+            pi5_simple_scan_post_latch_ticks: 1,
+            pi5_simple_scan_clock_hold_ticks: 1,
+            rp1_hub75_pwm_bits: 6,
+            rp1_hub75_require_progress_after_queued_frames: 8,
+            rp1_hub75_dwell_shift_limit: 7,
+        };
+
+        assert_eq!(tuning.matrix_effective_brightness(), 1.0);
+    }
 }

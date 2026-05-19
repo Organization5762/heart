@@ -10,6 +10,7 @@ from manyfold import BehaviorSubject, MergeNode, StreamNode
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.streams import StreamPriority, observe_on_background
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
@@ -46,15 +47,16 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         )
         color_updates = self._color.map(lambda color: ("color", color))
         tick_updates = (
-            self._peripheral_manager.frame_tick_controller.observable()
+            self._peripheral_manager.input_io.frame_tick_stream()
             .map(lambda frame_tick: ("tick", frame_tick))
 
         )
-        return (
-            MergeNode.merge(color_updates, tick_updates)
-            .scan(self._advance_state, seed=initial_state)
-
-
+        events = observe_on_background(
+            MergeNode.merge(color_updates, tick_updates),
+            priority=StreamPriority.LOW,
+        )
+        return events.scan(self._advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def set_color(self, color: Color | None) -> None:
@@ -75,18 +77,18 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         next_color = self._color.value or Color.random()
         return RandomPixelState(color=next_color, pixels=self._random_pixels())
 
-    def _random_pixels(self) -> tuple[tuple[int, int], ...]:
+    def _random_pixels(self) -> np.ndarray:
         if self._rng is None:
-            pixels = self._numpy_rng.integers(
+            return self._numpy_rng.integers(
                 low=(0, 0),
                 high=(self._width, self._height),
                 size=(self._num_pixels, 2),
                 dtype=np.int16,
             )
-            return tuple(map(tuple, pixels.tolist()))
-        return tuple(
-            (
-                (self._rng.randrange(self._width), self._rng.randrange(self._height))
-                for _ in range(self._num_pixels)
+        pixels = np.empty((self._num_pixels, 2), dtype=np.int16)
+        for index in range(self._num_pixels):
+            pixels[index] = (
+                self._rng.randrange(self._width),
+                self._rng.randrange(self._height),
             )
-        )
+        return pixels

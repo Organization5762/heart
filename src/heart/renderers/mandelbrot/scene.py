@@ -110,7 +110,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self.scene_controls = SceneControls(state)
         self.keyboard_controls = KeyboardControls(
             self.scene_controls,
-            peripheral_manager.mandelbrot_control_profile,
+            peripheral_manager.input_io.mandelbrot,
         )
 
         if isinstance(orientation, Cube):

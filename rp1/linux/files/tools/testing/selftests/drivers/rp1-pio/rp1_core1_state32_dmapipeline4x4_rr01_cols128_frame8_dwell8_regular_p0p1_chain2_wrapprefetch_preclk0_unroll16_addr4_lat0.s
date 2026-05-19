@@ -1,0 +1,6 @@
+.equ REGULAR_P0P1_WRAP_PREFETCH, 1
+.equ REGULAR_P0P1_PRECLK_NOPS, 0
+.equ REGULAR_P0P1_UNROLL, 16
+.equ REGULAR_P0P1_ROW_ADDR_STAGE_NOPS, 4
+.equ REGULAR_P0P1_LAT_PULSE_NOPS, 0
+.include "rp1_core1_state32_regular_p0p1_chain2_profile.inc"

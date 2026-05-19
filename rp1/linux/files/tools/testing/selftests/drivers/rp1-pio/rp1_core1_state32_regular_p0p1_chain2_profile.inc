@@ -1,0 +1,133 @@
+/*
+ * Shared PWM11 hzeller "regular" P0/P1 profile for two populated parallel
+ * chains. Variant wrappers set only tuning knobs before including this file.
+ */
+.equ STATUS_MAGIC,        0x52385032 /* R8P2 */
+.equ STATUS_ADDR,         0x2000f000
+.equ FRAME_COUNTER,       0x2000f004
+.equ CTRL_ADDR,           0x2000f008
+.equ LEGACY_STATUS_ADDR,  0x200080f0
+.equ USE_STATE32_DMA_ROUND_ROBIN_CH01, 1
+.equ DMA_ROUND_ROBIN_CHANNELS, 2
+.ifndef REGULAR_P0P1_PLANE_COUNT
+.equ REGULAR_P0P1_PLANE_COUNT, 11
+.endif
+.equ PLANE_COUNT,         REGULAR_P0P1_PLANE_COUNT
+.equ DWELL_ITERS,         1
+.equ SHARED_SLAB_BASE,    0x2000b800
+.equ STATE32_BASE,        0x10002000
+.equ DMA_PIPE_SLOT0_BASE, 0x20009000
+.equ DMA_PIPE_SLOT1_BASE, 0x2000a000
+.equ DMA_PIPE_SLOT2_BASE, 0x2000c000
+.equ DMA_PIPE_SLOT3_BASE, 0x2000d000
+.equ USE_DSRAM_CACHE,     1
+.ifndef REGULAR_P0P1_DMA_PIPELINE4
+.equ REGULAR_P0P1_DMA_PIPELINE4, 1
+.endif
+.if REGULAR_P0P1_DMA_PIPELINE4
+.equ USE_STATE32_DMA_PIPELINE4_CHUNK_STREAM, 1
+.else
+.equ USE_STATE32_DMA_CHUNK_STREAM, 1
+.endif
+.equ USE_STATE32_ROW_MAJOR_RECORDS, 1
+.equ USE_PLANECOUNT_WEIGHTED_DWELL, 1
+.equ WEIGHTED_DWELL_BASE, 6
+.equ USE_RUNTIME_DWELL_SHIFT_LIMIT, 1
+.equ USE_RGB_ONLY_CACHE,  1
+.ifndef REGULAR_P0P1_FULL_RIO_WORDS
+.equ REGULAR_P0P1_FULL_RIO_WORDS, 0
+.endif
+.if REGULAR_P0P1_FULL_RIO_WORDS
+.equ USE_FULL_STATE32_RIO_WORDS, 1
+.endif
+.ifndef REGULAR_P0P1_OE_ACTIVE_DURING_SHIFT
+.equ REGULAR_P0P1_OE_ACTIVE_DURING_SHIFT, 1
+.endif
+.if REGULAR_P0P1_OE_ACTIVE_DURING_SHIFT
+.equ USE_OE_ACTIVE_DURING_SHIFT, 1
+.endif
+.ifndef REGULAR_P0P1_USE_OE_SETCLR
+.equ REGULAR_P0P1_USE_OE_SETCLR, 1
+.endif
+.if REGULAR_P0P1_USE_OE_SETCLR
+.equ USE_OE_SETCLR,        1
+.endif
+.ifndef REGULAR_P0P1_USE_LAT_SETCLR
+.equ REGULAR_P0P1_USE_LAT_SETCLR, 1
+.endif
+.if REGULAR_P0P1_USE_LAT_SETCLR
+.equ USE_LAT_SETCLR,       1
+.endif
+.equ ROW_WORDS,           128
+.equ DMA_CHUNK_RECORDS,   4
+.equ PAD_CTRL_CLK,        0x42
+.equ PAD_CTRL_LAT,        0x42
+.equ PAD_CTRL_OE,         0x42
+.equ PAD_CTRL_ADDR,       0x42
+.equ PAD_CTRL_RGB,        0x42
+
+.ifndef REGULAR_P0P1_WRAP_PREFETCH
+.equ REGULAR_P0P1_WRAP_PREFETCH, 0
+.endif
+.if REGULAR_P0P1_WRAP_PREFETCH
+.equ USE_STATE32_DMA_PIPELINE_WRAP_PREFETCH, 1
+.endif
+
+.ifndef REGULAR_P0P1_PRECLK_NOPS
+.equ REGULAR_P0P1_PRECLK_NOPS, 1
+.endif
+.if REGULAR_P0P1_PRECLK_NOPS == 1
+.equ USE_PRECLK_SETUP_NOP1, 1
+.elseif REGULAR_P0P1_PRECLK_NOPS == 2
+.equ USE_PRECLK_SETUP_NOP2, 1
+.elseif REGULAR_P0P1_PRECLK_NOPS != 0
+.error "REGULAR_P0P1_PRECLK_NOPS supports 0, 1, or 2"
+.endif
+
+.ifndef REGULAR_P0P1_ROW_ADDR_STAGE_NOPS
+.equ REGULAR_P0P1_ROW_ADDR_STAGE_NOPS, 8
+.endif
+.equ ROW_ADDR_STAGE_NOPS, REGULAR_P0P1_ROW_ADDR_STAGE_NOPS
+
+.ifndef REGULAR_P0P1_LAT_PULSE_NOPS
+.equ REGULAR_P0P1_LAT_PULSE_NOPS, 2
+.endif
+.equ LAT_PULSE_NOPS, REGULAR_P0P1_LAT_PULSE_NOPS
+
+.ifndef REGULAR_P0P1_UNROLL
+.equ REGULAR_P0P1_UNROLL, 8
+.endif
+.if REGULAR_P0P1_UNROLL == 16
+.equ USE_ROW_WORD_LOOP_UNROLL16, 1
+.elseif REGULAR_P0P1_UNROLL == 8
+.equ USE_ROW_WORD_LOOP_UNROLL8, 1
+.elseif REGULAR_P0P1_UNROLL == 4
+.equ USE_ROW_WORD_LOOP_UNROLL4, 1
+.else
+.error "REGULAR_P0P1_UNROLL supports 4, 8, or 16"
+.endif
+
+.equ GPIO_CLK,            17
+.equ GPIO_LAT,            4
+.equ GPIO_OE,             18
+.equ USE_LEGACY_OE_SYNC,  0
+.equ GPIO_A,              22
+.equ GPIO_B,              23
+.equ GPIO_C,              24
+.equ GPIO_D,              25
+.equ GPIO_E,              15
+.equ GPIO_R1,             11
+.equ GPIO_G1,             27
+.equ GPIO_B1,             7
+.equ GPIO_R2,             8
+.equ GPIO_G2,             9
+.equ GPIO_B2,             10
+.equ USE_P1_RGB,          1
+.equ GPIO_P1_R1,          12
+.equ GPIO_P1_G1,          5
+.equ GPIO_P1_B1,          6
+.equ GPIO_P1_R2,          19
+.equ GPIO_P1_G2,          13
+.equ GPIO_P1_B2,          20
+
+.include "rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell28.s"

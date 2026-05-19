@@ -372,7 +372,7 @@ class TestNavigationGameModes:
         game_modes.set_state(GameModeState())
         window = _make_window()
         peripheral_manager = Mock()
-        peripheral_manager.navigation_profile.subscribe_events = Mock()
+        peripheral_manager.input_io.navigation.subscribe_events = Mock()
         orientation = Mock()
 
         game_modes.initialize(
@@ -493,6 +493,30 @@ class TestNavigationGameModes:
             4,
             "######------------------",
         )
+
+    def test_render_initialization_progress_can_skip_screen_draw(self) -> None:
+        """Verify totems can suppress the visible startup progress bar while retaining logs."""
+        game_modes = GameModes()
+        window = Mock()
+        window.screen = Mock()
+        window.screen.get_flags.return_value = 0
+
+        with (
+            patch.object(game_modes_module.Configuration, "render_initialization_progress") as progress_enabled,
+            patch.object(game_modes_module.logger, "info"),
+            patch.object(game_modes_module.pygame.display, "flip"),
+        ):
+            progress_enabled.return_value = False
+            game_modes._render_initialization_progress(
+                window=window,
+                completed=0,
+                total=4,
+            )
+
+        window.screen.fill.assert_called_once_with(
+            game_modes_module.INITIALIZATION_BACKGROUND_COLOR
+        )
+        window.device.set_screen.assert_called_once_with(window.screen)
 
 
 if __name__ == "__main__":

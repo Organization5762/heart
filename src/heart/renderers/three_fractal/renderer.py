@@ -253,10 +253,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         self.last_frame_time = time.monotonic()
         self._input_subscriptions = [
-            peripheral_manager.keyboard_controller.snapshot_stream().subscribe(
+            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
                 on_next=self._set_keyboard_snapshot
             ),
-            peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
+            peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
                 on_next=self._set_gamepad_snapshot
             ),
         ]

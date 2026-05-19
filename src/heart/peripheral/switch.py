@@ -264,7 +264,7 @@ class FakeSwitch(BaseSwitch):
                     "FakeSwitch requires an active GameLoop for navigation input"
                 )
                 return
-            navigation = loop.peripheral_manager.navigation_profile
+            navigation = loop.peripheral_manager.input_io.navigation
             self._navigation_subscription = navigation.subscribe_events(
                 on_browse_delta=self._handle_browse,
                 on_activate=self._handle_activate,

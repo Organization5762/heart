@@ -4,6 +4,7 @@ set -euo pipefail
 
 CONFIG_FILE="/boot/firmware/config.txt"
 CMDLINE_FILE="/boot/firmware/cmdline.txt"
+TOTEM_DRIVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../drivers/totem" && pwd)"
 AUDIO_PARAM="dtparam=audio=off"
 ASPM_PARAM="pcie_aspm=off"
 ISOLATED_CPU_PARAM="isolcpus=3"
@@ -81,6 +82,14 @@ PY
 ensure_config_line "$CONFIG_FILE" "$AUDIO_PARAM" "dtparam=audio=on"
 ensure_cmdline_flag "$CMDLINE_FILE" "$ASPM_PARAM"
 ensure_cmdline_flag "$CMDLINE_FILE" "$ISOLATED_CPU_PARAM"
+
+sudo install -m 0755 "$TOTEM_DRIVER_DIR/setup-performance.sh" /usr/local/bin/setup-totem-performance.sh
+sudo install -m 0755 "$TOTEM_DRIVER_DIR/setup-xvfb.sh" /usr/local/bin/setup-xvfb.sh
+sudo install -m 0755 "$TOTEM_DRIVER_DIR/start-heart.sh" /usr/local/bin/start-heart.sh
+sudo install -m 0644 "$TOTEM_DRIVER_DIR/totem-performance.service" /etc/systemd/system/totem-performance.service
+sudo install -m 0644 "$TOTEM_DRIVER_DIR/totem.service" /etc/systemd/system/totem.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now totem-performance.service
 
 curl "$RGB_MATRIX_INSTALLER_URL" > "$RGB_MATRIX_INSTALLER_FILE"
 sudo bash "$RGB_MATRIX_INSTALLER_FILE"

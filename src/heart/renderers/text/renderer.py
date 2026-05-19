@@ -22,6 +22,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         color: Color,
         x_location: float | None = None,
         y_location: float | None = None,
+        line_spacing_px: int = 0,
         provider: TextRenderingProvider | None = None,
     ) -> None:
         self._font: pygame.font.Font | None = None
@@ -33,6 +34,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
             color=color,
             x_location=x_location,
             y_location=y_location,
+            line_spacing_px=line_spacing_px,
         )
         super().__init__(builder=self._provider)
 
@@ -90,7 +92,7 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         antialias = (
             PIXEL_FONT_ANTIALIAS if self.state.font_name.endswith(".ttf") else True
         )
-        line_height = font.get_linesize()
+        line_height = max(1, font.get_linesize() + self.state.line_spacing_px)
         for line in lines:
             text_surface = font.render(
                 line,

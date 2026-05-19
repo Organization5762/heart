@@ -5,8 +5,6 @@ from random import Random
 
 from manyfold import StreamNode
 
-from heart.peripheral.core.input import (AccelerometerController,
-                                         AccelerometerDebugProfile)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
@@ -22,13 +20,9 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
-        accelerometer_controller: AccelerometerController,
-        accelerometer_debug_profile: AccelerometerDebugProfile,
         randomness: RandomnessProvider,
     ) -> None:
         self._peripheral_manager = peripheral_manager
-        self._accelerometer_controller = accelerometer_controller
-        self._accelerometer_debug_profile = accelerometer_debug_profile
         self._rng = randomness.rng()
 
     def observable(
@@ -41,14 +35,10 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
 
 
         )
-        frame_ticks = (
-            self._peripheral_manager.frame_tick_controller.observable()
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
+        accelerations = (
+            self._peripheral_manager.input_io.active_acceleration().start_with(None)
         )
-        if self._accelerometer_debug_profile.should_use_debug_input():
-            acceleration_source = self._accelerometer_debug_profile.node()
-        else:
-            acceleration_source = self._accelerometer_controller.node()
-        accelerations = acceleration_source.start_with(None)
         frame_inputs = (
             frame_ticks.with_latest_from(window_sizes, accelerations)
             .map(self._to_frame_input)

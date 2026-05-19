@@ -23,6 +23,10 @@ pub use crate::runtime::{
     PackedScanFrameStats, Pi5ScanConfig, Pi5ScanTiming, Pi5SimpleProbeMode, Pi5SimpleProbeSession,
     Rp1Hub75PresentStats, Rp1Hub75Stats, Rp1Hub75WorkerStatus, WiringProfile as ProbeWiringProfile,
 };
+pub use crate::runtime::{
+    ColorOrder as RuntimeColorOrder, MatrixDriverCore as RuntimeMatrixDriver,
+    MatrixDriverError as RuntimeMatrixDriverError,
+};
 
 fn to_py_runtime_error(error: MatrixDriverError) -> PyErr {
     match error {
@@ -407,7 +411,7 @@ impl NativeMatrixDriver {
     fn submit_rgba(&self, data: &Bound<'_, PyBytes>, width: u32, height: u32) -> PyResult<()> {
         self.with_driver(|driver| {
             driver
-                .submit_rgba(data.as_bytes().to_vec(), width, height)
+                .submit_rgba(data.as_bytes(), width, height)
                 .map_err(to_py_runtime_error)
         })
     }
@@ -468,16 +472,41 @@ impl NativeWiringProfile {
         }
     }
 
+    #[classattr]
+    fn ElectroDragonP0() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::ElectroDragonP0,
+        }
+    }
+
+    #[classattr]
+    fn ThreePortActive() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::ThreePortActive,
+        }
+    }
+
+    #[classattr]
+    fn Regular() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::ThreePortActive,
+        }
+    }
+
     #[getter]
     fn value(&self) -> &'static str {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "adafruit_hat_pwm",
+            WiringProfile::ElectroDragonP0 => "electrodragon_p0",
+            WiringProfile::ThreePortActive => "three-port-active",
         }
     }
 
     fn __repr__(&self) -> String {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "WiringProfile.AdafruitHatPwm".to_string(),
+            WiringProfile::ElectroDragonP0 => "WiringProfile.ElectroDragonP0".to_string(),
+            WiringProfile::ThreePortActive => "WiringProfile.ThreePortActive".to_string(),
         }
     }
 }

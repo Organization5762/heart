@@ -41,7 +41,7 @@ def _peripheral_manager(
 ) -> tuple[PeripheralManager, BehaviorSubject[SwitchState]]:
     manager = PeripheralManager()
     switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
-    monkeypatch.setattr(manager, "get_main_switch_subscription", lambda: switch_stream)
+    monkeypatch.setattr(manager.input_io, "main_switch_stream", lambda: switch_stream)
     if gamepad is not None:
         manager.register(gamepad)
     return manager, switch_stream
@@ -50,7 +50,7 @@ def _peripheral_manager(
 def _advance_frame(
     manager: PeripheralManager, clock_factory, *, delta_ms: float
 ) -> None:
-    manager.frame_tick_controller.advance(clock_factory(int(delta_ms)))
+    manager.input_io.frame_ticks.advance(clock_factory(int(delta_ms)))
 
 
 @pytest.fixture

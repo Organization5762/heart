@@ -61,10 +61,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             peripheral_manager=peripheral_manager,
         )
         self.set_state(state)
-        self._navigation_subscription = (
-            peripheral_manager.navigation_profile.subscribe_events(
-                on_activate=self._process_activate,
-            )
+        self._navigation_subscription = peripheral_manager.input_io.navigation.subscribe_events(
+            on_activate=self._process_activate,
         )
 
         if self.scenes:

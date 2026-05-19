@@ -30,6 +30,7 @@ class FakeDriver:
     def __init__(self, config: FakeMatrixConfig) -> None:
         self.config = config
         self.closed = False
+        self.clear_calls = 0
         self.submissions: list[tuple[bytes, int, int]] = []
 
     @property
@@ -44,7 +45,7 @@ class FakeDriver:
         self.submissions.append((data, width, height))
 
     def clear(self) -> None:
-        pass
+        self.clear_calls += 1
 
     def stats(self) -> object:
         return SimpleNamespace(
@@ -70,6 +71,7 @@ class TestRgbDisplayRuntime:
 
         monkeypatch.setenv("HEART_PANEL_ROWS", "32")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
         native_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
             WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
@@ -86,6 +88,39 @@ class TestRgbDisplayRuntime:
             panel_cols=64,
             chain_length=2,
             parallel=3,
+            color_order="rgb",
+        )
+
+    def test_build_matrix_config_resolves_three_port_active_wiring(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the runtime maps the hzeller regular profile to Heart's explicit three-port name."""
+
+        monkeypatch.setenv("HEART_PANEL_ROWS", "64")
+        monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
+        monkeypatch.setenv(
+            "HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active"
+        )
+        native_module = SimpleNamespace(
+            MatrixConfig=FakeMatrixConfig,
+            WiringProfile=SimpleNamespace(
+                AdafruitHatPwm="hat-pwm",
+                ElectroDragonP0="electrodragon-p0",
+                ThreePortActive="three-port-active",
+            ),
+            ColorOrder=SimpleNamespace(RGB="rgb"),
+        )
+
+        config = build_matrix_config(
+            native_module, Rectangle.with_layout(columns=4, rows=1)
+        )
+
+        assert config == FakeMatrixConfig(
+            wiring="three-port-active",
+            panel_rows=64,
+            panel_cols=64,
+            chain_length=4,
+            parallel=1,
             color_order="rgb",
         )
 
@@ -121,6 +156,7 @@ class TestRgbDisplayRuntime:
         )
         monkeypatch.setenv("HEART_PANEL_ROWS", "16")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "32")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
 
         driver = build_matrix_driver(Rectangle.with_layout(columns=4, rows=1))
 
@@ -148,6 +184,7 @@ class TestRgbDisplayRuntime:
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
         monkeypatch.setenv("HEART_RGB_DISPLAY_BACKEND", "native")
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
         monkeypatch.setattr(
             "heart.device.rgb_display.runtime.optional_import",
             lambda *_args, **_kwargs: fake_module,
@@ -210,8 +247,13 @@ class TestRgbDisplayRuntime:
 
         device.set_screen(surface)
 
-        assert len(fake_driver.submissions) == 1
-        submitted_bytes, width, height = fake_driver.submissions[0]
+        assert fake_driver.clear_calls == 1
+        assert len(fake_driver.submissions) == 4
+        startup_bytes, startup_width, startup_height = fake_driver.submissions[0]
+        assert startup_width == 64
+        assert startup_height == 32
+        assert startup_bytes == bytes(64 * 32 * 4)
+        submitted_bytes, width, height = fake_driver.submissions[-1]
         assert width == 64
         assert height == 32
         assert len(submitted_bytes) == 64 * 32 * 4

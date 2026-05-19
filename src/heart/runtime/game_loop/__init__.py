@@ -18,6 +18,7 @@ from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop.components import GameLoopComponents
+from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 try:
@@ -105,7 +106,10 @@ class GameLoop:
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
-        self.max_fps = _env_int(MAX_FPS_ENV_VAR, max_fps, minimum=1)
+        self.max_fps = min(
+            _env_int(MAX_FPS_ENV_VAR, max_fps, minimum=1),
+            Configuration.runtime_max_fps(),
+        )
         self.components = self._load_components()
 
         # Lampe controller
@@ -135,6 +139,10 @@ class GameLoop:
             started_at = time.perf_counter()
             self._apply_post_processors(render_surface)
             timings["post_ms"] = _elapsed_ms_since(started_at)
+
+            started_at = time.perf_counter()
+            self.components.display.screen.fill("black")
+            timings["clear_ms"] = _elapsed_ms_since(started_at)
 
             started_at = time.perf_counter()
             self.components.display.blit(render_surface, (0, 0))
@@ -256,7 +264,7 @@ class GameLoop:
 
     def set_clock(self, clock: pygame.time.Clock) -> None:
         self.components.display.set_clock(clock)
-        self.components.peripheral_manager.clock.on_next(self.components.display.clock)
+        self.components.peripheral_runtime.set_clock(self.components.display.clock)
 
     @property
     def screen(self) -> pygame.Surface | None:

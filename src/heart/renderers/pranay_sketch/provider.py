@@ -96,7 +96,7 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[PranaySketchState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
         )
         initial_state = self._load_initial_state()
 

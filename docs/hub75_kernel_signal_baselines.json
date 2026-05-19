@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-12",
+  "references": [
+    {
+      "name": "pio_known_good_red_pending_capture",
+      "kind": "pio",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-pio-baseline/digital.csv",
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'",
+      "notes": "A saved CSV now exists locally, but the new diagnosis path classifies it as electrically silent with zero edges on every captured column, so it is not yet a valid baseline."
+    },
+    {
+      "name": "pio_known_good_live_recheck_20260513",
+      "kind": "pio",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv",
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'",
+      "notes": "A same-day live recapture through Logic2 MCP is still electrically silent on channels 0..6, so the stale baseline problem is not file age."
+    },
+    {
+      "name": "pio_known_good_live_recheck_20260512_all16",
+      "kind": "pio",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16/digital.csv",
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'",
+      "notes": "A fresh same-day all-16 Logic2 export remains electrically silent even though the known-good PIO run itself completed normally, so there is still no usable live baseline."
+    },
+    {
+      "name": "direct_rio_bootstrap_reference",
+      "kind": "bootstrap",
+      "status": "available",
+      "capture_csv": "/Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv",
+      "notes": "Temporary scoring bootstrap until a real PIO baseline capture is recorded with the same methodology."
+    },
+    {
+      "name": "rp1_hub75_live_kernel_waveform",
+      "kind": "kernel",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-rp1h-bridge/digital.csv",
+      "run_command": "ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'",
+      "notes": "The bridged kernel route has a saved CSV locally, but that export is also electrically silent across every captured column, so it cannot yet serve as a live similarity candidate."
+    },
+    {
+      "name": "all_channel_probe_sanity_capture",
+      "kind": "diagnostic",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-all-channels/digital.csv",
+      "notes": "The all-channel discovery export is also electrically silent, which argues against a simple 0..6 signal-map mistake inside the existing saved CSVs."
+    },
+    {
+      "name": "manual_gpio_toggle_sanity_20260512",
+      "kind": "diagnostic",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260512-manual-toggle-live-all16/digital.csv",
+      "notes": "A fresh same-day all-16 manual-toggle capture is still electrically silent with only static highs on channels 9 and 11, even though pinctrl itself reports GPIO5 changing state locally."
+    },
+    {
+      "name": "manual_gpio_toggle_sanity_20260513",
+      "kind": "diagnostic",
+      "status": "saved-capture-invalid",
+      "capture_csv": "/Users/lampe/code/heart/.captures/20260513-manual-toggle-all16/digital.csv",
+      "notes": "A same-day slow manual GPIO toggle across expected HUB75 pins still exported zero edges on all 16 Saleae channels, with only static highs on channels 9 and 11. Treat the bench as a probe-routing or fixture-grounding problem before further kernel tuning."
+    }
+  ]
+}

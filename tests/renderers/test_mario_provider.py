@@ -21,11 +21,9 @@ class TestMarioRendererProvider:
     ) -> None:
         """Verify `observable(peripheral_manager)` works so StatefulBaseRenderer initialization does not fail at subscription time."""
         peripheral_manager = PeripheralManager()
-        accelerometer_controller = peripheral_manager.accelerometer_controller
-        accelerometer_debug_profile = peripheral_manager.accelerometer_debug_profile
         spritesheet = _SpriteSheetProbe()
         monkeypatch.setattr(
-            accelerometer_debug_profile,
+            peripheral_manager.input_io.debug_accelerometer,
             "should_use_debug_input",
             lambda: False,
         )
@@ -48,14 +46,14 @@ class TestMarioRendererProvider:
         provider = MarioRendererProvider(
             metadata_file_path="mario_64.json",
             sheet_file_path="mario_64.png",
-            accelerometer_controller=accelerometer_controller,
-            accelerometer_debug_profile=accelerometer_debug_profile,
         )
         observed_states = []
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
-        accelerometer_controller.node().on_next(Acceleration(x=0.0, y=0.0, z=12.5))
-        peripheral_manager.frame_tick_controller.advance(
+        peripheral_manager.input_io.physical_acceleration().on_next(
+            Acceleration(x=0.0, y=0.0, z=12.5)
+        )
+        peripheral_manager.input_io.frame_ticks.advance(
             stub_clock_factory(16, fps=60.0)
         )
 
@@ -71,15 +69,7 @@ class TestMarioRendererProvider:
         monkeypatch,
     ) -> None:
         """Confirm frame advancement uses elapsed clock time so Mario animation can progress once a jump loop has started."""
-        peripheral_manager = PeripheralManager()
-        accelerometer_controller = peripheral_manager.accelerometer_controller
-        accelerometer_debug_profile = peripheral_manager.accelerometer_debug_profile
         spritesheet = _SpriteSheetProbe()
-        monkeypatch.setattr(
-            accelerometer_debug_profile,
-            "should_use_debug_input",
-            lambda: False,
-        )
         monkeypatch.setattr(
             "heart.renderers.mario.provider.Loader.load_json",
             lambda _path: {
@@ -103,8 +93,6 @@ class TestMarioRendererProvider:
         provider = MarioRendererProvider(
             metadata_file_path="mario_64.json",
             sheet_file_path="mario_64.png",
-            accelerometer_controller=accelerometer_controller,
-            accelerometer_debug_profile=accelerometer_debug_profile,
         )
         initial_state = provider._create_initial_state()
         started_state = provider._advance_state(

@@ -41,6 +41,7 @@ class PeripheralRuntime:
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
+        self._frame_clock: pygame.time.Clock | None = None
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -65,7 +66,7 @@ class PeripheralRuntime:
             logger.debug("Beats input debug streaming disabled")
             return
 
-        self._peripheral_manager.debug_tap.observable().subscribe(
+        self._peripheral_manager.input_io.debug_tap.observable().subscribe(
             on_next=lambda envelope: ws.send(
                 kind="peripheral",
                 payload=self._streaming_envelope(envelope),
@@ -84,7 +85,7 @@ class PeripheralRuntime:
             self._apply_control_message(control_message)
 
     def _apply_control_message(self, control_message: Any) -> None:
-        navigation = self._peripheral_manager.navigation_profile
+        navigation = self._peripheral_manager.input_io.navigation
         if control_message.command == CONTROL_COMMAND_BROWSE:
             navigation.inject_browse(
                 control_message.browse_step,
@@ -100,7 +101,7 @@ class PeripheralRuntime:
             )
             return
         if control_message.command == CONTROL_COMMAND_SENSOR_UPDATE:
-            external_sensor_hub = self._peripheral_manager.external_sensor_hub
+            external_sensor_hub = self._peripheral_manager.input_io.external_sensors
             sensor_key = control_message.sensor_key
             if sensor_key is None:
                 return
@@ -198,18 +199,28 @@ class PeripheralRuntime:
             duration_seconds=PHONE_IMAGE_DISPLAY_DURATION_SECONDS,
         )
 
-    def tick(self) -> None:
+    def poll(self) -> None:
         drain_frame_thread_queue()
         self._drain_control_messages()
         gamepad = self._peripheral_manager.get_gamepad()
         if gamepad is not None:
             gamepad.update()
-        if self._peripheral_manager.clock.value is None:
+
+    def set_clock(self, clock: pygame.time.Clock | None) -> None:
+        self._frame_clock = clock
+
+    def advance_frame(self, clock: pygame.time.Clock | None = None) -> None:
+        if clock is not None:
+            self._frame_clock = clock
+        if self._frame_clock is None:
             return
-        self._peripheral_manager.frame_tick_controller.advance(
-            self._peripheral_manager.clock.value
+        self._peripheral_manager.input_io.frame_ticks.advance(
+            self._frame_clock
         )
-        self._peripheral_manager.game_tick.on_next(True)
+
+    def tick(self) -> None:
+        self.poll()
+        self.advance_frame()
 
 
 def _build_websocket() -> Any:

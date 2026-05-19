@@ -10,6 +10,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 RP1_HUB75_DEVICE_PATH = Path("/dev/rp1-hub75")
+PI5_MATRIX_BACKEND_ENV_VAR = "HEART_PI5_MATRIX_BACKEND"
 
 
 def select_device() -> Device:
@@ -88,12 +89,20 @@ def _select_pi_device(
             reason="X11_FORWARD set",
         )
 
-    if pi_info is not None and pi_info.version >= 5 and not _rp1_hub75_device_exists():
+    if (
+        pi_info is not None
+        and pi_info.version >= 5
+        and not _rp1_hub75_device_exists()
+        and not _pi5_matrix_backend_requested()
+    ):
         return _select_pi_local_screen(
             orientation=orientation,
             panel_width=panel_width,
             panel_height=panel_height,
-            reason=f"{RP1_HUB75_DEVICE_PATH} is not present",
+            reason=(
+                f"{RP1_HUB75_DEVICE_PATH} is not present and "
+                f"{PI5_MATRIX_BACKEND_ENV_VAR} is not set"
+            ),
         )
 
     try:
@@ -111,6 +120,11 @@ def _select_pi_device(
 
 def _rp1_hub75_device_exists() -> bool:
     return RP1_HUB75_DEVICE_PATH.exists()
+
+
+def _pi5_matrix_backend_requested() -> bool:
+    value = os.environ.get(PI5_MATRIX_BACKEND_ENV_VAR, "").strip().lower()
+    return value not in {"", "auto"}
 
 
 def _is_missing_native_matrix_runtime(error: RuntimeError) -> bool:

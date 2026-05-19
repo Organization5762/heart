@@ -31,6 +31,8 @@ class _NavigationProfile:
 class _PeripheralManager:
     def __init__(self, *, with_gamepad: bool = False) -> None:
         self.navigation_profile = _NavigationProfile()
+        self.input_io = Mock()
+        self.input_io.navigation = self.navigation_profile
         self.gamepad = _Gamepad() if with_gamepad else None
 
     def get_gamepad(self) -> "_Gamepad | None":

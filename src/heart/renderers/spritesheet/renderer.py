@@ -4,6 +4,7 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
+from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet.provider import SpritesheetProvider
 from heart.renderers.spritesheet.state import (FrameDescription,
@@ -25,6 +26,7 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         boomerang: bool = False,
         frame_data: list[FrameDescription] | None = None,
         skip_last_frame: bool = False,
+        direct_clock_ticks: bool = False,
     ) -> None:
         sheet_argument = sheet_file_path
         if isinstance(provider, SpritesheetProvider):
@@ -57,7 +59,9 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
         self.provider = resolved_provider
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self._brightness = 1.0
-        super().__init__(builder=self.provider)
+        self._direct_clock_ticks = direct_clock_ticks
+        builder = None if self._direct_clock_ticks else self.provider
+        super().__init__(builder=builder)
 
     @classmethod
     def from_frame_data(
@@ -81,17 +85,33 @@ class SpritesheetLoop(StatefulBaseRenderer[SpritesheetLoopState]):
             boomerang=boomerang,
             skip_last_frame=skip_last_frame,
         )
-        return cls(provider)
+        return cls(provider, direct_clock_ticks=disable_input)
 
     def brightness(self, value: float) -> SpritesheetLoop:
         self._brightness = value
         return self
+
+    def _create_initial_state(
+        self,
+        window: DisplayContext,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> SpritesheetLoopState:
+        del window, orientation
+        return self.provider.initial_state(peripheral_manager=peripheral_manager)
 
     def real_process(
         self,
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        if self._direct_clock_ticks and window.clock is not None:
+            self.set_state(
+                self.provider.advance(
+                    self.state,
+                    elapsed_ms=float(window.clock.get_time()),
+                )
+            )
         state = self.state
 
         spritesheet = state.spritesheet

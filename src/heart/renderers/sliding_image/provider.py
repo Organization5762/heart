@@ -45,7 +45,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             ConstantNode(initial_state.width).observable(), window_stream
         )
         return (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .with_latest_from(window_stream)
             .map(lambda pair: pair[1])
             .scan(
@@ -94,7 +94,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             ConstantNode(initial_state.width).observable(), window_stream
         )
         return (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .with_latest_from(window_stream)
             .map(lambda pair: pair[1])
             .scan(

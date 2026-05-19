@@ -5,7 +5,6 @@ from manyfold import MergeNode, StreamNode
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
-from heart.peripheral.providers.switch import MainSwitchProvider
 from heart.renderers.life.state import LifeState
 from heart.utilities.env import Configuration
 
@@ -14,11 +13,9 @@ class LifeStateProvider:
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
-        main_switch: MainSwitchProvider,
         randomness: RandomnessProvider,
     ) -> None:
         self._pm = peripheral_manager
-        self._main_switch = main_switch
         self._randomness = randomness
 
     def observable(
@@ -55,7 +52,7 @@ class LifeStateProvider:
             window_sizes.take(1).map(create_new_grid).map(create_state)
         )
         reseed_states: StreamNode[LifeState] = (
-            self._main_switch.observable()
+            self._pm.input_io.main_switch_stream()
             .with_latest_from(window_sizes)
             .map(lambda pair: create_new_grid(pair[1]))
             .map(create_state)
@@ -67,7 +64,7 @@ class LifeStateProvider:
         )
         operations: StreamNode[StateOp] = MergeNode.merge(
             injected_states.map(op_from_injected),
-            self._pm.frame_tick_controller.observable().map(op_from_tick),
+            self._pm.input_io.frame_tick_stream().map(op_from_tick),
         )
         result: StreamNode[LifeState] = initial_state.flat_map(
             lambda first_state: operations.scan(

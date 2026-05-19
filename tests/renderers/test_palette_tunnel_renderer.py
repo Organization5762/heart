@@ -45,10 +45,15 @@ class _SnapshotController:
         return self.stream
 
 
+class _InputIO:
+    def __init__(self) -> None:
+        self.keyboard = _SnapshotController()
+        self.gamepad = _SnapshotController()
+
+
 class _PeripheralManager:
     def __init__(self) -> None:
-        self.keyboard_controller = _SnapshotController()
-        self.gamepad_controller = _SnapshotController()
+        self.input_io = _InputIO()
 
 
 class _Clock:
@@ -132,10 +137,10 @@ class TestPaletteTunnelScene:
 
         scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
         initial_cursor = scene.cursor.copy()
-        manager.keyboard_controller.stream.emit(
+        manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(pressed_keys=frozenset({pygame.K_d}), timestamp_ms=1.0)
         )
-        manager.gamepad_controller.stream.emit(
+        manager.input_io.gamepad.stream.emit(
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
@@ -271,8 +276,8 @@ class TestPaletteTunnelScene:
         )
         scene.reset()
 
-        keyboard_subscription = manager.keyboard_controller.stream.subscriptions[0][0]
-        gamepad_subscription = manager.gamepad_controller.stream.subscriptions[0][0]
+        keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
+        gamepad_subscription = manager.input_io.gamepad.stream.subscriptions[0][0]
         assert keyboard_subscription.dispose_calls == 1
         assert gamepad_subscription.dispose_calls == 1
         assert shader_runtime.reset_calls == 1

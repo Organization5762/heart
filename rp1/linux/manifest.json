@@ -1,0 +1,70 @@
+{
+  "name": "heart-rp1-hub75-linux-bundle",
+  "description": "Heart-owned Linux driver and RP1 selftest artifacts needed for HUB75 bring-up.",
+  "linux_root_files_dir": "files",
+  "boot_preflight": {
+    "firmware_feature_table": {
+      "address": "0x5928",
+      "known_launchable_words": [
+        "0x50494f20",
+        "0x00000021",
+        "0x20000549",
+        "0x00000003"
+      ],
+      "notes": "Observed launchable on totem1 with the firmware-callback core1 launcher."
+    },
+    "legacy_hook_5fc": {
+      "address": "0x5fc",
+      "known_launchable_word": "0xd1d02902"
+    },
+    "vector_hook_12c": {
+      "address": "0x12c",
+      "known_launchable_word": "0x20000ac5"
+    }
+  },
+  "files": [
+    "drivers/misc/rp1-hub75.c",
+    "include/uapi/misc/rp1_hub75_if.h",
+    "tools/include/uapi/misc/rp1_hub75_if.h",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_build_payloads.sh",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_5fc_totem3.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_5fc_totem3_safe.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_dualboot.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_fwcall.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_mem.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_syscfg_vector_12c_totem3.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_syscfg_vector_12c_totem3_safe.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_launch_vector_probe.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell28.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_fullrio_preclk0_unroll16_addr0_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_latchblank_preclk0_unroll16_addr0_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_wrapdirectoe_preclk0_unroll16_addr0_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr0_lat1.bin",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr0_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_oeoffshift_nowrap_preclk1_unroll8_addr8_lat2.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame11_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr0_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr2_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat0.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat2.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr8_lat1.s",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_regular_p0p1_chain2_profile.inc",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_core1_vector_probe.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_hub75_deploy_module.sh",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_hub75_module/Makefile",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_hub75_publish_regular_green_slot.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_hub75_rio_static_regular.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_hub75_run_candidate.sh",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_mmio_poke32.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_mmio_read32.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_sram_counter.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_sram_dump.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_sram_poke32.c",
+    "tools/testing/selftests/drivers/rp1-pio/rp1_sram_read32.c"
+  ]
+}

@@ -18,16 +18,14 @@ class TestWaterCubeStateProvider:
     ) -> None:
         """Verify startup emits a WaterCubeState instead of feeding the initial state through the reducer as acceleration."""
         peripheral_manager = PeripheralManager()
-        accelerometer_controller = peripheral_manager.accelerometer_controller
-        accelerometer_debug_profile = peripheral_manager.accelerometer_debug_profile
+        accelerometer_controller = peripheral_manager.input_io.accelerometer
+        accelerometer_debug_profile = peripheral_manager.input_io.debug_accelerometer
         monkeypatch.setattr(
             accelerometer_debug_profile,
             "should_use_debug_input",
             lambda: False,
         )
         provider = WaterCubeStateProvider(
-            accelerometer_controller=accelerometer_controller,
-            accelerometer_debug_profile=accelerometer_debug_profile,
             device=LocalScreen(width=64, height=64, orientation=Cube.sides()),
         )
         observed_states = []

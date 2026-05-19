@@ -37,7 +37,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
 
 
         )
-        frame_ticks = peripheral_manager.frame_tick_controller.observable()
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
 
         def to_state(
             latest: tuple[object | None, tuple[int, int], str],

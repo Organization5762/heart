@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock
 
-import pygame
 import numpy as np
+import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Cube

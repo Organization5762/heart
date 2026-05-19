@@ -12,16 +12,16 @@ import pygame
 from manyfold import shutdown
 from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
-from OpenGL.GL import (GL_CLAMP_TO_EDGE, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
-                       GL_MODELVIEW, GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RGBA,
-                       GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-                       GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_S,
-                       GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBegin,
-                       glBindTexture, glClear, glDeleteTextures, glDisable,
-                       glEnable, glEnd, glGenTextures, glLoadIdentity,
-                       glMatrixMode, glOrtho, glReadPixels, glTexCoord2f,
-                       glTexImage2D, glTexParameteri, glTexSubImage2D,
-                       glUseProgram, glVertex2f, glViewport)
+from OpenGL.GL import (GL_CLAMP_TO_EDGE, GL_COLOR_BUFFER_BIT,
+                       GL_DEPTH_BUFFER_BIT, GL_MODELVIEW, GL_NEAREST,
+                       GL_PROJECTION, GL_QUADS, GL_RGBA, GL_TEXTURE_2D,
+                       GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER,
+                       GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE,
+                       glBegin, glBindTexture, glClear, glDeleteTextures,
+                       glDisable, glEnable, glEnd, glGenTextures,
+                       glLoadIdentity, glMatrixMode, glOrtho, glReadPixels,
+                       glTexCoord2f, glTexImage2D, glTexParameteri,
+                       glTexSubImage2D, glUseProgram, glVertex2f, glViewport)
 
 from heart import DeviceDisplayMode
 from heart.device import Cube, Orientation, Rectangle
@@ -256,15 +256,29 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self.render_size = self._render_size(self.window_size, orientation)
         self.tiled_mode = isinstance(orientation, Cube)
         self._initialize_shader()
-        self._subscriptions = [
-            peripheral_manager.keyboard_controller.snapshot_stream().subscribe(
-                on_next=self._set_keyboard_snapshot,
-            ),
-            peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
-                on_next=self._set_gamepad_snapshot,
-            ),
-        ]
+        self._subscriptions = self._subscribe_to_input_snapshots(peripheral_manager)
         return AudioStormState(start_time=time.monotonic())
+
+    def _subscribe_to_input_snapshots(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> list[SubscriptionLike]:
+        subscriptions: list[SubscriptionLike] = []
+        keyboard_controller = getattr(peripheral_manager, "keyboard_controller", None)
+        gamepad_controller = getattr(peripheral_manager, "gamepad_controller", None)
+        if keyboard_controller is not None:
+            subscriptions.append(
+                keyboard_controller.snapshot_stream().subscribe(
+                    on_next=self._set_keyboard_snapshot,
+                )
+            )
+        if gamepad_controller is not None:
+            subscriptions.append(
+                gamepad_controller.snapshot_stream().subscribe(
+                    on_next=self._set_gamepad_snapshot,
+                )
+            )
+        return subscriptions
 
     def real_process(
         self,

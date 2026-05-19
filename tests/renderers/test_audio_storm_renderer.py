@@ -14,13 +14,10 @@ from heart.display.shaders.fullscreen import TextureUniform
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.renderers.audio_storm import renderer as audio_storm_module
-from heart.renderers.audio_storm.renderer import (AUDIO_TEXTURE_HEIGHT,
-                                                  AUDIO_TEXTURE_WIDTH,
-                                                  DEFAULT_VOICE_PALETTE,
-                                                  FREE_VOICE_RANDOMIZATION_BOUNDS,
-                                                  ORBIT_INITIAL_PHASE,
-                                                  SYNTH_WRITE_X_CENTER,
-                                                  AudioStormScene)
+from heart.renderers.audio_storm.renderer import (
+    AUDIO_TEXTURE_HEIGHT, AUDIO_TEXTURE_WIDTH, DEFAULT_VOICE_PALETTE,
+    FREE_VOICE_RANDOMIZATION_BOUNDS, ORBIT_INITIAL_PHASE, SYNTH_WRITE_X_CENTER,
+    AudioStormScene)
 
 
 class _Subscription:

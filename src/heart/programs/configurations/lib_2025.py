@@ -13,9 +13,9 @@ from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
 from heart.renderers.kirby import KirbyScene
 from heart.renderers.life.renderer import Life
-from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
+from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.palette_tunnel import PaletteTunnelScene

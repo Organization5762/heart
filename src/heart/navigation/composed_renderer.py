@@ -175,6 +175,8 @@ class ComposedRenderer(StatefulBaseRenderer[ComposedRendererState]):
     def _merge_surfaces(surfaces: Sequence[pygame.Surface]) -> pygame.Surface | None:
         if not surfaces:
             return None
+        if len(surfaces) == 1:
+            return surfaces[0]
         base = pygame.Surface(surfaces[0].get_size(), pygame.SRCALPHA)
         base.fill((0, 0, 0, 0))
         for surface in surfaces:

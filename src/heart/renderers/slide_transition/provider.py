@@ -46,7 +46,7 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         initial_state: SlideTransitionState,
     ) -> StreamNode[SlideTransitionState]:
         return (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
             .scan(
                 lambda state, frame_tick: self._advance(
                     state=state,

@@ -68,6 +68,9 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
             WiringProfile=SimpleNamespace(
                 AdafruitHatPwm="hat-pwm",
                 AdafruitHat="hat",
+                ElectroDragonP0="electrodragon-p0",
+                ThreePortActive="three-port-active",
+                Regular="regular",
             ),
             ColorOrder=SimpleNamespace(RGB="rgb", GBR="gbr"),
         )
@@ -126,10 +129,10 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
         assert matrix._driver.swapped_canvases == [canvas]
         assert matrix._driver.cleared is True
 
-    def test_rgb_matrix_rejects_unsupported_hardware_mapping(
+    def test_rgb_matrix_accepts_regular_mapping(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify unsupported hardware mappings fail fast with a clear message. This matters because callers should learn immediately when they request an hzeller-specific transport shape the heart_rgb_matrix_driver stack does not implement."""
+        """Verify hzeller regular compatibility maps to the native three-port active profile."""
 
         fake_module = self._fake_native_module()
         monkeypatch.setattr(
@@ -140,8 +143,27 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
         options = heart_rgb_matrix_driver_rgbmatrix.RGBMatrixOptions()
         options.hardware_mapping = "regular"
 
-        with pytest.raises(ValueError, match="hardware mappings"):
-            heart_rgb_matrix_driver_rgbmatrix.RGBMatrix(options=options)
+        matrix = heart_rgb_matrix_driver_rgbmatrix.RGBMatrix(options=options)
+
+        assert matrix._driver.config.wiring == "three-port-active"
+
+    def test_rgb_matrix_accepts_three_port_active_mapping(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the preferred three-port active name maps directly."""
+
+        fake_module = self._fake_native_module()
+        monkeypatch.setattr(
+            heart_rgb_matrix_driver_rgbmatrix,
+            "_load_matrix_runtime_module",
+            lambda: fake_module,
+        )
+        options = heart_rgb_matrix_driver_rgbmatrix.RGBMatrixOptions()
+        options.hardware_mapping = "three-port-active"
+
+        matrix = heart_rgb_matrix_driver_rgbmatrix.RGBMatrix(options=options)
+
+        assert matrix._driver.config.wiring == "three-port-active"
 
     def test_rgb_matrix_warns_when_legacy_options_are_ignored(
         self, monkeypatch: pytest.MonkeyPatch

@@ -30,8 +30,8 @@ class TestYoListenRenderer:
         peripheral_manager = PeripheralManager()
         switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
         monkeypatch.setattr(
-            peripheral_manager,
-            "get_main_switch_subscription",
+            peripheral_manager.input_io,
+            "main_switch_stream",
             lambda: switch_stream,
         )
         peripheral_manager.window.on_next(window)

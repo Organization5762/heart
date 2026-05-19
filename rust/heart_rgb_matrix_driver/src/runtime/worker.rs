@@ -195,6 +195,9 @@ const PIO_IOC_GPIO_INIT: libc::c_ulong = iow::<Rp1GpioInitArgs>(102, 50);
 const PIO_IOC_GPIO_SET_FUNCTION: libc::c_ulong = iow::<Rp1GpioSetFunctionArgs>(102, 51);
 
 fn raw_byte_pull_program_spec() -> ProgramSpec {
+    let out_shift_right = std::env::var("HEART_PI5_SIMPLE_SCAN_OUT_SHIFT_RIGHT")
+        .map(|value| value != "0")
+        .unwrap_or(PI5_PIO_RAW_BYTE_PULL_OUT_SHIFT_RIGHT);
     ProgramSpec {
         base_program: &PI5_PIO_RAW_BYTE_PULL_BASE_PROGRAM,
         delay_patch_indices: &PI5_PIO_RAW_BYTE_PULL_DELAY_PATCH_INDICES,
@@ -202,7 +205,7 @@ fn raw_byte_pull_program_spec() -> ProgramSpec {
         out_pin_count: PI5_PIO_RAW_BYTE_PULL_OUT_PIN_COUNT,
         set_pin_base: 0,
         set_pin_count: 0,
-        out_shift_right: PI5_PIO_RAW_BYTE_PULL_OUT_SHIFT_RIGHT,
+        out_shift_right,
         auto_pull: false,
         pull_threshold: 32,
         sideset_pin_count: PI5_PIO_RAW_BYTE_PULL_SIDESET_PIN_COUNT,

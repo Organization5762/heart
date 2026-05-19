@@ -27,7 +27,7 @@ DEFAULT_COLS: Final[int] = 32
 DEFAULT_DISABLE_HARDWARE_PULSING: Final[bool] = False
 DEFAULT_DROP_PRIVILEGES: Final[bool] = True
 DEFAULT_GPIO_SLOWDOWN: Final[int] = 1
-DEFAULT_HARDWARE_MAPPING: Final[str] = "adafruit-hat-pwm"
+DEFAULT_HARDWARE_MAPPING: Final[str] = "three-port-active"
 DEFAULT_LED_RGB_SEQUENCE: Final[str] = "RGB"
 DEFAULT_MULTIPLEXING: Final[int] = 0
 DEFAULT_PANEL_TYPE: Final[str] = ""
@@ -38,14 +38,6 @@ DEFAULT_PWM_LSB_NANOSECONDS: Final[int] = 130
 DEFAULT_ROW_ADDRESS_TYPE: Final[int] = 0
 DEFAULT_ROWS: Final[int] = 32
 
-HARDWARE_MAPPING_TO_WIRING_ATTR: Final[dict[str, str]] = {
-    "adafruit-hat": "AdafruitHat",
-    "adafruit-hat-pwm": "AdafruitHatPwm",
-}
-LED_RGB_SEQUENCE_TO_COLOR_ORDER_ATTR: Final[dict[str, str]] = {
-    "GBR": "GBR",
-    "RGB": "RGB",
-}
 IGNORED_OPTION_DEFAULTS: Final[dict[str, object]] = {
     "brightness": DEFAULT_BRIGHTNESS,
     "disable_hardware_pulsing": DEFAULT_DISABLE_HARDWARE_PULSING,
@@ -58,6 +50,18 @@ IGNORED_OPTION_DEFAULTS: Final[dict[str, object]] = {
     "pwm_lsb_nanoseconds": DEFAULT_PWM_LSB_NANOSECONDS,
     "row_address_type": DEFAULT_ROW_ADDRESS_TYPE,
 }
+SUPPORTED_HARDWARE_MAPPINGS: Final[tuple[str, ...]] = (
+    "adafruit-hat",
+    "adafruit-hat-pwm",
+    "adafruit_hat_pwm",
+    "electrodragon",
+    "electrodragon-p0",
+    "electrodragon_p0",
+    "regular",
+    "three-port-active",
+    "three_port_active",
+)
+SUPPORTED_LED_RGB_SEQUENCES: Final[tuple[str, ...]] = ("GBR", "RGB")
 
 
 class RGBMatrixOptions:
@@ -126,27 +130,35 @@ class RGBMatrix:
 
 
 def _resolve_wiring(native_module: Any, hardware_mapping: str) -> object:
-    wiring_attr = HARDWARE_MAPPING_TO_WIRING_ATTR.get(hardware_mapping)
-    if wiring_attr is None:
-        supported = ", ".join(sorted(HARDWARE_MAPPING_TO_WIRING_ATTR))
-        raise ValueError(
-            "heart_rgb_matrix_driver RGBMatrix compatibility only supports hardware mappings "
-            f"{supported}; received {hardware_mapping!r}."
-        )
-    return getattr(native_module.WiringProfile, wiring_attr)
+    wiring_profile = native_module.WiringProfile
+    match hardware_mapping:
+        case "adafruit-hat":
+            return wiring_profile.AdafruitHat
+        case "adafruit-hat-pwm" | "adafruit_hat_pwm":
+            return wiring_profile.AdafruitHatPwm
+        case "electrodragon" | "electrodragon-p0" | "electrodragon_p0":
+            return wiring_profile.ElectroDragonP0
+        case "regular" | "three-port-active" | "three_port_active":
+            return wiring_profile.ThreePortActive
+    supported = ", ".join(SUPPORTED_HARDWARE_MAPPINGS)
+    raise ValueError(
+        "heart_rgb_matrix_driver RGBMatrix compatibility only supports hardware mappings "
+        f"{supported}; received {hardware_mapping!r}."
+    )
 
 
 def _resolve_color_order(native_module: Any, led_rgb_sequence: str) -> object:
-    color_order_attr = LED_RGB_SEQUENCE_TO_COLOR_ORDER_ATTR.get(
-        led_rgb_sequence.upper()
+    color_order = native_module.ColorOrder
+    match led_rgb_sequence.upper():
+        case "GBR":
+            return color_order.GBR
+        case "RGB":
+            return color_order.RGB
+    supported = ", ".join(SUPPORTED_LED_RGB_SEQUENCES)
+    raise ValueError(
+        "heart_rgb_matrix_driver RGBMatrix compatibility only supports LED RGB sequences "
+        f"{supported}; received {led_rgb_sequence!r}."
     )
-    if color_order_attr is None:
-        supported = ", ".join(sorted(LED_RGB_SEQUENCE_TO_COLOR_ORDER_ATTR))
-        raise ValueError(
-            "heart_rgb_matrix_driver RGBMatrix compatibility only supports LED RGB sequences "
-            f"{supported}; received {led_rgb_sequence!r}."
-        )
-    return getattr(native_module.ColorOrder, color_order_attr)
 
 
 def _log_ignored_option_overrides(options: RGBMatrixOptions) -> None:

@@ -14,14 +14,15 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
                        GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLE_STRIP,
                        GL_UNSIGNED_BYTE, GL_VERTEX_SHADER, glActiveTexture,
                        glAttachShader, glBindAttribLocation, glBindTexture,
-                       glClear, glCompileShader, glCreateProgram, glCreateShader,
-                       glDeleteProgram, glDeleteShader, glDrawArrays,
-                       glEnableVertexAttribArray, glGetProgramInfoLog,
-                       glGetProgramiv, glGetShaderInfoLog, glGetShaderiv,
-                       glGetUniformLocation, glLinkProgram, glReadPixels,
-                       glShaderSource, glUniform1f, glUniform1i, glUniform2fv,
-                       glUniform3fv, glUniform4fv, glUniformMatrix4fv,
-                       glUseProgram, glVertexAttribPointer, glViewport)
+                       glClear, glCompileShader, glCreateProgram,
+                       glCreateShader, glDeleteProgram, glDeleteShader,
+                       glDrawArrays, glEnableVertexAttribArray,
+                       glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog,
+                       glGetShaderiv, glGetUniformLocation, glLinkProgram,
+                       glReadPixels, glShaderSource, glUniform1f, glUniform1i,
+                       glUniform2fv, glUniform3fv, glUniform4fv,
+                       glUniformMatrix4fv, glUseProgram, glVertexAttribPointer,
+                       glViewport)
 
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger

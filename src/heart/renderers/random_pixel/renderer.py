@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+import pygame
+
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.display.color import Color
@@ -21,11 +23,13 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
         brightness: float = 1.0,
         *,
         randomness: RandomnessProvider,
+        update_interval_ms: float = 100.0,
         provider: RandomPixelStateProvider | None = None,
         provider_factory: Callable[..., RandomPixelStateProvider] | None = None,
     ) -> None:
         self.num_pixels = num_pixels
         self.brightness = brightness
+        self.update_interval_ms = update_interval_ms
         self._initial_color = color
         self._randomness = randomness
         self._provider_factory = provider_factory or RandomPixelStateProvider
@@ -49,6 +53,7 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
                 peripheral_manager=peripheral_manager,
                 initial_color=self._initial_color,
                 randomness=self._randomness,
+                update_interval_ms=self.update_interval_ms,
             )
             self.builder = self._provider
         super().initialize(window, peripheral_manager, orientation)
@@ -60,10 +65,20 @@ class RandomPixel(StatefulBaseRenderer[RandomPixelState]):
     ) -> None:
         state = self.state
 
-        color_value = [int(x * self.brightness) for x in state.color._as_tuple()]
+        color_value = tuple(int(x * self.brightness) for x in state.color._as_tuple())
 
-        for x, y in state.pixels:
-            window.screen.set_at((x, y), color_value)
+        if state.pixels.size == 0:
+            return
+
+        try:
+            pixels = pygame.surfarray.pixels3d(window.screen)
+        except ValueError:
+            for x, y in state.pixels:
+                window.screen.set_at((int(x), int(y)), color_value)
+            return
+
+        pixels[state.pixels[:, 0], state.pixels[:, 1]] = color_value
+        del pixels
 
     def set_color(self, color: Color | None) -> None:
         self._initial_color = color

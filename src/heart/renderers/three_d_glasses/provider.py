@@ -46,7 +46,7 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         initial_state: ThreeDGlassesState,
     ) -> StreamNode[ThreeDGlassesState]:
         frame_ticks = (
-            peripheral_manager.frame_tick_controller.observable()
+            peripheral_manager.input_io.frame_tick_stream()
         )
         tick_updates = frame_ticks.map(
             lambda frame_tick: (

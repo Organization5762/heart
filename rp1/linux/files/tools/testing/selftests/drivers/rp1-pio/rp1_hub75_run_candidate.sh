@@ -1,0 +1,4180 @@
+#!/bin/sh
+#
+# Launch one RP1 core1 HUB75 candidate from a clean boot.
+
+set -eu
+
+candidate="${1:-rgbmask}"
+seconds="${2:-5.0}"
+bytes_per_tick="0"
+ticks_per_frame="1"
+panels="4"
+seed_offset="0xc000"
+seed_count="1"
+status_offset="0x80f0"
+counter_offset="0x80f4"
+ctrl_offset="0x80f8"
+running_status_magic=""
+running_status_magic2=""
+requires_low_sram="0"
+launch_no_legacy_status="0"
+post_ready_slot0_canary="0"
+launcher="${RP1_HUB75_LAUNCHER:-rp1_core1_launch_mem}"
+frame_slot_after_launch="${RP1_HUB75_WAIT_FRAME_SLOT_AFTER_LAUNCH:-0}"
+frame_slot_offset="${RP1_HUB75_FRAME_SLOT_OFFSET:-0xb800}"
+frame_slot_expected_high="${RP1_HUB75_FRAME_SLOT_EXPECTED_HIGH:-0x00000010}"
+frame_slot_timeout_seconds="${RP1_HUB75_FRAME_SLOT_TIMEOUT_SECONDS:-5}"
+rp1_pads_bank0_base="0x0f0000"
+rp1_gpio_r1="5"
+rp1_gpio_g1="13"
+rp1_gpio_b1="6"
+rp1_gpio_r2="12"
+rp1_gpio_g2="16"
+rp1_gpio_b2="23"
+rp1_gpio_p1_r1=""
+rp1_gpio_p1_g1=""
+rp1_gpio_p1_b1=""
+rp1_gpio_p1_r2=""
+rp1_gpio_p1_g2=""
+rp1_gpio_p1_b2=""
+rp1_gpio_clk="17"
+rp1_gpio_lat="21"
+rp1_gpio_oe="18"
+rp1_gpio_a="22"
+rp1_gpio_b="26"
+rp1_gpio_c="27"
+rp1_gpio_d="20"
+rp1_gpio_e="24"
+pad_restore_file="$(mktemp)"
+if [ "${RP1_HUB75_ALLOW_PIO_TRAMPOLINE:-0}" = "1" ]; then
+	launcher="core1_test_730_safe"
+fi
+
+if [ "$candidate" = "state32-dmapipeline4x4-e4-unroll8" ]; then
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		candidate="state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8"
+		;;
+	8)
+		candidate="state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8"
+		;;
+	*)
+		echo "state32-dmapipeline4x4-e4-unroll8 supports RP1_HUB75_PWM_BITS=6 or 8 for now" >&2
+		exit 2
+		;;
+	esac
+fi
+
+cleanup_pad_restore()
+{
+	if [ ! -f "$pad_restore_file" ]; then
+		return
+	fi
+
+	while IFS=' ' read -r offset value; do
+		if [ -n "$offset" ] && [ -n "$value" ] &&
+		   [ -x ./rp1_mmio_poke32 ]; then
+			sudo ./rp1_mmio_poke32 "$offset" "$value" >/dev/null
+		fi
+	done < "$pad_restore_file"
+	rm -f "$pad_restore_file"
+}
+
+trap cleanup_pad_restore EXIT HUP INT TERM
+
+pad_override_requested()
+{
+	for name in \
+		RP1_HUB75_PAD_DRIVE RP1_HUB75_PAD_DRIVE_CLK \
+		RP1_HUB75_PAD_DRIVE_LAT RP1_HUB75_PAD_DRIVE_OE \
+		RP1_HUB75_PAD_DRIVE_ADDR RP1_HUB75_PAD_DRIVE_RGB \
+		RP1_HUB75_PAD_DRIVE_A RP1_HUB75_PAD_DRIVE_B \
+		RP1_HUB75_PAD_DRIVE_C RP1_HUB75_PAD_DRIVE_D \
+		RP1_HUB75_PAD_DRIVE_E \
+		RP1_HUB75_PAD_SLEW RP1_HUB75_PAD_SLEW_CLK \
+		RP1_HUB75_PAD_SLEW_LAT RP1_HUB75_PAD_SLEW_OE \
+		RP1_HUB75_PAD_SLEW_ADDR RP1_HUB75_PAD_SLEW_RGB \
+		RP1_HUB75_PAD_SLEW_A RP1_HUB75_PAD_SLEW_B \
+		RP1_HUB75_PAD_SLEW_C RP1_HUB75_PAD_SLEW_D \
+		RP1_HUB75_PAD_SLEW_E
+	do
+		eval "value=\${$name:-}"
+		if [ -n "$value" ]; then
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+pad_offset_for_gpio()
+{
+	gpio="$1"
+
+	printf '0x%x\n' $((rp1_pads_bank0_base + 0x04 + gpio * 4))
+}
+
+pad_drive_bits()
+{
+	case "$1" in
+	2) echo "0" ;;
+	4) echo "1" ;;
+	8) echo "2" ;;
+	12) echo "3" ;;
+	*)
+		echo "unsupported RP1_HUB75_PAD_DRIVE value: $1" >&2
+		exit 2
+		;;
+	esac
+}
+
+pad_slew_bit()
+{
+	case "$1" in
+	0|slow) echo "0" ;;
+	1|fast) echo "1" ;;
+	*)
+		echo "unsupported RP1_HUB75_PAD_SLEW value: $1" >&2
+		exit 2
+		;;
+	esac
+}
+
+pad_record_restore()
+{
+	offset="$1"
+	value="$2"
+
+	if ! grep -q "^$offset " "$pad_restore_file"; then
+		printf '%s %s\n' "$offset" "$value" >> "$pad_restore_file"
+	fi
+}
+
+pad_apply_one()
+{
+	gpio="$1"
+	drive="$2"
+	slew="$3"
+	offset="$(pad_offset_for_gpio "$gpio")"
+	orig="$(sudo ./rp1_mmio_read32 "$offset")"
+	value="$orig"
+
+	pad_record_restore "$offset" "$orig"
+
+	if [ -n "$drive" ]; then
+		drive_bits="$(pad_drive_bits "$drive")"
+		value="$(printf '0x%x' $(((value & ~0x30) | (drive_bits << 4))))"
+	fi
+	if [ -n "$slew" ]; then
+		slew_bit="$(pad_slew_bit "$slew")"
+		value="$(printf '0x%x' $(((value & ~0x1) | slew_bit)))"
+	fi
+	if [ "$value" != "$orig" ]; then
+		echo "pad_override gpio=$gpio offset=$offset from=$orig to=$value"
+		sudo ./rp1_mmio_poke32 "$offset" "$value" >/dev/null
+	fi
+}
+
+pad_apply_group()
+{
+	group="$1"
+	pins="$2"
+	drive="${RP1_HUB75_PAD_DRIVE:-}"
+	slew="${RP1_HUB75_PAD_SLEW:-}"
+
+	eval "group_drive=\${RP1_HUB75_PAD_DRIVE_${group}:-}"
+	eval "group_slew=\${RP1_HUB75_PAD_SLEW_${group}:-}"
+	if [ -n "$group_drive" ]; then
+		drive="$group_drive"
+	fi
+	if [ -n "$group_slew" ]; then
+		slew="$group_slew"
+	fi
+	if [ -z "$drive" ] && [ -z "$slew" ]; then
+		return
+	fi
+
+	for gpio in $pins; do
+		pad_apply_one "$gpio" "$drive" "$slew"
+	done
+}
+
+pad_apply_named()
+{
+	gpio="$1"
+	drive_name="$2"
+	slew_name="$3"
+
+	eval "drive=\${$drive_name:-}"
+	eval "slew=\${$slew_name:-}"
+	if [ -z "$drive" ] && [ -z "$slew" ]; then
+		return
+	fi
+
+	pad_apply_one "$gpio" "$drive" "$slew"
+}
+
+apply_hub75_pad_overrides()
+{
+	if ! pad_override_requested; then
+		return
+	fi
+	if [ ! -x ./rp1_mmio_read32 ] || [ ! -x ./rp1_mmio_poke32 ]; then
+		echo "pad override requested, but rp1_mmio_read32/rp1_mmio_poke32 are missing in $(pwd)" >&2
+		exit 1
+	fi
+
+	pad_apply_group "CLK" "$rp1_gpio_clk"
+	pad_apply_group "LAT" "$rp1_gpio_lat"
+	pad_apply_group "OE" "$rp1_gpio_oe"
+	pad_apply_group "ADDR" "$rp1_gpio_a $rp1_gpio_b $rp1_gpio_c $rp1_gpio_d $rp1_gpio_e"
+	pad_apply_group "RGB" "$rp1_gpio_r1 $rp1_gpio_g1 $rp1_gpio_b1 $rp1_gpio_r2 $rp1_gpio_g2 $rp1_gpio_b2 $rp1_gpio_p1_r1 $rp1_gpio_p1_g1 $rp1_gpio_p1_b1 $rp1_gpio_p1_r2 $rp1_gpio_p1_g2 $rp1_gpio_p1_b2"
+	pad_apply_named "$rp1_gpio_a" "RP1_HUB75_PAD_DRIVE_A" "RP1_HUB75_PAD_SLEW_A"
+	pad_apply_named "$rp1_gpio_b" "RP1_HUB75_PAD_DRIVE_B" "RP1_HUB75_PAD_SLEW_B"
+	pad_apply_named "$rp1_gpio_c" "RP1_HUB75_PAD_DRIVE_C" "RP1_HUB75_PAD_SLEW_C"
+	pad_apply_named "$rp1_gpio_d" "RP1_HUB75_PAD_DRIVE_D" "RP1_HUB75_PAD_SLEW_D"
+	pad_apply_named "$rp1_gpio_e" "RP1_HUB75_PAD_DRIVE_E" "RP1_HUB75_PAD_SLEW_E"
+}
+
+sram_fill32()
+{
+	offset="$1"
+	bytes="$2"
+	value="$3"
+	start=$((offset))
+	end=$((start + bytes))
+	cur="$start"
+
+	while [ "$cur" -lt "$end" ]; do
+		sudo ./rp1_sram_poke32 "$(printf '0x%x' "$cur")" "$value" >/dev/null
+		cur=$((cur + 4))
+	done
+}
+
+sram_hash()
+{
+	offset="$1"
+	bytes="$2"
+
+	sudo ./rp1_sram_dump "$offset" "$bytes" | shasum -a 256 | awk '{ print $1 }'
+}
+
+wait_frame_slot_after_launch()
+{
+	if [ "$frame_slot_after_launch" != "1" ]; then
+		return
+	fi
+
+	deadline=$(($(date +%s) + frame_slot_timeout_seconds))
+	while [ "$(date +%s)" -le "$deadline" ]; do
+		slot_low="$(sudo ./rp1_sram_read32 "$frame_slot_offset" 2>/dev/null || printf '0x00000000\n')"
+		slot_high="$(sudo ./rp1_sram_read32 "$((frame_slot_offset + 4))" 2>/dev/null || printf '0x00000000\n')"
+		if [ "$slot_low" != "0x00000000" ] &&
+		   [ "$slot_high" = "$frame_slot_expected_high" ]; then
+			echo "post-launch frame slot ready at $frame_slot_offset dma=${slot_high}${slot_low#0x}"
+			return
+		fi
+		sleep 0.05
+	done
+
+	echo "timed out waiting for post-launch frame slot at $frame_slot_offset low=$slot_low high=$slot_high expected_high=$frame_slot_expected_high" >&2
+	exit 1
+}
+
+set_regular_p0p1_chain2_state32_params()
+{
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="180224"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x52385032"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	rp1_gpio_r1="11"
+	rp1_gpio_g1="27"
+	rp1_gpio_b1="7"
+	rp1_gpio_r2="8"
+	rp1_gpio_g2="9"
+	rp1_gpio_b2="10"
+	rp1_gpio_p1_r1="12"
+	rp1_gpio_p1_g1="5"
+	rp1_gpio_p1_b1="6"
+	rp1_gpio_p1_r2="19"
+	rp1_gpio_p1_g2="13"
+	rp1_gpio_p1_b2="20"
+	rp1_gpio_lat="4"
+	rp1_gpio_a="22"
+	rp1_gpio_b="23"
+	rp1_gpio_c="24"
+	rp1_gpio_d="25"
+	rp1_gpio_e="15"
+}
+
+set_regular_p0p1_chain2_state32_pwm6_params()
+{
+	set_regular_p0p1_chain2_state32_params
+	bytes_per_tick="98304"
+}
+
+case "$candidate" in
+rgbmask)
+	bin="rp1_core1_sram_procrio_rgbmask_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52364d53"
+	;;
+rgbmask-unroll16)
+	bin="rp1_core1_sram_procrio_rgbmask_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52363136"
+	;;
+rgbmask-isram)
+	bin="rp1_core1_sram_procrio_rgbmask_isram_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52364953"
+	;;
+rgbmask-isram-unroll16)
+	bin="rp1_core1_sram_procrio_rgbmask_isram_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52364955"
+	;;
+rgbmask-isram-unroll8)
+	bin="rp1_core1_sram_procrio_rgbmask_isram_unroll8_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52364938"
+	;;
+state32-isram-unroll8)
+	bin="rp1_core1_sram_procrio_state32_isram_unroll8_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334938"
+	;;
+state32-isram-unroll16)
+	bin="rp1_core1_sram_procrio_state32_isram_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334955"
+	;;
+state32-isram-tailfast-unroll16)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335446"
+	;;
+state32-isram-tailfast-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335434"
+	;;
+state32-isram-tailfast-dwell20)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335432"
+	;;
+state32-isram-tailfast-dwell0)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_unroll16_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335430"
+	;;
+state32-isram-tailfast-fastpad)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_fastpad_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334638"
+	;;
+state32-isram-tailfast-fastpad-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_fastpad_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334634"
+	;;
+state32-isram-tailfast-nopush)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_nopush_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334e38"
+	;;
+state32-isram-tailfast-nopush-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_nopush_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334e34"
+	;;
+state32-isram-tailfast-fastpad-nopush-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_fastpad_nopush_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334d34"
+	;;
+state32-isram-tailfast-batch10)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_batch10_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334238"
+	;;
+state32-isram-tailfast-batch10-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_batch10_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334234"
+	;;
+state32-isram-tailfast-fastpad-batch10-dwell24)
+	bin="rp1_core1_sram_procrio_state32_isram_tailfast_fastpad_batch10_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334246"
+	;;
+state32-dsramcache)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_loop_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334438"
+	;;
+state32-dsramcache-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334434"
+	;;
+state32-dsramcache-fastpad-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334446"
+	;;
+state32-sharedtext-dsramcache-dwell24)
+	bin="rp1_core1_sram_procrio_state32_sharedtext_dsramcache_nopush_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334334"
+	;;
+state32-sharedtext-dsramcache-fastpad-dwell24)
+	bin="rp1_core1_sram_procrio_state32_sharedtext_dsramcache_fastpad_nopush_unroll16_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334346"
+	;;
+state32-dsramcache-unroll8-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_unroll8_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53333834"
+	;;
+state32-dsramcache-fastpad-unroll8-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_fastpad_unroll8_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53333846"
+	;;
+state32-dsramcache-fastpad-unroll8-dwell20)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_fastpad_unroll8_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53333832"
+	;;
+state32-dsramcache-fastpad-unroll8-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_fastpad_unroll8_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53333830"
+	;;
+state32-dsramcache-lowprefetch4-copylatclr-setclr-r10-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_lowprefetch4_copylatclr_setclr_r10_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334452"
+	;;
+state32-dsramcache-lowprefetch4-copylatclr-setclr-r10-regcount-clknop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_lowprefetch4_copylatclr_setclr_r10_regcount_clknop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5333444e"
+	;;
+state32-dsramcache-lowprefetch4-copylatclr-setclr-r10-regcount-clknop4-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_lowprefetch4_copylatclr_setclr_r10_regcount_clknop4_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334434"
+	;;
+state32-dsramcache-lowprefetch4-copylatclr-clkout-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_lowprefetch4_copylatclr_clkout_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334f43"
+	;;
+state32-dsramcache-lowprefetch4-copyframe-copylatclr-clkout-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_lowprefetch4_copyframe_copylatclr_clkout_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334f46"
+	bytes_per_tick="8192"
+	;;
+state32-dsramcache-copyplane-copylatclr-clkout-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copyplane_copylatclr_clkout_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334f50"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copyplane-copylatclr-clkout-regcount-frame5-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copyplane_copylatclr_clkout_regcount_frame5_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334f35"
+	bytes_per_tick="40960"
+	;;
+state32-dsramcache-copyplane-clkout-regcount-frame6-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copyplane_clkout_regcount_frame6_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53334f36"
+	bytes_per_tick="49152"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-frame6-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame6_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335836"
+	bytes_per_tick="49152"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335831"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell64)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell64.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336434"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell128)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell128.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336438"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell192)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell192.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336439"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell255)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell255.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336435"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell320)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell320.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336530"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell340)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell340.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336630"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell344)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell344.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336634"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell348)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell348.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336638"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell352)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell352.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336532"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-clkout-regcount-dwell384)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_regcount_frame11_dwell384.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53336534"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell348)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell348.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373138"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell352)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell352.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373132"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell360)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell360.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373130"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373830"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell504)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell504.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373034"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell508)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell508.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373038"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell512)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell512.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373532"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-regcount-dwell520)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_regcount_frame11_dwell520.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373230"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374130"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e34"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-forceoe-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_forceoe_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374634"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-forceoe-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_forceoe_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374630"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-forceoe-regcount-dwell64)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_forceoe_regcount_frame11_dwell64.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374636"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-regcount-dwell64)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_regcount_frame11_dwell64.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374638"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-regcount-dwell32)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_regcount_frame11_dwell32.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374632"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-regcount-dwell32)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_regcount_frame11_dwell32.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337464c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell32)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell32.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374643"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e01"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-addr2slow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_addr2slow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e42"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay8-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay8_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e18"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay4-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay4_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e14"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e16"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-rgbslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_rgbslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e48"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-addrrgbslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_addrrgbslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e49"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4a"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-allslow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_allslow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4b"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-lat2-clknop-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_lat2_clknop_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e06"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e26"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-copyrgbonly-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_copyrgbonly_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374f15"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-first8-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_first8_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e56"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-firstburst1-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_firstburst1_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e54"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-firstburst1post2-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_firstburst1post2_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e55"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay6-copyrgbonly-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay6_copyrgbonly_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374f16"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e15"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-allslow-lat2-clknop-regcount-dwell1-postcopy1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_allslow_lat2_clknop_regcount_frame11_dwell1_postcopy1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4d"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-head16-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_head16_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4e"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_offset="0x9000"
+	seed_count="3"
+	seed_stride="8192"
+	status_magic="0x53374e53"
+	bytes_per_tick="24576"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat2-clknop-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_allslow_lat2_clknop_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e61"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat1-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_allslow_lat1_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e58"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_allslow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e59"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e5a"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-clknop4-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_clknop4_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e60"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e62"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-addr4slow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_addr4slow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e63"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-b4slow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_b4slow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e64"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e65"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop15-seedoe-copydelay5-splithead1-clkfast-directctrl-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop15_seedoe_copydelay5_splithead1_clkfast_directctrl_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e66"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad7-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad7_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e67"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad5-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad5_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e68"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad3-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad3_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e69"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e6a"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e6b"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-blanklead1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_blanklead1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375075"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-blanklead2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_blanklead2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375076"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375079"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-blanklead1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_blanklead1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337507a"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-blankhold1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_blankhold1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337507b"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-blankhold2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_blankhold2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337507c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-oeenable1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_oeenable1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337507d"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-ctrlrgbblank-oeenable2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_ctrlrgbblank_oeenable2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337507e"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-blankhold1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_blankhold1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375073"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-blankhold2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_blankhold2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375074"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-oeenable1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_oeenable1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375077"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-oeenable2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_oeenable2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375078"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-rowhold1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_rowhold1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375071"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-rowhold2-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_rowhold2_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375072"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-addr4slow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_addr4slow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375063"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop13-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop13_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e70"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop15-seedoe-copydelay5-splithead1-clkfast-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop15_seedoe_copydelay5_splithead1_clkfast_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e6c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clk4fast-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clk4fast_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e6d"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop12-seedoe-copydelay5-splithead1-clk2slow-directctrl-rowpad1-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop12_seedoe_copydelay5_splithead1_clk2slow_directctrl_rowpad1_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e6e"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clk12fast-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clk12fast_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e5c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clk8fast-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clk8fast_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e5d"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clk4fast-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clk4fast_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e5e"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-clk4slow-lat2-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1_clk4slow_lat2_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e5f"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1predec-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead1predec_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e57"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead2-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead2_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e52"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead4-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead4_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e51"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead8-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead8_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e50"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead16-allslow-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5_splithead16_allslow_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e4f"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5predec-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_copydelay5predec_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e25"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-lat2-clknop-regcount-dwell1-postcopy32)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_seedoe_lat2_clknop_regcount_frame11_dwell1_postcopy32.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e32"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell16)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell16.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374631"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374608"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell4)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell4.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374604"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell2)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell2.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374602"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374601"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-forceoe-lat2-clknop-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_forceoe_lat2_clknop_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374600"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-latguard-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_latguard_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374734"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop8-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop8_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374e38"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-setctrl-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_setctrl_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374330"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-setctrl-regcount-dwell508)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_setctrl_regcount_frame11_dwell508.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374338"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetupnop4-setctrl-regcount-dwell480)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetupnop4_setctrl_regcount_frame11_dwell480.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374334"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell508)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell508.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374138"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-addr8-rgb8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_addr8_rgb8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374188"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-clk8-addr8-rgb8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_clk8_addr8_rgb8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374888"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-addr4-rgb4)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_addr4_rgb4.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374144"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-slow12)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_slow12.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337530c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-slow8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_slow8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375308"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-addrsetup-regcount-dwell480-pad-clkfast-slowctl8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_addrsetup_regcount_frame11_dwell480_pad_clkfast_slowctl8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x533753c8"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-setup-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_setup_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375330"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-setup-regcount-dwell240)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_setup_regcount_frame11_dwell240.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375334"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-batch10-dwell508)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_batch10_frame11_dwell508.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373838"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-batch10-dwell512)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_batch10_frame11_dwell512.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373832"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-batch10-dwell524)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_batch10_frame11_dwell524.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373234"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-batch10-dwell528)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_batch10_frame11_dwell528.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373238"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-clkout-batch10-dwell540)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_clkout_batch10_frame11_dwell540.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373430"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy10plane-srcptr-clkout-regcount-frame6-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_srcptr_clkout_regcount_frame6_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	seed_offset="0x0"
+	seed_count="6"
+	status_magic="0x53335036"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	requires_low_sram="1"
+	bytes_per_tick="49152"
+	;;
+state32-dsramcache-copy10plane-srcptr-clkout-regcount-frame2-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_srcptr_clkout_regcount_frame2_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	seed_offset="0xb000"
+	seed_count="2"
+	status_magic="0x53335032"
+	bytes_per_tick="16384"
+	;;
+state32-dsramcache-copy10plane-clkout-row8-frame7-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_row8_frame7_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335837"
+	bytes_per_tick="57344"
+	;;
+state32-dsramcache-copy10plane-clkout-unroll32-frame7-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy10plane_clkout_unroll32_frame7_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335537"
+	bytes_per_tick="57344"
+	;;
+rgb6-dsramcache-expandframe-clkout-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_rgb6_dsramcache_expandframe_clkout_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f46"
+	bytes_per_tick="2048"
+	;;
+rgb6-dsramcache-expandframe-clkout-nonop-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_rgb6_dsramcache_expandframe_clkout_nonop_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f4e"
+	bytes_per_tick="2048"
+	;;
+rgb6-dsramcache-expandplane-clkout-nonop-regcount-dwell0)
+	bin="rp1_core1_sram_procrio_rgb6_dsramcache_expandplane_clkout_nonop_regcount_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f50"
+	bytes_per_tick="22528"
+	;;
+rgb6-dsramcache-expandplane-clkout-nonop-regcount-frame4-dwell0)
+	bin="rp1_core1_sram_procrio_rgb6_dsramcache_expandplane_clkout_nonop_regcount_frame4_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f34"
+	bytes_per_tick="8192"
+	;;
+state32-dsramcache-refillplane-fastpad-unroll8-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_fastpad_unroll8_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335234"
+	;;
+state32-dsramcache-refillplane-fastpad-unroll8-dwell20)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_fastpad_unroll8_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335232"
+	;;
+state32-dsramcache-refillplane-fastpad-unroll8-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_fastpad_unroll8_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335230"
+	;;
+state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell24)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_copy10_fastpad_unroll8_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335834"
+	;;
+state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell20)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_copy10_fastpad_unroll8_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335832"
+	;;
+state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_refillplane_copy10_fastpad_unroll8_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53335830"
+	;;
+state32-rowrefill-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_rowrefill_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375234"
+	;;
+state32-rowrefill-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_rowrefill_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375232"
+	;;
+state32-rowrefill-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_rowrefill_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375230"
+	;;
+state32-tailrefill-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375434"
+	;;
+state32-tailrefill-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375432"
+	;;
+state32-tailrefill-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375430"
+	;;
+state32-tailrefill-regcount-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_regcount_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375534"
+	;;
+state32-tailrefill-regcount-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_regcount_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375532"
+	;;
+state32-tailrefill-regcount-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_regcount_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375530"
+	;;
+state32-tailrefill-regcount-latsetclr-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_regcount_latsetclr_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337554c"
+	;;
+state32-tailrefill-batch10-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_batch10_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375634"
+	;;
+state32-tailrefill-batch10-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_batch10_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375632"
+	;;
+state32-tailrefill-batch10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_batch10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375630"
+	;;
+state32-tailrefill-stream1-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_stream1_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375734"
+	;;
+state32-tailrefill-stream1-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_stream1_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375732"
+	;;
+state32-tailrefill-stream1-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_stream1_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375730"
+	;;
+state32-tailrefill-setclr-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_setclr_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375834"
+	;;
+state32-tailrefill-setclr-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_setclr_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375832"
+	;;
+state32-tailrefill-setclr-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_setclr_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375830"
+	;;
+state32-tailrefill-lowprefetch-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375934"
+	;;
+state32-tailrefill-lowprefetch-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375932"
+	;;
+state32-tailrefill-lowprefetch-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375930"
+	;;
+state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375a34"
+	;;
+state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375a32"
+	;;
+state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375a30"
+	;;
+state32-tailrefill-lowprefetch-setclr-r10-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_r10_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375134"
+	;;
+state32-tailrefill-lowprefetch-setclr-r10-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_r10_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375132"
+	;;
+state32-tailrefill-lowprefetch-setclr-r10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch_setclr_r10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375130"
+	;;
+state32-tailrefill-lowprefetch4-setclr-r10-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_setclr_r10_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373434"
+	;;
+state32-tailrefill-lowprefetch4-setclr-r10-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_setclr_r10_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373432"
+	;;
+state32-tailrefill-lowprefetch4-setclr-r10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_setclr_r10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53373430"
+	;;
+state32-tailrefill-lowprefetch4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375034"
+	;;
+state32-tailrefill-lowprefetch4-directctrl-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directctrl_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374434"
+	;;
+state32-tailrefill-lowprefetch4-directctrl-copylatclr-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directctrl_copylatclr_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337444c"
+	;;
+state32-tailrefill-lowprefetch4-directctrl-forceoe-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directctrl_forceoe_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374f34"
+	;;
+state32-tailrefill-lowprefetch4-directctrl-latclr4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directctrl_latclr4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374834"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c34"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-shiftlatclr4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_shiftlatclr4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374f48"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copystr8-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copystr8_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375338"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copylatclr-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copylatclr_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337434c"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copylatclr-clkout-regcount-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copylatclr_clkout_regcount_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374f52"
+	bytes_per_tick="90112"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copylatclr-nodsb-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copylatclr_nodsb_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5337434e"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copylatclr4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copylatclr4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374334"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copylatclr-last4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copylatclr_last4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c35"
+	;;
+state32-tailrefill-lowprefetch4-directoe-outlat-copydelay8-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_directoe_outlat_copydelay8_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374438"
+	;;
+state32-tailrefill-lowprefetch4-latwide4-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_latwide4_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53375734"
+	;;
+state32-tailrefill-lowprefetch4-latclear-setclr-r10-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_latclear_setclr_r10_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374334"
+	;;
+state32-tailrefill-lowprefetch4-latsetclr-setclr-r10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_latsetclr_setclr_r10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c34"
+	;;
+state32-tailrefill-lowprefetch4-latguard-setclr-r10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch4_latguard_setclr_r10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374734"
+	;;
+state32-tailrefill-lowprefetch10-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374b34"
+	;;
+state32-tailrefill-lowprefetch10-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374b32"
+	;;
+state32-tailrefill-lowprefetch10-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374b30"
+	;;
+state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell24)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_setclr_fastpad_loop_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c34"
+	;;
+state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell20)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_setclr_fastpad_loop_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c32"
+	;;
+state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell0)
+	bin="rp1_core1_sram_procrio_state32_tailrefill_lowprefetch10_setclr_fastpad_loop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53374c30"
+	;;
+procrio-control64-dwell0)
+	bin="rp1_core1_procrio_control64_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x43363430"
+	;;
+rgb6byte)
+	bin="rp1_core1_sram_procrio_rgb6byte_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364259"
+	;;
+rgb6byte-clkout-nonop-dwell0)
+	bin="rp1_core1_sram_procrio_rgb6byte_clkout_nonop_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f44"
+	bytes_per_tick="22528"
+	;;
+rio32-safe)
+	bin="rp1_core1_sram_procrio_ring2_unroll16_frame11_dwell28.bin"
+	seed_prog="rp1_hub75_seed_rows"
+	seed_stride="8704"
+	status_magic="0x52313638"
+	;;
+sram-readbench-isram)
+	bin="rp1_core1_sram_readbench_isram.bin"
+	seed_prog="rp1_hub75_seed_rgb_masks"
+	seed_stride="8192"
+	status_magic="0x52424d52"
+	bytes_per_tick="8192"
+	ticks_per_frame="0"
+	;;
+sram-copy-dsram-bench)
+	bin="rp1_core1_sram_copy_to_dsram_bench.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x52334643"
+	bytes_per_tick="8192"
+	ticks_per_frame="11"
+	;;
+rgb6-expand-dsram-bench)
+	bin="rp1_core1_rgb6_to_dsram_expand_bench.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365844"
+	bytes_per_tick="2048"
+	ticks_per_frame="11"
+	;;
+sram-row64-copy-dsram-bench)
+	bin="rp1_core1_sram_copy_row64_to_dsram_bench.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x52375238"
+	bytes_per_tick="256"
+	ticks_per_frame="352"
+	;;
+sram-row64-copy10-dsram-bench)
+	bin="rp1_core1_sram_copy_row64_to_dsram_copy10_bench.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x52375258"
+	bytes_per_tick="256"
+	ticks_per_frame="352"
+	;;
+sram-row64-safe8-dsram-bench)
+	bin="rp1_core1_sram_copy_row64_to_dsram_safe8_bench.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x52375253"
+	bytes_per_tick="256"
+	ticks_per_frame="352"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell24)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell24.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365234"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell20)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell20.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365232"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell0)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell0.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365230"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell192)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell192.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363139"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell224)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell224.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363232"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell240)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell240.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363234"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363235"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb8fast)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb8fast.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363846"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4fast)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4fast.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363446"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363453"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb2slow)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb2slow.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363253"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-lat2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_lat2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c32"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c34"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb2slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb2slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236324c"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-lat4-setclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_lat4_setclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365334"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb2slow-lat4-setclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb2slow_lat4_setclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365332"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell248-rgb4slow-lat4-setclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell248_rgb4slow_lat4_setclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365348"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell250-rgb4slow-lat4-setclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell250_rgb4slow_lat4_setclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365350"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-lat4-oesetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_lat4_oesetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f45"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell248-rgb4slow-lat4-oesetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell248_rgb4slow_lat4_oesetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f48"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell244-rgb4slow-lat4-oesetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell244_rgb4slow_lat4_oesetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364f44"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-addr8slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_addr8slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364138"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-addr4slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_addr4slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364134"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-addr2slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_addr2slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364132"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb2slow-addr2slow-lat4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb2slow_addr2slow_lat4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364232"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell252-rgb4slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell252_rgb4slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236434e"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell238-rgb4slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell238_rgb4slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364338"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb4slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb4slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364337"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364339"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk8fast-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk8fast_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364838"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk4fast-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk4fast_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364834"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk2fast-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk2fast_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364832"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-ctrl4fast-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_ctrl4fast_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364634"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk4fast-latoe2fast-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk4fast_latoe2fast_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c32"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c53"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell223-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell223_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363233"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell210-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell210_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52363231"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell237-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell237_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c52"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell223-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell223_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c4e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell217-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell217_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c37"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364c35"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk2fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk2fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364232"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk8fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk8fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364238"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk12fast-latoe2slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk12fast_latoe2slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364243"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236424c"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell195-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk1-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell195_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk1_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365035"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell194-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk1-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell194_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk1_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365036"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell190-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk1-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell190_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk1_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365031"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell180-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk1-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell180_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk1_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365032"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell120-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell120_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365331"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell90-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell90_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365332"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell60-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell60_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365333"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell180-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell180_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365334"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell195-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell195_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365336"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell194-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell194_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365337"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell190-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-addrnop4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell190_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_addrnop4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365338"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell186-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-addrnop8-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell186_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_addrnop8_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365339"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell250-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell250_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365341"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365344"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk12fast-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk12fast_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365352"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk8fast-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk8fast_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365354"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk4fast-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk4fast_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365355"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2fast-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2fast_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365356"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2slow-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2slow_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365357"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365359"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535b"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535c"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell214-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell214_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535d"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell213-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell213_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell0-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell0_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536d"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell213-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop5-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell213_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop5_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536b"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell213-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop6-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell213_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop6_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536a"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell213-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop7-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell213_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop7_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536c"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell181-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-clkhold1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell181_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_clkhold1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365369"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell181-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop5-rgbsetclr-clkhold1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell181_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop5_rgbsetclr_clkhold1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell181-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell181_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535f"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell150-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell150_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236536f"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell100-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell100_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365370"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell50-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell50_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365371"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell25-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell25_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365372"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell10-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell10_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365373"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell5-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell5_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365378"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell2-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell2_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365379"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell1-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell1_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537a"
+	;;
+rgb6cache-expandframe-fastpad-rowloop-dwell1-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_expandframe_fastpad_rowloop_frame11_dwell1_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537f"
+	;;
+rgb333cache-refillplane-fastpad-rowloop-frame7-dwell16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb333cache_refillplane_fastpad_rowloop_frame7_dwell16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb333_words"
+	seed_stride="8192"
+	status_magic="0x52333337"
+	;;
+rgb333cache-refillplane-fastpad-rowloop-frame7-dwell24-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb333cache_refillplane_fastpad_rowloop_frame7_dwell24_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb333_words"
+	seed_stride="8192"
+	status_magic="0x52333338"
+	;;
+rgb333cache-refillplane-fastpad-rowloop-frame7-dwell96-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb333cache_refillplane_fastpad_rowloop_frame7_dwell96_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb333_words"
+	seed_stride="8192"
+	status_magic="0x52333339"
+	;;
+rgb333cache-refillplane-fastpad-rowloop-frame7-dwell88-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb333cache_refillplane_fastpad_rowloop_frame7_dwell88_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb333_words"
+	seed_stride="8192"
+	status_magic="0x52333341"
+	;;
+rgb444cache-refillplane-fastpad-rowloop-frame15-dwell88-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb444cache_refillplane_fastpad_rowloop_frame15_dwell88_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb444_words"
+	seed_stride="8192"
+	status_magic="0x52343441"
+	;;
+rgb888-rowmajor-constred-frame8-dwell4-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb888_rowmajor_constred_frame8_dwell4_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	status_magic="0x52384352"
+	;;
+rgb111cache-refillplane-fastpad-rowloop-frame11-dwell1-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb111cache_refillplane_fastpad_rowloop_frame11_dwell1_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_offset="0xa000"
+	seed_stride="24576"
+	status_magic="0x52313131"
+	;;
+state32-preexpanded-rowmajor-frame11-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_preexpanded_rowmajor_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="90112"
+	ticks_per_frame="1"
+	status_magic="0x53313252"
+	;;
+state32-preexpanded-rowmajor-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_preexpanded_rowmajor_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="49152"
+	ticks_per_frame="1"
+	status_magic="0x53303652"
+	;;
+state32-slabstream-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_slabstream_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="2816"
+	ticks_per_frame="32"
+	status_magic="0x53384c42"
+	;;
+state32-slabstream-frame6-ring8-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_slabstream_frame6_ring8_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="1536"
+	ticks_per_frame="32"
+	status_magic="0x53365288"
+	;;
+state32-chunk80-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_chunk80_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="20480"
+	ticks_per_frame="3"
+	status_magic="0x43483638"
+	;;
+state32-chunk20-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_chunk20_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="20480"
+	ticks_per_frame="10"
+	status_magic="0x43323536"
+	;;
+state32-chunk8-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_chunk8_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="8192"
+	ticks_per_frame="24"
+	status_magic="0x43323538"
+	;;
+state32-dmachunk-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmachunk_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444d3638"
+	;;
+state32-dmaasync8-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44413838"
+	;;
+state32-dmaasync8-wait-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415738"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmaasync8-wait-ch0-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_ch0_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415730"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmaasync8-wait-ch1-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_ch1_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415739"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmaasync8-wait-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44525231"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmadualpair8-wait-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmadualpair8_wait_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44325031"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmadualpairfast8-wait-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmadualpairfast8_wait_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44324631"
+	running_status_magic="0x444d5348"
+	;;
+state32-dmapipeline4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503431"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4-postisramready-nolegacy80f0-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline4_postisramready_nolegacy80f0_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44505259"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	launch_no_legacy_status="1"
+	post_ready_slot0_canary="1"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503434"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk0)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk0.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45345030"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll256)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll256.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45345531"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk0-unroll256)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk0_unroll256.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45345530"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+rio32-dmapipeline4x2-rr01-cols256-frame6-dwell8-addr2slow-latoe2slow-lat2-unroll514)
+	bin="rp1_core1_rio32_dmapipeline4x2_rr01_cols256_frame6_dwell8_addr2slow_latoe2slow_lat2_unroll514.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="394752"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45314432"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45343831"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45343838"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-electrodragonp0-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell8_electrodragonp0_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45385030"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols128-frame8-regular-p0p1-chain2-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+		bytes_per_tick="180224"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x52385032"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	rp1_gpio_r1="11"
+	rp1_gpio_g1="27"
+	rp1_gpio_b1="7"
+	rp1_gpio_r2="8"
+	rp1_gpio_g2="9"
+	rp1_gpio_b2="10"
+	rp1_gpio_p1_r1="12"
+	rp1_gpio_p1_g1="5"
+	rp1_gpio_p1_b1="6"
+	rp1_gpio_p1_r2="19"
+	rp1_gpio_p1_g2="13"
+	rp1_gpio_p1_b2="20"
+	rp1_gpio_lat="4"
+	rp1_gpio_a="22"
+	rp1_gpio_b="23"
+	rp1_gpio_c="24"
+	rp1_gpio_d="25"
+	rp1_gpio_e="15"
+	;;
+state32-dmapipeline4x4-rr01-cols128-frame8-regular-p0p1-chain2-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8-wrapprefetch)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8_wrapprefetch.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll8.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk1-unroll16)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk1_unroll16.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr4-lat2)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat2.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr8-lat1)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr8_lat1.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr4-lat1)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat1.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr2-lat1)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr2_lat1.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr0-lat1)
+	case "${RP1_HUB75_PWM_BITS:-8}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr0_lat1.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	8)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr0_lat1.bin"
+		set_regular_p0p1_chain2_state32_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr0-lat1 supports RP1_HUB75_PWM_BITS=6 or 8" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-fullrio-preclk0-unroll16-addr0-lat1)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_fullrio_preclk0_unroll16_addr0_lat1.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-fullrio-preclk0-unroll16-addr0-lat1 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2)
+	case "${RP1_HUB75_PWM_BITS:-11}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	8)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin"
+		set_regular_p0p1_chain2_state32_params
+		bytes_per_tick="131072"
+		;;
+	11)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame11_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin"
+		set_regular_p0p1_chain2_state32_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2 supports RP1_HUB75_PWM_BITS=6, 8, or 11" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh1)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkhigh1.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh1 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr16-lat4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr16_lat4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr16-lat4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-stage16-lat4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_stage16_lat4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-stage16-lat4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clearlat)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clearlat.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clearlat supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr16-lat2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr16_lat2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr16-lat2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-setup8-addr8-lat2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_setup8_addr8_lat2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-setup8-addr8-lat2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-setup8-addr8-lat4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_setup8_addr8_lat4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-setup8-addr8-lat4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkhigh2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh2-tailpipe)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkhigh2_tailpipe.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh2-tailpipe supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkcall2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkcall2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkcall2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkcall4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkcall4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkcall4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkloop2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkloop2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkloop2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkloop4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkloop4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkloop4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkretain)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkretain.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkretain supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkhigh4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkhigh4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll4-addr8-lat2-clkhigh2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll4_addr8_lat2_clkhigh2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll4-addr8-lat2-clkhigh2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll4-addr8-lat2-clkhigh4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll4_addr8_lat2_clkhigh4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll4-addr8-lat2-clkhigh4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2-clkhigh2)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_nowrap_preclk1_unroll8_addr8_lat2_clkhigh2.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2-clkhigh2 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2-clkhigh4)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_nowrap_preclk1_unroll8_addr8_lat2_clkhigh4.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2-clkhigh4 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-clkaddr-nowrap-setup8-stage16)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_clkaddr_nowrap_setup8_stage16.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-clkaddr-nowrap-setup8-stage16 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-safe-slow)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_safe_slow.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	8)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_safe_slow.bin"
+		set_regular_p0p1_chain2_state32_params
+		bytes_per_tick="131072"
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-safe-slow supports RP1_HUB75_PWM_BITS=6 or 8" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2)
+	case "${RP1_HUB75_PWM_BITS:-8}" in
+	8)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_oeoffshift_nowrap_preclk1_unroll8_addr8_lat2.bin"
+		set_regular_p0p1_chain2_state32_params
+		bytes_per_tick="131072"
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-oeoffshift-nowrap-preclk1-unroll8-addr8-lat2 supports RP1_HUB75_PWM_BITS=8 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-wrapdirectoe-preclk0-unroll16-addr0-lat1)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_wrapdirectoe_preclk0_unroll16_addr0_lat1.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-wrapdirectoe-preclk0-unroll16-addr0-lat1 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-latchblank-preclk0-unroll16-addr0-lat1)
+	case "${RP1_HUB75_PWM_BITS:-6}" in
+	6)
+		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_latchblank_preclk0_unroll16_addr0_lat1.bin"
+		set_regular_p0p1_chain2_state32_pwm6_params
+		;;
+	*)
+		echo "state32-regular-p0p1-chain2-latchblank-preclk0-unroll16-addr0-lat1 supports RP1_HUB75_PWM_BITS=6 for now" >&2
+		exit 2
+		;;
+	esac
+	;;
+state32-regular-p0p1-chain2-wrap-preclk0-unroll16-addr4-lat0)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame8_dwell8_regular_p0p1_chain2_wrapprefetch_preclk0_unroll16_addr4_lat0.bin"
+	set_regular_p0p1_chain2_state32_params
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell16-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell16_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45383136"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-addr4-clk2-latoe2-lat1-rgbsetclr-preclk1-unroll16)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell8_addr4_clk2_latoe2_lat1_rgbsetclr_preclk1_unroll16.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45383136"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8-nomask)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8_nomask.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x4538484f"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame8-dwell8-addr2slow-clk2slow-latoe2slow-lat4-addrnop8-rgbsetclr-preclk0-unroll8-rowhold4)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame8_dwell8_addr2slow_clk2slow_latoe2slow_lat4_addrnop8_rgbsetclr_preclk0_unroll8_rowhold4.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="262144"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45384c49"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr4-clk2-latoe2-lat1-rgbsetclr-preclk1-unroll16)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr4_clk2_latoe2_lat1_rgbsetclr_preclk1_unroll16.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45343136"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-unroll8-nomask)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_unroll8_nomask.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x4534484f"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat4-addrnop8-rgbsetclr-preclk0-unroll8-rowhold4)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat4_addrnop8_rgbsetclr_preclk0_unroll8_rowhold4.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45344c49"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk0-unroll8)
+	bin="rp1_core1_state32_dmapipeline4x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk0_unroll8.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45343830"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+rio32-dmapipeline4x2-rr01-cols256-frame6-dwell8-addr2slow-latoe2slow-lat2-unroll2)
+	bin="rp1_core1_rio32_dmapipeline4x2_rr01_cols256_frame6_dwell8_addr2slow_latoe2slow_lat2_unroll2.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="394752"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x45314421"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x2-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline4x2_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503432"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline4x1-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline4x1_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503431"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline8x1-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline8x1_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503831"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline8x2-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline8x2_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503832"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline5x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline5x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503534"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline6x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline6x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503634"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline7x4-rr01-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline7x4_rr01_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44503734"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline6x4-rr1-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline6x4_rr1_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44363134"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline6x4-rr04-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline6x4_rr04_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44363434"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmapipeline6x4-rr06-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmapipeline6x4_rr06_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_offset="0xf000"
+	counter_offset="0xf004"
+	ctrl_offset="0xf008"
+	status_magic="0x44363634"
+	running_status_magic="0x444d4350"
+	running_status_magic2="0x444d5348"
+	;;
+state32-dmaasync16-wait-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync16_wait_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415736"
+	;;
+state32-dmaasync14-wait-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync14_wait_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415734"
+	;;
+state32-dmaasync8-wait-cols256-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_cols256_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44415731"
+	;;
+state32-dmaasync8-waitrepeat-cols256-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_waitrepeat_cols256_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44523131"
+	;;
+state32-dmaasync8-waitrepeat-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_waitrepeat_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44523838"
+	;;
+state32-dmaasync8-wait-cols256-frame6-dwell16-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_cols256_frame6_dwell16_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44573136"
+	;;
+rio32-dmaasync6-wait-cols256-frame6-dwell16-addr2slow-latoe2slow-lat2)
+	bin="rp1_core1_rio32_dmaasync6_wait_cols256_frame6_dwell16_addr2slow_latoe2slow_lat2.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="394752"
+	ticks_per_frame="1"
+	status_magic="0x52363136"
+	;;
+state32-dmaasync8-wait-cols256-frame6-dwell32-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_wait_cols256_frame6_dwell32_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44573332"
+	;;
+state32-dmaasync12-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync12_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44413132"
+	;;
+state32-dmaasync14-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync14_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44413134"
+	;;
+state32-dmaonly8-cols256-frame6)
+	bin="rp1_core1_state32_dmaonly8_cols256_frame6.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444f3038"
+	;;
+state32-dmaonly12-cols256-frame6)
+	bin="rp1_core1_state32_dmaonly12_cols256_frame6.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444f3132"
+	;;
+state32-staticchunk8-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53543838"
+	;;
+state32-staticchunk8-cols256-frame6-dwell4-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_cols256_frame6_dwell4_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53543834"
+	;;
+state32-staticchunk8-cols256-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_cols256_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53543831"
+	;;
+state32-staticchunk8-cols256-frame6-dwell0-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_cols256_frame6_dwell0_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53543830"
+	;;
+state32-staticchunk8-dmacontend-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_dmacontend_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53443838"
+	;;
+state32-staticchunk8-dmacontend-cols256-frame6-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_staticchunk8_dmacontend_cols256_frame6_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x53443831"
+	;;
+state32-dmaasync8-cols256-frame6-dwell4-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmaasync8_cols256_frame6_dwell4_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x44413834"
+	;;
+state32-dmachunk16-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmachunk16_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444d3136"
+	;;
+state32-dmachunk16-cols256-frame6-dwell4-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmachunk16_cols256_frame6_dwell4_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444d3134"
+	;;
+state32-dmachunk24-cols256-frame6-dwell8-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_dmachunk24_cols256_frame6_dwell8_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="196608"
+	ticks_per_frame="1"
+	status_magic="0x444d3234"
+	;;
+pwm6bits-frame-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_pwm6bits_frame_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog=""
+	seed_stride="0"
+	bytes_per_tick="9216"
+	ticks_per_frame="1"
+	status_magic="0x50364246"
+	;;
+rgb888cache-refillplane-fastpad-rowloop-frame8-dwell2-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell2_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x52383841"
+	;;
+rgb888const-refillplane-fastpad-rowloop-frame8-dwell2-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb888const_refillplane_fastpad_rowloop_frame8_dwell2_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x52383852"
+	;;
+rgb888debug-refillplane-fastpad-rowloop-frame8-dwell2-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb888debug_refillplane_fastpad_rowloop_frame8_dwell2_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x52383844"
+	;;
+rgb888expandhalt-frame8-debug)
+	bin="rp1_core1_rgb888expandhalt_frame8_debug.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x52383848"
+	;;
+rgb888expandhalt-frame8-debug-readnop4)
+	bin="rp1_core1_rgb888expandhalt_frame8_debug_readnop4.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x5238384c"
+	;;
+rgb888cache-refillplane-fastpad-rowloop-frame8-dwell2-readnop4-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell2_readnop4_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x5238384e"
+	;;
+rgb888expandhalt-frame8-debug-warm16)
+	bin="rp1_core1_rgb888expandhalt_frame8_debug_warm16.bin"
+	seed_prog="rp1_hub75_seed_rgb888_words"
+	seed_stride="16384"
+	status_magic="0x52383857"
+	;;
+	rgb888cache-refillplane-fastpad-rowloop-frame8-dwell2-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+		bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell2_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+		seed_prog="rp1_hub75_seed_rgb888_words"
+		seed_stride="16384"
+		status_magic="0x52383858"
+		;;
+	rgb888cache-refillplane-fastpad-rowloop-frame8-dwell1-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+		bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell1_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+		seed_prog="rp1_hub75_seed_rgb888_words"
+		seed_stride="16384"
+		status_magic="0x52383859"
+		;;
+	rgb888cache-refillplane-fastpad-rowloop-frame8-dwell4-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+		bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell4_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+		seed_prog="rp1_hub75_seed_rgb888_words"
+		seed_stride="16384"
+		status_magic="0x5238385a"
+		;;
+		rgb888cache-rowmajor-fastpad-frame8-dwell4-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+			bin="rp1_core1_rgb888cache_rowmajor_fastpad_frame8_dwell4_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+			seed_prog="rp1_hub75_seed_rgb888_words"
+			seed_offset="0xbf00"
+			seed_stride="16384"
+			status_magic="0x52385234"
+			;;
+		rgb888cache-rowmajor-outfast-frame8-dwell4-warm16-addr2slow-clkfast-latoe2slow-lat2-addrnop4-preclk0)
+			bin="rp1_core1_rgb888cache_rowmajor_outfast_frame8_dwell4_warm16_addr2slow_clkfast_latoe2slow_lat2_addrnop4_preclk0.bin"
+			seed_prog="rp1_hub75_seed_rgb888_words"
+			seed_offset="0xbf00"
+			seed_stride="16384"
+			status_magic="0x52385246"
+			;;
+		rgb888cache-refillplane-fastpad-rowloop-frame8-dwell8-warm16-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+			bin="rp1_core1_rgb888cache_refillplane_fastpad_rowloop_frame8_dwell8_warm16_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+			seed_prog="rp1_hub75_seed_rgb888_words"
+		seed_stride="16384"
+		status_magic="0x5238385b"
+		;;
+	state32-copyframe-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+		bin="rp1_core1_state32_copyframe_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+		seed_prog="rp1_hub75_seed_state32"
+		seed_stride="8192"
+	status_magic="0x53365340"
+	;;
+state32-copyframe-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat1-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_copyframe_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat1_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365344"
+	;;
+state32-copyframe-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk0)
+	bin="rp1_core1_state32_copyframe_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365343"
+	;;
+state32-copyframe-fastpad-rowloop-dwell1-addr4slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_copyframe_fastpad_rowloop_frame11_dwell1_addr4slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365342"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365345"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy32)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy32.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365346"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy16)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy16.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365347"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy8)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy8.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365348"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy4)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy4.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365349"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy2)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy2.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5336534a"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5336534b"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-copyrgbonly-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-postcopy1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_copyrgbonly_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_postcopy1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365353"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop4-rgbsetclr-preclk1-postcopy1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop4_rgbsetclr_preclk1_postcopy1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5336534c"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop0-rgbsetclr-preclk1-postcopy1)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop0_rgbsetclr_preclk1_postcopy1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x5336534d"
+	bytes_per_tick="90112"
+	;;
+state32-dsramcache-copy11plane-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop0-rgbsetclr-preclk0-postcopy0)
+	bin="rp1_core1_sram_procrio_state32_dsramcache_copy11plane_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop0_rgbsetclr_preclk0_postcopy0.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365350"
+	bytes_per_tick="90112"
+	;;
+state32-copyonce-fastpad-rowloop-dwell1-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_state32_copyonce_fastpad_rowloop_frame11_dwell1_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_state32"
+	seed_stride="8192"
+	status_magic="0x53365341"
+	;;
+rgb6cache-expandonce-fastpad-rowloop-dwell1-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_expandonce_fastpad_rowloop_frame11_dwell1_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell1-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop7-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell1_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop7_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537d"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell1-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-explicitclklow)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell1_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_explicitclklow.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537c"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell1-rgbonly-addr4slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell1_rgbonly_addr4slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236537b"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell10-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1-rgb4slow)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell10_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1_rgb4slow.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365376"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell10-rgbonly-addr4slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell10_rgbonly_addr4slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365377"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell10-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell10_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365375"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell0-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell0_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365374"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell185-rgbonly-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-rgbsetclr-preclk1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell185_rgbonly_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_rgbsetclr_preclk1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365360"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell310-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell310_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365361"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell220-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell220_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365362"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell260-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell260_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365363"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell237-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell237_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365364"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell235-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l1)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell235_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l1.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365365"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell235-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h1l2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell235_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h1l2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365366"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell203-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell203_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365367"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell214-constred-addr2slow-clk2slow-latoe2slow-lat2-addrnop8-clkonly-h2l2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell214_constred_addr2slow_clk2slow_latoe2slow_lat2_addrnop8_clkonly_h2l2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365368"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk2slow-latoe2slow-lat1-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk2slow_latoe2slow_lat1_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236535a"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk4slow-latoe2slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk4slow_latoe2slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365358"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgbonly-addr2slow-clk12fast-latoe8slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgbonly_addr2slow_clk12fast_latoe8slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365353"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell220-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell220_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365345"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell225-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell225_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365346"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell80-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell80_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365347"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell100-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell100_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365348"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell120-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell120_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365349"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell180-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell180_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534a"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell190-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell190_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534b"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell194-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell194_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534c"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell150-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell150_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534d"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell160-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell160_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell170-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell170_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236534f"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell173-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell173_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365351"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell174-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clklo-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell174_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clklo_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365350"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell260-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell260_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365342"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell270-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell270_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365343"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell200-rgbonly-addr2slow-clk12fast-latoe4slow-lat4-rgbsetclr-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell200_rgbonly_addr2slow_clk12fast_latoe4slow_lat4_rgbsetclr_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365335"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell165-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk2-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell165_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk2_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365033"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell155-rgb2slow-addr2slow-clk12fast-latoe4slow-lat4-preclk2-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell155_rgb2slow_addr2slow_clk12fast_latoe4slow_lat4_preclk2_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365034"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr4slow-clk12fast-latoe4slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr4slow_clk12fast_latoe4slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364134"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr8slow-clk12fast-latoe4slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr8slow_clk12fast_latoe4slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364138"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr12slow-clk12fast-latoe4slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr12slow_clk12fast_latoe4slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364143"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk12fast-latoe8slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk12fast_latoe8slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236424d"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell215-rgb2slow-addr2slow-clk12fast-latoe12slow-lat4-clknop2)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell215_rgb2slow_addr2slow_clk12fast_latoe12slow_lat4_clknop2.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236424e"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell193-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop3)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell193_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop3.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364d33"
+	;;
+rgb6cache-refillplane-fastpad-rowloop-dwell190-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clknop3)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_rowloop_frame11_dwell190_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clknop3.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364d30"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk4slow-latoe2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk4slow_latoe2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365334"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell237-rgb2slow-addr2slow-clk8slow-latoe2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell237_rgb2slow_addr2slow_clk8slow_latoe2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52365338"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell120-rgb2slow-addr2slow-clk2fast-latoe2slow-lat4-clknop4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell120_rgb2slow_addr2slow_clk2fast_latoe2slow_lat4_clknop4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52324e31"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell80-rgb2slow-addr2slow-clk2fast-latoe2slow-lat4-clknop4)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell80_rgb2slow_addr2slow_clk2fast_latoe2slow_lat4_clknop4.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52324e38"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell0-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkout)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell0_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkout.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236434f"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell80-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkout)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell80_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkout.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364351"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell160-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkout)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell160_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkout.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364352"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell214-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkout)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell214_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkout.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364354"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell228-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkout)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell228_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkout.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364356"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell160-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkoutnop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell160_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkoutnop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x5236434d"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell120-rgb2slow-addr2slow-clk4fast-latoe2slow-lat4-clkoutnop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell120_rgb2slow_addr2slow_clk4fast_latoe2slow_lat4_clkoutnop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364357"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell220-rgb4slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell220_rgb4slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364332"
+	;;
+rgb6cache-refillplane-fastpad-unroll8-dwell200-rgb4slow-addr2slow-lat4-clknop)
+	bin="rp1_core1_rgb6cache_refillplane_fastpad_unroll8_frame11_dwell200_rgb4slow_addr2slow_lat4_clknop.bin"
+	seed_prog="rp1_hub75_seed_rgb6_bytes"
+	seed_stride="2048"
+	status_magic="0x52364330"
+	;;
+*)
+	echo "usage: $0 [rgbmask|rgbmask-unroll16|rgbmask-isram|rgbmask-isram-unroll8|rgbmask-isram-unroll16|state32-isram-unroll8|state32-isram-unroll16|state32-isram-tailfast-unroll16|state32-isram-tailfast-dwell24|state32-isram-tailfast-dwell20|state32-isram-tailfast-dwell0|state32-isram-tailfast-fastpad|state32-isram-tailfast-fastpad-dwell24|state32-isram-tailfast-nopush|state32-isram-tailfast-nopush-dwell24|state32-isram-tailfast-fastpad-nopush-dwell24|state32-isram-tailfast-batch10|state32-isram-tailfast-batch10-dwell24|state32-isram-tailfast-fastpad-batch10-dwell24|state32-dsramcache|state32-dsramcache-dwell24|state32-dsramcache-fastpad-dwell24|state32-sharedtext-dsramcache-dwell24|state32-sharedtext-dsramcache-fastpad-dwell24|state32-dsramcache-unroll8-dwell24|state32-dsramcache-fastpad-unroll8-dwell24|state32-dsramcache-fastpad-unroll8-dwell20|state32-dsramcache-fastpad-unroll8-dwell0|state32-dsramcache-refillplane-fastpad-unroll8-dwell24|state32-dsramcache-refillplane-fastpad-unroll8-dwell20|state32-dsramcache-refillplane-fastpad-unroll8-dwell0|state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell24|state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell20|state32-dsramcache-refillplane-copy10-fastpad-unroll8-dwell0|state32-rowrefill-fastpad-loop-dwell24|state32-rowrefill-fastpad-loop-dwell20|state32-rowrefill-fastpad-loop-dwell0|state32-tailrefill-fastpad-loop-dwell24|state32-tailrefill-fastpad-loop-dwell20|state32-tailrefill-fastpad-loop-dwell0|state32-tailrefill-regcount-fastpad-loop-dwell24|state32-tailrefill-regcount-fastpad-loop-dwell20|state32-tailrefill-regcount-fastpad-loop-dwell0|state32-tailrefill-batch10-fastpad-loop-dwell24|state32-tailrefill-batch10-fastpad-loop-dwell20|state32-tailrefill-batch10-fastpad-loop-dwell0|state32-tailrefill-stream1-fastpad-loop-dwell24|state32-tailrefill-stream1-fastpad-loop-dwell20|state32-tailrefill-stream1-fastpad-loop-dwell0|state32-tailrefill-setclr-fastpad-loop-dwell24|state32-tailrefill-setclr-fastpad-loop-dwell20|state32-tailrefill-setclr-fastpad-loop-dwell0|state32-tailrefill-lowprefetch-fastpad-loop-dwell24|state32-tailrefill-lowprefetch-fastpad-loop-dwell20|state32-tailrefill-lowprefetch-fastpad-loop-dwell0|state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell24|state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell20|state32-tailrefill-lowprefetch-setclr-fastpad-loop-dwell0|state32-tailrefill-lowprefetch10-fastpad-loop-dwell24|state32-tailrefill-lowprefetch10-fastpad-loop-dwell20|state32-tailrefill-lowprefetch10-fastpad-loop-dwell0|state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell24|state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell20|state32-tailrefill-lowprefetch10-setclr-fastpad-loop-dwell0|rgb6cache-refillplane-fastpad-unroll8-dwell24|rgb6cache-refillplane-fastpad-unroll8-dwell20|rgb6cache-refillplane-fastpad-unroll8-dwell0|rgb6byte|rio32-safe|sram-readbench-isram|sram-copy-dsram-bench|rgb6-expand-dsram-bench|sram-row64-copy-dsram-bench|sram-row64-copy10-dsram-bench|sram-row64-safe8-dsram-bench] [seconds]" >&2
+	exit 2
+	;;
+esac
+
+if [ ! -x "./$launcher" ] || [ ! -f "$bin" ] ||
+   [ ! -x ./rp1_sram_read32 ] ||
+   { [ -n "$seed_prog" ] && [ ! -x "./$seed_prog" ]; }; then
+	echo "missing launcher, payload, or seed helper in $(pwd)" >&2
+	echo "launcher=$launcher bin=$bin seed_prog=$seed_prog" >&2
+	exit 1
+fi
+
+if [ "$requires_low_sram" = "1" ] &&
+   [ "${RP1_HUB75_ALLOW_LOW_SRAM_OVERWRITE:-0}" != "1" ]; then
+	echo "$candidate seeds low shared SRAM and overwrites firmware/launcher scratch after launch." >&2
+	echo "Set RP1_HUB75_ALLOW_LOW_SRAM_OVERWRITE=1 on a manually power-cycled test boot to run it." >&2
+	exit 2
+fi
+
+if [ "$launcher" = "core1_test_730_safe" ]; then
+	echo "using legacy PIO-triggered trampoline because RP1_HUB75_ALLOW_PIO_TRAMPOLINE=1" >&2
+fi
+if [ "$launch_no_legacy_status" = "1" ]; then
+	sudo env RP1_CORE1_LAUNCH_NO_LEGACY_STATUS=1 "./$launcher" "$bin"
+else
+	sudo "./$launcher" "$bin"
+fi
+sleep 0.1
+status="$(sudo ./rp1_sram_read32 "$status_offset")"
+if [ "$status" != "$status_magic" ] &&
+   { [ -z "$running_status_magic" ] || [ "$status" != "$running_status_magic" ]; } &&
+   { [ -z "$running_status_magic2" ] || [ "$status" != "$running_status_magic2" ]; }; then
+	if [ -n "$running_status_magic2" ]; then
+		echo "worker status mismatch: got $status expected $status_magic, $running_status_magic, or $running_status_magic2" >&2
+	elif [ -n "$running_status_magic" ]; then
+		echo "worker status mismatch: got $status expected $status_magic or $running_status_magic" >&2
+	else
+		echo "worker status mismatch: got $status expected $status_magic" >&2
+	fi
+	exit 1
+fi
+if [ "$post_ready_slot0_canary" = "1" ]; then
+	if [ ! -x ./rp1_sram_dump ] || [ ! -x ./rp1_sram_poke32 ]; then
+		echo "post-ready canary requested, but rp1_sram_dump/rp1_sram_poke32 are missing" >&2
+		exit 1
+	fi
+	echo "post-ready slot0 canary fill/check offset=0x7000 bytes=8192"
+	sram_fill32 0x7000 8192 0xa5c30001
+	slot0_hash_before="$(sram_hash 0x7000 8192)"
+	sleep 0.05
+	slot0_hash_after="$(sram_hash 0x7000 8192)"
+	if [ "$slot0_hash_before" != "$slot0_hash_after" ]; then
+		echo "slot0 canary changed before START_MAGIC: before=$slot0_hash_before after=$slot0_hash_after" >&2
+		exit 1
+	fi
+	echo "post-ready slot0 canary stable hash=$slot0_hash_after"
+fi
+apply_hub75_pad_overrides
+seed_env=""
+if [ "${RP1_HUB75_SEED_NOADDR:-0}" = "1" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_NOADDR=1"
+fi
+if [ "${RP1_HUB75_SEED_ZERORGB:-0}" = "1" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_ZERORGB=1"
+fi
+if [ -n "${RP1_HUB75_SEED_SOLID:-}" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_SOLID=$RP1_HUB75_SEED_SOLID"
+fi
+if [ -n "${RP1_HUB75_SEED_RGB6_MASK:-}" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_RGB6_MASK=$RP1_HUB75_SEED_RGB6_MASK"
+fi
+if [ -n "${RP1_HUB75_SEED_RGB6_PATTERN:-}" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_RGB6_PATTERN=$RP1_HUB75_SEED_RGB6_PATTERN"
+fi
+if [ -n "${RP1_HUB75_SEED_STATE32_PATTERN:-}" ]; then
+	seed_env="$seed_env RP1_HUB75_SEED_STATE32_PATTERN=$RP1_HUB75_SEED_STATE32_PATTERN"
+fi
+if [ -n "$seed_prog" ]; then
+	if [ -n "$seed_env" ]; then
+		# shellcheck disable=SC2086 # seed_env is controlled boolean assignments.
+		sudo env $seed_env "./$seed_prog" "$seed_offset" "$seed_count" "$seed_stride"
+	else
+		sudo "./$seed_prog" "$seed_offset" "$seed_count" "$seed_stride"
+	fi
+fi
+if [ -n "${RP1_HUB75_PRE_START_COMMAND:-}" ]; then
+	sh -c "$RP1_HUB75_PRE_START_COMMAND"
+fi
+wait_frame_slot_after_launch
+sudo ./rp1_sram_poke32 "$ctrl_offset" 0x48553537
+sudo ./rp1_sram_counter "$counter_offset" "$seconds" "$bytes_per_tick" "$ticks_per_frame" "$panels"

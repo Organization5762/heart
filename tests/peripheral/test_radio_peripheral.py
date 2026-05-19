@@ -7,7 +7,10 @@ import pytest
 from manyfold import Graph
 from manyfold.sensor_io import BackoffPolicy, RetryPolicy
 
+from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core import Input, PeripheralMessageEnvelope
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.flowtoy import bind_flowtoy_color_control
 from heart.peripheral.input_payloads import RadioPacket
 from heart.peripheral.radio import (FLOWTOY_PATTERN_EVENT,
                                     FLOWTOY_RAW_COMMAND_EVENT,
@@ -94,6 +97,13 @@ class FakeSerialModule:
         handle = FakeSerialHandle()
         self.handles.append(handle)
         return handle
+
+
+class ConfigurationLoaderStub:
+    registry: object = object()
+
+    def load(self) -> PeripheralConfiguration:
+        return PeripheralConfiguration(detectors=(), graph_nodes=())
 
 
 class TestRadioPacketPayloads:
@@ -409,6 +419,54 @@ class TestRadioPeripheralFlowToyCommands:
         pattern = FlowToyPattern(group_id=2, mode=5)
 
         assert pattern.to_serial_command() == "p2,0,5,0,0,0,0,0,0,0,0,0,0"
+
+    def test_bind_flowtoy_color_control_sends_pattern_from_final_frame(self) -> None:
+        """Verify final-frame color can drive FlowToy commands through the shared input bus."""
+        pygame = pytest.importorskip("pygame")
+        driver = DummyDriver()
+        peripheral = RadioPeripheral(driver=driver)
+        manager = PeripheralManager(configuration_loader=ConfigurationLoaderStub())
+        manager.register(peripheral)
+        surface = pygame.Surface((2, 2))
+        surface.fill((255, 0, 0))
+
+        subscription = bind_flowtoy_color_control(
+            manager,
+            group_id=4,
+            page=2,
+            mode=7,
+            min_interval_s=0.0,
+        )
+        try:
+            manager.window.emit(surface)
+        finally:
+            subscription.dispose()
+
+        assert driver.commands == ["p4,2,7,14,0,255,255,0,0,0,0,0,0"]
+
+    def test_bind_flowtoy_color_control_without_radio_does_not_compute_color(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify unconnected FlowToy color control does not subscribe to final-frame color streams."""
+        pygame = pytest.importorskip("pygame")
+        manager = PeripheralManager(configuration_loader=ConfigurationLoaderStub())
+        surface = pygame.Surface((1, 1))
+        calls: list[Any] = []
+
+        def average_color(candidate: Any) -> tuple[int, int, int, int]:
+            calls.append(candidate)
+            return (255, 255, 255, 255)
+
+        monkeypatch.setattr(pygame.transform, "average_color", average_color)
+
+        subscription = bind_flowtoy_color_control(manager)
+        try:
+            manager.window.emit(surface)
+        finally:
+            subscription.dispose()
+
+        assert calls == []
 
 
 class TestSerialRadioDriverWrites:

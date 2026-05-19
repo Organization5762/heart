@@ -13,3 +13,4 @@ class TextRenderingState:
     color: Color
     x_location: int | None
     y_location: int | None
+    line_spacing_px: int = 0

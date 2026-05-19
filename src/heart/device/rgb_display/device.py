@@ -15,6 +15,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 FRAME_LOG_INTERVAL = 120
+STARTUP_FLUSH_FRAMES = 3
 
 
 class LEDMatrix(Device):
@@ -36,6 +37,7 @@ class LEDMatrix(Device):
         )
         self.driver: MatrixDriverProtocol = build_matrix_driver(orientation)
         self._frames_sent = 0
+        self._flush_startup_frames()
         atexit.register(self.close)
 
     def layout(self) -> Layout:
@@ -71,6 +73,14 @@ class LEDMatrix(Device):
             converted_image.width,
             converted_image.height,
         )
+
+    def _flush_startup_frames(self) -> None:
+        logger.info("Flushing matrix startup state with %s black frames", STARTUP_FLUSH_FRAMES)
+        self.driver.clear()
+        width, height = self.full_display_size()
+        blank_frame = bytes(width * height * len(RGBA_IMAGE_FORMAT))
+        for _ in range(STARTUP_FLUSH_FRAMES):
+            self.driver.submit_rgba(blank_frame, width, height)
 
     def close(self) -> None:
         self.driver.close()

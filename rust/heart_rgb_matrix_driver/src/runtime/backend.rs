@@ -2,13 +2,19 @@ use std::time::Duration;
 
 #[cfg(not(test))]
 use std::fs;
-#[cfg(not(test))]
 use std::path::Path;
 
 use super::config::MatrixConfigNative;
 use super::frame::FrameBuffer;
 use super::rp1_hub75::Rp1Hub75Backend;
+use super::rp1_sram_rgb888::Rp1SramRgb888Backend;
 use super::tuning::runtime_tuning;
+
+const PI5_BACKEND_ENV_VAR: &str = "HEART_PI5_MATRIX_BACKEND";
+const PI5_BACKEND_AUTO: &str = "auto";
+const PI5_BACKEND_RP1_HUB75: &str = "rp1-hub75";
+const PI5_BACKEND_RP1_SRAM_RGB888: &str = "rp1-sram-rgb888";
+const RP1_HUB75_DEVICE_PATH: &str = "/dev/rp1-hub75";
 
 pub(crate) trait MatrixBackend: Send {
     fn refresh_interval(&self) -> Duration;
@@ -96,6 +102,36 @@ fn build_pi4_backend(
 }
 
 fn build_pi5_backend(
+    config: &MatrixConfigNative,
+) -> Result<(Box<dyn MatrixBackend>, String), String> {
+    let requested_backend = std::env::var(PI5_BACKEND_ENV_VAR)
+        .unwrap_or_else(|_| PI5_BACKEND_AUTO.to_string())
+        .trim()
+        .to_ascii_lowercase();
+    match requested_backend.as_str() {
+        "" | PI5_BACKEND_AUTO => {
+            if Path::new(RP1_HUB75_DEVICE_PATH).exists() {
+                build_pi5_rp1_hub75_backend(config)
+            } else {
+                Err(format!(
+                    "{RP1_HUB75_DEVICE_PATH} is not present. Set {PI5_BACKEND_ENV_VAR}={PI5_BACKEND_RP1_SRAM_RGB888} to write Heart frames into the external RP1 SRAM RGB888 scanner buffer."
+                ))
+            }
+        }
+        PI5_BACKEND_RP1_HUB75 => build_pi5_rp1_hub75_backend(config),
+        PI5_BACKEND_RP1_SRAM_RGB888 | "sram-rgb888" => {
+            Ok((
+                Box::new(Rp1SramRgb888Backend::new(config)?) as Box<dyn MatrixBackend>,
+                "pi5-rp1-sram-rgb888".to_string(),
+            ))
+        }
+        other => Err(format!(
+            "Unsupported {PI5_BACKEND_ENV_VAR}={other:?}. Use {PI5_BACKEND_AUTO:?}, {PI5_BACKEND_RP1_HUB75:?}, or {PI5_BACKEND_RP1_SRAM_RGB888:?}."
+        )),
+    }
+}
+
+fn build_pi5_rp1_hub75_backend(
     config: &MatrixConfigNative,
 ) -> Result<(Box<dyn MatrixBackend>, String), String> {
     Ok((

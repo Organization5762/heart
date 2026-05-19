@@ -10,7 +10,8 @@ import pygame
 from heart.device import Rectangle
 from heart.device.local import LocalScreen
 from heart.display.shaders import fullscreen as fullscreen_module
-from heart.display.shaders.fullscreen import FullscreenShaderRuntime, TextureUniform
+from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
+                                              TextureUniform)
 from heart.runtime.display_context import DisplayContext
 
 
