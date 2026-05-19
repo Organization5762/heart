@@ -1,7 +1,24 @@
+from contextlib import nullcontext
+
 import pygame
 import pytest
 
+from heart import DeviceDisplayMode
+from heart.navigation.game_modes import GameModeState, ModeEntry
+from heart.renderers import StatefulBaseRenderer
 from heart.runtime.game_loop import GameLoop
+
+
+class _Renderer(StatefulBaseRenderer):
+    def __init__(self, *, display_mode: DeviceDisplayMode) -> None:
+        super().__init__()
+        self.device_display_mode = display_mode
+        self.reset_calls = 0
+
+    def reset(self) -> None:
+        self.reset_calls += 1
+        self.initialized = False
+        super().reset()
 
 
 class TestGameLoop:
@@ -65,3 +82,69 @@ class TestGameLoop:
         loop = GameLoop(device=device, resolver=resolver)
 
         assert loop.max_fps == 60
+
+    def test_render_frame_resets_initialized_opengl_renderers_on_display_mode_change(
+        self,
+        device,
+        resolver,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Reset stale OpenGL resources before pygame recreates the display context."""
+        loop = GameLoop(device=device, resolver=resolver)
+        loop.ensure_screen_initialized()
+        renderer = _Renderer(display_mode=DeviceDisplayMode.OPENGL)
+        renderer.initialized = True
+        loop.components.game_modes.set_state(
+            GameModeState(
+                entries=[ModeEntry(title_renderer=renderer, renderer=renderer)]
+            )
+        )
+        loop.components.display.last_render_mode = (
+            DeviceDisplayMode.MIRRORED.to_pygame_mode()
+        )
+        monkeypatch.setattr(
+            loop.components.display,
+            "display_mode",
+            lambda _mode: nullcontext(loop.components.display),
+        )
+        monkeypatch.setattr(
+            "heart.runtime.game_loop.ComposedRenderer.render_batch",
+            lambda *args, **kwargs: None,
+        )
+
+        loop.render_frame([renderer])
+
+        assert renderer.reset_calls == 1
+
+    def test_render_frame_keeps_opengl_renderers_when_display_mode_is_stable(
+        self,
+        device,
+        resolver,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Avoid reinitializing shader-backed renderers when the GL context stays alive."""
+        loop = GameLoop(device=device, resolver=resolver)
+        loop.ensure_screen_initialized()
+        renderer = _Renderer(display_mode=DeviceDisplayMode.OPENGL)
+        renderer.initialized = True
+        loop.components.game_modes.set_state(
+            GameModeState(
+                entries=[ModeEntry(title_renderer=renderer, renderer=renderer)]
+            )
+        )
+        loop.components.display.last_render_mode = (
+            DeviceDisplayMode.OPENGL.to_pygame_mode()
+        )
+        monkeypatch.setattr(
+            loop.components.display,
+            "display_mode",
+            lambda _mode: nullcontext(loop.components.display),
+        )
+        monkeypatch.setattr(
+            "heart.runtime.game_loop.ComposedRenderer.render_batch",
+            lambda *args, **kwargs: None,
+        )
+
+        loop.render_frame([renderer])
+
+        assert renderer.reset_calls == 0

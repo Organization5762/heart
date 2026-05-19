@@ -6,6 +6,8 @@ from typing import Any
 
 import numpy as np
 import pygame
+import pytest
+from OpenGL.error import GLError
 
 from heart.device import Rectangle
 from heart.device.local import LocalScreen
@@ -195,3 +197,29 @@ class TestFullscreenShaderRuntime:
         runtime.reset()
 
         assert deleted_programs == [101]
+
+    def test_draw_resets_stale_program_after_context_recreation(
+        self, monkeypatch
+    ) -> None:
+        _install_compile_stubs(monkeypatch)
+        deleted_programs: list[int] = []
+        monkeypatch.setattr(fullscreen_module, "glDeleteProgram", deleted_programs.append)
+        runtime = FullscreenShaderRuntime()
+        runtime.initialize(fragment_source="void main() {}")
+
+        def reject_stale_program(program: int) -> None:
+            raise GLError(
+                err=1281,
+                description=b"invalid value",
+                baseOperation="glUseProgram",
+                cArguments=(program,),
+            )
+
+        monkeypatch.setattr(fullscreen_module, "glUseProgram", reject_stale_program)
+
+        with pytest.raises(RuntimeError, match="shader program 101 is no longer valid"):
+            runtime.draw(viewport_size=(64, 32), uniforms={})
+
+        assert deleted_programs == [101]
+        assert runtime.program is None
+        assert runtime.uniform_locations == {}

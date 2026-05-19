@@ -85,7 +85,7 @@ class FullscreenShaderRuntime:
             fragment_source=resolved_fragment_source,
             attribute_name=attribute_name,
         )
-        glUseProgram(self.program)
+        self._use_program()
         glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, self._quad_vertices)
         glEnableVertexAttribArray(0)
 
@@ -102,7 +102,7 @@ class FullscreenShaderRuntime:
     ) -> None:
         if self.program is None:
             raise RuntimeError("FullscreenShaderRuntime is not initialized")
-        glUseProgram(self.program)
+        self._use_program()
         width, height = viewport_size
         origin_x, origin_y = viewport_origin
         glViewport(origin_x, origin_y, width, height)
@@ -174,6 +174,18 @@ class FullscreenShaderRuntime:
         self.program = None
         self.uniform_locations.clear()
         self.pixel_buffer = None
+
+    def _use_program(self) -> None:
+        if self.program is None:
+            raise RuntimeError("FullscreenShaderRuntime is not initialized")
+        try:
+            glUseProgram(self.program)
+        except GLError as exc:
+            stale_program = self.program
+            self.reset()
+            raise RuntimeError(
+                f"OpenGL shader program {stale_program} is no longer valid"
+            ) from exc
 
     def _ensure_pixel_buffer(self, *, width: int, height: int) -> None:
         if (

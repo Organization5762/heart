@@ -314,8 +314,10 @@ class GameLoop:
             raise RuntimeError("GameLoop screen is not initialized")
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
+        display_mode = self._resolve_display_mode(renderers)
+        self._reset_opengl_renderers_before_display_mode_change(display_mode)
         with self.components.display.display_mode(
-            self._resolve_display_mode(renderers)
+            display_mode
         ):
             return ComposedRenderer.render_batch(
                 renderers,
@@ -323,6 +325,55 @@ class GameLoop:
                 peripheral_manager=self.components.peripheral_manager,
                 orientation=self.device.orientation,
             )
+
+    def _reset_opengl_renderers_before_display_mode_change(
+        self,
+        display_mode: DeviceDisplayMode,
+    ) -> None:
+        current_mode = self.components.display.last_render_mode
+        target_mode = display_mode.to_pygame_mode()
+        if current_mode == target_mode:
+            return
+        for renderer in self._iter_runtime_renderers():
+            if (
+                renderer.initialized
+                and renderer.device_display_mode == DeviceDisplayMode.OPENGL
+            ):
+                logger.info(
+                    "Resetting OpenGL renderer %s before display mode transition",
+                    renderer.name,
+                )
+                renderer.reset()
+
+    def _iter_runtime_renderers(self) -> Sequence["StatefulBaseRenderer[Any]"]:
+        seen: set[int] = set()
+        result: list["StatefulBaseRenderer[Any]"] = []
+
+        def visit(renderer: "StatefulBaseRenderer[Any]") -> None:
+            renderer_id = id(renderer)
+            if renderer_id in seen:
+                return
+            seen.add(renderer_id)
+            result.append(renderer)
+            if isinstance(renderer, ComposedRenderer):
+                for child in renderer.renderers:
+                    visit(child)
+            elif isinstance(renderer, MultiScene):
+                for scene in renderer.scenes:
+                    visit(scene)
+
+        if self._temporary_renderer is not None:
+            visit(self._temporary_renderer)
+
+        game_modes = self.components.game_modes
+        if game_modes._state is not None:
+            for entry in game_modes.state.entries:
+                visit(entry.title_renderer)
+                visit(entry.renderer)
+            for post_processor in game_modes.state.post_processors:
+                visit(post_processor)
+
+        return result
 
     def _prepare_container(
         self,
