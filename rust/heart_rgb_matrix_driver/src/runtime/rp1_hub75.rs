@@ -275,22 +275,7 @@ struct SramSlotPublisher {
 
 #[derive(Debug)]
 enum Rp1Hub75FrameLoader {
-    Direct {
-        frame_bytes: u32,
-    },
-    RegularHorizontalLanes {
-        buffer: Vec<u8>,
-        input_frame_bytes: usize,
-        input_width: usize,
-        panel_rows: usize,
-        output_width: usize,
-    },
-    RegularStackedLanes {
-        buffer: Vec<u8>,
-        input_frame_bytes: usize,
-        input_width: usize,
-        active_height: usize,
-    },
+    Direct { frame_bytes: u32 },
 }
 
 impl Rp1Hub75Backend {
@@ -299,7 +284,7 @@ impl Rp1Hub75Backend {
         let external_sram_slot_offset = parse_optional_usize(EXTERNAL_SRAM_SLOT_OFFSET_ENV)?;
         if config.chain_length != 1
             && external_sram_slot_offset.is_none()
-            && config.wiring != WiringProfile::Regular
+            && config.wiring != WiringProfile::ThreePortActive
         {
             return Err(
                 "RP1 HUB75 packer currently requires chain_length=1; use parallel panels instead."
@@ -309,26 +294,25 @@ impl Rp1Hub75Backend {
 
         let frame_loader = Rp1Hub75FrameLoader::for_config(config, external_sram_slot_offset)?;
         let frame_bytes = frame_loader.queue_frame_bytes();
-        let pwm_bits = runtime_tuning()
-            .pi5_simple_scan_default_pwm_bits
-            .min(11)
-            .max(1);
+        let pwm_bits = runtime_tuning().rp1_hub75_pwm_bits.min(11).max(1);
         let dwell_shift_limit = runtime_tuning().rp1_hub75_dwell_shift_limit;
 
-        let (cols, rows, panel_count, lane_count, chain_length) =
-            if external_sram_slot_offset.is_some() && config.wiring != WiringProfile::Regular {
-                (
-                    u16::try_from(config.width()?)
-                        .map_err(|_| "RP1 HUB75 external SRAM width exceeds u16.".to_string())?,
-                    u16::try_from(config.height()?)
-                        .map_err(|_| "RP1 HUB75 external SRAM height exceeds u16.".to_string())?,
-                    1,
-                    1,
-                    1,
-                )
-            } else {
-                rp1h_geometry_for_config(config)?
-            };
+        let (cols, rows, panel_count, lane_count, chain_length) = if external_sram_slot_offset
+            .is_some()
+            && config.wiring != WiringProfile::ThreePortActive
+        {
+            (
+                u16::try_from(config.width()?)
+                    .map_err(|_| "RP1 HUB75 external SRAM width exceeds u16.".to_string())?,
+                u16::try_from(config.height()?)
+                    .map_err(|_| "RP1 HUB75 external SRAM height exceeds u16.".to_string())?,
+                1,
+                1,
+                1,
+            )
+        } else {
+            rp1h_geometry_for_config(config)?
+        };
 
         let mut rp1_config = Rp1hConfig {
             size: std::mem::size_of::<Rp1hConfig>() as u32,
@@ -715,20 +699,17 @@ fn rp1h_mapping_for_wiring(wiring: WiringProfile) -> u8 {
     match wiring {
         WiringProfile::AdafruitHatPwm => RP1H_MAPPING_ADAFRUIT_HAT_PWM,
         WiringProfile::ElectroDragonP0 => RP1H_MAPPING_ELECTRODRAGON_P0,
-        WiringProfile::Regular => RP1H_MAPPING_REGULAR,
+        WiringProfile::ThreePortActive => RP1H_MAPPING_REGULAR,
     }
 }
 
 fn rp1h_geometry_for_config(
     config: &MatrixConfigNative,
 ) -> Result<(u16, u16, u32, u32, u32), String> {
-    if config.wiring == WiringProfile::Regular {
-        let horizontal_logical_input = config.chain_length == 4 && config.parallel == 1;
-        let stacked_or_hzeller_input =
-            config.chain_length == 2 && (config.parallel == 2 || config.parallel == 3);
-        if !horizontal_logical_input && !stacked_or_hzeller_input {
+    if config.wiring == WiringProfile::ThreePortActive {
+        if config.chain_length != 4 || config.parallel != 1 {
             return Err(
-                "RP1 HUB75 regular profile currently supports logical chain_length=4 parallel=1 or chain_length=2 with parallel=2/3.".to_string(),
+                "RP1 HUB75 three-port active profile expects a horizontal 4-panel RGB888 strip: chain_length=4 parallel=1.".to_string(),
             );
         }
         return Ok((config.panel_cols, config.panel_rows, 4, 2, 2));
@@ -750,58 +731,43 @@ impl Rp1Hub75FrameLoader {
         _external_sram_slot_offset: Option<usize>,
     ) -> Result<Self, String> {
         let input_frame_bytes = config.frame_len()?;
-        if config.wiring != WiringProfile::Regular {
+        if config.wiring != WiringProfile::ThreePortActive {
             let frame_bytes = u32::try_from(input_frame_bytes)
                 .map_err(|_| "RP1 HUB75 frame size exceeds 32-bit UAPI length.".to_string())?;
             return Ok(Self::Direct { frame_bytes });
         }
-        let input_width = usize::try_from(config.width()?)
-            .map_err(|_| "RP1 HUB75 regular input width exceeds host usize.".to_string())?;
-        let input_height = usize::try_from(config.height()?)
-            .map_err(|_| "RP1 HUB75 regular input height exceeds host usize.".to_string())?;
+        let input_width = usize::try_from(config.width()?).map_err(|_| {
+            "RP1 HUB75 three-port active input width exceeds host usize.".to_string()
+        })?;
+        let input_height = usize::try_from(config.height()?).map_err(|_| {
+            "RP1 HUB75 three-port active input height exceeds host usize.".to_string()
+        })?;
         let output_width = usize::from(config.panel_cols) * 2;
-        let active_height = usize::from(config.panel_rows) * 2;
         if config.chain_length == 4 && config.parallel == 1 {
-            if input_width != output_width * 2 || input_height != usize::from(config.panel_rows) {
+            let expected_width = output_width * 2;
+            if input_width != expected_width || input_height != usize::from(config.panel_rows) {
                 return Err(format!(
-                    "RP1 HUB75 regular horizontal loader expected {}x{} input, received {input_width}x{input_height}.",
-                    output_width * 2,
+                    "RP1 HUB75 three-port active horizontal loader expected {}x{} input, received {input_width}x{input_height}.",
+                    expected_width,
                     config.panel_rows
                 ));
             }
-            let queue_frame_bytes = expected_rgb888_size_usize(output_width, active_height)?;
-            return Ok(Self::RegularHorizontalLanes {
-                buffer: vec![0; queue_frame_bytes],
-                input_frame_bytes,
-                input_width,
-                panel_rows: usize::from(config.panel_rows),
-                output_width,
+            return Ok(Self::Direct {
+                frame_bytes: u32::try_from(input_frame_bytes).map_err(|_| {
+                    "RP1 HUB75 three-port active horizontal frame size exceeds 32-bit UAPI length."
+                        .to_string()
+                })?,
             });
         }
-        if config.chain_length != 2 || input_height < active_height {
-            return Err(format!(
-                "RP1 HUB75 regular loader needs at least {active_height} active input rows, received {input_height}."
-            ));
-        }
-        if input_width != output_width {
-            return Err(format!(
-                "RP1 HUB75 regular stacked loader expected width {output_width}, received {input_width}."
-            ));
-        }
-        let queue_frame_bytes = expected_rgb888_size_usize(output_width, active_height)?;
-        Ok(Self::RegularStackedLanes {
-            buffer: vec![0; queue_frame_bytes],
-            input_frame_bytes,
-            input_width,
-            active_height,
-        })
+        Err(
+            "RP1 HUB75 three-port active profile expects a horizontal 4-panel RGB888 strip: chain_length=4 parallel=1."
+                .to_string(),
+        )
     }
 
     fn queue_frame_bytes(&self) -> u32 {
         match self {
             Self::Direct { frame_bytes } => *frame_bytes,
-            Self::RegularHorizontalLanes { buffer, .. } => buffer.len() as u32,
-            Self::RegularStackedLanes { buffer, .. } => buffer.len() as u32,
         }
     }
 
@@ -818,118 +784,8 @@ impl Rp1Hub75FrameLoader {
                 }
                 Ok((frame.as_ptr(), frame.len()))
             }
-            Self::RegularHorizontalLanes {
-                buffer,
-                input_frame_bytes,
-                input_width,
-                panel_rows,
-                output_width,
-            } => {
-                if frame.len() != *input_frame_bytes {
-                    return Err(format!(
-                        "RP1 HUB75 regular horizontal loader expected {input_frame_bytes} RGB888 bytes but received {}.",
-                        frame.len()
-                    ));
-                }
-                copy_regular_horizontal_lanes(
-                    frame,
-                    buffer,
-                    *input_width,
-                    *panel_rows,
-                    *output_width,
-                )?;
-                Ok((buffer.as_ptr(), buffer.len()))
-            }
-            Self::RegularStackedLanes {
-                buffer,
-                input_frame_bytes,
-                input_width,
-                active_height,
-            } => {
-                if frame.len() != *input_frame_bytes {
-                    return Err(format!(
-                        "RP1 HUB75 regular loader expected {input_frame_bytes} RGB888 bytes but received {}.",
-                        frame.len()
-                    ));
-                }
-                copy_regular_active_lanes(frame, buffer, *input_width, *active_height)?;
-                Ok((buffer.as_ptr(), buffer.len()))
-            }
         }
     }
-}
-
-fn expected_rgb888_size_usize(width: usize, height: usize) -> Result<usize, String> {
-    width
-        .checked_mul(height)
-        .and_then(|pixels| pixels.checked_mul(3))
-        .ok_or_else(|| "Matrix RGB888 frame size exceeds supported dimensions.".to_string())
-}
-
-fn copy_regular_active_lanes(
-    source: &[u8],
-    destination: &mut [u8],
-    width: usize,
-    active_height: usize,
-) -> Result<(), String> {
-    let active_bytes = expected_rgb888_size_usize(width, active_height)?;
-    if destination.len() != active_bytes {
-        return Err(format!(
-            "RP1 HUB75 regular destination has {} bytes but needs {active_bytes}.",
-            destination.len()
-        ));
-    }
-    if source.len() < active_bytes {
-        return Err(format!(
-            "RP1 HUB75 regular source has {} bytes but needs at least {active_bytes}.",
-            source.len()
-        ));
-    }
-    destination.copy_from_slice(&source[..active_bytes]);
-    Ok(())
-}
-
-fn copy_regular_horizontal_lanes(
-    source: &[u8],
-    destination: &mut [u8],
-    input_width: usize,
-    panel_rows: usize,
-    output_width: usize,
-) -> Result<(), String> {
-    let output_height = panel_rows.checked_mul(2).ok_or_else(|| {
-        "RP1 HUB75 regular output height exceeds supported dimensions.".to_string()
-    })?;
-    let output_bytes = expected_rgb888_size_usize(output_width, output_height)?;
-    let input_bytes = expected_rgb888_size_usize(input_width, panel_rows)?;
-    if source.len() != input_bytes {
-        return Err(format!(
-            "RP1 HUB75 regular horizontal source has {} bytes but needs {input_bytes}.",
-            source.len()
-        ));
-    }
-    if destination.len() != output_bytes {
-        return Err(format!(
-            "RP1 HUB75 regular horizontal destination has {} bytes but needs {output_bytes}.",
-            destination.len()
-        ));
-    }
-
-    let row_bytes = output_width
-        .checked_mul(3)
-        .ok_or_else(|| "RP1 HUB75 regular row width exceeds supported dimensions.".to_string())?;
-    let input_row_bytes = input_width.checked_mul(3).ok_or_else(|| {
-        "RP1 HUB75 regular input row width exceeds supported dimensions.".to_string()
-    })?;
-    for row in 0..panel_rows {
-        let src_row = row * input_row_bytes;
-        let dst_lane0 = row * row_bytes;
-        let dst_lane1 = (row + panel_rows) * row_bytes;
-        destination[dst_lane0..dst_lane0 + row_bytes]
-            .copy_from_slice(&source[src_row..src_row + row_bytes]);
-        destination[dst_lane1..dst_lane1 + row_bytes]
-            .copy_from_slice(&source[src_row + row_bytes..src_row + row_bytes * 2]);
-    }
-    Ok(())
 }
 
 impl MmapMapping {
@@ -1171,9 +1027,9 @@ mod tests {
     }
 
     #[test]
-    fn regular_active_loader_keeps_first_two_lanes_and_drops_third() {
+    fn three_port_active_rejects_three_parallel_lanes() {
         let config = MatrixConfigNative::new(
-            WiringProfile::Regular,
+            WiringProfile::ThreePortActive,
             2,
             2,
             2,
@@ -1181,20 +1037,31 @@ mod tests {
             super::super::config::ColorOrder::Rgb,
         )
         .unwrap();
-        let mut loader = Rp1Hub75FrameLoader::for_config(&config, None).unwrap();
-        let input: Vec<u8> = (0..72).collect();
 
-        let (ptr, len) = loader.prepare(&input).unwrap();
-        let copied = unsafe { std::slice::from_raw_parts(ptr, len) };
-
-        assert_eq!(len, 48);
-        assert_eq!(copied, &input[..48]);
+        let err = Rp1Hub75FrameLoader::for_config(&config, None).unwrap_err();
+        assert!(err.contains("chain_length=4 parallel=1"));
     }
 
     #[test]
-    fn regular_geometry_uses_two_active_lanes_for_horizontal_chain4() {
+    fn three_port_active_rejects_stacked_2x2_input() {
         let config = MatrixConfigNative::new(
-            WiringProfile::Regular,
+            WiringProfile::ThreePortActive,
+            2,
+            2,
+            2,
+            2,
+            super::super::config::ColorOrder::Rgb,
+        )
+        .unwrap();
+
+        let err = Rp1Hub75FrameLoader::for_config(&config, None).unwrap_err();
+        assert!(err.contains("chain_length=4 parallel=1"));
+    }
+
+    #[test]
+    fn three_port_active_geometry_uses_two_active_lanes_for_horizontal_chain4() {
+        let config = MatrixConfigNative::new(
+            WiringProfile::ThreePortActive,
             64,
             64,
             4,
@@ -1210,9 +1077,9 @@ mod tests {
     }
 
     #[test]
-    fn regular_horizontal_loader_reshapes_four_panels_to_two_lanes() {
+    fn three_port_active_horizontal_loader_keeps_256x64_regular_strip() {
         let config = MatrixConfigNative::new(
-            WiringProfile::Regular,
+            WiringProfile::ThreePortActive,
             2,
             2,
             4,
@@ -1221,15 +1088,63 @@ mod tests {
         )
         .unwrap();
         let mut loader = Rp1Hub75FrameLoader::for_config(&config, None).unwrap();
-        let input: Vec<u8> = (0..48).collect();
+        let mut input = vec![0; 48];
+
+        set_rgb(&mut input, 8, 0, 0, [10, 0, 0]);
+        set_rgb(&mut input, 8, 0, 1, [11, 0, 0]);
+        set_rgb(&mut input, 8, 2, 0, [0, 20, 0]);
+        set_rgb(&mut input, 8, 2, 1, [0, 21, 0]);
+        set_rgb(&mut input, 8, 4, 0, [0, 0, 30]);
+        set_rgb(&mut input, 8, 4, 1, [0, 0, 31]);
+        set_rgb(&mut input, 8, 6, 0, [40, 40, 40]);
+        set_rgb(&mut input, 8, 6, 1, [41, 41, 41]);
 
         let (ptr, len) = loader.prepare(&input).unwrap();
         let copied = unsafe { std::slice::from_raw_parts(ptr, len) };
 
         assert_eq!(len, 48);
-        assert_eq!(&copied[0..12], &input[0..12]);
-        assert_eq!(&copied[12..24], &input[24..36]);
-        assert_eq!(&copied[24..36], &input[12..24]);
-        assert_eq!(&copied[36..48], &input[36..48]);
+        assert_eq!(copied, input.as_slice());
+        assert_eq!(rgb_at(copied, 8, 0, 0), [10, 0, 0]);
+        assert_eq!(rgb_at(copied, 8, 2, 0), [0, 20, 0]);
+        assert_eq!(rgb_at(copied, 8, 4, 0), [0, 0, 30]);
+        assert_eq!(rgb_at(copied, 8, 6, 0), [40, 40, 40]);
+        assert_eq!(
+            regular_chain2_strip_sources(copied, 8, 2, 0),
+            [[10, 0, 0], [11, 0, 0], [0, 0, 30], [0, 0, 31]]
+        );
+        assert_eq!(
+            regular_chain2_strip_sources(copied, 8, 2, 2),
+            [[0, 20, 0], [0, 21, 0], [40, 40, 40], [41, 41, 41]]
+        );
+    }
+
+    fn set_rgb(frame: &mut [u8], width: usize, x: usize, y: usize, rgb: [u8; 3]) {
+        let offset = pixel_offset(width, x, y);
+        frame[offset..offset + 3].copy_from_slice(&rgb);
+    }
+
+    fn rgb_at(frame: &[u8], width: usize, x: usize, y: usize) -> [u8; 3] {
+        let offset = pixel_offset(width, x, y);
+        [frame[offset], frame[offset + 1], frame[offset + 2]]
+    }
+
+    fn regular_chain2_strip_sources(
+        frame: &[u8],
+        width: usize,
+        panel_rows: usize,
+        x: usize,
+    ) -> [[u8; 3]; 4] {
+        let row_pairs = panel_rows / 2;
+        let active_cols = width / 2;
+        [
+            rgb_at(frame, width, x, 0),
+            rgb_at(frame, width, x, row_pairs),
+            rgb_at(frame, width, active_cols + x, 0),
+            rgb_at(frame, width, active_cols + x, row_pairs),
+        ]
+    }
+
+    fn pixel_offset(width: usize, x: usize, y: usize) -> usize {
+        (y * width + x) * 3
     }
 }

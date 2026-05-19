@@ -86,6 +86,7 @@ class FakeWiringProfile(Enum):
     AdafruitHatPwm = "adafruit_hat_pwm"
     AdafruitHat = "adafruit_hat"
     AdafruitTripleHat = "adafruit_triple_hat"
+    ThreePortActive = "three-port-active"
     Regular = "regular"
 
 

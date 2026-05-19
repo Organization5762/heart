@@ -82,7 +82,7 @@ impl MatrixConfigNative {
 pub enum WiringProfile {
     AdafruitHatPwm,
     ElectroDragonP0,
-    Regular,
+    ThreePortActive,
 }
 
 impl TryFrom<&str> for WiringProfile {
@@ -92,7 +92,7 @@ impl TryFrom<&str> for WiringProfile {
         match value {
             "adafruit_hat_pwm" => Ok(Self::AdafruitHatPwm),
             "electrodragon" | "electrodragon_p0" => Ok(Self::ElectroDragonP0),
-            "regular" => Ok(Self::Regular),
+            "regular" | "three-port-active" | "three_port_active" => Ok(Self::ThreePortActive),
             _ => Err(format!("Unsupported wiring profile '{value}'.")),
         }
     }

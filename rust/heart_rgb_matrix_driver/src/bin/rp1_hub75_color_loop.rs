@@ -92,7 +92,9 @@ fn parse_wiring() -> Result<ProbeWiringProfile, String> {
     {
         "adafruit_hat_pwm" | "pwm" => Ok(ProbeWiringProfile::AdafruitHatPwm),
         "electrodragon" | "electrodragon_p0" => Ok(ProbeWiringProfile::ElectroDragonP0),
-        "regular" => Ok(ProbeWiringProfile::Regular),
+        "regular" | "three-port-active" | "three_port_active" => {
+            Ok(ProbeWiringProfile::ThreePortActive)
+        }
         other => Err(format!("Unsupported HEART_RGB_MATRIX_WIRING={other}")),
     }
 }

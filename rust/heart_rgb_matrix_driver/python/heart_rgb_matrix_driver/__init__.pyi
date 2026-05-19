@@ -95,6 +95,7 @@ class Rp1Hub75WorkerStatus:
 class WiringProfile:
     AdafruitHatPwm: typing.ClassVar[WiringProfile]
     ElectroDragonP0: typing.ClassVar[WiringProfile]
+    ThreePortActive: typing.ClassVar[WiringProfile]
     Regular: typing.ClassVar[WiringProfile]
 
 @typing.final

@@ -480,9 +480,16 @@ impl NativeWiringProfile {
     }
 
     #[classattr]
+    fn ThreePortActive() -> NativeWiringProfile {
+        NativeWiringProfile {
+            inner: WiringProfile::ThreePortActive,
+        }
+    }
+
+    #[classattr]
     fn Regular() -> NativeWiringProfile {
         NativeWiringProfile {
-            inner: WiringProfile::Regular,
+            inner: WiringProfile::ThreePortActive,
         }
     }
 
@@ -491,7 +498,7 @@ impl NativeWiringProfile {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "adafruit_hat_pwm",
             WiringProfile::ElectroDragonP0 => "electrodragon_p0",
-            WiringProfile::Regular => "regular",
+            WiringProfile::ThreePortActive => "three-port-active",
         }
     }
 
@@ -499,7 +506,7 @@ impl NativeWiringProfile {
         match self.inner {
             WiringProfile::AdafruitHatPwm => "WiringProfile.AdafruitHatPwm".to_string(),
             WiringProfile::ElectroDragonP0 => "WiringProfile.ElectroDragonP0".to_string(),
-            WiringProfile::Regular => "WiringProfile.Regular".to_string(),
+            WiringProfile::ThreePortActive => "WiringProfile.ThreePortActive".to_string(),
         }
     }
 }

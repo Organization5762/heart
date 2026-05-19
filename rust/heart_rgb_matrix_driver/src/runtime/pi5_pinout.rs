@@ -45,7 +45,7 @@ impl Pi5ScanPinout {
                 lat_gpio: 4,
                 clock_gpio: 17,
             }),
-            WiringProfile::Regular => Ok(Self {
+            WiringProfile::ThreePortActive => Ok(Self {
                 rgb_gpios: [11, 27, 7, 8, 9, 10],
                 addr_gpios: [22, 23, 24, 25, 15],
                 oe_gpio: 18,

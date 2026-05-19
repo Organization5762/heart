@@ -89,6 +89,39 @@ class TestRgbDisplayRuntime:
             color_order="rgb",
         )
 
+    def test_build_matrix_config_resolves_three_port_active_wiring(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the runtime maps the hzeller regular profile to Heart's explicit three-port name."""
+
+        monkeypatch.setenv("HEART_PANEL_ROWS", "64")
+        monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
+        monkeypatch.setenv(
+            "HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active"
+        )
+        native_module = SimpleNamespace(
+            MatrixConfig=FakeMatrixConfig,
+            WiringProfile=SimpleNamespace(
+                AdafruitHatPwm="hat-pwm",
+                ElectroDragonP0="electrodragon-p0",
+                ThreePortActive="three-port-active",
+            ),
+            ColorOrder=SimpleNamespace(RGB="rgb"),
+        )
+
+        config = build_matrix_config(
+            native_module, Rectangle.with_layout(columns=2, rows=2)
+        )
+
+        assert config == FakeMatrixConfig(
+            wiring="three-port-active",
+            panel_rows=64,
+            panel_cols=64,
+            chain_length=2,
+            parallel=2,
+            color_order="rgb",
+        )
+
     def test_build_matrix_driver_requires_native_runtime_by_default(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

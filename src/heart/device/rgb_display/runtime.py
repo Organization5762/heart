@@ -47,6 +47,16 @@ class MatrixDriverProtocol(Protocol):
         """Shut down the runtime."""
 
 
+class WiringProfileProtocol(Protocol):
+    AdafruitHatPwm: object
+    ElectroDragonP0: object
+    ThreePortActive: object
+
+
+class ColorOrderProtocol(Protocol):
+    RGB: object
+
+
 def build_matrix_driver(orientation: Orientation) -> MatrixDriverProtocol:
     backend_name = os.getenv(BACKEND_ENV_VAR, "").strip().lower()
     if backend_name not in ("", NATIVE_BACKEND):
@@ -65,33 +75,47 @@ def build_matrix_driver(orientation: Orientation) -> MatrixDriverProtocol:
 
 def build_matrix_config(native_module: ModuleType, orientation: Orientation) -> object:
     config_type = getattr(native_module, "MatrixConfig", None)
-    wiring_profile = getattr(native_module, "WiringProfile", None)
-    color_order = getattr(native_module, "ColorOrder", None)
+    wiring_profile = cast(
+        WiringProfileProtocol | None, getattr(native_module, "WiringProfile", None)
+    )
+    color_order = cast(
+        ColorOrderProtocol | None, getattr(native_module, "ColorOrder", None)
+    )
     if config_type is None or wiring_profile is None or color_order is None:
         raise RuntimeError(
             f"Native matrix runtime module {MATRIX_RUNTIME_MODULE} is missing configuration types."
         )
     hardware_mapping = os.environ.get(HARDWARE_MAPPING_ENV_VAR, "adafruit_hat_pwm")
-    wiring_attr = {
-        "adafruit-hat-pwm": "AdafruitHatPwm",
-        "adafruit_hat_pwm": "AdafruitHatPwm",
-        "electrodragon": "ElectroDragonP0",
-        "electrodragon-p0": "ElectroDragonP0",
-        "electrodragon_p0": "ElectroDragonP0",
-        "regular": "Regular",
-    }.get(hardware_mapping)
-    if wiring_attr is None:
+    wiring = _resolve_wiring_profile(wiring_profile, hardware_mapping)
+    if wiring == wiring_profile.ThreePortActive and (
+        orientation.layout.columns != 4 or orientation.layout.rows != 1
+    ):
         raise RuntimeError(
-            f"Unsupported {HARDWARE_MAPPING_ENV_VAR}={hardware_mapping!r}."
+            "three-port-active requires a horizontal 4-panel layout so the RP1 "
+            "driver receives a 256x64 RGB888 strip. Set HEART_LAYOUT_COLUMNS=4 "
+            "and HEART_LAYOUT_ROWS=1."
         )
     return config_type(
-        wiring=getattr(wiring_profile, wiring_attr),
+        wiring=wiring,
         panel_rows=Configuration.panel_rows(),
         panel_cols=Configuration.panel_columns(),
         chain_length=orientation.layout.columns,
         parallel=orientation.layout.rows,
         color_order=color_order.RGB,
     )
+
+
+def _resolve_wiring_profile(
+    wiring_profile: WiringProfileProtocol, hardware_mapping: str
+) -> object:
+    match hardware_mapping:
+        case "adafruit-hat-pwm" | "adafruit_hat_pwm":
+            return wiring_profile.AdafruitHatPwm
+        case "electrodragon" | "electrodragon-p0" | "electrodragon_p0":
+            return wiring_profile.ElectroDragonP0
+        case "regular" | "three-port-active" | "three_port_active":
+            return wiring_profile.ThreePortActive
+    raise RuntimeError(f"Unsupported {HARDWARE_MAPPING_ENV_VAR}={hardware_mapping!r}.")
 
 
 def _load_matrix_runtime_module() -> ModuleType:

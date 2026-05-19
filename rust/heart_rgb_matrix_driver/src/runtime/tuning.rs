@@ -20,6 +20,7 @@ const HEART_PI5_SIMPLE_SCAN_POST_ADDR_TICKS_DEFAULT: u32 = 5;
 const HEART_PI5_SIMPLE_SCAN_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_POST_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
+const HEART_RP1_HUB75_PWM_BITS_DEFAULT: u8 = 6;
 const HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT: u32 = 8;
 const HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT: u32 = 7;
 
@@ -43,6 +44,8 @@ pub(crate) struct RuntimeTuning {
     pub(crate) pi5_simple_scan_post_latch_ticks: u32,
     /* Per-column low/high hold count for the simple explicit-word transport. */
     pub(crate) pi5_simple_scan_clock_hold_ticks: u32,
+    /* PWM bit depth used by the RP1 HUB75 kernel packer and scanner path. */
+    pub(crate) rp1_hub75_pwm_bits: u8,
     /* Fail fast when the kernel packer queues frames but no display worker retires them. */
     pub(crate) rp1_hub75_require_progress_after_queued_frames: u32,
     /* Maximum binary-PWM dwell exponent used by the RP1 HUB75 scanner. */
@@ -105,6 +108,11 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             "HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS",
             HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT,
             |value| value > 0,
+        ),
+        rp1_hub75_pwm_bits: parse_env_u8(
+            "HEART_RP1_HUB75_PWM_BITS",
+            HEART_RP1_HUB75_PWM_BITS_DEFAULT,
+            |value| (1..=11).contains(&value),
         ),
         rp1_hub75_require_progress_after_queued_frames: parse_env_u32(
             "HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES",

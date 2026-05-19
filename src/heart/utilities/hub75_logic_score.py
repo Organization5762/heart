@@ -23,6 +23,8 @@ DEFAULT_SIGNAL_MAP = {
 }
 HUB75_ADDRESS_SIGNALS = ("A", "B", "C", "D", "E")
 OE_LONG_BLANK_THRESHOLD_NS = 10_000.0
+OE_MEDIAN_BLANK_WARNING_NS = 500.0
+OE_MEDIAN_BLANK_ACTIVE_FRACTION_WARNING = 0.05
 CLK_LONG_PERIOD_THRESHOLD_NS = 10_000.0
 
 
@@ -107,6 +109,7 @@ class Hub75SignalSummary:
     max_address_edge_interval_ns: dict[str, float | None]
     valid_hub75: bool
     validity_issues: tuple[str, ...]
+    warnings: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -259,11 +262,17 @@ def summarize_hub75_capture(
             strict=False,
         )
     ]
+    median_oe_active_ns = _median_ns(oe_durations[0])
+    median_oe_blank_ns = _median_ns(oe_durations[1])
     validity_issues = _validate_hub75_summary(
         lat_rise_count=len(lat_rises),
         interval_count=len(intervals),
         median_clocks_per_row=float(median(clocks_per_row)) if clocks_per_row else 0.0,
         median_clk_period_ns=_median_ns(clk_periods),
+    )
+    warnings = _warn_hub75_summary(
+        median_oe_active_ns=median_oe_active_ns,
+        median_oe_blank_ns=median_oe_blank_ns,
     )
 
     return Hub75SignalSummary(
@@ -291,8 +300,8 @@ def summarize_hub75_capture(
         ),
         oe_active_fraction=oe_active_time / oe_total_time if oe_total_time else 0.0,
         oe_blank_fraction=oe_blank_time / oe_total_time if oe_total_time else 0.0,
-        median_oe_active_ns=_median_ns(oe_durations[0]),
-        median_oe_blank_ns=_median_ns(oe_durations[1]),
+        median_oe_active_ns=median_oe_active_ns,
+        median_oe_blank_ns=median_oe_blank_ns,
         p90_oe_blank_ns=_percentile_ns(oe_durations[1], 0.90),
         p99_oe_blank_ns=_percentile_ns(oe_durations[1], 0.99),
         max_oe_blank_ns=_max_ns(oe_durations[1]),
@@ -316,6 +325,7 @@ def summarize_hub75_capture(
         },
         valid_hub75=not validity_issues,
         validity_issues=validity_issues,
+        warnings=warnings,
     )
 
 
@@ -808,3 +818,23 @@ def _validate_hub75_summary(
     if median_clk_period_ns is None:
         issues.append("need_clk_period")
     return tuple(issues)
+
+
+def _warn_hub75_summary(
+    *,
+    median_oe_active_ns: float | None,
+    median_oe_blank_ns: float | None,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if median_oe_blank_ns is None:
+        return ()
+    if median_oe_blank_ns > OE_MEDIAN_BLANK_WARNING_NS:
+        warnings.append("oe_median_blank_exceeds_500ns")
+    if (
+        median_oe_active_ns is not None
+        and median_oe_active_ns > 0
+        and median_oe_blank_ns / median_oe_active_ns
+        > OE_MEDIAN_BLANK_ACTIVE_FRACTION_WARNING
+    ):
+        warnings.append("oe_median_blank_exceeds_5pct_active")
+    return tuple(warnings)

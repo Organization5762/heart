@@ -147,6 +147,8 @@ static unsigned int env_mapping(void)
 	if (!strcmp(value, "electrodragon") ||
 	    !strcmp(value, "electrodragon_p0") ||
 	    !strcmp(value, "electrodragon-p0") ||
+	    !strcmp(value, "three-port-active") ||
+	    !strcmp(value, "three_port_active") ||
 	    !strcmp(value, "regular"))
 		return RP1H_MAPPING_ELECTRODRAGON_P0;
 	fprintf(stderr, "invalid RP1_HUB75_MAPPING=%s\n", value);

@@ -88,7 +88,22 @@ class TestHub75LogicScore:
         score = score_hub75_similarity(baseline, candidate)
 
         assert candidate.oe_active_fraction < baseline.oe_active_fraction
+        assert "oe_median_blank_exceeds_5pct_active" in candidate.warnings
         assert score.feature_scores["oe_active_fraction"] < 1.0
+
+    def test_oe_median_blank_absolute_warning_flags_large_blanks(
+        self, tmp_path: Path
+    ) -> None:
+        """Verify median OE blank time has an absolute warning, not just a duty-ratio warning."""
+
+        capture_path = tmp_path / "candidate.csv"
+        _write_capture_csv(capture_path, _build_capture_rows(oe_blank_padding_ticks=50))
+
+        summary = summarize_hub75_capture(load_hub75_logic_csv(capture_path), cols=4)
+
+        assert summary.median_oe_blank_ns is not None
+        assert summary.median_oe_blank_ns > 500.0
+        assert "oe_median_blank_exceeds_500ns" in summary.warnings
 
     def test_oe_blank_outliers_are_summarized_and_penalized(
         self, tmp_path: Path

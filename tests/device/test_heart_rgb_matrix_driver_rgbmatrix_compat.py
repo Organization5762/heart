@@ -69,6 +69,7 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
                 AdafruitHatPwm="hat-pwm",
                 AdafruitHat="hat",
                 ElectroDragonP0="electrodragon-p0",
+                ThreePortActive="three-port-active",
                 Regular="regular",
             ),
             ColorOrder=SimpleNamespace(RGB="rgb", GBR="gbr"),
@@ -131,7 +132,7 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
     def test_rgb_matrix_accepts_regular_mapping(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Verify hzeller regular maps to the native regular multi-lane profile."""
+        """Verify hzeller regular compatibility maps to the native three-port active profile."""
 
         fake_module = self._fake_native_module()
         monkeypatch.setattr(
@@ -144,7 +145,25 @@ class TestHeartRgbMatrixDriverRgbmatrixCompatibility:
 
         matrix = heart_rgb_matrix_driver_rgbmatrix.RGBMatrix(options=options)
 
-        assert matrix._driver.config.wiring == "regular"
+        assert matrix._driver.config.wiring == "three-port-active"
+
+    def test_rgb_matrix_accepts_three_port_active_mapping(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the preferred three-port active name maps directly."""
+
+        fake_module = self._fake_native_module()
+        monkeypatch.setattr(
+            heart_rgb_matrix_driver_rgbmatrix,
+            "_load_matrix_runtime_module",
+            lambda: fake_module,
+        )
+        options = heart_rgb_matrix_driver_rgbmatrix.RGBMatrixOptions()
+        options.hardware_mapping = "three-port-active"
+
+        matrix = heart_rgb_matrix_driver_rgbmatrix.RGBMatrix(options=options)
+
+        assert matrix._driver.config.wiring == "three-port-active"
 
     def test_rgb_matrix_warns_when_legacy_options_are_ignored(
         self, monkeypatch: pytest.MonkeyPatch
