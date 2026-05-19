@@ -24,3 +24,6 @@
 - Before changing RP1 HUB75 shared-SRAM source offsets, check `docs/RP1_HUB75_SRAM_MAP.md`. Do not use `0x2000c000` or `0x20004000` as generic safe buffers; validate against payload size and reserved firmware/launcher/mailbox ranges first.
 - When syncing this repo to a totem with `rsync`, exclude local-only workspaces and caches, including `.git/`, `.worktrees/`, `.uv-cache/`, `.venv/`, `.captures/`, `tmp/`, `target/`, `node_modules/`, and `__pycache__/`.
 - Run expensive frame-tick-driven renderer state work through priority-aware background stream scheduling instead of inline on the main loop.
+
+## Validation Log
+- 2026-05-19: RP1 HUB75 runtime CIE1931 gamma mapping and totem brightness default update. Ran `cargo fmt && cargo test -q` from `rust/heart_rgb_matrix_driver` and `uv run pytest tests/test_rp1_hub75_regular_contract.py -q`.
