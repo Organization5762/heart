@@ -21,7 +21,7 @@ def add_rock_paper_scissors_mode(
                 TextRendering(
                     text=["Shi Fu Mi"],
                     font="Grand9K Pixel.ttf",
-                    font_size=14,
+                    font_size=13,
                     color=Color(255, 255, 255),
                     y_location=0.7,
                 ),

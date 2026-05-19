@@ -22,6 +22,7 @@ from heart.renderers.spritesheet_random import SpritesheetLoopRandom
 from heart.renderers.text import TextRendering
 from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
+from heart.renderers.vibe import VibeScene
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
 from heart.runtime.game_loop import GameLoop
@@ -94,7 +95,7 @@ def configure(loop: GameLoop) -> None:
                 TextRendering(
                     text=["mandelbrot"],
                     font="Grand9K Pixel.ttf",
-                    font_size=12,
+                    font_size=11,
                     color=Color(255, 255, 255),
                     y_location=0.55,
                 ),
@@ -109,8 +110,19 @@ def configure(loop: GameLoop) -> None:
     palette_tunnel_mode = loop.add_mode(centered_text_title("palette\ntunnel"))
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
-    audio_storm_mode = loop.add_mode(centered_text_title("spectrum"))
+    audio_storm_mode = loop.add_mode(
+        centered_text(
+            text="spectrum",
+            font_size=13,
+            color=Color(255, 255, 255),
+            line_height_px=TITLE_LINE_HEIGHT_PX,
+            line_spacing_px=TITLE_LINE_SPACING_PX,
+        )
+    )
     audio_storm_mode.add_renderer(AudioStormScene())
+
+    vibe_mode = loop.add_mode(VibeScene.title_scene())
+    vibe_mode.add_renderer(VibeScene())
 
     hilbert_mode = loop.add_mode(centered_text_title("hilbert"))
     hilbert_mode.add_renderer(HilbertScene)
