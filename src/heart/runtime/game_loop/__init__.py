@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gc
+import os
 import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -19,6 +21,11 @@ from heart.runtime.game_loop.components import GameLoopComponents
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - resource is available on supported targets.
+    resource = None
+
 if TYPE_CHECKING:
     from heart.renderers import StatefulBaseRenderer
     from heart.runtime.container import RuntimeContainer
@@ -29,6 +36,60 @@ ACTIVE_GAME_LOOP: "GameLoop" | None = None
 DependencyT = TypeVar("DependencyT")
 DEFAULT_MAX_FPS = 500
 EDGE_THRESHOLD = 1
+MAX_FPS_ENV_VAR = "HEART_MAX_FPS"
+PERF_LOG_ENABLED_ENV_VAR = "HEART_RENDER_PERF_LOG"
+PERF_LOG_INTERVAL_ENV_VAR = "HEART_RENDER_PERF_LOG_INTERVAL"
+DEFAULT_PERF_LOG_INTERVAL_SECONDS = 2.0
+ENV_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _elapsed_ms_since(start_seconds: float) -> float:
+    return (time.perf_counter() - start_seconds) * 1000.0
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ENV_TRUE_VALUES
+
+
+def _env_float(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid %s=%r; using %.2f",
+            name,
+            raw_value,
+            default,
+        )
+        return default
+
+
+def _env_int(name: str, default: int, *, minimum: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid %s=%r; using %s",
+            name,
+            raw_value,
+            default,
+        )
+        return default
+    if parsed < minimum:
+        logger.warning(
+            "Invalid %s=%r; using %s",
+            name,
+            raw_value,
+            default,
+        )
+        return default
+    return parsed
 
 
 class GameLoop:
@@ -45,7 +106,10 @@ class GameLoop:
         self.initialized = False
         self.device = self.context_container.resolve(Device)
 
-        self.max_fps = min(max_fps, Configuration.runtime_max_fps())
+        self.max_fps = min(
+            _env_int(MAX_FPS_ENV_VAR, max_fps, minimum=1),
+            Configuration.runtime_max_fps(),
+        )
         self.components = self._load_components()
 
         # Lampe controller
@@ -53,22 +117,46 @@ class GameLoop:
         self.edge_thresh = EDGE_THRESHOLD
         self._temporary_renderer: "StatefulBaseRenderer[Any]" | None = None
         self._temporary_renderer_deadline_monotonic: float | None = None
+        self._frame_index = 0
+        self._last_perf_log_monotonic = 0.0
 
     def _one_loop(
         self,
         renderers: list["StatefulBaseRenderer[Any]"],
-    ):
+    ) -> dict[str, float]:
         if self.components.display.screen is None:
             raise RuntimeError("GameLoop screen is not initialized")
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop clock is not initialized")
+
+        timings: dict[str, float] = {}
+
+        started_at = time.perf_counter()
         render_surface = self.render_frame(renderers)
+        timings["render_ms"] = _elapsed_ms_since(started_at)
+
         if render_surface is not None:
+            started_at = time.perf_counter()
             self._apply_post_processors(render_surface)
+            timings["post_ms"] = _elapsed_ms_since(started_at)
+
+            started_at = time.perf_counter()
             self.components.display.screen.fill("black")
+            timings["clear_ms"] = _elapsed_ms_since(started_at)
+
+            started_at = time.perf_counter()
             self.components.display.blit(render_surface, (0, 0))
+            timings["blit_ms"] = _elapsed_ms_since(started_at)
+
+            started_at = time.perf_counter()
             pygame.display.flip()
+            timings["flip_ms"] = _elapsed_ms_since(started_at)
+
+            started_at = time.perf_counter()
             self.device.set_screen(self.components.display.screen)
+            timings["device_ms"] = _elapsed_ms_since(started_at)
+
+        return timings
 
     def _apply_post_processors(self, surface: pygame.Surface) -> None:
         post_processors = self.components.game_modes.get_post_processors()
@@ -343,18 +431,143 @@ class GameLoop:
         if renderer is not None:
             renderer.reset()
 
+    def _maybe_log_perf_frame(
+        self,
+        *,
+        renderers: Sequence["StatefulBaseRenderer[Any]"],
+        timings: dict[str, float],
+    ) -> None:
+        if not _env_flag_enabled(PERF_LOG_ENABLED_ENV_VAR):
+            return
+
+        now = time.monotonic()
+        interval = max(
+            0.1,
+            _env_float(
+                PERF_LOG_INTERVAL_ENV_VAR,
+                DEFAULT_PERF_LOG_INTERVAL_SECONDS,
+            ),
+        )
+        if now < self._last_perf_log_monotonic + interval:
+            return
+        self._last_perf_log_monotonic = now
+
+        renderer_names = ",".join(renderer.name for renderer in renderers) or "none"
+        lifecycle_counts = self._renderer_lifecycle_counts()
+        clock = self.components.display.clock
+        fps = clock.get_fps() if clock is not None else 0.0
+
+        logger.info(
+            "render.perf.frame frame=%s fps=%.1f max_fps=%s total=%.2fms "
+            "pre_tick=%.2fms events=%.2fms preprocess=%.2fms select=%.2fms "
+            "render=%.2fms post=%.2fms blit=%.2fms flip=%.2fms "
+            "device=%.2fms pacing=%.2fms post_tick=%.2fms publish=%.2fms "
+            "renderers=%s active_initialized=%s all_initialized=%s "
+            "post_processors=%s gc=%s rss=%s",
+            self._frame_index,
+            fps,
+            self.max_fps,
+            timings.get("total_ms", 0.0),
+            timings.get("peripheral_pre_ms", 0.0),
+            timings.get("events_ms", 0.0),
+            timings.get("preprocess_ms", 0.0),
+            timings.get("select_ms", 0.0),
+            timings.get("render_ms", 0.0),
+            timings.get("post_ms", 0.0),
+            timings.get("blit_ms", 0.0),
+            timings.get("flip_ms", 0.0),
+            timings.get("device_ms", 0.0),
+            timings.get("pacing_ms", 0.0),
+            timings.get("peripheral_post_ms", 0.0),
+            timings.get("clock_publish_ms", 0.0),
+            renderer_names,
+            sum(1 for renderer in renderers if renderer.initialized),
+            lifecycle_counts["initialized"],
+            len(self.components.game_modes.get_post_processors()),
+            gc.get_count(),
+            self._resident_memory_usage(),
+        )
+
+    def _renderer_lifecycle_counts(self) -> dict[str, int]:
+        seen: set[int] = set()
+        renderers: list["StatefulBaseRenderer[Any]"] = []
+        if self.components.game_modes.initialized:
+            for entry in self.components.game_modes.state.entries:
+                renderers.extend(
+                    self._collect_renderer_tree(entry.title_renderer, seen=seen)
+                )
+                renderers.extend(self._collect_renderer_tree(entry.renderer, seen=seen))
+            for renderer in self.components.game_modes.get_post_processors():
+                renderers.extend(self._collect_renderer_tree(renderer, seen=seen))
+        return {
+            "total": len(renderers),
+            "initialized": sum(1 for renderer in renderers if renderer.initialized),
+        }
+
+    def _collect_renderer_tree(
+        self,
+        renderer: "StatefulBaseRenderer[Any]",
+        *,
+        seen: set[int],
+    ) -> list["StatefulBaseRenderer[Any]"]:
+        renderer_id = id(renderer)
+        if renderer_id in seen:
+            return []
+        seen.add(renderer_id)
+
+        result = [renderer]
+        for child in getattr(renderer, "renderers", ()):
+            result.extend(self._collect_renderer_tree(child, seen=seen))
+        for child in getattr(renderer, "scenes", ()):
+            result.extend(self._collect_renderer_tree(child, seen=seen))
+        return result
+
+    @staticmethod
+    def _resident_memory_usage() -> int | None:
+        if resource is None:
+            return None
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
     def _run_main_loop(self) -> None:
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
         while self.running:
-            self.components.peripheral_runtime.poll()
+            frame_started_at = time.perf_counter()
+            timings: dict[str, float] = {}
+
+            step_started_at = time.perf_counter()
+            self.components.peripheral_runtime.tick()
+            timings["peripheral_pre_ms"] = _elapsed_ms_since(step_started_at)
+
+            step_started_at = time.perf_counter()
             self.running = self.components.event_handler.handle_events()
+            timings["events_ms"] = _elapsed_ms_since(step_started_at)
+
+            step_started_at = time.perf_counter()
             self._preprocess_setup()  # can't dim display each time
+            timings["preprocess_ms"] = _elapsed_ms_since(step_started_at)
+
+            step_started_at = time.perf_counter()
             renderers = self._select_renderers()
-            self._one_loop(renderers=renderers)
+            timings["select_ms"] = _elapsed_ms_since(step_started_at)
+
+            timings.update(self._one_loop(renderers=renderers))
             # self._render_pacer.pace(render_start, 20)
 
+            step_started_at = time.perf_counter()
             self.components.display.clock.tick(self.max_fps)
-            self.components.peripheral_runtime.advance_frame(
+            timings["pacing_ms"] = _elapsed_ms_since(step_started_at)
+
+            step_started_at = time.perf_counter()
+            self.components.peripheral_runtime.tick()
+            timings["peripheral_post_ms"] = _elapsed_ms_since(step_started_at)
+
+            step_started_at = time.perf_counter()
+            self.components.peripheral_manager.clock.on_next(
                 self.components.display.clock
             )
+            timings["clock_publish_ms"] = _elapsed_ms_since(step_started_at)
+
+            self._frame_index += 1
+            timings["total_ms"] = _elapsed_ms_since(frame_started_at)
+            self._maybe_log_perf_frame(renderers=renderers, timings=timings)

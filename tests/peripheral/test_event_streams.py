@@ -75,6 +75,18 @@ class TestPeripheralObserveSharing:
 
 
 class TestGraphRouteStreamTransforms:
+    def test_route_stream_retains_latest_value_only(self) -> None:
+        """Keep per-frame runtime streams from accumulating unbounded graph history."""
+        graph = Graph()
+        route = runtime_route("test_event_stream_retention", "HeartRetention")
+        stream = GraphRouteStream[int](graph, route)
+
+        for value in range(10):
+            stream.on_next(value)
+
+        assert stream.value == 9
+        assert len(graph._history[route.route_ref.display()]) == 1
+
     def test_combine_latest_accepts_graph_route_stream_sources(self) -> None:
         graph = Graph()
         route_a = runtime_route("test_event_stream_combine_a", "HeartCombineA")

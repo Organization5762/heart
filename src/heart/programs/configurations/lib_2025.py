@@ -14,6 +14,7 @@ from heart.renderers.kirby import KirbyScene
 from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
+from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.palette_tunnel import PaletteTunnelScene
@@ -62,6 +63,9 @@ def configure(loop: GameLoop) -> None:
 
     sphere_mode = loop.add_mode("3d fractal")
     sphere_mode.add_renderer(FractalScene)
+
+    mandelbulb_mode = loop.add_mode("mandelbulb")
+    mandelbulb_mode.add_renderer(MandelbulbScene())
 
     palette_tunnel_mode = loop.add_mode("palette\ntunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())

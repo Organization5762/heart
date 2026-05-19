@@ -17,15 +17,18 @@ class DummyRenderer:
         self.reset_calls = 0
         self.device_display_mode = device_display_mode
         self.initialize_calls = 0
+        self.initialized = False
 
-    def get_renderers(self, peripheral_manager):
+    def get_renderers(self):
         return [self]
 
     def initialize(self, *_args, **_kwargs) -> None:
         self.initialize_calls += 1
+        self.initialized = True
 
     def reset(self) -> None:
         self.reset_calls += 1
+        self.initialized = False
 
 
 def _make_game_modes(count: int = 3) -> GameModes:
