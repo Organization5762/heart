@@ -2789,7 +2789,7 @@ state32-regular-p0p1-chain2-fullrio-preclk0-unroll16-addr0-lat1)
 	esac
 	;;
 state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2)
-	case "${RP1_HUB75_PWM_BITS:-8}" in
+	case "${RP1_HUB75_PWM_BITS:-11}" in
 	6)
 		bin="rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin"
 		set_regular_p0p1_chain2_state32_pwm6_params

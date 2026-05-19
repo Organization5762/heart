@@ -72,7 +72,7 @@ def test_regular_p0p1_chain2_runner_syntax_accepts_pwm6_oeoffshift_candidate() -
     runner = RUNNER.read_text()
 
     assert f"{KNOWN_GOOD_CANDIDATE})" in runner
-    assert 'case "${RP1_HUB75_PWM_BITS:-8}" in' in runner
+    assert 'case "${RP1_HUB75_PWM_BITS:-11}" in' in runner
     assert "6)" in runner
     assert f'bin="{KNOWN_GOOD_PAYLOAD}"' in runner
     assert "11)" in runner
@@ -93,6 +93,10 @@ def test_regular_p0p1_chain2_defaults_point_at_oeoffshift_candidate() -> None:
     assert f"HEART_RP1_HUB75_SCANNER_CANDIDATE={KNOWN_GOOD_CANDIDATE}" in totem_env
     assert "HEART_LAYOUT_COLUMNS=4" in totem_env
     assert "HEART_LAYOUT_ROWS=1" in totem_env
+    assert "HEART_RGB_MATRIX_BRIGHTNESS=0.8" in totem_env
+    assert "HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS=8" in totem_env
+    assert "HEART_RGB_MATRIX_GAMMA=1.20" in totem_env
+    assert "HEART_RP1_HUB75_PWM_BITS=11" in totem_env
 
 
 def test_regular_p0p1_chain2_repro_documents_256x64_abcd_transport_contract() -> None:

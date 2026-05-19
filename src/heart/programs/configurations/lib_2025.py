@@ -62,13 +62,13 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.add_renderer(MandelbrotMode)
 
-    sphere_mode = loop.add_mode("3d fractal")
+    sphere_mode = loop.add_mode("void sphere")
     sphere_mode.add_renderer(FractalScene)
 
-    mandelbulb_mode = loop.add_mode("mandelbulb")
+    mandelbulb_mode = loop.add_mode("bulb")
     mandelbulb_mode.add_renderer(MandelbulbScene())
 
-    palette_tunnel_mode = loop.add_mode("palette\ntunnel")
+    palette_tunnel_mode = loop.add_mode("gem tunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
     audio_storm_mode = loop.add_mode("spectrum")

@@ -20,7 +20,7 @@ const HEART_PI5_SIMPLE_SCAN_POST_ADDR_TICKS_DEFAULT: u32 = 5;
 const HEART_PI5_SIMPLE_SCAN_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_POST_LATCH_TICKS_DEFAULT: u32 = 1;
 const HEART_PI5_SIMPLE_SCAN_CLOCK_HOLD_TICKS_DEFAULT: u32 = 1;
-const HEART_RP1_HUB75_PWM_BITS_DEFAULT: u8 = 6;
+const HEART_RP1_HUB75_PWM_BITS_DEFAULT: u8 = 11;
 const HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES_DEFAULT: u32 = 8;
 const HEART_RP1_HUB75_DWELL_SHIFT_LIMIT_DEFAULT: u32 = 7;
 const HEART_RGB_MATRIX_BRIGHTNESS_DEFAULT: f32 = 1.0;
@@ -223,6 +223,7 @@ mod tests {
 
     #[test]
     fn rp1_hub75_dwell_sum_matches_binary_pwm_with_shift_limit() {
+        assert_eq!(HEART_RP1_HUB75_PWM_BITS_DEFAULT, 11);
         assert_eq!(rp1_hub75_dwell_sum(6, 7), 63);
         assert_eq!(rp1_hub75_dwell_sum(8, 7), 255);
         assert_eq!(rp1_hub75_dwell_sum(11, 7), 639);
