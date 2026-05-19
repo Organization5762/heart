@@ -27,3 +27,4 @@
 
 ## Validation Log
 - 2026-05-19: RP1 HUB75 runtime CIE1931 gamma mapping and totem brightness default update. Ran `cargo fmt && cargo test -q` from `rust/heart_rgb_matrix_driver` and `uv run pytest tests/test_rp1_hub75_regular_contract.py -q`.
+- 2026-05-19: 2026 library centered title color now uses the Kirby default. Ran `uv run pytest tests/programs/test_lib_2026_configuration.py -q`.
