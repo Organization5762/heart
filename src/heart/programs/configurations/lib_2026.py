@@ -115,7 +115,7 @@ def configure(loop: GameLoop) -> None:
     audio_storm_mode = loop.add_mode(
         centered_text(
             text="spectrum",
-            font_size=13,
+            font_size=12,
             color=Color(255, 255, 255),
             line_height_px=TITLE_LINE_HEIGHT_PX,
             line_spacing_px=TITLE_LINE_SPACING_PX,
