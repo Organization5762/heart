@@ -10,7 +10,7 @@ import pygame
 from heart.device import Rectangle
 from heart.device.local import LocalScreen
 from heart.display.shaders import fullscreen as fullscreen_module
-from heart.display.shaders.fullscreen import FullscreenShaderRuntime
+from heart.display.shaders.fullscreen import FullscreenShaderRuntime, TextureUniform
 from heart.runtime.display_context import DisplayContext
 
 
@@ -32,6 +32,9 @@ def _install_compile_stubs(monkeypatch) -> dict[str, list[Any]]:
         "uniform3fv": [],
         "uniform4fv": [],
         "uniform_matrix4fv": [],
+        "uniform1i": [],
+        "active_texture": [],
+        "bind_texture": [],
         "draw": [],
     }
     monkeypatch.setattr(fullscreen_module, "glCreateShader", lambda shader_type: shader_type)
@@ -85,6 +88,21 @@ def _install_compile_stubs(monkeypatch) -> dict[str, list[Any]]:
     )
     monkeypatch.setattr(
         fullscreen_module,
+        "glActiveTexture",
+        lambda *args: calls["active_texture"].append(args),
+    )
+    monkeypatch.setattr(
+        fullscreen_module,
+        "glBindTexture",
+        lambda *args: calls["bind_texture"].append(args),
+    )
+    monkeypatch.setattr(
+        fullscreen_module,
+        "glUniform1i",
+        lambda *args: calls["uniform1i"].append(args),
+    )
+    monkeypatch.setattr(
+        fullscreen_module,
         "glDrawArrays",
         lambda *args: calls["draw"].append(args),
     )
@@ -121,6 +139,7 @@ class TestFullscreenShaderRuntime:
                 "u_vec3": (1.0, 2.0, 3.0),
                 "u_vec4": (1.0, 2.0, 3.0, 4.0),
                 "u_mat4": matrix,
+                "u_texture": TextureUniform(texture_id=77, texture_unit=2),
             },
         )
 
@@ -131,6 +150,9 @@ class TestFullscreenShaderRuntime:
         matrix_call = calls["uniform_matrix4fv"][0]
         assert matrix_call[:3] == (len("u_mat4"), 1, False)
         np.testing.assert_array_equal(matrix_call[3], matrix)
+        assert calls["active_texture"][0] == (fullscreen_module.GL_TEXTURE0 + 2,)
+        assert calls["bind_texture"][0] == (fullscreen_module.GL_TEXTURE_2D, 77)
+        assert calls["uniform1i"][0] == (len("u_texture"), 2)
         assert calls["draw"]
 
     def test_read_to_surface_flips_opengl_pixels_into_pygame_surface(

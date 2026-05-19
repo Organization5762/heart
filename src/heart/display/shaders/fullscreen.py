@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ctypes import byref, c_int
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -10,23 +11,34 @@ from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
                        GL_DEPTH_BUFFER_BIT, GL_FLOAT, GL_FRAGMENT_SHADER,
                        GL_INFO_LOG_LENGTH, GL_LINK_STATUS, GL_RGBA,
-                       GL_TRIANGLE_STRIP, GL_UNSIGNED_BYTE, GL_VERTEX_SHADER,
-                       glAttachShader, glBindAttribLocation, glClear,
-                       glCompileShader, glCreateProgram, glCreateShader,
+                       GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLE_STRIP,
+                       GL_UNSIGNED_BYTE, GL_VERTEX_SHADER, glActiveTexture,
+                       glAttachShader, glBindAttribLocation, glBindTexture,
+                       glClear, glCompileShader, glCreateProgram, glCreateShader,
                        glDeleteProgram, glDeleteShader, glDrawArrays,
                        glEnableVertexAttribArray, glGetProgramInfoLog,
                        glGetProgramiv, glGetShaderInfoLog, glGetShaderiv,
                        glGetUniformLocation, glLinkProgram, glReadPixels,
-                       glShaderSource, glUniform1f, glUniform2fv, glUniform3fv,
-                       glUniform4fv, glUniformMatrix4fv, glUseProgram,
-                       glVertexAttribPointer, glViewport)
+                       glShaderSource, glUniform1f, glUniform1i, glUniform2fv,
+                       glUniform3fv, glUniform4fv, glUniformMatrix4fv,
+                       glUseProgram, glVertexAttribPointer, glViewport)
 
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
-UniformValue = float | int | tuple[float, ...] | list[float] | np.ndarray
+
+@dataclass(frozen=True, slots=True)
+class TextureUniform:
+    texture_id: int
+    texture_unit: int = 0
+    target: int = GL_TEXTURE_2D
+
+
+UniformValue = (
+    float | int | tuple[float, ...] | list[float] | np.ndarray | TextureUniform
+)
 DEFAULT_VERTEX_SHADER = """#version 120
 attribute vec4 vPosition;
 void main() {
@@ -239,6 +251,11 @@ class FullscreenShaderRuntime:
 
     @staticmethod
     def _apply_uniform(location: int, value: UniformValue) -> None:
+        if isinstance(value, TextureUniform):
+            glActiveTexture(GL_TEXTURE0 + value.texture_unit)
+            glBindTexture(value.target, value.texture_id)
+            glUniform1i(location, value.texture_unit)
+            return
         if isinstance(value, (float, int)):
             glUniform1f(location, float(value))
             return
