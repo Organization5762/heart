@@ -15,6 +15,7 @@ from heart.renderers.kirby import KirbyScene
 from heart.renderers.life.renderer import Life
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbrot.title import MandelbrotTitle
+from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.palette_tunnel import PaletteTunnelScene
@@ -113,21 +114,16 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.add_renderer(MandelbrotMode)
 
-    sphere_mode = loop.add_mode(centered_text_title("3d\nfractal"))
+    sphere_mode = loop.add_mode("void sphere")
     sphere_mode.add_renderer(FractalScene)
 
-    palette_tunnel_mode = loop.add_mode(centered_text_title("palette\ntunnel"))
+    mandelbulb_mode = loop.add_mode("bulb")
+    mandelbulb_mode.add_renderer(MandelbulbScene())
+
+    palette_tunnel_mode = loop.add_mode("gem tunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
-    audio_storm_mode = loop.add_mode(
-        centered_text(
-            text="spectrum",
-            font_size=12,
-            color=Color(255, 255, 255),
-            line_height_px=TITLE_LINE_HEIGHT_PX,
-            line_spacing_px=TITLE_LINE_SPACING_PX,
-        )
-    )
+    audio_storm_mode = loop.add_mode("spectrum")
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
