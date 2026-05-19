@@ -15,6 +15,8 @@ RP1_SCANNER_BOOT_TIMEOUT_SECONDS="${HEART_RP1_HUB75_SCANNER_BOOT_TIMEOUT_SECONDS
 RP1_EXTERNAL_SCANNER="${HEART_RP1_HUB75_EXTERNAL_SCANNER:-0}"
 RP1_CLEAR_SLOT_BEFORE_START="${HEART_RP1_HUB75_CLEAR_SLOT_BEFORE_START:-0}"
 RP1_EXPECTED_SLOT_HIGH="${HEART_RP1_HUB75_EXPECTED_SLOT_HIGH:-0x00000010}"
+RP1_REQUIRE_PWM_HANDSHAKE="${HEART_RP1_HUB75_REQUIRE_PWM_HANDSHAKE:-1}"
+RP1_SLOT_META_OFFSET="${HEART_RP1_HUB75_SLOT_META_OFFSET:-16}"
 HEART_START_LOG="${HEART_START_LOG:-/tmp/heart-start-heart.log}"
 RUN_CONFIGURATION="${RUN_CONFIGURATION:-lib_2025}"
 TOTEM_BIN="${HEART_TOTEM_BIN:-${REPO_DIR}/.venv/bin/totem}"
@@ -47,6 +49,18 @@ fi
 SRAM_READER="${HEART_RP1_HUB75_SRAM_READER:-${RP1_PIO_DIR}/rp1_sram_read32}"
 SRAM_WRITER="${HEART_RP1_HUB75_SRAM_WRITER:-${RP1_PIO_DIR}/rp1_sram_poke32}"
 SCANNER_RUNNER="${HEART_RP1_HUB75_SCANNER_RUNNER:-${RP1_PIO_DIR}/rp1_hub75_run_candidate.sh}"
+RP1_EXPECTED_SLOT_META="$(printf '0x%08x' "$((0x48500000 | RP1_SCANNER_PWM_BITS))")"
+
+normalize_hex32() {
+  printf '0x%08x' "$(( $1 ))"
+}
+
+slot_meta_matches_scanner_pwm() {
+  if [[ "${RP1_REQUIRE_PWM_HANDSHAKE}" != "1" ]]; then
+    return 0
+  fi
+  [[ "$(normalize_hex32 "${1:-0x00000000}")" == "${RP1_EXPECTED_SLOT_META}" ]]
+}
 
 if [[ ! -x "${SRAM_READER}" ]]; then
   log "missing SRAM reader: ${SRAM_READER}"
@@ -75,6 +89,8 @@ if [[ "${RP1_CLEAR_SLOT_BEFORE_START}" == "1" ]]; then
   "${SRAM_WRITER}" "${RP1_SRAM_SLOT_OFFSET}" 0x00000000 >/dev/null 2>&1 || true
   "${SRAM_WRITER}" "$((RP1_SRAM_SLOT_OFFSET + 4))" 0x00000000 >/dev/null 2>&1 || true
   "${SRAM_WRITER}" "$((RP1_SRAM_SLOT_OFFSET + 8))" 0x00000000 >/dev/null 2>&1 || true
+  "${SRAM_WRITER}" "$((RP1_SRAM_SLOT_OFFSET + 12))" 0x00000000 >/dev/null 2>&1 || true
+  "${SRAM_WRITER}" "$((RP1_SRAM_SLOT_OFFSET + RP1_SLOT_META_OFFSET))" 0x00000000 >/dev/null 2>&1 || true
   log "cleared RP1 HUB75 DMA slot at ${RP1_SRAM_SLOT_OFFSET} before starting Heart"
 fi
 
@@ -103,11 +119,12 @@ while (( SECONDS < deadline )); do
 
   slot_low="$("${SRAM_READER}" "${RP1_SRAM_SLOT_OFFSET}" 2>/dev/null || printf '0x00000000\n')"
   slot_high="$("${SRAM_READER}" "$((RP1_SRAM_SLOT_OFFSET + 4))" 2>/dev/null || printf '0x00000000\n')"
+  slot_meta="$("${SRAM_READER}" "$((RP1_SRAM_SLOT_OFFSET + RP1_SLOT_META_OFFSET))" 2>/dev/null || printf '0x00000000\n')"
   if grep -q 'Sending matrix frame #[0-9].*size=(256, 64)' "${HEART_START_LOG}" 2>/dev/null; then
     frame_seen=1
   fi
 
-  if [[ "${frame_seen}" == "1" && "${slot_low}" != "0x00000000" && "${slot_high}" == "${RP1_EXPECTED_SLOT_HIGH}" ]]; then
+  if [[ "${frame_seen}" == "1" && "${slot_low}" != "0x00000000" && "${slot_high}" == "${RP1_EXPECTED_SLOT_HIGH}" ]] && slot_meta_matches_scanner_pwm "${slot_meta}"; then
     break
   fi
 
@@ -118,8 +135,12 @@ if [[ "${frame_seen}" != "1" || "${slot_low}" == "0x00000000" || "${slot_high}" 
   log "timed out waiting for Heart frame and live RP1 HUB75 DMA slot at ${RP1_SRAM_SLOT_OFFSET} low=${slot_low} high=${slot_high} frame_seen=${frame_seen}"
   exit 3
 fi
+if ! slot_meta_matches_scanner_pwm "${slot_meta:-0x00000000}"; then
+  log "refusing scanner PWM mismatch: scanner pwm=${RP1_SCANNER_PWM_BITS} expected slot meta=${RP1_EXPECTED_SLOT_META} observed slot meta=${slot_meta:-0x00000000}. Set HEART_RP1_HUB75_PWM_BITS and HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS to the same value."
+  exit 4
+fi
 
-log "launching scanner ${RP1_SCANNER_CANDIDATE} pwm=${RP1_SCANNER_PWM_BITS} after DMA slot ${slot_high}${slot_low#0x}"
+log "launching scanner ${RP1_SCANNER_CANDIDATE} pwm=${RP1_SCANNER_PWM_BITS} slot_meta=${slot_meta} after DMA slot ${slot_high}${slot_low#0x}"
 (
   cd "${RP1_PIO_DIR}"
   RP1_HUB75_PWM_BITS="${RP1_SCANNER_PWM_BITS}" \

@@ -36,7 +36,7 @@ pub(crate) struct RuntimeTuning {
      * Normalized pre-packer brightness scalar applied to submitted RGB frames.
      * The effective scalar is normalized against binary-PWM dwell so
      * final_light ~= input_rgb * brightness_scalar * sum(active_bitplane_dwell).
-    */
+     */
     pub(crate) matrix_brightness: f32,
     pub(crate) matrix_brightness_reference_pwm_bits: u8,
     pub(crate) matrix_gamma: f32,
@@ -159,10 +159,8 @@ impl RuntimeTuning {
             self.matrix_brightness_reference_pwm_bits,
             self.rp1_hub75_dwell_shift_limit,
         );
-        let active_dwell = rp1_hub75_dwell_sum(
-            self.rp1_hub75_pwm_bits,
-            self.rp1_hub75_dwell_shift_limit,
-        );
+        let active_dwell =
+            rp1_hub75_dwell_sum(self.rp1_hub75_pwm_bits, self.rp1_hub75_dwell_shift_limit);
         let dwell_ratio = reference_dwell as f32 / active_dwell as f32;
 
         (self.matrix_brightness * dwell_ratio).clamp(0.0, 1.0)

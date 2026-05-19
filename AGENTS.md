@@ -23,3 +23,4 @@
 - Do not use temporal PWM for HUB75 brightness experiments. Low-brightness temporal flicker looks bad and can create seizure-like flashing; debug color depth with true bitplanes or static non-temporal patterns instead.
 - Before changing RP1 HUB75 shared-SRAM source offsets, check `docs/RP1_HUB75_SRAM_MAP.md`. Do not use `0x2000c000` or `0x20004000` as generic safe buffers; validate against payload size and reserved firmware/launcher/mailbox ranges first.
 - When syncing this repo to a totem with `rsync`, exclude local-only workspaces and caches, including `.git/`, `.worktrees/`, `.uv-cache/`, `.venv/`, `.captures/`, `tmp/`, `target/`, `node_modules/`, and `__pycache__/`.
+- Run expensive frame-tick-driven renderer state work through priority-aware background stream scheduling instead of inline on the main loop.

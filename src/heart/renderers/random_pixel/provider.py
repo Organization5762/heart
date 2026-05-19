@@ -10,6 +10,7 @@ from manyfold import BehaviorSubject, MergeNode, StreamNode
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.streams import StreamPriority, observe_on_background
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
@@ -50,11 +51,12 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
             .map(lambda frame_tick: ("tick", frame_tick))
 
         )
-        return (
-            MergeNode.merge(color_updates, tick_updates)
-            .scan(self._advance_state, seed=initial_state)
-
-
+        events = observe_on_background(
+            MergeNode.merge(color_updates, tick_updates),
+            priority=StreamPriority.LOW,
+        )
+        return events.scan(self._advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def set_color(self, color: Color | None) -> None:

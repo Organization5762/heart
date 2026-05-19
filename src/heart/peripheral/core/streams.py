@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from enum import IntEnum
 from functools import cached_property
-from threading import Lock
+from itertools import count
+from queue import PriorityQueue
+from threading import Lock, Thread
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
 from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
@@ -11,6 +14,7 @@ from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.core.subscriptions import (CallbackObservable,
+                                                 CallbackSubscription,
                                                  CompositeSubscription)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
@@ -18,12 +22,56 @@ PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
+_BACKGROUND_SEQUENCE = count()
+_BACKGROUND_QUEUE: PriorityQueue[tuple[int, int, Callable[[], None]]] = PriorityQueue()
+_BACKGROUND_WORKERS_STARTED = False
+_BACKGROUND_WORKERS_LOCK = Lock()
+_BACKGROUND_WORKER_COUNT = 1
 LATEST_ONLY_RETENTION = RouteRetentionPolicy(
     latest_replay_policy="latest_only",
     replay_window="latest",
     payload_retention_policy="separate_store",
     history_limit=1,
 )
+
+
+class StreamPriority(IntEnum):
+    HIGH = 0
+    NORMAL = 10
+    LOW = 20
+
+
+def _ensure_background_workers() -> None:
+    global _BACKGROUND_WORKERS_STARTED
+    with _BACKGROUND_WORKERS_LOCK:
+        if _BACKGROUND_WORKERS_STARTED:
+            return
+        _BACKGROUND_WORKERS_STARTED = True
+        for index in range(_BACKGROUND_WORKER_COUNT):
+            thread = Thread(
+                target=_run_background_worker,
+                name=f"heart-stream-background-{index}",
+                daemon=True,
+            )
+            thread.start()
+
+
+def _run_background_worker() -> None:
+    while True:
+        _priority, _sequence, callback = _BACKGROUND_QUEUE.get()
+        try:
+            callback()
+        finally:
+            _BACKGROUND_QUEUE.task_done()
+
+
+def _schedule_background(
+    callback: Callable[[], None],
+    *,
+    priority: StreamPriority,
+) -> None:
+    _ensure_background_workers()
+    _BACKGROUND_QUEUE.put((int(priority), next(_BACKGROUND_SEQUENCE), callback))
 
 
 def unwrap_stream_value(value: Any) -> Any:
@@ -47,6 +95,58 @@ def _stream_from_source(source: Any) -> "_DerivedStream":
 
 def _materialize_stream(source: Any) -> StreamNode[Any]:
     return cast(StreamNode[Any], _MaterializedStream(source))
+
+
+def observe_on_background(
+    source: Any,
+    *,
+    priority: StreamPriority = StreamPriority.NORMAL,
+) -> StreamNode[Any]:
+    """Deliver stream notifications from a priority-aware background worker."""
+
+    def subscribe(observer: Any) -> Any:
+        disposed = False
+        lock = Lock()
+
+        def if_live(callback: Callable[[], None]) -> None:
+            with lock:
+                if disposed:
+                    return
+            callback()
+
+        def schedule_next(value: Any) -> None:
+            _schedule_background(
+                lambda: if_live(lambda: observer.on_next(value)),
+                priority=priority,
+            )
+
+        def schedule_error(error: Exception) -> None:
+            _schedule_background(
+                lambda: if_live(lambda: observer.on_error(error)),
+                priority=priority,
+            )
+
+        def schedule_completed() -> None:
+            _schedule_background(
+                lambda: if_live(observer.on_completed),
+                priority=priority,
+            )
+
+        subscription = source.subscribe(
+            schedule_next,
+            schedule_error,
+            schedule_completed,
+        )
+
+        def dispose() -> None:
+            nonlocal disposed
+            with lock:
+                disposed = True
+            subscription.dispose()
+
+        return CallbackSubscription(dispose)
+
+    return cast(StreamNode[Any], _materialize_stream(_DerivedStream(subscribe)))
 
 
 def combine_latest(*sources: Any) -> StreamNode[tuple[Any, ...]]:

@@ -14,16 +14,15 @@ chain2 path used by the 2x2 totem face.
 | Logical panels across x | `A B C D`, each `64x64` |
 | Kernel config | `cols=64 rows=64 panel_count=4 lane_count=2 chain_length=2` |
 | Stream | `state32` |
-| PWM bits | `6` |
+| PWM bits | `8` for current Heart default; `6` remains useful for hzeller visual parity |
 | Dwell shift limit | `7` |
-| Scanner candidate | `state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2-clkretain` |
-| Scanner frame rate observed | about `457 Hz` |
+| Scanner candidate | `state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2` |
+| Scanner frame rate observed | varies by PWM/candidate; record with each run |
 | External scanner control slot | `0xb800` |
 | Active slot DMA | `0x000000103a65c000` or `0x000000103aa5c000` depending queued slot |
 
-`clkretain` means RGB is cleared independently from CLK, then CLK is explicitly
-set high and explicitly cleared low. The baseline scanner without this knob is
-`state32-regular-p0p1-chain2-oeoffshift-preclk1-unroll8-addr8-lat2`.
+Timing variants such as `clkretain` or `clkhigh*` are scanner experiments only.
+They must not change the driver byte schema or the kernel state32 word schema.
 
 ## Driver Output Schema
 
@@ -202,3 +201,49 @@ The GPIO pin defaults and alias checks live in
 `rp1_core1_hub75_gpio_pins.inc`. That include is intentionally separate from
 the scanner loop so audits can verify the pin contract without reading the
 streaming/timing implementation.
+
+## Direct State32 Bypass
+
+Use `scripts/rp1_hub75_run_direct_state32_regular.sh` to bypass the kernel
+RGB888 packer and publish a pre-packed state32 frame directly into slot 0:
+
+```bash
+RP1_HUB75_TARGET=michael@totem3.local \
+RP1_HUB75_PWM_BITS=8 \
+RP1_HUB75_SECONDS=120 \
+  ./scripts/rp1_hub75_run_direct_state32_regular.sh
+```
+
+This helper starts the scanner first, then publishes the direct state32 slot via
+`RP1_HUB75_PRE_START_COMMAND`. Do not publish the slot before launching the
+scanner: the payload is loaded at `0x20008000`, and the current `pwm8`
+candidate is `15564` bytes (`0x3ccc`), so the payload load covers
+`0x20008000..0x2000bccb` and overwrites `0x2000b800`.
+
+Current direct-publisher schema:
+
+| Source panel | Logical range | Transport lane |
+| --- | --- | --- |
+| `A` | `x=0..63, y=0..63` | `P0 top/bottom`, transport cols `0..63` |
+| `B` | `x=64..127, y=0..63` | `P0 top/bottom`, transport cols `64..127` |
+| `C` | `x=128..191, y=0..63` | `P1 top/bottom`, transport cols `0..63` |
+| `D` | `x=192..255, y=0..63` | `P1 top/bottom`, transport cols `64..127` |
+
+The publisher renders base panel colors plus special row-tail markers on rows
+`24..31` and `56..63`. Those rows are intentionally chosen because recent
+visual corruption was concentrated in the bottom eight rows of each `64x32`
+scan half.
+
+Expected proof after launch:
+
+| Check | Expected value |
+| --- | --- |
+| `0xb800` | nonzero slot DMA low word |
+| `0xb804` | `0x00000010` |
+| `0xb808` | DMA status, commonly `0x00000002` after scanner copies |
+| `0xb80c` | dwell shift limit, default `0x00000007` |
+| `0xb810` | Heart/scanner PWM handshake word, `0x48500000 | pwm_bits` |
+
+If the direct state32 bypass still shows the same row-tail corruption, the
+problem is downstream of the RGB888 packer: scanner SRAM bookkeeping, DMA copy
+boundaries, row/plane indexing, or physical transport timing.

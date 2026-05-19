@@ -30,6 +30,7 @@ class FakeDriver:
     def __init__(self, config: FakeMatrixConfig) -> None:
         self.config = config
         self.closed = False
+        self.clear_calls = 0
         self.submissions: list[tuple[bytes, int, int]] = []
 
     @property
@@ -44,7 +45,7 @@ class FakeDriver:
         self.submissions.append((data, width, height))
 
     def clear(self) -> None:
-        pass
+        self.clear_calls += 1
 
     def stats(self) -> object:
         return SimpleNamespace(
@@ -246,8 +247,13 @@ class TestRgbDisplayRuntime:
 
         device.set_screen(surface)
 
-        assert len(fake_driver.submissions) == 1
-        submitted_bytes, width, height = fake_driver.submissions[0]
+        assert fake_driver.clear_calls == 1
+        assert len(fake_driver.submissions) == 4
+        startup_bytes, startup_width, startup_height = fake_driver.submissions[0]
+        assert startup_width == 64
+        assert startup_height == 32
+        assert startup_bytes == bytes(64 * 32 * 4)
+        submitted_bytes, width, height = fake_driver.submissions[-1]
         assert width == 64
         assert height == 32
         assert len(submitted_bytes) == 64 * 32 * 4

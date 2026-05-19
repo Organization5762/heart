@@ -34,7 +34,9 @@ impl FrameBuffer {
         let gamma = tuning.matrix_gamma;
         match color_order {
             ColorOrder::Rgb => copy_rgb888(&mut self.data, source, brightness, gamma),
-            ColorOrder::Gbr => copy_rgb888_with_gbr_remap(&mut self.data, source, brightness, gamma),
+            ColorOrder::Gbr => {
+                copy_rgb888_with_gbr_remap(&mut self.data, source, brightness, gamma)
+            }
         }
     }
 }

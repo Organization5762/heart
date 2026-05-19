@@ -2,7 +2,8 @@ use std::fs::{File, OpenOptions};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::sync::atomic::{fence, Ordering};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use super::backend::MatrixBackend;
 use super::config::{MatrixConfigNative, WiringProfile};
@@ -41,6 +42,11 @@ const RP1H_GET_WORKER_STATUS: libc::c_ulong = ior::<Rp1hWorkerStatus>(b'H', 0x49
 const RP1_SRAM_HOST_BASE: libc::off_t = 0x1f00400000;
 const RP1_SRAM_MAP_SIZE: usize = 0x10000;
 const EXTERNAL_SRAM_SLOT_OFFSET_ENV: &str = "HEART_RP1_HUB75_EXTERNAL_SRAM_SLOT_OFFSET";
+const PUBLISH_ON_FRAME_EDGE_ENV: &str = "HEART_RP1_HUB75_PUBLISH_ON_FRAME_EDGE";
+const FRAME_COUNTER_OFFSET_ENV: &str = "HEART_RP1_HUB75_FRAME_COUNTER_OFFSET";
+const DEFAULT_FRAME_COUNTER_OFFSET: usize = 0xf004;
+const EXTERNAL_SRAM_SLOT_META_MAGIC: u32 = 0x4850_0000;
+const EXTERNAL_SRAM_SLOT_META_OFFSET: usize = 16;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -270,7 +276,9 @@ struct SramSlotPublisher {
     _device: File,
     mapping: MmapMapping,
     offset: usize,
+    pwm_bits: u8,
     dwell_shift_limit: u32,
+    frame_counter_offset: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -365,8 +373,26 @@ impl Rp1Hub75Backend {
             0,
             RP1H_DEVICE_PATH,
         )?;
+        let publish_on_frame_edge = std::env::var(PUBLISH_ON_FRAME_EDGE_ENV)
+            .map(|value| value != "0")
+            .unwrap_or(false);
+        let frame_counter_offset = if publish_on_frame_edge {
+            Some(
+                parse_optional_usize(FRAME_COUNTER_OFFSET_ENV)?
+                    .unwrap_or(DEFAULT_FRAME_COUNTER_OFFSET),
+            )
+        } else {
+            None
+        };
         let external_sram_slot = external_sram_slot_offset
-            .map(|offset| SramSlotPublisher::new(offset, rp1_config.dwell_shift_limit))
+            .map(|offset| {
+                SramSlotPublisher::new(
+                    offset,
+                    rp1_config.pwm_bits,
+                    rp1_config.dwell_shift_limit,
+                    frame_counter_offset,
+                )
+            })
             .transpose()?;
         let wait_timeout_ns = std::env::var("HEART_RP1_HUB75_WAIT_PRESENT_TIMEOUT_NS")
             .ok()
@@ -842,6 +868,20 @@ impl MmapMapping {
         }
         Ok(())
     }
+
+    fn read32(&self, offset: usize) -> Result<u32, String> {
+        if offset
+            .checked_add(std::mem::size_of::<u32>())
+            .filter(|end| *end <= self.len)
+            .is_none()
+        {
+            return Err(format!(
+                "RP1 SRAM read offset 0x{offset:x} exceeds mapped size 0x{:x}.",
+                self.len
+            ));
+        }
+        Ok(unsafe { std::ptr::read_volatile((self.addr as *const u8).add(offset).cast::<u32>()) })
+    }
 }
 
 impl Drop for MmapMapping {
@@ -888,14 +928,19 @@ fn xioctl<T>(fd: RawFd, request: libc::c_ulong, arg: &mut T, label: &str) -> Res
 }
 
 impl SramSlotPublisher {
-    fn new(offset: usize, dwell_shift_limit: u32) -> Result<Self, String> {
+    fn new(
+        offset: usize,
+        pwm_bits: u8,
+        dwell_shift_limit: u32,
+        frame_counter_offset: Option<usize>,
+    ) -> Result<Self, String> {
         if offset
-            .checked_add(16)
+            .checked_add(EXTERNAL_SRAM_SLOT_META_OFFSET + 4)
             .filter(|end| *end <= RP1_SRAM_MAP_SIZE)
             .is_none()
         {
             return Err(format!(
-                "{EXTERNAL_SRAM_SLOT_OFFSET_ENV}=0x{offset:x} leaves no room for the 16-byte slot control block."
+                "{EXTERNAL_SRAM_SLOT_OFFSET_ENV}=0x{offset:x} leaves no room for the RP1 HUB75 slot control block and metadata."
             ));
         }
         let device = OpenOptions::new()
@@ -915,18 +960,39 @@ impl SramSlotPublisher {
             _device: device,
             mapping,
             offset,
+            pwm_bits,
             dwell_shift_limit,
+            frame_counter_offset,
         })
     }
 
     fn publish(&self, slot_dma: u64) -> Result<(), String> {
+        self.wait_for_frame_edge()?;
+        let meta = EXTERNAL_SRAM_SLOT_META_MAGIC | u32::from(self.pwm_bits);
         self.mapping.write32(self.offset, slot_dma as u32)?;
         self.mapping
             .write32(self.offset + 4, (slot_dma >> 32) as u32)?;
         self.mapping.write32(self.offset + 8, 0)?;
         self.mapping
             .write32(self.offset + 12, self.dwell_shift_limit)?;
+        self.mapping
+            .write32(self.offset + EXTERNAL_SRAM_SLOT_META_OFFSET, meta)?;
         fence(Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn wait_for_frame_edge(&self) -> Result<(), String> {
+        let Some(offset) = self.frame_counter_offset else {
+            return Ok(());
+        };
+        let start = self.mapping.read32(offset)?;
+        let deadline = Instant::now() + Duration::from_millis(20);
+        while Instant::now() < deadline {
+            if self.mapping.read32(offset)? != start {
+                return Ok(());
+            }
+            thread::sleep(Duration::from_micros(100));
+        }
         Ok(())
     }
 }

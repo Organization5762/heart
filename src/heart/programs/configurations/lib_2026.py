@@ -15,7 +15,6 @@ from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.palette_tunnel import PaletteTunnelScene
 from heart.renderers.pranay_sketch import PranaySketchRenderer
-from heart.renderers.random_pixel import RandomPixel
 from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
@@ -31,7 +30,6 @@ TITLE_FONT_SIZE = 14
 TITLE_LINE_HEIGHT_PX = 21
 TITLE_LINE_SPACING_PX = -4
 PRANAY_SKETCH_MODE_TITLE = "Dolly's\nsketch"
-CONFETTI_UPDATE_INTERVAL_MS = 33.0
 
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
@@ -175,10 +173,10 @@ def configure(loop: GameLoop) -> None:
     )
     water_mode.add_renderer(WaterCube)
 
-    pranay_mode = loop.add_mode(PRANAY_SKETCH_MODE_TITLE)
+    pranay_mode = loop.add_mode(friend_beacon_text(text=PRANAY_SKETCH_MODE_TITLE))
     pranay_mode.add_renderer(PranaySketchRenderer())
 
-    friend_beacon_mode = loop.add_mode("friend\nbeacon")
+    friend_beacon_mode = loop.add_mode(friend_beacon_text(text="friend\nbeacon"))
     friend_beacon_mode.add_renderer(
         MultiScene(
             [
@@ -260,43 +258,5 @@ def configure(loop: GameLoop) -> None:
             sheet_file_path="spookyeye.png",
             metadata_file_path="spookyeye.json",
             randomness=randomness,
-        )
-    )
-
-    confetti = loop.add_mode("confetti")
-    confetti.add_renderer(
-        loop.compose(
-            [
-                RandomPixel(
-                    num_pixels=40000,
-                    brightness=0.05,
-                    randomness=randomness,
-                    update_interval_ms=CONFETTI_UPDATE_INTERVAL_MS,
-                ),
-                RandomPixel(
-                    num_pixels=4000,
-                    brightness=0.10,
-                    randomness=randomness,
-                    update_interval_ms=CONFETTI_UPDATE_INTERVAL_MS,
-                ),
-                RandomPixel(
-                    num_pixels=2000,
-                    brightness=0.25,
-                    randomness=randomness,
-                    update_interval_ms=CONFETTI_UPDATE_INTERVAL_MS,
-                ),
-                RandomPixel(
-                    num_pixels=500,
-                    brightness=0.50,
-                    randomness=randomness,
-                    update_interval_ms=CONFETTI_UPDATE_INTERVAL_MS,
-                ),
-                RandomPixel(
-                    num_pixels=50,
-                    brightness=1,
-                    randomness=randomness,
-                    update_interval_ms=CONFETTI_UPDATE_INTERVAL_MS,
-                ),
-            ]
         )
     )

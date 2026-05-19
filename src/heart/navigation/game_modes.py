@@ -352,6 +352,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         if total <= 0:
             return
         self._log_initialization_progress(completed=completed, total=total)
+        if not Configuration.render_initialization_progress():
+            self._clear_initialization_progress(window, completed=completed, total=total)
+            return
         if window.screen is None:
             return
         if window.screen.get_flags() & pygame.OPENGL:
@@ -405,6 +408,24 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             )
 
         pygame.display.flip()
+
+    def _clear_initialization_progress(
+        self,
+        window: DisplayContext,
+        *,
+        completed: int,
+        total: int,
+    ) -> None:
+        if window.screen is None:
+            return
+        if completed not in {0, total}:
+            return
+        if window.screen.get_flags() & pygame.OPENGL:
+            return
+
+        window.screen.fill(INITIALIZATION_BACKGROUND_COLOR)
+        pygame.display.flip()
+        window.device.set_screen(window.screen)
 
     def _log_initialization_progress(self, *, completed: int, total: int) -> None:
         progress_units = max(0, min(completed, total))

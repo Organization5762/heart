@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from threading import Event, get_ident
 from typing import Any
 
 from manyfold import Graph, StreamNode
@@ -11,7 +12,11 @@ from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
-                                           combine_latest, runtime_route)
+                                           StreamPriority,
+                                           _schedule_background,
+                                           combine_latest,
+                                           observe_on_background,
+                                           runtime_route)
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  NoopSubscription)
 
@@ -158,6 +163,55 @@ class TestGraphRouteStreamTransforms:
             subscription_a.dispose()
             subscription_b.dispose()
             subscription_doubled.dispose()
+
+
+class TestBackgroundStreamScheduling:
+    def test_observe_on_background_delivers_off_caller_thread(self) -> None:
+        source: EventStream[int] = EventStream()
+        caller_thread = get_ident()
+        delivered = Event()
+        observed: list[tuple[int, int]] = []
+
+        subscription = observe_on_background(source).subscribe(
+            lambda value: (observed.append((value, get_ident())), delivered.set())
+        )
+        try:
+            source.emit(3)
+
+            assert delivered.wait(1.0)
+            assert observed == [(3, observed[0][1])]
+            assert observed[0][1] != caller_thread
+        finally:
+            subscription.dispose()
+
+    def test_background_scheduler_prefers_higher_priority_pending_work(self) -> None:
+        started = Event()
+        release = Event()
+        completed = Event()
+        observed: list[str] = []
+
+        def blocking_low_priority() -> None:
+            started.set()
+            assert release.wait(1.0)
+            observed.append("low-blocking")
+
+        def record(value: str) -> None:
+            observed.append(value)
+            if len(observed) == 3:
+                completed.set()
+
+        _schedule_background(
+            blocking_low_priority,
+            priority=StreamPriority.LOW,
+        )
+        assert started.wait(1.0)
+
+        _schedule_background(lambda: record("low-pending"), priority=StreamPriority.LOW)
+        _schedule_background(lambda: record("high-pending"), priority=StreamPriority.HIGH)
+        release.set()
+
+        assert completed.wait(1.0)
+        assert observed == ["low-blocking", "high-pending", "low-pending"]
 
 
 class TestManyfoldSensorEnvelopeBridge:
