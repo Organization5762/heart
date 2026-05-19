@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from unittest.mock import Mock
 
 from heart.navigation import MultiScene
+from heart.peripheral.core.input import GamepadController, GamepadDpadValue
 from heart.renderers import StatefulBaseRenderer
 
 
@@ -28,8 +29,20 @@ class _NavigationProfile:
 
 
 class _PeripheralManager:
-    def __init__(self) -> None:
+    def __init__(self, *, with_gamepad: bool = False) -> None:
         self.navigation_profile = _NavigationProfile()
+        self.gamepad = _Gamepad() if with_gamepad else None
+
+    def get_gamepad(self) -> "_Gamepad | None":
+        return self.gamepad
+
+
+class _Gamepad:
+    def __init__(self) -> None:
+        self.dpad = GamepadDpadValue()
+
+    def is_connected(self) -> bool:
+        return True
 
 
 class _Scene(StatefulBaseRenderer[int]):
@@ -62,6 +75,15 @@ def _window() -> Mock:
     window.screen = None
     window.display_mode.side_effect = lambda _mode: nullcontext(window)
     return window
+
+
+def _stub_dpad_read(monkeypatch) -> None:
+    monkeypatch.setattr(GamepadController, "_mapping_for_gamepad", lambda _gamepad: Mock())
+    monkeypatch.setattr(
+        GamepadController,
+        "_read_dpad",
+        lambda gamepad, _mapping: gamepad.dpad,
+    )
 
 
 class TestMultiSceneLifecycle:
@@ -117,4 +139,80 @@ class TestMultiSceneLifecycle:
         assert manager.navigation_profile.subscription.dispose_calls == 1
         assert first.reset_calls == 1
         assert second.reset_calls == 1
+        assert multi_scene.initialized is False
+
+    def test_dpad_right_and_left_step_through_scenes(self, monkeypatch) -> None:
+        _stub_dpad_read(monkeypatch)
+        first = _Scene("first")
+        second = _Scene("second")
+        third = _Scene("third")
+        multi_scene = MultiScene([first, second, third])
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+
+        assert multi_scene.get_renderers() == [first]
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+        assert multi_scene.get_renderers() == [second]
+        manager.gamepad.dpad = GamepadDpadValue()
+        assert multi_scene.get_renderers() == [second]
+        manager.gamepad.dpad = GamepadDpadValue(x=-1)
+        assert multi_scene.get_renderers() == [first]
+
+    def test_dpad_left_wraps_to_last_scene(self, monkeypatch) -> None:
+        _stub_dpad_read(monkeypatch)
+        first = _Scene("first")
+        second = _Scene("second")
+        third = _Scene("third")
+        multi_scene = MultiScene([first, second, third])
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+        manager.gamepad.dpad = GamepadDpadValue(x=-1)
+
+        assert multi_scene.get_renderers() == [third]
+
+    def test_held_dpad_direction_does_not_repeat(self, monkeypatch) -> None:
+        _stub_dpad_read(monkeypatch)
+        first = _Scene("first")
+        second = _Scene("second")
+        third = _Scene("third")
+        multi_scene = MultiScene([first, second, third])
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+
+        assert multi_scene.get_renderers() == [second]
+        assert multi_scene.get_renderers() == [second]
+
+    def test_get_renderers_reads_dpad_after_warmup_reset(self, monkeypatch) -> None:
+        _stub_dpad_read(monkeypatch)
+        first = _Scene("first")
+        second = _Scene("second")
+        multi_scene = MultiScene([first, second])
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+        multi_scene.reset()
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+
+        assert multi_scene.initialized is False
+        assert multi_scene.get_renderers() == [second]
         assert multi_scene.initialized is False
