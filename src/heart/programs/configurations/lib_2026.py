@@ -26,6 +26,7 @@ from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.vibe import VibeScene
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
+from heart.renderers.tetris import TetrisRenderer
 from heart.runtime.game_loop import GameLoop
 
 TITLE_TILE_HEIGHT_PX = 64
@@ -192,6 +193,9 @@ def configure(loop: GameLoop) -> None:
         )
     )
     water_mode.add_renderer(WaterCube)
+
+    tetris_mode = loop.add_mode("tetris")
+    tetris_mode.add_renderer(TetrisRenderer)
 
     pranay_mode = loop.add_mode(friend_beacon_text(text=PRANAY_SKETCH_MODE_TITLE))
     pranay_mode.add_renderer(PranaySketchRenderer())
