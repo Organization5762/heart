@@ -93,9 +93,9 @@ def test_regular_p0p1_chain2_defaults_point_at_oeoffshift_candidate() -> None:
     assert f"HEART_RP1_HUB75_SCANNER_CANDIDATE={KNOWN_GOOD_CANDIDATE}" in totem_env
     assert "HEART_LAYOUT_COLUMNS=4" in totem_env
     assert "HEART_LAYOUT_ROWS=1" in totem_env
-    assert "HEART_RGB_MATRIX_BRIGHTNESS=0.8" in totem_env
+    assert "HEART_RGB_MATRIX_BRIGHTNESS=1.0" in totem_env
     assert "HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS=8" in totem_env
-    assert "HEART_RGB_MATRIX_GAMMA=1.20" in totem_env
+    assert "HEART_RGB_MATRIX_GAMMA=cie1931" in totem_env
     assert "HEART_RP1_HUB75_PWM_BITS=11" in totem_env
 
 

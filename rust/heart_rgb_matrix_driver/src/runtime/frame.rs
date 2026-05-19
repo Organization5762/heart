@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 
 use super::config::ColorOrder;
-use super::tuning::runtime_tuning;
+use super::tuning::{runtime_tuning, MatrixGamma};
 
 #[derive(Debug)]
 pub(crate) struct FrameBuffer {
@@ -78,7 +78,7 @@ impl FrameBufferPool {
     }
 }
 
-fn copy_rgb888(destination: &mut [u8], source: &[u8], brightness: f32, gamma: f32) {
+fn copy_rgb888(destination: &mut [u8], source: &[u8], brightness: f32, gamma: MatrixGamma) {
     if source.len() >= runtime_tuning().parallel_color_remap_threshold_bytes {
         destination
             .par_chunks_exact_mut(3)
@@ -100,7 +100,12 @@ fn copy_rgb888(destination: &mut [u8], source: &[u8], brightness: f32, gamma: f3
     }
 }
 
-fn copy_rgb888_with_gbr_remap(destination: &mut [u8], source: &[u8], brightness: f32, gamma: f32) {
+fn copy_rgb888_with_gbr_remap(
+    destination: &mut [u8],
+    source: &[u8],
+    brightness: f32,
+    gamma: MatrixGamma,
+) {
     if source.len() >= runtime_tuning().parallel_color_remap_threshold_bytes {
         destination
             .par_chunks_exact_mut(3)
@@ -122,9 +127,8 @@ fn copy_rgb888_with_gbr_remap(destination: &mut [u8], source: &[u8], brightness:
     }
 }
 
-fn scale_channel(value: u8, brightness: f32, gamma: f32) -> u8 {
-    let normalized = f32::from(value) / 255.0;
-    let adjusted = normalized.powf(gamma) * 255.0 * brightness;
+fn scale_channel(value: u8, brightness: f32, gamma: MatrixGamma) -> u8 {
+    let adjusted = f32::from(gamma.apply(value)) * brightness;
 
     adjusted.round().clamp(0.0, 255.0) as u8
 }
@@ -143,7 +147,20 @@ mod tests {
 
         frame.write_rgba(&rgba, ColorOrder::Rgb);
 
-        assert_eq!(frame.as_slice(), &[1, 2, 3, 4, 5, 6]);
+        let tuning = runtime_tuning();
+        let brightness = tuning.matrix_effective_brightness();
+        let gamma = tuning.matrix_gamma;
+        assert_eq!(
+            frame.as_slice(),
+            &[
+                scale_channel(1, brightness, gamma),
+                scale_channel(2, brightness, gamma),
+                scale_channel(3, brightness, gamma),
+                scale_channel(4, brightness, gamma),
+                scale_channel(5, brightness, gamma),
+                scale_channel(6, brightness, gamma),
+            ]
+        );
     }
 
     #[test]
@@ -156,21 +173,47 @@ mod tests {
 
         frame.write_rgba(&rgba, ColorOrder::Gbr);
 
-        assert_eq!(frame.as_slice(), &[1, 3, 2, 4, 6, 5]);
+        let tuning = runtime_tuning();
+        let brightness = tuning.matrix_effective_brightness();
+        let gamma = tuning.matrix_gamma;
+        assert_eq!(
+            frame.as_slice(),
+            &[
+                scale_channel(1, brightness, gamma),
+                scale_channel(3, brightness, gamma),
+                scale_channel(2, brightness, gamma),
+                scale_channel(4, brightness, gamma),
+                scale_channel(6, brightness, gamma),
+                scale_channel(5, brightness, gamma),
+            ]
+        );
     }
 
     #[test]
     fn scale_channel_applies_normalized_brightness() {
-        assert_eq!(scale_channel(255, 1.0, 1.0), 255);
-        assert_eq!(scale_channel(255, 0.8, 1.0), 204);
-        assert_eq!(scale_channel(10, 0.5, 1.0), 5);
-        assert_eq!(scale_channel(255, 0.0, 1.0), 0);
+        assert_eq!(scale_channel(255, 1.0, MatrixGamma::Power(1.0)), 255);
+        assert_eq!(scale_channel(255, 0.8, MatrixGamma::Power(1.0)), 204);
+        assert_eq!(scale_channel(10, 0.5, MatrixGamma::Power(1.0)), 5);
+        assert_eq!(scale_channel(255, 0.0, MatrixGamma::Power(1.0)), 0);
     }
 
     #[test]
     fn scale_channel_applies_output_gamma() {
-        assert_eq!(scale_channel(255, 1.0, 1.2), 255);
-        assert!(scale_channel(128, 1.0, 1.2) < scale_channel(128, 1.0, 1.0));
-        assert!(scale_channel(128, 1.0, 0.8) > scale_channel(128, 1.0, 1.0));
+        assert_eq!(scale_channel(255, 1.0, MatrixGamma::Power(1.2)), 255);
+        assert!(
+            scale_channel(128, 1.0, MatrixGamma::Power(1.2))
+                < scale_channel(128, 1.0, MatrixGamma::Power(1.0))
+        );
+        assert!(
+            scale_channel(128, 1.0, MatrixGamma::Power(0.8))
+                > scale_channel(128, 1.0, MatrixGamma::Power(1.0))
+        );
+    }
+
+    #[test]
+    fn scale_channel_accepts_hzeller_cie1931_gamma_mapping() {
+        assert_eq!(scale_channel(255, 1.0, MatrixGamma::Cie1931), 255);
+        assert_eq!(scale_channel(128, 1.0, MatrixGamma::Cie1931), 47);
+        assert_eq!(scale_channel(128, 0.5, MatrixGamma::Cie1931), 24);
     }
 }

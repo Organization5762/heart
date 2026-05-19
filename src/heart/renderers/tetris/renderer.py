@@ -159,6 +159,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         move_x = self._repeat_move(memory, move_direction, elapsed_ms)
         dpad_up = snapshot.dpad.y > 0 and memory.previous_dpad_y <= 0
         memory.previous_dpad_y = snapshot.dpad.y
+        # NORTH is reserved for the global navigation alternate-activate exit.
         return TetrisControls(
             move_x=move_x,
             soft_drop=self._soft_drop(snapshot),

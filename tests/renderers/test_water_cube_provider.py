@@ -24,11 +24,11 @@ class _Clock:
 class TestWaterCubeStateProvider:
     """Ensure the default playlist's water renderer initializes from a valid state."""
 
-    def test_observable_steps_on_frame_tick_with_latest_accelerometer_update(
+    def test_observable_steps_at_most_once_per_100ms_with_averaged_acceleration(
         self,
         monkeypatch,
     ) -> None:
-        """Verify accelerometer input is sampled on frame ticks instead of advancing the simulation directly."""
+        """Verify accelerometer input is sampled on throttled frame ticks."""
         peripheral_manager = PeripheralManager()
         accelerometer_controller = peripheral_manager.input_io.accelerometer
         accelerometer_debug_profile = peripheral_manager.input_io.debug_accelerometer
@@ -48,8 +48,22 @@ class TestWaterCubeStateProvider:
 
         assert len(observed_states) == 1
 
-        peripheral_manager.input_io.frame_ticks.advance(_Clock())
+        peripheral_manager.input_io.frame_ticks.advance(_Clock(delta_ms=16.0))
+
+        assert len(observed_states) == 1
+
+        accelerometer_controller.node().on_next(Acceleration(x=10.0, y=20.0, z=30.0))
+        peripheral_manager.input_io.frame_ticks.advance(_Clock(delta_ms=83.0))
+
+        assert len(observed_states) == 1
+
+        accelerometer_controller.node().on_next(Acceleration(x=16.0, y=32.0, z=48.0))
+        peripheral_manager.input_io.frame_ticks.advance(_Clock(delta_ms=1.0))
 
         assert len(observed_states) == 2
         assert observed_states[0].gvec is None
-        assert observed_states[1].gvec == Acceleration(x=4.0, y=5.0, z=6.0)
+        assert observed_states[1].gvec == Acceleration(x=10.0, y=19.0, z=28.0)
+
+        peripheral_manager.input_io.frame_ticks.advance(_Clock(delta_ms=99.0))
+
+        assert len(observed_states) == 2
