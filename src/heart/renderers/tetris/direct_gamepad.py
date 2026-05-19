@@ -10,9 +10,11 @@ from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadDpadValue)
 from heart.peripheral.core.input.gamepad import DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
 from heart.peripheral.gamepad.gamepad import GamepadIdentifier
-from heart.peripheral.gamepad.peripheral_mappings import (
-    BitDoLite2, BitDoLite2Bluetooth, DpadType, SwitchLikeMapping,
-    SwitchProMapping)
+from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
+                                                          BitDoLite2Bluetooth,
+                                                          DpadType,
+                                                          SwitchLikeMapping,
+                                                          SwitchProMapping)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

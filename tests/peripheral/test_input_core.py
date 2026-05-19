@@ -615,6 +615,30 @@ class TestGamepadController:
         assert second_snapshot.button_held(GamepadButton.NORTH) is True
         assert second_snapshot.dpad == GamepadDpadValue(x=-1)
 
+    def test_motion_only_sample_does_not_consume_button_taps(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify fallback motion reads do not starve one-shot button commands."""
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
+        )
+        gamepad = Gamepad(
+            joystick_id=0,
+            joystick=_JoystickProbe(buttons={1: False}),
+        )
+        gamepad._tap_flag[1] = True
+        controller = GamepadController(
+            manager=_GamepadManager(gamepad),
+            debug_tap=InputDebugTap(),
+        )
+
+        motion_snapshot = controller.sample(include_tapped_buttons=False)
+        command_snapshot = controller.sample()
+
+        assert motion_snapshot.tapped_buttons == frozenset()
+        assert command_snapshot.tapped_buttons == frozenset({GamepadButton.SOUTH})
+
     def test_snapshot_stream_can_target_one_gamepad_by_joystick_id(self) -> None:
         """Verify indexed gamepad streams are stable so renderer-specific controller routing can subscribe by slot."""
         controller = GamepadController(
@@ -1109,6 +1133,55 @@ class TestMandelbrotControlProfile:
         )
 
         assert motion_states[-1] == (0.0, -0.5)
+
+    def test_signed_trigger_axes_drive_zoom(self, monkeypatch) -> None:
+        """Verify Mandelbrot triggers work for controllers whose trigger axes rest at -1."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
+        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: gamepad_snapshots)
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+        motion_states: list[tuple[bool, bool]] = []
+
+        profile.motion_state.subscribe(
+            lambda state: motion_states.append((state.zoom_in, state.zoom_out))
+        )
+
+        gamepad_snapshots.emit(
+            _gamepad_snapshot(
+                axes={
+                    GamepadAxis.LEFT_X: 0.0,
+                    GamepadAxis.LEFT_Y: 0.0,
+                    GamepadAxis.RIGHT_X: 0.0,
+                    GamepadAxis.RIGHT_Y: 0.0,
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: -1.0,
+                },
+                timestamp_monotonic=2.0,
+            )
+        )
+        gamepad_snapshots.emit(
+            _gamepad_snapshot(
+                axes={
+                    GamepadAxis.LEFT_X: 0.0,
+                    GamepadAxis.LEFT_Y: 0.0,
+                    GamepadAxis.RIGHT_X: 0.0,
+                    GamepadAxis.RIGHT_Y: 0.0,
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: 1.0,
+                },
+                timestamp_monotonic=3.0,
+            )
+        )
+
+        assert motion_states == [(False, False), (True, False)]
 
 
 class TestAccelerometerDebugProfile:

@@ -25,6 +25,7 @@ class KeyboardControls:
         profile: MandelbrotControlProfile,
     ) -> None:
         self.scene_controls = scene_controls
+        self._profile = profile
         self._latest_motion_state = MandelbrotMotionState()
         self._pending_commands: deque[MandelbrotCommand] = deque()
         self._subscriptions: list[SubscriptionLike] = [
@@ -116,6 +117,14 @@ class KeyboardControls:
         self._latest_motion_state = state
 
     def _motion_state_with_keyboard_fallback(self) -> MandelbrotMotionState:
+        sampled_gamepad_state = self._sample_gamepad_motion_state()
+        if (
+            sampled_gamepad_state is not None
+            and self._has_motion_input(sampled_gamepad_state)
+            and not self._has_motion_input(self._latest_motion_state)
+        ):
+            return sampled_gamepad_state
+
         keyboard_state = self._sample_keyboard_motion_state()
         if keyboard_state is None:
             return self._latest_motion_state
@@ -132,6 +141,12 @@ class KeyboardControls:
             increase_iterations=keyboard_state.increase_iterations,
             decrease_iterations=keyboard_state.decrease_iterations,
         )
+
+    def _sample_gamepad_motion_state(self) -> MandelbrotMotionState | None:
+        try:
+            return self._profile.sample_gamepad_motion_state()
+        except (AttributeError, pygame.error):
+            return None
 
     def _sample_keyboard_motion_state(self) -> MandelbrotMotionState | None:
         try:

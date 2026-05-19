@@ -254,7 +254,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
     ) -> AudioStormState:
         self.window_size = window.get_size()
         self.render_size = self._render_size(self.window_size, orientation)
-        self.tiled_mode = isinstance(orientation, Cube)
+        self.tiled_mode = self._should_tile(orientation)
         self._initialize_shader()
         self._subscriptions = self._subscribe_to_input_snapshots(peripheral_manager)
         return AudioStormState(start_time=time.monotonic())
@@ -289,7 +289,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         if self.window_size != window.get_size() or self.render_size != render_size:
             self.window_size = window.get_size()
             self.render_size = render_size
-            self.tiled_mode = isinstance(orientation, Cube)
+            self.tiled_mode = self._should_tile(orientation)
             self._reset_tiled_resources()
 
         elapsed_s = self._elapsed_seconds(window.clock)
@@ -772,9 +772,18 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         window_size: tuple[int, int],
         orientation: Orientation,
     ) -> tuple[int, int]:
-        if isinstance(orientation, Cube):
-            return (window_size[1], window_size[1])
+        if AudioStormScene._should_tile(orientation):
+            layout = orientation.layout
+            return (
+                max(1, window_size[0] // layout.columns),
+                max(1, window_size[1] // layout.rows),
+            )
         return window_size
+
+    @staticmethod
+    def _should_tile(orientation: Orientation) -> bool:
+        layout = orientation.layout
+        return layout.columns > 1 or layout.rows > 1
 
     @staticmethod
     def _clamp(value: float, low: float, high: float) -> float:
