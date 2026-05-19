@@ -19,7 +19,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        glUseProgram, glVertex2f, glViewport)
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Orientation
+from heart.device import Orientation
 from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
                                               UniformValue)
 from heart.display.shaders.shader_templates.palette_tunnel import \
@@ -76,7 +76,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
     ) -> PaletteTunnelState:
         self.window_size = window.get_size()
         self.render_size = self._render_size(self.window_size, orientation)
-        self.tiled_mode = isinstance(orientation, Cube)
+        self.tiled_mode = self._should_tile(orientation)
         self.cursor = self._initial_cursor(self.render_size)
         self._initialize_shader()
         self._subscriptions = [
@@ -101,7 +101,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
         if self.window_size != window.get_size() or self.render_size != render_size:
             self.window_size = window.get_size()
             self.render_size = render_size
-            self.tiled_mode = isinstance(orientation, Cube)
+            self.tiled_mode = self._should_tile(orientation)
             self._reset_tiled_resources()
             self.cursor = self._clamped_cursor(self.cursor, self.render_size)
         self._update_cursor(window.clock)
@@ -317,13 +317,18 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
         window_size: tuple[int, int],
         orientation: Orientation,
     ) -> tuple[int, int]:
-        if isinstance(orientation, Cube):
+        if PaletteTunnelScene._should_tile(orientation):
             layout = orientation.layout
             return (
                 max(1, window_size[0] // layout.columns),
                 max(1, window_size[1] // layout.rows),
             )
         return window_size
+
+    @staticmethod
+    def _should_tile(orientation: Orientation) -> bool:
+        layout = orientation.layout
+        return layout.columns > 1 or layout.rows > 1
 
     @staticmethod
     def _clamped_cursor(

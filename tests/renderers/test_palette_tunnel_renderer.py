@@ -8,7 +8,7 @@ import numpy as np
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Layout
+from heart.device import Cube, Layout, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.renderers.palette_tunnel.renderer import (MOUSE_SCALE,
@@ -135,7 +135,7 @@ class TestPaletteTunnelScene:
         manager = _PeripheralManager()
         window = _window()
 
-        scene.initialize(window=window, peripheral_manager=manager, orientation=Mock())
+        scene.initialize(window=window, peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
         initial_cursor = scene.cursor.copy()
         manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(pressed_keys=frozenset({pygame.K_d}), timestamp_ms=1.0)
@@ -152,7 +152,7 @@ class TestPaletteTunnelScene:
             )
         )
 
-        scene.real_process(window=window, orientation=Mock())
+        scene.real_process(window=window, orientation=Rectangle.with_layout(columns=1, rows=1))
 
         assert scene.cursor[0] > initial_cursor[0]
         assert scene.cursor[1] > initial_cursor[1]
@@ -268,6 +268,12 @@ class TestPaletteTunnelScene:
 
         assert PaletteTunnelScene._render_size((128, 64), orientation) == (64, 32)
 
+    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(self) -> None:
+        orientation = Rectangle.with_layout(columns=4, rows=1)
+
+        assert PaletteTunnelScene._render_size((320, 80), orientation) == (80, 80)
+        assert PaletteTunnelScene._should_tile(orientation) is True
+
     def test_reset_disposes_subscriptions_and_shader(self) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
@@ -277,7 +283,7 @@ class TestPaletteTunnelScene:
         scene.initialize(
             window=_window(),
             peripheral_manager=manager,
-            orientation=Mock(),
+            orientation=Rectangle.with_layout(columns=1, rows=1),
         )
         scene.reset()
 

@@ -21,6 +21,7 @@ from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.renderers.tetris import TetrisRenderer
 from heart.renderers.text import TextRendering
 from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
@@ -115,7 +116,7 @@ def configure(loop: GameLoop) -> None:
     audio_storm_mode = loop.add_mode(
         centered_text(
             text="spectrum",
-            font_size=13,
+            font_size=12,
             color=Color(255, 255, 255),
             line_height_px=TITLE_LINE_HEIGHT_PX,
             line_spacing_px=TITLE_LINE_SPACING_PX,
@@ -193,6 +194,9 @@ def configure(loop: GameLoop) -> None:
         )
     )
     water_mode.add_renderer(WaterCube)
+
+    tetris_mode = loop.add_mode("tetris")
+    tetris_mode.add_renderer(TetrisRenderer)
 
     pranay_mode = loop.add_mode(friend_beacon_text(text=PRANAY_SKETCH_MODE_TITLE))
     pranay_mode.add_renderer(PranaySketchRenderer())

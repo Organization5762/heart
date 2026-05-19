@@ -20,10 +20,17 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         if peripheral_manager is None:
             msg = "WaterCubeStateProvider requires a PeripheralManager"
             raise ValueError(msg)
-        accel = peripheral_manager.input_io.active_acceleration()
-
         initial = WaterCubeState.initial_state(self.device)
-        return accel.scan(self._advance_state, seed=initial).start_with(initial)
+        acceleration = peripheral_manager.input_io.active_acceleration().start_with(None)
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
+        return (
+            frame_ticks.with_latest_from(acceleration)
+            .scan(
+                lambda prev, latest: self._advance_state(prev, latest[1]),
+                seed=initial,
+            )
+            .start_with(initial)
+        )
 
     def _advance_state(
         self, prev: WaterCubeState, acceleration: Acceleration | None

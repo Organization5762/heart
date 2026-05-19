@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import math
 import time
-from typing import TYPE_CHECKING
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    DEFAULT_BALL_SPEED,
@@ -19,13 +19,11 @@ from heart.renderers.bouncing_ball.state import (BallPosition,
                                                  BouncingBallState, ChildBall)
 from heart.runtime.display_context import DisplayContext
 
-if TYPE_CHECKING:
-    from heart.renderers.bouncing_ball.provider import \
-        BouncingBallStateProvider
-
-BACKGROUND_COLOR = (3, 5, 10)
-GRID_COLOR = (17, 31, 44)
-WALL_COLOR = (35, 52, 70)
+BACKGROUND_COLOR = (0, 0, 0)
+GRID_COLOR = (8, 14, 20)
+WALL_COLOR = (28, 38, 48)
+ADJACENT_PANEL_COLOR = (5, 10, 15)
+ADJACENT_PANEL_EDGE_COLOR = (18, 30, 42)
 BALL_CORE_COLOR = (76, 242, 255)
 BALL_EDGE_COLOR = (255, 76, 216)
 CHILD_BALL_CORE_COLOR = (255, 206, 76)
@@ -38,7 +36,7 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
 
     def __init__(
         self,
-        provider: "BouncingBallStateProvider | None" = None,
+        provider: ObservableProvider[BouncingBallState] | None = None,
     ) -> None:
         super().__init__(builder=provider)
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -116,7 +114,12 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         side_index: int,
     ) -> None:
         pygame.draw.rect(screen, BACKGROUND_COLOR, rect)
-        self._draw_room(screen=screen, rect=rect)
+        self._draw_room(
+            screen=screen,
+            rect=rect,
+            position=position,
+            side_index=side_index,
+        )
         for child in child_balls:
             age_ratio = child.age_s / max(child.lifetime_s, 1e-9)
             self._draw_ball(
@@ -153,21 +156,30 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         )
         pygame.draw.rect(screen, WALL_COLOR, rect, 1)
 
-    def _draw_room(self, *, screen: pygame.Surface, rect: pygame.Rect) -> None:
-        center_x = rect.centerx
-        horizon_y = rect.centery
+    def _draw_room(
+        self,
+        *,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        position: BallPosition,
+        side_index: int,
+    ) -> None:
+        lateral = self._face_lateral(position=position, side_index=side_index)
+        vanishing_point = self._precipice_point(rect=rect, lateral=lateral)
+        adjacent_panel = self._adjacent_panel_polygon(rect=rect, lateral=lateral)
         inset_x = max(3, rect.width // 9)
         ceiling_y = rect.top + max(3, rect.height // 9)
         floor_y = rect.bottom - max(3, rect.height // 9)
+        pygame.draw.polygon(screen, ADJACENT_PANEL_COLOR, adjacent_panel)
+        pygame.draw.polygon(screen, ADJACENT_PANEL_EDGE_COLOR, adjacent_panel, 1)
         pygame.draw.line(screen, WALL_COLOR, (rect.left, ceiling_y), (rect.right, ceiling_y))
         pygame.draw.line(screen, WALL_COLOR, (rect.left, floor_y), (rect.right, floor_y))
-        pygame.draw.line(screen, GRID_COLOR, (center_x, rect.top), (center_x, rect.bottom))
-        pygame.draw.line(
-            screen,
-            GRID_COLOR,
-            (rect.left + inset_x, horizon_y),
-            (rect.right - inset_x, horizon_y),
-        )
+        for start, end in self._runway_segments(rect=rect, lateral=lateral):
+            pygame.draw.line(screen, GRID_COLOR, start, end)
+        pygame.draw.line(screen, WALL_COLOR, (rect.left + inset_x, floor_y), vanishing_point)
+        pygame.draw.line(screen, WALL_COLOR, (rect.right - inset_x, floor_y), vanishing_point)
+        pygame.draw.line(screen, GRID_COLOR, (rect.left + inset_x, ceiling_y), vanishing_point)
+        pygame.draw.line(screen, GRID_COLOR, (rect.right - inset_x, ceiling_y), vanishing_point)
 
     def _draw_ball(
         self,
@@ -218,18 +230,93 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         angle = side_index * math.pi / 2.0
         normal_x = math.sin(angle)
         normal_z = -math.cos(angle)
-        tangent_x = math.cos(angle)
-        tangent_z = math.sin(angle)
 
-        lateral = (position.x * tangent_x) + (position.z * tangent_z)
+        lateral = self._face_lateral(position=position, side_index=side_index)
         forward = (position.x * normal_x) + (position.z * normal_z)
         near_ratio = max(0.0, min(1.0, (forward + WORLD_LIMIT) / (WORLD_LIMIT * 2.0)))
 
         perspective = 0.72 + near_ratio * 0.5
-        x = rect.centerx + int(lateral * rect.width * 0.28 * perspective)
-        y = rect.centery - int(position.y * rect.height * 0.42 * perspective)
         radius = int(max(2.0, rect.height * (0.08 + near_ratio * 0.16)))
+        vanishing_x, vanishing_y = self._precipice_point(rect=rect, lateral=lateral)
+        projected_x = rect.centerx + int(lateral * rect.width * 0.24 * perspective)
+        projected_y = rect.centery - int(position.y * rect.height * 0.38 * perspective)
+        depth_weight = 0.32 + (near_ratio * 0.68)
+        x = int((vanishing_x * (1.0 - depth_weight)) + (projected_x * depth_weight))
+        y = int((vanishing_y * (1.0 - depth_weight)) + (projected_y * depth_weight))
+        x = max(rect.left + radius, min(rect.right - radius - 1, x))
+        y = max(rect.top + radius, min(rect.bottom - radius - 1, y))
         return x, y, radius, near_ratio
+
+    @staticmethod
+    def _precipice_point(*, rect: pygame.Rect, lateral: float) -> tuple[int, int]:
+        x = rect.right - 1 if lateral >= 0.0 else rect.left
+        return (x, rect.centery)
+
+    @staticmethod
+    def _adjacent_panel_polygon(
+        *,
+        rect: pygame.Rect,
+        lateral: float,
+    ) -> tuple[tuple[int, int], ...]:
+        edge_x = rect.right - 1 if lateral >= 0.0 else rect.left
+        inset_direction = -1 if lateral >= 0.0 else 1
+        depth = max(6, rect.width // 4)
+        top_y = rect.top + max(3, rect.height // 9)
+        bottom_y = rect.bottom - max(3, rect.height // 9)
+        far_top_y = rect.top + max(2, rect.height // 4)
+        far_bottom_y = rect.bottom - max(2, rect.height // 4)
+        far_x = edge_x + (inset_direction * depth)
+        return (
+            (edge_x, top_y),
+            (edge_x, bottom_y),
+            (far_x, far_bottom_y),
+            (far_x, far_top_y),
+        )
+
+    @classmethod
+    def _runway_segments(
+        cls,
+        *,
+        rect: pygame.Rect,
+        lateral: float,
+    ) -> tuple[tuple[tuple[int, int], tuple[int, int]], ...]:
+        vanishing_point = cls._precipice_point(rect=rect, lateral=lateral)
+        ceiling_y = rect.top + max(3, rect.height // 9)
+        floor_y = rect.bottom - max(3, rect.height // 9)
+        near_left = (rect.left, floor_y)
+        near_right = (rect.right - 1, floor_y)
+        far_left = (rect.left, ceiling_y)
+        far_right = (rect.right - 1, ceiling_y)
+        diagonal = math.hypot(rect.width, rect.height)
+        stripe_count = max(3, min(7, int(diagonal // 18)))
+        segments: list[tuple[tuple[int, int], tuple[int, int]]] = []
+        for index in range(1, stripe_count + 1):
+            t = (index / (stripe_count + 1)) ** 1.45
+            left_floor = cls._interpolate_point(near_left, vanishing_point, t)
+            right_floor = cls._interpolate_point(near_right, vanishing_point, t)
+            left_ceiling = cls._interpolate_point(far_left, vanishing_point, t)
+            right_ceiling = cls._interpolate_point(far_right, vanishing_point, t)
+            segments.append((left_floor, right_floor))
+            segments.append((left_ceiling, right_ceiling))
+        return tuple(segments)
+
+    @staticmethod
+    def _face_lateral(*, position: BallPosition, side_index: int) -> float:
+        angle = side_index * math.pi / 2.0
+        tangent_x = math.cos(angle)
+        tangent_z = math.sin(angle)
+        return (position.x * tangent_x) + (position.z * tangent_z)
+
+    @staticmethod
+    def _interpolate_point(
+        start: tuple[int, int],
+        end: tuple[int, int],
+        t: float,
+    ) -> tuple[int, int]:
+        return (
+            int(start[0] + ((end[0] - start[0]) * t)),
+            int(start[1] + ((end[1] - start[1]) * t)),
+        )
 
     def _depth_color(
         self,

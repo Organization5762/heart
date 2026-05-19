@@ -15,11 +15,14 @@ from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    advance_bouncing_ball_state)
 from heart.renderers.bouncing_ball.state import BallVelocity, BouncingBallState
 
-ACCELERATION_FORCE_GAIN = 0.16
-ACCELERATION_BASELINE_ADAPT_PER_SECOND = 1.4
-FORCE_DECAY_SECONDS = 0.65
-VELOCITY_DAMPING_PER_SECOND = 0.04
-MAX_BALL_SPEED = 1.6
+ACCELERATION_FORCE_GAIN = 0.22
+ACCELERATION_DEADBAND = 0.18
+ACCELERATION_BASELINE_REST_ADAPT_PER_SECOND = 0.85
+ACCELERATION_BASELINE_MOVING_ADAPT_PER_SECOND = 0.18
+FORCE_DECAY_SECONDS = 0.48
+MAX_FORCE = 1.35
+VELOCITY_DAMPING_PER_SECOND = 0.09
+MAX_BALL_SPEED = 1.7
 
 
 class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
@@ -52,7 +55,6 @@ class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
                 seed=initial,
             )
             .start_with(initial)
-
         )
 
     def _advance_state(
@@ -88,24 +90,33 @@ class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
         fy = state.force.y * decay
         fz = state.force.z * decay
         if acceleration is None:
-            return replace(state.force, x=fx, y=fy, z=fz)
+            return self._limited_force(BallVelocity(x=fx, y=fy, z=fz))
 
         baseline = self._baseline
         if baseline is None:
             self._baseline = acceleration
-            return replace(state.force, x=fx, y=fy, z=fz)
+            return self._limited_force(BallVelocity(x=fx, y=fy, z=fz))
 
-        fx += (acceleration.x - baseline.x) * ACCELERATION_FORCE_GAIN
-        fy += (acceleration.y - baseline.y) * ACCELERATION_FORCE_GAIN
-        fz += (acceleration.z - baseline.z) * ACCELERATION_FORCE_GAIN
+        delta_x = self._filtered_delta(acceleration.x - baseline.x)
+        delta_y = self._filtered_delta(acceleration.y - baseline.y)
+        delta_z = self._filtered_delta(acceleration.z - baseline.z)
+        fx += delta_x * ACCELERATION_FORCE_GAIN
+        fy += delta_y * ACCELERATION_FORCE_GAIN
+        fz += delta_z * ACCELERATION_FORCE_GAIN
 
-        baseline_alpha = min(1.0, ACCELERATION_BASELINE_ADAPT_PER_SECOND * dt)
+        motion = (delta_x * delta_x + delta_y * delta_y + delta_z * delta_z) ** 0.5
+        adapt_rate = (
+            ACCELERATION_BASELINE_REST_ADAPT_PER_SECOND
+            if motion <= ACCELERATION_DEADBAND
+            else ACCELERATION_BASELINE_MOVING_ADAPT_PER_SECOND
+        )
+        baseline_alpha = min(1.0, adapt_rate * dt)
         self._baseline = Acceleration(
             x=baseline.x + ((acceleration.x - baseline.x) * baseline_alpha),
             y=baseline.y + ((acceleration.y - baseline.y) * baseline_alpha),
             z=baseline.z + ((acceleration.z - baseline.z) * baseline_alpha),
         )
-        return replace(state.force, x=fx, y=fy, z=fz)
+        return self._limited_force(BallVelocity(x=fx, y=fy, z=fz))
 
     def _velocity_with_force(
         self,
@@ -124,4 +135,26 @@ class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
             vx *= scale
             vy *= scale
             vz *= scale
-        return replace(state.velocity, x=vx, y=vy, z=vz)
+        return BallVelocity(x=vx, y=vy, z=vz)
+
+    @staticmethod
+    def _filtered_delta(value: float) -> float:
+        magnitude = abs(value)
+        if magnitude <= ACCELERATION_DEADBAND:
+            return 0.0
+        return math.copysign(magnitude - ACCELERATION_DEADBAND, value)
+
+    @staticmethod
+    def _limited_force(force: BallVelocity) -> BallVelocity:
+        magnitude = max(
+            (force.x * force.x + force.y * force.y + force.z * force.z) ** 0.5,
+            1e-9,
+        )
+        if magnitude <= MAX_FORCE:
+            return force
+        scale = MAX_FORCE / magnitude
+        return BallVelocity(
+            x=force.x * scale,
+            y=force.y * scale,
+            z=force.z * scale,
+        )

@@ -216,7 +216,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.time_initialized = time.monotonic()
         self.target_surface = window
         window_size = window.get_size()
-        tiled_mode = isinstance(orientation, Cube)
+        tiled_mode = self._should_tile(orientation)
 
         self.tiled_mode = tiled_mode
         self.clock = window.clock
@@ -914,6 +914,11 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             max(1, window_size[0] // layout.columns),
             max(1, window_size[1] // layout.rows),
         )
+
+    @staticmethod
+    def _should_tile(orientation: Orientation) -> bool:
+        layout = orientation.layout
+        return layout.columns > 1 or layout.rows > 1
 
     def _dispose_input_subscriptions(self) -> None:
         for subscription in self._input_subscriptions:

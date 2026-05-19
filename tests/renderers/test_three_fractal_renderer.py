@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Layout, Orientation
+from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import FractalRuntime, FractalScene
 from heart.renderers.three_fractal.state import FractalSceneState
@@ -85,7 +85,7 @@ class TestFractalRuntime:
         window = Mock()
         window.get_size.return_value = (64, 64)
         window.clock = Mock()
-        orientation = Mock()
+        orientation = Rectangle.with_layout(columns=1, rows=1)
         peripheral_manager = Mock()
 
         monkeypatch.setattr(
@@ -127,7 +127,7 @@ class TestFractalRuntime:
         runtime._create_initial_state(
             window=window,
             peripheral_manager=manager,
-            orientation=Mock(),
+            orientation=Rectangle.with_layout(columns=1, rows=1),
         )
         runtime.reset()
 
@@ -238,6 +238,13 @@ class TestFractalRuntime:
 
         assert FractalRuntime._tile_render_size((128, 64), orientation) == (64, 32)
 
+    def test_rectangle_multi_panel_layout_enables_tiling(self) -> None:
+        """Verify local rectangle layouts with multiple panels render one repeated panel."""
+        orientation = Rectangle.with_layout(columns=4, rows=1)
+
+        assert FractalRuntime._should_tile(orientation) is True
+        assert FractalRuntime._tile_render_size((320, 80), orientation) == (80, 80)
+
 
 class TestFractalScene:
     """Ensure fractal scene reset cascades into the runtime so navigation can leave OpenGL-backed modes safely."""
@@ -267,7 +274,7 @@ class TestFractalScene:
         state = provider.initial_state(
             window=Mock(),
             peripheral_manager=Mock(),
-            orientation=Mock(),
+            orientation=Rectangle.with_layout(columns=1, rows=1),
         )
 
         assert isinstance(state.runtime, _ProviderRuntime)
@@ -306,7 +313,7 @@ class TestFractalScene:
         scene.set_state(FractalSceneState(runtime=runtime))
         scene._peripheral_manager = Mock()
 
-        scene.real_process(window=Mock(), orientation=Mock())
+        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
 
         assert runtime.initialize_calls == 1
 
@@ -318,8 +325,8 @@ class TestFractalScene:
         scene.set_state(FractalSceneState(runtime=runtime))
         scene._peripheral_manager = Mock()
 
-        scene.real_process(window=Mock(), orientation=Mock())
-        scene.real_process(window=Mock(), orientation=Mock())
+        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
 
         assert runtime.initialize_calls == 1
         assert scene._runtime_failed is True
