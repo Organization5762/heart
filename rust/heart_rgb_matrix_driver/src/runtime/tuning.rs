@@ -27,6 +27,12 @@ const HEART_RGB_MATRIX_BRIGHTNESS_DEFAULT: f32 = 1.0;
 const HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS_DEFAULT: u8 = 8;
 const HEART_RGB_MATRIX_GAMMA_DEFAULT: f32 = 1.0;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum MatrixGamma {
+    Power(f32),
+    Cie1931,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RuntimeTuning {
     pub(crate) matrix_simulated_refresh_interval_ms: u64,
@@ -39,7 +45,7 @@ pub(crate) struct RuntimeTuning {
      */
     pub(crate) matrix_brightness: f32,
     pub(crate) matrix_brightness_reference_pwm_bits: u8,
-    pub(crate) matrix_gamma: f32,
+    pub(crate) matrix_gamma: MatrixGamma,
     pub(crate) parallel_color_remap_threshold_bytes: usize,
     /* Default PWM bit depth used when building a Pi 5 scan config. */
     pub(crate) pi5_simple_scan_default_pwm_bits: u8,
@@ -90,10 +96,9 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             HEART_RGB_MATRIX_BRIGHTNESS_REFERENCE_PWM_BITS_DEFAULT,
             |value| (1..=11).contains(&value),
         ),
-        matrix_gamma: parse_env_f32(
+        matrix_gamma: parse_matrix_gamma(
             "HEART_RGB_MATRIX_GAMMA",
-            HEART_RGB_MATRIX_GAMMA_DEFAULT,
-            |value| value.is_finite() && (0.25..=4.0).contains(&value),
+            MatrixGamma::Power(HEART_RGB_MATRIX_GAMMA_DEFAULT),
         ),
         parallel_color_remap_threshold_bytes: parse_env_usize(
             "HEART_PARALLEL_COLOR_REMAP_THRESHOLD_BYTES",
@@ -151,6 +156,18 @@ pub(crate) fn runtime_tuning() -> &'static RuntimeTuning {
             |value| value <= 10,
         ),
     })
+}
+
+impl MatrixGamma {
+    pub(crate) fn apply(self, value: u8) -> u8 {
+        match self {
+            Self::Power(gamma) => {
+                let normalized = f32::from(value) / 255.0;
+                (normalized.powf(gamma) * 255.0).round().clamp(0.0, 255.0) as u8
+            }
+            Self::Cie1931 => cie1931_map_color(value),
+        }
+    }
 }
 
 impl RuntimeTuning {
@@ -217,6 +234,33 @@ fn parse_env_f32(key: &str, default: f32, validator: impl Fn(f32) -> bool) -> f3
         .unwrap_or(default)
 }
 
+fn parse_matrix_gamma(key: &str, default: MatrixGamma) -> MatrixGamma {
+    let Ok(value) = env::var(key) else {
+        return default;
+    };
+    let normalized = value.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "cie1931" | "cie" | "hzeller" | "hzeller-cie1931" => MatrixGamma::Cie1931,
+        "" => default,
+        _ => normalized
+            .parse::<f32>()
+            .ok()
+            .filter(|value| value.is_finite() && (0.25..=4.0).contains(value))
+            .map(MatrixGamma::Power)
+            .unwrap_or(default),
+    }
+}
+
+fn cie1931_map_color(color: u8) -> u8 {
+    let value = f32::from(color) * 100.0 / 255.0;
+    let luminance = if value <= 8.0 {
+        value / 902.3
+    } else {
+        ((value + 16.0) / 116.0).powi(3)
+    };
+    (255.0 * luminance).round().clamp(0.0, 255.0) as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,7 +281,7 @@ mod tests {
             matrix_max_pending_frames: 2,
             matrix_brightness: 1.0,
             matrix_brightness_reference_pwm_bits: 8,
-            matrix_gamma: 1.0,
+            matrix_gamma: MatrixGamma::Power(1.0),
             parallel_color_remap_threshold_bytes: 256 * 1024,
             pi5_simple_scan_default_pwm_bits: 11,
             pi5_simple_scan_lsb_dwell_ticks: 1,
@@ -262,7 +306,7 @@ mod tests {
             matrix_max_pending_frames: 2,
             matrix_brightness: 1.0,
             matrix_brightness_reference_pwm_bits: 8,
-            matrix_gamma: 1.0,
+            matrix_gamma: MatrixGamma::Power(1.0),
             parallel_color_remap_threshold_bytes: 256 * 1024,
             pi5_simple_scan_default_pwm_bits: 11,
             pi5_simple_scan_lsb_dwell_ticks: 1,
