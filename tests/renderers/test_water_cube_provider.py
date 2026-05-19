@@ -9,14 +9,26 @@ from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.provider import WaterCubeStateProvider
 
 
+class _Clock:
+    def __init__(self, delta_ms: float = 16.0, fps: float = 60.0) -> None:
+        self.delta_ms = delta_ms
+        self.fps = fps
+
+    def get_fps(self) -> float:
+        return self.fps
+
+    def get_time(self) -> float:
+        return self.delta_ms
+
+
 class TestWaterCubeStateProvider:
     """Ensure the default playlist's water renderer initializes from a valid state."""
 
-    def test_observable_emits_initial_state_before_accelerometer_updates(
+    def test_observable_steps_on_frame_tick_with_latest_accelerometer_update(
         self,
         monkeypatch,
     ) -> None:
-        """Verify startup emits a WaterCubeState instead of feeding the initial state through the reducer as acceleration."""
+        """Verify accelerometer input is sampled on frame ticks instead of advancing the simulation directly."""
         peripheral_manager = PeripheralManager()
         accelerometer_controller = peripheral_manager.input_io.accelerometer
         accelerometer_debug_profile = peripheral_manager.input_io.debug_accelerometer
@@ -32,7 +44,12 @@ class TestWaterCubeStateProvider:
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
         accelerometer_controller.node().on_next(Acceleration(x=1.0, y=2.0, z=3.0))
+        accelerometer_controller.node().on_next(Acceleration(x=4.0, y=5.0, z=6.0))
+
+        assert len(observed_states) == 1
+
+        peripheral_manager.input_io.frame_ticks.advance(_Clock())
 
         assert len(observed_states) == 2
         assert observed_states[0].gvec is None
-        assert observed_states[1].gvec == Acceleration(x=1.0, y=2.0, z=3.0)
+        assert observed_states[1].gvec == Acceleration(x=4.0, y=5.0, z=6.0)
