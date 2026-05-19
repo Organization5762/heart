@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import math
 import time
-from typing import TYPE_CHECKING
 
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.providers import ObservableProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    DEFAULT_BALL_SPEED,
@@ -19,13 +19,9 @@ from heart.renderers.bouncing_ball.state import (BallPosition,
                                                  BouncingBallState, ChildBall)
 from heart.runtime.display_context import DisplayContext
 
-if TYPE_CHECKING:
-    from heart.renderers.bouncing_ball.provider import \
-        BouncingBallStateProvider
-
-BACKGROUND_COLOR = (3, 5, 10)
-GRID_COLOR = (17, 31, 44)
-WALL_COLOR = (35, 52, 70)
+BACKGROUND_COLOR = (0, 0, 0)
+GRID_COLOR = (8, 14, 20)
+WALL_COLOR = (28, 38, 48)
 BALL_CORE_COLOR = (76, 242, 255)
 BALL_EDGE_COLOR = (255, 76, 216)
 CHILD_BALL_CORE_COLOR = (255, 206, 76)
@@ -38,7 +34,7 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
 
     def __init__(
         self,
-        provider: "BouncingBallStateProvider | None" = None,
+        provider: ObservableProvider[BouncingBallState] | None = None,
     ) -> None:
         super().__init__(builder=provider)
         self.device_display_mode = DeviceDisplayMode.FULL
@@ -226,9 +222,11 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         near_ratio = max(0.0, min(1.0, (forward + WORLD_LIMIT) / (WORLD_LIMIT * 2.0)))
 
         perspective = 0.72 + near_ratio * 0.5
-        x = rect.centerx + int(lateral * rect.width * 0.28 * perspective)
-        y = rect.centery - int(position.y * rect.height * 0.42 * perspective)
         radius = int(max(2.0, rect.height * (0.08 + near_ratio * 0.16)))
+        x = rect.centerx + int(lateral * rect.width * 0.24 * perspective)
+        y = rect.centery - int(position.y * rect.height * 0.38 * perspective)
+        x = max(rect.left + radius, min(rect.right - radius - 1, x))
+        y = max(rect.top + radius, min(rect.bottom - radius - 1, y))
         return x, y, radius, near_ratio
 
     def _depth_color(

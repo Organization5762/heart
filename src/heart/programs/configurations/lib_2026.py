@@ -6,8 +6,7 @@ from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.audio_storm import AudioStormScene
-from heart.renderers.bouncing_ball import (BouncingBallRenderer,
-                                           BouncingBallStateProvider)
+from heart.renderers.bouncing_ball import BouncingBallRenderer
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
 from heart.renderers.kirby import KirbyScene
@@ -124,7 +123,7 @@ def configure(loop: GameLoop) -> None:
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
-    bouncing_ball_mode.add_renderer(BouncingBallRenderer(BouncingBallStateProvider()))
+    bouncing_ball_mode.add_renderer(BouncingBallRenderer())
 
     vibe_mode = loop.add_mode(VibeScene.title_scene())
     vibe_mode.add_renderer(VibeScene())
