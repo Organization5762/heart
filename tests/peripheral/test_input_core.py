@@ -27,6 +27,7 @@ from heart.peripheral.core.input.accelerometer import (
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.input.peripheral_inputs import \
     PERIPHERAL_INPUT_DISPATCH_STREAM
+from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream, runtime_route
 from heart.peripheral.gamepad import Gamepad
@@ -296,6 +297,46 @@ class TestFrameTickController:
         assert tap.snapshot()[-1].stage is InputDebugStage.FRAME
         assert tap.snapshot()[-1].stream_name == "frame.tick"
         assert tap.latency_snapshot()["frame.tick"].count == 1
+
+
+class TestInputStreamHelpers:
+    """Cover stream helpers shared across input-derived renderers."""
+
+    def test_average_by_frame_window_emits_once_per_elapsed_window(self) -> None:
+        """Verify frame-clocked stream averaging smooths samples without emitting intermediate values."""
+        source: EventStream[float | None] = EventStream()
+        frame_ticks: EventStream[FrameTick] = EventStream()
+        observed: list[float] = []
+
+        average_by_frame_window(
+            source.start_with(None),
+            frame_ticks,
+            interval_ms=100.0,
+            selector=lambda value: value,
+        ).subscribe(observed.append)
+
+        source.emit(2.0)
+        frame_ticks.emit(
+            FrameTick(
+                frame_index=0,
+                delta_ms=40.0,
+                delta_s=0.04,
+                monotonic_s=1.0,
+                fps=25.0,
+            )
+        )
+        source.emit(8.0)
+        frame_ticks.emit(
+            FrameTick(
+                frame_index=1,
+                delta_ms=60.0,
+                delta_s=0.06,
+                monotonic_s=1.06,
+                fps=25.0,
+            )
+        )
+
+        assert observed == [5.0]
 
 
 class TestKeyboardController:
