@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from heart.device import Orientation
-from heart.peripheral.core.input import GamepadController
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
@@ -61,14 +60,18 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             peripheral_manager=peripheral_manager,
         )
         self.set_state(state)
-        self._navigation_subscription = peripheral_manager.input_io.navigation.subscribe_events(
-            on_activate=self._process_activate,
+        self._navigation_subscription = (
+            peripheral_manager.input_io.navigation.subscribe_events(
+                on_activate=self._process_activate,
+            )
         )
 
         if self.scenes:
             active_scene_index = self._active_scene_index()
             self._last_active_scene_index = active_scene_index
-            self.device_display_mode = self.scenes[active_scene_index].device_display_mode
+            self.device_display_mode = self.scenes[
+                active_scene_index
+            ].device_display_mode
 
         return state
 
@@ -113,16 +116,11 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         peripheral_manager = self.state.peripheral_manager
         if peripheral_manager is None:
             return
-        get_gamepad = getattr(peripheral_manager, "get_gamepad", None)
-        if get_gamepad is None:
-            return
-        gamepad = get_gamepad()
-        if gamepad is None or not gamepad.is_connected():
+        snapshot = peripheral_manager.input_io.gamepad.sample()
+        if not snapshot.connected:
             self._last_dpad_x = 0
             return
-        mapping = GamepadController._mapping_for_gamepad(gamepad)
-        dpad = GamepadController._read_dpad(gamepad, mapping)
-        direction = int(dpad.x)
+        direction = int(snapshot.dpad.x)
         if direction == self._last_dpad_x:
             return
         self._last_dpad_x = direction

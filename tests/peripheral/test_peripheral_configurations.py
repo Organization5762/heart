@@ -24,7 +24,8 @@ from heart.peripheral.drawing_pad import (DrawingPad,
                                           drawing_pad_detection_route,
                                           drawing_pad_sample_event_route)
 from heart.peripheral.gamepad import Gamepad
-from heart.peripheral.gamepad.gamepad import gamepad_detection_route
+from heart.peripheral.gamepad.gamepad import (DEFAULT_GAMEPAD_SLOTS,
+                                              gamepad_detection_route)
 from heart.peripheral.input_payloads import MicrophoneLevel, RadioPacket
 from heart.peripheral.microphone import (Microphone,
                                          microphone_detection_route,
@@ -367,6 +368,23 @@ class TestManyfoldAccelerometerConfiguration:
 
 class TestManyfoldGamepadConfiguration:
     """Cover default graph-node factories so gamepad discovery stays Manyfold-owned."""
+
+    def test_gamepad_detection_enumerates_joystick_slots(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.joystick.quit", lambda: None
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.joystick.init", lambda: None
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.joystick.get_count", lambda: 0
+        )
+
+        gamepads = list(Gamepad.detect())
+
+        assert [gamepad.joystick_id for gamepad in gamepads] == list(
+            range(DEFAULT_GAMEPAD_SLOTS)
+        )
 
     def test_gamepad_detection_node_publishes_detection_event(
         self,

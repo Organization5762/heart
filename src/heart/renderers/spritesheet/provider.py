@@ -6,15 +6,13 @@ from manyfold import EmptyNode, MergeNode, StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
+from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
-                                                          BitDoLite2Bluetooth)
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
-from heart.utilities.env import Configuration
 
 
 class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
@@ -80,16 +78,10 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     def initial_state(
         self, *, peripheral_manager: PeripheralManager
     ) -> SpritesheetLoopState:
-        gamepad = None
-        if not self.disable_input:
-            try:
-                gamepad = peripheral_manager.get_gamepad()
-            except Exception:
-                gamepad = None
         return SpritesheetLoopState(
             phase=self.initial_phase,
             spritesheet=Loader.load_spirtesheet(self.file),
-            gamepad=gamepad,
+            gamepad=None if self.disable_input else peripheral_manager.input_io.gamepad,
         )
 
     def observable(
@@ -98,9 +90,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         initial_state = self._last_state or self.initial_state(
             peripheral_manager=peripheral_manager
         )
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         if self.disable_input:
             switch_updates = EmptyNode().observable()
         else:
@@ -120,8 +110,6 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             .scan(lambda state, update: update(state), seed=initial_state)
             .start_with(initial_state)
             .do_action(self._remember_state)
-
-
         )
 
     def _remember_state(self, state: SpritesheetLoopState) -> None:
@@ -151,22 +139,19 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
     def _apply_gamepad_input(self, state: SpritesheetLoopState) -> SpritesheetLoopState:
         if self.disable_input:
             return state
-        gamepad = state.gamepad
-        if gamepad is None or not gamepad.is_connected():
+        gamepad_controller = state.gamepad
+        if gamepad_controller is None:
             return state
-        mapping = BitDoLite2Bluetooth() if Configuration.is_pi() else BitDoLite2()
+        snapshot = gamepad_controller.sample()
+        if not snapshot.connected:
+            return state
         duration_scale = state.duration_scale
-        accelerate = False
-        decelerate = False
-        try:
-            accelerate = bool(gamepad.is_held(mapping.BUTTON_PLUS)) or bool(
-                gamepad.axis_passed_threshold(mapping.AXIS_R)
-            )
-            decelerate = bool(gamepad.is_held(mapping.BUTTON_MINUS)) or bool(
-                gamepad.axis_passed_threshold(mapping.AXIS_L)
-            )
-        except Exception:
-            return state
+        accelerate = bool(snapshot.button_held(GamepadButton.PLUS)) or bool(
+            snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)
+        )
+        decelerate = bool(snapshot.button_held(GamepadButton.MINUS)) or bool(
+            snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
+        )
         if accelerate and (not decelerate):
             duration_scale += 0.005
         elif decelerate and (not accelerate):

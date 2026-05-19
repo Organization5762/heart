@@ -6,6 +6,7 @@ from manyfold import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
+from heart.peripheral.core.input import GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.switch import SwitchState
@@ -44,6 +45,11 @@ def _peripheral_manager(
     monkeypatch.setattr(manager.input_io, "main_switch_stream", lambda: switch_stream)
     if gamepad is not None:
         manager.register(gamepad)
+        monkeypatch.setattr(
+            manager.input_io.gamepad,
+            "sample",
+            lambda: GamepadSnapshot(connected=True, identifier="pad"),
+        )
     return manager, switch_stream
 
 
@@ -147,7 +153,7 @@ class TestSpritesheetLoopProvider:
         state = renderer.state
 
         assert state.spritesheet is spritesheet
-        assert state.gamepad is gamepad
+        assert state.gamepad is manager.input_io.gamepad
         assert state.current_frame == 1
         assert state.loop_count == 0
         assert state.phase == LoopPhase.LOOP

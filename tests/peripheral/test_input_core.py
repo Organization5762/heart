@@ -29,6 +29,7 @@ from heart.peripheral.core.input.peripheral_inputs import \
     PERIPHERAL_INPUT_DISPATCH_STREAM
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import EventStream, runtime_route
+from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -67,6 +68,56 @@ class _SwitchProbe(BaseSwitch):
 
     def _event_stream(self) -> StreamNode[SwitchState]:
         return self._stream.observable()
+
+
+class _JoystickProbe:
+    def __init__(
+        self,
+        *,
+        name: str = "8BitDo Lite 2",
+        buttons: dict[int, bool] | None = None,
+        axes: dict[int, float] | None = None,
+        hat: tuple[int, int] = (0, 0),
+    ) -> None:
+        self._name = name
+        self._buttons = buttons or {}
+        self._axes = axes or {}
+        self._hat = hat
+        self.init_calls = 0
+        self.quit_calls = 0
+
+    def init(self) -> None:
+        self.init_calls += 1
+
+    def quit(self) -> None:
+        self.quit_calls += 1
+
+    def get_name(self) -> str:
+        return self._name
+
+    def get_numbuttons(self) -> int:
+        if not self._buttons:
+            return 0
+        return max(self._buttons) + 1
+
+    def get_numaxes(self) -> int:
+        if not self._axes:
+            return 0
+        return max(self._axes) + 1
+
+    def get_button(self, button_id: int) -> bool:
+        return self._buttons.get(button_id, False)
+
+    def get_axis(self, axis_id: int) -> float:
+        return self._axes.get(axis_id, 0.0)
+
+    def get_hat(self, _hat_id: int) -> tuple[int, int]:
+        return self._hat
+
+
+class _GamepadManager:
+    def __init__(self, *gamepads: Gamepad) -> None:
+        self.peripherals = gamepads
 
 
 class _InputProbe(Peripheral[int]):
@@ -444,6 +495,97 @@ class TestKeyboardController:
 class TestGamepadController:
     """Group gamepad controller tests so button, axis, and stick views remain reusable across renderers and profiles."""
 
+    def test_sample_combines_all_connected_gamepads(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify primary gamepad input is a centralized snapshot across connected joystick slots."""
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
+        )
+        first = Gamepad(
+            joystick_id=0,
+            joystick=_JoystickProbe(
+                buttons={1: True},
+                axes={0: 0.25},
+                hat=(1, 0),
+            ),
+        )
+        second = Gamepad(
+            joystick_id=1,
+            joystick=_JoystickProbe(
+                buttons={2: True, 8: True},
+                axes={1: -0.75},
+                hat=(0, 1),
+            ),
+        )
+        controller = GamepadController(
+            manager=_GamepadManager(first, second),
+            debug_tap=InputDebugTap(),
+        )
+
+        snapshot = controller.sample()
+
+        assert snapshot.connected is True
+        assert snapshot.identifier == "8BitDo Lite 2+8BitDo Lite 2"
+        assert snapshot.button_held(GamepadButton.SOUTH) is True
+        assert snapshot.button_held(GamepadButton.NORTH) is True
+        assert snapshot.button_held(GamepadButton.MINUS) is True
+        assert snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0) == 0.25
+        assert snapshot.axis_value(GamepadAxis.LEFT_Y, dead_zone=0.0) == -0.75
+        assert snapshot.dpad == GamepadDpadValue(x=1, y=1)
+
+    def test_sample_can_target_one_gamepad_by_joystick_id(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify renderers can opt out of the merged primary snapshot and read one physical controller."""
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
+        )
+        first = Gamepad(
+            joystick_id=0,
+            joystick=_JoystickProbe(buttons={1: True}, hat=(1, 0)),
+        )
+        second = Gamepad(
+            joystick_id=1,
+            joystick=_JoystickProbe(buttons={2: True}, hat=(-1, 0)),
+        )
+        controller = GamepadController(
+            manager=_GamepadManager(first, second),
+            debug_tap=InputDebugTap(),
+        )
+
+        first_snapshot = controller.sample(joystick_id=0)
+        second_snapshot = controller.sample(joystick_id=1)
+
+        assert first_snapshot.button_held(GamepadButton.SOUTH) is True
+        assert first_snapshot.button_held(GamepadButton.NORTH) is False
+        assert first_snapshot.dpad == GamepadDpadValue(x=1)
+        assert second_snapshot.button_held(GamepadButton.SOUTH) is False
+        assert second_snapshot.button_held(GamepadButton.NORTH) is True
+        assert second_snapshot.dpad == GamepadDpadValue(x=-1)
+
+    def test_snapshot_stream_can_target_one_gamepad_by_joystick_id(self) -> None:
+        """Verify indexed gamepad streams are stable so renderer-specific controller routing can subscribe by slot."""
+        controller = GamepadController(
+            manager=_GamepadManager(),
+            debug_tap=InputDebugTap(),
+        )
+
+        indexed_stream = controller.snapshot_stream(joystick_id=1)
+
+        assert indexed_stream is controller.snapshot_stream(joystick_id=1)
+        assert indexed_stream is not controller.snapshot_stream()
+
     def test_views_project_shared_snapshot_state(
         self,
         monkeypatch,
@@ -658,8 +800,7 @@ class TestPeripheralInputBus:
         assert [input_event.data for input_event in matching.inputs] == [{"value": 7}]
         assert ignored.inputs == []
         assert (
-            io.debug_tap.snapshot()[-1].stream_name
-            == PERIPHERAL_INPUT_DISPATCH_STREAM
+            io.debug_tap.snapshot()[-1].stream_name == PERIPHERAL_INPUT_DISPATCH_STREAM
         )
 
     def test_bind_without_targets_does_not_subscribe_to_source(self) -> None:

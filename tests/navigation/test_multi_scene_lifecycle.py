@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from unittest.mock import Mock
 
 from heart.navigation import MultiScene
-from heart.peripheral.core.input import GamepadController, GamepadDpadValue
+from heart.peripheral.core.input import GamepadDpadValue, GamepadSnapshot
 from heart.renderers import StatefulBaseRenderer
 
 
@@ -34,17 +34,24 @@ class _PeripheralManager:
         self.input_io = Mock()
         self.input_io.navigation = self.navigation_profile
         self.gamepad = _Gamepad() if with_gamepad else None
-
-    def get_gamepad(self) -> "_Gamepad | None":
-        return self.gamepad
+        self.input_io.gamepad = self.gamepad or _DisconnectedGamepad()
 
 
 class _Gamepad:
     def __init__(self) -> None:
         self.dpad = GamepadDpadValue()
 
-    def is_connected(self) -> bool:
-        return True
+    def sample(self) -> GamepadSnapshot:
+        return GamepadSnapshot(
+            connected=True,
+            identifier="pad",
+            dpad=self.dpad,
+        )
+
+
+class _DisconnectedGamepad:
+    def sample(self) -> GamepadSnapshot:
+        return GamepadSnapshot(connected=False, identifier=None)
 
 
 class _Scene(StatefulBaseRenderer[int]):
@@ -79,15 +86,6 @@ def _window() -> Mock:
     return window
 
 
-def _stub_dpad_read(monkeypatch) -> None:
-    monkeypatch.setattr(GamepadController, "_mapping_for_gamepad", lambda _gamepad: Mock())
-    monkeypatch.setattr(
-        GamepadController,
-        "_read_dpad",
-        lambda gamepad, _mapping: gamepad.dpad,
-    )
-
-
 class TestMultiSceneLifecycle:
     def test_initialize_does_not_eagerly_initialize_child_scenes(self) -> None:
         first = _Scene("first")
@@ -117,7 +115,9 @@ class TestMultiSceneLifecycle:
             peripheral_manager=manager,
             orientation=Mock(),
         )
-        first.initialize(window=_window(), peripheral_manager=manager, orientation=Mock())
+        first.initialize(
+            window=_window(), peripheral_manager=manager, orientation=Mock()
+        )
 
         assert manager.navigation_profile.activate_callback is not None
         manager.navigation_profile.activate_callback(object())
@@ -143,8 +143,7 @@ class TestMultiSceneLifecycle:
         assert second.reset_calls == 1
         assert multi_scene.initialized is False
 
-    def test_dpad_right_and_left_step_through_scenes(self, monkeypatch) -> None:
-        _stub_dpad_read(monkeypatch)
+    def test_dpad_right_and_left_step_through_scenes(self) -> None:
         first = _Scene("first")
         second = _Scene("second")
         third = _Scene("third")
@@ -165,8 +164,7 @@ class TestMultiSceneLifecycle:
         manager.gamepad.dpad = GamepadDpadValue(x=-1)
         assert multi_scene.get_renderers() == [first]
 
-    def test_dpad_left_wraps_to_last_scene(self, monkeypatch) -> None:
-        _stub_dpad_read(monkeypatch)
+    def test_dpad_left_wraps_to_last_scene(self) -> None:
         first = _Scene("first")
         second = _Scene("second")
         third = _Scene("third")
@@ -182,8 +180,7 @@ class TestMultiSceneLifecycle:
 
         assert multi_scene.get_renderers() == [third]
 
-    def test_held_dpad_direction_does_not_repeat(self, monkeypatch) -> None:
-        _stub_dpad_read(monkeypatch)
+    def test_held_dpad_direction_does_not_repeat(self) -> None:
         first = _Scene("first")
         second = _Scene("second")
         third = _Scene("third")
@@ -200,8 +197,7 @@ class TestMultiSceneLifecycle:
         assert multi_scene.get_renderers() == [second]
         assert multi_scene.get_renderers() == [second]
 
-    def test_get_renderers_reads_dpad_after_warmup_reset(self, monkeypatch) -> None:
-        _stub_dpad_read(monkeypatch)
+    def test_get_renderers_reads_dpad_after_warmup_reset(self) -> None:
         first = _Scene("first")
         second = _Scene("second")
         multi_scene = MultiScene([first, second])

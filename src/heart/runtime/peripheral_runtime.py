@@ -208,9 +208,6 @@ class PeripheralRuntime:
         drain_frame_thread_queue()
         self._drain_control_messages()
         self._poll_gamepad_navigation()
-        gamepad = self._peripheral_manager.get_gamepad()
-        if gamepad is not None:
-            gamepad.update()
 
     def _poll_gamepad_navigation(self) -> None:
         snapshot = self._peripheral_manager.input_io.gamepad.sample()
@@ -254,9 +251,7 @@ class PeripheralRuntime:
             self._frame_clock = clock
         if self._frame_clock is None:
             return
-        self._peripheral_manager.input_io.frame_ticks.advance(
-            self._frame_clock
-        )
+        self._peripheral_manager.input_io.frame_ticks.advance(self._frame_clock)
 
     def tick(self) -> None:
         self.poll()

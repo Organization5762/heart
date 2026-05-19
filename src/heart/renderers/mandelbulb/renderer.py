@@ -126,10 +126,10 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self.tiled_mode = isinstance(orientation, Cube)
         self._initialize_shader()
         self._subscriptions = [
-            peripheral_manager.keyboard_controller.snapshot_stream().subscribe(
+            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
                 on_next=self._set_keyboard_snapshot,
             ),
-            peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
+            peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
                 on_next=self._set_gamepad_snapshot,
             ),
         ]

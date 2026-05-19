@@ -21,6 +21,7 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 INITIALIZATION_DELAY_SECONDS = 1.5
 DEFAULT_JOYSTICK_ID = 0
+DEFAULT_GAMEPAD_SLOTS = 4
 DEFAULT_AXIS_DEAD_ZONE = 0.0
 DEFAULT_AXIS_THRESHOLD = 0.0
 GAMEPAD_GRAPH_OWNER = OwnerName("heart.gamepad")
@@ -233,7 +234,9 @@ class Gamepad(Peripheral[Any]):
         try:
             pygame.joystick.quit()
             pygame.joystick.init()
-            yield cls()
+            slot_count = max(DEFAULT_GAMEPAD_SLOTS, pygame.joystick.get_count())
+            for joystick_id in range(slot_count):
+                yield cls(joystick_id=joystick_id)
         except pygame.error:
             logger.exception("Error initializing joystick module")
             return
@@ -295,13 +298,20 @@ class Gamepad(Peripheral[Any]):
     def gamepad_detected() -> bool:
         return pygame.joystick.get_count() > 0
 
+    def _slot_available(self) -> bool:
+        return pygame.joystick.get_count() > self.joystick_id
+
     def _read_from_gamepad(self, interval: int) -> None:
         try:
-            while Gamepad.gamepad_detected() and not self.is_connected():
+            while self._slot_available() and not self.is_connected():
                 try:
-                    self.joystick = pygame.joystick.Joystick(0)
+                    self.joystick = pygame.joystick.Joystick(self.joystick_id)
                     self.joystick.init()
-                    logger.info(f"{self.joystick.get_name()} ready")
+                    logger.info(
+                        "%s ready on joystick slot %s",
+                        self.joystick.get_name(),
+                        self.joystick_id,
+                    )
                 except pygame.error as e:
                     logger.warning(f"Error connecting joystick: {e}")
                     # trying to touch joystick module from a thread becomes weird af
@@ -309,11 +319,15 @@ class Gamepad(Peripheral[Any]):
                 except Exception:
                     pass
 
-            if not Gamepad.gamepad_detected() and self.is_connected():
+            if not self._slot_available() and self.is_connected():
                 cached_name = self.joystick.get_name() if self.joystick else None
                 self.reset()
                 if cached_name is not None:
-                    logger.info(f"{cached_name} disconnected")
+                    logger.info(
+                        "%s disconnected from joystick slot %s",
+                        cached_name,
+                        self.joystick_id,
+                    )
 
             # Todo: We're reaching unfathomable levels of hard-coding.
             #  This will only work specifically with our pi4, and our 8bitdo
