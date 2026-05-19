@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 class MandelbrotMode(StatefulBaseRenderer[AppState]):
     def __init__(self):
         super().__init__()
-        self.device_display_mode = DeviceDisplayMode.FULL
+        self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.clock: pygame.time.Clock | None = None
 
         # screen properties
@@ -81,8 +81,13 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         self.clock = window.clock
         self.height = window.get_height()
         self.width = window.get_width()
-        screen_cols = orientation.layout.columns
-        screen_rows = orientation.layout.rows
+        render_orientation = (
+            Rectangle.with_layout(columns=1, rows=1)
+            if self.device_display_mode == DeviceDisplayMode.MIRRORED
+            else orientation
+        )
+        screen_cols = render_orientation.layout.columns
+        screen_rows = render_orientation.layout.rows
         self.screens = {
             (i, j): pygame.Surface(
                 (self.width // screen_cols, self.height // screen_rows), pygame.SRCALPHA
@@ -103,7 +108,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             msurface_width=self.width,
             msurface_height=self.height,
             num_palettes=len(self.palettes),
-            init_orientation=orientation,
+            init_orientation=render_orientation,
             mode="auto",
         )
         self.set_state(state)
@@ -113,7 +118,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             peripheral_manager.input_io.mandelbrot,
         )
 
-        if isinstance(orientation, Cube):
+        if isinstance(render_orientation, Cube):
             # warmup compilation of the jitted functions
             mandelbrot_surface = pygame.Surface((self.width // 2, self.height))
             julia_surface = pygame.Surface((self.width // 2, self.height))
@@ -202,7 +207,10 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
 
         individual_screen_width = self.screens[(0, 0)].get_width()
         individual_screen_height = self.screens[(0, 0)].get_height()
-        if self.state.view_mode == ViewMode.MANDELBROT:
+        if self.device_display_mode == DeviceDisplayMode.MIRRORED:
+            self.state.view_mode = ViewMode.MANDELBROT
+            self._draw_mandelbrot_to_surface(window.screen)
+        elif self.state.view_mode == ViewMode.MANDELBROT:
             match self.state.orientation:
                 case Rectangle():
                     self._draw_mandelbrot_to_surface(window.screen)

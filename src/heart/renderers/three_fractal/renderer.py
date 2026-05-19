@@ -223,7 +223,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.mode = "auto"
 
         if self.tiled_mode:
-            self.render_size = (window_size[1], window_size[1])
+            self.render_size = self._tile_render_size(window_size, orientation)
             self.window_size = self.render_size
             self.real_window_size = window_size
 
@@ -270,7 +270,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         """Set up resources for tiled rendering."""
         # Create a pixel buffer to store the rendered result
         self.pixels = np.zeros(
-            (self.render_size[0], self.render_size[1], 4), dtype=np.uint8
+            (self.render_size[1], self.render_size[0], 4), dtype=np.uint8
         )
 
         # Create a texture to hold the rendered result for display
@@ -329,27 +329,24 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         # Draw the texture multiple times
         tile_width = self.render_size[0]
         tile_height = self.render_size[1]
-        tiles_x = self.real_window_size[0] // tile_width
-
         # Clear the screen for the tiled display
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        for i in range(tiles_x):
-            x = i * tile_width
+        for x in range(0, self.real_window_size[0], tile_width):
+            for y in range(0, self.real_window_size[1], tile_height):
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(x, y)
 
-            glBegin(GL_QUADS)
-            glTexCoord2f(0, 0)
-            glVertex2f(x, 0)
+                glTexCoord2f(1, 0)
+                glVertex2f(x + tile_width, y)
 
-            glTexCoord2f(1, 0)
-            glVertex2f(x + tile_width, 0)
+                glTexCoord2f(1, 1)
+                glVertex2f(x + tile_width, y + tile_height)
 
-            glTexCoord2f(1, 1)
-            glVertex2f(x + tile_width, tile_height)
-
-            glTexCoord2f(0, 1)
-            glVertex2f(x, tile_height)
-            glEnd()
+                glTexCoord2f(0, 1)
+                glVertex2f(x, y + tile_height)
+                glEnd()
 
         # Read pixels for rendering to Pygame surface
         glReadPixels(
@@ -906,6 +903,17 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.surface_array = None
         self.time_initialized = None
         self._trigger_right_prev_active = False
+
+    @staticmethod
+    def _tile_render_size(
+        window_size: tuple[int, int],
+        orientation: Orientation,
+    ) -> tuple[int, int]:
+        layout = orientation.layout
+        return (
+            max(1, window_size[0] // layout.columns),
+            max(1, window_size[1] // layout.rows),
+        )
 
     def _dispose_input_subscriptions(self) -> None:
         for subscription in self._input_subscriptions:
