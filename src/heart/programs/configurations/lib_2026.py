@@ -22,13 +22,13 @@ from heart.renderers.pranay_sketch import PranaySketchRenderer
 from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
+from heart.renderers.tetris import TetrisRenderer
 from heart.renderers.text import TextRendering
 from heart.renderers.three_fractal import FractalScene
 from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.vibe import VibeScene
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
-from heart.renderers.tetris import TetrisRenderer
 from heart.runtime.game_loop import GameLoop
 
 TITLE_TILE_HEIGHT_PX = 64
@@ -48,7 +48,7 @@ def centered_text_title(text: str) -> TextRendering:
     return centered_text(
         text=text,
         font_size=TITLE_FONT_SIZE,
-        color=Color(255, 255, 255),
+        color=Color.kirby(),
         line_height_px=TITLE_LINE_HEIGHT_PX,
         line_spacing_px=TITLE_LINE_SPACING_PX,
     )
