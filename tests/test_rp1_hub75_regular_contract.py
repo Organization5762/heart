@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -15,6 +16,7 @@ REPRO_SCRIPT = REPO_ROOT / "scripts/rp1_hub75_reproduce_totem_blue.sh"
 REPRO_DOC = REPO_ROOT / "docs/RP1_HUB75_TOTEM_BLUE_REPRO.md"
 SUPERVISOR_SCANNER = REPO_ROOT / "drivers/totem/heart-supervisor-rp1-scanner.sh"
 TOTEM_ENV_EXAMPLE = REPO_ROOT / "drivers/totem/totem3.env.example"
+LINUX_MANIFEST = REPO_ROOT / "rp1/linux/manifest.json"
 RP1H_DRIVER = REPO_ROOT / "rp1/linux/files/drivers/misc/rp1-hub75.c"
 REGULAR_PROFILE = (
     REPO_ROOT
@@ -79,6 +81,15 @@ def test_regular_p0p1_chain2_runner_syntax_accepts_pwm6_oeoffshift_candidate() -
     assert f'bin="{KNOWN_GOOD_PWM11_PAYLOAD}"' in runner
     assert "set_regular_p0p1_chain2_state32_pwm6_params" in runner
     assert f"{KNOWN_GOOD_CANDIDATE} supports RP1_HUB75_PWM_BITS=6, 8, or 11" in runner
+
+
+def test_regular_p0p1_chain2_manifest_includes_known_good_payloads() -> None:
+    manifest = json.loads(LINUX_MANIFEST.read_text())
+    files = set(manifest["files"])
+    payload_dir = "tools/testing/selftests/drivers/rp1-pio"
+
+    assert f"{payload_dir}/{KNOWN_GOOD_PAYLOAD}" in files
+    assert f"{payload_dir}/{KNOWN_GOOD_PWM11_PAYLOAD}" in files
 
 
 def test_regular_p0p1_chain2_defaults_point_at_oeoffshift_candidate() -> None:
