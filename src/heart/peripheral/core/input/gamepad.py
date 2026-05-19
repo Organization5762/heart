@@ -215,6 +215,9 @@ class GamepadController:
             upstream_ids=("gamepad.snapshot",),
         ).connect(stream)
 
+    def sample(self) -> GamepadSnapshot:
+        return self._sample()
+
     def _sample(self) -> GamepadSnapshot:
         gamepad = self._active_gamepad()
         if gamepad is None:
