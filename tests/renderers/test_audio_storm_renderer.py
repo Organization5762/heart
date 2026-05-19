@@ -9,7 +9,7 @@ import pygame
 import pytest
 
 from heart import DeviceDisplayMode
-from heart.device import Cube
+from heart.device import Cube, Layout
 from heart.display.shaders.fullscreen import TextureUniform
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, KeyboardSnapshot)
@@ -664,6 +664,11 @@ class TestAudioStormScene:
         assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [(80, 80)]
         assert len(gl_begin_calls) == 4
         assert shader_runtime.read_to_surface_sizes == [(320, 80)]
+
+    def test_cube_render_size_uses_layout_panel_dimensions(self) -> None:
+        orientation = Cube(Layout(columns=2, rows=2))
+
+        assert AudioStormScene._render_size((128, 64), orientation) == (64, 32)
 
     def test_reset_disposes_subscriptions_and_resources(self, monkeypatch) -> None:
         scene = AudioStormScene()

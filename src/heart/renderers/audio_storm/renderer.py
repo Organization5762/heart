@@ -773,7 +773,11 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         orientation: Orientation,
     ) -> tuple[int, int]:
         if isinstance(orientation, Cube):
-            return (window_size[1], window_size[1])
+            layout = orientation.layout
+            return (
+                max(1, window_size[0] // layout.columns),
+                max(1, window_size[1] // layout.rows),
+            )
         return window_size
 
     @staticmethod

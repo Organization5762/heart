@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pygame
 
 from heart import DeviceDisplayMode
+from heart.device import Cube, Layout, Orientation
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import FractalRuntime, FractalScene
 from heart.renderers.three_fractal.state import FractalSceneState
@@ -226,6 +227,16 @@ class TestFractalRuntime:
         runtime.display_texture = 1
 
         assert runtime.is_initialized() is False
+
+    def test_cube_tile_render_size_uses_one_physical_panel(self) -> None:
+        """Verify cube rendering samples one panel before repeating it across the OpenGL window."""
+        assert FractalRuntime._tile_render_size((320, 80), Cube.sides()) == (80, 80)
+
+    def test_tile_render_size_handles_multi_row_layouts(self) -> None:
+        """Verify internal tiling is layout-based instead of hardcoded to horizontal strips."""
+        orientation = Orientation(Layout(columns=2, rows=2))
+
+        assert FractalRuntime._tile_render_size((128, 64), orientation) == (64, 32)
 
 
 class TestFractalScene:

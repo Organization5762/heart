@@ -8,7 +8,7 @@ import numpy as np
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Cube
+from heart.device import Cube, Layout
 from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
                                          GamepadSnapshot, KeyboardSnapshot)
 from heart.renderers.palette_tunnel.renderer import (MOUSE_SCALE,
@@ -262,6 +262,11 @@ class TestPaletteTunnelScene:
         assert scene.tile_pixels.shape == (80, 80, 4)
         assert len(gl_begin_calls) == 4
         assert shader_runtime.read_to_surface_sizes == [(320, 80)]
+
+    def test_cube_render_size_uses_layout_panel_dimensions(self) -> None:
+        orientation = Cube(Layout(columns=2, rows=2))
+
+        assert PaletteTunnelScene._render_size((128, 64), orientation) == (64, 32)
 
     def test_reset_disposes_subscriptions_and_shader(self) -> None:
         scene = PaletteTunnelScene()
