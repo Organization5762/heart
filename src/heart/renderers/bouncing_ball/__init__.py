@@ -1,5 +1,3 @@
-from heart.renderers.bouncing_ball.provider import \
-    BouncingBallStateProvider as BouncingBallStateProvider
 from heart.renderers.bouncing_ball.renderer import \
     BouncingBallRenderer as BouncingBallRenderer
 from heart.renderers.bouncing_ball.state import BallPosition as BallPosition

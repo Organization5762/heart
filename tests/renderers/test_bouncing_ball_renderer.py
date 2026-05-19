@@ -4,13 +4,10 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Cube
-from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.sensor import Acceleration
 from heart.renderers.bouncing_ball import (BallPosition, BallVelocity,
                                            BouncingBallRenderer,
-                                           BouncingBallState,
-                                           BouncingBallStateProvider)
+                                           BouncingBallState)
 from heart.renderers.bouncing_ball.physics import advance_bouncing_ball_state
 from heart.runtime.display_context import DisplayContext
 
@@ -94,113 +91,6 @@ class TestBouncingBallRenderer:
 
         assert decayed.child_balls == ()
 
-    def test_provider_accelerometer_force_changes_velocity(self) -> None:
-        provider = BouncingBallStateProvider()
-        initial = BouncingBallState(
-            position=BallPosition(x=0.0, y=0.0, z=0.0),
-            velocity=BallVelocity(x=0.0, y=0.0, z=0.0),
-            last_time_s=0.0,
-        )
-
-        resting = provider._advance_state(
-            state=initial,
-            frame_tick=FrameTick(
-                frame_index=1,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.05,
-            ),
-            acceleration=Acceleration(x=0.0, y=0.0, z=9.81),
-        )
-        state = provider._advance_state(
-            state=resting,
-            frame_tick=FrameTick(
-                frame_index=2,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.1,
-            ),
-            acceleration=Acceleration(x=4.0, y=2.0, z=12.0),
-        )
-
-        assert state.velocity.x > 0.0
-        assert state.velocity.y > 0.0
-        assert state.velocity.z > 0.0
-
-    def test_provider_resting_gravity_does_not_act_like_force(self) -> None:
-        provider = BouncingBallStateProvider()
-        initial = BouncingBallState(
-            position=BallPosition(x=0.0, y=0.0, z=0.0),
-            velocity=BallVelocity(x=0.0, y=0.0, z=0.0),
-            last_time_s=0.0,
-        )
-
-        first = provider._advance_state(
-            state=initial,
-            frame_tick=FrameTick(
-                frame_index=1,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.05,
-            ),
-            acceleration=Acceleration(x=0.0, y=0.0, z=9.81),
-        )
-        second = provider._advance_state(
-            state=first,
-            frame_tick=FrameTick(
-                frame_index=2,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.1,
-            ),
-            acceleration=Acceleration(x=0.0, y=0.0, z=9.81),
-        )
-
-        assert second.velocity.x == 0.0
-        assert second.velocity.y == 0.0
-        assert second.velocity.z == 0.0
-
-    def test_provider_force_decays_after_motion_stops(self) -> None:
-        provider = BouncingBallStateProvider()
-        initial = BouncingBallState(
-            position=BallPosition(x=0.0, y=0.0, z=0.0),
-            velocity=BallVelocity(x=0.0, y=0.0, z=0.0),
-            last_time_s=0.0,
-        )
-
-        resting = provider._advance_state(
-            state=initial,
-            frame_tick=FrameTick(
-                frame_index=1,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.05,
-            ),
-            acceleration=Acceleration(x=0.0, y=0.0, z=9.81),
-        )
-        pushed = provider._advance_state(
-            state=resting,
-            frame_tick=FrameTick(
-                frame_index=2,
-                delta_ms=50.0,
-                delta_s=0.05,
-                monotonic_s=0.1,
-            ),
-            acceleration=Acceleration(x=6.0, y=0.0, z=9.81),
-        )
-        decayed = provider._advance_state(
-            state=pushed,
-            frame_tick=FrameTick(
-                frame_index=3,
-                delta_ms=200.0,
-                delta_s=0.2,
-                monotonic_s=0.3,
-            ),
-            acceleration=None,
-        )
-
-        assert abs(decayed.force.x) < abs(pushed.force.x)
-
     def test_render_draws_distinct_ball_sizes_across_four_screens(self, device) -> None:
         renderer = BouncingBallRenderer()
         renderer.set_state(
@@ -229,6 +119,21 @@ class TestBouncingBallRenderer:
         )
 
         assert first_bright_pixels > third_bright_pixels
+
+    def test_projection_keeps_ball_inside_panel_bounds(self) -> None:
+        renderer = BouncingBallRenderer()
+        rect = pygame.Rect(0, 0, 64, 64)
+
+        projected_x, projected_y, radius, _ = renderer._project_ball(
+            rect=rect,
+            position=BallPosition(x=1.0, y=0.78, z=1.0),
+            side_index=1,
+        )
+
+        assert rect.left <= projected_x - radius
+        assert projected_x + radius < rect.right
+        assert rect.top <= projected_y - radius
+        assert projected_y + radius < rect.bottom
 
     def _count_bright_pixels(self, surface: pygame.Surface) -> int:
         return sum(
