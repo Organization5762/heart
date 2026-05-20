@@ -11,13 +11,18 @@ from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.cube_pong.state import (PLAYER_ONE, PLAYER_TWO,
-                                             CubePongControls, CubePongState,
-                                             advance_cube_pong_state,
-                                             ball_radius,
-                                             face_position_for_ball,
-                                             new_cube_pong_round,
-                                             paddle_path_x, paddle_size)
+from heart.renderers.cube_pong.state import (
+    PLAYER_ONE,
+    PLAYER_TWO,
+    CubePongControls,
+    CubePongState,
+    advance_cube_pong_state,
+    ball_radius,
+    face_position_for_ball,
+    new_cube_pong_round,
+    paddle_path_x,
+    paddle_size,
+)
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
@@ -33,7 +38,9 @@ LOSS_FLASH_COLOR = (105, 10, 24)
 KEYBOARD_CONTROL_STEP = 1.0
 GAMEPAD_DEAD_ZONE = 0.15
 LINUX_JOYSTICK_SYSFS = Path("/sys/class/input")
-SCORE_FONT_SCALE = 0.38
+SCORE_FONT_SCALE = 0.19
+SCORE_SEPARATOR_GAP_SCALE = 0.05
+SCORE_SEPARATOR_COLOR = (202, 211, 224)
 logger = get_logger(__name__)
 
 
@@ -171,35 +178,47 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
     def _draw_scores(self, window: DisplayContext, state: CubePongState) -> None:
         if window.screen is None:
             raise RuntimeError("CubePongRenderer requires an initialized display")
-        self._draw_score(
+        self._draw_full_score(
             window.screen,
-            score=state.player_one_score,
-            color=PADDLE_ONE_COLOR,
+            player_one_score=state.player_one_score,
+            player_two_score=state.player_two_score,
             center_x=state.screen_width // 2,
             top=2,
         )
-        self._draw_score(
+        self._draw_full_score(
             window.screen,
-            score=state.player_two_score,
-            color=PADDLE_TWO_COLOR,
+            player_one_score=state.player_one_score,
+            player_two_score=state.player_two_score,
             center_x=round(state.screen_width * 2.5),
             top=2,
         )
 
-    def _draw_score(
+    def _draw_full_score(
         self,
         screen: pygame.Surface,
         *,
-        score: int,
-        color: tuple[int, int, int],
+        player_one_score: int,
+        player_two_score: int,
         center_x: int,
         top: int,
     ) -> None:
-        font_size = max(18, round(screen.get_height() * SCORE_FONT_SCALE))
-        surface = self._font(font_size).render(str(score), False, color)
-        rect = surface.get_rect()
-        rect.midtop = (center_x, top)
-        screen.blit(surface, rect)
+        font_size = max(9, round(screen.get_height() * SCORE_FONT_SCALE))
+        font = self._font(font_size)
+        surfaces = (
+            font.render(str(player_one_score), False, PADDLE_ONE_COLOR),
+            font.render("-", False, SCORE_SEPARATOR_COLOR),
+            font.render(str(player_two_score), False, PADDLE_TWO_COLOR),
+        )
+        separator_gap = max(2, round(screen.get_height() * SCORE_SEPARATOR_GAP_SCALE))
+        total_width = sum(surface.get_width() for surface in surfaces) + (
+            separator_gap * 2
+        )
+        x = round(center_x - total_width / 2)
+        screen.blit(surfaces[0], (x, top))
+        x += surfaces[0].get_width() + separator_gap
+        screen.blit(surfaces[1], (x, top))
+        x += surfaces[1].get_width() + separator_gap
+        screen.blit(surfaces[2], (x, top))
 
     def _font(self, size: int) -> pygame.font.Font:
         if not pygame.font.get_init():
@@ -383,6 +402,13 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         if elapsed_ms <= 0:
             return 1 / 60
         return elapsed_ms / 1000
+
+    def reset(self) -> None:
+        super().reset()
+        self._peripheral_manager = None
+        self._last_logged_controller_signature.clear()
+        self._state = None
+        self.initialized = False
 
     def _individual_screen_size(
         self,
