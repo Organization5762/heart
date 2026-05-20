@@ -29,8 +29,8 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
         initial_state = TixylandState()
 
         def advance_state(state: TixylandState, frame_tick: object) -> TixylandState:
-            gamepad = self._peripheral_manager.input_io.gamepad.sample()
-            state = _apply_gamepad_controls(state, gamepad)
+            for event in self._peripheral_manager.input_io.gamepad.sample():
+                state = _apply_gamepad_controls(state, event.snapshot)
             delta_seconds = max(frame_tick.delta_ms, 0.0) / 1000
             return replace(
                 state,

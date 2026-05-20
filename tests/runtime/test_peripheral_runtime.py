@@ -7,7 +7,8 @@ from PIL import Image
 from heart.device.beats.websocket import ControlMessage
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadDpadValue, GamepadSnapshot,
-                                         InputDebugStage, InputDebugTap)
+                                         GamepadSnapshotEvent, InputDebugStage,
+                                         InputDebugTap)
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
                                               PeripheralRuntime,
@@ -32,11 +33,16 @@ class _GamepadControllerStub:
         self.snapshots: list[GamepadSnapshot] = []
         self.sample_calls: list[bool] = []
 
-    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+    def sample(
+        self, *, include_tapped_buttons: bool = True
+    ) -> tuple[GamepadSnapshotEvent, ...]:
         self.sample_calls.append(include_tapped_buttons)
         if not self.snapshots:
-            return GamepadSnapshot(connected=False, identifier=None)
-        return self.snapshots.pop(0)
+            return ()
+        snapshot = self.snapshots.pop(0)
+        if not snapshot.connected:
+            return ()
+        return (GamepadSnapshotEvent(joystick_id=0, snapshot=snapshot),)
 
 
 class _NavigationProfileStub:
@@ -279,9 +285,9 @@ class TestPeripheralRuntimeStreaming:
         runtime.poll()
 
         assert manager.input_io.navigation.injected == [
-            ("activate", 0, "gamepad.south"),
+            ("activate", 0, "gamepad.0.south"),
             ("browse", 1, "gamepad.dpad"),
-            ("alternate_activate", 0, "gamepad.north"),
+            ("alternate_activate", 0, "gamepad.0.north"),
         ]
         assert manager.input_io.gamepad.sample_calls == [False, False]
 
@@ -419,7 +425,7 @@ class TestPeripheralRuntimeStreaming:
 
         assert call_order == ["sample", "drain:64"]
         assert manager.input_io.navigation.injected == [
-            ("activate", 0, "gamepad.south"),
+            ("activate", 0, "gamepad.0.south"),
         ]
 
     def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:

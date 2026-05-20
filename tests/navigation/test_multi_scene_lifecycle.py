@@ -6,7 +6,8 @@ from contextlib import nullcontext
 from unittest.mock import Mock
 
 from heart.navigation import MultiScene
-from heart.peripheral.core.input import GamepadDpadValue, GamepadSnapshot
+from heart.peripheral.core.input import (GamepadDpadValue, GamepadSnapshot,
+                                         GamepadSnapshotEvent)
 from heart.renderers import StatefulBaseRenderer
 
 
@@ -42,19 +43,28 @@ class _Gamepad:
         self.dpad = GamepadDpadValue()
         self.sample_include_tapped_buttons: list[bool] = []
 
-    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+    def sample(
+        self, *, include_tapped_buttons: bool = True
+    ) -> tuple[GamepadSnapshotEvent, ...]:
         self.sample_include_tapped_buttons.append(include_tapped_buttons)
-        return GamepadSnapshot(
-            connected=True,
-            identifier="pad",
-            dpad=self.dpad,
+        return (
+            GamepadSnapshotEvent(
+                joystick_id=0,
+                snapshot=GamepadSnapshot(
+                    connected=True,
+                    identifier="pad",
+                    dpad=self.dpad,
+                ),
+            ),
         )
 
 
 class _DisconnectedGamepad:
-    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+    def sample(
+        self, *, include_tapped_buttons: bool = True
+    ) -> tuple[GamepadSnapshotEvent, ...]:
         del include_tapped_buttons
-        return GamepadSnapshot(connected=False, identifier=None)
+        return ()
 
 
 class _Scene(StatefulBaseRenderer[int]):

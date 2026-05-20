@@ -24,7 +24,8 @@ from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
 from heart.display.shaders.shader_templates.palette_tunnel import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
@@ -57,6 +58,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots: tuple[GamepadSnapshotEvent, ...] = ()
 
     def is_initialized(self) -> bool:
         return (
@@ -261,22 +263,27 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             ],
             dtype=np.float32,
         )
-        direction[0] += self._gamepad_snapshot.dpad.x
-        direction[1] += self._gamepad_snapshot.dpad.y
-        direction[0] += self._gamepad_snapshot.axis_value(
-            GamepadAxis.LEFT_X,
-            dead_zone=GAMEPAD_DEAD_ZONE,
-        )
-        direction[1] -= self._gamepad_snapshot.axis_value(
-            GamepadAxis.LEFT_Y,
-            dead_zone=GAMEPAD_DEAD_ZONE,
-        )
+        for event in self._gamepad_snapshots:
+            snapshot = event.snapshot
+            direction[0] += snapshot.dpad.x
+            direction[1] += snapshot.dpad.y
+            direction[0] += snapshot.axis_value(
+                GamepadAxis.LEFT_X,
+                dead_zone=GAMEPAD_DEAD_ZONE,
+            )
+            direction[1] -= snapshot.axis_value(
+                GamepadAxis.LEFT_Y,
+                dead_zone=GAMEPAD_DEAD_ZONE,
+            )
         if np.linalg.norm(direction) > 1.0:
             direction = direction / np.linalg.norm(direction)
         if (
             pygame.K_LSHIFT in keys
             or pygame.K_RSHIFT in keys
-            or self._gamepad_snapshot.button_held(GamepadButton.EAST)
+            or any(
+                event.snapshot.button_held(GamepadButton.EAST)
+                for event in self._gamepad_snapshots
+            )
         ):
             direction *= KEYBOARD_FAST_MULTIPLIER
         return direction
@@ -291,7 +298,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             return
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample()
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

@@ -10,7 +10,8 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.renderers.palette_tunnel.renderer import (MOUSE_SCALE,
                                                      PaletteTunnelScene)
 
@@ -49,6 +50,10 @@ class _SnapshotController:
         return self.stream
 
     def sample(self) -> object:
+        if isinstance(self.snapshot, GamepadSnapshot):
+            if not self.snapshot.connected:
+                return ()
+            return (GamepadSnapshotEvent(joystick_id=0, snapshot=self.snapshot),)
         return self.snapshot
 
     def _set_snapshot(self, value: object) -> None:

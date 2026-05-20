@@ -27,7 +27,8 @@ from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
 from heart.display.shaders.shader_templates.mandelbulb import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.container import build_runtime_container
@@ -101,6 +102,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots: tuple[GamepadSnapshotEvent, ...] = ()
         self._key_pressed_last_frame: dict[int, bool] = {}
         self._last_phase_toggle_snapshot_time: float | None = None
         self._last_auto_orbit_toggle_snapshot_time: float | None = None
@@ -180,6 +182,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots = ()
         self._key_pressed_last_frame.clear()
         self._last_phase_toggle_snapshot_time = None
         self._last_auto_orbit_toggle_snapshot_time = None
@@ -212,8 +215,8 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         keys = self._keyboard_snapshot.pressed_keys
         self._process_toggles(keys)
         phase_speed_delta = (
-            float(self._gamepad_snapshot.button_held(GamepadButton.PLUS))
-            - float(self._gamepad_snapshot.button_held(GamepadButton.MINUS))
+            float(self._button_held(GamepadButton.PLUS))
+            - float(self._button_held(GamepadButton.MINUS))
         )
         self.phase_speed = self._clamp(
             self.phase_speed
@@ -229,7 +232,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         orbit_x = (
             float(pygame.K_RIGHT in keys)
             - float(pygame.K_LEFT in keys)
-            + self._gamepad_snapshot.axis_value(
+            + self._axis_value(
                 GamepadAxis.LEFT_X,
                 dead_zone=GAMEPAD_DEAD_ZONE,
             )
@@ -237,7 +240,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         orbit_y = (
             float(pygame.K_UP in keys)
             - float(pygame.K_DOWN in keys)
-            - self._gamepad_snapshot.axis_value(
+            - self._axis_value(
                 GamepadAxis.LEFT_Y,
                 dead_zone=GAMEPAD_DEAD_ZONE,
             )
@@ -253,9 +256,9 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             float(pygame.K_s in keys)
             - float(pygame.K_w in keys)
         )
-        if self._gamepad_snapshot.button_held(GamepadButton.ZL):
+        if self._button_held(GamepadButton.ZL):
             zoom += 1.0
-        if self._gamepad_snapshot.button_held(GamepadButton.ZR):
+        if self._button_held(GamepadButton.ZR):
             zoom -= 1.0
         self.camera_distance = self._clamp(
             self.camera_distance + zoom * ZOOM_UNITS_PER_SECOND * elapsed_s,
@@ -270,7 +273,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             + trigger_right
             - trigger_left
         )
-        if self._gamepad_snapshot.button_held(GamepadButton.EAST):
+        if self._button_held(GamepadButton.EAST):
             power_delta -= 1.0
         self.target_power = self._clamp(
             self.target_power + power_delta * POWER_UNITS_PER_SECOND * elapsed_s,
@@ -304,11 +307,11 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
     def _update_color_vector(self, elapsed_s: float) -> None:
         raw_vector = np.array(
             [
-                self._gamepad_snapshot.axis_value(
+                self._axis_value(
                     GamepadAxis.RIGHT_X,
                     dead_zone=GAMEPAD_DEAD_ZONE,
                 ),
-                -self._gamepad_snapshot.axis_value(
+                -self._axis_value(
                     GamepadAxis.RIGHT_Y,
                     dead_zone=GAMEPAD_DEAD_ZONE,
                 ),
@@ -338,7 +341,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         )
         if gamepad_tapped:
             self._last_phase_toggle_snapshot_time = (
-                self._gamepad_snapshot.timestamp_monotonic
+                self._latest_tapped_timestamp(GamepadButton.WEST)
             )
         return keyboard_tapped or gamepad_tapped
 
@@ -355,7 +358,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         )
         if gamepad_tapped:
             self._last_auto_orbit_toggle_snapshot_time = (
-                self._gamepad_snapshot.timestamp_monotonic
+                self._latest_tapped_timestamp(GamepadButton.L3)
             )
         return keyboard_tapped or gamepad_tapped
 
@@ -366,7 +369,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         )
         if gamepad_tapped:
             self._last_color_mode_toggle_snapshot_time = (
-                self._gamepad_snapshot.timestamp_monotonic
+                self._latest_tapped_timestamp(GamepadButton.R3)
             )
         return gamepad_tapped
 
@@ -376,9 +379,8 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         button: GamepadButton,
         last_timestamp: float | None,
     ) -> bool:
-        if not self._gamepad_snapshot.button_tapped(button):
-            return False
-        return self._gamepad_snapshot.timestamp_monotonic != last_timestamp
+        timestamp = self._latest_tapped_timestamp(button)
+        return timestamp is not None and timestamp != last_timestamp
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
@@ -390,18 +392,43 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             return
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample()
 
     def _power_morph_held(self, keys: frozenset[int]) -> bool:
-        return pygame.K_SPACE in keys or self._gamepad_snapshot.button_held(
-            GamepadButton.SOUTH
-        )
+        return pygame.K_SPACE in keys or self._button_held(GamepadButton.SOUTH)
 
     def _trigger_pressure(self, axis: GamepadAxis) -> float:
-        raw_value = self._gamepad_snapshot.axis_value(axis, dead_zone=0.0)
+        raw_value = self._axis_value(axis, dead_zone=0.0)
         if raw_value < 0.0:
             return self._clamp((raw_value + 1.0) * 0.5, 0.0, 1.0)
         return self._clamp(raw_value, 0.0, 1.0)
+
+    def _button_held(self, button: GamepadButton) -> bool:
+        return any(
+            event.snapshot.button_held(button)
+            for event in self._gamepad_snapshots
+        )
+
+    def _axis_value(self, axis: GamepadAxis, *, dead_zone: float) -> float:
+        values = [
+            event.snapshot.axis_value(axis, dead_zone=dead_zone)
+            for event in self._gamepad_snapshots
+        ]
+        if not values:
+            return 0.0
+        if axis in {GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT}:
+            return max(values)
+        return max(values, key=abs)
+
+    def _latest_tapped_timestamp(self, button: GamepadButton) -> float | None:
+        timestamps = [
+            event.snapshot.timestamp_monotonic
+            for event in self._gamepad_snapshots
+            if event.snapshot.button_tapped(button)
+        ]
+        if not timestamps:
+            return None
+        return max(timestamps)
 
     def _render_tiled(self, window: DisplayContext) -> None:
         assert self.render_size is not None

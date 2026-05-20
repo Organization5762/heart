@@ -28,7 +28,9 @@ from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
 from heart.display.shaders.shader_templates.three_fractal import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadDpadValue, GamepadSnapshot,
+                                         GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
@@ -131,6 +133,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots: tuple[GamepadSnapshotEvent, ...] = ()
         self._trigger_right_prev_active = False
 
     def is_initialized(self) -> bool:
@@ -436,8 +439,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         if (
             keyboard_toggle_tapped
-            or self._gamepad_snapshot.button_tapped(GamepadButton.WEST)
-            or self._gamepad_snapshot.button_tapped(GamepadButton.NORTH)
+            or self._button_tapped(GamepadButton.WEST)
+            or self._button_tapped(GamepadButton.NORTH)
         ):
             self.mode = "auto"
             self._auto_started = False
@@ -476,17 +479,18 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             acc[2] += self.speed_accel / self.max_fps
 
         acc[0] += (
-            self._gamepad_snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.1)
+            self._axis_value(GamepadAxis.LEFT_X, dead_zone=0.1)
             * self.speed_accel
             / self.max_fps
         )
         acc[2] += (
-            self._gamepad_snapshot.axis_value(GamepadAxis.LEFT_Y, dead_zone=0.1)
+            self._axis_value(GamepadAxis.LEFT_Y, dead_zone=0.1)
             * self.speed_accel
             / self.max_fps
         )
-        acc[0] += self._gamepad_snapshot.dpad.x * self.speed_accel / self.max_fps
-        acc[2] -= self._gamepad_snapshot.dpad.y * self.speed_accel / self.max_fps
+        dpad = self._dpad_value()
+        acc[0] += dpad.x * self.speed_accel / self.max_fps
+        acc[2] -= dpad.y * self.speed_accel / self.max_fps
 
         # Apply acceleration or deceleration
         if np.isclose(np.dot(acc, acc), 0.0):
@@ -507,7 +511,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
         trigger_right_active = (
             _trigger_pressure(
-                self._gamepad_snapshot.axis_value(
+                self._axis_value(
                     GamepadAxis.TRIGGER_RIGHT,
                     dead_zone=0.0,
                 )
@@ -530,7 +534,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         try:
             trigger_left_active = (
                 _trigger_pressure(
-                    self._gamepad_snapshot.axis_value(
+                    self._axis_value(
                         GamepadAxis.TRIGGER_LEFT,
                         dead_zone=0.0,
                     )
@@ -540,7 +544,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             if (
                 self._is_key_down(pygame.K_SPACE)
                 or trigger_left_active
-                or self._gamepad_snapshot.button_held(GamepadButton.SOUTH)
+                or self._button_held(GamepadButton.SOUTH)
             ):
                 target = self.BASE_RADIUS + 0.2
                 self.active_radius = lerp(
@@ -572,15 +576,15 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if self._is_key_down(pygame.K_e):
             rz = self.make_rot(-0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
-        if self._gamepad_snapshot.button_held(GamepadButton.ZL):
+        if self._button_held(GamepadButton.ZL):
             rz = self.make_rot(0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
-        if self._gamepad_snapshot.button_held(GamepadButton.ZR):
+        if self._button_held(GamepadButton.ZR):
             rz = self.make_rot(-0.01, 2)
             self.mat[:3, :3] = np.dot(rz, self.mat[:3, :3])
 
-        right_x = self._gamepad_snapshot.axis_value(GamepadAxis.RIGHT_X, dead_zone=0.1)
-        right_y = self._gamepad_snapshot.axis_value(GamepadAxis.RIGHT_Y, dead_zone=0.1)
+        right_x = self._axis_value(GamepadAxis.RIGHT_X, dead_zone=0.1)
+        right_y = self._axis_value(GamepadAxis.RIGHT_Y, dead_zone=0.1)
         if right_x != 0.0 or right_y != 0.0:
             fps_scale_factor = (self.clock.get_time() / 1000.0) / (1 / self.max_fps)
             stick_scale_factor = 8
@@ -596,13 +600,9 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             self.mat[:3, :3] = self.reorthogonalize(self.mat[:3, :3])
 
         # speed
-        if self._is_key_down(pygame.K_j) or self._gamepad_snapshot.button_held(
-            GamepadButton.PLUS
-        ):
+        if self._is_key_down(pygame.K_j) or self._button_held(GamepadButton.PLUS):
             self.max_velocity += 0.03
-        if self._is_key_down(pygame.K_k) or self._gamepad_snapshot.button_held(
-            GamepadButton.MINUS
-        ):
+        if self._is_key_down(pygame.K_k) or self._button_held(GamepadButton.MINUS):
             self.max_velocity = max(self.max_velocity - 0.03, 0)
 
         try:
@@ -616,7 +616,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return key in self._keyboard_snapshot.pressed_keys
 
     def _refresh_gamepad_snapshot(self, peripheral_manager: PeripheralManager) -> None:
-        self._gamepad_snapshot = peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = peripheral_manager.input_io.gamepad.sample()
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
@@ -630,17 +630,46 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def _has_manual_input(self) -> bool:
         if self._keyboard_snapshot.pressed_keys:
             return True
-        if self._gamepad_snapshot.dpad != self._gamepad_snapshot.dpad.__class__():
+        if self._dpad_value() != GamepadDpadValue():
             return True
         return any(
-            self._gamepad_snapshot.axis_value(axis, dead_zone=0.1) != 0.0
+            self._axis_value(axis, dead_zone=0.1) != 0.0
             for axis in (
                 GamepadAxis.LEFT_X,
                 GamepadAxis.LEFT_Y,
                 GamepadAxis.RIGHT_X,
                 GamepadAxis.RIGHT_Y,
             )
-        ) or any(self._gamepad_snapshot.buttons.values())
+        ) or any(any(event.snapshot.buttons.values()) for event in self._gamepad_snapshots)
+
+    def _button_held(self, button: GamepadButton) -> bool:
+        return any(
+            event.snapshot.button_held(button)
+            for event in self._gamepad_snapshots
+        )
+
+    def _button_tapped(self, button: GamepadButton) -> bool:
+        return any(
+            event.snapshot.button_tapped(button)
+            for event in self._gamepad_snapshots
+        )
+
+    def _axis_value(self, axis: GamepadAxis, *, dead_zone: float) -> float:
+        values = [
+            event.snapshot.axis_value(axis, dead_zone=dead_zone)
+            for event in self._gamepad_snapshots
+        ]
+        if not values:
+            return 0.0
+        if axis in {GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT}:
+            return max(values)
+        return max(values, key=abs)
+
+    def _dpad_value(self) -> GamepadDpadValue:
+        return GamepadDpadValue(
+            x=max(-1, min(1, sum(event.snapshot.dpad.x for event in self._gamepad_snapshots))),
+            y=max(-1, min(1, sum(event.snapshot.dpad.y for event in self._gamepad_snapshots))),
+        )
 
     def _reset_camera_pos(self):
         # self.mat[3, :3] = np.array([0., 0., 0.])
@@ -789,6 +818,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.surface_array = None
         self.time_initialized = None
         self._trigger_right_prev_active = False
+        self._gamepad_snapshots = ()
 
     @staticmethod
     def _tile_render_size(

@@ -63,8 +63,8 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
-            lambda switch_state: (
-                lambda state: self.handle_switch(state, switch_state)
+            lambda switch_event: (
+                lambda state: self.handle_switch(state, switch_event.state)
             )
         )
         tick_updates = frame_ticks.map(
@@ -122,26 +122,25 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         gamepad_controller = state.gamepad
         if gamepad_controller is None:
             return state
-        snapshot = gamepad_controller.sample()
-        if not snapshot.connected:
-            return state
         caption_duration_scale = state.caption_duration_scale
         rotation_duration_scale = state.rotation_duration_scale
-        bumper_pressed = snapshot.button_held(GamepadButton.ZL) or snapshot.button_held(
-            GamepadButton.ZR
-        )
-        left_trigger_pressure = _trigger_pressure(
-            snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
-        )
-        right_trigger_pressure = _trigger_pressure(
-            snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)
-        )
-        if bumper_pressed:
-            caption_duration_scale += 0.005
-        if right_trigger_pressure > 0.0:
-            rotation_duration_scale += 0.005 * right_trigger_pressure
-        if left_trigger_pressure > 0.0:
-            rotation_duration_scale -= 0.005 * left_trigger_pressure
+        for event in gamepad_controller.sample():
+            snapshot = event.snapshot
+            bumper_pressed = snapshot.button_held(GamepadButton.ZL) or snapshot.button_held(
+                GamepadButton.ZR
+            )
+            left_trigger_pressure = _trigger_pressure(
+                snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
+            )
+            right_trigger_pressure = _trigger_pressure(
+                snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)
+            )
+            if bumper_pressed:
+                caption_duration_scale += 0.005
+            if right_trigger_pressure > 0.0:
+                rotation_duration_scale += 0.005 * right_trigger_pressure
+            if left_trigger_pressure > 0.0:
+                rotation_duration_scale -= 0.005 * left_trigger_pressure
         return replace(
             state,
             caption_duration_scale=caption_duration_scale,

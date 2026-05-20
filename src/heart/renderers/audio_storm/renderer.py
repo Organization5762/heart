@@ -30,7 +30,8 @@ from heart.display.shaders.fullscreen import (FullscreenShaderRuntime,
 from heart.display.shaders.shader_templates.audio_storm import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.container import build_runtime_container
@@ -232,6 +233,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots: tuple[GamepadSnapshotEvent, ...] = ()
         self._trigger_rest_values: dict[GamepadAxis, float] = {}
         self._voice_palette = DEFAULT_VOICE_PALETTE
         self._randomize_palette_was_held = False
@@ -304,6 +306,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._gamepad_snapshots = ()
         self._trigger_rest_values.clear()
         self._voice_palette = DEFAULT_VOICE_PALETTE
         self._randomize_palette_was_held = False
@@ -398,12 +401,8 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             gain_multiplier *= ACCENT_GAIN_MULTIPLIER
         left_held = pygame.K_q in keys or self._trigger_held(GamepadAxis.TRIGGER_LEFT)
         right_held = pygame.K_e in keys or self._trigger_held(GamepadAxis.TRIGGER_RIGHT)
-        zl_held = pygame.K_z in keys or self._gamepad_snapshot.button_held(
-            GamepadButton.ZL
-        )
-        zr_held = pygame.K_x in keys or self._gamepad_snapshot.button_held(
-            GamepadButton.ZR
-        )
+        zl_held = pygame.K_z in keys or self._button_held(GamepadButton.ZL)
+        zr_held = pygame.K_x in keys or self._button_held(GamepadButton.ZR)
         if left_held:
             self._render_voice(
                 self._voice_palette.kick,
@@ -478,7 +477,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             ).astype(np.float32)
 
     def _write_x(self) -> float:
-        stick_x = self._gamepad_snapshot.axis_value(
+        stick_x = self._axis_value(
             GamepadAxis.LEFT_X,
             dead_zone=GAMEPAD_DEAD_ZONE,
         )
@@ -492,7 +491,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         )
 
     def _band_shift(self) -> float:
-        stick_y = -self._gamepad_snapshot.axis_value(
+        stick_y = -self._axis_value(
             GamepadAxis.LEFT_Y,
             dead_zone=GAMEPAD_DEAD_ZONE,
         )
@@ -502,7 +501,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         return (stick_y + keyboard_y) * SYNTH_BAND_SHIFT_RANGE
 
     def _width_multiplier(self) -> float:
-        stick_x = self._gamepad_snapshot.axis_value(
+        stick_x = self._axis_value(
             GamepadAxis.RIGHT_X,
             dead_zone=GAMEPAD_DEAD_ZONE,
         )
@@ -513,7 +512,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         )
 
     def _gain_multiplier(self) -> float:
-        stick_y = -self._gamepad_snapshot.axis_value(
+        stick_y = -self._axis_value(
             GamepadAxis.RIGHT_Y,
             dead_zone=GAMEPAD_DEAD_ZONE,
         )
@@ -525,7 +524,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
 
     def _accent_held(self) -> bool:
         return pygame.K_SPACE in self._keyboard_snapshot.pressed_keys or (
-            self._gamepad_snapshot.button_held(GamepadButton.SOUTH)
+            self._button_held(GamepadButton.SOUTH)
         )
 
     def _reverse_scroll_held(self) -> bool:
@@ -547,7 +546,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
 
     def _randomize_palette_held(self) -> bool:
         return pygame.K_c in self._keyboard_snapshot.pressed_keys or (
-            self._gamepad_snapshot.button_held(GamepadButton.EAST)
+            self._button_held(GamepadButton.EAST)
         )
 
     def _print_palette_held(self) -> bool:
@@ -594,7 +593,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
 
     def _freeze_held(self) -> bool:
         return pygame.K_a in self._keyboard_snapshot.pressed_keys or (
-            self._gamepad_snapshot.button_held(GamepadButton.WEST)
+            self._button_held(GamepadButton.WEST)
         )
 
     def _write_audio_pixels(self) -> None:
@@ -743,22 +742,29 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self.audio_texture = None
 
     def _trigger_held(self, axis: GamepadAxis) -> bool:
-        raw_value = self._gamepad_snapshot.axis_value(axis, dead_zone=0.0)
-        return self._trigger_pressure(axis, raw_value) >= TRIGGER_DEAD_ZONE
+        return any(
+            self._trigger_pressure(
+                axis,
+                event.snapshot.axis_value(axis, dead_zone=0.0),
+            )
+            >= TRIGGER_DEAD_ZONE
+            for event in self._gamepad_snapshots
+        )
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
-        if not self._gamepad_snapshot.connected:
+        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample()
+        if not self._gamepad_snapshots:
             self._trigger_rest_values.clear()
             return
         for axis in (GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT):
-            self._trigger_rest_values.setdefault(
-                axis,
-                self._gamepad_snapshot.axis_value(axis, dead_zone=0.0),
-            )
+            for event in self._gamepad_snapshots:
+                self._trigger_rest_values.setdefault(
+                    axis,
+                    event.snapshot.axis_value(axis, dead_zone=0.0),
+                )
 
     def _trigger_pressure(self, axis: GamepadAxis, raw_value: float) -> float:
         rest_value = self._trigger_rest_values.get(axis)
@@ -779,6 +785,21 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         if raw_value < 0.0:
             return self._clamp((raw_value + 1.0) * 0.5, 0.0, 1.0)
         return self._clamp(raw_value, 0.0, 1.0)
+
+    def _button_held(self, button: GamepadButton) -> bool:
+        return any(
+            event.snapshot.button_held(button)
+            for event in self._gamepad_snapshots
+        )
+
+    def _axis_value(self, axis: GamepadAxis, *, dead_zone: float) -> float:
+        values = [
+            event.snapshot.axis_value(axis, dead_zone=dead_zone)
+            for event in self._gamepad_snapshots
+        ]
+        if not values:
+            return 0.0
+        return max(values, key=abs)
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

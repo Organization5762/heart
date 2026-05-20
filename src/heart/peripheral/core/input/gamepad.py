@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass, field
-from datetime import timedelta
 from enum import StrEnum
-from functools import cache, cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import StreamNode, Timer
 
-from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
-                                               InputDebugTap)
-from heart.peripheral.core.streams import combine_latest
+from heart.peripheral.core.input.debug import InputDebugTap
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth,
@@ -20,11 +17,15 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
 from heart.utilities.env import Configuration
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from heart.peripheral.core.manager import PeripheralManager
-GAMEPAD_POLL_INTERVAL_MS = 20
 DEFAULT_GAMEPAD_AXIS_DEAD_ZONE = 0.1
+GAMEPAD_PUMP_THROTTLE_SECONDS = 0.007
+GAMEPAD_STATS_LOG_INTERVAL_SECONDS = 5.0
 
 
 class GamepadButton(StrEnum):
@@ -70,6 +71,12 @@ class GamepadButtonTapEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class GamepadSnapshotEvent:
+    joystick_id: int
+    snapshot: "GamepadSnapshot"
+
+
+@dataclass(frozen=True, slots=True)
 class GamepadSnapshot:
     connected: bool
     identifier: str | None
@@ -98,203 +105,106 @@ class GamepadController:
     def __init__(self, manager: "PeripheralManager", debug_tap: InputDebugTap) -> None:
         self._manager = manager
         self._debug_tap = debug_tap
-        self._snapshot_streams_by_joystick_id: dict[
-            int, StreamNode[GamepadSnapshot]
-        ] = {}
-
-    @cached_property
-    def _snapshot_stream(self) -> StreamNode[GamepadSnapshot]:
-        stream = (
-            Timer(period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS))
-            .then_on_main_thread()
-            .map(lambda _: self._sample(include_tapped_buttons=False))
-            .distinct_until_changed()
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.RAW,
-            stream_name="gamepad.snapshot",
-            source_id=lambda snapshot: (
-                "gamepad" if snapshot.connected else "gamepad:none"
-            ),
-        ).connect(stream)
-
-    def snapshot_stream(
-        self,
-        joystick_id: int | None = None,
-    ) -> StreamNode[GamepadSnapshot]:
-        if joystick_id is not None:
-            return self._snapshot_stream_for_joystick_id(joystick_id)
-        return self._snapshot_stream
-
-    def _snapshot_stream_for_joystick_id(
-        self,
-        joystick_id: int,
-    ) -> StreamNode[GamepadSnapshot]:
-        if joystick_id not in self._snapshot_streams_by_joystick_id:
-            stream = (
-                Timer(period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS))
-                .then_on_main_thread()
-                .map(
-                    lambda _: self._sample(
-                        joystick_id=joystick_id,
-                        include_tapped_buttons=False,
-                    )
-                )
-                .distinct_until_changed()
-            )
-            self._snapshot_streams_by_joystick_id[joystick_id] = InputDebugNode(
-                tap=self._debug_tap,
-                stage=InputDebugStage.RAW,
-                stream_name=f"gamepad.snapshot.{joystick_id}",
-                source_id=lambda snapshot: (
-                    f"gamepad:{joystick_id}"
-                    if snapshot.connected
-                    else f"gamepad:{joystick_id}:none"
-                ),
-            ).connect(stream)
-        return self._snapshot_streams_by_joystick_id[joystick_id]
-
-    @cache
-    def button_held(self, button: GamepadButton) -> StreamNode[bool]:
-        stream = (
-            self.snapshot_stream()
-            .map(lambda snapshot: snapshot.button_held(button))
-            .distinct_until_changed()
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.VIEW,
-            stream_name=f"gamepad.button_held.{button.value}",
-            source_id=button.value,
-            upstream_ids=("gamepad.snapshot",),
-        ).connect(stream)
-
-    @cache
-    def button_tapped(self, button: GamepadButton) -> StreamNode[GamepadButtonTapEvent]:
-        stream = (
-            self.snapshot_stream()
-            .pairwise()
-            .filter(
-                lambda latest: not latest[0].button_held(button)
-                and latest[1].button_held(button)
-            )
-            .map(
-                lambda latest: GamepadButtonTapEvent(
-                    button=button, timestamp_monotonic=latest[1].timestamp_monotonic
-                )
-            )
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.VIEW,
-            stream_name=f"gamepad.button_tapped.{button.value}",
-            source_id=button.value,
-            upstream_ids=("gamepad.snapshot",),
-        ).connect(stream)
-
-    @cache
-    def axis_value(
-        self, axis: GamepadAxis, dead_zone: float = DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
-    ) -> StreamNode[float]:
-        stream = (
-            self.snapshot_stream()
-            .map(lambda snapshot: snapshot.axis_value(axis, dead_zone=dead_zone))
-            .distinct_until_changed()
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.VIEW,
-            stream_name=f"gamepad.axis.{axis.value}",
-            source_id=axis.value,
-            upstream_ids=("gamepad.snapshot",),
-        ).connect(stream)
-
-    @cache
-    def stick_value(
-        self, stick_name: str, dead_zone: float = DEFAULT_GAMEPAD_AXIS_DEAD_ZONE
-    ) -> StreamNode[GamepadStickValue]:
-        axis_x = GamepadAxis.LEFT_X if stick_name == "left" else GamepadAxis.RIGHT_X
-        axis_y = GamepadAxis.LEFT_Y if stick_name == "left" else GamepadAxis.RIGHT_Y
-        stream = (
-            combine_latest(
-                self.axis_value(axis_x, dead_zone),
-                self.axis_value(axis_y, dead_zone),
-            )
-            .map(lambda latest: GamepadStickValue(x=latest[0], y=latest[1]))
-            .distinct_until_changed()
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.VIEW,
-            stream_name=f"gamepad.stick.{stick_name}",
-            source_id=stick_name,
-            upstream_ids=(
-                f"gamepad.axis.{axis_x.value}",
-                f"gamepad.axis.{axis_y.value}",
-            ),
-        ).connect(stream)
-
-    @cache
-    def dpad_value(self) -> StreamNode[GamepadDpadValue]:
-        stream = (
-            self.snapshot_stream()
-            .map(lambda snapshot: snapshot.dpad)
-            .distinct_until_changed()
-        )
-        return InputDebugNode(
-            tap=self._debug_tap,
-            stage=InputDebugStage.VIEW,
-            stream_name="gamepad.dpad",
-            source_id="dpad",
-            upstream_ids=("gamepad.snapshot",),
-        ).connect(stream)
+        self._last_pump_monotonic = 0.0
+        self._stats_window_start = time.monotonic()
+        self._sample_calls = 0
+        self._sample_events_calls = 0
+        self._targeted_sample_calls = 0
+        self._gamepad_slots_sampled = 0
+        self._connected_snapshots_sampled = 0
+        self._pump_calls = 0
+        self._pump_skips = 0
+        self._pump_errors = 0
+        self._sample_callers: dict[str, int] = {}
 
     def sample(
         self,
         joystick_id: int | None = None,
         *,
         include_tapped_buttons: bool = True,
-    ) -> GamepadSnapshot:
-        return self._sample(
-            joystick_id=joystick_id,
-            include_tapped_buttons=include_tapped_buttons,
-        )
-
-    def _sample(
-        self,
-        joystick_id: int | None = None,
-        *,
-        include_tapped_buttons: bool = True,
-    ) -> GamepadSnapshot:
+    ) -> tuple[GamepadSnapshotEvent, ...]:
         self._pump_gamepad_events()
         if joystick_id is not None:
             gamepad = self._gamepad(joystick_id)
             if gamepad is None:
-                return GamepadSnapshot(
-                    connected=False,
-                    identifier=None,
-                    timestamp_monotonic=time.monotonic(),
+                self._record_sample(
+                    kind="sample",
+                    joystick_id=joystick_id,
+                    gamepad_count=0,
+                    connected_count=0,
                 )
-            return self._sample_gamepad(
+                return ()
+            snapshot = self._sample_gamepad(
                 gamepad,
                 include_tapped_buttons=include_tapped_buttons,
             )
-        snapshots = [
-            snapshot
-            for gamepad in self._gamepads()
-            if (
-                snapshot := self._sample_gamepad(
-                    gamepad,
-                    include_tapped_buttons=include_tapped_buttons,
+            if not snapshot.connected:
+                self._record_sample(
+                    kind="sample",
+                    joystick_id=joystick_id,
+                    gamepad_count=1,
+                    connected_count=0,
                 )
-            ).connected
-        ]
-        if not snapshots:
-            return GamepadSnapshot(
-                connected=False, identifier=None, timestamp_monotonic=time.monotonic()
+                return ()
+            self._record_sample(
+                kind="sample",
+                joystick_id=joystick_id,
+                gamepad_count=1,
+                connected_count=1,
             )
-        return self._combine_snapshots(snapshots)
+            return (GamepadSnapshotEvent(joystick_id=joystick_id, snapshot=snapshot),)
+        gamepads = self._gamepads()
+        events = self._sample_events_without_pump(
+            gamepads=gamepads,
+            include_tapped_buttons=include_tapped_buttons,
+        )
+        self._record_sample(
+            kind="sample",
+            joystick_id=None,
+            gamepad_count=len(gamepads),
+            connected_count=len(events),
+        )
+        return events
+
+    def sample_events(
+        self,
+        *,
+        include_tapped_buttons: bool = True,
+    ) -> tuple[GamepadSnapshotEvent, ...]:
+        self._pump_gamepad_events()
+        gamepads = self._gamepads()
+        events = self._sample_events_without_pump(
+            gamepads=gamepads,
+            include_tapped_buttons=include_tapped_buttons,
+        )
+        self._record_sample(
+            kind="sample_events",
+            joystick_id=None,
+            gamepad_count=len(gamepads),
+            connected_count=len(events),
+        )
+        return events
+
+    def _sample_events_without_pump(
+        self,
+        *,
+        gamepads: tuple[Gamepad, ...] | None = None,
+        include_tapped_buttons: bool = True,
+    ) -> tuple[GamepadSnapshotEvent, ...]:
+        events: list[GamepadSnapshotEvent] = []
+        for gamepad in gamepads if gamepads is not None else self._gamepads():
+            snapshot = self._sample_gamepad(
+                gamepad,
+                include_tapped_buttons=include_tapped_buttons,
+            )
+            if snapshot.connected:
+                events.append(
+                    GamepadSnapshotEvent(
+                        joystick_id=gamepad.joystick_id,
+                        snapshot=snapshot,
+                    )
+                )
+        return tuple(events)
 
     def _sample_gamepad(
         self,
@@ -377,66 +287,97 @@ class GamepadController:
                 gamepads.append(peripheral)
         return tuple(gamepads)
 
+    def _pump_gamepad_events(self) -> None:
+        now = time.monotonic()
+        if now - self._last_pump_monotonic < GAMEPAD_PUMP_THROTTLE_SECONDS:
+            self._pump_skips += 1
+            return
+        try:
+            pygame.event.pump()
+        except pygame.error:
+            self._pump_errors += 1
+            return
+        self._pump_calls += 1
+        self._last_pump_monotonic = now
+
+    def _record_sample(
+        self,
+        *,
+        kind: str,
+        joystick_id: int | None,
+        gamepad_count: int,
+        connected_count: int,
+    ) -> None:
+        if kind == "sample_events":
+            self._sample_events_calls += 1
+        else:
+            self._sample_calls += 1
+        if joystick_id is not None:
+            self._targeted_sample_calls += 1
+        self._gamepad_slots_sampled += gamepad_count
+        self._connected_snapshots_sampled += connected_count
+        caller = _sample_caller_label()
+        self._sample_callers[caller] = self._sample_callers.get(caller, 0) + 1
+        self._log_sample_stats_if_due()
+
+    def _log_sample_stats_if_due(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self._stats_window_start
+        if elapsed < GAMEPAD_STATS_LOG_INTERVAL_SECONDS:
+            return
+        total_calls = self._sample_calls + self._sample_events_calls
+        if total_calls == 0:
+            self._reset_sample_stats(now)
+            return
+        top_callers = ", ".join(
+            f"{caller}={count}"
+            for caller, count in sorted(
+                self._sample_callers.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )[:5]
+        )
+        logger.info(
+            "Gamepad sample stats window=%.1fs sample_calls=%d "
+            "sample_events_calls=%d targeted_calls=%d slots_sampled=%d "
+            "connected_snapshots=%d pump_calls=%d pump_skips=%d "
+            "pump_errors=%d top_callers=%s",
+            elapsed,
+            self._sample_calls,
+            self._sample_events_calls,
+            self._targeted_sample_calls,
+            self._gamepad_slots_sampled,
+            self._connected_snapshots_sampled,
+            self._pump_calls,
+            self._pump_skips,
+            self._pump_errors,
+            top_callers or "none",
+        )
+        self._reset_sample_stats(now)
+
+    def _reset_sample_stats(self, now: float) -> None:
+        self._stats_window_start = now
+        self._sample_calls = 0
+        self._sample_events_calls = 0
+        self._targeted_sample_calls = 0
+        self._gamepad_slots_sampled = 0
+        self._connected_snapshots_sampled = 0
+        self._pump_calls = 0
+        self._pump_skips = 0
+        self._pump_errors = 0
+        self._sample_callers.clear()
+
     def _gamepad(self, joystick_id: int) -> Gamepad | None:
         for gamepad in self._gamepads():
             if gamepad.joystick_id == joystick_id:
                 return gamepad
         return None
 
-    @staticmethod
-    def _pump_gamepad_events() -> None:
-        try:
-            pygame.event.pump()
-        except pygame.error:
-            return
-
-    def _combine_snapshots(
-        self,
-        snapshots: list[GamepadSnapshot],
-    ) -> GamepadSnapshot:
-        return GamepadSnapshot(
-            connected=True,
-            identifier="+".join(
-                snapshot.identifier or "unknown" for snapshot in snapshots
-            ),
-            buttons=self._combine_buttons(snapshots),
-            tapped_buttons=frozenset().union(
-                *(snapshot.tapped_buttons for snapshot in snapshots)
-            ),
-            axes=self._combine_axes(snapshots),
-            dpad=self._combine_dpad(snapshots),
-            timestamp_monotonic=max(
-                snapshot.timestamp_monotonic for snapshot in snapshots
-            ),
-        )
-
-    @staticmethod
-    def _combine_buttons(
-        snapshots: list[GamepadSnapshot],
-    ) -> dict[GamepadButton, bool]:
-        return {
-            button: any(snapshot.button_held(button) for snapshot in snapshots)
-            for button in GamepadButton
-        }
-
-    @staticmethod
-    def _combine_axes(
-        snapshots: list[GamepadSnapshot],
-    ) -> dict[GamepadAxis, float]:
-        axes: dict[GamepadAxis, float] = {}
-        for axis in GamepadAxis:
-            values = [snapshot.axes.get(axis, 0.0) for snapshot in snapshots]
-            if axis in {GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT}:
-                axes[axis] = max(values)
-            else:
-                axes[axis] = max(values, key=abs)
-        return axes
-
-    @staticmethod
-    def _combine_dpad(snapshots: list[GamepadSnapshot]) -> GamepadDpadValue:
-        x = max(-1, min(1, sum(snapshot.dpad.x for snapshot in snapshots)))
-        y = max(-1, min(1, sum(snapshot.dpad.y for snapshot in snapshots)))
-        return GamepadDpadValue(x=x, y=y)
+    def _snapshot_for_joystick_id(self, joystick_id: int) -> GamepadSnapshot:
+        events = self.sample(joystick_id=joystick_id, include_tapped_buttons=False)
+        if not events:
+            return GamepadSnapshot(connected=False, identifier=None)
+        return events[0].snapshot
 
     @staticmethod
     def _mapping_for_gamepad(gamepad: Gamepad) -> SwitchLikeMapping:
@@ -467,3 +408,13 @@ class GamepadController:
             )
             return GamepadDpadValue(x=x_dir, y=y_dir)
         return GamepadDpadValue()
+
+
+def _sample_caller_label() -> str:
+    try:
+        frame = sys._getframe(3)
+    except ValueError:
+        return "unknown"
+    code = frame.f_code
+    filename = Path(code.co_filename).name
+    return f"{filename}:{code.co_name}"

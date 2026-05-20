@@ -52,14 +52,55 @@ class TestBouncingBallRenderer:
     def test_cradle_uses_side_views_on_a_and_c_panels(self) -> None:
         views = tuple(BouncingBallRenderer._panel_view(index) for index in range(4))
 
-        assert views == ("side", "front", "side", "front")
+        assert views == ("left_side", "front", "right_side", "front")
 
-    def test_side_view_scales_swinging_ball_toward_viewer(self) -> None:
-        resting = BouncingBallRenderer._side_view_depth_scale(0.0)
-        swinging = BouncingBallRenderer._side_view_depth_scale(0.92)
+    def test_left_side_view_scales_left_swinging_ball_toward_viewer(self) -> None:
+        resting = BouncingBallRenderer._side_view_depth_scale(0.0, view_sign=-1.0)
+        left_swinging = BouncingBallRenderer._side_view_depth_scale(
+            -0.92,
+            view_sign=-1.0,
+        )
+        right_swinging = BouncingBallRenderer._side_view_depth_scale(
+            0.92,
+            view_sign=-1.0,
+        )
 
-        assert swinging > resting
-        assert swinging > 1.6
+        assert left_swinging > resting
+        assert left_swinging > 1.6
+        assert right_swinging == resting
+
+    def test_right_side_view_scales_right_swinging_ball_toward_viewer(self) -> None:
+        resting = BouncingBallRenderer._side_view_depth_scale(0.0, view_sign=1.0)
+        left_swinging = BouncingBallRenderer._side_view_depth_scale(
+            -0.92,
+            view_sign=1.0,
+        )
+        right_swinging = BouncingBallRenderer._side_view_depth_scale(
+            0.92,
+            view_sign=1.0,
+        )
+
+        assert right_swinging > resting
+        assert right_swinging > 1.6
+        assert left_swinging == resting
+
+    def test_far_side_view_keeps_swinging_ball_pink(self) -> None:
+        renderer = BouncingBallRenderer()
+        surface = pygame.Surface((64, 64), pygame.SRCALPHA)
+
+        renderer._draw_cradle(
+            screen=surface,
+            rect=pygame.Rect(0, 0, 64, 64),
+            elapsed_s=0.65,
+            view="right_side",
+        )
+
+        upper_magenta_pixels = self._count_pixels_matching(
+            surface,
+            max_y=42,
+            predicate=lambda color: color.r > 180 and color.b > 150 and color.g < 120,
+        )
+        assert upper_magenta_pixels > 0
 
     def test_side_view_keeps_swinging_ball_on_vertical_line(self) -> None:
         renderer = BouncingBallRenderer()
@@ -69,7 +110,7 @@ class TestBouncingBallRenderer:
             screen=surface,
             rect=pygame.Rect(0, 0, 64, 64),
             elapsed_s=0.65,
-            view="side",
+            view="left_side",
         )
 
         bright_x_values = [
@@ -91,7 +132,7 @@ class TestBouncingBallRenderer:
             screen=surface,
             rect=pygame.Rect(0, 0, 64, 64),
             elapsed_s=0.65,
-            view="side",
+            view="left_side",
         )
 
         assert surface.get_clip() == original_clip
@@ -268,4 +309,18 @@ class TestBouncingBallRenderer:
             for x in range(surface.get_width())
             for y in range(surface.get_height())
             if surface.get_at((x, y)).r > 80
+        )
+
+    def _count_pixels_matching(
+        self,
+        surface: pygame.Surface,
+        *,
+        max_y: int,
+        predicate,
+    ) -> int:
+        return sum(
+            1
+            for x in range(surface.get_width())
+            for y in range(max_y)
+            if predicate(surface.get_at((x, y)))
         )

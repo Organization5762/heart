@@ -87,8 +87,8 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         switch_updates = (
             peripheral_manager.input_io.main_switch_stream()
             .map(
-                lambda switch_state: (
-                    lambda state: self.handle_switch_state(state, switch_state)
+                lambda switch_event: (
+                    lambda state: self.handle_switch_state(state, switch_event.state)
                 )
             )
 

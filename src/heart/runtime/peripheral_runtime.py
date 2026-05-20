@@ -242,20 +242,30 @@ class PeripheralRuntime:
         drain_frame_thread_queue(max_items=FRAME_THREAD_DRAIN_MAX_ITEMS)
 
     def _poll_gamepad_navigation(self) -> None:
-        snapshot = self._peripheral_manager.input_io.gamepad.sample(
+        events = self._peripheral_manager.input_io.gamepad.sample(
             include_tapped_buttons=False
         )
-        if not snapshot.connected:
+        if not events:
             self._rearm_gamepad_navigation()
             return
 
         navigation = self._peripheral_manager.input_io.navigation
-        if self._button_pressed(snapshot, GamepadButton.SOUTH):
-            navigation.inject_activate(source="gamepad.south")
-        if self._button_pressed(snapshot, GamepadButton.NORTH):
-            navigation.inject_alternate_activate(source="gamepad.north")
+        for event in events:
+            snapshot = event.snapshot
+            if self._button_pressed(snapshot, GamepadButton.SOUTH):
+                navigation.inject_activate(source=f"gamepad.{event.joystick_id}.south")
+            if self._button_pressed(snapshot, GamepadButton.NORTH):
+                navigation.inject_alternate_activate(
+                    source=f"gamepad.{event.joystick_id}.north"
+                )
 
-        direction = self._dpad_direction(snapshot.dpad)
+        direction = max(
+            -1,
+            min(
+                1,
+                sum(self._dpad_direction(event.snapshot.dpad) for event in events),
+            ),
+        )
         if direction == 0:
             self._navigation_dpad_center_frames += 1
             if self._navigation_dpad_center_frames >= DPAD_CENTER_FRAMES_TO_REARM:

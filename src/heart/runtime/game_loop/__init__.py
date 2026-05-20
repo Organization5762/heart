@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import numpy as np
 import pygame
+from heart_device_manager.environment import is_pi
 from manyfold import shutdown
 
 from heart import DeviceDisplayMode
@@ -612,6 +613,8 @@ class GameLoop:
     def _run_main_loop(self) -> None:
         if self.components.display.clock is None:
             raise RuntimeError("GameLoop failed to initialize display clock")
+        handle_events = not is_pi()
+
         while self.running:
             frame_started_at = time.perf_counter()
             timings: dict[str, float] = {}
@@ -621,7 +624,8 @@ class GameLoop:
             timings["peripheral_pre_ms"] = _elapsed_ms_since(step_started_at)
 
             step_started_at = time.perf_counter()
-            self.running = self.components.event_handler.handle_events()
+            if handle_events:
+                self.running = self.components.event_handler.handle_events()
             timings["events_ms"] = _elapsed_ms_since(step_started_at)
 
             step_started_at = time.perf_counter()
