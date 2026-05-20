@@ -645,6 +645,52 @@ class TestGamepadController:
         assert second_snapshot.button_held(GamepadButton.NORTH) is True
         assert second_snapshot.dpad == GamepadDpadValue(x=-1)
 
+    def test_sample_pumps_pygame_once_for_controller_batch(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify one all-controller sample pumps SDL once instead of once per joystick."""
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+        pump_calls = 0
+
+        def pump() -> None:
+            nonlocal pump_calls
+            pump_calls += 1
+
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.pygame.event.pump",
+            pump,
+        )
+        update_pump_flags: list[bool] = []
+        original_update = Gamepad._update
+
+        def update(self: Gamepad, *, pump_events: bool = True) -> None:
+            update_pump_flags.append(pump_events)
+            original_update(self, pump_events=pump_events)
+
+        monkeypatch.setattr(Gamepad, "_update", update)
+        controller = GamepadController(
+            manager=_GamepadManager(
+                *(
+                    Gamepad(
+                        joystick_id=joystick_id,
+                        joystick=_JoystickProbe(buttons={1: joystick_id == 0}),
+                    )
+                    for joystick_id in range(4)
+                )
+            ),
+            debug_tap=InputDebugTap(),
+        )
+
+        snapshot = controller.sample()
+
+        assert snapshot.connected is True
+        assert pump_calls == 1
+        assert update_pump_flags == [False, False, False, False]
+
     def test_motion_only_sample_does_not_consume_button_taps(
         self,
         monkeypatch,

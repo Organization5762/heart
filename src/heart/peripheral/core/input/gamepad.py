@@ -267,6 +267,7 @@ class GamepadController:
         *,
         include_tapped_buttons: bool = True,
     ) -> GamepadSnapshot:
+        self._pump_gamepad_events()
         if joystick_id is not None:
             gamepad = self._gamepad(joystick_id)
             if gamepad is None:
@@ -301,7 +302,7 @@ class GamepadController:
         *,
         include_tapped_buttons: bool = True,
     ) -> GamepadSnapshot:
-        gamepad.update()
+        gamepad.update(pump_events=False)
         if not gamepad.is_connected():
             return GamepadSnapshot(
                 connected=False, identifier=None, timestamp_monotonic=time.monotonic()
@@ -381,6 +382,13 @@ class GamepadController:
             if gamepad.joystick_id == joystick_id:
                 return gamepad
         return None
+
+    @staticmethod
+    def _pump_gamepad_events() -> None:
+        try:
+            pygame.event.pump()
+        except pygame.error:
+            return
 
     def _combine_snapshots(
         self,
