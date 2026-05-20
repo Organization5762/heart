@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
+                                            BEATS_WEB_ENABLED_ENV_VAR,
                                             DEFAULT_BEATS_RUNTIME_HOST,
                                             DEFAULT_BEATS_RUNTIME_PORT,
                                             DEFAULT_BEATS_WEB_HOST,
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 
 DEFAULT_BEATS_WEB_START_SCRIPT = "web"
 FORWARD_TO_BEATS_ENV_VAR = "FORWARD_TO_BEATS_APP"
+BEATS_WEBSOCKET_ENABLED_ENV_VAR = "BEATS_WEBSOCKET_ENABLED"
 BEATS_WEBSOCKET_HOST_ENV_VAR = "VITE_BEATS_WEBSOCKET_HOST"
 BEATS_WEBSOCKET_PORT_ENV_VAR = "VITE_BEATS_WEBSOCKET_PORT"
 BEATS_WEBSOCKET_URL_ENV_VAR = "VITE_BEATS_WEBSOCKET_URL"
@@ -240,7 +242,7 @@ def build_totem_run_command(
     configuration: str,
     add_low_power_mode: bool,
 ) -> list[str]:
-    """Build the runtime command that forwards frames into Beats."""
+    """Build the runtime command that serves the Beats control websocket."""
 
     command = ["uv", "run", "totem", "run", "--configuration", configuration]
     if not add_low_power_mode:
@@ -270,10 +272,11 @@ def build_runtime_env(
     websocket_bind_host: str | None = None,
     websocket_port: int | None = None,
 ) -> dict[str, str]:
-    """Prepare runtime environment variables for Beats forwarding."""
+    """Prepare runtime environment variables for Beats phone controls."""
 
     runtime_env = dict(base_env)
-    runtime_env[FORWARD_TO_BEATS_ENV_VAR] = "1"
+    runtime_env.pop(BEATS_WEB_ENABLED_ENV_VAR, None)
+    runtime_env[BEATS_WEBSOCKET_ENABLED_ENV_VAR] = "1"
     if websocket_bind_host is not None:
         runtime_env[WEBSOCKET_BIND_HOST_ENV_VAR] = websocket_bind_host
     if websocket_port is not None:

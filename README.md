@@ -55,7 +55,8 @@ Key `totem run` flags:
 
 - `--configuration <name>` selects modules from `heart.programs.configurations`.
 - `--add-low-power-mode/--no-add-low-power-mode` toggles the standby mode that keeps LEDs dim when no scenes are active.
-- `totem run --with-beats --configuration <name>` launches the streamed totem runtime and a LAN-visible Beats web UI together, wiring `FORWARD_TO_BEATS_APP=1`, `BEATS_WEBSOCKET_BIND_HOST=0.0.0.0`, and a Vite dev server on `http://localhost:5173`.
+- `totem run --with-beats --configuration <name>` launches the totem runtime, a Beats control websocket for phone text/image/navigation commands, and a LAN-visible Beats web UI together, wiring `BEATS_WEBSOCKET_ENABLED=1`, `BEATS_WEBSOCKET_BIND_HOST=0.0.0.0`, and a Vite dev server on `http://localhost:5173`.
+- `BEATS_WEB_ENABLED=1 totem run --configuration <name>` enables the same Beats web UI and phone-control websocket from an environment file or shell without setting `FORWARD_TO_BEATS_APP`.
 - `totem run --with-beats --remote-runtime --beats-runtime-host totem.local` launches only the browser-served Beats UI and points it at an existing runtime websocket on the Pi.
 
 ## Architecture Summary
