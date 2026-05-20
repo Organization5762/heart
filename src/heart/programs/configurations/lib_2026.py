@@ -93,10 +93,46 @@ def friend_beacon_text(text: str) -> TextRendering:
 def configure(loop: GameLoop) -> None:
     randomness = RandomnessProvider()
 
-    add_cube_pong_mode(loop)
-
     kirby_mode = loop.add_mode(KirbyScene.title_scene())
     kirby_mode.add_renderer(KirbyScene)
+
+    friend_beacon_mode = loop.add_mode(friend_beacon_text(text="friend\nbeacon"))
+    friend_beacon_mode.add_renderer(
+        MultiScene(
+            [
+                *[
+                    friend_beacon_text(text=f"Where's\n{name}")
+                    for name in sorted([
+                        "andrew",
+                        "anil",
+                        "august",
+                        "brian",
+                        "cal",
+                        "clem",
+                        "deena",
+                        "elena",
+                        "eric",
+                        "faye",
+                        "giang",
+                        "jordan",
+                        "lampe",
+                        "lilli",
+                        "macy",
+                        "maddie",
+                        "pranay",
+                        "seb",
+                        "spriha",
+                        "rachel",
+                        "logan",
+                        "sri",
+                        "will",
+                        "juicebox"
+                    ])
+                ],
+                friend_beacon_text(text="Lost my\nfriends\nagain"),
+            ]
+        )
+    )
 
     modelbrot = loop.add_mode(
         title=loop.compose(
@@ -114,13 +150,13 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.add_renderer(MandelbrotMode)
 
-    mandelbulb_mode = loop.add_mode(centered_text_title("mandel\nbulb"))
+    mandelbulb_mode = loop.add_mode(centered_text_title("bulb"))
     mandelbulb_mode.add_renderer(MandelbulbScene())
 
-    sphere_mode = loop.add_mode(centered_text_title("3d\nfractal"))
+    sphere_mode = loop.add_mode(centered_text_title("void sphere"))
     sphere_mode.add_renderer(FractalScene)
 
-    palette_tunnel_mode = loop.add_mode("gem tunnel")
+    palette_tunnel_mode = loop.add_mode("gem\ntunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
     audio_storm_mode = loop.add_mode("spectrum")
@@ -150,6 +186,8 @@ def configure(loop: GameLoop) -> None:
         )
     )
     mario_mode.add_renderer(MarioRenderer)
+
+    add_cube_pong_mode(loop)
 
     add_rock_paper_scissors_mode(loop, randomness=randomness)
 
@@ -202,44 +240,6 @@ def configure(loop: GameLoop) -> None:
 
     pranay_mode = loop.add_mode(friend_beacon_text(text=PRANAY_SKETCH_MODE_TITLE))
     pranay_mode.add_renderer(PranaySketchRenderer())
-
-    friend_beacon_mode = loop.add_mode(friend_beacon_text(text="friend\nbeacon"))
-    friend_beacon_mode.add_renderer(
-        MultiScene(
-            [
-                *[
-                    friend_beacon_text(text=f"Where's\n{name}")
-                    for name in [
-                        "andrew",
-                        "anil",
-                        "august",
-                        "brian",
-                        "cal",
-                        "clem",
-                        "deena",
-                        "elena",
-                        "eric",
-                        "faye",
-                        "giang",
-                        "jordan",
-                        "lampe",
-                        "lilli",
-                        "macy",
-                        "maddie",
-                        "pranay",
-                        "seb",
-                        "spriha",
-                        "rachel",
-                        "logan",
-                        "sri",
-                        "will",
-                        "juicebox"
-                    ]
-                ],
-                friend_beacon_text(text="Lost my\nfriends\nagain"),
-            ]
-        )
-    )
 
     tixyland = loop.add_mode("tixyland")
     tixyland_factory = loop.resolve(TixylandFactory)
