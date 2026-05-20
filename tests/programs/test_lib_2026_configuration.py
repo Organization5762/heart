@@ -20,6 +20,18 @@ def test_centered_titles_use_kirby_color(loop) -> None:
     assert fractal_entry.title_renderer._provider._color == Color.kirby()
 
 
+def test_pair_bluetooth_mode_is_not_registered(loop) -> None:
+    configure(loop)
+
+    title_texts = {
+        entry.title_renderer._provider._text
+        for entry in loop.components.game_modes.state.entries
+        if isinstance(entry.title_renderer, TextRendering)
+    }
+
+    assert ("pair bt",) not in title_texts
+
+
 def test_vibe_title_uses_centered_kirby_title(loop) -> None:
     configure(loop)
 
@@ -57,7 +69,10 @@ def test_mandelbulb_mode_follows_mandelbrot(loop) -> None:
     mandelbrot_index = next(
         index
         for index, entry in enumerate(entries)
-        if any(isinstance(renderer, MandelbrotMode) for renderer in entry.renderer.renderers)
+        if any(
+            isinstance(renderer, MandelbrotMode)
+            for renderer in entry.renderer.renderers
+        )
     )
     mandelbulb_entry = entries[mandelbrot_index + 1]
 
