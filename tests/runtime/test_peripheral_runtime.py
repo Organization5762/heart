@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 from PIL import Image
 
 from heart.device.beats.websocket import ControlMessage
-from heart.peripheral.core.input import InputDebugStage, InputDebugTap
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadDpadValue, GamepadSnapshot,
+                                         InputDebugStage, InputDebugTap)
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
                                               PeripheralRuntime,
@@ -22,6 +24,19 @@ class _InputIOStub:
         self.debug_tap = InputDebugTap()
         self.navigation = _NavigationProfileStub()
         self.external_sensors = _ExternalSensorHubStub()
+        self.gamepad = _GamepadControllerStub()
+
+
+class _GamepadControllerStub:
+    def __init__(self) -> None:
+        self.snapshots: list[GamepadSnapshot] = []
+        self.sample_calls: list[bool] = []
+
+    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+        self.sample_calls.append(include_tapped_buttons)
+        if not self.snapshots:
+            return GamepadSnapshot(connected=False, identifier=None)
+        return self.snapshots.pop(0)
 
 
 class _NavigationProfileStub:
@@ -237,6 +252,174 @@ class TestPeripheralRuntimeStreaming:
         assert manager.input_io.external_sensors.updates == [
             ("set", "accelerometer:debug:z", 12.5),
             ("clear", "accelerometer:debug:z", None),
+        ]
+
+    def test_poll_maps_one_sampled_gamepad_snapshot_to_navigation(self) -> None:
+        """Verify runtime controller navigation samples once and injects logical intents without stream subscriptions."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.extend(
+            [
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(x=1),
+                    buttons={GamepadButton.SOUTH: True},
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    buttons={GamepadButton.NORTH: True},
+                ),
+            ]
+        )
+
+        runtime.poll()
+        runtime.poll()
+
+        assert manager.input_io.navigation.injected == [
+            ("activate", 0, "gamepad.south"),
+            ("browse", 1, "gamepad.dpad"),
+            ("alternate_activate", 0, "gamepad.north"),
+        ]
+        assert manager.input_io.gamepad.sample_calls == [False, False]
+
+    def test_poll_does_not_bind_west_button_to_global_exit(self) -> None:
+        """Verify Y/WEST remains available for renderer-local controls."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.append(
+            GamepadSnapshot(
+                connected=True,
+                identifier="controller",
+                tapped_buttons=frozenset({GamepadButton.WEST}),
+            )
+        )
+
+        runtime.poll()
+
+        assert manager.input_io.navigation.injected == []
+        assert manager.input_io.gamepad.sample_calls == [False]
+
+    def test_poll_does_not_consume_renderer_local_tap_buttons(self) -> None:
+        """Verify renderer-local taps such as WEST/Y and L3 survive runtime polling."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.append(
+            GamepadSnapshot(
+                connected=True,
+                identifier="controller",
+                buttons={
+                    GamepadButton.WEST: True,
+                    GamepadButton.L3: True,
+                },
+                tapped_buttons=frozenset({GamepadButton.WEST, GamepadButton.L3}),
+            )
+        )
+
+        runtime.poll()
+
+        assert manager.input_io.navigation.injected == []
+        assert manager.input_io.gamepad.sample_calls == [False]
+
+    def test_poll_latches_sampled_dpad_until_centered(self) -> None:
+        """Verify held d-pad input does not repeat just because runtime samples before and after rendering."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.extend(
+            [
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(x=1),
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(x=1),
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(),
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(),
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="controller",
+                    dpad=GamepadDpadValue(x=-1),
+                ),
+            ]
+        )
+
+        for _ in range(5):
+            runtime.poll()
+
+        assert manager.input_io.navigation.injected == [
+            ("browse", 1, "gamepad.dpad"),
+            ("browse", -1, "gamepad.dpad"),
+        ]
+
+    def test_poll_ignores_left_stick_for_global_scene_navigation(self) -> None:
+        """Verify noisy left stick input does not browse global scenes."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.append(
+            GamepadSnapshot(
+                connected=True,
+                identifier="controller",
+                axes={GamepadAxis.LEFT_X: 1.0},
+            )
+        )
+
+        runtime.poll()
+
+        assert manager.input_io.navigation.injected == []
+
+    def test_poll_handles_gamepad_before_frame_thread_drain(self, monkeypatch) -> None:
+        """Keep queued renderer graph work from sitting in front of direct input polling."""
+
+        call_order: list[str] = []
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager.input_io.gamepad.snapshots.append(
+            GamepadSnapshot(
+                connected=True,
+                identifier="controller",
+                buttons={GamepadButton.SOUTH: True},
+            )
+        )
+
+        original_sample = manager.input_io.gamepad.sample
+
+        def sample(*, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+            call_order.append("sample")
+            return original_sample(include_tapped_buttons=include_tapped_buttons)
+
+        def drain_frame_thread_queue(*, max_items: int | None = None) -> int:
+            call_order.append(f"drain:{max_items}")
+            return 0
+
+        manager.input_io.gamepad.sample = sample
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.drain_frame_thread_queue",
+            drain_frame_thread_queue,
+        )
+
+        runtime.poll()
+
+        assert call_order == ["sample", "drain:64"]
+        assert manager.input_io.navigation.injected == [
+            ("activate", 0, "gamepad.south"),
         ]
 
     def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:

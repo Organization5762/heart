@@ -46,24 +46,26 @@ class _SnapshotStream:
 
 
 class _SnapshotController:
-    def __init__(self) -> None:
-        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
+    def __init__(self, snapshot: object | None = None) -> None:
+        self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
         self.stream = _SnapshotStream(on_emit=self._set_snapshot)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> GamepadSnapshot:
+    def sample(self) -> object:
         return self.snapshot
 
     def _set_snapshot(self, value: object) -> None:
-        if isinstance(value, GamepadSnapshot):
+        if isinstance(value, GamepadSnapshot | KeyboardSnapshot):
             self.snapshot = value
 
 
 class _InputIO:
     def __init__(self) -> None:
-        self.keyboard = _SnapshotController()
+        self.keyboard = _SnapshotController(
+            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+        )
         self.gamepad = _SnapshotController()
 
 
@@ -124,6 +126,29 @@ def _window(width: int = 100, height: int = 80) -> Mock:
     window.get_size.return_value = (width, height)
     window.clock = _Clock(100)
     return window
+
+
+def _calibrate_triggers(
+    scene: AudioStormScene,
+    manager: _PeripheralManager,
+    *,
+    left: float = -1.0,
+    right: float = -1.0,
+) -> None:
+    manager.gamepad_controller.stream.emit(
+        GamepadSnapshot(
+            connected=True,
+            identifier="pad",
+            axes={
+                GamepadAxis.TRIGGER_LEFT: left,
+                GamepadAxis.TRIGGER_RIGHT: right,
+            },
+        )
+    )
+    scene.real_process(
+        window=_window(),
+        orientation=Rectangle.with_layout(columns=1, rows=1),
+    )
 
 
 def _stub_texture_gl(monkeypatch, *, texture_id: int = 9) -> dict[str, list[object]]:
@@ -308,6 +333,8 @@ class TestAudioStormScene:
             orientation=Rectangle.with_layout(columns=1, rows=1),
         )
         scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        _calibrate_triggers(baseline_scene, baseline_manager)
+        _calibrate_triggers(scene, manager)
         baseline_manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -353,6 +380,8 @@ class TestAudioStormScene:
             peripheral_manager=boosted_manager,
             orientation=Rectangle.with_layout(columns=1, rows=1),
         )
+        _calibrate_triggers(base_scene, base_manager, left=0.0)
+        _calibrate_triggers(boosted_scene, boosted_manager, left=0.0)
         base_manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -432,6 +461,7 @@ class TestAudioStormScene:
         )
 
         scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        _calibrate_triggers(scene, manager)
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -661,6 +691,30 @@ class TestAudioStormScene:
         assert resting_energy == 0.0
         assert scene.audio_energy.max() > 0.0
 
+    def test_reversed_signed_trigger_axes_are_normalized(self, monkeypatch) -> None:
+        scene = AudioStormScene()
+        scene.shader_runtime = _ShaderRuntime()
+        manager = _PeripheralManager()
+        _stub_texture_gl(monkeypatch)
+
+        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        _calibrate_triggers(scene, manager, left=1.0, right=1.0)
+        resting_energy = float(scene.audio_energy.max())
+        manager.gamepad_controller.stream.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                axes={
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: 1.0,
+                },
+            )
+        )
+        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+
+        assert resting_energy == 0.0
+        assert scene.audio_energy.max() > 0.0
+
     def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
         scene = AudioStormScene()
         shader_runtime = _ShaderRuntime()
@@ -694,7 +748,7 @@ class TestAudioStormScene:
         assert AudioStormScene._render_size((320, 80), orientation) == (80, 80)
         assert AudioStormScene._should_tile(orientation) is True
 
-    def test_reset_disposes_subscriptions_and_resources(self, monkeypatch) -> None:
+    def test_reset_clears_input_snapshots_and_resources(self, monkeypatch) -> None:
         scene = AudioStormScene()
         scene.shader_runtime = _ShaderRuntime()
         manager = _PeripheralManager()
@@ -709,11 +763,9 @@ class TestAudioStormScene:
         scene.display_texture = 11
         scene.reset()
 
-        keyboard_subscription = manager.keyboard_controller.stream.subscriptions[0][0]
-        assert keyboard_subscription.dispose_calls == 1
+        assert manager.keyboard_controller.stream.subscriptions == []
         assert gl_calls["delete"] == [([11],), ([9],)]
         assert scene.window_size is None
         assert scene.render_size is None
         assert scene.tiled_mode is False
-        assert scene._subscriptions == []
         assert np.count_nonzero(scene.audio_energy) == 0

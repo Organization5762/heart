@@ -11,22 +11,15 @@ from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.screen_mapping import (
-    SCREEN_SLOT_BLUETOOTH_MACS,
-    normalize_bluetooth_mac,
-)
+    SCREEN_SLOT_BLUETOOTH_MACS, normalize_bluetooth_mac)
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.cube_pong.state import (
-    PLAYER_ONE,
-    PLAYER_TWO,
-    CubePongControls,
-    CubePongState,
-    advance_cube_pong_state,
-    ball_radius,
-    face_position_for_ball,
-    new_cube_pong_round,
-    paddle_path_x,
-    paddle_size,
-)
+from heart.renderers.cube_pong.state import (PLAYER_ONE, PLAYER_TWO,
+                                             CubePongControls, CubePongState,
+                                             advance_cube_pong_state,
+                                             ball_radius,
+                                             face_position_for_ball,
+                                             new_cube_pong_round,
+                                             paddle_path_x, paddle_size)
 from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
@@ -45,6 +38,7 @@ LINUX_JOYSTICK_SYSFS = Path("/sys/class/input")
 SCORE_FONT_SCALE = 0.19
 SCORE_SEPARATOR_GAP_SCALE = 0.05
 SCORE_SEPARATOR_COLOR = (202, 211, 224)
+WINNER_FONT_SCALE = 0.42
 logger = get_logger(__name__)
 
 

@@ -107,7 +107,7 @@ class GamepadController:
         stream = (
             Timer(period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS))
             .then_on_main_thread()
-            .map(lambda _: self._sample())
+            .map(lambda _: self._sample(include_tapped_buttons=False))
             .distinct_until_changed()
         )
         return InputDebugNode(
@@ -135,7 +135,12 @@ class GamepadController:
             stream = (
                 Timer(period=timedelta(milliseconds=GAMEPAD_POLL_INTERVAL_MS))
                 .then_on_main_thread()
-                .map(lambda _: self._sample(joystick_id=joystick_id))
+                .map(
+                    lambda _: self._sample(
+                        joystick_id=joystick_id,
+                        include_tapped_buttons=False,
+                    )
+                )
                 .distinct_until_changed()
             )
             self._snapshot_streams_by_joystick_id[joystick_id] = InputDebugNode(
@@ -169,10 +174,14 @@ class GamepadController:
     def button_tapped(self, button: GamepadButton) -> StreamNode[GamepadButtonTapEvent]:
         stream = (
             self.snapshot_stream()
-            .filter(lambda snapshot: snapshot.button_tapped(button))
+            .pairwise()
+            .filter(
+                lambda latest: not latest[0].button_held(button)
+                and latest[1].button_held(button)
+            )
             .map(
-                lambda snapshot: GamepadButtonTapEvent(
-                    button=button, timestamp_monotonic=snapshot.timestamp_monotonic
+                lambda latest: GamepadButtonTapEvent(
+                    button=button, timestamp_monotonic=latest[1].timestamp_monotonic
                 )
             )
         )
@@ -406,13 +415,14 @@ class GamepadController:
     def _combine_axes(
         snapshots: list[GamepadSnapshot],
     ) -> dict[GamepadAxis, float]:
-        return {
-            axis: max(
-                (snapshot.axes.get(axis, 0.0) for snapshot in snapshots),
-                key=abs,
-            )
-            for axis in GamepadAxis
-        }
+        axes: dict[GamepadAxis, float] = {}
+        for axis in GamepadAxis:
+            values = [snapshot.axes.get(axis, 0.0) for snapshot in snapshots]
+            if axis in {GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT}:
+                axes[axis] = max(values)
+            else:
+                axes[axis] = max(values, key=abs)
+        return axes
 
     @staticmethod
     def _combine_dpad(snapshots: list[GamepadSnapshot]) -> GamepadDpadValue:

@@ -51,24 +51,26 @@ class _SnapshotStream:
 
 
 class _SnapshotController:
-    def __init__(self) -> None:
-        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
+    def __init__(self, snapshot: object | None = None) -> None:
+        self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
         self.stream = _SnapshotStream(on_emit=self._set_snapshot)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> GamepadSnapshot:
+    def sample(self) -> object:
         return self.snapshot
 
     def _set_snapshot(self, value: object) -> None:
-        if isinstance(value, GamepadSnapshot):
+        if isinstance(value, GamepadSnapshot | KeyboardSnapshot):
             self.snapshot = value
 
 
 class _InputIO:
     def __init__(self) -> None:
-        self.keyboard = _SnapshotController()
+        self.keyboard = _SnapshotController(
+            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+        )
         self.gamepad = _SnapshotController()
 
 
@@ -706,8 +708,7 @@ class TestMandelbulbScene:
         scene.display_texture = 11
         scene.reset()
 
-        keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
-        assert keyboard_subscription.dispose_calls == 1
+        assert manager.input_io.keyboard.stream.subscriptions == []
         assert deleted_textures == [11]
         assert shader_runtime.reset_calls == 1
         assert scene.window_size is None

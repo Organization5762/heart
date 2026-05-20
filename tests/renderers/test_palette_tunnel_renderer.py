@@ -24,8 +24,9 @@ class _Subscription:
 
 
 class _SnapshotStream:
-    def __init__(self) -> None:
+    def __init__(self, on_emit=None) -> None:
         self.subscriptions: list[tuple[_Subscription, object]] = []
+        self._on_emit = on_emit
 
     def subscribe(self, *, on_next) -> _Subscription:
         subscription = _Subscription()
@@ -33,25 +34,33 @@ class _SnapshotStream:
         return subscription
 
     def emit(self, value: object) -> None:
+        if self._on_emit is not None:
+            self._on_emit(value)
         for _, on_next in self.subscriptions:
             on_next(value)
 
 
 class _SnapshotController:
-    def __init__(self, snapshot: GamepadSnapshot | None = None) -> None:
-        self.stream = _SnapshotStream()
+    def __init__(self, snapshot: object | None = None) -> None:
+        self.stream = _SnapshotStream(on_emit=self._set_snapshot)
         self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> GamepadSnapshot:
+    def sample(self) -> object:
         return self.snapshot
+
+    def _set_snapshot(self, value: object) -> None:
+        if isinstance(value, GamepadSnapshot | KeyboardSnapshot):
+            self.snapshot = value
 
 
 class _InputIO:
     def __init__(self, gamepad_snapshot: GamepadSnapshot | None = None) -> None:
-        self.keyboard = _SnapshotController()
+        self.keyboard = _SnapshotController(
+            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+        )
         self.gamepad = _SnapshotController(gamepad_snapshot)
 
 
@@ -311,7 +320,7 @@ class TestPaletteTunnelScene:
         assert PaletteTunnelScene._render_size((320, 80), orientation) == (80, 80)
         assert PaletteTunnelScene._should_tile(orientation) is True
 
-    def test_reset_disposes_subscriptions_and_shader(self) -> None:
+    def test_reset_clears_snapshot_state_and_shader(self) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -324,10 +333,8 @@ class TestPaletteTunnelScene:
         )
         scene.reset()
 
-        keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
-        assert keyboard_subscription.dispose_calls == 1
+        assert manager.input_io.keyboard.stream.subscriptions == []
         assert shader_runtime.reset_calls == 1
         assert scene.window_size is None
         assert scene.render_size is None
         assert scene.tiled_mode is False
-        assert scene._subscriptions == []

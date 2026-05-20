@@ -7,25 +7,17 @@ import pygame
 from heart.device import Device, Rectangle
 from heart.peripheral.core.input import GamepadButton, GamepadDpadValue
 from heart.renderers.tetris.direct_gamepad import DirectGamepadSnapshot
-from heart.renderers.tetris.renderer import (
-    BOARD_BORDER_COLOR,
-    GHOST_PIECE_COLOR,
-    MODE_LABEL_COLOR,
-    TetrisPlayMode,
-    TetrisRenderer,
-)
-from heart.renderers.tetris.state import (
-    BOARD_WIDTH,
-    TetrisControls,
-    TetrisGameState,
-    TetrisInputMemory,
-    TetrisPiece,
-    TetrisPieceKind,
-    advance_player,
-    guideline_fall_interval_ms,
-    player_level,
-    queue_garbage_for_opponents,
-)
+from heart.renderers.tetris.renderer import (BOARD_BORDER_COLOR,
+                                             GHOST_PIECE_COLOR,
+                                             MODE_LABEL_COLOR, TetrisPlayMode,
+                                             TetrisRenderer)
+from heart.renderers.tetris.state import (BOARD_WIDTH, TetrisControls,
+                                          TetrisGameState, TetrisInputMemory,
+                                          TetrisPiece, TetrisPieceKind,
+                                          advance_player,
+                                          guideline_fall_interval_ms,
+                                          player_level,
+                                          queue_garbage_for_opponents)
 from heart.runtime.display_context import DisplayContext
 
 

@@ -13,17 +13,13 @@ from heart.peripheral.core.input import GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers import StatefulBaseRenderer
-from heart.renderers.reaction_time.state import (
-    ReactionPhase,
-    ReactionPlayerState,
-    ReactionTimeState,
-    new_reaction_round,
-    reaction_winner,
-)
-from heart.renderers.tetris.direct_gamepad import (
-    DirectGamepadSnapshot,
-    DirectTetrisGamepads,
-)
+from heart.renderers.reaction_time.state import (ReactionPhase,
+                                                 ReactionPlayerState,
+                                                 ReactionTimeState,
+                                                 new_reaction_round,
+                                                 reaction_winner)
+from heart.renderers.tetris.direct_gamepad import (DirectGamepadSnapshot,
+                                                   DirectTetrisGamepads)
 from heart.runtime.display_context import DisplayContext
 
 RNG_NAMESPACE = "reaction-time"

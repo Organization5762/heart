@@ -27,8 +27,9 @@ logger = get_logger(__name__)
 
 
 class MandelbrotMode(StatefulBaseRenderer[AppState]):
-    def __init__(self):
+    def __init__(self, *, enable_input: bool = True):
         super().__init__()
+        self.enable_input = enable_input
         self.device_display_mode = DeviceDisplayMode.FULL
         self.clock: pygame.time.Clock | None = None
 
@@ -245,7 +246,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             input_available = True
             # When we first enter the scene, ignore input briefly without treating
             # the grace period as a failed input device.
-            if not self._is_input_grace_period():
+            if self.enable_input and not self._is_input_grace_period():
                 input_available = self.process_input()
             if not input_available:
                 if not self.input_error:

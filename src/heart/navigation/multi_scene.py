@@ -13,6 +13,8 @@ from .native_scene_manager import (SceneManagerBackend,
 from .renderer_specs import (RendererResolver, RendererSpec,
                              resolve_renderer_spec)
 
+DPAD_CENTER_FRAMES_TO_REARM = 2
+
 
 @dataclass
 class MultiSceneState:
@@ -35,7 +37,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         ]
         self._navigation_subscription = None
         self._last_active_scene_index: int | None = None
-        self._last_dpad_x = 0
+        self._dpad_armed = True
+        self._dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
         self._enable_dpad_scene_selection = enable_dpad_scene_selection
         scene_names = [scene.name for scene in self.scenes]
         self._scene_manager = scene_manager_backend or build_scene_manager_backend(
@@ -96,7 +99,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         if self._state is not None:
             self.state.offset_of_button_value = self.state.current_button_value
             self._scene_manager.reset_button_offset(self.state.current_button_value)
-        self._last_dpad_x = 0
+        self._dpad_armed = True
+        self._dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
         if self._navigation_subscription is not None:
             self._navigation_subscription.dispose()
             self._navigation_subscription = None
@@ -120,16 +124,23 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         peripheral_manager = self.state.peripheral_manager
         if peripheral_manager is None:
             return
-        snapshot = peripheral_manager.input_io.gamepad.sample()
+        snapshot = peripheral_manager.input_io.gamepad.sample(
+            include_tapped_buttons=False
+        )
         if not snapshot.connected:
-            self._last_dpad_x = 0
+            self._dpad_armed = True
+            self._dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
             return
         direction = int(snapshot.dpad.x)
-        if direction == self._last_dpad_x:
-            return
-        self._last_dpad_x = direction
         if direction == 0:
+            self._dpad_center_frames += 1
+            if self._dpad_center_frames >= DPAD_CENTER_FRAMES_TO_REARM:
+                self._dpad_armed = True
             return
+        if not self._dpad_armed:
+            return
+        self._dpad_armed = False
+        self._dpad_center_frames = 0
         self._advance_scene(direction)
 
     def _advance_scene(self, step: int) -> None:

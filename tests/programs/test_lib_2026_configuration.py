@@ -1,35 +1,43 @@
 """Validate 2026 library configuration details."""
 
 from heart.display.color import Color
+from heart.navigation import MultiScene
 from heart.programs.configurations.lib_2026 import configure
+from heart.renderers.bird_flock import BirdFlockRenderer
+from heart.renderers.controller_pairing import ControllerPairingRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.renderers.mandelbulb import MandelbulbScene
 from heart.renderers.text import TextRendering
+from heart.renderers.waving_tree import WavingTreeRenderer
 
 
 def test_centered_titles_use_kirby_color(loop) -> None:
     configure(loop)
 
-    fractal_entry = next(
+    sphere_entry = next(
         entry
         for entry in loop.components.game_modes.state.entries
         if isinstance(entry.title_renderer, TextRendering)
-        and entry.title_renderer._provider._text == ("3d\nfractal",)
+        and entry.title_renderer._provider._text == ("void\nsphere",)
     )
 
-    assert fractal_entry.title_renderer._provider._color == Color.kirby()
+    assert sphere_entry.title_renderer._provider._color == Color.kirby()
 
 
-def test_pair_bluetooth_mode_is_not_registered(loop) -> None:
+def test_pair_bluetooth_mode_is_registered(loop) -> None:
     configure(loop)
 
-    title_texts = {
-        entry.title_renderer._provider._text
+    pair_entry = next(
+        entry
         for entry in loop.components.game_modes.state.entries
         if isinstance(entry.title_renderer, TextRendering)
-    }
+        and entry.title_renderer._provider._text == ("pair bt",)
+    )
 
-    assert ("pair bt",) not in title_texts
+    assert any(
+        isinstance(renderer, ControllerPairingRenderer)
+        for renderer in pair_entry.renderer.renderers
+    )
 
 
 def test_vibe_title_uses_centered_kirby_title(loop) -> None:
@@ -47,7 +55,7 @@ def test_vibe_title_uses_centered_kirby_title(loop) -> None:
     assert title_renderer._provider._y_location == 0.3359375
 
 
-def test_spectrum_title_uses_smaller_pixel_font(loop) -> None:
+def test_spectrum_title_uses_compact_pixel_font(loop) -> None:
     configure(loop)
 
     spectrum_entry = next(
@@ -59,7 +67,7 @@ def test_spectrum_title_uses_smaller_pixel_font(loop) -> None:
     title_renderer = spectrum_entry.title_renderer
 
     assert isinstance(title_renderer, TextRendering)
-    assert title_renderer._provider._font_size == 12
+    assert title_renderer._provider._font_size == 10
 
 
 def test_mandelbulb_mode_follows_mandelbrot(loop) -> None:
@@ -81,4 +89,54 @@ def test_mandelbulb_mode_follows_mandelbrot(loop) -> None:
         for renderer in mandelbulb_entry.renderer.renderers
     )
     assert isinstance(mandelbulb_entry.title_renderer, TextRendering)
-    assert mandelbulb_entry.title_renderer._provider._text == ("mandel\nbulb",)
+    assert mandelbulb_entry.title_renderer._provider._text == ("bulb",)
+
+
+def test_tixyland_mode_uses_dpad_scene_selection(loop) -> None:
+    configure(loop)
+
+    tixyland_entry = next(
+        entry
+        for entry in loop.components.game_modes.state.entries
+        if isinstance(entry.title_renderer, TextRendering)
+        and entry.title_renderer._provider._text == ("tixyland",)
+    )
+    multi_scene = next(
+        renderer
+        for renderer in tixyland_entry.renderer.renderers
+        if isinstance(renderer, MultiScene)
+    )
+
+    assert multi_scene._enable_dpad_scene_selection
+
+
+def test_birds_mode_is_registered(loop) -> None:
+    configure(loop)
+
+    birds_entry = next(
+        entry
+        for entry in loop.components.game_modes.state.entries
+        if isinstance(entry.title_renderer, TextRendering)
+        and entry.title_renderer._provider._text == ("birds",)
+    )
+
+    assert any(
+        isinstance(renderer, BirdFlockRenderer)
+        for renderer in birds_entry.renderer.renderers
+    )
+
+
+def test_tree_mode_is_registered(loop) -> None:
+    configure(loop)
+
+    tree_entry = next(
+        entry
+        for entry in loop.components.game_modes.state.entries
+        if isinstance(entry.title_renderer, TextRendering)
+        and entry.title_renderer._provider._text == ("tree",)
+    )
+
+    assert any(
+        isinstance(renderer, WavingTreeRenderer)
+        for renderer in tree_entry.renderer.renderers
+    )

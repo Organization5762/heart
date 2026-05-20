@@ -16,9 +16,8 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.core.input.frame import FrameTick, FrameTickController
-from heart.peripheral.core.input.gamepad import (
-    DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
-    GamepadController, GamepadSnapshot)
+from heart.peripheral.core.input.gamepad import (GamepadController,
+                                                 GamepadSnapshot)
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
 from heart.peripheral.core.input.peripheral_inputs import PeripheralInputBus
@@ -27,15 +26,13 @@ from heart.peripheral.core.input.profiles.mandelbrot import (
 from heart.peripheral.core.input.profiles.navigation import (
     ActivateIntent, AlternateActivateIntent, BrowseIntent, NavigationIntent,
     NavigationProfile)
-from heart.peripheral.core.input.streams import (map_stream, merge_streams,
-                                                 threshold_direction)
+from heart.peripheral.core.input.streams import map_stream, merge_streams
 from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
                                            runtime_route)
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
-NAVIGATION_STICK_THRESHOLD = 0.6
 FINAL_FRAME_ROUTE = runtime_route("window", "HeartRuntimeWindow")
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 TNavigationIntent = TypeVar("TNavigationIntent", bound=NavigationIntent)
@@ -209,40 +206,11 @@ class InputIO:
             self.keyboard.key_pressed(pygame.K_UP),
             lambda _event: AlternateActivateIntent(source="keyboard.up"),
         )
-        gamepad_dpad = (
-            self.gamepad.dpad_value()
-            .pairwise()
-            .filter(lambda latest: latest[0].x != latest[1].x and latest[1].x != 0)
-            .map(lambda latest: BrowseIntent(source="gamepad.dpad", step=latest[1].x))
-        )
-        gamepad_left_stick = (
-            self.gamepad.axis_value(GamepadAxis.LEFT_X, DEFAULT_GAMEPAD_AXIS_DEAD_ZONE)
-            .map(lambda value: threshold_direction(value, NAVIGATION_STICK_THRESHOLD))
-            .distinct_until_changed()
-            .filter(lambda direction: direction != 0)
-            .map(
-                lambda direction: BrowseIntent(
-                    source="gamepad.left_stick", step=direction
-                )
-            )
-        )
-        gamepad_south = map_stream(
-            self.gamepad.button_tapped(GamepadButton.SOUTH),
-            lambda _button: ActivateIntent(source="gamepad.south"),
-        )
-        gamepad_north = map_stream(
-            self.gamepad.button_tapped(GamepadButton.NORTH),
-            lambda _button: AlternateActivateIntent(source="gamepad.north"),
-        )
         stream = merge_streams(
             keyboard_left,
             keyboard_right,
             keyboard_down,
             keyboard_up,
-            gamepad_dpad,
-            gamepad_left_stick,
-            gamepad_south,
-            gamepad_north,
             self.switch_navigation_intents(),
             self.injected_navigation_intents,
         )
@@ -256,10 +224,6 @@ class InputIO:
                 "keyboard.pressed.right",
                 "keyboard.pressed.down",
                 "keyboard.pressed.up",
-                "gamepad.dpad",
-                "gamepad.axis.left_x",
-                "gamepad.button_tapped.south",
-                "gamepad.button_tapped.north",
                 "switch.rotational_value",
                 "switch.button_value",
                 "switch.long_button_value",

@@ -8,11 +8,15 @@ VIBE_SCENE_NAMES = (
     "sunsleeper",
     "tree",
     "heart",
+    "flower",
+    "zed",
     "sun",
-    "sun bright",
+    "space",
     "overmono sheet",
     "overmono runner",
+    "sara",
     "oppi",
+    "berry preserver",
 )
 
 

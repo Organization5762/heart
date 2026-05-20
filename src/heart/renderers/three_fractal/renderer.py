@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 import pygame
 from manyfold import StreamNode, shutdown
-from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
@@ -133,7 +132,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
         self._trigger_right_prev_active = False
-        self._input_subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
         if not super().is_initialized():
@@ -252,11 +250,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         self.last_update_time = time.monotonic()
 
         self.last_frame_time = time.monotonic()
-        self._input_subscriptions = [
-            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
-                on_next=self._set_keyboard_snapshot
-            ),
-        ]
         return FractalRuntimeState(peripheral_manager=peripheral_manager)
 
         self.mode = "auto"
@@ -628,6 +621,12 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
+    def _refresh_keyboard_snapshot(self, peripheral_manager: PeripheralManager) -> None:
+        try:
+            self._keyboard_snapshot = peripheral_manager.input_io.keyboard.sample()
+        except (AttributeError, pygame.error):
+            return
+
     def _has_manual_input(self) -> bool:
         if self._keyboard_snapshot.pressed_keys:
             return True
@@ -657,6 +656,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         orientation: Orientation,
     ) -> None:
         peripheral_manager = self.state.peripheral_manager
+        self._refresh_keyboard_snapshot(peripheral_manager)
         self._refresh_gamepad_snapshot(peripheral_manager)
         # Update the target surface if it changed
         if window is not self.target_surface:
@@ -765,7 +765,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             pygame.mouse.set_visible(True)
         except pygame.error:
             logger.debug("Skipping fractal mouse reset; pygame video is not initialized")
-        self._dispose_input_subscriptions()
         self._delete_gl_texture(getattr(self, "display_texture", None))
         self.initialized = False
         self._auto_started = False
@@ -806,11 +805,6 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
     def _should_tile(orientation: Orientation) -> bool:
         layout = orientation.layout
         return layout.columns > 1 or layout.rows > 1
-
-    def _dispose_input_subscriptions(self) -> None:
-        for subscription in self._input_subscriptions:
-            subscription.dispose()
-        self._input_subscriptions.clear()
 
     @staticmethod
     def _delete_gl_texture(texture_id: int | None) -> None:

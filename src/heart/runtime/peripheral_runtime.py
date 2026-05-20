@@ -16,7 +16,8 @@ from heart import DeviceDisplayMode
 from heart.device.beats.websocket import WebSocket
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
-from heart.peripheral.core.input import InputDebugEnvelope
+from heart.peripheral.core.input import (GamepadButton, GamepadDpadValue,
+                                         InputDebugEnvelope)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.free_text import FreeTextRenderer
 from heart.renderers.image import (ContainRenderImage,
@@ -37,6 +38,8 @@ CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
 CONTROL_COMMAND_EMOJI_UPDATE = "emoji_update"
 PHONE_TEXT_DISPLAY_DURATION_SECONDS = 5.0
 PHONE_IMAGE_DISPLAY_DURATION_SECONDS = 5.0
+DPAD_CENTER_FRAMES_TO_REARM = 2
+FRAME_THREAD_DRAIN_MAX_ITEMS = 64
 PHONE_PHOTO_DIRECTORY_ENV_VAR = "HEART_PHONE_PHOTO_DIR"
 DEFAULT_PHONE_PHOTO_DIRECTORY = Path("~/heart-phone-photos")
 GAMEPAD_NAVIGATION_STICK_THRESHOLD = 0.6
@@ -49,6 +52,12 @@ class PeripheralRuntime:
         self._peripheral_manager = peripheral_manager
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
         self._frame_clock: pygame.time.Clock | None = None
+        self._navigation_dpad_armed = True
+        self._navigation_dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
+        self._navigation_buttons_held: dict[GamepadButton, bool] = {
+            GamepadButton.SOUTH: False,
+            GamepadButton.NORTH: False,
+        }
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -228,8 +237,51 @@ class PeripheralRuntime:
             logger.warning("Ignoring unsupported phone emoji: %s", emoji)
 
     def poll(self) -> None:
-        drain_frame_thread_queue()
+        self._poll_gamepad_navigation()
         self._drain_control_messages()
+        drain_frame_thread_queue(max_items=FRAME_THREAD_DRAIN_MAX_ITEMS)
+
+    def _poll_gamepad_navigation(self) -> None:
+        snapshot = self._peripheral_manager.input_io.gamepad.sample(
+            include_tapped_buttons=False
+        )
+        if not snapshot.connected:
+            self._rearm_gamepad_navigation()
+            return
+
+        navigation = self._peripheral_manager.input_io.navigation
+        if self._button_pressed(snapshot, GamepadButton.SOUTH):
+            navigation.inject_activate(source="gamepad.south")
+        if self._button_pressed(snapshot, GamepadButton.NORTH):
+            navigation.inject_alternate_activate(source="gamepad.north")
+
+        direction = self._dpad_direction(snapshot.dpad)
+        if direction == 0:
+            self._navigation_dpad_center_frames += 1
+            if self._navigation_dpad_center_frames >= DPAD_CENTER_FRAMES_TO_REARM:
+                self._navigation_dpad_armed = True
+            return
+        if not self._navigation_dpad_armed:
+            return
+        self._navigation_dpad_armed = False
+        self._navigation_dpad_center_frames = 0
+        navigation.inject_browse(direction, source="gamepad.dpad")
+
+    def _rearm_gamepad_navigation(self) -> None:
+        self._navigation_dpad_armed = True
+        self._navigation_dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
+        for button in self._navigation_buttons_held:
+            self._navigation_buttons_held[button] = False
+
+    def _button_pressed(self, snapshot: Any, button: GamepadButton) -> bool:
+        held = bool(snapshot.button_held(button))
+        was_held = self._navigation_buttons_held[button]
+        self._navigation_buttons_held[button] = held
+        return held and not was_held
+
+    @staticmethod
+    def _dpad_direction(dpad: GamepadDpadValue) -> int:
+        return int(dpad.x)
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self._frame_clock = clock

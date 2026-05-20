@@ -1,8 +1,6 @@
-from collections import deque
 from dataclasses import replace
 
 import pygame
-from manyfold.graph import SubscriptionLike
 
 from heart.device import Cube, Rectangle
 from heart.peripheral.core.input import (CyclePaletteCommand, GamepadButton,
@@ -26,21 +24,15 @@ class KeyboardControls:
     ) -> None:
         self.scene_controls = scene_controls
         self._profile = profile
-        self._latest_motion_state = MandelbrotMotionState()
-        self._pending_commands: deque[MandelbrotCommand] = deque()
         self._last_sampled_buttons: frozenset[GamepadButton] = frozenset()
-        self._subscriptions: list[SubscriptionLike] = [
-            profile.motion_state.subscribe(on_next=self._set_latest_motion_state),
-            profile.command_events.subscribe(on_next=self._queue_command),
-        ]
+        self._last_sampled_keys: frozenset[int] = frozenset()
 
     def dispose(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-        self._subscriptions.clear()
+        return None
 
     def update(self) -> None:
-        state = self._motion_state_with_keyboard_fallback()
+        keys = self._sample_keyboard_keys()
+        state = self._motion_state_from_snapshots(keys)
 
         if state.move_x != 0 or state.move_y != 0:
             self.scene_controls._move(
@@ -66,11 +58,11 @@ class KeyboardControls:
         if state.decrease_iterations:
             self.scene_controls._decrease_max_iterations()
 
-        for command in self._sample_gamepad_commands():
+        for command in self._sample_keyboard_commands(keys):
             self._apply_command(command)
 
-        while self._pending_commands:
-            self._apply_command(self._pending_commands.popleft())
+        for command in self._sample_gamepad_commands():
+            self._apply_command(command)
 
     def _apply_command(self, command: MandelbrotCommand) -> None:
         match command:
@@ -114,30 +106,23 @@ class KeyboardControls:
             case Rectangle():
                 self.scene_controls.state.orientation = Cube(orientation.layout)
 
-    def _queue_command(self, command: MandelbrotCommand) -> None:
-        self._pending_commands.append(command)
-
-    def _set_latest_motion_state(self, state: MandelbrotMotionState) -> None:
-        self._latest_motion_state = state
-
-    def _motion_state_with_keyboard_fallback(self) -> MandelbrotMotionState:
+    def _motion_state_from_snapshots(
+        self,
+        keys: frozenset[int] | None,
+    ) -> MandelbrotMotionState:
         sampled_gamepad_state = self._sample_gamepad_motion_state()
-        if (
-            sampled_gamepad_state is not None
-            and self._has_motion_input(sampled_gamepad_state)
-            and not self._has_motion_input(self._latest_motion_state)
+        if sampled_gamepad_state is not None and self._has_motion_input(
+            sampled_gamepad_state
         ):
             return sampled_gamepad_state
 
-        keyboard_state = self._sample_keyboard_motion_state()
+        keyboard_state = self._sample_keyboard_motion_state(keys)
         if keyboard_state is None:
-            return self._latest_motion_state
+            return MandelbrotMotionState()
         if not self._has_keyboard_input(keyboard_state):
-            return self._latest_motion_state
-        if self._has_motion_input(self._latest_motion_state):
-            return self._latest_motion_state
+            return sampled_gamepad_state or MandelbrotMotionState()
         return replace(
-            self._latest_motion_state,
+            sampled_gamepad_state or MandelbrotMotionState(),
             move_x=keyboard_state.move_x,
             move_y=keyboard_state.move_y,
             zoom_in=keyboard_state.zoom_in,
@@ -174,18 +159,43 @@ class KeyboardControls:
             )
         return tuple(commands)
 
-    def _sample_keyboard_motion_state(self) -> MandelbrotMotionState | None:
+    def _sample_keyboard_keys(self) -> frozenset[int] | None:
         try:
             pygame.event.pump()
             keys = pygame.key.get_pressed()
         except pygame.error:
             return None
 
+        pressed_keys: set[int] = set()
+        for key in (
+            pygame.K_a,
+            pygame.K_d,
+            pygame.K_e,
+            pygame.K_i,
+            pygame.K_j,
+            pygame.K_k,
+            pygame.K_LEFTBRACKET,
+            pygame.K_p,
+            pygame.K_q,
+            pygame.K_RIGHTBRACKET,
+            pygame.K_s,
+            pygame.K_w,
+            pygame.K_0,
+            pygame.K_9,
+        ):
+            if self._key_pressed(keys, key):
+                pressed_keys.add(key)
+        return frozenset(pressed_keys)
+
+    def _sample_keyboard_motion_state(
+        self,
+        keys: frozenset[int] | None,
+    ) -> MandelbrotMotionState | None:
+        if keys is None:
+            return None
+
         def pressed(key: int) -> bool:
-            try:
-                return bool(keys[key])
-            except (IndexError, KeyError):
-                return False
+            return key in keys
 
         return MandelbrotMotionState(
             move_x=float(pressed(pygame.K_d)) - float(pressed(pygame.K_a)),
@@ -195,6 +205,42 @@ class KeyboardControls:
             increase_iterations=pressed(pygame.K_j),
             decrease_iterations=pressed(pygame.K_k),
         )
+
+    def _sample_keyboard_commands(
+        self,
+        keys: frozenset[int] | None,
+    ) -> tuple[MandelbrotCommand, ...]:
+        if keys is None:
+            self._last_sampled_keys = frozenset()
+            return ()
+
+        tapped = keys - self._last_sampled_keys
+        self._last_sampled_keys = keys
+        commands: list[MandelbrotCommand] = []
+        if pygame.K_RIGHTBRACKET in tapped:
+            commands.append(NextViewModeCommand(source="keyboard.right_bracket"))
+        if pygame.K_LEFTBRACKET in tapped:
+            commands.append(PreviousViewModeCommand(source="keyboard.left_bracket"))
+        if pygame.K_i in tapped:
+            commands.append(ToggleDebugCommand(source="keyboard.i"))
+        if pygame.K_p in tapped:
+            commands.append(ToggleFpsCommand(source="keyboard.p"))
+        if pygame.K_0 in tapped:
+            commands.append(
+                SetOrientationCommand(source="keyboard.0", orientation_kind="rectangle")
+            )
+        if pygame.K_9 in tapped:
+            commands.append(
+                SetOrientationCommand(source="keyboard.9", orientation_kind="cube")
+            )
+        return tuple(commands)
+
+    @staticmethod
+    def _key_pressed(keys: pygame.key.ScancodeWrapper, key: int) -> bool:
+        try:
+            return bool(keys[key])
+        except (IndexError, KeyError):
+            return False
 
     @staticmethod
     def _has_keyboard_input(state: MandelbrotMotionState) -> bool:

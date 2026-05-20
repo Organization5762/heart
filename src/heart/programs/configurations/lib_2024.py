@@ -45,7 +45,7 @@ def configure(loop: GameLoop) -> None:
                 "faye",
                 "big W",
                 "spriha",
-                "andrew",
+                "popov",
                 "mel",
                 "stu",
                 "elena",
