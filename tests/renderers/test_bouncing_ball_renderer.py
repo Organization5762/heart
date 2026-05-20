@@ -39,7 +39,7 @@ class TestBouncingBallRenderer:
         assert near_depth > far_depth
         assert near_radius > far_radius
 
-    def test_far_projection_converges_toward_adjacent_wall_precipice(self) -> None:
+    def test_far_projection_converges_toward_centered_far_wall(self) -> None:
         renderer = BouncingBallRenderer()
         rect = pygame.Rect(0, 0, 100, 80)
 
@@ -50,55 +50,45 @@ class TestBouncingBallRenderer:
         )
 
         assert far_depth == 0.0
-        assert projected_x > rect.centerx
+        assert abs(projected_x - rect.centerx) <= 1
         assert abs(projected_y - rect.centery) <= 1
 
-    def test_precipice_point_uses_lateral_side_of_face(self) -> None:
-        rect = pygame.Rect(10, 20, 80, 60)
+    def test_camera_space_rotates_with_cube_side(self) -> None:
+        position = BallPosition(x=0.8, y=0.25, z=-0.4)
 
-        assert BouncingBallRenderer._precipice_point(rect=rect, lateral=0.5) == (
-            rect.right - 1,
-            rect.centery,
+        side_zero = BouncingBallRenderer._camera_space(
+            position=position,
+            side_index=0,
         )
-        assert BouncingBallRenderer._precipice_point(rect=rect, lateral=-0.5) == (
-            rect.left,
-            rect.centery,
+        side_one = BouncingBallRenderer._camera_space(
+            position=position,
+            side_index=1,
         )
 
-    def test_face_lateral_rotates_with_cube_side(self) -> None:
-        position = BallPosition(x=0.8, y=0.0, z=-0.4)
+        assert side_zero == (0.8, 0.25, 0.4)
+        assert side_one == (-0.4, 0.25, 0.8)
 
-        assert BouncingBallRenderer._face_lateral(position=position, side_index=0) > 0.0
-        assert BouncingBallRenderer._face_lateral(position=position, side_index=1) < 0.0
-
-    def test_adjacent_panel_polygon_projects_from_selected_side_edge(self) -> None:
+    def test_project_wall_centers_far_wall_inside_panel(self) -> None:
         rect = pygame.Rect(0, 0, 100, 80)
 
-        right_panel = BouncingBallRenderer._adjacent_panel_polygon(
-            rect=rect,
-            lateral=1.0,
-        )
-        left_panel = BouncingBallRenderer._adjacent_panel_polygon(
-            rect=rect,
-            lateral=-1.0,
-        )
+        far_wall = BouncingBallRenderer._project_wall(rect=rect, depth=-1.0)
 
-        assert right_panel[0][0] == rect.right - 1
-        assert right_panel[2][0] < right_panel[0][0]
-        assert left_panel[0][0] == rect.left
-        assert left_panel[2][0] > left_panel[0][0]
+        assert far_wall[0][0] > rect.left
+        assert far_wall[1][0] < rect.right
+        assert far_wall[0][1] > rect.top
+        assert far_wall[2][1] < rect.bottom
 
-    def test_runway_segments_stack_toward_precipice_by_hypotenuse(self) -> None:
+    def test_runway_segments_stack_toward_centered_far_wall(self) -> None:
         rect = pygame.Rect(0, 0, 96, 64)
 
-        segments = BouncingBallRenderer._runway_segments(rect=rect, lateral=1.0)
+        segments = BouncingBallRenderer._runway_segments(rect=rect)
 
         assert len(segments) >= 6
         first_floor_start, first_floor_end = segments[0]
         last_floor_start, last_floor_end = segments[-2]
         assert first_floor_start[1] > last_floor_start[1]
-        assert first_floor_end[0] <= rect.right - 1
-        assert last_floor_end[0] <= rect.right - 1
+        assert first_floor_start[0] < last_floor_start[0]
+        assert first_floor_end[0] > last_floor_end[0]
 
     def test_state_bounces_off_side_and_top_walls(self) -> None:
         renderer = BouncingBallRenderer()
