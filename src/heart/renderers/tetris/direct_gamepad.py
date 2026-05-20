@@ -15,18 +15,16 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           DpadType,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
+from heart.peripheral.gamepad.screen_mapping import (
+    bluetooth_mac_for_screen_slot,
+    normalize_bluetooth_mac,
+)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 LINUX_JOYSTICK_SYSFS = Path("/sys/class/input")
 STICK_LOG_THRESHOLD = 0.35
-TETRIS_SLOT_BLUETOOTH_MACS: tuple[str | None, ...] = (
-    "E4:17:D8:E9:76:C8",  # 8BitDo Lite 2
-    "E4:17:D8:43:5C:48",  # 8BitDo Lite 2
-    "E4:17:D8:58:22:8A",  # 8BitDo Lite 2
-    "E4:17:D8:91:15:35",  # 8BitDo Lite 2
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,13 +216,11 @@ def _mapped_joystick_index(slot: int) -> int | None:
 
 
 def _target_bluetooth_mac(slot: int) -> str | None:
-    if slot >= len(TETRIS_SLOT_BLUETOOTH_MACS):
-        return None
-    return TETRIS_SLOT_BLUETOOTH_MACS[slot]
+    return bluetooth_mac_for_screen_slot(slot)
 
 
 def _normalize_bluetooth_mac(mac_address: str) -> str:
-    return mac_address.replace(":", "").lower()
+    return normalize_bluetooth_mac(mac_address)
 
 
 def _mapping_for_joystick(joystick: pygame.joystick.JoystickType) -> SwitchLikeMapping:

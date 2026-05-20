@@ -20,6 +20,7 @@ from heart.renderers.mario.renderer import MarioRenderer
 from heart.renderers.multicolor import MulticolorRenderer
 from heart.renderers.palette_tunnel import PaletteTunnelScene
 from heart.renderers.pranay_sketch import PranaySketchRenderer
+from heart.renderers.reaction_time import ReactionTimeRenderer
 from heart.renderers.rock_paper_scissors import add_rock_paper_scissors_mode
 from heart.renderers.spritesheet import SpritesheetLoop
 from heart.renderers.spritesheet_random import SpritesheetLoopRandom
@@ -235,6 +236,9 @@ def configure(loop: GameLoop) -> None:
 
     tetris_mode = loop.add_mode("tetris")
     tetris_mode.add_renderer(TetrisRenderer)
+
+    reaction_mode = loop.add_mode(centered_text_title("reaction"))
+    reaction_mode.add_renderer(ReactionTimeRenderer(randomness=randomness))
 
     pranay_mode = loop.add_mode(friend_beacon_text(text=PRANAY_SKETCH_MODE_TITLE))
     pranay_mode.add_renderer(PranaySketchRenderer())
