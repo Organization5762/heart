@@ -281,7 +281,10 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
             self._gamepads(),
             key=lambda candidate: candidate.joystick_id,
         ):
-            snapshot = controller.snapshot_for_gamepad(gamepad, consume_taps=False)
+            snapshot = controller.sample(
+                joystick_id=gamepad.joystick_id,
+                include_tapped_buttons=False,
+            )
             if not snapshot.connected:
                 continue
             connected.append(snapshot)

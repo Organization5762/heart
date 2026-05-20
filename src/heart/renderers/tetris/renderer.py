@@ -7,6 +7,7 @@ from dataclasses import replace
 import pygame
 
 from heart import DeviceDisplayMode
+from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
@@ -30,8 +31,6 @@ HUD_PANEL_COLOR = pygame.Color(0, 3, 7)
 BOARD_BACKGROUND_COLOR = pygame.Color(0, 0, 0)
 BOARD_BORDER_COLOR = pygame.Color(40, 255, 226)
 BOARD_BORDER_SHADOW_COLOR = pygame.Color(0, 78, 148)
-GRID_COLOR = pygame.Color(24, 35, 45)
-GHOST_COLOR = pygame.Color(88, 96, 118)
 GARBAGE_WARNING_COLOR = pygame.Color(255, 70, 80)
 GAME_OVER_COLOR = pygame.Color(255, 35, 60)
 WIN_OVERLAY_COLOR = pygame.Color(255, 228, 68)
@@ -54,21 +53,10 @@ TETRIS_PALETTE: dict[TetrisColor, pygame.Color] = {
     TetrisColor.GARBAGE: pygame.Color(82, 88, 103),
 }
 RNG_NAMESPACE = "tetris"
+PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 PREVIEW_CELL_SIZE_PX = 2
 NEXT_PREVIEW_COUNT = 6
 logger = get_logger(__name__)
-
-
-def _blend_color(
-    color: pygame.Color,
-    target: pygame.Color,
-    amount: float,
-) -> pygame.Color:
-    return pygame.Color(
-        int(color.r + ((target.r - color.r) * amount)),
-        int(color.g + ((target.g - color.g) * amount)),
-        int(color.b + ((target.b - color.b) * amount)),
-    )
 
 
 class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
@@ -84,6 +72,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         self._fonts: dict[int, pygame.font.Font] = {}
         self._last_logged_controls_by_player: dict[int, tuple[object, ...]] = {}
         self._gamepads = DirectTetrisGamepads()
+        self._native_surface: pygame.Surface | None = None
 
     def _create_initial_state(
         self,
@@ -123,8 +112,30 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                 queue_garbage_for_opponents(self.state, player_index, cleared)
             update_match_end_state(self.state)
 
-        window.fill(BACKGROUND_COLOR)
-        self._render_players(window.screen, orientation)
+        render_target = self._native_render_target(window)
+        render_target.fill((0, 0, 0, 0))
+        pygame.draw.rect(
+            render_target,
+            BACKGROUND_COLOR,
+            pygame.Rect((0, 0), window.device.full_display_size()),
+        )
+        self._render_players(
+            render_target,
+            window.device.individual_display_size(),
+            orientation.layout.columns,
+        )
+        if render_target is not window.screen:
+            pygame.transform.scale(render_target, window.screen.get_size(), window.screen)
+
+    def _native_render_target(self, window: DisplayContext) -> pygame.Surface:
+        if window.screen is None:
+            raise RuntimeError("TetrisRenderer requires an initialized display surface")
+        native_size = window.device.full_display_size()
+        if window.screen.get_size() == native_size:
+            return window.screen
+        if self._native_surface is None or self._native_surface.get_size() != native_size:
+            self._native_surface = pygame.Surface(native_size, pygame.SRCALPHA)
+        return self._native_surface
 
     def _elapsed_ms(self, window: DisplayContext) -> float:
         if window.clock is None:
@@ -259,14 +270,14 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
     def _render_players(
         self,
         screen: pygame.Surface,
-        orientation: Orientation,
+        panel_size: tuple[int, int],
+        panel_columns: int,
     ) -> None:
-        panel_width = screen.get_width() // orientation.layout.columns
-        panel_height = screen.get_height() // orientation.layout.rows
-        render_scale = max(1, min(panel_width // 64, panel_height // 64))
+        panel_width, panel_height = panel_size
+        columns = max(1, panel_columns)
         for player_index, player in enumerate(self.state.players):
-            col = player_index % orientation.layout.columns
-            row = player_index // orientation.layout.columns
+            col = player_index % columns
+            row = player_index // columns
             panel = pygame.Rect(
                 col * panel_width,
                 row * panel_height,
@@ -278,7 +289,6 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                 panel,
                 player,
                 player_index,
-                render_scale,
             )
 
     def _render_player_panel(
@@ -287,61 +297,58 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         panel: pygame.Rect,
         player: TetrisPlayerState,
         player_index: int,
-        render_scale: int,
     ) -> None:
         pygame.draw.rect(screen, PANEL_BACKGROUND_COLOR, panel)
         accent = PLAYER_ACCENT_COLORS[player_index % len(PLAYER_ACCENT_COLORS)]
-        cell_size = CELL_SIZE_PX * render_scale
-        preview_cell_size = PREVIEW_CELL_SIZE_PX * render_scale
+        cell_size = CELL_SIZE_PX
+        preview_cell_size = PREVIEW_CELL_SIZE_PX
         board_width_px = BOARD_WIDTH * cell_size
         board_height_px = BOARD_HEIGHT * cell_size
-        board_total_width = board_width_px + (2 * render_scale)
-        board_total_height = board_height_px + (2 * render_scale)
-        board_left = panel.left + ((panel.width - board_total_width) // 2) + render_scale
+        board_total_width = board_width_px + 2
+        board_total_height = board_height_px + 2
+        board_left = panel.left + ((panel.width - board_total_width) // 2) + 1
         board_top = (
             panel.top
-            + max(render_scale, (panel.height - board_total_height) // 2)
-            + render_scale
+            + max(1, (panel.height - board_total_height) // 2)
+            + 1
         )
         board_rect = pygame.Rect(
-            board_left - render_scale,
-            board_top - render_scale,
-            board_width_px + (2 * render_scale),
-            board_height_px + (2 * render_scale),
+            board_left - 1,
+            board_top - 1,
+            board_width_px + 2,
+            board_height_px + 2,
         )
         hold_rect = pygame.Rect(
-            panel.left + render_scale,
-            panel.top + render_scale,
-            max(1, board_rect.left - panel.left - (3 * render_scale)),
-            19 * render_scale,
+            panel.left + 1,
+            panel.top + 1,
+            max(1, board_rect.left - panel.left - 3),
+            19,
         )
         garbage_rect = pygame.Rect(
             hold_rect.left,
-            hold_rect.bottom + (2 * render_scale),
+            hold_rect.bottom + 2,
             hold_rect.width,
-            max(1, panel.bottom - hold_rect.bottom - (3 * render_scale)),
+            max(1, panel.bottom - hold_rect.bottom - 3),
         )
         next_rect = pygame.Rect(
-            board_rect.right + (2 * render_scale),
-            panel.top + render_scale,
-            max(1, panel.right - board_rect.right - (3 * render_scale)),
-            panel.height - (2 * render_scale),
+            board_rect.right + 2,
+            panel.top + 1,
+            max(1, panel.right - board_rect.right - 3),
+            panel.height - 2,
         )
-        self._draw_hud_frame(screen, hold_rect, accent, render_scale)
-        self._draw_hud_frame(screen, garbage_rect, accent, render_scale)
-        self._draw_hud_frame(screen, board_rect, accent, render_scale)
-        self._draw_hud_frame(screen, next_rect, accent, render_scale)
-        board_inner = board_rect.inflate(-2 * render_scale, -2 * render_scale)
+        self._draw_hud_frame(screen, hold_rect, accent)
+        self._draw_hud_frame(screen, garbage_rect, accent)
+        self._draw_hud_frame(screen, board_rect, accent)
+        self._draw_hud_frame(screen, next_rect, accent)
+        board_inner = board_rect.inflate(-2, -2)
         pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, board_inner)
         self._render_board(screen, board_left, board_top, player, cell_size)
-        self._render_ghost(screen, board_left, board_top, player, cell_size)
         self._render_active_piece(screen, board_left, board_top, player, cell_size)
         self._render_hold_panel(
             screen,
             hold_rect,
             player,
             accent,
-            render_scale,
             preview_cell_size,
         )
         self._render_next_panel(
@@ -349,37 +356,34 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
             next_rect,
             player,
             accent,
-            render_scale,
             preview_cell_size,
         )
         self._render_garbage_meter(
             screen,
             garbage_rect,
             player,
-            render_scale,
         )
         if player.game_over:
             self._render_game_over(screen, board_rect)
         if self.state.match_finished:
-            self._render_match_result(screen, panel, board_rect, player_index, render_scale)
+            self._render_match_result(screen, panel, board_rect, player_index)
 
     def _draw_hud_frame(
         self,
         screen: pygame.Surface,
         rect: pygame.Rect,
         accent: pygame.Color,
-        render_scale: int,
     ) -> None:
         pygame.draw.rect(screen, BOARD_BORDER_SHADOW_COLOR, rect)
-        pygame.draw.rect(screen, BOARD_BORDER_COLOR, rect, render_scale)
-        inner = rect.inflate(-2 * render_scale, -2 * render_scale)
+        pygame.draw.rect(screen, BOARD_BORDER_COLOR, rect, 1)
+        inner = rect.inflate(-2, -2)
         if inner.width <= 0 or inner.height <= 0:
             return
-        pygame.draw.rect(screen, BOARD_BORDER_COLOR, inner, render_scale)
-        content = inner.inflate(-2 * render_scale, -2 * render_scale)
+        pygame.draw.rect(screen, BOARD_BORDER_COLOR, inner, 1)
+        content = inner.inflate(-2, -2)
         if content.width > 0 and content.height > 0:
             pygame.draw.rect(screen, HUD_PANEL_COLOR, content)
-        pygame.draw.line(screen, accent, rect.topleft, rect.topright, render_scale)
+        pygame.draw.line(screen, accent, rect.topleft, rect.topright, 1)
 
     def _render_board(
         self,
@@ -391,35 +395,9 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
     ) -> None:
         for y, row in enumerate(player.board):
             for x, color in enumerate(row):
-                rect = self._cell_rect(board_left, board_top, x, y, cell_size)
-                if color is None:
-                    pygame.draw.rect(screen, GRID_COLOR, rect, 1)
-                else:
+                if color is not None:
+                    rect = self._cell_rect(board_left, board_top, x, y, cell_size)
                     self._draw_block(screen, rect, TETRIS_PALETTE[color])
-
-    def _render_ghost(
-        self,
-        screen: pygame.Surface,
-        board_left: int,
-        board_top: int,
-        player: TetrisPlayerState,
-        cell_size: int,
-    ) -> None:
-        if player.active is None or player.game_over:
-            return
-        ghost = player.active
-        while not self._piece_collides(player, ghost.moved(0, 1)):
-            ghost = ghost.moved(0, 1)
-        if ghost == player.active:
-            return
-        for x, y in ghost.cells():
-            if y >= 0:
-                pygame.draw.rect(
-                    screen,
-                    GHOST_COLOR,
-                    self._cell_rect(board_left, board_top, x, y, cell_size),
-                    max(1, cell_size // 3),
-                )
 
     def _render_active_piece(
         self,
@@ -443,16 +421,15 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         panel: pygame.Rect,
         player: TetrisPlayerState,
         accent: pygame.Color,
-        render_scale: int,
         preview_cell_size: int,
     ) -> None:
-        self._render_mini_label(screen, "H", panel.centerx, panel.top, accent, render_scale)
+        del accent
         if player.hold_piece is not None:
             self._render_preview_piece(
                 screen,
                 player.hold_piece,
-                panel.left + (2 * render_scale),
-                panel.top + (7 * render_scale),
+                panel.left + 2,
+                panel.top + 7,
                 cell_size=preview_cell_size,
                 dim=player.hold_used,
             )
@@ -463,34 +440,18 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         panel: pygame.Rect,
         player: TetrisPlayerState,
         accent: pygame.Color,
-        render_scale: int,
         preview_cell_size: int,
     ) -> None:
-        self._render_mini_label(screen, "N", panel.centerx, panel.top, accent, render_scale)
-        preview_x = panel.left + (2 * render_scale)
+        del accent
+        preview_x = panel.left + 2
         for index, kind in enumerate(list(player.next_queue)[:NEXT_PREVIEW_COUNT]):
             self._render_preview_piece(
                 screen,
                 kind,
                 preview_x,
-                panel.top + ((6 + (index * 9)) * render_scale),
+                panel.top + 6 + (index * 9),
                 cell_size=preview_cell_size,
             )
-
-    def _render_mini_label(
-        self,
-        screen: pygame.Surface,
-        label: str,
-        x: int,
-        y: int,
-        color: pygame.Color,
-        render_scale: int,
-    ) -> None:
-        font = self._tiny_font(render_scale)
-        surface = font.render(label, False, color)
-        rect = surface.get_rect()
-        rect.midtop = (x, y)
-        screen.blit(surface, rect)
 
     def _render_preview_piece(
         self,
@@ -519,16 +480,15 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         screen: pygame.Surface,
         panel: pygame.Rect,
         player: TetrisPlayerState,
-        render_scale: int,
     ) -> None:
-        fill_bottom = panel.bottom - (2 * render_scale)
-        bar_height = 4 * render_scale
+        fill_bottom = panel.bottom - 2
+        bar_height = 4
         for index in range(min(player.pending_garbage, 9)):
             rect = pygame.Rect(
-                panel.left + (2 * render_scale),
+                panel.left + 2,
                 fill_bottom - ((index + 1) * bar_height),
-                max(1, panel.width - (4 * render_scale)),
-                max(1, bar_height - render_scale),
+                max(1, panel.width - 4),
+                max(1, bar_height - 1),
             )
             pygame.draw.rect(screen, GARBAGE_WARNING_COLOR, rect)
 
@@ -539,27 +499,6 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         color: pygame.Color,
     ) -> None:
         pygame.draw.rect(screen, color, rect)
-        if rect.width <= 1 or rect.height <= 1:
-            return
-        highlight = _blend_color(color, pygame.Color("white"), 0.44)
-        lowlight = _blend_color(color, pygame.Color("black"), 0.38)
-        bevel = max(1, min(rect.width, rect.height) // 3)
-        pygame.draw.rect(screen, highlight, pygame.Rect(rect.left, rect.top, rect.width, bevel))
-        pygame.draw.rect(screen, highlight, pygame.Rect(rect.left, rect.top, bevel, rect.height))
-        pygame.draw.rect(
-            screen,
-            lowlight,
-            pygame.Rect(rect.left, rect.bottom - bevel, rect.width, bevel),
-        )
-        pygame.draw.rect(
-            screen,
-            lowlight,
-            pygame.Rect(rect.right - bevel, rect.top, bevel, rect.height),
-        )
-        inset = max(1, bevel)
-        inner = rect.inflate(-2 * inset, -2 * inset)
-        if inner.width > 0 and inner.height > 0:
-            pygame.draw.rect(screen, _blend_color(color, pygame.Color("white"), 0.12), inner)
 
     def _render_game_over(
         self,
@@ -590,39 +529,90 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         panel: pygame.Rect,
         board_rect: pygame.Rect,
         player_index: int,
-        render_scale: int,
     ) -> None:
         won = self.state.winner_index == player_index
         overlay = pygame.Surface(panel.size, pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         screen.blit(overlay, panel.topleft)
 
-        card_width = min(panel.width - (6 * render_scale), board_rect.width + (12 * render_scale))
-        card_height = min(panel.height - (8 * render_scale), 28 * render_scale)
+        card_width = min(panel.width - 4, board_rect.width + 16)
+        card_height = min(panel.height - 8, 44)
         card = pygame.Rect(0, 0, max(1, card_width), max(1, card_height))
         card.center = board_rect.center
         pygame.draw.rect(screen, pygame.Color(0, 5, 12), card)
-        pygame.draw.rect(screen, BOARD_BORDER_SHADOW_COLOR, card, max(1, render_scale))
-        pygame.draw.rect(screen, RESTART_BUTTON_COLOR, card.inflate(-2 * render_scale, -2 * render_scale), max(1, render_scale))
+        pygame.draw.rect(screen, BOARD_BORDER_SHADOW_COLOR, card, 1)
+        pygame.draw.rect(screen, RESTART_BUTTON_COLOR, card.inflate(-2, -2), 1)
 
         label = "WIN" if won else "LOSE"
         label_color = WIN_OVERLAY_COLOR if won else LOSE_OVERLAY_COLOR
-        label_font = self._font(max(13, 9 * render_scale))
-        label_surface = label_font.render(label, False, label_color)
-        label_rect = label_surface.get_rect()
-        label_rect.midtop = (card.centerx, card.top + (4 * render_scale))
-        screen.blit(label_surface, label_rect)
+        self._render_centered_result_text(
+            screen,
+            card.inflate(-6, -6),
+            label=label,
+            label_color=label_color,
+        )
 
-        restart_font = self._font(max(8, 5 * render_scale))
-        restart_surface = restart_font.render("PRESS -", False, RESTART_BUTTON_COLOR)
-        restart_rect = restart_surface.get_rect()
-        restart_rect.midtop = (card.centerx, label_rect.bottom + (2 * render_scale))
-        screen.blit(restart_surface, restart_rect)
+    def _render_centered_result_text(
+        self,
+        screen: pygame.Surface,
+        bounds: pygame.Rect,
+        *,
+        label: str,
+        label_color: pygame.Color,
+    ) -> None:
+        surfaces, gaps = self._fit_result_text_surfaces(
+            bounds,
+            label=label,
+            label_color=label_color,
+        )
+        total_height = sum(surface.get_height() for surface in surfaces) + sum(gaps)
+        y = bounds.centery - total_height // 2
+        for surface, gap_after in zip(surfaces, [*gaps, 0]):
+            rect = surface.get_rect()
+            rect.midtop = (bounds.centerx, y)
+            screen.blit(surface, rect)
+            y = rect.bottom + gap_after
 
-        reset_surface = restart_font.render("RESTART", False, pygame.Color("white"))
-        reset_rect = reset_surface.get_rect()
-        reset_rect.midtop = (card.centerx, restart_rect.bottom)
-        screen.blit(reset_surface, reset_rect)
+    def _fit_result_text_surfaces(
+        self,
+        bounds: pygame.Rect,
+        *,
+        label: str,
+        label_color: pygame.Color,
+    ) -> tuple[tuple[pygame.Surface, pygame.Surface, pygame.Surface], tuple[int, int]]:
+        label_size = 12
+        restart_size = 7
+        while label_size >= 7 and restart_size >= 5:
+            label_surface = self._font(label_size).render(label, False, label_color)
+            restart_font = self._font(restart_size)
+            press_surface = restart_font.render(
+                "PRESS -",
+                False,
+                RESTART_BUTTON_COLOR,
+            )
+            reset_surface = restart_font.render("RESTART", False, pygame.Color("white"))
+            surfaces = (label_surface, press_surface, reset_surface)
+            gaps = (2, 0)
+            total_height = (
+                sum(surface.get_height() for surface in surfaces) + sum(gaps)
+            )
+            widest = max(surface.get_width() for surface in surfaces)
+            if total_height <= bounds.height and widest <= bounds.width:
+                return surfaces, gaps
+            label_size -= 1
+            restart_size -= 1
+        return (
+            (
+                self._font(label_size).render(label, False, label_color),
+                self._font(restart_size).render(
+                    "PRESS -",
+                    False,
+                    RESTART_BUTTON_COLOR,
+                ),
+                self._font(restart_size).render("RESTART", False, pygame.Color("white")),
+            ),
+            (1, 0),
+        )
 
     def _cell_rect(
         self,
@@ -639,24 +629,9 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
             cell_size,
         )
 
-    def _piece_collides(
-        self,
-        player: TetrisPlayerState,
-        piece: TetrisPiece,
-    ) -> bool:
-        for x, y in piece.cells():
-            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-                return True
-            if y >= 0 and player.board[y][x] is not None:
-                return True
-        return False
-
-    def _tiny_font(self, render_scale: int) -> pygame.font.Font:
-        return self._font(max(8, 6 * render_scale))
-
     def _font(self, font_size: int) -> pygame.font.Font:
         if font_size not in self._fonts:
             if not pygame.font.get_init():
                 pygame.font.init()
-            self._fonts[font_size] = pygame.font.Font(None, font_size)
+            self._fonts[font_size] = Loader.load_font(PIXEL_FONT_PATH, font_size)
         return self._fonts[font_size]
