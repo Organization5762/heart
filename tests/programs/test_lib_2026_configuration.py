@@ -2,7 +2,8 @@
 
 from heart.display.color import Color
 from heart.navigation import MultiScene
-from heart.programs.configurations.lib_2026 import configure
+from heart.programs.configurations.lib_2026 import (
+    FRIEND_BEACON_COLOR, JUICEBOX_FRIEND_BEACON_COLOR, configure)
 from heart.renderers.bird_flock import BirdFlockRenderer
 from heart.renderers.controller_pairing import ControllerPairingRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
@@ -38,6 +39,35 @@ def test_pair_bluetooth_mode_is_registered(loop) -> None:
         isinstance(renderer, ControllerPairingRenderer)
         for renderer in pair_entry.renderer.renderers
     )
+
+
+def test_juicebox_friend_beacon_title_is_neon_green(loop) -> None:
+    configure(loop)
+
+    friend_beacon_entry = next(
+        entry
+        for entry in loop.components.game_modes.state.entries
+        if isinstance(entry.title_renderer, TextRendering)
+        and entry.title_renderer._provider._text == ("friend\nbeacon",)
+    )
+    multi_scene = next(
+        renderer
+        for renderer in friend_beacon_entry.renderer.renderers
+        if isinstance(renderer, MultiScene)
+    )
+    juicebox_title = next(
+        scene
+        for scene in multi_scene.scenes
+        if scene._provider._text == ("Where's\njuicebox",)
+    )
+    anil_title = next(
+        scene
+        for scene in multi_scene.scenes
+        if scene._provider._text == ("Where's\nanil",)
+    )
+
+    assert juicebox_title._provider._color == JUICEBOX_FRIEND_BEACON_COLOR
+    assert anil_title._provider._color == FRIEND_BEACON_COLOR
 
 
 def test_vibe_title_uses_centered_kirby_title(loop) -> None:
