@@ -47,10 +47,10 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     return val
 
 
-def centered_text_title(text: str) -> TextRendering:
+def centered_text_title(text: str, override_font_size: int = TITLE_FONT_SIZE) -> TextRendering:
     return centered_text(
         text=text,
-        font_size=TITLE_FONT_SIZE,
+        font_size=override_font_size,
         color=Color.kirby(),
         line_height_px=TITLE_LINE_HEIGHT_PX,
         line_spacing_px=TITLE_LINE_SPACING_PX,
@@ -153,13 +153,13 @@ def configure(loop: GameLoop) -> None:
     mandelbulb_mode = loop.add_mode(centered_text_title("bulb"))
     mandelbulb_mode.add_renderer(MandelbulbScene())
 
-    sphere_mode = loop.add_mode(centered_text_title("void sphere"))
+    sphere_mode = loop.add_mode(centered_text_title("void\nsphere", override_font_size=14))
     sphere_mode.add_renderer(FractalScene)
 
-    palette_tunnel_mode = loop.add_mode("gem\ntunnel")
+    palette_tunnel_mode = loop.add_mode(centered_text_title("gem"))
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
-    audio_storm_mode = loop.add_mode("spectrum")
+    audio_storm_mode = loop.add_mode(centered_text_title("spectrum"))
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
