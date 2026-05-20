@@ -13,7 +13,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.tixyland.provider import (MAX_SPEED_SCALE,
                                                TixylandStateProvider)
 from heart.renderers.tixyland.renderer import Tixyland
-from heart.renderers.tixyland.state import TixylandState
+from heart.renderers.tixyland.state import (DEFAULT_TIXYLAND_HUE_DEGREES,
+                                            TixylandState)
 from heart.runtime.display_context import DisplayContext
 
 
@@ -29,6 +30,12 @@ class _Clock:
 
 
 class TestTixyland:
+    def test_default_hue_avoids_red_cast(self) -> None:
+        state = TixylandState()
+
+        assert state.hue_degrees == DEFAULT_TIXYLAND_HUE_DEGREES
+        assert 170.0 <= state.hue_degrees <= 210.0
+
     def test_held_trigger_keeps_scaling_speed(self, monkeypatch) -> None:
         peripheral_manager = PeripheralManager()
         provider = TixylandStateProvider(peripheral_manager)

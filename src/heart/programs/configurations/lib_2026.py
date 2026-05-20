@@ -6,6 +6,7 @@ from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.audio_storm import AudioStormScene
+from heart.renderers.bird_flock import BirdFlockRenderer
 from heart.renderers.bouncing_ball import (BouncingBallRenderer,
                                            BouncingBallStateProvider)
 from heart.renderers.controller_pairing import ControllerPairingRenderer
@@ -32,6 +33,7 @@ from heart.renderers.tixyland import Tixyland, TixylandFactory
 from heart.renderers.vibe import VibeScene
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.renderers.water_title_screen import WaterTitleScreen
+from heart.renderers.waving_tree import WavingTreeRenderer
 from heart.runtime.game_loop import GameLoop
 
 TITLE_TILE_HEIGHT_PX = 64
@@ -269,12 +271,17 @@ def configure(loop: GameLoop) -> None:
                 build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
                 build_tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
             ],
-            enable_dpad_scene_selection=False,
         )
     )
 
     life = loop.add_mode("life")
     life.add_renderer(Life)
+
+    birds = loop.add_mode(centered_text_title("birds"))
+    birds.add_renderer(BirdFlockRenderer())
+
+    tree = loop.add_mode(centered_text_title("tree"))
+    tree.add_renderer(WavingTreeRenderer())
 
     spooky = loop.add_mode("spook")
     spooky.add_renderer(

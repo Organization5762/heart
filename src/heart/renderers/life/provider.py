@@ -3,6 +3,7 @@ from typing import Callable
 import numpy as np
 from manyfold import MergeNode, StreamNode
 
+from heart.peripheral.core.input import GamepadButton, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.life.state import LifeState
@@ -39,6 +40,9 @@ class LifeStateProvider:
             return lambda _: new_state
 
         def op_from_tick(_: object) -> StateOp:
+            gamepad = self._pm.input_io.gamepad.sample()
+            if _should_reseed_from_gamepad(gamepad):
+                return lambda s: create_state(create_new_grid(s.grid.shape))
             return lambda s: s._update_grid()
 
         window_sizes: StreamNode[tuple[int, int]] = (
@@ -74,3 +78,7 @@ class LifeStateProvider:
 
         )
         return result
+
+
+def _should_reseed_from_gamepad(gamepad: GamepadSnapshot) -> bool:
+    return gamepad.connected and gamepad.button_tapped(GamepadButton.PLUS)
