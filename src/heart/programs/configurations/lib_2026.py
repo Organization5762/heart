@@ -159,7 +159,7 @@ def configure(loop: GameLoop) -> None:
     palette_tunnel_mode = loop.add_mode(centered_text_title("gem"))
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
-    audio_storm_mode = loop.add_mode(centered_text_title("spectrum"))
+    audio_storm_mode = loop.add_mode(centered_text_title("spectrum", override_font_size=12))
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
