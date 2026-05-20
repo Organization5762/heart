@@ -16,8 +16,7 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.core.input.frame import FrameTick, FrameTickController
-from heart.peripheral.core.input.gamepad import (GamepadController,
-                                                 GamepadSnapshot)
+from heart.peripheral.core.input.gamepad import GamepadController
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
 from heart.peripheral.core.input.peripheral_inputs import PeripheralInputBus
@@ -36,6 +35,12 @@ from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 FINAL_FRAME_ROUTE = runtime_route("window", "HeartRuntimeWindow")
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 TNavigationIntent = TypeVar("TNavigationIntent", bound=NavigationIntent)
+
+
+@dataclass
+class SwitchStateEvent:
+    source_id: str
+    state: SwitchState
 
 
 @dataclass
@@ -124,13 +129,15 @@ class InputIO:
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
         return tuple(self.peripheral_source())
 
-    def main_switch_stream(self) -> StreamNode[SwitchState]:
+    def main_switch_stream(self) -> StreamNode[SwitchStateEvent]:
         return self._switch_stream(include_fake_switches=True)
 
-    def physical_main_switch_stream(self) -> StreamNode[SwitchState]:
+    def physical_main_switch_stream(self) -> StreamNode[SwitchStateEvent]:
         return self._switch_stream(include_fake_switches=False)
 
-    def _switch_stream(self, *, include_fake_switches: bool) -> StreamNode[SwitchState]:
+    def _switch_stream(
+        self, *, include_fake_switches: bool
+    ) -> StreamNode[SwitchStateEvent]:
         streams = [
             peripheral.observe
             for peripheral in self.peripherals
@@ -139,9 +146,7 @@ class InputIO:
         ]
         if not streams:
             return EmptyNode().observable()
-        return MergeNode.merge(*streams).map(
-            PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
-        )
+        return MergeNode.merge(*streams).map(_switch_state_event)
 
     @cached_property
     def all_accelerometers(self) -> StreamNode[Acceleration]:
@@ -167,9 +172,6 @@ class InputIO:
 
     def keyboard_snapshots(self) -> StreamNode[KeyboardSnapshot]:
         return self.keyboard.snapshot_stream()
-
-    def gamepad_snapshots(self) -> StreamNode[GamepadSnapshot]:
-        return self.gamepad.snapshot_stream()
 
     def frame_tick_stream(self) -> StreamNode[FrameTick]:
         return self.frame_ticks.observable()
@@ -245,49 +247,64 @@ class InputIO:
         )
 
     def switch_browse_intents(
-        self, switch_updates: StreamNode[SwitchState]
+        self, switch_updates: StreamNode[SwitchStateEvent]
     ) -> StreamNode[BrowseIntent]:
-        return (
-            switch_updates.pairwise()
-            .map(lambda latest: latest[1].rotational_value - latest[0].rotational_value)
-            .filter(lambda delta: delta != 0)
-            .map(lambda delta: BrowseIntent(source="switch.rotary", step=delta))
-        )
+        output: EventStream[BrowseIntent] = EventStream()
+        previous_by_source: dict[str, int] = {}
+
+        def emit_delta(event: SwitchStateEvent) -> None:
+            previous = previous_by_source.get(event.source_id)
+            current = event.state.rotational_value
+            if previous is not None:
+                delta = current - previous
+                if delta != 0:
+                    output.emit(BrowseIntent(source="switch.rotary", step=delta))
+            previous_by_source[event.source_id] = current
+
+        switch_updates.subscribe(emit_delta)
+        return output
 
     def switch_activate_intents(
-        self, switch_updates: StreamNode[SwitchState]
+        self, switch_updates: StreamNode[SwitchStateEvent]
     ) -> StreamNode[ActivateIntent]:
         return _counter_increase_intents(
             switch_updates,
-            lambda state: state.button_value,
+            lambda event: event.state.button_value,
             lambda: ActivateIntent(source="switch.button"),
         )
 
     def switch_alternate_activate_intents(
-        self, switch_updates: StreamNode[SwitchState]
+        self, switch_updates: StreamNode[SwitchStateEvent]
     ) -> StreamNode[AlternateActivateIntent]:
         return _counter_increase_intents(
             switch_updates,
-            lambda state: state.long_button_value,
+            lambda event: event.state.long_button_value,
             lambda: AlternateActivateIntent(source="switch.long_button"),
         )
 
 
 def _counter_increase_intents(
-    source: StreamNode[SwitchState],
-    counter_value: Callable[[SwitchState], int],
+    source: StreamNode[SwitchStateEvent],
+    counter_value: Callable[[SwitchStateEvent], int],
     create_intent: Callable[[], TNavigationIntent],
 ) -> StreamNode[TNavigationIntent]:
     output: EventStream[TNavigationIntent] = EventStream()
-    previous: int | None = None
+    previous_by_source: dict[str, int] = {}
 
-    def emit_increases(state: SwitchState) -> None:
-        nonlocal previous
-        current = counter_value(state)
+    def emit_increases(event: SwitchStateEvent) -> None:
+        previous = previous_by_source.get(event.source_id)
+        current = counter_value(event)
         if previous is not None:
             for _ in range(max(0, current - previous)):
                 output.emit(create_intent())
-        previous = current
+        previous_by_source[event.source_id] = current
 
     source.subscribe(emit_increases)
     return output
+
+
+def _switch_state_event(
+    envelope: PeripheralMessageEnvelope[SwitchState],
+) -> SwitchStateEvent:
+    source_id = envelope.peripheral_info.id or "switch:unknown"
+    return SwitchStateEvent(source_id=source_id, state=envelope.data)

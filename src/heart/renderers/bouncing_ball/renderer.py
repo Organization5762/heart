@@ -26,8 +26,9 @@ HIGHLIGHT_COLOR = (255, 255, 255)
 CRADLE_BALL_COUNT = 5
 CRADLE_PERIOD_SECONDS = 2.6
 CRADLE_MAX_SWING_RADIANS = 0.92
-CRADLE_VIEW_SIDE = "side"
 CRADLE_VIEW_FRONT = "front"
+CRADLE_VIEW_LEFT_SIDE = "left_side"
+CRADLE_VIEW_RIGHT_SIDE = "right_side"
 
 
 class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
@@ -117,7 +118,9 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
 
     @staticmethod
     def _panel_view(panel_index: int) -> str:
-        return CRADLE_VIEW_SIDE if panel_index % 2 == 0 else CRADLE_VIEW_FRONT
+        if panel_index % 2 == 1:
+            return CRADLE_VIEW_FRONT
+        return CRADLE_VIEW_LEFT_SIDE if panel_index % 4 == 0 else CRADLE_VIEW_RIGHT_SIDE
 
     def _draw_cradle(
         self,
@@ -138,7 +141,7 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         pygame.draw.line(screen, FRAME_COLOR, frame.bottomleft, frame.topleft, 1)
         pygame.draw.line(screen, FRAME_COLOR, frame.bottomright, frame.topright, 1)
 
-        if view == CRADLE_VIEW_SIDE:
+        if view in (CRADLE_VIEW_LEFT_SIDE, CRADLE_VIEW_RIGHT_SIDE):
             self._draw_side_view(
                 screen=screen,
                 rect=rect,
@@ -146,6 +149,7 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
                 string_length=string_length,
                 radius=radius,
                 swing_angles=swing_angles,
+                view=view,
             )
         else:
             self._draw_front_view(
@@ -196,8 +200,10 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         string_length: int,
         radius: int,
         swing_angles: tuple[float, ...],
+        view: str,
     ) -> None:
         base_x = rect.centerx
+        view_sign = -1.0 if view == CRADLE_VIEW_LEFT_SIDE else 1.0
         bob_positions: list[tuple[int, int]] = []
         for index in range(CRADLE_BALL_COUNT):
             angle = swing_angles[index]
@@ -211,16 +217,26 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
 
         for index, center in sorted(
             enumerate(bob_positions),
-            key=lambda item: self._side_view_depth_scale(swing_angles[item[0]]),
+            key=lambda item: (
+                abs(swing_angles[item[0]]) > 0.01,
+                self._side_view_depth_scale(
+                    swing_angles[item[0]],
+                    view_sign=view_sign,
+                ),
+            ),
         ):
-            depth_scale = self._side_view_depth_scale(swing_angles[index])
+            depth_scale = self._side_view_depth_scale(
+                swing_angles[index],
+                view_sign=view_sign,
+            )
             scaled_radius = max(2, round(radius * depth_scale))
+            active = abs(swing_angles[index]) > 0.01
             self._draw_cradle_ball(
                 screen=screen,
                 center=center,
                 radius=scaled_radius,
-                active=abs(swing_angles[index]) > 0.01,
-                core_color=BALL_EDGE_COLOR if depth_scale > 1.05 else BALL_CORE_COLOR,
+                active=active,
+                core_color=BALL_EDGE_COLOR if active else BALL_CORE_COLOR,
             )
 
     @staticmethod
@@ -261,8 +277,9 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         return (left_angle, 0.0, 0.0, 0.0, right_angle)
 
     @staticmethod
-    def _side_view_depth_scale(angle: float) -> float:
-        return 0.72 + abs(math.sin(angle)) * 1.18
+    def _side_view_depth_scale(angle: float, *, view_sign: float) -> float:
+        signed_depth = math.sin(angle) * view_sign
+        return 0.72 + max(0.0, signed_depth) * 1.18
 
     def _draw_cradle_ball(
         self,

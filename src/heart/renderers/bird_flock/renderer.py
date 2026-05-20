@@ -10,7 +10,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.bird_flock.state import Bird, BirdFlockState
@@ -86,18 +86,20 @@ class BirdFlockRenderer(StatefulBaseRenderer[BirdFlockState]):
         now_s = time.monotonic()
         width, height = window.get_size()
         dt = min(max(now_s - self.state.last_time_s, 0.0), 0.06)
-        gamepad = self._sample_gamepad()
-        birds = self._apply_count_control(
-            birds=self.state.birds,
-            gamepad=gamepad,
-            width=width,
-            height=height,
-        )
-        hue_degrees = _controlled_hue(
-            hue_degrees=self.state.hue_degrees,
-            gamepad=gamepad,
-            dt=dt,
-        )
+        birds = self.state.birds
+        hue_degrees = self.state.hue_degrees
+        for event in self._sample_gamepads():
+            birds = self._apply_count_control(
+                birds=birds,
+                gamepad=event.snapshot,
+                width=width,
+                height=height,
+            )
+            hue_degrees = _controlled_hue(
+                hue_degrees=hue_degrees,
+                gamepad=event.snapshot,
+                dt=dt,
+            )
         state = BirdFlockState(
             birds=self._advance_birds(
                 birds=birds,
@@ -117,9 +119,9 @@ class BirdFlockRenderer(StatefulBaseRenderer[BirdFlockState]):
             bird_color=_bird_color(hue_degrees),
         )
 
-    def _sample_gamepad(self) -> GamepadSnapshot:
+    def _sample_gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
         if self._peripheral_manager is None:
-            return GamepadSnapshot(connected=False, identifier=None)
+            return ()
         return self._peripheral_manager.input_io.gamepad.sample(
             include_tapped_buttons=False
         )

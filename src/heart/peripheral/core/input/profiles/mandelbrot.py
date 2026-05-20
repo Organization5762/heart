@@ -10,7 +10,7 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.gamepad import (
     DEFAULT_GAMEPAD_AXIS_DEAD_ZONE, GamepadAxis, GamepadButton,
-    GamepadController, GamepadSnapshot)
+    GamepadController, GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
 from heart.peripheral.core.input.streams import map_stream
@@ -150,15 +150,14 @@ class MandelbrotControlProfile:
     @cached_property
     def motion_state(self) -> StreamNode[MandelbrotMotionState]:
         stream = (
-            combine_latest(
-                self._keyboard.snapshot_stream().start_with(
-                    KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
-                ),
-                self._gamepad.snapshot_stream().start_with(
-                    GamepadSnapshot(connected=False, identifier=None)
-                ),
+            self._keyboard.snapshot_stream()
+            .start_with(KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0))
+            .map(
+                lambda keyboard_snapshot: self._to_motion_state_from_gamepad_events(
+                    keyboard_snapshot,
+                    self._gamepad.sample(include_tapped_buttons=False),
+                )
             )
-            .map(lambda latest: self._to_motion_state_from_snapshots(*latest))
             .distinct_until_changed()
 
         )
@@ -172,9 +171,7 @@ class MandelbrotControlProfile:
 
     @cached_property
     def command_events(self) -> StreamNode[MandelbrotCommand]:
-        stream = MergeNode.merge(
-            self._keyboard_command_streams(), self._gamepad_command_streams()
-        )
+        stream = self._keyboard_command_streams()
         return InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.LOGICAL,
@@ -211,15 +208,17 @@ class MandelbrotControlProfile:
         return self._observable
 
     def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
-        return self._to_motion_state_from_snapshots(
+        return self._to_motion_state_from_gamepad_events(
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
             self._gamepad.sample(include_tapped_buttons=False),
         )
 
     def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
-        snapshot = self._gamepad.sample(include_tapped_buttons=False)
         return frozenset(
-            button for button in GamepadButton if snapshot.button_held(button)
+            button
+            for event in self._gamepad.sample(include_tapped_buttons=False)
+            for button in GamepadButton
+            if event.snapshot.button_held(button)
         )
 
     def _keyboard_command_streams(self) -> StreamNode[MandelbrotCommand]:
@@ -252,62 +251,6 @@ class MandelbrotControlProfile:
                     source="keyboard.9", orientation_kind="cube"
                 ),
             ),
-        )
-
-    def _gamepad_command_streams(self) -> StreamNode[MandelbrotCommand]:
-        return MergeNode.merge(
-            map_stream(
-                self._gamepad.button_tapped(GamepadButton.ZR),
-                lambda _button: NextViewModeCommand(source="gamepad.zr"),
-            ),
-            map_stream(
-                self._gamepad.button_tapped(GamepadButton.ZL),
-                lambda _button: PreviousViewModeCommand(source="gamepad.zl"),
-            ),
-            map_stream(
-                self._gamepad.button_tapped(GamepadButton.HOME),
-                lambda _button: ToggleAutoModeCommand(source="gamepad.home"),
-            ),
-            map_stream(
-                self._gamepad.button_tapped(GamepadButton.NORTH),
-                lambda _button: CyclePaletteCommand(
-                    source="gamepad.north", palette_delta=1
-                ),
-            ),
-            map_stream(
-                self._gamepad.button_tapped(GamepadButton.WEST),
-                lambda _button: CyclePaletteCommand(
-                    source="gamepad.west", palette_delta=-1
-                ),
-            ),
-            self._combo_command(
-                GamepadButton.HOME,
-                GamepadButton.PLUS,
-                ToggleOrientationCommand(source="gamepad.home_plus"),
-            ),
-            self._combo_command(
-                GamepadButton.HOME,
-                GamepadButton.MINUS,
-                ToggleFpsCommand(source="gamepad.home_minus"),
-            ),
-        )
-
-    def _combo_command(
-        self,
-        modifier: GamepadButton,
-        primary: GamepadButton,
-        command: MandelbrotCommand,
-    ) -> StreamNode[MandelbrotCommand]:
-        return (
-            combine_latest(
-                self._gamepad.button_held(modifier),
-                self._gamepad.button_held(primary),
-            )
-            .map(lambda latest: bool(latest[0]) and bool(latest[1]))
-            .distinct_until_changed()
-            .filter(bool)
-            .map(lambda _active: command)
-
         )
 
     def _apply_command(
@@ -453,6 +396,45 @@ class MandelbrotControlProfile:
             zoom_out=zoom_out,
             increase_iterations=increase_iterations,
             decrease_iterations=decrease_iterations,
+        )
+
+    def _to_motion_state_from_gamepad_events(
+        self,
+        keyboard_snapshot: KeyboardSnapshot,
+        gamepad_events: tuple[GamepadSnapshotEvent, ...],
+    ) -> MandelbrotMotionState:
+        state = self._to_motion_state_from_snapshots(
+            keyboard_snapshot,
+            GamepadSnapshot(connected=False, identifier=None),
+        )
+        for event in gamepad_events:
+            state = self._combine_motion_states(
+                state,
+                self._to_motion_state_from_snapshots(
+                    KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
+                    event.snapshot,
+                ),
+            )
+        return state
+
+    @staticmethod
+    def _combine_motion_states(
+        left: MandelbrotMotionState,
+        right: MandelbrotMotionState,
+    ) -> MandelbrotMotionState:
+        return MandelbrotMotionState(
+            move_x=left.move_x + right.move_x,
+            move_y=left.move_y + right.move_y,
+            pan_x=left.pan_x + right.pan_x,
+            pan_y=left.pan_y + right.pan_y,
+            move_multiplier=max(left.move_multiplier, right.move_multiplier),
+            home_modifier=left.home_modifier or right.home_modifier,
+            plus_held=left.plus_held or right.plus_held,
+            minus_held=left.minus_held or right.minus_held,
+            zoom_in=left.zoom_in or right.zoom_in,
+            zoom_out=left.zoom_out or right.zoom_out,
+            increase_iterations=left.increase_iterations or right.increase_iterations,
+            decrease_iterations=left.decrease_iterations or right.decrease_iterations,
         )
 
     def _to_compatibility_state(

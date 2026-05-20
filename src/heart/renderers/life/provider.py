@@ -40,8 +40,11 @@ class LifeStateProvider:
             return lambda _: new_state
 
         def op_from_tick(_: object) -> StateOp:
-            gamepad = self._pm.input_io.gamepad.sample()
-            if _should_reseed_from_gamepad(gamepad):
+            gamepads = self._pm.input_io.gamepad.sample()
+            if any(
+                _should_reseed_from_gamepad(event.snapshot)
+                for event in gamepads
+            ):
                 return lambda s: create_state(create_new_grid(s.grid.shape))
             return lambda s: s._update_grid()
 
@@ -57,6 +60,7 @@ class LifeStateProvider:
         )
         reseed_states: StreamNode[LifeState] = (
             self._pm.input_io.main_switch_stream()
+            .map(lambda switch_event: switch_event.state)
             .with_latest_from(window_sizes)
             .map(lambda pair: create_new_grid(pair[1]))
             .map(create_state)

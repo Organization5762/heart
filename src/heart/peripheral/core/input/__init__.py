@@ -27,6 +27,8 @@ from heart.peripheral.core.input.gamepad import \
 from heart.peripheral.core.input.gamepad import \
     GamepadSnapshot as GamepadSnapshot
 from heart.peripheral.core.input.gamepad import \
+    GamepadSnapshotEvent as GamepadSnapshotEvent
+from heart.peripheral.core.input.gamepad import \
     GamepadStickValue as GamepadStickValue
 from heart.peripheral.core.input.io import InputIO as InputIO
 from heart.peripheral.core.input.keyboard import \

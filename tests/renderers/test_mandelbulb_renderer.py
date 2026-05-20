@@ -13,7 +13,8 @@ from heart.device import Rectangle
 from heart.display.shaders.shader_templates.mandelbulb import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.mandelbulb.renderer import (BASE_PHASE_SPEED, BASE_POWER,
                                                  COLOR_MODE_COUNT,
@@ -59,6 +60,10 @@ class _SnapshotController:
         return self.stream
 
     def sample(self) -> object:
+        if isinstance(self.snapshot, GamepadSnapshot):
+            if not self.snapshot.connected:
+                return ()
+            return (GamepadSnapshotEvent(joystick_id=0, snapshot=self.snapshot),)
         return self.snapshot
 
     def _set_snapshot(self, value: object) -> None:

@@ -7,7 +7,6 @@ from heart.peripheral.configuration_loader import PeripheralConfigurationLoader
 from heart.peripheral.core import Peripheral
 from heart.peripheral.core.input import InputIO
 from heart.peripheral.core.streams import GraphRouteStream, PeripheralStreams
-from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import BluetoothSwitch
 from heart.utilities.logging import get_logger
@@ -142,12 +141,6 @@ class PeripheralManager:
     def bluetooth_switch(self) -> BluetoothSwitch | None:
         for peripheral in self._peripherals:
             if isinstance(peripheral, BluetoothSwitch):
-                return peripheral
-        return None
-
-    def get_gamepad(self) -> Gamepad | None:
-        for peripheral in self._peripherals:
-            if isinstance(peripheral, Gamepad):
                 return peripheral
         return None
 

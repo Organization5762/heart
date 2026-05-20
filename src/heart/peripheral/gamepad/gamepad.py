@@ -141,12 +141,18 @@ class Gamepad(Peripheral[Any]):
         self.joystick = None
         self._num_buttons = None
         self._num_axes = None
+        self._clear_input_state()
+
+    def _clear_input_state(self) -> None:
         self._press_time.clear()
         self._tap_flag.clear()
         self._pressed_prev_frame.clear()
         self._pressed_curr_frame.clear()
         self._axis_prev_frame.clear()
+        self._axis_tapped_prev_frame.clear()
         self._axis_curr_frame.clear()
+        self._dpad_last_frame = (0.0, 0.0)
+        self._dpad_curr_frame = (0.0, 0.0)
 
     @property
     def num_buttons(self) -> int:
@@ -180,6 +186,7 @@ class Gamepad(Peripheral[Any]):
             self._update(pump_events=pump_events)
         except Exception:
             logger.exception("Error updating gamepad state")
+            self._clear_input_state()
 
     def _update(self, *, pump_events: bool = True) -> None:
         if not self.joystick:
@@ -194,6 +201,9 @@ class Gamepad(Peripheral[Any]):
         self._pressed_prev_frame = self._pressed_curr_frame.copy()
         self._axis_prev_frame = self._axis_curr_frame.copy()
         self._dpad_last_frame = self._dpad_curr_frame
+        self._pressed_curr_frame = defaultdict(bool)
+        self._axis_curr_frame = defaultdict(float)
+        self._dpad_curr_frame = (0.0, 0.0)
 
         try:
             self._dpad_curr_frame = self.joystick.get_hat(0)
@@ -353,11 +363,7 @@ class Gamepad(Peripheral[Any]):
         time.sleep(INITIALIZATION_DELAY_SECONDS)
 
         # macOS AppKit requires SDL event and joystick APIs to run on the process
-        # main thread, so route both polling loops through the frame-thread queue.
+        # main thread, so route device discovery through the frame-thread queue.
         Timer(period=timedelta(seconds=1)).then_on_main_thread().subscribe(
             on_next=self._read_from_gamepad,
-        )
-
-        Timer(period=timedelta(milliseconds=20)).then_on_main_thread().subscribe(
-            on_next=lambda _: self._update()
         )

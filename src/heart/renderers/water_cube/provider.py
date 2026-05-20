@@ -2,7 +2,7 @@ from manyfold import StreamNode
 
 from heart.device import Device
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
@@ -81,14 +81,17 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
     def _advance_state(
         self,
         prev: WaterCubeState,
-        latest: tuple[Acceleration | None, GamepadSnapshot],
+        latest: tuple[Acceleration | None, tuple[GamepadSnapshotEvent, ...]],
     ) -> WaterCubeState:
-        acceleration, gamepad = latest
-        acceleration_average = _next_acceleration_average(
-            prev.acceleration_average,
-            gamepad,
-        )
-        water_hue_degrees = _next_water_hue(prev.water_hue_degrees, gamepad)
+        acceleration, gamepads = latest
+        acceleration_average = prev.acceleration_average
+        water_hue_degrees = prev.water_hue_degrees
+        for event in gamepads:
+            acceleration_average = _next_acceleration_average(
+                acceleration_average,
+                event.snapshot,
+            )
+            water_hue_degrees = _next_water_hue(water_hue_degrees, event.snapshot)
         return prev._step(
             heights=prev.heights,
             velocities=prev.velocities,

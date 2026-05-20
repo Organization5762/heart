@@ -56,8 +56,8 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         )
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
-            lambda switch_state: (
-                lambda state: self.handle_switch_state(state, switch_state)
+            lambda switch_event: (
+                lambda state: self.handle_switch_state(state, switch_event.state)
             )
         )
         tick_updates = frame_ticks.map(

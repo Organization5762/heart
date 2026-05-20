@@ -96,8 +96,8 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         else:
             switches = peripheral_manager.input_io.main_switch_stream()
             switch_updates = switches.map(
-                lambda switch_state: (
-                    lambda state: self.handle_switch(state, switch_state)
+                lambda switch_event: (
+                    lambda state: self.handle_switch(state, switch_event.state)
                 )
             )
         tick_updates = frame_ticks.map(
@@ -142,24 +142,23 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         gamepad_controller = state.gamepad
         if gamepad_controller is None:
             return state
-        snapshot = gamepad_controller.sample()
-        if not snapshot.connected:
-            return state
         duration_scale = state.duration_scale
-        accelerate = (
-            snapshot.button_held(GamepadButton.PLUS)
-            or snapshot.button_held(GamepadButton.ZR)
-            or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)) > 0.0
-        )
-        decelerate = (
-            snapshot.button_held(GamepadButton.MINUS)
-            or snapshot.button_held(GamepadButton.ZL)
-            or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)) > 0.0
-        )
-        if accelerate and (not decelerate):
-            duration_scale += 0.005
-        elif decelerate and (not accelerate):
-            duration_scale -= 0.005
+        for event in gamepad_controller.sample():
+            snapshot = event.snapshot
+            accelerate = (
+                snapshot.button_held(GamepadButton.PLUS)
+                or snapshot.button_held(GamepadButton.ZR)
+                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)) > 0.0
+            )
+            decelerate = (
+                snapshot.button_held(GamepadButton.MINUS)
+                or snapshot.button_held(GamepadButton.ZL)
+                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)) > 0.0
+            )
+            if accelerate and (not decelerate):
+                duration_scale += 0.005
+            elif decelerate and (not accelerate):
+                duration_scale -= 0.005
         return replace(state, duration_scale=duration_scale)
 
     def _next_frame(
