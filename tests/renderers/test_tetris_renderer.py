@@ -9,6 +9,7 @@ from heart.peripheral.core.input import GamepadButton, GamepadDpadValue
 from heart.renderers.tetris.direct_gamepad import DirectGamepadSnapshot
 from heart.renderers.tetris.renderer import (
     BOARD_BORDER_COLOR,
+    GHOST_PIECE_COLOR,
     TetrisPlayMode,
     TetrisRenderer,
 )
@@ -125,6 +126,25 @@ class TestTetrisRenderer:
         )
 
         assert controls == TetrisControls()
+
+    def test_landing_piece_projects_to_bottom(self) -> None:
+        renderer = TetrisRenderer(rng=random.Random(1))
+        player = TetrisGameState.create(random.Random(1), player_count=1).players[0]
+        player.active = TetrisPiece(TetrisPieceKind.I_PIECE, rotation=0, x=0, y=0)
+
+        ghost = renderer._landing_piece(player)
+
+        assert ghost == TetrisPiece(TetrisPieceKind.I_PIECE, rotation=0, x=0, y=18)
+
+    def test_render_ghost_piece_draws_bottom_shade(self) -> None:
+        renderer = TetrisRenderer(rng=random.Random(1))
+        player = TetrisGameState.create(random.Random(1), player_count=1).players[0]
+        player.active = TetrisPiece(TetrisPieceKind.I_PIECE, rotation=0, x=0, y=0)
+        surface = pygame.Surface((64, 64))
+
+        renderer._render_ghost_piece(surface, 0, 0, player, 3)
+
+        assert surface.get_at((0, 57))[:3] == GHOST_PIECE_COLOR[:3]
 
     def test_solo_mode_draws_two_screen_panels(self, device: Device) -> None:
         device.orientation = Rectangle.with_layout(columns=2, rows=1)

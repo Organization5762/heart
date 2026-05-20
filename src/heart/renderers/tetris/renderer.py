@@ -34,6 +34,7 @@ from .state import (
     TetrisPieceKind,
     TetrisPlayerState,
     advance_player,
+    collides,
     queue_garbage_for_opponents,
     update_match_end_state,
 )
@@ -44,6 +45,7 @@ HUD_PANEL_COLOR = pygame.Color(0, 3, 7)
 BOARD_BACKGROUND_COLOR = pygame.Color(0, 0, 0)
 BOARD_BORDER_COLOR = pygame.Color(40, 255, 226)
 BOARD_BORDER_SHADOW_COLOR = pygame.Color(0, 78, 148)
+GHOST_PIECE_COLOR = pygame.Color(96, 108, 132)
 GARBAGE_WARNING_COLOR = pygame.Color(255, 70, 80)
 GAME_OVER_COLOR = pygame.Color(255, 35, 60)
 WIN_OVERLAY_COLOR = pygame.Color(255, 228, 68)
@@ -472,6 +474,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         board_inner = board_rect.inflate(-2, -2)
         pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, board_inner)
         self._render_board(screen, board_left, board_top, player, cell_size)
+        self._render_ghost_piece(screen, board_left, board_top, player, cell_size)
         self._render_active_piece(screen, board_left, board_top, player, cell_size)
         self._render_hold_panel(
             screen,
@@ -527,6 +530,30 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                 if color is not None:
                     rect = self._cell_rect(board_left, board_top, x, y, cell_size)
                     self._draw_block(screen, rect, TETRIS_PALETTE[color])
+
+    def _render_ghost_piece(
+        self,
+        screen: pygame.Surface,
+        board_left: int,
+        board_top: int,
+        player: TetrisPlayerState,
+        cell_size: int,
+    ) -> None:
+        ghost = self._landing_piece(player)
+        if ghost is None or ghost == player.active:
+            return
+        for x, y in ghost.cells():
+            if y >= 0:
+                rect = self._cell_rect(board_left, board_top, x, y, cell_size)
+                pygame.draw.rect(screen, GHOST_PIECE_COLOR, rect, 1)
+
+    def _landing_piece(self, player: TetrisPlayerState) -> TetrisPiece | None:
+        if player.active is None or player.game_over:
+            return None
+        ghost = player.active
+        while not collides(player.board, ghost.moved(0, 1)):
+            ghost = ghost.moved(0, 1)
+        return ghost
 
     def _render_active_piece(
         self,
