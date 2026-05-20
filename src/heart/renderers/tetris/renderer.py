@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import replace
+from enum import StrEnum
 
 import pygame
 
@@ -17,13 +18,26 @@ from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 from .direct_gamepad import DirectGamepadSnapshot, DirectTetrisGamepads
-from .state import (BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE_PX,
-                    MOVE_REPEAT_DELAY_MS, MOVE_REPEAT_INTERVAL_MS,
-                    PIECE_ROTATIONS, TetrisColor, TetrisControls,
-                    TetrisGameState, TetrisInputMemory, TetrisPiece,
-                    TetrisPieceKind, TetrisPlayerState, advance_player,
-                    queue_garbage_for_opponents, restart_match,
-                    update_match_end_state)
+from .state import (
+    BOARD_HEIGHT,
+    BOARD_WIDTH,
+    CELL_SIZE_PX,
+    MOVE_REPEAT_DELAY_MS,
+    MOVE_REPEAT_INTERVAL_MS,
+    PIECE_ROTATIONS,
+    PLAYER_COUNT,
+    TetrisColor,
+    TetrisControls,
+    TetrisGameState,
+    TetrisInputMemory,
+    TetrisPiece,
+    TetrisPieceKind,
+    TetrisPlayerState,
+    advance_player,
+    collides,
+    queue_garbage_for_opponents,
+    update_match_end_state,
+)
 
 BACKGROUND_COLOR = pygame.Color(0, 8, 20)
 PANEL_BACKGROUND_COLOR = pygame.Color(0, 18, 40)
@@ -31,6 +45,8 @@ HUD_PANEL_COLOR = pygame.Color(0, 3, 7)
 BOARD_BACKGROUND_COLOR = pygame.Color(0, 0, 0)
 BOARD_BORDER_COLOR = pygame.Color(40, 255, 226)
 BOARD_BORDER_SHADOW_COLOR = pygame.Color(0, 78, 148)
+GHOST_PIECE_COLOR = pygame.Color(96, 108, 132)
+MODE_LABEL_COLOR = pygame.Color(255, 255, 255)
 GARBAGE_WARNING_COLOR = pygame.Color(255, 70, 80)
 GAME_OVER_COLOR = pygame.Color(255, 35, 60)
 WIN_OVERLAY_COLOR = pygame.Color(255, 228, 68)
@@ -56,7 +72,15 @@ RNG_NAMESPACE = "tetris"
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 PREVIEW_CELL_SIZE_PX = 2
 NEXT_PREVIEW_COUNT = 6
+DUAL_SYNCED_PLAYER_COUNT = 2
+SOLO_MIRRORED_PLAYER_COUNT = 1
 logger = get_logger(__name__)
+
+
+class TetrisPlayMode(StrEnum):
+    FOUR_PLAYER = "four_player"
+    DUAL_SYNCED = "dual_synced"
+    SOLO_MIRRORED = "solo_mirrored"
 
 
 class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
@@ -73,6 +97,9 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         self._last_logged_controls_by_player: dict[int, tuple[object, ...]] = {}
         self._gamepads = DirectTetrisGamepads()
         self._native_surface: pygame.Surface | None = None
+        self._play_mode = TetrisPlayMode.FOUR_PLAYER
+        self._mode_switch_chord_held = False
+        self._synchronized_input_memory = TetrisInputMemory()
 
     def _create_initial_state(
         self,
@@ -81,7 +108,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         orientation: Orientation,
     ) -> TetrisGameState:
         del window, peripheral_manager, orientation
-        return TetrisGameState.create(self._rng)
+        return self._create_game_state()
 
     def real_process(
         self,
@@ -91,26 +118,24 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         if window.screen is None:
             raise RuntimeError("TetrisRenderer requires an initialized display surface")
         elapsed_ms = self._elapsed_ms(window)
-        self._gamepads.refresh(player_count=len(self.state.players))
-        controls_by_player: list[TetrisControls] = []
-        for player_index, player in enumerate(self.state.players):
-            snapshot = self._snapshot_for_player(player_index)
-            controls = self._controls_for_snapshot(
-                player.input_memory,
-                snapshot,
-                elapsed_ms,
-            )
-            self._log_renderer_command(player_index, snapshot, controls)
-            controls_by_player.append(controls)
+        self._gamepads.refresh(player_count=PLAYER_COUNT)
+        snapshots = [self._latest_snapshot(slot) for slot in range(PLAYER_COUNT)]
+        if self._consume_mode_switch_chord(snapshots):
+            self._switch_play_mode()
+            controls_by_player = [TetrisControls() for _player in self.state.players]
+        else:
+            controls_by_player = self._controls_by_player(snapshots, elapsed_ms)
         if self.state.match_finished:
             if any(controls.restart for controls in controls_by_player):
-                restart_match(self.state, self._rng)
+                self._reset_current_game()
         else:
             for player_index, player in enumerate(self.state.players):
                 controls = replace(controls_by_player[player_index], restart=False)
                 cleared = advance_player(player, controls, elapsed_ms, self._rng)
-                queue_garbage_for_opponents(self.state, player_index, cleared)
-            update_match_end_state(self.state)
+                if self._play_mode is TetrisPlayMode.FOUR_PLAYER:
+                    queue_garbage_for_opponents(self.state, player_index, cleared)
+            if self._play_mode is TetrisPlayMode.FOUR_PLAYER:
+                update_match_end_state(self.state)
 
         render_target = self._native_render_target(window)
         render_target.fill((0, 0, 0, 0))
@@ -123,9 +148,12 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
             render_target,
             window.device.individual_display_size(),
             orientation.layout.columns,
+            orientation.layout.rows,
         )
         if render_target is not window.screen:
-            pygame.transform.scale(render_target, window.screen.get_size(), window.screen)
+            pygame.transform.scale(
+                render_target, window.screen.get_size(), window.screen
+            )
 
     def _native_render_target(self, window: DisplayContext) -> pygame.Surface:
         if window.screen is None:
@@ -133,7 +161,10 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         native_size = window.device.full_display_size()
         if window.screen.get_size() == native_size:
             return window.screen
-        if self._native_surface is None or self._native_surface.get_size() != native_size:
+        if (
+            self._native_surface is None
+            or self._native_surface.get_size() != native_size
+        ):
             self._native_surface = pygame.Surface(native_size, pygame.SRCALPHA)
         return self._native_surface
 
@@ -151,6 +182,79 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
     def _latest_snapshot(self, player_index: int) -> DirectGamepadSnapshot:
         return self._gamepads.snapshot_for_slot(player_index)
 
+    def _create_game_state(self) -> TetrisGameState:
+        return TetrisGameState.create(
+            self._rng,
+            player_count=self._player_count_for_mode(),
+        )
+
+    def _player_count_for_mode(self) -> int:
+        if self._play_mode is TetrisPlayMode.DUAL_SYNCED:
+            return DUAL_SYNCED_PLAYER_COUNT
+        if self._play_mode is TetrisPlayMode.SOLO_MIRRORED:
+            return SOLO_MIRRORED_PLAYER_COUNT
+        return PLAYER_COUNT
+
+    def _controls_by_player(
+        self,
+        snapshots: list[DirectGamepadSnapshot],
+        elapsed_ms: float,
+    ) -> list[TetrisControls]:
+        if self._uses_synchronized_controls():
+            controls = self._controls_for_snapshots(
+                self._synchronized_input_memory,
+                snapshots,
+                elapsed_ms,
+            )
+            self._log_renderer_command(
+                0,
+                self._command_source_snapshot(snapshots),
+                controls,
+            )
+            return [controls for _player in self.state.players]
+
+        controls_by_player: list[TetrisControls] = []
+        for player_index, player in enumerate(self.state.players):
+            snapshot = snapshots[player_index]
+            controls = self._controls_for_snapshot(
+                player.input_memory,
+                snapshot,
+                elapsed_ms,
+            )
+            self._log_renderer_command(player_index, snapshot, controls)
+            controls_by_player.append(controls)
+        return controls_by_player
+
+    def _uses_synchronized_controls(self) -> bool:
+        return self._play_mode in {
+            TetrisPlayMode.DUAL_SYNCED,
+            TetrisPlayMode.SOLO_MIRRORED,
+        }
+
+    def _consume_mode_switch_chord(
+        self,
+        snapshots: list[DirectGamepadSnapshot],
+    ) -> bool:
+        chord_held = any(
+            snapshot.button_held(GamepadButton.PLUS)
+            and snapshot.button_held(GamepadButton.MINUS)
+            for snapshot in snapshots
+        )
+        should_switch = chord_held and not self._mode_switch_chord_held
+        self._mode_switch_chord_held = chord_held
+        return should_switch
+
+    def _switch_play_mode(self) -> None:
+        play_modes = tuple(TetrisPlayMode)
+        next_index = (play_modes.index(self._play_mode) + 1) % len(play_modes)
+        self._play_mode = play_modes[next_index]
+        self._reset_current_game()
+
+    def _reset_current_game(self) -> None:
+        self.set_state(self._create_game_state())
+        self._synchronized_input_memory = TetrisInputMemory()
+        self._last_logged_controls_by_player.clear()
+
     def _internal_process(
         self,
         window: DisplayContext,
@@ -166,19 +270,28 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         snapshot: DirectGamepadSnapshot,
         elapsed_ms: float,
     ) -> TetrisControls:
-        move_direction = self._move_direction(snapshot)
+        return self._controls_for_snapshots(memory, [snapshot], elapsed_ms)
+
+    def _controls_for_snapshots(
+        self,
+        memory: TetrisInputMemory,
+        snapshots: list[DirectGamepadSnapshot],
+        elapsed_ms: float,
+    ) -> TetrisControls:
+        move_direction = self._move_direction_for_snapshots(snapshots)
         move_x = self._repeat_move(memory, move_direction, elapsed_ms)
-        dpad_up = snapshot.dpad.y > 0 and memory.previous_dpad_y <= 0
-        memory.previous_dpad_y = snapshot.dpad.y
+        dpad_y = self._dpad_y(snapshots)
+        dpad_up = dpad_y > 0 and memory.previous_dpad_y <= 0
+        memory.previous_dpad_y = dpad_y
         # NORTH is reserved for the global navigation alternate-activate exit.
         return TetrisControls(
             move_x=move_x,
-            soft_drop=self._soft_drop(snapshot),
-            hard_drop=snapshot.button_tapped(GamepadButton.SOUTH),
-            rotate_cw=snapshot.button_tapped(GamepadButton.EAST),
+            soft_drop=dpad_y < 0,
+            hard_drop=self._button_tapped(snapshots, GamepadButton.SOUTH),
+            rotate_cw=self._button_tapped(snapshots, GamepadButton.EAST),
             rotate_ccw=False,
             hold=dpad_up,
-            restart=snapshot.button_tapped(GamepadButton.MINUS),
+            restart=self._button_tapped(snapshots, GamepadButton.MINUS),
         )
 
     def _log_renderer_command(
@@ -230,9 +343,41 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         )
 
     def _move_direction(self, snapshot: DirectGamepadSnapshot) -> int:
-        if snapshot.dpad.x != 0:
-            return 1 if snapshot.dpad.x > 0 else -1
+        return self._move_direction_for_snapshots([snapshot])
+
+    def _move_direction_for_snapshots(
+        self,
+        snapshots: list[DirectGamepadSnapshot],
+    ) -> int:
+        for snapshot in snapshots:
+            if snapshot.dpad.x != 0:
+                return 1 if snapshot.dpad.x > 0 else -1
         return 0
+
+    def _dpad_y(self, snapshots: list[DirectGamepadSnapshot]) -> int:
+        for snapshot in snapshots:
+            if snapshot.dpad.y != 0:
+                return 1 if snapshot.dpad.y > 0 else -1
+        return 0
+
+    def _button_tapped(
+        self,
+        snapshots: list[DirectGamepadSnapshot],
+        button: GamepadButton,
+    ) -> bool:
+        return any(snapshot.button_tapped(button) for snapshot in snapshots)
+
+    def _command_source_snapshot(
+        self,
+        snapshots: list[DirectGamepadSnapshot],
+    ) -> DirectGamepadSnapshot:
+        for snapshot in snapshots:
+            if snapshot.dpad.x != 0 or snapshot.dpad.y != 0 or snapshot.tapped_buttons:
+                return snapshot
+        for snapshot in snapshots:
+            if snapshot.connected:
+                return snapshot
+        return snapshots[0]
 
     def _soft_drop(self, snapshot: DirectGamepadSnapshot) -> bool:
         return snapshot.dpad.y < 0
@@ -272,12 +417,18 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         screen: pygame.Surface,
         panel_size: tuple[int, int],
         panel_columns: int,
+        panel_rows: int,
     ) -> None:
         panel_width, panel_height = panel_size
         columns = max(1, panel_columns)
-        for player_index, player in enumerate(self.state.players):
-            col = player_index % columns
-            row = player_index // columns
+        rows = max(1, panel_rows)
+        for panel_index in range(columns * rows):
+            player_index = self._player_index_for_panel(panel_index, columns * rows)
+            if player_index >= len(self.state.players):
+                continue
+            player = self.state.players[player_index]
+            col = panel_index % columns
+            row = panel_index // columns
             panel = pygame.Rect(
                 col * panel_width,
                 row * panel_height,
@@ -290,6 +441,15 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                 player,
                 player_index,
             )
+
+    def _player_index_for_panel(self, panel_index: int, panel_count: int) -> int:
+        if self._play_mode is TetrisPlayMode.SOLO_MIRRORED:
+            return 0
+        if self._play_mode is TetrisPlayMode.DUAL_SYNCED:
+            if panel_count >= DUAL_SYNCED_PLAYER_COUNT * 2:
+                return min(panel_index // 2, DUAL_SYNCED_PLAYER_COUNT - 1)
+            return panel_index % DUAL_SYNCED_PLAYER_COUNT
+        return panel_index
 
     def _render_player_panel(
         self,
@@ -307,11 +467,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         board_total_width = board_width_px + 2
         board_total_height = board_height_px + 2
         board_left = panel.left + ((panel.width - board_total_width) // 2) + 1
-        board_top = (
-            panel.top
-            + max(1, (panel.height - board_total_height) // 2)
-            + 1
-        )
+        board_top = panel.top + max(1, (panel.height - board_total_height) // 2) + 1
         board_rect = pygame.Rect(
             board_left - 1,
             board_top - 1,
@@ -343,6 +499,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         board_inner = board_rect.inflate(-2, -2)
         pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, board_inner)
         self._render_board(screen, board_left, board_top, player, cell_size)
+        self._render_ghost_piece(screen, board_left, board_top, player, cell_size)
         self._render_active_piece(screen, board_left, board_top, player, cell_size)
         self._render_hold_panel(
             screen,
@@ -367,6 +524,25 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
             self._render_game_over(screen, board_rect)
         if self.state.match_finished:
             self._render_match_result(screen, panel, board_rect, player_index)
+        self._render_mode_label(screen, panel)
+
+    def _render_mode_label(self, screen: pygame.Surface, panel: pygame.Rect) -> None:
+        label = self._mode_label()
+        label_surface = self._font(7).render(label, False, MODE_LABEL_COLOR)
+        screen.blit(
+            label_surface,
+            (
+                panel.left + 2,
+                panel.bottom - label_surface.get_height() - 1,
+            ),
+        )
+
+    def _mode_label(self) -> str:
+        if self._play_mode is TetrisPlayMode.FOUR_PLAYER:
+            return "F"
+        if self._play_mode is TetrisPlayMode.DUAL_SYNCED:
+            return "D"
+        return "S"
 
     def _draw_hud_frame(
         self,
@@ -398,6 +574,30 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                 if color is not None:
                     rect = self._cell_rect(board_left, board_top, x, y, cell_size)
                     self._draw_block(screen, rect, TETRIS_PALETTE[color])
+
+    def _render_ghost_piece(
+        self,
+        screen: pygame.Surface,
+        board_left: int,
+        board_top: int,
+        player: TetrisPlayerState,
+        cell_size: int,
+    ) -> None:
+        ghost = self._landing_piece(player)
+        if ghost is None or ghost == player.active:
+            return
+        for x, y in ghost.cells():
+            if y >= 0:
+                rect = self._cell_rect(board_left, board_top, x, y, cell_size)
+                pygame.draw.rect(screen, GHOST_PIECE_COLOR, rect, 1)
+
+    def _landing_piece(self, player: TetrisPlayerState) -> TetrisPiece | None:
+        if player.active is None or player.game_over:
+            return None
+        ghost = player.active
+        while not collides(player.board, ghost.moved(0, 1)):
+            ghost = ghost.moved(0, 1)
+        return ghost
 
     def _render_active_piece(
         self,
@@ -593,9 +793,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
             reset_surface = restart_font.render("RESTART", False, pygame.Color("white"))
             surfaces = (label_surface, press_surface, reset_surface)
             gaps = (2, 0)
-            total_height = (
-                sum(surface.get_height() for surface in surfaces) + sum(gaps)
-            )
+            total_height = sum(surface.get_height() for surface in surfaces) + sum(gaps)
             widest = max(surface.get_width() for surface in surfaces)
             if total_height <= bounds.height and widest <= bounds.width:
                 return surfaces, gaps
@@ -609,7 +807,9 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
                     False,
                     RESTART_BUTTON_COLOR,
                 ),
-                self._font(restart_size).render("RESTART", False, pygame.Color("white")),
+                self._font(restart_size).render(
+                    "RESTART", False, pygame.Color("white")
+                ),
             ),
             (1, 0),
         )
