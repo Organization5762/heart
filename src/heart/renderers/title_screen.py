@@ -14,6 +14,8 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
 
+MIN_PREVIEW_SCALE = 2
+
 
 @dataclass(frozen=True)
 class TextBlock:
@@ -86,19 +88,28 @@ class TitleScreen(StatefulBaseRenderer[TitleScreenState]):
         if window.screen is None:
             return
 
-        window.fill(self.background._as_tuple())
+        output_window = self._native_title_window(window)
+        output_window.fill(self.background._as_tuple())
         text_block = self._render_text_block()
-        text_x = (window.get_width() - text_block.width) // 2
-        text_y = window.get_height() - text_block.height - self.text_bottom_margin_px
+        text_x = (output_window.get_width() - text_block.width) // 2
+        text_y = (
+            output_window.get_height() - text_block.height - self.text_bottom_margin_px
+        )
         image_bottom = max(0, text_y - self.image_text_gap_px)
 
-        image_surface = self._render_image(window, orientation)
+        image_surface = self._render_image(output_window, orientation)
         self._blit_image_centered_in_region(
-            window=window,
+            window=output_window,
             image_surface=image_surface,
             image_bottom=image_bottom,
         )
-        self._blit_text_block(window, text_block, x=text_x, y=text_y)
+        self._blit_text_block(output_window, text_block, x=text_x, y=text_y)
+        if output_window is not window:
+            assert output_window.screen is not None
+            scaled = pygame.transform.scale(
+                output_window.screen, window.screen.get_size()
+            )
+            window.screen.blit(scaled, (0, 0))
 
     def _render_text_block(self) -> TextBlock:
         font = self._load_font()
@@ -123,6 +134,39 @@ class TitleScreen(StatefulBaseRenderer[TitleScreenState]):
                 self._font = pygame.ftfont.SysFont(self.font, self.font_size)
             self._font_key = font_key
         return self._font
+
+    def _native_title_window(self, window: DisplayContext) -> DisplayContext:
+        native_size = self._native_title_surface_size(window)
+        if native_size is None:
+            return window
+        return DisplayContext(
+            device=window.device,
+            screen=pygame.Surface(native_size, pygame.SRCALPHA),
+            clock=window.clock,
+            last_render_mode=window.last_render_mode,
+            can_configure_display=False,
+        )
+
+    def _native_title_surface_size(
+        self,
+        window: DisplayContext,
+    ) -> tuple[int, int] | None:
+        scale_factor = window.device.scale_factor
+        if scale_factor < MIN_PREVIEW_SCALE:
+            return None
+
+        window_width, window_height = window.get_size()
+        if window_width % scale_factor != 0 or window_height % scale_factor != 0:
+            return None
+
+        native_size = (window_width // scale_factor, window_height // scale_factor)
+        valid_native_sizes = {
+            window.device.individual_display_size(),
+            window.device.full_display_size(),
+        }
+        if native_size not in valid_native_sizes:
+            return None
+        return native_size
 
     def _render_image(
         self,
