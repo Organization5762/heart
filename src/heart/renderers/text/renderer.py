@@ -11,6 +11,7 @@ from heart.runtime.display_context import DisplayContext
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
 PIXEL_FONT_ANTIALIAS = False
+MIN_PREVIEW_SCALE = 2
 
 
 class TextRendering(StatefulBaseRenderer[TextRenderingState]):
@@ -83,7 +84,15 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
         if font is None:
             return
 
-        window_width, window_height = window.get_size()
+        if window.screen is None:
+            return
+
+        output_surface = window.screen
+        native_size = self._native_text_surface_size(window)
+        if native_size is not None:
+            output_surface = pygame.Surface(native_size, pygame.SRCALPHA)
+
+        window_width, window_height = output_surface.get_size()
         if self.state.y_location is not None:
             y_offset = int(self.state.y_location * window_height)
         else:
@@ -105,5 +114,30 @@ class TextRendering(StatefulBaseRenderer[TextRenderingState]):
                 x_offset = (window_width - text_width) // 2
             else:
                 x_offset = int(self.state.x_location * window_width)
-            window.screen.blit(text_surface, (x_offset, y_offset))
+            output_surface.blit(text_surface, (x_offset, y_offset))
             y_offset += line_height
+
+        if output_surface is not window.screen:
+            scaled = pygame.transform.scale(output_surface, window.screen.get_size())
+            window.screen.blit(scaled, (0, 0))
+
+    def _native_text_surface_size(
+        self,
+        window: DisplayContext,
+    ) -> tuple[int, int] | None:
+        scale_factor = window.device.scale_factor
+        if scale_factor < MIN_PREVIEW_SCALE:
+            return None
+
+        window_width, window_height = window.get_size()
+        if window_width % scale_factor != 0 or window_height % scale_factor != 0:
+            return None
+
+        native_size = (window_width // scale_factor, window_height // scale_factor)
+        valid_native_sizes = {
+            window.device.individual_display_size(),
+            window.device.full_display_size(),
+        }
+        if native_size not in valid_native_sizes:
+            return None
+        return native_size

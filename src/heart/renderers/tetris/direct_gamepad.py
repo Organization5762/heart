@@ -16,9 +16,7 @@ from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
 from heart.peripheral.gamepad.screen_mapping import (
-    bluetooth_mac_for_screen_slot,
-    normalize_bluetooth_mac,
-)
+    bluetooth_mac_for_screen_slot, normalize_bluetooth_mac)
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 

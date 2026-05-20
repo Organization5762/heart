@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from PIL import Image
+
 from heart.device.beats.websocket import ControlMessage
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadDpadValue, GamepadSnapshot,
                                          InputDebugStage, InputDebugTap)
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
-                                              PeripheralRuntime)
+                                              PeripheralRuntime,
+                                              save_phone_photo)
 
 
 class _PeripheralManagerStub:
@@ -76,9 +79,13 @@ class _WebSocketStub:
 class _TemporaryRendererLoop:
     def __init__(self) -> None:
         self.clear_count = 0
+        self.floating_emojis: list[str] = []
 
     def clear_temporary_renderer(self) -> None:
         self.clear_count += 1
+
+    def present_floating_emoji(self, emoji: str) -> None:
+        self.floating_emojis.append(emoji)
 
 
 class TestPeripheralRuntimeStreaming:
@@ -356,3 +363,40 @@ class TestPeripheralRuntimeStreaming:
         runtime._drain_control_messages()
 
         assert loop.clear_count == 1
+
+    def test_emoji_control_presents_floating_overlay(self, monkeypatch) -> None:
+        """Verify emoji controls are layered through the active loop instead of replacing the current renderer."""
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+        loop = _TemporaryRendererLoop()
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.get_active_game_loop",
+            lambda: loop,
+        )
+
+        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        assert websocket.control_handler is not None
+
+        websocket.control_handler(ControlMessage(command="emoji_update", emoji="heart"))
+        runtime._drain_control_messages()
+
+        assert loop.floating_emojis == ["heart"]
+        assert loop.clear_count == 0
+
+    def test_save_phone_photo_writes_png_to_configured_directory(
+        self,
+        monkeypatch,
+        tmp_path,
+    ) -> None:
+        """Verify phone photos persist on the runtime host so Pi sessions keep captured images."""
+        monkeypatch.setenv("HEART_PHONE_PHOTO_DIR", str(tmp_path))
+        image = Image.new("RGBA", (2, 2), (255, 0, 0, 255))
+
+        saved_path = save_phone_photo(image)
+
+        assert saved_path.parent == tmp_path
+        assert saved_path.name.startswith("phone-photo-")
+        assert saved_path.suffix == ".png"
+        with Image.open(saved_path) as saved_image:
+            assert saved_image.size == (2, 2)

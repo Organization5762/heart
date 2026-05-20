@@ -44,6 +44,32 @@ CONTROL_COMMAND_ALTERNATE = "alternate_activate"
 CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
 CONTROL_COMMAND_TEXT_UPDATE = "text_update"
 CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
+CONTROL_COMMAND_EMOJI_UPDATE = "emoji_update"
+CONTROL_EMOJI_POOP = "poop"
+CONTROL_EMOJI_SKULL = "skull"
+CONTROL_EMOJI_HEART = "heart"
+CONTROL_EMOJI_STAR = "star"
+CONTROL_EMOJI_RAINBOW = "rainbow"
+CONTROL_FACE_NAMES = (
+    "seb",
+    "faye",
+    "will",
+    "clem",
+    "cal",
+    "sri",
+    "lampe",
+    "ditto",
+)
+SUPPORTED_CONTROL_EMOJIS = frozenset(
+    {
+        CONTROL_EMOJI_POOP,
+        CONTROL_EMOJI_SKULL,
+        CONTROL_EMOJI_HEART,
+        CONTROL_EMOJI_STAR,
+        CONTROL_EMOJI_RAINBOW,
+        *CONTROL_FACE_NAMES,
+    }
+)
 MAX_CONTROL_IMAGE_BASE64_LENGTH = 2_000_000
 BEATS_WEBSOCKET_OWNER = OwnerName("heart.beats.websocket")
 BEATS_WEBSOCKET_FAMILY = StreamFamily("beats")
@@ -58,6 +84,7 @@ class ControlMessage:
     text: str | None = None
     image_base64: str | None = None
     image_mime_type: str | None = None
+    emoji: str | None = None
     clear: bool = False
 
 
@@ -218,6 +245,7 @@ def decode_control_message(message: str | bytes) -> ControlMessage | None:
         CONTROL_COMMAND_SENSOR_UPDATE,
         CONTROL_COMMAND_TEXT_UPDATE,
         CONTROL_COMMAND_IMAGE_UPDATE,
+        CONTROL_COMMAND_EMOJI_UPDATE,
     }:
         logger.warning("Unknown websocket control command: %s.", command)
         return None
@@ -282,6 +310,17 @@ def decode_control_message(message: str | bytes) -> ControlMessage | None:
             image_base64=image_base64 if isinstance(image_base64, str) else None,
             image_mime_type=image_mime_type if isinstance(image_mime_type, str) else None,
             clear=clear,
+        )
+
+    if command == CONTROL_COMMAND_EMOJI_UPDATE:
+        emoji = parsed.get("emoji")
+        if not isinstance(emoji, str) or emoji not in SUPPORTED_CONTROL_EMOJIS:
+            logger.warning("Invalid websocket emoji payload: %r.", emoji)
+            return None
+        return ControlMessage(
+            command=command,
+            browse_step=browse_step,
+            emoji=emoji,
         )
 
     return ControlMessage(command=command, browse_step=browse_step)

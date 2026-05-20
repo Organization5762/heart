@@ -11,9 +11,7 @@ from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.gamepad.screen_mapping import (
-    SCREEN_SLOT_BLUETOOTH_MACS,
-    normalize_bluetooth_mac,
-)
+    SCREEN_SLOT_BLUETOOTH_MACS, normalize_bluetooth_mac)
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.cube_pong.state import (PLAYER_ONE, PLAYER_TWO,
                                              CubePongControls, CubePongState,
@@ -40,6 +38,7 @@ LINUX_JOYSTICK_SYSFS = Path("/sys/class/input")
 SCORE_FONT_SCALE = 0.19
 SCORE_SEPARATOR_GAP_SCALE = 0.05
 SCORE_SEPARATOR_COLOR = (202, 211, 224)
+WINNER_FONT_SCALE = 0.42
 logger = get_logger(__name__)
 
 
@@ -113,6 +112,8 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         self._draw_scores(window, state)
         self._draw_paddles(window, state)
         self._draw_balls(window, state)
+        if state.winning_player is not None:
+            self._draw_winner_callout(window, state)
 
     def _draw_face_guides(self, window: DisplayContext, state: CubePongState) -> None:
         if window.screen is None:
@@ -218,6 +219,29 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         screen.blit(surfaces[1], (x, top))
         x += surfaces[1].get_width() + separator_gap
         screen.blit(surfaces[2], (x, top))
+
+    def _draw_winner_callout(
+        self,
+        window: DisplayContext,
+        state: CubePongState,
+    ) -> None:
+        if window.screen is None:
+            raise RuntimeError("CubePongRenderer requires an initialized display")
+        screen = window.screen
+        color = (
+            PADDLE_ONE_COLOR
+            if state.winning_player == PLAYER_ONE
+            else PADDLE_TWO_COLOR
+        )
+        label = "P1 WINS" if state.winning_player == PLAYER_ONE else "P2 WINS"
+        font_size = max(18, round(state.screen_height * WINNER_FONT_SCALE))
+        surface = self._font(font_size).render(label, False, color)
+        rect = surface.get_rect()
+        rect.center = (
+            screen.get_width() // 2,
+            screen.get_height() // 2,
+        )
+        screen.blit(surface, rect)
 
     def _font(self, size: int) -> pygame.font.Font:
         if not pygame.font.get_init():
