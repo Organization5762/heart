@@ -8,7 +8,7 @@ uniform vec2 iResolution;
 const float AMBIENT_OCCLUSION_STRENGTH = 0.01;
 const vec3 AMBIENT_OCCLUSION_COLOR_DELTA = vec3(0.8, 0.8, 0.8);
 const vec3 BACKGROUND_COLOR = vec3(0.15, 0.15, 0.15);
-const float EXPOSURE = 1.0;
+const float EXPOSURE = 1.25;
 const float FIELD_OF_VIEW = 60.0;
 const vec3 LIGHT_COLOR = vec3(1.0, 0.9, 0.6);
 const vec3 LIGHT_DIRECTION = vec3(-0.36, 0.48, 0.8);
@@ -172,6 +172,9 @@ void main() {
     col += scene(p, ray, vignette, 0.0);
 
     // Output final color
-    gl_FragColor.rgb = clamp(col.xyz * EXPOSURE, 0.0, 1.0);
+    vec3 final_col = col.xyz * EXPOSURE;
+    float gray = dot(final_col, vec3(0.299, 0.587, 0.114));
+    final_col = mix(vec3(gray), final_col, 1.35);
+    gl_FragColor.rgb = clamp(final_col, 0.0, 1.0);
     gl_FragDepth = min(col.w / MAX_DIST, 0.999);
 }
