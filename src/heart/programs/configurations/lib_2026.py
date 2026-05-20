@@ -129,6 +129,7 @@ def configure(loop: GameLoop) -> None:
                         "eric",
                         "faye",
                         "giang",
+                        "goose babe",
                         "jordan",
                         "lampe",
                         "lilli",
