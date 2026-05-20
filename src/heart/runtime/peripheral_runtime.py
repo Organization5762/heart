@@ -61,7 +61,11 @@ class PeripheralRuntime:
         self._peripheral_manager.start()
 
     def configure_streaming(self, websocket: Any | None = None) -> None:
-        if websocket is None and not Configuration.forward_to_beats_app():
+        if (
+            websocket is None
+            and not Configuration.forward_to_beats_app()
+            and not Configuration.beats_websocket_enabled()
+        ):
             logger.debug("Beats streaming disabled; skipping websocket startup")
             return
 

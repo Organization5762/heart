@@ -12,14 +12,17 @@ from typer.testing import CliRunner
 from heart import loop
 from heart.cli.commands import run as run_module
 from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_HOST_ENV_VAR,
+                                          BEATS_WEBSOCKET_ENABLED_ENV_VAR,
                                           BEATS_WEBSOCKET_PORT_ENV_VAR,
                                           BEATS_WEBSOCKET_URL_ENV_VAR,
                                           FORWARD_TO_BEATS_ENV_VAR,
+                                          build_runtime_env,
                                           build_beats_web_env,
                                           build_totem_run_command,
                                           ensure_beats_dependencies,
                                           resolve_beats_workspace)
-from heart.cli.commands.run_options import CONFIGURATION_OVERRIDE_ENV_VAR
+from heart.cli.commands.run_options import (BEATS_WEB_ENABLED_ENV_VAR,
+                                            CONFIGURATION_OVERRIDE_ENV_VAR)
 
 runner = CliRunner()
 
@@ -68,10 +71,21 @@ class TestRunBeatsCommandBuilders:
             "/tmp/heart/experimental/beats"
         )
 
-    def test_runtime_env_flag_name_remains_stable(self) -> None:
-        """Verify the runtime forwarding env var stays stable so the combined launcher continues selecting the streamed device path."""
+    def test_runtime_env_enables_control_websocket_without_frame_forwarding(
+        self,
+    ) -> None:
+        """Verify the combined launcher starts the control websocket without replacing the physical display device."""
 
         assert FORWARD_TO_BEATS_ENV_VAR == "FORWARD_TO_BEATS_APP"
+        env = build_runtime_env(
+            {"PATH": "/bin", BEATS_WEB_ENABLED_ENV_VAR: "1"},
+            websocket_bind_host="0.0.0.0",
+        )
+
+        assert env[BEATS_WEBSOCKET_ENABLED_ENV_VAR] == "1"
+        assert FORWARD_TO_BEATS_ENV_VAR not in env
+        assert BEATS_WEB_ENABLED_ENV_VAR not in env
+        assert env["BEATS_WEBSOCKET_BIND_HOST"] == "0.0.0.0"
 
 
 class TestEnsureBeatsDependencies:
@@ -335,6 +349,28 @@ class TestRunCommandWithBeats:
         run_module.run_command(with_beats=True)
 
         assert recorded_call["configuration"] == "rubiks_connected_x_visualizer"
+
+    def test_run_command_env_enables_beats_web_launcher(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify service environments can launch Beats web without adding command-line flags."""
+
+        recorded_call: dict[str, object] = {}
+
+        def _fake_run_beats_web_command(**kwargs: object) -> None:
+            recorded_call.update(kwargs)
+
+        monkeypatch.setenv(BEATS_WEB_ENABLED_ENV_VAR, "1")
+        monkeypatch.setattr(
+            "heart.cli.commands.run_beats.run_beats_web_command",
+            _fake_run_beats_web_command,
+        )
+
+        run_module.run_command(configuration="lib_2026")
+
+        assert recorded_call["configuration"] == "lib_2026"
+        assert recorded_call["local_runtime"] is True
+        assert recorded_call["web_host"] == "0.0.0.0"
 
     def test_run_command_keeps_with_beats_web_as_alias(
         self, monkeypatch: pytest.MonkeyPatch

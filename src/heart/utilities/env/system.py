@@ -58,6 +58,10 @@ class SystemConfiguration:
         return _env_flag("FORWARD_TO_BEATS_APP", default=False)
 
     @classmethod
+    def beats_websocket_enabled(cls) -> bool:
+        return _env_flag("BEATS_WEBSOCKET_ENABLED", default=False)
+
+    @classmethod
     def stream_beats_input_debug(cls) -> bool:
         return _env_flag("BEATS_STREAM_INPUT_DEBUG", default=False)
 

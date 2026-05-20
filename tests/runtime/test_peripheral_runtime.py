@@ -81,6 +81,10 @@ class TestPeripheralRuntimeStreaming:
             "heart.runtime.peripheral_runtime.Configuration.forward_to_beats_app",
             classmethod(lambda cls: False),
         )
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.beats_websocket_enabled",
+            classmethod(lambda cls: False),
+        )
 
         def _unexpected_websocket() -> object:
             raise AssertionError(
@@ -93,6 +97,32 @@ class TestPeripheralRuntimeStreaming:
         )
 
         runtime.configure_streaming()
+
+    def test_configure_streaming_starts_websocket_for_control_server(
+        self, monkeypatch
+    ) -> None:
+        """Verify phone controls can start the Beats websocket without switching the runtime to streamed display output."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        websocket = _WebSocketStub()
+
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.forward_to_beats_app",
+            classmethod(lambda cls: False),
+        )
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime.Configuration.beats_websocket_enabled",
+            classmethod(lambda cls: True),
+        )
+        monkeypatch.setattr(
+            "heart.runtime.peripheral_runtime._build_websocket",
+            lambda: websocket,
+        )
+
+        runtime.configure_streaming()
+
+        assert websocket.control_handler is not None
 
     def test_configure_streaming_emits_peripheral_envelopes(self, monkeypatch) -> None:
         """Verify debug tap events are wrapped as peripheral payloads so the Beats websocket can replay and decode them after reconnects."""

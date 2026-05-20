@@ -1,12 +1,14 @@
 import os
 from pathlib import Path
 
+from heart.utilities.env.parsing import _env_flag
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
 DEFAULT_CONFIGURATION = "lib_2025"
 CONFIGURATION_OVERRIDE_ENV_VAR = "HEART_RUN_CONFIGURATION"
+BEATS_WEB_ENABLED_ENV_VAR = "BEATS_WEB_ENABLED"
 DEFAULT_ADD_LOW_POWER_MODE = True
 DEFAULT_WITH_BEATS = False
 DEFAULT_INSTALL_BEATS_DEPS = True
@@ -31,3 +33,9 @@ def resolve_configuration_name(configuration: str) -> str:
             override,
         )
     return override
+
+
+def beats_web_enabled() -> bool:
+    """Return True when the combined Beats web launcher is enabled by env."""
+
+    return _env_flag(BEATS_WEB_ENABLED_ENV_VAR, default=False)
