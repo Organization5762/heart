@@ -40,8 +40,13 @@ class _LoaderStub:
 
 
 class _DetectedPeripheral(Peripheral[str]):
-    def __init__(self) -> None:
+    def __init__(self, peripheral_id: str | None = None) -> None:
+        self._peripheral_id = peripheral_id
         self.run_count = 0
+
+    def peripheral_info(self):
+        info = super().peripheral_info()
+        return type(info)(id=self._peripheral_id, tags=info.tags)
 
     def run(self) -> None:
         self.run_count += 1
@@ -145,3 +150,20 @@ class TestPeripheralManagerGraph:
 
         assert directly_started.run_count == 1
         assert graph_owned.run_count == 0
+
+    def test_register_replaces_existing_peripheral_with_same_id(self) -> None:
+        first = _DetectedPeripheral(peripheral_id="gamepad:0")
+        replacement = _DetectedPeripheral(peripheral_id="gamepad:0")
+        other = _DetectedPeripheral(peripheral_id="gamepad:1")
+        manager = PeripheralManager(
+            configuration_loader=cast(
+                Any,
+                _LoaderStub(PeripheralConfiguration(detectors=())),
+            )
+        )
+
+        manager.register(first)
+        manager.register(other)
+        manager.register(replacement)
+
+        assert manager.peripherals == (replacement, other)

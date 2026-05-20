@@ -125,6 +125,18 @@ class PeripheralManager:
                 dispose(timeout=1.0)
 
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
+        peripheral_id = peripheral.peripheral_info().id
+        if peripheral_id is None:
+            self._peripherals.append(peripheral)
+            return
+        for index, existing in enumerate(self._peripherals):
+            if existing.peripheral_info().id == peripheral_id:
+                logger.info(
+                    "Replacing already-registered peripheral '%s'",
+                    peripheral_id,
+                )
+                self._peripherals[index] = peripheral
+                return
         self._peripherals.append(peripheral)
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
