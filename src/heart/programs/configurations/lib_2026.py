@@ -91,8 +91,6 @@ def friend_beacon_text(text: str) -> TextRendering:
 
 def configure(loop: GameLoop) -> None:
     randomness = RandomnessProvider()
-    controller_pairing_mode = loop.add_mode("pair bt")
-    controller_pairing_mode.add_renderer(ControllerPairingRenderer())
 
     add_cube_pong_mode(loop)
 
@@ -289,3 +287,6 @@ def configure(loop: GameLoop) -> None:
             randomness=randomness,
         )
     )
+
+    controller_pairing_mode = loop.add_mode("pair bt")
+    controller_pairing_mode.add_renderer(ControllerPairingRenderer())
