@@ -41,6 +41,8 @@ TITLE_FONT_SIZE = 14
 TITLE_LINE_HEIGHT_PX = 21
 TITLE_LINE_SPACING_PX = -4
 PRANAY_SKETCH_MODE_TITLE = "Dolly's\nsketch"
+FRIEND_BEACON_COLOR = Color(255, 105, 180)
+JUICEBOX_FRIEND_BEACON_COLOR = Color(57, 255, 20)
 
 
 def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
@@ -82,14 +84,26 @@ def centered_text(
     )
 
 
-def friend_beacon_text(text: str) -> TextRendering:
+def friend_beacon_text(
+    text: str,
+    color: Color = FRIEND_BEACON_COLOR,
+) -> TextRendering:
     return centered_text(
         text=text,
         font_size=12,
-        color=Color(255, 105, 180),
+        color=color,
         line_height_px=18,
         line_spacing_px=-2,
     )
+
+
+def friend_beacon_person_text(name: str) -> TextRendering:
+    color = (
+        JUICEBOX_FRIEND_BEACON_COLOR
+        if name == "juicebox"
+        else FRIEND_BEACON_COLOR
+    )
+    return friend_beacon_text(text=f"Where's\n{name}", color=color)
 
 
 def configure(loop: GameLoop) -> None:
@@ -103,7 +117,7 @@ def configure(loop: GameLoop) -> None:
         MultiScene(
             [
                 *[
-                    friend_beacon_text(text=f"Where's\n{name}")
+                    friend_beacon_person_text(name)
                     for name in sorted([
                         "anil",
                         "august",
