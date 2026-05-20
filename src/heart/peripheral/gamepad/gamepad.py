@@ -175,23 +175,20 @@ class Gamepad(Peripheral[Any]):
     def axis_key(axis_id: int) -> str:
         return f"axis{axis_id}"
 
-    def update(self) -> None:
+    def update(self, *, pump_events: bool = True) -> None:
         try:
-            self._update()
+            self._update(pump_events=pump_events)
         except Exception:
             logger.exception("Error updating gamepad state")
 
-    def _update(self) -> None:
+    def _update(self, *, pump_events: bool = True) -> None:
         if not self.joystick:
             return
 
-        # Refresh Pygame's internal event queue so that joystick state is up-to-date
-        # Without this, axes may appear stuck at their previous values (often -1),
-        # and button states may not change, leading to the behaviour where the
-        # stick seems permanently pushed to the top-left and only some buttons
-        # register. Calling pygame.event.pump() ensures Pygame processes any
-        # pending input events before we query the current state.
-        pygame.event.pump()
+        if pump_events:
+            # Refresh Pygame's internal event queue so joystick state is current.
+            # Batch callers can pump once before updating several controllers.
+            pygame.event.pump()
 
         now = pygame.time.get_ticks()
         self._pressed_prev_frame = self._pressed_curr_frame.copy()
