@@ -4,6 +4,7 @@ from pathlib import Path
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.spritesheet import (BoundingBox, FrameDescription, Size,
                                          SpritesheetLoop)
+from heart.renderers.vibe.life_preserver_renderer import LifePreserverRenderer
 from heart.renderers.vibe.oppi_renderer import OppiRenderer
 from heart.renderers.vibe.overmono_runner import OvermonoRunner
 from heart.renderers.vibe.zed_renderer import ZedRenderer
@@ -34,7 +35,6 @@ SUN_FRAME_DURATION_MS = 30
 SPACE_FRAME_SIZE = 64
 SPACE_FRAME_COUNT = 30
 SPACE_FRAME_DURATION_MS = 140
-SUN2_BRIGHTNESS = 0.8
 OVERMONO_FRAME_SIZE = 64
 OVERMONO_FRAME_COUNT = 2
 OVERMONO_FRAME_DURATION_MS = 375
@@ -127,15 +127,6 @@ class VibeState:
                 ),
             ),
             SpritesheetLoop(
-                sheet_file_path=str(SUN_SHEET_PATH),
-                disable_input=True,
-                frame_data=VibeState._frame_data(
-                    SUN_FRAME_SIZE,
-                    SUN_FRAME_COUNT,
-                    SUN_FRAME_DURATION_MS,
-                ),
-            ).brightness(SUN2_BRIGHTNESS),
-            SpritesheetLoop(
                 sheet_file_path=str(SPACE_SHEET_PATH),
                 disable_input=True,
                 frame_data=VibeState._frame_data(
@@ -164,5 +155,6 @@ class VibeState:
                 ),
             ),
             OppiRenderer(),
+            LifePreserverRenderer(),
         ]
         return VibeState(scenes=scenes)

@@ -10,7 +10,6 @@ from pprint import pformat
 import numpy as np
 import pygame
 from manyfold import shutdown
-from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_CLAMP_TO_EDGE, GL_COLOR_BUFFER_BIT,
                        GL_DEPTH_BUFFER_BIT, GL_MODELVIEW, GL_NEAREST,
@@ -233,11 +232,11 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._trigger_rest_values: dict[GamepadAxis, float] = {}
         self._voice_palette = DEFAULT_VOICE_PALETTE
         self._randomize_palette_was_held = False
         self._print_palette_was_held = False
         self._voice_rng = random.Random()
-        self._subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
         return (
@@ -257,30 +256,10 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self.render_size = self._render_size(self.window_size, orientation)
         self.tiled_mode = self._should_tile(orientation)
         self._initialize_shader()
-        self._subscriptions = self._subscribe_to_input_snapshots(peripheral_manager)
         return AudioStormState(
             start_time=time.monotonic(),
             peripheral_manager=peripheral_manager,
         )
-
-    def _subscribe_to_input_snapshots(
-        self,
-        peripheral_manager: PeripheralManager,
-    ) -> list[SubscriptionLike]:
-        subscriptions: list[SubscriptionLike] = []
-        input_io = getattr(peripheral_manager, "input_io", None)
-        keyboard_controller = (
-            input_io.keyboard
-            if input_io is not None
-            else getattr(peripheral_manager, "keyboard_controller", None)
-        )
-        if keyboard_controller is not None:
-            subscriptions.append(
-                keyboard_controller.snapshot_stream().subscribe(
-                    on_next=self._set_keyboard_snapshot,
-                )
-            )
-        return subscriptions
 
     def real_process(
         self,
@@ -295,6 +274,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             self._reset_tiled_resources()
 
         elapsed_s = self._elapsed_seconds(window.clock)
+        self._refresh_keyboard_snapshot(self.state.peripheral_manager)
         self._refresh_gamepad_snapshot()
         self._process_palette_actions()
         self._update_audio_texture(elapsed_s)
@@ -310,9 +290,6 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         )
 
     def reset(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-        self._subscriptions.clear()
         self._reset_tiled_resources()
         self._reset_audio_resources()
         self.shader_runtime.reset()
@@ -327,11 +304,29 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self._trigger_rest_values.clear()
         self._voice_palette = DEFAULT_VOICE_PALETTE
         self._randomize_palette_was_held = False
         self._print_palette_was_held = False
         self.initialized = False
         super().reset()
+
+    def _refresh_keyboard_snapshot(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
+        input_io = getattr(peripheral_manager, "input_io", None)
+        keyboard_controller = (
+            input_io.keyboard
+            if input_io is not None
+            else getattr(peripheral_manager, "keyboard_controller", None)
+        )
+        if keyboard_controller is None:
+            return
+        try:
+            self._keyboard_snapshot = keyboard_controller.sample()
+        except (AttributeError, pygame.error):
+            return
 
     def _initialize_shader(self) -> None:
         template_path = Path(shader_template_location).parent
@@ -749,17 +744,41 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
 
     def _trigger_held(self, axis: GamepadAxis) -> bool:
         raw_value = self._gamepad_snapshot.axis_value(axis, dead_zone=0.0)
-        if raw_value < 0.0:
-            value = (raw_value + 1.0) * 0.5
-        else:
-            value = raw_value
-        return value >= TRIGGER_DEAD_ZONE
+        return self._trigger_pressure(axis, raw_value) >= TRIGGER_DEAD_ZONE
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
     def _refresh_gamepad_snapshot(self) -> None:
         self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
+        if not self._gamepad_snapshot.connected:
+            self._trigger_rest_values.clear()
+            return
+        for axis in (GamepadAxis.TRIGGER_LEFT, GamepadAxis.TRIGGER_RIGHT):
+            self._trigger_rest_values.setdefault(
+                axis,
+                self._gamepad_snapshot.axis_value(axis, dead_zone=0.0),
+            )
+
+    def _trigger_pressure(self, axis: GamepadAxis, raw_value: float) -> float:
+        rest_value = self._trigger_rest_values.get(axis)
+        if rest_value is not None:
+            if rest_value <= -0.5:
+                return self._clamp(
+                    (raw_value - rest_value) / (1.0 - rest_value),
+                    0.0,
+                    1.0,
+                )
+            if rest_value >= 0.5:
+                return self._clamp(
+                    (rest_value - raw_value) / (rest_value + 1.0),
+                    0.0,
+                    1.0,
+                )
+            return self._clamp(abs(raw_value - rest_value), 0.0, 1.0)
+        if raw_value < 0.0:
+            return self._clamp((raw_value + 1.0) * 0.5, 0.0, 1.0)
+        return self._clamp(raw_value, 0.0, 1.0)
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

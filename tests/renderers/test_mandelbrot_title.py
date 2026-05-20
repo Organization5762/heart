@@ -16,7 +16,8 @@ from heart.runtime.display_context import DisplayContext
 class _StubMandelbrotMode:
     instances: list["_StubMandelbrotMode"] = []
 
-    def __init__(self) -> None:
+    def __init__(self, *, enable_input: bool = True) -> None:
+        self.enable_input = enable_input
         self.initialize = Mock()
         self._internal_process = Mock(side_effect=self._draw_preview)
         self.reset = Mock()
@@ -29,7 +30,8 @@ class _StubMandelbrotMode:
 
 
 class _FailingMandelbrotMode:
-    def __init__(self) -> None:
+    def __init__(self, *, enable_input: bool = True) -> None:
+        self.enable_input = enable_input
         self.initialize = Mock(side_effect=RuntimeError("preview failed"))
         self.reset = Mock()
 
@@ -60,6 +62,7 @@ class TestMandelbrotTitle:
 
         assert title.device_display_mode == DeviceDisplayMode.MIRRORED
         stub = _StubMandelbrotMode.instances[-1]
+        assert stub.enable_input is False
         preview_orientation = stub.initialize.call_args.args[2]
         assert isinstance(preview_orientation, Rectangle)
         assert preview_orientation.layout.columns == 1
@@ -73,6 +76,11 @@ class TestMandelbrotTitle:
         stub.reset.assert_called_once_with()
         assert title.state.image.get_size() == device.individual_display_size()
         assert title.state.image.get_at((0, 0))[:3] == (12, 34, 56)
+
+        title.real_process(window, device.orientation)
+
+        assert stub._internal_process.call_count == 1
+        assert window.screen.get_at((0, 0))[:3] == (12, 34, 56)
 
     def test_composed_title_output_is_tiled(
         self,
@@ -134,3 +142,29 @@ class TestMandelbrotTitle:
 
         assert title.state.image.get_size() == device.individual_display_size()
         assert window.screen.get_at((0, 0))[:3] == (0, 0, 0)
+
+    def test_reset_does_not_keep_live_preview_renderer(
+        self,
+        device,
+        manager,
+        monkeypatch,
+    ) -> None:
+        """Verify the title stores only the first preview frame after initialization."""
+
+        window = DisplayContext(
+            device=device,
+            screen=pygame.Surface(device.individual_display_size()),
+            clock=pygame.time.Clock(),
+        )
+        monkeypatch.setattr(
+            "heart.renderers.mandelbrot.title.MandelbrotMode",
+            _StubMandelbrotMode,
+        )
+        title = MandelbrotTitle()
+        title.initialize(window, manager, device.orientation)
+        stub = _StubMandelbrotMode.instances[-1]
+
+        title.reset()
+
+        stub.reset.assert_called_once_with()
+        assert title.initialized is False

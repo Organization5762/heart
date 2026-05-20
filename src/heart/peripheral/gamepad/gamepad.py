@@ -209,11 +209,10 @@ class Gamepad(Peripheral[Any]):
 
             if pressed and not self._pressed_prev_frame[button_id]:
                 self._press_time[button_id] = now
+                self._tap_flag[button_id] = True
 
             if not pressed and self._pressed_prev_frame[button_id]:
-                t0 = self._press_time.pop(button_id, None)
-                if t0 is not None and now - t0 <= self.TAP_THRESHOLD_MS:
-                    self._tap_flag[button_id] = True
+                self._press_time.pop(button_id, None)
 
         for axis_id in range(self.num_axes):
             axis_value = self.joystick.get_axis(axis_id)

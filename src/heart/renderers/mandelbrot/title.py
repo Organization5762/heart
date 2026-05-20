@@ -30,7 +30,7 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
         orientation: Orientation,
     ) -> MandelbrotTitleState:
         del orientation
-        mandelbrot = MandelbrotMode()
+        mandelbrot = MandelbrotMode(enable_input=False)
         preview_orientation = Rectangle.with_layout(columns=1, rows=1)
         first_image = pygame.Surface(window.get_size(), pygame.SRCALPHA)
         first_image.fill((0, 0, 0, 255))
@@ -57,4 +57,9 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        del orientation
         window.blit(self.state.image, (0, 0))
+
+    def reset(self) -> None:
+        self.initialized = False
+        super().reset()

@@ -75,6 +75,24 @@ class KeyboardController:
     def snapshot_stream(self) -> StreamNode[KeyboardSnapshot]:
         return self._snapshot_stream
 
+    def sample(self) -> KeyboardSnapshot:
+        if Configuration.is_pi() and (not Configuration.is_x11_forward()):
+            return KeyboardSnapshot(
+                pressed_keys=frozenset(), timestamp_ms=time.monotonic() * 1000.0
+            )
+        try:
+            pygame.event.pump()
+            keys = pygame.key.get_pressed()
+        except pygame.error:
+            logger.debug("Keyboard polling skipped because pygame video is unavailable.")
+            return KeyboardSnapshot(
+                pressed_keys=frozenset(), timestamp_ms=time.monotonic() * 1000.0
+            )
+        return KeyboardSnapshot(
+            pressed_keys=_pressed_keys_from_state(keys),
+            timestamp_ms=time.monotonic() * 1000.0,
+        )
+
     @cache
     def key_events(self, key: int) -> StreamNode[KeyboardEvent]:
         def _advance(

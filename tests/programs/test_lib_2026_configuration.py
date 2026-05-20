@@ -10,14 +10,14 @@ from heart.renderers.text import TextRendering
 def test_centered_titles_use_kirby_color(loop) -> None:
     configure(loop)
 
-    fractal_entry = next(
+    sphere_entry = next(
         entry
         for entry in loop.components.game_modes.state.entries
         if isinstance(entry.title_renderer, TextRendering)
-        and entry.title_renderer._provider._text == ("3d\nfractal",)
+        and entry.title_renderer._provider._text == ("void\nsphere",)
     )
 
-    assert fractal_entry.title_renderer._provider._color == Color.kirby()
+    assert sphere_entry.title_renderer._provider._color == Color.kirby()
 
 
 def test_pair_bluetooth_mode_is_not_registered(loop) -> None:
@@ -47,7 +47,7 @@ def test_vibe_title_uses_centered_kirby_title(loop) -> None:
     assert title_renderer._provider._y_location == 0.3359375
 
 
-def test_spectrum_title_uses_smaller_pixel_font(loop) -> None:
+def test_spectrum_title_uses_default_pixel_font(loop) -> None:
     configure(loop)
 
     spectrum_entry = next(
@@ -59,7 +59,7 @@ def test_spectrum_title_uses_smaller_pixel_font(loop) -> None:
     title_renderer = spectrum_entry.title_renderer
 
     assert isinstance(title_renderer, TextRendering)
-    assert title_renderer._provider._font_size == 12
+    assert title_renderer._provider._font_size == 14
 
 
 def test_mandelbulb_mode_follows_mandelbrot(loop) -> None:
@@ -81,4 +81,4 @@ def test_mandelbulb_mode_follows_mandelbrot(loop) -> None:
         for renderer in mandelbulb_entry.renderer.renderers
     )
     assert isinstance(mandelbulb_entry.title_renderer, TextRendering)
-    assert mandelbulb_entry.title_renderer._provider._text == ("mandel\nbulb",)
+    assert mandelbulb_entry.title_renderer._provider._text == ("bulb",)

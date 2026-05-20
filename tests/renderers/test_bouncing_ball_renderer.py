@@ -21,74 +21,81 @@ class TestBouncingBallRenderer:
 
         assert renderer.device_display_mode == DeviceDisplayMode.FULL
 
-    def test_projection_grows_as_ball_moves_toward_viewing_screen(self) -> None:
+    def test_cradle_swing_alternates_between_outer_balls(self) -> None:
+        first_half = BouncingBallRenderer._swing_angles(0.65)
+        second_half = BouncingBallRenderer._swing_angles(1.95)
+
+        assert first_half[0] < 0.0
+        assert first_half[-1] == 0.0
+        assert second_half[0] == 0.0
+        assert second_half[-1] > 0.0
+
+    def test_cradle_rest_centers_are_evenly_spaced(self) -> None:
+        centers = BouncingBallRenderer._rest_centers(
+            rect=pygame.Rect(0, 0, 256, 64),
+            radius=6,
+        )
+
+        assert len(centers) == 5
+        assert centers[2] == 128
+        assert centers[1] - centers[0] == centers[2] - centers[1]
+
+    def test_cradle_frame_stays_inside_display(self) -> None:
+        rect = pygame.Rect(64, 0, 64, 64)
+        frame = BouncingBallRenderer._cradle_frame(rect)
+
+        assert rect.contains(frame)
+        assert frame.left > rect.left
+        assert frame.top > rect.top
+        assert frame.bottom < rect.bottom
+
+    def test_cradle_uses_side_views_on_a_and_c_panels(self) -> None:
+        views = tuple(BouncingBallRenderer._panel_view(index) for index in range(4))
+
+        assert views == ("side", "front", "side", "front")
+
+    def test_side_view_scales_swinging_ball_toward_viewer(self) -> None:
+        resting = BouncingBallRenderer._side_view_depth_scale(0.0)
+        swinging = BouncingBallRenderer._side_view_depth_scale(0.92)
+
+        assert swinging > resting
+        assert swinging > 1.6
+
+    def test_side_view_keeps_swinging_ball_on_vertical_line(self) -> None:
         renderer = BouncingBallRenderer()
-        rect = pygame.Rect(0, 0, 64, 64)
+        surface = pygame.Surface((64, 64), pygame.SRCALPHA)
 
-        _, _, far_radius, far_depth = renderer._project_ball(
-            rect=rect,
-            position=BallPosition(x=0.0, y=0.0, z=1.0),
-            side_index=0,
-        )
-        _, _, near_radius, near_depth = renderer._project_ball(
-            rect=rect,
-            position=BallPosition(x=0.0, y=0.0, z=-1.0),
-            side_index=0,
+        renderer._draw_cradle(
+            screen=surface,
+            rect=pygame.Rect(0, 0, 64, 64),
+            elapsed_s=0.65,
+            view="side",
         )
 
-        assert near_depth > far_depth
-        assert near_radius > far_radius
+        bright_x_values = [
+            x
+            for x in range(surface.get_width())
+            for y in range(surface.get_height())
+            if surface.get_at((x, y)).r > 80
+        ]
+        center_x = surface.get_width() // 2
+        rendered_midpoint = (min(bright_x_values) + max(bright_x_values)) / 2
+        assert abs(rendered_midpoint - center_x) <= 0.5
 
-    def test_far_projection_converges_toward_centered_far_wall(self) -> None:
+    def test_cradle_drawing_restores_panel_clip(self) -> None:
         renderer = BouncingBallRenderer()
-        rect = pygame.Rect(0, 0, 100, 80)
+        surface = pygame.Surface((128, 64), pygame.SRCALPHA)
+        original_clip = surface.get_clip()
 
-        projected_x, projected_y, _radius, far_depth = renderer._project_ball(
-            rect=rect,
-            position=BallPosition(x=0.0, y=0.0, z=1.0),
-            side_index=0,
+        renderer._draw_clipped_cradle(
+            screen=surface,
+            rect=pygame.Rect(0, 0, 64, 64),
+            elapsed_s=0.65,
+            view="side",
         )
 
-        assert far_depth == 0.0
-        assert abs(projected_x - rect.centerx) <= 1
-        assert abs(projected_y - rect.centery) <= 1
-
-    def test_camera_space_rotates_with_cube_side(self) -> None:
-        position = BallPosition(x=0.8, y=0.25, z=-0.4)
-
-        side_zero = BouncingBallRenderer._camera_space(
-            position=position,
-            side_index=0,
-        )
-        side_one = BouncingBallRenderer._camera_space(
-            position=position,
-            side_index=1,
-        )
-
-        assert side_zero == (0.8, 0.25, 0.4)
-        assert side_one == (-0.4, 0.25, 0.8)
-
-    def test_project_wall_centers_far_wall_inside_panel(self) -> None:
-        rect = pygame.Rect(0, 0, 100, 80)
-
-        far_wall = BouncingBallRenderer._project_wall(rect=rect, depth=-1.0)
-
-        assert far_wall[0][0] > rect.left
-        assert far_wall[1][0] < rect.right
-        assert far_wall[0][1] > rect.top
-        assert far_wall[2][1] < rect.bottom
-
-    def test_runway_segments_stack_toward_centered_far_wall(self) -> None:
-        rect = pygame.Rect(0, 0, 96, 64)
-
-        segments = BouncingBallRenderer._runway_segments(rect=rect)
-
-        assert len(segments) >= 6
-        first_floor_start, first_floor_end = segments[0]
-        last_floor_start, last_floor_end = segments[-2]
-        assert first_floor_start[1] > last_floor_start[1]
-        assert first_floor_start[0] < last_floor_start[0]
-        assert first_floor_end[0] > last_floor_end[0]
+        assert surface.get_clip() == original_clip
+        assert self._count_bright_pixels(surface.subsurface(pygame.Rect(64, 0, 64, 64))) == 0
 
     def test_state_bounces_off_side_and_top_walls(self) -> None:
         renderer = BouncingBallRenderer()
@@ -216,7 +223,7 @@ class TestBouncingBallRenderer:
 
         assert 0.0 < abs(decayed.force.x) < abs(pushed.force.x)
 
-    def test_render_draws_distinct_ball_sizes_across_four_screens(self, device) -> None:
+    def test_render_draws_newtons_cradle_across_four_panel_views(self, device) -> None:
         renderer = BouncingBallRenderer()
         renderer.set_state(
             BouncingBallState(
@@ -236,29 +243,16 @@ class TestBouncingBallRenderer:
 
         renderer._internal_process(window, PeripheralManager(), Cube.sides())
 
-        first_bright_pixels = self._count_bright_pixels(
+        bright_pixels = self._count_bright_pixels(surface)
+        side_panel_pixels = self._count_bright_pixels(
             surface.subsurface(pygame.Rect(0, 0, 64, 64))
         )
-        third_bright_pixels = self._count_bright_pixels(
-            surface.subsurface(pygame.Rect(128, 0, 64, 64))
+        front_panel_pixels = self._count_bright_pixels(
+            surface.subsurface(pygame.Rect(64, 0, 64, 64))
         )
 
-        assert first_bright_pixels > third_bright_pixels
-
-    def test_projection_keeps_ball_inside_panel_bounds(self) -> None:
-        renderer = BouncingBallRenderer()
-        rect = pygame.Rect(0, 0, 64, 64)
-
-        projected_x, projected_y, radius, _ = renderer._project_ball(
-            rect=rect,
-            position=BallPosition(x=1.0, y=0.78, z=1.0),
-            side_index=1,
-        )
-
-        assert rect.left <= projected_x - radius
-        assert projected_x + radius < rect.right
-        assert rect.top <= projected_y - radius
-        assert projected_y + radius < rect.bottom
+        assert bright_pixels > 120
+        assert side_panel_pixels != front_panel_pixels
 
     def _frame_tick(self, *, index: int, delta_s: float) -> FrameTick:
         return FrameTick(

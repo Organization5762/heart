@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pygame
-from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RGBA,
@@ -58,7 +57,6 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             timestamp_ms=0.0,
         )
         self._gamepad_snapshot = GamepadSnapshot(connected=False, identifier=None)
-        self._subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
         return (
@@ -79,11 +77,6 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
         self.tiled_mode = self._should_tile(orientation)
         self.cursor = self._initial_cursor(self.render_size)
         self._initialize_shader()
-        self._subscriptions = [
-            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
-                on_next=self._set_keyboard_snapshot,
-            ),
-        ]
         return PaletteTunnelState(
             peripheral_manager=peripheral_manager,
             start_time=time.monotonic(),
@@ -94,6 +87,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        self._refresh_keyboard_snapshot()
         self._refresh_gamepad_snapshot()
         render_size = self._render_size(window.get_size(), orientation)
         if self.window_size != window.get_size() or self.render_size != render_size:
@@ -113,9 +107,6 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             )
 
     def reset(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-        self._subscriptions.clear()
         self._reset_tiled_resources()
         self.shader_runtime.reset()
         self.window_size = None
@@ -292,6 +283,12 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
+
+    def _refresh_keyboard_snapshot(self) -> None:
+        try:
+            self._keyboard_snapshot = self.state.peripheral_manager.input_io.keyboard.sample()
+        except (AttributeError, pygame.error):
+            return
 
     def _refresh_gamepad_snapshot(self) -> None:
         self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()

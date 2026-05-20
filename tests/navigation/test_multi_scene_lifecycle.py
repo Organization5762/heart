@@ -40,8 +40,10 @@ class _PeripheralManager:
 class _Gamepad:
     def __init__(self) -> None:
         self.dpad = GamepadDpadValue()
+        self.sample_include_tapped_buttons: list[bool] = []
 
-    def sample(self) -> GamepadSnapshot:
+    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+        self.sample_include_tapped_buttons.append(include_tapped_buttons)
         return GamepadSnapshot(
             connected=True,
             identifier="pad",
@@ -50,7 +52,8 @@ class _Gamepad:
 
 
 class _DisconnectedGamepad:
-    def sample(self) -> GamepadSnapshot:
+    def sample(self, *, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+        del include_tapped_buttons
         return GamepadSnapshot(connected=False, identifier=None)
 
 
@@ -161,8 +164,36 @@ class TestMultiSceneLifecycle:
         assert multi_scene.get_renderers() == [second]
         manager.gamepad.dpad = GamepadDpadValue()
         assert multi_scene.get_renderers() == [second]
+        assert multi_scene.get_renderers() == [second]
         manager.gamepad.dpad = GamepadDpadValue(x=-1)
         assert multi_scene.get_renderers() == [first]
+        assert manager.gamepad.sample_include_tapped_buttons == [
+            False,
+            False,
+            False,
+            False,
+            False,
+        ]
+
+    def test_one_frame_dpad_bounce_does_not_repeat_scene_selection(self) -> None:
+        first = _Scene("first")
+        second = _Scene("second")
+        third = _Scene("third")
+        multi_scene = MultiScene([first, second, third])
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+        assert multi_scene.get_renderers() == [second]
+        manager.gamepad.dpad = GamepadDpadValue()
+        assert multi_scene.get_renderers() == [second]
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+        assert multi_scene.get_renderers() == [second]
 
     def test_dpad_scene_selection_can_be_disabled(self) -> None:
         first = _Scene("first")

@@ -6,21 +6,15 @@ import pygame
 
 from heart.device import Device
 from heart.peripheral.core.manager import PeripheralManager
-from heart.renderers.cube_pong.renderer import (
-    BALL_COLORS,
-    PADDLE_ONE_COLOR,
-    PADDLE_TWO_COLOR,
-    CubePongRenderer,
-)
-from heart.renderers.cube_pong.state import (
-    ROUTE_ACROSS_SCREEN_FOUR,
-    ROUTE_ACROSS_SCREEN_TWO,
-    CubePongBall,
-    CubePongControls,
-    CubePongState,
-    advance_cube_pong_state,
-    new_cube_pong_round,
-)
+from heart.renderers.cube_pong.renderer import (BALL_COLORS, PADDLE_ONE_COLOR,
+                                                PADDLE_TWO_COLOR,
+                                                CubePongRenderer)
+from heart.renderers.cube_pong.state import (ROUTE_ACROSS_SCREEN_FOUR,
+                                             ROUTE_ACROSS_SCREEN_TWO,
+                                             CubePongBall, CubePongControls,
+                                             CubePongState,
+                                             advance_cube_pong_state,
+                                             new_cube_pong_round)
 from heart.runtime.display_context import DisplayContext
 
 

@@ -580,6 +580,36 @@ class TestGamepadController:
         assert snapshot.axis_value(GamepadAxis.LEFT_Y, dead_zone=0.0) == -0.75
         assert snapshot.dpad == GamepadDpadValue(x=1, y=1)
 
+    def test_combined_trigger_axis_prefers_pressed_signed_trigger(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify an idle signed trigger on one slot does not mask a pressed trigger on another slot."""
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
+        )
+        idle = Gamepad(
+            joystick_id=0,
+            joystick=_JoystickProbe(axes={2: -1.0, 5: -1.0}),
+        )
+        pressed = Gamepad(
+            joystick_id=1,
+            joystick=_JoystickProbe(axes={2: 1.0, 5: -1.0}),
+        )
+        controller = GamepadController(
+            manager=_GamepadManager(idle, pressed),
+            debug_tap=InputDebugTap(),
+        )
+
+        snapshot = controller.sample()
+
+        assert snapshot.axis_value(GamepadAxis.TRIGGER_LEFT, dead_zone=0.0) == 1.0
+        assert snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0) == -1.0
+
     def test_sample_can_target_one_gamepad_by_joystick_id(
         self,
         monkeypatch,
@@ -639,6 +669,39 @@ class TestGamepadController:
         assert motion_snapshot.tapped_buttons == frozenset()
         assert command_snapshot.tapped_buttons == frozenset({GamepadButton.SOUTH})
 
+    def test_button_taps_emit_on_press_edge(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify sampled button taps are immediate on press instead of waiting for release."""
+        monkeypatch.setattr(
+            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
+        )
+        joystick = _JoystickProbe(buttons={1: False, 3: False})
+        gamepad = Gamepad(joystick_id=0, joystick=joystick)
+        controller = GamepadController(
+            manager=_GamepadManager(gamepad),
+            debug_tap=InputDebugTap(),
+        )
+
+        assert controller.sample().tapped_buttons == frozenset()
+
+        joystick._buttons[1] = True
+        press_snapshot = controller.sample()
+        held_snapshot = controller.sample()
+        joystick._buttons[1] = False
+        controller.sample()
+        joystick._buttons[3] = True
+        y_press_snapshot = controller.sample()
+
+        assert press_snapshot.tapped_buttons == frozenset({GamepadButton.SOUTH})
+        assert held_snapshot.tapped_buttons == frozenset()
+        assert y_press_snapshot.tapped_buttons == frozenset({GamepadButton.WEST})
+
     def test_snapshot_stream_can_target_one_gamepad_by_joystick_id(self) -> None:
         """Verify indexed gamepad streams are stable so renderer-specific controller routing can subscribe by slot."""
         controller = GamepadController(
@@ -655,7 +718,7 @@ class TestGamepadController:
         self,
         monkeypatch,
     ) -> None:
-        """Verify shared gamepad views derive button taps and stick coordinates from one snapshot stream so consumers stay consistent."""
+        """Verify shared gamepad views derive button press edges and stick coordinates from one snapshot stream so consumers stay consistent."""
         tap = InputDebugTap()
         controller = GamepadController(manager=object(), debug_tap=tap)
         snapshots: EventStream[GamepadSnapshot] = EventStream()
@@ -672,8 +735,20 @@ class TestGamepadController:
             GamepadSnapshot(
                 connected=True,
                 identifier="pad",
+                buttons={GamepadButton.SOUTH: False},
+                axes={
+                    GamepadAxis.LEFT_X: 0.0,
+                    GamepadAxis.LEFT_Y: 0.0,
+                },
+                dpad=GamepadDpadValue(),
+                timestamp_monotonic=0.5,
+            )
+        )
+        snapshots.emit(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
                 buttons={GamepadButton.SOUTH: True},
-                tapped_buttons=frozenset({GamepadButton.SOUTH}),
                 axes={
                     GamepadAxis.LEFT_X: 0.8,
                     GamepadAxis.LEFT_Y: -0.4,
@@ -692,19 +767,17 @@ class TestGamepadController:
 
 
 class TestNavigationProfile:
-    """Group navigation-profile tests so keyboard and gamepad inputs produce the same logical navigation contract."""
+    """Group navigation-profile tests so keyboard and injected inputs produce the shared logical navigation contract."""
 
-    def test_profile_maps_keyboard_and_gamepad_inputs_to_logical_events(
+    def test_profile_maps_keyboard_and_injected_inputs_to_logical_events(
         self,
         monkeypatch,
     ) -> None:
-        """Verify equivalent keyboard and gamepad inputs emit the same navigation outputs so scene navigation remains device-agnostic."""
+        """Verify equivalent keyboard and injected inputs emit the same navigation outputs so runtime-owned gamepad navigation has one path."""
         io = InputIO(graph=Graph(), peripheral_source=lambda: ())
         tap = io.debug_tap
         keyboard_snapshots: EventStream[KeyboardSnapshot] = EventStream()
-        gamepad_snapshots: EventStream[GamepadSnapshot] = EventStream()
         monkeypatch.setattr(io.keyboard, "snapshot_stream", lambda: keyboard_snapshots)
-        monkeypatch.setattr(io.gamepad, "snapshot_stream", lambda: gamepad_snapshots)
         profile = io.navigation
         intents: list[tuple[str, str, int]] = []
         browse: list[int] = []
@@ -737,27 +810,9 @@ class TestNavigationProfile:
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=300.0))
         keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_UP, timestamp_ms=310.0))
 
-        gamepad_snapshots.emit(_gamepad_snapshot(timestamp_monotonic=1.0))
-        gamepad_snapshots.emit(
-            _gamepad_snapshot(
-                dpad=GamepadDpadValue(x=1),
-                timestamp_monotonic=2.0,
-            )
-        )
-        gamepad_snapshots.emit(
-            _gamepad_snapshot(
-                tapped_buttons=frozenset({GamepadButton.SOUTH}),
-                dpad=GamepadDpadValue(x=1),
-                timestamp_monotonic=3.0,
-            )
-        )
-        gamepad_snapshots.emit(
-            _gamepad_snapshot(
-                tapped_buttons=frozenset({GamepadButton.NORTH}),
-                dpad=GamepadDpadValue(x=1),
-                timestamp_monotonic=4.0,
-            )
-        )
+        profile.inject_browse(1, source="gamepad.dpad")
+        profile.inject_activate(source="gamepad.south")
+        profile.inject_alternate_activate(source="gamepad.north")
 
         assert browse == [-1, 1, 1]
         assert activate == ["ActivateIntent", "ActivateIntent"]
@@ -1021,7 +1076,7 @@ class TestMandelbrotControlProfile:
         )
         gamepad_snapshots.emit(
             _gamepad_snapshot(
-                tapped_buttons=frozenset({GamepadButton.NORTH}),
+                buttons={GamepadButton.NORTH: True},
                 axes={
                     GamepadAxis.LEFT_X: 0.0,
                     GamepadAxis.LEFT_Y: 0.0,

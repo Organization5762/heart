@@ -10,7 +10,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, KeyboardSnapshot)
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import (FractalRuntime,
                                                     FractalScene,
@@ -60,20 +60,22 @@ class _SnapshotStream:
 
 
 class _SnapshotController:
-    def __init__(self) -> None:
+    def __init__(self, snapshot: object | None = None) -> None:
         self.stream = _SnapshotStream()
-        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> GamepadSnapshot:
+    def sample(self) -> object:
         return self.snapshot
 
 
 class _InputIO:
     def __init__(self) -> None:
-        self.keyboard = _SnapshotController()
+        self.keyboard = _SnapshotController(
+            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+        )
         self.gamepad = _SnapshotController()
 
 
@@ -132,11 +134,11 @@ class TestFractalRuntime:
 
         window.configure_window.assert_not_called()
 
-    def test_reset_disposes_snapshot_subscriptions(
+    def test_reset_does_not_retain_snapshot_subscriptions(
         self,
         monkeypatch,
     ) -> None:
-        """Verify repeated fractal entry and exit does not accumulate live input listeners."""
+        """Verify repeated fractal entry and exit does not create live input listeners."""
         runtime = FractalRuntime()
         window = Mock()
         window.get_size.return_value = (64, 64)
@@ -158,9 +160,7 @@ class TestFractalRuntime:
         )
         runtime.reset()
 
-        keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0]
-        assert keyboard_subscription.dispose_calls == 1
-        assert runtime._input_subscriptions == []
+        assert manager.input_io.keyboard.stream.subscriptions == []
 
     def test_reset_deletes_owned_tiled_gl_texture(
         self,

@@ -6,10 +6,8 @@ from heart.display.color import Color
 from heart.navigation import MultiScene
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.audio_storm import AudioStormScene
-from heart.renderers.bouncing_ball import (
-    BouncingBallRenderer,
-    BouncingBallStateProvider,
-)
+from heart.renderers.bouncing_ball import (BouncingBallRenderer,
+                                           BouncingBallStateProvider)
 from heart.renderers.cube_pong import add_cube_pong_mode
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
@@ -103,7 +101,6 @@ def configure(loop: GameLoop) -> None:
                 *[
                     friend_beacon_text(text=f"Where's\n{name}")
                     for name in sorted([
-                        "andrew",
                         "anil",
                         "august",
                         "brian",
@@ -119,6 +116,7 @@ def configure(loop: GameLoop) -> None:
                         "lilli",
                         "macy",
                         "maddie",
+                        "popov",
                         "pranay",
                         "seb",
                         "spriha",

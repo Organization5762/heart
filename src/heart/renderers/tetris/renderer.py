@@ -18,26 +18,13 @@ from heart.runtime.display_context import DisplayContext
 from heart.utilities.logging import get_logger
 
 from .direct_gamepad import DirectGamepadSnapshot, DirectTetrisGamepads
-from .state import (
-    BOARD_HEIGHT,
-    BOARD_WIDTH,
-    CELL_SIZE_PX,
-    MOVE_REPEAT_DELAY_MS,
-    MOVE_REPEAT_INTERVAL_MS,
-    PIECE_ROTATIONS,
-    PLAYER_COUNT,
-    TetrisColor,
-    TetrisControls,
-    TetrisGameState,
-    TetrisInputMemory,
-    TetrisPiece,
-    TetrisPieceKind,
-    TetrisPlayerState,
-    advance_player,
-    collides,
-    queue_garbage_for_opponents,
-    update_match_end_state,
-)
+from .state import (BOARD_HEIGHT, BOARD_WIDTH, CELL_SIZE_PX,
+                    MOVE_REPEAT_DELAY_MS, MOVE_REPEAT_INTERVAL_MS,
+                    PIECE_ROTATIONS, PLAYER_COUNT, TetrisColor, TetrisControls,
+                    TetrisGameState, TetrisInputMemory, TetrisPiece,
+                    TetrisPieceKind, TetrisPlayerState, advance_player,
+                    collides, queue_garbage_for_opponents,
+                    update_match_end_state)
 
 BACKGROUND_COLOR = pygame.Color(0, 8, 20)
 PANEL_BACKGROUND_COLOR = pygame.Color(0, 18, 40)

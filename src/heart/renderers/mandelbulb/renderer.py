@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pygame
 from manyfold import shutdown
-from manyfold.graph import SubscriptionLike
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RGBA,
@@ -106,7 +105,6 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self._last_phase_toggle_snapshot_time: float | None = None
         self._last_auto_orbit_toggle_snapshot_time: float | None = None
         self._last_color_mode_toggle_snapshot_time: float | None = None
-        self._subscriptions: list[SubscriptionLike] = []
 
     def is_initialized(self) -> bool:
         return (
@@ -126,11 +124,6 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self.render_size = self._render_size(self.window_size, orientation)
         self.tiled_mode = self._should_tile(orientation)
         self._initialize_shader()
-        self._subscriptions = [
-            peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
-                on_next=self._set_keyboard_snapshot,
-            ),
-        ]
         return MandelbulbState(
             start_time=time.monotonic(),
             peripheral_manager=peripheral_manager,
@@ -148,6 +141,7 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
             self.tiled_mode = self._should_tile(orientation)
             self._reset_tiled_resources()
 
+        self._refresh_keyboard_snapshot()
         self._refresh_gamepad_snapshot()
         self._process_input(window.clock)
 
@@ -162,9 +156,6 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         )
 
     def reset(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-        self._subscriptions.clear()
         self._reset_tiled_resources()
         self.shader_runtime.reset()
         self.window_size = None
@@ -391,6 +382,12 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
+
+    def _refresh_keyboard_snapshot(self) -> None:
+        try:
+            self._keyboard_snapshot = self.state.peripheral_manager.input_io.keyboard.sample()
+        except (AttributeError, pygame.error):
+            return
 
     def _refresh_gamepad_snapshot(self) -> None:
         self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
