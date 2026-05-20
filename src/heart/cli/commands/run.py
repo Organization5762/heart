@@ -15,6 +15,7 @@ from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
                                             DEFAULT_INSTALL_BEATS_DEPS,
                                             DEFAULT_LOCAL_BEATS_RUNTIME,
                                             DEFAULT_WITH_BEATS,
+                                            beats_web_enabled,
                                             resolve_configuration_name)
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.game_loop import GameLoop
@@ -98,7 +99,7 @@ def run_command(
 ) -> None:
     resolved_configuration = resolve_configuration_name(configuration)
 
-    if with_beats or with_beats_web:
+    if with_beats or with_beats_web or beats_web_enabled():
         run_beats.run_beats_web_command(
             configuration=resolved_configuration,
             add_low_power_mode=add_low_power_mode,

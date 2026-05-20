@@ -145,6 +145,17 @@ class TestUtilitiesEnv:
         monkeypatch.setenv("FORWARD_TO_BEATS_MAP", "true")
         assert Configuration.forward_to_beats_app() is False
 
+    def test_beats_websocket_enabled_reads_expected_env_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify the Beats websocket helper can enable phone controls without frame forwarding."""
+
+        _clear_env(monkeypatch, "BEATS_WEBSOCKET_ENABLED")
+        assert Configuration.beats_websocket_enabled() is False
+
+        monkeypatch.setenv("BEATS_WEBSOCKET_ENABLED", "true")
+        assert Configuration.beats_websocket_enabled() is True
+
     def test_asset_cache_strategy_defaults_all(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
