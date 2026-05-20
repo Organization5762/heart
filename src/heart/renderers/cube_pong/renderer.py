@@ -10,6 +10,10 @@ from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.gamepad.screen_mapping import (
+    SCREEN_SLOT_BLUETOOTH_MACS,
+    normalize_bluetooth_mac,
+)
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.cube_pong.state import (PLAYER_ONE, PLAYER_TWO,
                                              CubePongControls, CubePongState,
@@ -47,22 +51,22 @@ class PongControllerBinding:
 PONG_CONTROLLER_BINDINGS: tuple[PongControllerBinding, ...] = (
     PongControllerBinding(
         player=PLAYER_ONE,
-        mac_address="E4:17:D8:E9:76:C8",  # Pink 8BitDo Lite 2 controller.
+        mac_address=SCREEN_SLOT_BLUETOOTH_MACS[0] or "",
         color_name="pink",
     ),
     PongControllerBinding(
         player=PLAYER_ONE,
-        mac_address="E4:17:D8:91:15:35",  # Pink 8BitDo Lite 2 controller.
+        mac_address=SCREEN_SLOT_BLUETOOTH_MACS[3] or "",
         color_name="pink",
     ),
     PongControllerBinding(
         player=PLAYER_TWO,
-        mac_address="E4:17:D8:43:5C:48",  # Teal 8BitDo Lite 2 controller.
+        mac_address=SCREEN_SLOT_BLUETOOTH_MACS[1] or "",
         color_name="teal",
     ),
     PongControllerBinding(
         player=PLAYER_TWO,
-        mac_address="E4:17:D8:58:22:8A",  # Teal 8BitDo Lite 2 controller.
+        mac_address=SCREEN_SLOT_BLUETOOTH_MACS[2] or "",
         color_name="teal",
     ),
 )
@@ -416,4 +420,4 @@ def _joystick_paths() -> tuple[Path, ...]:
 
 
 def _normalize_bluetooth_mac(mac_address: str) -> str:
-    return mac_address.replace(":", "").lower()
+    return normalize_bluetooth_mac(mac_address)
