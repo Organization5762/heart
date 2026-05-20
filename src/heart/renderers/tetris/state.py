@@ -11,8 +11,12 @@ BOARD_HEIGHT = 20
 CELL_SIZE_PX = 3
 PLAYER_COUNT = 4
 QUEUE_PREVIEW_LENGTH = 6
-FALL_INTERVAL_MS = 700
+LINES_PER_LEVEL = 10
+MAX_GRAVITY_LEVEL = 15
+FALL_INTERVAL_MS = 1000.0
 SOFT_DROP_INTERVAL_MS = 120
+SOFT_DROP_GRAVITY_MULTIPLIER = 20
+SOFT_DROP_MIN_INTERVAL_MS = 16.0
 LOCK_DELAY_MS = 450
 MOVE_REPEAT_DELAY_MS = 80
 MOVE_REPEAT_INTERVAL_MS = 35
@@ -184,7 +188,9 @@ class TetrisGameState:
     winner_index: int | None = None
 
     @classmethod
-    def create(cls, rng: random.Random, player_count: int = PLAYER_COUNT) -> "TetrisGameState":
+    def create(
+        cls, rng: random.Random, player_count: int = PLAYER_COUNT
+    ) -> "TetrisGameState":
         return cls(players=[TetrisPlayerState.create(rng) for _ in range(player_count)])
 
 
@@ -306,6 +312,26 @@ def clear_lines(player: TetrisPlayerState) -> int:
     return cleared
 
 
+def player_level(player: TetrisPlayerState) -> int:
+    return (player.lines_cleared // LINES_PER_LEVEL) + 1
+
+
+def guideline_fall_interval_ms(level: int) -> float:
+    gravity_level = max(1, min(level, MAX_GRAVITY_LEVEL))
+    seconds_per_row = (0.8 - ((gravity_level - 1) * 0.007)) ** (gravity_level - 1)
+    return seconds_per_row * FALL_INTERVAL_MS
+
+
+def soft_drop_interval_ms(level: int) -> float:
+    return min(
+        SOFT_DROP_INTERVAL_MS,
+        max(
+            SOFT_DROP_MIN_INTERVAL_MS,
+            guideline_fall_interval_ms(level) / SOFT_DROP_GRAVITY_MULTIPLIER,
+        ),
+    )
+
+
 def apply_garbage(
     player: TetrisPlayerState,
     line_count: int,
@@ -315,10 +341,7 @@ def apply_garbage(
         hole = rng.randrange(BOARD_WIDTH)
         player.board.pop(0)
         player.board.append(
-            [
-                None if x == hole else TetrisColor.GARBAGE
-                for x in range(BOARD_WIDTH)
-            ]
+            [None if x == hole else TetrisColor.GARBAGE for x in range(BOARD_WIDTH)]
         )
     if player.active is not None and collides(player.board, player.active):
         while player.active is not None and collides(player.board, player.active):
@@ -402,23 +425,25 @@ def advance_player(
     if controls.hard_drop:
         return hard_drop(player, rng)
 
+    level = player_level(player)
     if controls.soft_drop:
+        soft_drop_interval = soft_drop_interval_ms(level)
         player.fall_elapsed_ms = 0.0
         player.input_memory.soft_drop_elapsed_ms += elapsed_ms
-        if player.input_memory.soft_drop_elapsed_ms < SOFT_DROP_INTERVAL_MS:
+        if player.input_memory.soft_drop_elapsed_ms < soft_drop_interval:
             return 0
         player.input_memory.soft_drop_elapsed_ms = 0.0
         if try_move(player, 0, 1):
             player.score += 1
             player.lock_elapsed_ms = 0.0
             return 0
-        player.lock_elapsed_ms += SOFT_DROP_INTERVAL_MS
+        player.lock_elapsed_ms += soft_drop_interval
         if player.lock_elapsed_ms >= LOCK_DELAY_MS:
             return lock_piece(player, rng)
         return 0
 
     player.input_memory.soft_drop_elapsed_ms = 0.0
-    fall_interval = FALL_INTERVAL_MS
+    fall_interval = guideline_fall_interval_ms(level)
     player.fall_elapsed_ms += elapsed_ms
     cleared = 0
     while player.fall_elapsed_ms >= fall_interval and not player.game_over:
