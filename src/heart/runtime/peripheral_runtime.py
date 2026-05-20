@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import base64
 import io
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from queue import Empty, SimpleQueue
 from typing import Any
 
@@ -31,8 +34,12 @@ CONTROL_COMMAND_ALTERNATE = "alternate_activate"
 CONTROL_COMMAND_SENSOR_UPDATE = "sensor_update"
 CONTROL_COMMAND_TEXT_UPDATE = "text_update"
 CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
+CONTROL_COMMAND_EMOJI_UPDATE = "emoji_update"
 PHONE_TEXT_DISPLAY_DURATION_SECONDS = 5.0
 PHONE_IMAGE_DISPLAY_DURATION_SECONDS = 5.0
+PHONE_PHOTO_DIRECTORY_ENV_VAR = "HEART_PHONE_PHOTO_DIR"
+DEFAULT_PHONE_PHOTO_DIRECTORY = Path("~/heart-phone-photos")
+GAMEPAD_NAVIGATION_STICK_THRESHOLD = 0.6
 
 
 class PeripheralRuntime:
@@ -130,6 +137,9 @@ class PeripheralRuntime:
                 image_base64=control_message.image_base64,
             )
             return
+        if control_message.command == CONTROL_COMMAND_EMOJI_UPDATE:
+            self._present_phone_emoji(control_message.emoji)
+            return
 
     def _streaming_envelope(
         self, envelope: InputDebugEnvelope
@@ -185,6 +195,8 @@ class PeripheralRuntime:
             image_bytes = base64.b64decode(image_base64, validate=True)
             with Image.open(io.BytesIO(image_bytes)) as uploaded_image:
                 normalized = ImageOps.exif_transpose(uploaded_image).convert("RGBA")
+                saved_path = save_phone_photo(normalized)
+                logger.info("Saved phone photo to %s", saved_path)
                 surface = pygame.image.fromstring(
                     normalized.tobytes(),
                     normalized.size,
@@ -202,6 +214,18 @@ class PeripheralRuntime:
             renderer,
             duration_seconds=PHONE_IMAGE_DISPLAY_DURATION_SECONDS,
         )
+
+    def _present_phone_emoji(self, emoji: str | None) -> None:
+        if emoji is None:
+            return
+        loop = get_active_game_loop()
+        if loop is None:
+            logger.debug("No active GameLoop available for phone emoji display.")
+            return
+        try:
+            loop.present_floating_emoji(emoji)
+        except ValueError:
+            logger.warning("Ignoring unsupported phone emoji: %s", emoji)
 
     def poll(self) -> None:
         drain_frame_thread_queue()
@@ -226,3 +250,19 @@ def _build_websocket() -> Any:
     """Construct the Beats websocket only when streaming is enabled."""
 
     return WebSocket()
+
+
+def phone_photo_directory() -> Path:
+    configured = os.environ.get(PHONE_PHOTO_DIRECTORY_ENV_VAR)
+    if configured:
+        return Path(configured).expanduser()
+    return DEFAULT_PHONE_PHOTO_DIRECTORY.expanduser()
+
+
+def save_phone_photo(image: Image.Image) -> Path:
+    output_dir = phone_photo_directory()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    output_path = output_dir / f"phone-photo-{timestamp}.png"
+    image.save(output_path, format="PNG")
+    return output_path

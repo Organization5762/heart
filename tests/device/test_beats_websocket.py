@@ -312,6 +312,52 @@ class TestControlMessageDecoding:
         assert decoded.image_base64 is None
         assert decoded.clear is True
 
+    def test_decodes_emoji_update_control_messages(self) -> None:
+        """Verify phone emoji controls decode into a validated overlay trigger."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "emoji_update",
+                    "emoji": "rainbow",
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "emoji_update"
+        assert decoded.emoji == "rainbow"
+
+    def test_decodes_face_update_control_messages(self) -> None:
+        """Verify phone face controls reuse the validated floating overlay trigger."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "emoji_update",
+                    "emoji": "seb",
+                }
+            )
+        )
+
+        assert decoded is not None
+        assert decoded.command == "emoji_update"
+        assert decoded.emoji == "seb"
+
+    def test_rejects_unknown_emoji_update_control_messages(self) -> None:
+        """Reject unsupported emoji names so the runtime only handles known overlay art."""
+        decoded = decode_control_message(
+            json.dumps(
+                {
+                    "kind": "control",
+                    "command": "emoji_update",
+                    "emoji": "fire",
+                }
+            )
+        )
+
+        assert decoded is None
+
 
 class TestWebSocketReplayCache:
     """Verify replay caching so reconnecting Beats clients immediately recover current stream state."""

@@ -23,6 +23,20 @@ const PHOTO_CROP_BOX_SIZE_PERCENT = 76;
 const PHOTO_CROP_BOX_INSET_PERCENT = (100 - PHOTO_CROP_BOX_SIZE_PERCENT) / 2;
 
 type PhoneControlCommand = "browse" | "activate" | "alternate_activate";
+type FloatingEmojiKey =
+  | "poop"
+  | "skull"
+  | "heart"
+  | "star"
+  | "rainbow"
+  | "seb"
+  | "faye"
+  | "will"
+  | "clem"
+  | "cal"
+  | "sri"
+  | "lampe"
+  | "ditto";
 type PhotoDraft = {
   cropOffsetXPercent: number;
   cropOffsetYPercent: number;
@@ -40,6 +54,12 @@ type PhoneControlAction = {
   label: string;
   browseStep?: number;
   tone: "primary" | "secondary";
+};
+
+type FloatingEmojiAction = {
+  emoji: FloatingEmojiKey;
+  glyph: string;
+  label: string;
 };
 
 const PHONE_CONTROL_ACTIONS: PhoneControlAction[] = [
@@ -79,9 +99,29 @@ const PHONE_CONTROL_ACTIONS: PhoneControlAction[] = [
   },
 ];
 
+const FLOATING_EMOJI_ACTIONS: FloatingEmojiAction[] = [
+  { emoji: "poop", glyph: "💩", label: "Poop" },
+  { emoji: "skull", glyph: "💀", label: "Skull" },
+  { emoji: "heart", glyph: "❤️", label: "Heart" },
+  { emoji: "star", glyph: "⭐", label: "Star" },
+  { emoji: "rainbow", glyph: "🌈", label: "Rainbow" },
+];
+
+const FLOATING_FACE_ACTIONS: FloatingEmojiAction[] = [
+  { emoji: "seb", glyph: "SE", label: "Seb" },
+  { emoji: "faye", glyph: "FA", label: "Faye" },
+  { emoji: "will", glyph: "WI", label: "Will" },
+  { emoji: "clem", glyph: "CL", label: "Clem" },
+  { emoji: "cal", glyph: "CA", label: "Cal" },
+  { emoji: "sri", glyph: "SR", label: "Sri" },
+  { emoji: "lampe", glyph: "LA", label: "Lampe" },
+  { emoji: "ditto", glyph: "DI", label: "Ditto" },
+];
+
 export function PhoneControlPanel() {
   const {
     readyState,
+    sendEmojiControl,
     sendImageControl,
     sendNavigationControl,
     sendTextControl,
@@ -174,6 +214,19 @@ export function PhoneControlPanel() {
 
     setTextDraft("");
     setLastActionLabel("Text cleared");
+  };
+
+  const handleEmojiSend = (action: FloatingEmojiAction) => {
+    if (controlsLocked) {
+      return;
+    }
+
+    const sent = sendEmojiControl(action.emoji);
+    if (!sent) {
+      return;
+    }
+
+    setLastActionLabel(`${action.label} emoji`);
   };
 
   const handleStartPhotoCapture = () => {
@@ -439,6 +492,44 @@ export function PhoneControlPanel() {
         </div>
 
         <div className="mt-4 grid gap-3 sm:mt-5">
+          <div className="beats-console-card rounded-2xl px-4 py-4">
+            <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
+              Floating Emoji
+            </div>
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              {FLOATING_EMOJI_ACTIONS.map((action) => (
+                <button
+                  key={action.emoji}
+                  type="button"
+                  disabled={controlsLocked}
+                  onClick={() => handleEmojiSend(action)}
+                  className="flex aspect-square min-h-16 items-center justify-center rounded-[1.1rem] border border-fuchsia-300/25 bg-fuchsia-400/10 text-3xl transition hover:bg-fuchsia-400/16 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label={`Send ${action.label} emoji`}
+                >
+                  <span aria-hidden="true">{action.glyph}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="beats-console-card rounded-2xl px-4 py-4">
+            <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
+              Floating Faces
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {FLOATING_FACE_ACTIONS.map((action) => (
+                <button
+                  key={action.emoji}
+                  type="button"
+                  disabled={controlsLocked}
+                  onClick={() => handleEmojiSend(action)}
+                  className="font-tomorrow flex aspect-square min-h-14 items-center justify-center rounded-[1.1rem] border border-amber-300/25 bg-amber-400/10 text-sm tracking-[0.1em] text-amber-50 transition hover:bg-amber-400/16 active:translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label={`Send ${action.label} face`}
+                >
+                  <span aria-hidden="true">{action.glyph}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="beats-console-card rounded-2xl px-4 py-4">
             <div className="beats-console-kicker font-tomorrow text-[10px] tracking-[0.2em] uppercase">
               Display Text
