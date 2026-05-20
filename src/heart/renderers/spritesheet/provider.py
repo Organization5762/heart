@@ -146,11 +146,15 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         if not snapshot.connected:
             return state
         duration_scale = state.duration_scale
-        accelerate = bool(snapshot.button_held(GamepadButton.PLUS)) or bool(
-            snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)
+        accelerate = (
+            snapshot.button_held(GamepadButton.PLUS)
+            or snapshot.button_held(GamepadButton.ZR)
+            or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)) > 0.0
         )
-        decelerate = bool(snapshot.button_held(GamepadButton.MINUS)) or bool(
-            snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
+        decelerate = (
+            snapshot.button_held(GamepadButton.MINUS)
+            or snapshot.button_held(GamepadButton.ZL)
+            or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)) > 0.0
         )
         if accelerate and (not decelerate):
             duration_scale += 0.005
@@ -285,3 +289,9 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             frame_data=frame_descriptions,
             skip_last_frame=skip_last_frame,
         )
+
+
+def _trigger_pressure(raw_value: float) -> float:
+    if raw_value < 0.0:
+        return max(0.0, min(1.0, (raw_value + 1.0) * 0.5))
+    return max(0.0, min(1.0, raw_value))

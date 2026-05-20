@@ -28,7 +28,6 @@ SIM_SPEED = 1
 SPRING_K = 6.0e-2  # spring to static plane
 NEIGH_K = 2.0e-1  # neighbour coupling (ripples)
 DAMPING = 0.985  # velocity decay
-BLUE = np.array([0, 90, 255], np.uint8)
 
 # grid coordinate helpers
 _centre = (GRID - 1) / 2.0
@@ -47,8 +46,12 @@ def _norm(v: Tuple[float, float, float]) -> Tuple[float, float, float]:
 class WaterCube(StatefulBaseRenderer[WaterCubeState]):
     """Height-field water simulation projected to four LED faces."""
 
-    def __init__(self, builder: WaterCubeStateProvider):
-        super().__init__(builder=builder)
+    def __init__(
+        self,
+        builder: WaterCubeStateProvider | None = None,
+        state: WaterCubeState | None = None,
+    ):
+        super().__init__(builder=builder, state=state)
         self.device_display_mode = DeviceDisplayMode.FULL
 
     # ─────────────────────── rendering helpers ───────────────────────────
@@ -86,6 +89,7 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
     ) -> None:
         gvec = _norm(self.state.gvec_tuple())
         _, _, gz = gvec
+        water_color = self.state.water_rgb()
 
         # --- compose frame -------------------------------------------------
         window_width, window_height = window.get_size()
@@ -97,6 +101,6 @@ class WaterCube(StatefulBaseRenderer[WaterCubeState]):
             mask = self._mask_from_heights(self.state.face_px, face_heights, gz)
             x0 = face * self.state.face_px
             face_view = frame[x0 : x0 + self.state.face_px, :]
-            face_view[mask] = BLUE
+            face_view[mask] = water_color
 
         pygame.surfarray.blit_array(window.screen, frame)

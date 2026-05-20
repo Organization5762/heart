@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
+import numpy as np
 import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Orientation, Rectangle
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot)
 from heart.renderers.three_fractal.provider import FractalSceneProvider
-from heart.renderers.three_fractal.renderer import FractalRuntime, FractalScene
+from heart.renderers.three_fractal.renderer import (FractalRuntime,
+                                                    FractalScene,
+                                                    _trigger_pressure)
 from heart.renderers.three_fractal.state import FractalSceneState
 
 
@@ -57,9 +62,13 @@ class _SnapshotStream:
 class _SnapshotController:
     def __init__(self) -> None:
         self.stream = _SnapshotStream()
+        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
+
+    def sample(self) -> GamepadSnapshot:
+        return self.snapshot
 
 
 class _InputIO:
@@ -71,6 +80,24 @@ class _InputIO:
 class _PeripheralManager:
     def __init__(self) -> None:
         self.input_io = _InputIO()
+
+
+class _SamplingGamepad:
+    def __init__(self, snapshot: GamepadSnapshot) -> None:
+        self.snapshot = snapshot
+
+    def sample(self) -> GamepadSnapshot:
+        return self.snapshot
+
+
+class _SamplingInputIO:
+    def __init__(self, snapshot: GamepadSnapshot) -> None:
+        self.gamepad = _SamplingGamepad(snapshot)
+
+
+class _SamplingPeripheralManager:
+    def __init__(self, snapshot: GamepadSnapshot) -> None:
+        self.input_io = _SamplingInputIO(snapshot)
 
 
 class TestFractalRuntime:
@@ -132,9 +159,7 @@ class TestFractalRuntime:
         runtime.reset()
 
         keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0]
-        gamepad_subscription = manager.input_io.gamepad.stream.subscriptions[0]
         assert keyboard_subscription.dispose_calls == 1
-        assert gamepad_subscription.dispose_calls == 1
         assert runtime._input_subscriptions == []
 
     def test_reset_deletes_owned_tiled_gl_texture(
@@ -244,6 +269,58 @@ class TestFractalRuntime:
 
         assert FractalRuntime._should_tile(orientation) is True
         assert FractalRuntime._tile_render_size((320, 80), orientation) == (80, 80)
+
+    def test_controller_input_samples_current_gamepad_for_movement(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify free-look movement does not depend on a previously delivered stream snapshot."""
+        runtime = FractalRuntime()
+        runtime.mat = np.identity(4, dtype=np.float32)
+        runtime.prevMat = np.copy(runtime.mat)
+        runtime.vel = np.zeros((3,), dtype=np.float32)
+        runtime.clock = Mock()
+        runtime.clock.get_time.return_value = 16
+        runtime.delta_real_time = 0.016
+        monkeypatch.setattr(runtime, "_process_mouse", lambda: None)
+        snapshot = GamepadSnapshot(
+            connected=True,
+            identifier="8BitDo Lite 2",
+            axes={GamepadAxis.LEFT_X: 1.0},
+        )
+
+        runtime._process_input(_SamplingPeripheralManager(snapshot))
+
+        assert runtime._gamepad_snapshot is snapshot
+        assert runtime.vel[0] > 0.0
+
+    def test_west_button_returns_free_look_to_auto_mode(self) -> None:
+        """Verify the old imperative BUTTON_Y auto-return action still works with sampled snapshots."""
+        runtime = FractalRuntime()
+        runtime.mode = "free"
+        runtime._auto_started = True
+        runtime.max_velocity = 2.0
+        runtime.mat = np.identity(4, dtype=np.float32)
+        runtime.vel = np.zeros((3,), dtype=np.float32)
+        runtime._gamepad_snapshot = GamepadSnapshot(
+            connected=True,
+            identifier="8BitDo Lite 2",
+            tapped_buttons=frozenset({GamepadButton.WEST}),
+        )
+
+        runtime._check_enter_auto(Mock())
+
+        assert runtime.mode == "auto"
+        assert runtime._auto_started is False
+        np.testing.assert_array_equal(
+            runtime.mat[3, :3],
+            np.array([0.0, 0.0, 12.0], dtype=np.float32),
+        )
+
+    def test_trigger_pressure_normalizes_signed_axes(self) -> None:
+        """Verify signed trigger rest values do not look active while pressed values still work."""
+        assert _trigger_pressure(-1.0) == 0.0
+        assert _trigger_pressure(1.0) == 1.0
 
 
 class TestFractalScene:

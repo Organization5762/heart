@@ -29,8 +29,9 @@ class _Subscription:
 
 
 class _SnapshotStream:
-    def __init__(self) -> None:
+    def __init__(self, on_emit=None) -> None:
         self.subscriptions: list[tuple[_Subscription, object]] = []
+        self._on_emit = on_emit
 
     def subscribe(self, *, on_next) -> _Subscription:
         subscription = _Subscription()
@@ -38,22 +39,39 @@ class _SnapshotStream:
         return subscription
 
     def emit(self, value: object) -> None:
+        if self._on_emit is not None:
+            self._on_emit(value)
         for _, on_next in self.subscriptions:
             on_next(value)
 
 
 class _SnapshotController:
     def __init__(self) -> None:
-        self.stream = _SnapshotStream()
+        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self.stream = _SnapshotStream(on_emit=self._set_snapshot)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
+    def sample(self) -> GamepadSnapshot:
+        return self.snapshot
+
+    def _set_snapshot(self, value: object) -> None:
+        if isinstance(value, GamepadSnapshot):
+            self.snapshot = value
+
+
+class _InputIO:
+    def __init__(self) -> None:
+        self.keyboard = _SnapshotController()
+        self.gamepad = _SnapshotController()
+
 
 class _PeripheralManager:
     def __init__(self) -> None:
-        self.keyboard_controller = _SnapshotController()
-        self.gamepad_controller = _SnapshotController()
+        self.input_io = _InputIO()
+        self.keyboard_controller = self.input_io.keyboard
+        self.gamepad_controller = self.input_io.gamepad
 
 
 class _Clock:
@@ -692,9 +710,7 @@ class TestAudioStormScene:
         scene.reset()
 
         keyboard_subscription = manager.keyboard_controller.stream.subscriptions[0][0]
-        gamepad_subscription = manager.gamepad_controller.stream.subscriptions[0][0]
         assert keyboard_subscription.dispose_calls == 1
-        assert gamepad_subscription.dispose_calls == 1
         assert gl_calls["delete"] == [([11],), ([9],)]
         assert scene.window_size is None
         assert scene.render_size is None

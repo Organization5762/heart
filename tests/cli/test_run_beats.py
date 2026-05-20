@@ -11,13 +11,13 @@ from typer.testing import CliRunner
 
 from heart import loop
 from heart.cli.commands import run as run_module
-from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_HOST_ENV_VAR,
-                                          BEATS_WEBSOCKET_ENABLED_ENV_VAR,
+from heart.cli.commands.run_beats import (BEATS_WEBSOCKET_ENABLED_ENV_VAR,
+                                          BEATS_WEBSOCKET_HOST_ENV_VAR,
                                           BEATS_WEBSOCKET_PORT_ENV_VAR,
                                           BEATS_WEBSOCKET_URL_ENV_VAR,
                                           FORWARD_TO_BEATS_ENV_VAR,
-                                          build_runtime_env,
                                           build_beats_web_env,
+                                          build_runtime_env,
                                           build_totem_run_command,
                                           ensure_beats_dependencies,
                                           resolve_beats_workspace)

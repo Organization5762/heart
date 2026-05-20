@@ -164,6 +164,24 @@ class TestMultiSceneLifecycle:
         manager.gamepad.dpad = GamepadDpadValue(x=-1)
         assert multi_scene.get_renderers() == [first]
 
+    def test_dpad_scene_selection_can_be_disabled(self) -> None:
+        first = _Scene("first")
+        second = _Scene("second")
+        multi_scene = MultiScene(
+            [first, second],
+            enable_dpad_scene_selection=False,
+        )
+        manager = _PeripheralManager(with_gamepad=True)
+
+        multi_scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Mock(),
+        )
+        manager.gamepad.dpad = GamepadDpadValue(x=1)
+
+        assert multi_scene.get_renderers() == [first]
+
     def test_dpad_left_wraps_to_last_scene(self) -> None:
         first = _Scene("first")
         second = _Scene("second")

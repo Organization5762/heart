@@ -1,5 +1,5 @@
-from heart.renderers.cube_pong.renderer import CubePongRenderer
 from heart.display.color import Color
+from heart.renderers.cube_pong.renderer import CubePongRenderer
 from heart.renderers.text import TextRendering
 from heart.runtime.game_loop import GameLoop
 

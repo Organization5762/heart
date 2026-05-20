@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from unittest.mock import Mock
 
 from manyfold import Graph
 from manyfold.sensor_io import BackoffPolicy, RetryPolicy
+from serial import SerialException
 
 from heart.peripheral.sensor import (Accelerometer, FakeAccelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_error_route,
-                                     accelerometer_vector_event_route,
+                                     accelerometer_vector_event_route, logger,
                                      magnetometer_vector_event_route)
 
 
@@ -86,6 +88,44 @@ class TestAccelerometerManyfoldNode:
         assert latest.value.data == {"x": 1.0, "y": 2.0, "z": 3.0}
         assert latest.value.identity.id == "accelerometer:/dev/ttyUSB0"
         assert peripheral.get_acceleration() is not None
+
+    def test_install_node_skips_invalid_utf8_and_keeps_streaming(
+        self,
+        monkeypatch,
+    ) -> None:
+        peripheral = Accelerometer(port="/dev/ttyUSB0", baudrate=115200)
+        payload = b'{"event_type":"sensor.acceleration","data":{"x":1,"y":2,"z":3}}\n'
+        monkeypatch.setattr(
+            peripheral,
+            "_connect_to_ser",
+            lambda: _SerialStub(iter((b"\x9f\xff\n", payload))),
+        )
+        graph = Graph()
+
+        handle = peripheral.install_node(
+            graph,
+            start_immediately=False,
+            retry=RetryPolicy(max_attempts=1),
+            backoff=BackoffPolicy.none(),
+        )
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        latest = graph.latest(accelerometer_vector_event_route())
+        assert latest is not None
+        assert latest.value.data == {"x": 1.0, "y": 2.0, "z": 3.0}
+        assert peripheral._decode_failures == 1
+
+    def test_serial_failures_log_as_reconnect_warnings(self, monkeypatch) -> None:
+        peripheral = Accelerometer(port="/dev/missing", baudrate=115200)
+        warning = Mock()
+        exception = Mock()
+        monkeypatch.setattr(logger, "warning", warning)
+        monkeypatch.setattr(logger, "exception", exception)
+
+        peripheral._log_stream_error(SerialException("missing port"), 1)
+
+        warning.assert_called_once()
+        exception.assert_not_called()
 
     def test_install_node_publishes_magnetometer_vectors_to_manyfold_route(
         self,

@@ -83,9 +83,6 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
             peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
                 on_next=self._set_keyboard_snapshot,
             ),
-            peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
-                on_next=self._set_gamepad_snapshot,
-            ),
         ]
         return PaletteTunnelState(
             peripheral_manager=peripheral_manager,
@@ -97,6 +94,7 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
         window: DisplayContext,
         orientation: Orientation,
     ) -> None:
+        self._refresh_gamepad_snapshot()
         render_size = self._render_size(window.get_size(), orientation)
         if self.window_size != window.get_size() or self.render_size != render_size:
             self.window_size = window.get_size()
@@ -295,8 +293,8 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
-    def _set_gamepad_snapshot(self, snapshot: GamepadSnapshot) -> None:
-        self._gamepad_snapshot = snapshot
+    def _refresh_gamepad_snapshot(self) -> None:
+        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

@@ -115,11 +115,11 @@ def configure(loop: GameLoop) -> None:
     )
     modelbrot.add_renderer(MandelbrotMode)
 
-    sphere_mode = loop.add_mode("void sphere")
-    sphere_mode.add_renderer(FractalScene)
-
-    mandelbulb_mode = loop.add_mode("bulb")
+    mandelbulb_mode = loop.add_mode(centered_text_title("mandel\nbulb"))
     mandelbulb_mode.add_renderer(MandelbulbScene())
+
+    sphere_mode = loop.add_mode(centered_text_title("3d\nfractal"))
+    sphere_mode.add_renderer(FractalScene)
 
     palette_tunnel_mode = loop.add_mode("gem tunnel")
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
@@ -130,7 +130,7 @@ def configure(loop: GameLoop) -> None:
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))
     bouncing_ball_mode.add_renderer(BouncingBallRenderer(BouncingBallStateProvider()))
 
-    vibe_mode = loop.add_mode(VibeScene.title_scene())
+    vibe_mode = loop.add_mode(centered_text_title("vibe"))
     vibe_mode.add_renderer(VibeScene())
 
     hilbert_mode = loop.add_mode(centered_text_title("hilbert"))
@@ -270,7 +270,8 @@ def configure(loop: GameLoop) -> None:
                 ),
                 build_tixyland(fn=lambda t, i, x, y: np.sin(y / 8 + t)),
                 build_tixyland(fn=lambda t, i, x, y: pattern_numpy(t, x, y)),
-            ]
+            ],
+            enable_dpad_scene_selection=False,
         )
     )
 

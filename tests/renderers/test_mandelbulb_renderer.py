@@ -9,7 +9,7 @@ import numpy as np
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Cube
+from heart.device import Rectangle
 from heart.display.shaders.shader_templates.mandelbulb import \
     __file__ as shader_template_location
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -34,8 +34,9 @@ class _Subscription:
 
 
 class _SnapshotStream:
-    def __init__(self) -> None:
+    def __init__(self, on_emit=None) -> None:
         self.subscriptions: list[tuple[_Subscription, object]] = []
+        self._on_emit = on_emit
 
     def subscribe(self, *, on_next) -> _Subscription:
         subscription = _Subscription()
@@ -43,16 +44,26 @@ class _SnapshotStream:
         return subscription
 
     def emit(self, value: object) -> None:
+        if self._on_emit is not None:
+            self._on_emit(value)
         for _, on_next in self.subscriptions:
             on_next(value)
 
 
 class _SnapshotController:
     def __init__(self) -> None:
-        self.stream = _SnapshotStream()
+        self.snapshot = GamepadSnapshot(connected=False, identifier=None)
+        self.stream = _SnapshotStream(on_emit=self._set_snapshot)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
+
+    def sample(self) -> GamepadSnapshot:
+        return self.snapshot
+
+    def _set_snapshot(self, value: object) -> None:
+        if isinstance(value, GamepadSnapshot):
+            self.snapshot = value
 
 
 class _InputIO:
@@ -568,7 +579,9 @@ class TestMandelbulbScene:
         assert scene.camera_distance > DEFAULT_CAMERA_DISTANCE
         assert scene.phase_speed == BASE_PHASE_SPEED
 
-    def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
+    def test_multi_panel_rectangle_renders_mirrored_tile_across_window(
+        self, monkeypatch
+    ) -> None:
         scene = MandelbulbScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -651,9 +664,12 @@ class TestMandelbulbScene:
         scene.initialize(
             window=window,
             peripheral_manager=manager,
-            orientation=Cube.sides(),
+            orientation=Rectangle.with_layout(columns=4, rows=1),
         )
-        scene.real_process(window=window, orientation=Cube.sides())
+        scene.real_process(
+            window=window,
+            orientation=Rectangle.with_layout(columns=4, rows=1),
+        )
 
         assert scene.tiled_mode is True
         assert scene.render_size == (80, 80)
@@ -663,6 +679,12 @@ class TestMandelbulbScene:
         assert scene.tile_pixels.shape == (80, 80, 4)
         assert len(gl_begin_calls) == 4
         assert shader_runtime.read_to_surface_sizes == [(320, 80)]
+
+    def test_render_size_handles_multi_row_layouts(self) -> None:
+        orientation = Rectangle.with_layout(columns=2, rows=2)
+
+        assert MandelbulbScene._render_size((128, 64), orientation) == (64, 32)
+        assert MandelbulbScene._should_tile(orientation) is True
 
     def test_reset_clears_shader_and_tiled_resources(self, monkeypatch) -> None:
         scene = MandelbulbScene()
@@ -685,9 +707,7 @@ class TestMandelbulbScene:
         scene.reset()
 
         keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
-        gamepad_subscription = manager.input_io.gamepad.stream.subscriptions[0][0]
         assert keyboard_subscription.dispose_calls == 1
-        assert gamepad_subscription.dispose_calls == 1
         assert deleted_textures == [11]
         assert shader_runtime.reset_calls == 1
         assert scene.window_size is None

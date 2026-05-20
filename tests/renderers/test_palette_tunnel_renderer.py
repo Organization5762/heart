@@ -38,22 +38,26 @@ class _SnapshotStream:
 
 
 class _SnapshotController:
-    def __init__(self) -> None:
+    def __init__(self, snapshot: GamepadSnapshot | None = None) -> None:
         self.stream = _SnapshotStream()
+        self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
 
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
+    def sample(self) -> GamepadSnapshot:
+        return self.snapshot
+
 
 class _InputIO:
-    def __init__(self) -> None:
+    def __init__(self, gamepad_snapshot: GamepadSnapshot | None = None) -> None:
         self.keyboard = _SnapshotController()
-        self.gamepad = _SnapshotController()
+        self.gamepad = _SnapshotController(gamepad_snapshot)
 
 
 class _PeripheralManager:
-    def __init__(self) -> None:
-        self.input_io = _InputIO()
+    def __init__(self, gamepad_snapshot: GamepadSnapshot | None = None) -> None:
+        self.input_io = _InputIO(gamepad_snapshot)
 
 
 class _Clock:
@@ -132,27 +136,33 @@ class TestPaletteTunnelScene:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
-        manager = _PeripheralManager()
+        gamepad_snapshot = GamepadSnapshot(
+            connected=True,
+            identifier="pad",
+            axes={
+                GamepadAxis.LEFT_X: 0.5,
+                GamepadAxis.LEFT_Y: -0.25,
+            },
+            dpad=GamepadDpadValue(x=0, y=1),
+        )
+        manager = _PeripheralManager(gamepad_snapshot)
         window = _window()
 
-        scene.initialize(window=window, peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=window,
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         initial_cursor = scene.cursor.copy()
         manager.input_io.keyboard.stream.emit(
             KeyboardSnapshot(pressed_keys=frozenset({pygame.K_d}), timestamp_ms=1.0)
         )
-        manager.input_io.gamepad.stream.emit(
-            GamepadSnapshot(
-                connected=True,
-                identifier="pad",
-                axes={
-                    GamepadAxis.LEFT_X: 0.5,
-                    GamepadAxis.LEFT_Y: -0.25,
-                },
-                dpad=GamepadDpadValue(x=0, y=1),
-            )
-        )
+        manager.input_io.gamepad.stream.emit(gamepad_snapshot)
 
-        scene.real_process(window=window, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=window,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
 
         assert scene.cursor[0] > initial_cursor[0]
         assert scene.cursor[1] > initial_cursor[1]
@@ -164,6 +174,33 @@ class TestPaletteTunnelScene:
             MOUSE_SCALE,
         )
         assert render_call["uniforms"]["iViewportOrigin"] == (0, 0)
+
+    def test_gamepad_stick_sample_moves_virtual_cursor_without_stream_emit(self) -> None:
+        scene = PaletteTunnelScene()
+        shader_runtime = _ShaderRuntime()
+        scene.shader_runtime = shader_runtime
+        manager = _PeripheralManager(
+            GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                axes={GamepadAxis.LEFT_X: 1.0},
+            )
+        )
+        window = _window()
+
+        scene.initialize(
+            window=window,
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
+        initial_cursor = scene.cursor.copy()
+        scene.real_process(
+            window=window,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
+
+        assert scene.cursor[0] > initial_cursor[0]
+        assert scene.cursor[1] == initial_cursor[1]
 
     def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
         scene = PaletteTunnelScene()
@@ -288,9 +325,7 @@ class TestPaletteTunnelScene:
         scene.reset()
 
         keyboard_subscription = manager.input_io.keyboard.stream.subscriptions[0][0]
-        gamepad_subscription = manager.input_io.gamepad.stream.subscriptions[0][0]
         assert keyboard_subscription.dispose_calls == 1
-        assert gamepad_subscription.dispose_calls == 1
         assert shader_runtime.reset_calls == 1
         assert scene.window_size is None
         assert scene.render_size is None

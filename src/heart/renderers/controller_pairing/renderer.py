@@ -11,6 +11,8 @@ import pygame
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.controller_pairing.state import (
@@ -54,8 +56,25 @@ CONTROLLER_PANEL_COLORS = {
 }
 FONT_SIZE_PX = 14
 SMALL_FONT_SIZE_PX = 12
-PANEL_NUMBER_FONT_SIZE_PX = 36
+PANEL_NUMBER_FONT_SIZE_PX = 28
 PANEL_STATUS_FONT_SIZE_PX = 14
+INPUT_LINE_COLOR = (245, 248, 255)
+INPUT_ACTIVE_COLOR = (255, 232, 110)
+INPUT_INACTIVE_COLOR = (155, 166, 180)
+BUTTON_LABELS = {
+    GamepadButton.SOUTH: "B",
+    GamepadButton.EAST: "A",
+    GamepadButton.WEST: "Y",
+    GamepadButton.NORTH: "X",
+    GamepadButton.PLUS: "+",
+    GamepadButton.MINUS: "-",
+    GamepadButton.HOME: "H",
+    GamepadButton.CAPTURE: "C",
+    GamepadButton.ZL: "ZL",
+    GamepadButton.ZR: "ZR",
+    GamepadButton.L3: "L3",
+    GamepadButton.R3: "R3",
+}
 
 
 class BluetoothctlControllerPairer:
@@ -356,6 +375,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         self._small_font: pygame.font.Font | None = None
         self._panel_number_font: pygame.font.Font | None = None
         self._panel_status_font: pygame.font.Font | None = None
+        self._peripheral_manager: PeripheralManager | None = None
         super().__init__()
         self.device_display_mode = DeviceDisplayMode.FULL
 
@@ -365,6 +385,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> ControllerPairingState:
+        self._peripheral_manager = peripheral_manager
         return ControllerPairingState(
             devices=tuple(
                 ControllerPairingDeviceState(target=target)
@@ -409,6 +430,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         if self._pairer is not None:
             self._pairer.stop()
             self._pairer = None
+        self._peripheral_manager = None
         super().reset()
 
     def _ensure_pairer_started(self) -> None:
@@ -451,31 +473,75 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
                 BACKGROUND_COLOR,
             )
             pygame.draw.rect(screen, base_color, rect)
+            snapshot = self._sample_gamepad_slot(index)
 
             self._draw_centered_text(
                 screen,
                 self._panel_number_font,
                 device.target.label,
-                pygame.Rect(x, 4, width, 30),
+                pygame.Rect(x, 0, width, 18),
                 PANEL_TEXT_COLOR,
             )
             self._draw_centered_text(
                 screen,
                 self._panel_status_font,
                 device.target.color.upper(),
-                pygame.Rect(x, 35, width, 13),
+                pygame.Rect(x, 18, width, 8),
                 PANEL_TEXT_COLOR,
             )
             self._draw_centered_text(
                 screen,
                 self._panel_status_font,
-                _status_label(device).upper(),
-                pygame.Rect(x, 49, width, 12),
-                PANEL_TEXT_COLOR,
+                _bluetooth_status_label(device),
+                pygame.Rect(x, 26, width, 8),
+                _bluetooth_status_color(device),
+            )
+            self._draw_centered_text(
+                screen,
+                self._panel_status_font,
+                _input_status_label(index, snapshot),
+                pygame.Rect(x, 34, width, 8),
+                INPUT_ACTIVE_COLOR if snapshot.connected else INPUT_INACTIVE_COLOR,
+            )
+            self._draw_input_snapshot(
+                screen,
+                snapshot,
+                pygame.Rect(x, 43, width, 21),
             )
         if screen.get_flags() & pygame.SRCALPHA:
             screen.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
 
+    def _draw_input_snapshot(
+        self,
+        screen: pygame.Surface,
+        snapshot: GamepadSnapshot,
+        rect: pygame.Rect,
+    ) -> None:
+        if self._small_font is None:
+            return
+        lines = _input_lines(snapshot)
+        line_height = 7
+        y = rect.top
+        for line_index, line in enumerate(lines):
+            color = INPUT_ACTIVE_COLOR if line_index == len(lines) - 1 else INPUT_LINE_COLOR
+            self._draw_clipped_text(
+                screen,
+                self._small_font,
+                line,
+                pygame.Rect(rect.left + 2, y, max(1, rect.width - 4), line_height),
+                color,
+            )
+            y += line_height
+
+    def _sample_gamepad_slot(self, slot: int) -> GamepadSnapshot:
+        manager = self._peripheral_manager
+        if manager is None:
+            return GamepadSnapshot(connected=False, identifier=None)
+        return manager.input_io.gamepad.sample(
+            joystick_id=slot,
+            include_tapped_buttons=False,
+        )
+
     def _draw_centered_text(
         self,
         screen: pygame.Surface,
@@ -488,7 +554,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         text_rect = surface.get_rect(center=rect.center)
         screen.blit(surface, text_rect)
 
-    def _draw_centered_text(
+    def _draw_clipped_text(
         self,
         screen: pygame.Surface,
         font: pygame.font.Font,
@@ -496,26 +562,28 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         rect: pygame.Rect,
         color: tuple[int, int, int],
     ) -> None:
+        previous_clip = screen.get_clip()
+        screen.set_clip(rect)
         surface = font.render(text, True, color)
-        text_rect = surface.get_rect(center=rect.center)
-        screen.blit(surface, text_rect)
+        screen.blit(surface, (rect.left, rect.top))
+        screen.set_clip(previous_clip)
 
 
-def _status_label(device: ControllerPairingDeviceState) -> str:
+def _bluetooth_status_label(device: ControllerPairingDeviceState) -> str:
     if device.connected:
-        return "connected"
+        return "BT LINK"
     if device.pairing:
-        return "pairing"
+        return "BT PAIR"
     if device.paired:
-        return "paired"
+        return "BT SAVED"
     if device.seen:
-        return "seen"
+        return "BT SEEN"
     if device.error:
-        return "error"
-    return "waiting"
+        return "BT ERROR"
+    return "BT WAIT"
 
 
-def _status_color(device: ControllerPairingDeviceState) -> tuple[int, int, int]:
+def _bluetooth_status_color(device: ControllerPairingDeviceState) -> tuple[int, int, int]:
     if device.connected:
         return CONNECTED_COLOR
     if device.pairing or device.seen:
@@ -525,6 +593,51 @@ def _status_color(device: ControllerPairingDeviceState) -> tuple[int, int, int]:
     if device.error:
         return ERROR_COLOR
     return MUTED_COLOR
+
+
+def _input_status_label(slot: int, snapshot: GamepadSnapshot) -> str:
+    if snapshot.connected:
+        return f"APP SLOT {slot + 1}"
+    return f"APP NO {slot + 1}"
+
+
+def _input_lines(snapshot: GamepadSnapshot) -> tuple[str, str, str]:
+    if not snapshot.connected:
+        return ("input idle", "D 0,0", "B -")
+    left_x = snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0)
+    left_y = snapshot.axis_value(GamepadAxis.LEFT_Y, dead_zone=0.0)
+    right_x = snapshot.axis_value(GamepadAxis.RIGHT_X, dead_zone=0.0)
+    right_y = snapshot.axis_value(GamepadAxis.RIGHT_Y, dead_zone=0.0)
+    trigger_left = _trigger_pressure(
+        snapshot.axis_value(GamepadAxis.TRIGGER_LEFT, dead_zone=0.0)
+    )
+    trigger_right = _trigger_pressure(
+        snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT, dead_zone=0.0)
+    )
+    buttons = _held_button_labels(snapshot)
+    return (
+        f"D {snapshot.dpad.x:+d},{snapshot.dpad.y:+d} L {_axis_pair(left_x, left_y)}",
+        f"R {_axis_pair(right_x, right_y)} T {trigger_left:.1f}/{trigger_right:.1f}",
+        f"B {buttons or '-'}",
+    )
+
+
+def _axis_pair(x: float, y: float) -> str:
+    return f"{x:+.1f},{y:+.1f}"
+
+
+def _trigger_pressure(raw_value: float) -> float:
+    if raw_value < 0.0:
+        return max(0.0, min(1.0, (raw_value + 1.0) * 0.5))
+    return max(0.0, min(1.0, raw_value))
+
+
+def _held_button_labels(snapshot: GamepadSnapshot) -> str:
+    return " ".join(
+        label
+        for button, label in BUTTON_LABELS.items()
+        if snapshot.button_held(button)
+    )
 
 
 def _short_address(address: str) -> str:

@@ -7,6 +7,7 @@ from typing import Any, Iterator
 from heart.peripheral.compass import Compass
 from heart.peripheral.configuration import GraphNodeFactory
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.manager import GRAPH_OWNED_PERIPHERAL_ATTR
 from heart.peripheral.drawing_pad import DrawingPad
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.heart_rates import HeartRateManager
@@ -56,10 +57,16 @@ def _switch_detection_node(
     start_immediately: bool,
     on_detect: Any | None,
 ) -> Any:
+    def register_graph_owned(peripheral: Peripheral[Any], access: Any) -> None:
+        if not isinstance(peripheral, FakeSwitch):
+            setattr(peripheral, GRAPH_OWNED_PERIPHERAL_ATTR, True)
+        if on_detect is not None:
+            on_detect(peripheral, access)
+
     return Switch.detection_node(
         detector=_detect_switches,
         spawn_sources=True,
-        on_detect=on_detect,
+        on_detect=register_graph_owned,
         start_immediately=start_immediately,
     )
 
@@ -154,9 +161,14 @@ def _accelerometer_detection_node(
     start_immediately: bool,
     on_detect: Any | None,
 ) -> Any:
+    def register_graph_owned(peripheral: Peripheral[Any], access: Any) -> None:
+        setattr(peripheral, GRAPH_OWNED_PERIPHERAL_ATTR, True)
+        if on_detect is not None:
+            on_detect(peripheral, access)
+
     return Accelerometer.detection_node(
         spawn_sources=True,
-        on_detect=on_detect,
+        on_detect=register_graph_owned,
         start_immediately=start_immediately,
     )
 
