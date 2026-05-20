@@ -13,9 +13,7 @@ from heart import DeviceDisplayMode
 from heart.device.beats.websocket import WebSocket
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
-from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         InputDebugEnvelope)
-from heart.peripheral.core.input.streams import threshold_direction
+from heart.peripheral.core.input import InputDebugEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.free_text import FreeTextRenderer
 from heart.renderers.image import (ContainRenderImage,
@@ -35,7 +33,6 @@ CONTROL_COMMAND_TEXT_UPDATE = "text_update"
 CONTROL_COMMAND_IMAGE_UPDATE = "image_update"
 PHONE_TEXT_DISPLAY_DURATION_SECONDS = 5.0
 PHONE_IMAGE_DISPLAY_DURATION_SECONDS = 5.0
-GAMEPAD_NAVIGATION_STICK_THRESHOLD = 0.6
 
 
 class PeripheralRuntime:
@@ -45,8 +42,6 @@ class PeripheralRuntime:
         self._peripheral_manager = peripheral_manager
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
         self._frame_clock: pygame.time.Clock | None = None
-        self._last_gamepad_dpad_x: int | None = None
-        self._last_gamepad_left_stick_direction: int | None = None
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -211,41 +206,6 @@ class PeripheralRuntime:
     def poll(self) -> None:
         drain_frame_thread_queue()
         self._drain_control_messages()
-        self._poll_gamepad_navigation()
-
-    def _poll_gamepad_navigation(self) -> None:
-        snapshot = self._peripheral_manager.input_io.gamepad.sample()
-        if not snapshot.connected:
-            self._last_gamepad_dpad_x = None
-            self._last_gamepad_left_stick_direction = None
-            return
-
-        navigation = self._peripheral_manager.input_io.navigation
-        dpad_x = snapshot.dpad.x
-        if (
-            self._last_gamepad_dpad_x is not None
-            and self._last_gamepad_dpad_x != dpad_x
-            and dpad_x != 0
-        ):
-            navigation.inject_browse(dpad_x, source="gamepad.dpad")
-        self._last_gamepad_dpad_x = dpad_x
-
-        left_stick_direction = threshold_direction(
-            snapshot.axis_value(GamepadAxis.LEFT_X),
-            GAMEPAD_NAVIGATION_STICK_THRESHOLD,
-        )
-        if (
-            self._last_gamepad_left_stick_direction is not None
-            and self._last_gamepad_left_stick_direction != left_stick_direction
-            and left_stick_direction != 0
-        ):
-            navigation.inject_browse(left_stick_direction, source="gamepad.left_stick")
-        self._last_gamepad_left_stick_direction = left_stick_direction
-
-        if snapshot.button_tapped(GamepadButton.SOUTH):
-            navigation.inject_activate(source="gamepad.south")
-        if snapshot.button_tapped(GamepadButton.NORTH):
-            navigation.inject_alternate_activate(source="gamepad.north")
 
     def set_clock(self, clock: pygame.time.Clock | None) -> None:
         self._frame_clock = clock
