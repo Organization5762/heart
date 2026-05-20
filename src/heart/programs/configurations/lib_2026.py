@@ -10,6 +10,7 @@ from heart.renderers.bouncing_ball import (
     BouncingBallRenderer,
     BouncingBallStateProvider,
 )
+from heart.renderers.controller_pairing import ControllerPairingRenderer
 from heart.renderers.cube_pong import add_cube_pong_mode
 from heart.renderers.hilbert_curve import HilbertScene
 from heart.renderers.image import RenderImage
@@ -288,3 +289,6 @@ def configure(loop: GameLoop) -> None:
             randomness=randomness,
         )
     )
+
+    controller_pairing_mode = loop.add_mode("pair bt")
+    controller_pairing_mode.add_renderer(ControllerPairingRenderer())

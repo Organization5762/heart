@@ -118,6 +118,8 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         self._draw_scores(window, state)
         self._draw_paddles(window, state)
         self._draw_balls(window, state)
+        if state.winning_player is not None:
+            self._draw_winner_callout(window, state)
 
     def _draw_face_guides(self, window: DisplayContext, state: CubePongState) -> None:
         if window.screen is None:
@@ -223,6 +225,29 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         screen.blit(surfaces[1], (x, top))
         x += surfaces[1].get_width() + separator_gap
         screen.blit(surfaces[2], (x, top))
+
+    def _draw_winner_callout(
+        self,
+        window: DisplayContext,
+        state: CubePongState,
+    ) -> None:
+        if window.screen is None:
+            raise RuntimeError("CubePongRenderer requires an initialized display")
+        screen = window.screen
+        color = (
+            PADDLE_ONE_COLOR
+            if state.winning_player == PLAYER_ONE
+            else PADDLE_TWO_COLOR
+        )
+        label = "P1 WINS" if state.winning_player == PLAYER_ONE else "P2 WINS"
+        font_size = max(18, round(state.screen_height * WINNER_FONT_SCALE))
+        surface = self._font(font_size).render(label, False, color)
+        rect = surface.get_rect()
+        rect.center = (
+            screen.get_width() // 2,
+            screen.get_height() // 2,
+        )
+        screen.blit(surface, rect)
 
     def _font(self, size: int) -> pygame.font.Font:
         if not pygame.font.get_init():

@@ -148,3 +148,25 @@ class TestGameLoop:
         loop.render_frame([renderer])
 
         assert renderer.reset_calls == 0
+
+    def test_select_renderers_appends_floating_emoji_overlay(
+        self,
+        device,
+        resolver,
+    ) -> None:
+        """Keep phone emoji bursts layered above the active renderer instead of replacing it."""
+        loop = GameLoop(device=device, resolver=resolver)
+        loop.ensure_screen_initialized()
+        renderer = _Renderer(display_mode=DeviceDisplayMode.MIRRORED)
+        loop.components.game_modes.set_state(
+            GameModeState(
+                entries=[ModeEntry(title_renderer=renderer, renderer=renderer)]
+            )
+        )
+
+        loop.present_floating_emoji("star")
+
+        selected = loop._select_renderers()
+
+        assert selected[0] is renderer
+        assert selected[-1] is loop._emoji_overlay_renderer

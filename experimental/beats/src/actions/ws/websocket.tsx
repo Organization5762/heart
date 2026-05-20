@@ -22,6 +22,22 @@ type WSContextValue = {
   sendSensorControl: (sensorKey: string, sensorValue: number | null) => boolean;
   sendTextControl: (text: string | null) => boolean;
   sendImageControl: (imageBase64: string, imageMimeType: string) => boolean;
+  sendEmojiControl: (
+    emoji:
+      | "poop"
+      | "skull"
+      | "heart"
+      | "star"
+      | "rainbow"
+      | "seb"
+      | "faye"
+      | "will"
+      | "clem"
+      | "cal"
+      | "sri"
+      | "lampe"
+      | "ditto",
+  ) => boolean;
 };
 
 const WSContext = createContext<WSContextValue>({
@@ -31,6 +47,7 @@ const WSContext = createContext<WSContextValue>({
   sendSensorControl: () => false,
   sendTextControl: () => false,
   sendImageControl: () => false,
+  sendEmojiControl: () => false,
 });
 
 interface WSProviderProps {
@@ -246,6 +263,25 @@ export function WSProvider({
     [],
   );
 
+  const sendEmojiControl = useCallback<WSContextValue["sendEmojiControl"]>(
+    (emoji) => {
+      const ws = socketRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+
+      ws.send(
+        JSON.stringify({
+          kind: "control",
+          command: "emoji_update",
+          emoji,
+        }),
+      );
+      return true;
+    },
+    [],
+  );
+
   return (
     <WSContext.Provider
       value={{
@@ -255,6 +291,7 @@ export function WSProvider({
         sendSensorControl,
         sendTextControl,
         sendImageControl,
+        sendEmojiControl,
       }}
     >
       {children}

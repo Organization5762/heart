@@ -13,6 +13,7 @@ from manyfold import shutdown
 from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.navigation import ComposedRenderer, MultiScene
+from heart.renderers.emoji_overlay import FloatingEmojiOverlayRenderer
 from heart.runtime.active_game_loop import set_active_game_loop
 from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
@@ -117,6 +118,7 @@ class GameLoop:
         self.edge_thresh = EDGE_THRESHOLD
         self._temporary_renderer: "StatefulBaseRenderer[Any]" | None = None
         self._temporary_renderer_deadline_monotonic: float | None = None
+        self._emoji_overlay_renderer: FloatingEmojiOverlayRenderer | None = None
         self._frame_index = 0
         self._last_perf_log_monotonic = 0.0
 
@@ -277,9 +279,13 @@ class GameLoop:
     def _select_renderers(self) -> list["StatefulBaseRenderer[Any]"]:
         temporary_renderer = self._active_temporary_renderer()
         if temporary_renderer is not None:
-            return [temporary_renderer]
-        base_renderers = self.components.game_modes.get_renderers()
-        renderers = list(base_renderers) if base_renderers else []
+            renderers = [temporary_renderer]
+        else:
+            base_renderers = self.components.game_modes.get_renderers()
+            renderers = list(base_renderers) if base_renderers else []
+        emoji_overlay = self._active_emoji_overlay_renderer()
+        if emoji_overlay is not None:
+            renderers.append(emoji_overlay)
         return renderers
 
     def present_temporary_renderer(
@@ -296,6 +302,18 @@ class GameLoop:
 
     def clear_temporary_renderer(self) -> None:
         self._clear_temporary_renderer()
+
+    def present_floating_emoji(self, emoji: str) -> None:
+        if self._emoji_overlay_renderer is None:
+            self._emoji_overlay_renderer = FloatingEmojiOverlayRenderer()
+        if not self._emoji_overlay_renderer.initialized:
+            self._ensure_display_initialized()
+            self._emoji_overlay_renderer.initialize(
+                window=self.components.display,
+                peripheral_manager=self.components.peripheral_manager,
+                orientation=self.device.orientation,
+            )
+        self._emoji_overlay_renderer.spawn(emoji)
 
     @property
     def peripheral_manager(self):
@@ -364,6 +382,8 @@ class GameLoop:
 
         if self._temporary_renderer is not None:
             visit(self._temporary_renderer)
+        if self._emoji_overlay_renderer is not None:
+            visit(self._emoji_overlay_renderer)
 
         game_modes = self.components.game_modes
         if game_modes._state is not None:
@@ -481,6 +501,16 @@ class GameLoop:
         self._temporary_renderer_deadline_monotonic = None
         if renderer is not None:
             renderer.reset()
+
+    def _active_emoji_overlay_renderer(self) -> FloatingEmojiOverlayRenderer | None:
+        renderer = self._emoji_overlay_renderer
+        if renderer is None:
+            return None
+        if not renderer.has_active_emojis():
+            self._emoji_overlay_renderer = None
+            renderer.reset()
+            return None
+        return renderer
 
     def _maybe_log_perf_frame(
         self,

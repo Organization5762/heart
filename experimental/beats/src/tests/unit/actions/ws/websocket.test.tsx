@@ -61,6 +61,16 @@ function SensorControlProbe() {
   );
 }
 
+function EmojiControlProbe() {
+  const { sendEmojiControl } = useWS();
+
+  return (
+    <button type="button" onClick={() => sendEmojiControl("rainbow")}>
+      Send Emoji Control
+    </button>
+  );
+}
+
 describe("WSProvider", () => {
   beforeEach(() => {
     FakeWebSocket.instances = [];
@@ -146,6 +156,34 @@ describe("WSProvider", () => {
         sensor_key: "accelerometer:debug:z",
         sensor_value: 12.5,
         clear: false,
+      }),
+    ]);
+  });
+
+  test("sends emoji control envelopes over the websocket", () => {
+    render(
+      <WSProvider
+        url="ws://localhost:8765"
+        retryDelay={100}
+        maxRetryDelay={200}
+      >
+        <EmojiControlProbe />
+      </WSProvider>,
+    );
+
+    act(() => {
+      FakeWebSocket.instances[0].triggerOpen();
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Send Emoji Control" }).click();
+    });
+
+    expect(FakeWebSocket.instances[0].sent).toEqual([
+      JSON.stringify({
+        kind: "control",
+        command: "emoji_update",
+        emoji: "rainbow",
       }),
     ]);
   });

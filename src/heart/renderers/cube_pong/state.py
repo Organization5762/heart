@@ -8,6 +8,9 @@ ROUTE_ACROSS_SCREEN_TWO = "screens_1_2_3"
 ROUTE_ACROSS_SCREEN_FOUR = "screens_1_4_3"
 ROUND_RESET_HOLD_S = 1.0
 SECOND_BALL_START_DELAY_S = 0.45
+SCORE_TO_WIN = 10
+RALLY_SPEEDUP_BOUNCES = 3
+RALLY_SPEEDUP_MULTIPLIER = 1.15
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +29,7 @@ class CubePongBall:
     vx: float
     vy: float
     launch_delay_s: float = 0.0
+    rally_bounces: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +49,7 @@ class CubePongState:
     player_two_score: int = 0
     losing_player: int | None = None
     reset_remaining_s: float = 0.0
+    winning_player: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,6 +131,9 @@ def advance_cube_pong_state(
     delta_s: float,
 ) -> CubePongState:
     delta_s = max(0.0, min(delta_s, 0.05))
+    if state.winning_player is not None:
+        return state
+
     if state.losing_player is not None:
         remaining = state.reset_remaining_s - delta_s
         if remaining <= 0:
@@ -145,6 +153,7 @@ def advance_cube_pong_state(
             player_two_score=state.player_two_score,
             losing_player=state.losing_player,
             reset_remaining_s=remaining,
+            winning_player=state.winning_player,
         )
 
     paddle_speed = max(state.screen_height * 1.9, 80.0)
@@ -183,6 +192,7 @@ def advance_cube_pong_state(
                 player_two_score += 1
             else:
                 player_one_score += 1
+            winning_player = _winning_player(player_one_score, player_two_score)
             updated_balls = [state.balls[0], state.balls[1]]
             for index, updated_ball in enumerate(balls):
                 updated_balls[index] = updated_ball
@@ -195,7 +205,10 @@ def advance_cube_pong_state(
                 player_one_score=player_one_score,
                 player_two_score=player_two_score,
                 losing_player=losing_player,
-                reset_remaining_s=ROUND_RESET_HOLD_S,
+                reset_remaining_s=0.0
+                if winning_player is not None
+                else ROUND_RESET_HOLD_S,
+                winning_player=winning_player,
             )
 
     return CubePongState(
@@ -265,6 +278,7 @@ def _advance_ball(
     next_y = ball.y + ball.vy * delta_s
     next_vx = ball.vx
     next_vy = ball.vy
+    rally_bounces = ball.rally_bounces
 
     if next_y <= radius:
         next_y = radius
@@ -276,7 +290,6 @@ def _advance_ball(
     paddle_one_x, paddle_two_x = paddle_path_x(screen_width)
     paddle_width, paddle_height = paddle_size(screen_width, screen_height)
     half_width = paddle_width / 2
-    max_speed = base_ball_speed(screen_width) * 1.45
     route = ROUTES[ball.route_name]
 
     if next_vx > 0:
@@ -297,15 +310,18 @@ def _advance_ball(
             )
             if hit_offset is None:
                 return (
-                    CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
+                    _moved_ball(ball, next_x, next_y, next_vx, next_vy),
                     defending_player,
                 )
             next_x = contact_x
-            next_vx = -min(abs(next_vx) * 1.02, max_speed)
-            next_vy = _spin_velocity(next_vy, hit_offset, screen_height)
+            next_vx, next_vy, rally_bounces = _paddle_bounce_velocity(
+                ball,
+                next_vx=-abs(next_vx),
+                next_vy=_spin_velocity(next_vy, hit_offset, screen_height),
+            )
         elif next_x > missed_x:
             return (
-                CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
+                _moved_ball(ball, next_x, next_y, next_vx, next_vy),
                 defending_player,
             )
     else:
@@ -326,19 +342,73 @@ def _advance_ball(
             )
             if hit_offset is None:
                 return (
-                    CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
+                    _moved_ball(ball, next_x, next_y, next_vx, next_vy),
                     defending_player,
                 )
             next_x = contact_x
-            next_vx = min(abs(next_vx) * 1.02, max_speed)
-            next_vy = _spin_velocity(next_vy, hit_offset, screen_height)
+            next_vx, next_vy, rally_bounces = _paddle_bounce_velocity(
+                ball,
+                next_vx=abs(next_vx),
+                next_vy=_spin_velocity(next_vy, hit_offset, screen_height),
+            )
         elif next_x < missed_x:
             return (
-                CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy),
+                _moved_ball(ball, next_x, next_y, next_vx, next_vy),
                 defending_player,
             )
 
-    return CubePongBall(ball.route_name, next_x, next_y, next_vx, next_vy), None
+    return (
+        CubePongBall(
+            route_name=ball.route_name,
+            x=next_x,
+            y=next_y,
+            vx=next_vx,
+            vy=next_vy,
+            rally_bounces=rally_bounces,
+        ),
+        None,
+    )
+
+
+def _moved_ball(
+    ball: CubePongBall,
+    x: float,
+    y: float,
+    vx: float,
+    vy: float,
+) -> CubePongBall:
+    return CubePongBall(
+        route_name=ball.route_name,
+        x=x,
+        y=y,
+        vx=vx,
+        vy=vy,
+        rally_bounces=ball.rally_bounces,
+    )
+
+
+def _paddle_bounce_velocity(
+    ball: CubePongBall,
+    *,
+    next_vx: float,
+    next_vy: float,
+) -> tuple[float, float, int]:
+    rally_bounces = ball.rally_bounces + 1
+    if rally_bounces % RALLY_SPEEDUP_BOUNCES != 0:
+        return next_vx, next_vy, rally_bounces
+    return (
+        next_vx * RALLY_SPEEDUP_MULTIPLIER,
+        next_vy * RALLY_SPEEDUP_MULTIPLIER,
+        rally_bounces,
+    )
+
+
+def _winning_player(player_one_score: int, player_two_score: int) -> int | None:
+    if player_one_score >= SCORE_TO_WIN:
+        return PLAYER_ONE
+    if player_two_score >= SCORE_TO_WIN:
+        return PLAYER_TWO
+    return None
 
 
 def _move_paddle(
