@@ -8,6 +8,9 @@ import { defineConfig } from "vite";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
+  server: {
+    allowedHosts: true,
+  },
   plugins: [
     tanstackRouter({
       target: "react",
