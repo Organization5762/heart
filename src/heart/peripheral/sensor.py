@@ -193,9 +193,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
         loop = ManagedRunLoop(
             body=self._run_loop,
             backoff=BackoffPolicy.fixed(RECONNECT_DELAY_SECONDS),
-            on_error=lambda _exc, _attempt: logger.exception(
-                "Accelerometer stream failed; reconnecting"
-            ),
+            on_error=self._log_stream_error,
             group="accelerometer",
         )
         self._loop_handle = loop.start_thread(
@@ -214,6 +212,12 @@ class Accelerometer(Peripheral[Acceleration | None]):
                 if not datum:
                     continue
                 self._process_data(datum)
+
+    def _log_stream_error(self, exc: BaseException, _attempt: int) -> None:
+        if isinstance(exc, serial.SerialException):
+            logger.warning("Accelerometer serial unavailable; reconnecting: %s", exc)
+            return
+        logger.exception("Accelerometer stream failed; reconnecting")
 
     def install_node(
         self,
@@ -271,7 +275,9 @@ class Accelerometer(Peripheral[Acceleration | None]):
         ).install(graph)
 
     def _process_data(self, data: bytes) -> Input | None:
-        bus_data = data.decode("utf-8").rstrip()
+        bus_data = self._decode_bus_data(data)
+        if bus_data is None:
+            return None
         if not bus_data:
             return None
         if "{" not in bus_data:
@@ -294,6 +300,14 @@ class Accelerometer(Peripheral[Acceleration | None]):
             args=(self._messages_received, self._decode_failures),
         )
         return self._update_due_to_data(parsed)
+
+    def _decode_bus_data(self, data: bytes) -> str | None:
+        try:
+            return data.decode("utf-8").rstrip()
+        except UnicodeDecodeError:
+            self._decode_failures += 1
+            logger.debug("Failed to decode sensor bytes as UTF-8: %r", data)
+            return None
 
     def get_acceleration(self) -> Acceleration | None:
         if self.acceleration_value is None:

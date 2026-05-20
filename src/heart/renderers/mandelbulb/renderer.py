@@ -70,6 +70,7 @@ MORPH_EASE_PER_SECOND = 18.0
 @dataclass
 class MandelbulbState:
     start_time: float
+    peripheral_manager: PeripheralManager
 
 
 class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
@@ -123,17 +124,17 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
     ) -> MandelbulbState:
         self.window_size = window.get_size()
         self.render_size = self._render_size(self.window_size, orientation)
-        self.tiled_mode = isinstance(orientation, Cube)
+        self.tiled_mode = self._should_tile(orientation)
         self._initialize_shader()
         self._subscriptions = [
             peripheral_manager.input_io.keyboard.snapshot_stream().subscribe(
                 on_next=self._set_keyboard_snapshot,
             ),
-            peripheral_manager.input_io.gamepad.snapshot_stream().subscribe(
-                on_next=self._set_gamepad_snapshot,
-            ),
         ]
-        return MandelbulbState(start_time=time.monotonic())
+        return MandelbulbState(
+            start_time=time.monotonic(),
+            peripheral_manager=peripheral_manager,
+        )
 
     def real_process(
         self,
@@ -144,9 +145,10 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         if self.window_size != window.get_size() or self.render_size != render_size:
             self.window_size = window.get_size()
             self.render_size = render_size
-            self.tiled_mode = isinstance(orientation, Cube)
+            self.tiled_mode = self._should_tile(orientation)
             self._reset_tiled_resources()
 
+        self._refresh_gamepad_snapshot()
         self._process_input(window.clock)
 
         if self.tiled_mode:
@@ -390,8 +392,8 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
-    def _set_gamepad_snapshot(self, snapshot: GamepadSnapshot) -> None:
-        self._gamepad_snapshot = snapshot
+    def _refresh_gamepad_snapshot(self) -> None:
+        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
 
     def _power_morph_held(self, keys: frozenset[int]) -> bool:
         return pygame.K_SPACE in keys or self._gamepad_snapshot.button_held(
@@ -510,9 +512,24 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         window_size: tuple[int, int],
         orientation: Orientation,
     ) -> tuple[int, int]:
-        if isinstance(orientation, Cube):
-            return (window_size[1], window_size[1])
+        if MandelbulbScene._should_tile(orientation):
+            layout = orientation.layout
+            return (
+                max(1, window_size[0] // layout.columns),
+                max(1, window_size[1] // layout.rows),
+            )
         return window_size
+
+    @staticmethod
+    def _should_tile(orientation: Orientation) -> bool:
+        layout = getattr(orientation, "layout", None)
+        if layout is None:
+            return False
+        columns = getattr(layout, "columns", 1)
+        rows = getattr(layout, "rows", 1)
+        if not isinstance(columns, int) or not isinstance(rows, int):
+            return False
+        return columns > 1 or rows > 1
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

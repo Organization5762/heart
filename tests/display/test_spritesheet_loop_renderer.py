@@ -6,7 +6,8 @@ from manyfold import BehaviorSubject
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
-from heart.peripheral.core.input import GamepadSnapshot
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.switch import SwitchState
@@ -39,6 +40,7 @@ def _peripheral_manager(
     monkeypatch: pytest.MonkeyPatch,
     *,
     gamepad: Gamepad | None = None,
+    gamepad_snapshot: GamepadSnapshot | None = None,
 ) -> tuple[PeripheralManager, BehaviorSubject[SwitchState]]:
     manager = PeripheralManager()
     switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
@@ -48,7 +50,8 @@ def _peripheral_manager(
         monkeypatch.setattr(
             manager.input_io.gamepad,
             "sample",
-            lambda: GamepadSnapshot(connected=True, identifier="pad"),
+            lambda: gamepad_snapshot
+            or GamepadSnapshot(connected=True, identifier="pad"),
         )
     return manager, switch_stream
 
@@ -222,3 +225,86 @@ class TestSpritesheetLoopProvider:
         initial_state = renderer.state
         switch_stream.on_next(SwitchState(0, 0, 0, 10, 0))
         assert renderer.state == initial_state
+
+    def test_signed_resting_triggers_do_not_cancel_kirby_speed_controls(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: DisplayContext,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Verify signed trigger axes resting at -1 are idle for spritesheet speed control."""
+
+        gamepad = Gamepad()
+        manager, _ = _peripheral_manager(
+            monkeypatch,
+            gamepad=gamepad,
+            gamepad_snapshot=GamepadSnapshot(
+                connected=True,
+                identifier="pad",
+                axes={
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: -0.2,
+                },
+            ),
+        )
+        monkeypatch.setattr(
+            assets_loader.Loader,
+            "load_spirtesheet",
+            lambda path: _SpriteSheetProbe(),
+        )
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=False,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, manager, orientation)
+
+        _advance_frame(manager, stub_clock_factory, delta_ms=0.0)
+
+        assert renderer.state.duration_scale == pytest.approx(0.005)
+
+    def test_zl_zr_buttons_adjust_kirby_speed(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        frame_data: list[FrameDescription],
+        window: DisplayContext,
+        orientation: Rectangle,
+        stub_clock_factory,
+    ) -> None:
+        """Verify digital shoulder buttons also drive spritesheet speed controls."""
+
+        snapshots = iter(
+            (
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="pad",
+                    buttons={GamepadButton.ZR: True},
+                ),
+                GamepadSnapshot(
+                    connected=True,
+                    identifier="pad",
+                    buttons={GamepadButton.ZL: True},
+                ),
+            )
+        )
+        gamepad = Gamepad()
+        manager, _ = _peripheral_manager(monkeypatch, gamepad=gamepad)
+        monkeypatch.setattr(manager.input_io.gamepad, "sample", lambda: next(snapshots))
+        monkeypatch.setattr(
+            assets_loader.Loader,
+            "load_spirtesheet",
+            lambda path: _SpriteSheetProbe(),
+        )
+        renderer = SpritesheetLoop(
+            "irrelevant.png",
+            disable_input=False,
+            frame_data=frame_data,
+        )
+        renderer.initialize(window, manager, orientation)
+
+        _advance_frame(manager, stub_clock_factory, delta_ms=0.0)
+        assert renderer.state.duration_scale == pytest.approx(0.005)
+        _advance_frame(manager, stub_clock_factory, delta_ms=0.0)
+        assert renderer.state.duration_scale == pytest.approx(0.0)

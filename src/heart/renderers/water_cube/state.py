@@ -1,3 +1,4 @@
+import colorsys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Self, Tuple
@@ -13,7 +14,10 @@ SIM_SPEED = 1
 SPRING_K = 0.06
 NEIGH_K = 0.2
 DAMPING = 0.985
-BLUE = np.array([0, 90, 255], np.uint8)
+DEFAULT_ACCELERATION_AVERAGE = 0.5
+DEFAULT_WATER_HUE_DEGREES = 218.0
+WATER_SATURATION = 1.0
+WATER_VALUE = 1.0
 
 
 @lru_cache(maxsize=None)
@@ -39,6 +43,8 @@ class WaterCubeState:
     heights: np.ndarray
     velocities: np.ndarray
     gvec: Acceleration | None
+    acceleration_average: float = DEFAULT_ACCELERATION_AVERAGE
+    water_hue_degrees: float = DEFAULT_WATER_HUE_DEGREES
 
     def gvec_tuple(self):
         accel = self.gvec
@@ -47,12 +53,40 @@ class WaterCubeState:
         gz = accel.z if accel else 1.0
         return (gx, gy, gz)
 
+    def water_rgb(self) -> np.ndarray:
+        hue = (self.water_hue_degrees % 360.0) / 360.0
+        red, green, blue = colorsys.hsv_to_rgb(hue, WATER_SATURATION, WATER_VALUE)
+        return np.array(
+            [int(red * 255), int(green * 255), int(blue * 255)],
+            dtype=np.uint8,
+        )
+
     def _step(
-        self, heights: np.ndarray, velocities: np.ndarray, acceleration: Acceleration
+        self,
+        heights: np.ndarray,
+        velocities: np.ndarray,
+        acceleration: Acceleration | None,
+        *,
+        acceleration_average: float | None = None,
+        water_hue_degrees: float | None = None,
     ) -> "WaterCubeState":
-        gx = acceleration.x if acceleration else 0.0
-        gy = -acceleration.y if acceleration else 0.0
-        gz = acceleration.z if acceleration else 1.0
+        next_average = (
+            self.acceleration_average
+            if acceleration_average is None
+            else acceleration_average
+        )
+        next_hue = (
+            self.water_hue_degrees
+            if water_hue_degrees is None
+            else water_hue_degrees
+        )
+        smoothed_acceleration = self._smooth_acceleration(
+            acceleration,
+            average=next_average,
+        )
+        gx = smoothed_acceleration.x if smoothed_acceleration else 0.0
+        gy = -smoothed_acceleration.y if smoothed_acceleration else 0.0
+        gz = smoothed_acceleration.z if smoothed_acceleration else 1.0
         gvec = (gx, gy, gz)
         h_target = _target_plane(self.face_px, gvec)
         diff = heights - h_target
@@ -76,7 +110,25 @@ class WaterCubeState:
             face_px=self.face_px,
             heights=adjusted_heights,
             velocities=adjusted_velocities,
-            gvec=acceleration,
+            gvec=smoothed_acceleration,
+            acceleration_average=next_average,
+            water_hue_degrees=next_hue,
+        )
+
+    def _smooth_acceleration(
+        self,
+        acceleration: Acceleration | None,
+        *,
+        average: float,
+    ) -> Acceleration | None:
+        if acceleration is None or self.gvec is None:
+            return acceleration
+        follow = max(0.0, min(1.0, average))
+        keep = 1.0 - follow
+        return Acceleration(
+            x=self.gvec.x * keep + acceleration.x * follow,
+            y=self.gvec.y * keep + acceleration.y * follow,
+            z=self.gvec.z * keep + acceleration.z * follow,
         )
 
     @classmethod

@@ -28,6 +28,12 @@ class _StubMandelbrotMode:
         window.screen.fill((12, 34, 56))
 
 
+class _FailingMandelbrotMode:
+    def __init__(self) -> None:
+        self.initialize = Mock(side_effect=RuntimeError("preview failed"))
+        self.reset = Mock()
+
+
 class TestMandelbrotTitle:
     """Ensure Mandelbrot title previews stay tileable in selection screens."""
 
@@ -103,3 +109,28 @@ class TestMandelbrotTitle:
                 panel_height - 1,
             )
             assert surface.get_at(panel_bottom_right)[:3] == (12, 34, 56)
+
+    def test_preview_failure_falls_back_to_black_title(
+        self,
+        device,
+        manager,
+        monkeypatch,
+    ) -> None:
+        """Verify Mandelbrot title selection still renders if preview warmup fails."""
+
+        window = DisplayContext(
+            device=device,
+            screen=pygame.Surface(device.individual_display_size()),
+            clock=pygame.time.Clock(),
+        )
+        monkeypatch.setattr(
+            "heart.renderers.mandelbrot.title.MandelbrotMode",
+            _FailingMandelbrotMode,
+        )
+        title = MandelbrotTitle()
+
+        title.initialize(window, manager, device.orientation)
+        title.real_process(window, device.orientation)
+
+        assert title.state.image.get_size() == device.individual_display_size()
+        assert window.screen.get_at((0, 0))[:3] == (0, 0, 0)

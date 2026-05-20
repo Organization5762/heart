@@ -1,6 +1,8 @@
 from manyfold import StreamNode
 
 from heart.device import Device
+from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+                                         GamepadSnapshot)
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
@@ -9,6 +11,10 @@ from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
 
 MIN_UPDATE_INTERVAL_MS = 100.0
+MIN_ACCELERATION_AVERAGE = 0.08
+MAX_ACCELERATION_AVERAGE = 1.0
+ACCELERATION_AVERAGE_STEP = 0.15
+HUE_STEP_DEGREES = 8.0
 
 
 class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
@@ -30,8 +36,14 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         acceleration = peripheral_manager.input_io.active_acceleration().start_with(None)
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         average_acceleration = self._average_acceleration(acceleration, frame_ticks)
+        samples = average_acceleration.map(
+            lambda latest: (
+                latest,
+                peripheral_manager.input_io.gamepad.sample(),
+            )
+        )
         return (
-            average_acceleration
+            samples
             .scan(
                 lambda prev, latest: self._advance_state(prev, latest),
                 seed=initial,
@@ -67,10 +79,52 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         )
 
     def _advance_state(
-        self, prev: WaterCubeState, acceleration: Acceleration | None
+        self,
+        prev: WaterCubeState,
+        latest: tuple[Acceleration | None, GamepadSnapshot],
     ) -> WaterCubeState:
+        acceleration, gamepad = latest
+        acceleration_average = _next_acceleration_average(
+            prev.acceleration_average,
+            gamepad,
+        )
+        water_hue_degrees = _next_water_hue(prev.water_hue_degrees, gamepad)
         return prev._step(
             heights=prev.heights,
             velocities=prev.velocities,
             acceleration=acceleration,
+            acceleration_average=acceleration_average,
+            water_hue_degrees=water_hue_degrees,
         )
+
+
+def _next_acceleration_average(current: float, gamepad: GamepadSnapshot) -> float:
+    if not gamepad.connected:
+        return current
+    thinner = _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT))
+    thicker = _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_LEFT))
+    delta = (thinner - thicker) * ACCELERATION_AVERAGE_STEP
+    return _clamp(
+        current + delta,
+        minimum=MIN_ACCELERATION_AVERAGE,
+        maximum=MAX_ACCELERATION_AVERAGE,
+    )
+
+
+def _next_water_hue(current: float, gamepad: GamepadSnapshot) -> float:
+    if not gamepad.connected:
+        return current
+    delta = 0.0
+    if gamepad.button_held(GamepadButton.ZR):
+        delta += HUE_STEP_DEGREES
+    if gamepad.button_held(GamepadButton.ZL):
+        delta -= HUE_STEP_DEGREES
+    return (current + delta) % 360.0
+
+
+def _trigger_pressure(raw_value: float) -> float:
+    return _clamp(raw_value, minimum=0.0, maximum=1.0)
+
+
+def _clamp(value: float, *, minimum: float, maximum: float) -> float:
+    return min(max(value, minimum), maximum)

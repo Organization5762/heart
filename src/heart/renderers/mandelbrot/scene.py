@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 class MandelbrotMode(StatefulBaseRenderer[AppState]):
     def __init__(self):
         super().__init__()
-        self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self.device_display_mode = DeviceDisplayMode.FULL
         self.clock: pygame.time.Clock | None = None
 
         # screen properties
@@ -182,6 +182,60 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             surface.fill((0, 0, 0))
         return surfaces
 
+    def _is_multi_panel_layout(self) -> bool:
+        return (
+            self.state.orientation.layout.columns > 1
+            or self.state.orientation.layout.rows > 1
+        )
+
+    def _blit_panel_screens(
+        self,
+        window: DisplayContext,
+        individual_screen_width: int,
+        individual_screen_height: int,
+    ) -> None:
+        for (x, y), screen in self.screens.items():
+            window.blit(
+                screen,
+                (y * individual_screen_width, x * individual_screen_height),
+            )
+
+    def _draw_mirrored_panels(
+        self,
+        window: DisplayContext,
+        individual_screen_width: int,
+        individual_screen_height: int,
+    ) -> None:
+        mirrored_screen = self.screens[(0, 0)]
+        self._draw_mandelbrot_to_surface(mirrored_screen)
+        for screen in self.screens.values():
+            if screen is not mirrored_screen:
+                screen.blit(mirrored_screen, (0, 0))
+        self._blit_panel_screens(
+            window,
+            individual_screen_width,
+            individual_screen_height,
+        )
+
+    def _draw_split_panels(
+        self,
+        window: DisplayContext,
+        individual_screen_width: int,
+        individual_screen_height: int,
+    ) -> None:
+        ordered_screens = [
+            screen for _position, screen in sorted(self.screens.items())
+        ]
+        for index in range(0, len(ordered_screens) - 1, 2):
+            first = ordered_screens[index]
+            second = ordered_screens[index + 1]
+            self._draw_split_view(first, second, window.clock)
+        self._blit_panel_screens(
+            window,
+            individual_screen_width,
+            individual_screen_height,
+        )
+
     def real_process(
         self,
         window: DisplayContext,
@@ -211,64 +265,53 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
             self.state.view_mode = ViewMode.MANDELBROT
             self._draw_mandelbrot_to_surface(window.screen)
         elif self.state.view_mode == ViewMode.MANDELBROT:
-            match self.state.orientation:
-                case Rectangle():
-                    self._draw_mandelbrot_to_surface(window.screen)
-                case Cube():
-                    for (x, y), screen in self.screens.items():
-                        # Same, unsure how this plays
-                        self._draw_mandelbrot_to_surface(screen)
-                        window.blit(
-                            screen,
-                            (y * individual_screen_width, x * individual_screen_height),
-                        )
+            if self._is_multi_panel_layout():
+                self._draw_mirrored_panels(
+                    window,
+                    individual_screen_width,
+                    individual_screen_height,
+                )
+            else:
+                self._draw_mandelbrot_to_surface(window.screen)
         elif self.state.view_mode in (
             ViewMode.MANDELBROT_SELECTED,
             ViewMode.JULIA_SELECTED,
         ):
-            match self.state.orientation:
-                case Rectangle():
-                    mandelbrot_surface, julia_surface = self._get_split_view_surfaces()
-                    self._draw_split_view(
-                        mandelbrot_surface, julia_surface, window.clock
-                    )
-                    # self._draw_orbit_to_surface(mandelbrot_surface)
-                    window.blit(mandelbrot_surface, (0, 0))
-                    window.blit(julia_surface, (self.width // 2, 0))
-                case Cube():
-                    screen0 = self.screens[(0, 0)]
-                    screen1 = self.screens[(0, 1)]
-                    screen2 = self.screens[(0, 2)]
-                    screen3 = self.screens[(0, 3)]
-                    self._draw_split_view(screen0, screen1, window.clock)
-                    self._draw_split_view(screen2, screen3, window.clock)
-                    window.blit(screen0, (0, 0))
-                    window.blit(screen1, (individual_screen_width, 0))
-                    window.blit(screen2, (individual_screen_width * 2, 0))
-                    window.blit(screen3, (individual_screen_width * 3, 0))
+            if self._is_multi_panel_layout():
+                self._draw_split_panels(
+                    window,
+                    individual_screen_width,
+                    individual_screen_height,
+                )
+            else:
+                mandelbrot_surface, julia_surface = self._get_split_view_surfaces()
+                self._draw_split_view(mandelbrot_surface, julia_surface, window.clock)
+                # self._draw_orbit_to_surface(mandelbrot_surface)
+                window.blit(mandelbrot_surface, (0, 0))
+                window.blit(julia_surface, (self.width // 2, 0))
         elif self.state.view_mode == ViewMode.JULIA:
-            match self.state.orientation:
-                case Rectangle():
-                    self._draw_julia_to_surface(window.screen)
-                case Cube():
-                    # lampe: unsure
-                    for (x, y), screen in self.screens.items():
-                        self._draw_julia_to_surface(screen)
-                        window.blit(
-                            screen,
-                            (y * individual_screen_width, x * individual_screen_height),
-                        )
+            if self._is_multi_panel_layout():
+                for screen in self.screens.values():
+                    self._draw_julia_to_surface(screen)
+                self._blit_panel_screens(
+                    window,
+                    individual_screen_width,
+                    individual_screen_height,
+                )
+            else:
+                self._draw_julia_to_surface(window.screen)
 
         if self.state.show_fps:
-            match self.state.orientation:
-                case Rectangle():
-                    self._draw_fps_to_surface(window)
-                case Cube():
-                    screen_width = self.screens[(0, 0)].get_width()
-                    screen_height = self.screens[(0, 0)].get_height()
-                    for (x, y), screen in self.screens.items():
-                        self._draw_fps_to_surface(screen)
-                        window.blit(screen, (y * screen_width, x * screen_height))
+            if self._is_multi_panel_layout():
+                for screen in self.screens.values():
+                    self._draw_fps_to_surface(screen)
+                self._blit_panel_screens(
+                    window,
+                    individual_screen_width,
+                    individual_screen_height,
+                )
+            else:
+                self._draw_fps_to_surface(window)
 
         if self.state.show_debug:
             # debug can just go across the whole window

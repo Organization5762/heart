@@ -216,6 +216,12 @@ class MandelbrotControlProfile:
             self._gamepad.sample(include_tapped_buttons=False),
         )
 
+    def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
+        snapshot = self._gamepad.sample(include_tapped_buttons=False)
+        return frozenset(
+            button for button in GamepadButton if snapshot.button_held(button)
+        )
+
     def _keyboard_command_streams(self) -> StreamNode[MandelbrotCommand]:
         return MergeNode.merge(
             map_stream(

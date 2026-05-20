@@ -11,8 +11,8 @@ from typing import Annotated
 
 import typer
 
-from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
-                                            BEATS_WEB_ENABLED_ENV_VAR,
+from heart.cli.commands.run_options import (BEATS_WEB_ENABLED_ENV_VAR,
+                                            DEFAULT_ADD_LOW_POWER_MODE,
                                             DEFAULT_BEATS_RUNTIME_HOST,
                                             DEFAULT_BEATS_RUNTIME_PORT,
                                             DEFAULT_BEATS_WEB_HOST,

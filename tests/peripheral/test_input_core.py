@@ -1183,6 +1183,63 @@ class TestMandelbrotControlProfile:
 
         assert motion_states == [(False, False), (True, False)]
 
+    def test_sampled_trigger_axes_do_not_drive_view_mode_buttons(
+        self, monkeypatch
+    ) -> None:
+        """Verify trigger axes stay zoom-only instead of masquerading as bumper commands."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: EventStream())
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: EventStream())
+        monkeypatch.setattr(
+            gamepad,
+            "sample",
+            lambda include_tapped_buttons=False: _gamepad_snapshot(
+                axes={
+                    GamepadAxis.LEFT_X: 0.0,
+                    GamepadAxis.LEFT_Y: 0.0,
+                    GamepadAxis.RIGHT_X: 0.0,
+                    GamepadAxis.RIGHT_Y: 0.0,
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: 1.0,
+                },
+            ),
+        )
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+
+        assert profile.sample_gamepad_buttons() == frozenset()
+
+    def test_sampled_bumper_buttons_drive_view_mode_buttons(self, monkeypatch) -> None:
+        """Verify physical bumper buttons still resolve to Mandelbrot view-mode commands."""
+        tap = InputDebugTap()
+        keyboard = KeyboardController(tap)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: EventStream())
+        monkeypatch.setattr(gamepad, "snapshot_stream", lambda: EventStream())
+        monkeypatch.setattr(
+            gamepad,
+            "sample",
+            lambda include_tapped_buttons=False: _gamepad_snapshot(
+                buttons={GamepadButton.ZR: True},
+                axes={
+                    GamepadAxis.TRIGGER_LEFT: -1.0,
+                    GamepadAxis.TRIGGER_RIGHT: -1.0,
+                },
+            ),
+        )
+        profile = MandelbrotControlProfile(
+            keyboard_controller=keyboard,
+            gamepad_controller=gamepad,
+            debug_tap=tap,
+        )
+
+        assert profile.sample_gamepad_buttons() == frozenset({GamepadButton.ZR})
+
 
 class TestAccelerometerDebugProfile:
     """Group accelerometer debug-profile tests so keyboard motion debugging stays deterministic across scenes."""

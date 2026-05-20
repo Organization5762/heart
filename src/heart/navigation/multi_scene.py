@@ -27,6 +27,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         scenes: list[RendererSpec],
         renderer_resolver: RendererResolver | None = None,
         scene_manager_backend: SceneManagerBackend | None = None,
+        enable_dpad_scene_selection: bool = True,
     ) -> None:
         super().__init__()
         self.scenes = [
@@ -35,6 +36,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self._navigation_subscription = None
         self._last_active_scene_index: int | None = None
         self._last_dpad_x = 0
+        self._enable_dpad_scene_selection = enable_dpad_scene_selection
         scene_names = [scene.name for scene in self.scenes]
         self._scene_manager = scene_manager_backend or build_scene_manager_backend(
             scene_names
@@ -108,6 +110,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self._advance_scene(1)
 
     def _process_dpad_scene_selection(self) -> None:
+        if not self._enable_dpad_scene_selection:
+            return
         # MultiScene can be warmup-reset before ComposedRenderer flattens it again.
         # The old state still carries the peripheral manager, so read from it
         # even when initialized is false.

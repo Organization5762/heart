@@ -94,13 +94,28 @@ class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
         self.device_display_mode = DeviceDisplayMode.MIRRORED
         self.set_state(MulticolorState())
 
+    def initialize(
+        self,
+        window: DisplayContext,
+        peripheral_manager: PeripheralManager,
+        orientation: Orientation,
+    ) -> None:
+        self._ensure_builder(peripheral_manager)
+        super().initialize(window, peripheral_manager, orientation)
+        width, height = window.get_size()
+        generate_pattern(max(1, width), max(1, height), 0.0)
+
+    def _ensure_builder(self, peripheral_manager: PeripheralManager) -> None:
+        if self._builder is not None:
+            return
+        self._builder = MulticolorStateProvider(peripheral_manager)
+        self.builder = self._builder
+
     def state_observable(
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[MulticolorState]:
-        if self._builder is None:
-            self._builder = MulticolorStateProvider(peripheral_manager)
-            self.builder = self._builder
-
+        self._ensure_builder(peripheral_manager)
+        assert self._builder is not None
         return self._builder.observable()
 
     def real_process(

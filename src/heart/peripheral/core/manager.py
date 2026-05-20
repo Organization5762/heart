@@ -13,6 +13,7 @@ from heart.peripheral.switch import BluetoothSwitch
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
+GRAPH_OWNED_PERIPHERAL_ATTR = "_heart_graph_owned"
 
 
 class PeripheralManager:
@@ -108,6 +109,12 @@ class PeripheralManager:
 
         self._started = True
         for peripheral in self._peripherals:
+            if getattr(peripheral, GRAPH_OWNED_PERIPHERAL_ATTR, False):
+                logger.info(
+                    "Skipping direct start for graph-owned peripheral '%s'",
+                    peripheral,
+                )
+                continue
             logger.info(f"Attempting to start peripheral '{peripheral}'")
             peripheral.run()
 

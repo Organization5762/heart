@@ -8,6 +8,9 @@ from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.mandelbrot.scene import MandelbrotMode
 from heart.runtime.display_context import DisplayContext
+from heart.utilities.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -29,6 +32,8 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
         del orientation
         mandelbrot = MandelbrotMode()
         preview_orientation = Rectangle.with_layout(columns=1, rows=1)
+        first_image = pygame.Surface(window.get_size(), pygame.SRCALPHA)
+        first_image.fill((0, 0, 0, 255))
         try:
             mandelbrot.initialize(
                 window,
@@ -41,6 +46,8 @@ class MandelbrotTitle(StatefulBaseRenderer[MandelbrotTitleState]):
                 preview_orientation,
             )
             first_image = window.screen.copy()
+        except Exception:
+            logger.exception("Mandelbrot title preview failed; using fallback frame")
         finally:
             mandelbrot.reset()
         return MandelbrotTitleState(image=first_image)

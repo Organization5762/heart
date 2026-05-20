@@ -186,6 +186,7 @@ FREE_VOICE_RANDOMIZATION_BOUNDS = VoiceRandomizationBounds(
 @dataclass
 class AudioStormState:
     start_time: float
+    peripheral_manager: PeripheralManager
 
 
 class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
@@ -257,25 +258,26 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self.tiled_mode = self._should_tile(orientation)
         self._initialize_shader()
         self._subscriptions = self._subscribe_to_input_snapshots(peripheral_manager)
-        return AudioStormState(start_time=time.monotonic())
+        return AudioStormState(
+            start_time=time.monotonic(),
+            peripheral_manager=peripheral_manager,
+        )
 
     def _subscribe_to_input_snapshots(
         self,
         peripheral_manager: PeripheralManager,
     ) -> list[SubscriptionLike]:
         subscriptions: list[SubscriptionLike] = []
-        keyboard_controller = getattr(peripheral_manager, "keyboard_controller", None)
-        gamepad_controller = getattr(peripheral_manager, "gamepad_controller", None)
+        input_io = getattr(peripheral_manager, "input_io", None)
+        keyboard_controller = (
+            input_io.keyboard
+            if input_io is not None
+            else getattr(peripheral_manager, "keyboard_controller", None)
+        )
         if keyboard_controller is not None:
             subscriptions.append(
                 keyboard_controller.snapshot_stream().subscribe(
                     on_next=self._set_keyboard_snapshot,
-                )
-            )
-        if gamepad_controller is not None:
-            subscriptions.append(
-                gamepad_controller.snapshot_stream().subscribe(
-                    on_next=self._set_gamepad_snapshot,
                 )
             )
         return subscriptions
@@ -293,6 +295,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             self._reset_tiled_resources()
 
         elapsed_s = self._elapsed_seconds(window.clock)
+        self._refresh_gamepad_snapshot()
         self._process_palette_actions()
         self._update_audio_texture(elapsed_s)
 
@@ -755,8 +758,8 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
-    def _set_gamepad_snapshot(self, snapshot: GamepadSnapshot) -> None:
-        self._gamepad_snapshot = snapshot
+    def _refresh_gamepad_snapshot(self) -> None:
+        self._gamepad_snapshot = self.state.peripheral_manager.input_io.gamepad.sample()
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

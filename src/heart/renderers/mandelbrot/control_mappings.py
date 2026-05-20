@@ -5,7 +5,7 @@ import pygame
 from manyfold.graph import SubscriptionLike
 
 from heart.device import Cube, Rectangle
-from heart.peripheral.core.input import (CyclePaletteCommand,
+from heart.peripheral.core.input import (CyclePaletteCommand, GamepadButton,
                                          MandelbrotCommand,
                                          MandelbrotControlProfile,
                                          MandelbrotMotionState,
@@ -28,6 +28,7 @@ class KeyboardControls:
         self._profile = profile
         self._latest_motion_state = MandelbrotMotionState()
         self._pending_commands: deque[MandelbrotCommand] = deque()
+        self._last_sampled_buttons: frozenset[GamepadButton] = frozenset()
         self._subscriptions: list[SubscriptionLike] = [
             profile.motion_state.subscribe(on_next=self._set_latest_motion_state),
             profile.command_events.subscribe(on_next=self._queue_command),
@@ -64,6 +65,9 @@ class KeyboardControls:
             self.scene_controls._increase_max_iterations()
         if state.decrease_iterations:
             self.scene_controls._decrease_max_iterations()
+
+        for command in self._sample_gamepad_commands():
+            self._apply_command(command)
 
         while self._pending_commands:
             self._apply_command(self._pending_commands.popleft())
@@ -147,6 +151,28 @@ class KeyboardControls:
             return self._profile.sample_gamepad_motion_state()
         except (AttributeError, pygame.error):
             return None
+
+    def _sample_gamepad_commands(self) -> tuple[MandelbrotCommand, ...]:
+        try:
+            buttons = self._profile.sample_gamepad_buttons()
+        except (AttributeError, pygame.error):
+            return ()
+        pressed = buttons - self._last_sampled_buttons
+        self._last_sampled_buttons = buttons
+        commands: list[MandelbrotCommand] = []
+        if GamepadButton.ZR in pressed:
+            commands.append(NextViewModeCommand(source="gamepad.zr.sampled"))
+        if GamepadButton.ZL in pressed:
+            commands.append(PreviousViewModeCommand(source="gamepad.zl.sampled"))
+        if GamepadButton.NORTH in pressed:
+            commands.append(
+                CyclePaletteCommand(source="gamepad.north.sampled", palette_delta=1)
+            )
+        if GamepadButton.WEST in pressed:
+            commands.append(
+                CyclePaletteCommand(source="gamepad.west.sampled", palette_delta=-1)
+            )
+        return tuple(commands)
 
     def _sample_keyboard_motion_state(self) -> MandelbrotMotionState | None:
         try:

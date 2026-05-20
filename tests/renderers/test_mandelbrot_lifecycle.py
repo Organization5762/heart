@@ -7,10 +7,10 @@ from unittest.mock import Mock
 import pygame
 
 from heart import DeviceDisplayMode
-from heart.device import Cube, Rectangle
+from heart.device import Rectangle
 from heart.device.local import LocalScreen
 from heart.navigation import ComposedRenderer
-from heart.peripheral.core.input import MandelbrotMotionState
+from heart.peripheral.core.input import GamepadButton, MandelbrotMotionState
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.mandelbrot.control_mappings import KeyboardControls
 from heart.renderers.mandelbrot.scene import MandelbrotMode
@@ -43,9 +43,13 @@ class _MandelbrotProfile:
         self.motion_state = _Stream()
         self.command_events = _Stream()
         self.sampled_gamepad_state: MandelbrotMotionState | None = None
+        self.sampled_gamepad_buttons: frozenset[GamepadButton] = frozenset()
 
     def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
         return self.sampled_gamepad_state or MandelbrotMotionState()
+
+    def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
+        return self.sampled_gamepad_buttons
 
 
 class _PressedKeys:
@@ -81,13 +85,13 @@ def _build_mandelbrot_runtime() -> tuple[
 class TestMandelbrotLifecycle:
     """Keep Mandelbrot entry and exit from leaking input subscriptions or reinitializing during input warmup."""
 
-    def test_mandelbrot_mode_renders_as_mirrored_single_panel(
+    def test_base_mandelbrot_mirrors_one_panel_across_multi_panel_rectangle(
         self,
         manager,
         monkeypatch,
     ) -> None:
-        """Verify Mandelbrot repeats one full-panel render across cube layouts."""
-        orientation = Cube.sides()
+        """Verify base Mandelbrot keeps mirrored content while the renderer stays in full display mode."""
+        orientation = Rectangle.with_layout(columns=4, rows=1)
         device = LocalScreen(width=16, height=8, orientation=orientation)
         window = DisplayContext(
             device=device,
@@ -99,9 +103,8 @@ class TestMandelbrotLifecycle:
 
         def draw_panel(surface: pygame.Surface) -> None:
             drawn_sizes.append(surface.get_size())
-            surface.fill((10, 20, 30))
+            surface.fill((10 + len(drawn_sizes), 20, 30))
             pygame.draw.rect(surface, (200, 30, 40), pygame.Rect(0, 0, 8, 8))
-            pygame.draw.rect(surface, (40, 200, 30), pygame.Rect(8, 0, 8, 8))
 
         monkeypatch.setattr(renderer, "_draw_mandelbrot_to_surface", draw_panel)
 
@@ -112,31 +115,65 @@ class TestMandelbrotLifecycle:
             orientation=orientation,
         )
 
-        assert renderer.device_display_mode == DeviceDisplayMode.MIRRORED
-        assert renderer.state.orientation.layout.columns == 1
+        assert renderer.device_display_mode == DeviceDisplayMode.FULL
+        assert renderer.state.orientation.layout.columns == 4
         assert renderer.state.orientation.layout.rows == 1
-        assert drawn_sizes == [(16, 8)]
+        assert drawn_sizes[-1:] == [(16, 8)]
         assert surface is not None
         assert surface.get_size() == (64, 8)
         for column in range(4):
             assert surface.get_at((column * 16, 0))[:3] == (200, 30, 40)
-            assert surface.get_at((column * 16 + 15, 0))[:3] == (40, 200, 30)
+            assert surface.get_at((column * 16 + 15, 0))[:3] == (11, 20, 30)
 
-    def test_mirrored_mandelbrot_ignores_split_view_mode(
+    def test_full_mandelbrot_preserves_split_view_mode(
         self,
         monkeypatch,
     ) -> None:
-        """Verify view-mode cycling cannot bring back split Mandelbrot/Julia output."""
+        """Verify full Mandelbrot mode allows the shoulder-driven split view modes."""
         renderer, window, _manager, orientation = _build_mandelbrot_runtime()
         renderer.state.view_mode = ViewMode.JULIA
-        draw = Mock()
-        monkeypatch.setattr(renderer, "_draw_mandelbrot_to_surface", draw)
+        draw_split = Mock()
+        monkeypatch.setattr(renderer, "_draw_split_view", draw_split)
         monkeypatch.setattr(renderer, "_is_input_grace_period", lambda: True)
 
         renderer.real_process(window, orientation)
 
-        assert renderer.state.view_mode == ViewMode.MANDELBROT
-        draw.assert_called_once_with(window.screen)
+        assert renderer.state.view_mode == ViewMode.JULIA
+        draw_split.assert_not_called()
+
+    def test_julia_mode_renders_individual_multi_panel_rectangle_panels(
+        self,
+        manager,
+        monkeypatch,
+    ) -> None:
+        """Verify Julia mode remains per-panel instead of using base Mandelbrot mirroring."""
+        orientation = Rectangle.with_layout(columns=4, rows=1)
+        device = LocalScreen(width=16, height=8, orientation=orientation)
+        window = DisplayContext(
+            device=device,
+            screen=pygame.Surface(device.full_display_size()),
+            clock=pygame.time.Clock(),
+        )
+        renderer = MandelbrotMode()
+        drawn_sizes: list[tuple[int, int]] = []
+
+        def draw_panel(surface: pygame.Surface) -> None:
+            drawn_sizes.append(surface.get_size())
+            surface.fill((40 + len(drawn_sizes), 50, 60))
+
+        monkeypatch.setattr(renderer, "_draw_julia_to_surface", draw_panel)
+        renderer.initialize(window, manager, orientation)
+        renderer.state.view_mode = ViewMode.JULIA
+        renderer.real_process(window, orientation)
+
+        assert drawn_sizes[-4:] == [(16, 8), (16, 8), (16, 8), (16, 8)]
+        assert window.screen is not None
+        for column in range(4):
+            assert window.screen.get_at((column * 16, 0))[:3] == (
+                41 + column,
+                50,
+                60,
+            )
 
     def test_keyboard_controls_disposes_profile_subscriptions(self) -> None:
         """Verify Mandelbrot input stream subscriptions are owned and released by the control adapter."""
@@ -203,6 +240,23 @@ class TestMandelbrotLifecycle:
             ((0.75, 0.0), {"multiplier": 2.0}),
             ((0.0, -0.5), {"explicit_mode": "panning", "multiplier": 2.0}),
         ]
+
+    def test_keyboard_controls_falls_back_to_sampled_right_shoulder_action(
+        self,
+        monkeypatch,
+    ) -> None:
+        """Verify sampled ZR presses still advance Mandelbrot when stream events are missed."""
+        profile = _MandelbrotProfile()
+        scene_controls = Mock()
+        monkeypatch.setattr(pygame.event, "pump", lambda: None)
+        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys())
+
+        controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
+        profile.sampled_gamepad_buttons = frozenset({GamepadButton.ZR})
+        controls.update()
+        controls.update()
+
+        scene_controls._increment_view_mode.assert_called_once_with()
 
     def test_reset_disposes_keyboard_controls(self) -> None:
         """Verify renderer reset releases Mandelbrot controls before the next scene entry."""

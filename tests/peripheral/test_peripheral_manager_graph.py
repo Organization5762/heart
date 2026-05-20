@@ -9,7 +9,8 @@ from manyfold.sensor_io import (ManagedGraphNode, SensorEvent, StopToken,
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core import Peripheral
-from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.manager import (GRAPH_OWNED_PERIPHERAL_ATTR,
+                                           PeripheralManager)
 
 
 def _sensor_event(event_type: str) -> SensorEvent:
@@ -39,7 +40,11 @@ class _LoaderStub:
 
 
 class _DetectedPeripheral(Peripheral[str]):
+    def __init__(self) -> None:
+        self.run_count = 0
+
     def run(self) -> None:
+        self.run_count += 1
         return None
 
 
@@ -119,3 +124,24 @@ class TestPeripheralManagerGraph:
 
         assert manager.peripherals == (detected,)
         assert [event.event_type for event in source_events] == ["test.source"]
+
+    def test_start_skips_graph_owned_peripherals(self) -> None:
+        graph_owned = _DetectedPeripheral()
+        directly_started = _DetectedPeripheral()
+        setattr(graph_owned, GRAPH_OWNED_PERIPHERAL_ATTR, True)
+        manager = PeripheralManager(
+            configuration_loader=cast(
+                Any,
+                _LoaderStub(
+                    PeripheralConfiguration(
+                        detectors=(lambda: (directly_started, graph_owned),)
+                    )
+                ),
+            )
+        )
+
+        manager.detect()
+        manager.start()
+
+        assert directly_started.run_count == 1
+        assert graph_owned.run_count == 0

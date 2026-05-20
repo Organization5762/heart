@@ -20,6 +20,7 @@ from heart.peripheral.configurations.pranay_pi import \
     configure as configure_pranay_pi
 from heart.peripheral.configurations.rubiks_connected_x import \
     configure as configure_rubiks_connected_x
+from heart.peripheral.core.manager import GRAPH_OWNED_PERIPHERAL_ATTR
 from heart.peripheral.drawing_pad import (DrawingPad,
                                           drawing_pad_detection_route,
                                           drawing_pad_sample_event_route)
@@ -40,6 +41,7 @@ from heart.peripheral.sensor import (Accelerometer, FakeAccelerometer,
                                      accelerometer_detection_route,
                                      accelerometer_vector_event_route,
                                      magnetometer_vector_event_route)
+from heart.peripheral.switch import FakeSwitch, Switch
 from heart.peripheral.uwb import (BaseStationMeasurement, FakeUWBPositioning,
                                   LocalizedTarget, uwb_detection_route,
                                   uwb_position_event_route)
@@ -162,6 +164,7 @@ class TestManyfoldAccelerometerConfiguration:
 
         handle.loop_handle.loop.run(handle.loop_handle.token)
         assert registered == [detected]
+        assert getattr(detected, GRAPH_OWNED_PERIPHERAL_ATTR) is True
         assert len(handle.spawned_handles) == 1
 
         spawned = handle.spawned_handles[0]
@@ -482,6 +485,30 @@ class TestManyfoldDrawingPadConfiguration:
 
 class TestManyfoldSwitchConfiguration:
     """Cover default graph-node factories so switch streams stay Manyfold-owned."""
+
+    def test_switch_detection_marks_only_real_switches_graph_owned(
+        self,
+        monkeypatch,
+    ) -> None:
+        real_switch = Switch(port="/dev/null", baudrate=115200)
+        fake_switch = FakeSwitch()
+
+        def _detect() -> Iterator[object]:
+            yield real_switch
+            yield fake_switch
+
+        monkeypatch.setattr("heart.peripheral.configurations._detect_switches", _detect)
+        registered: list[object] = []
+        handle = _switch_detection_node(
+            start_immediately=False,
+            on_detect=lambda peripheral, _access: registered.append(peripheral),
+        ).install(Graph())
+
+        handle.loop_handle.loop.run(handle.loop_handle.token)
+
+        assert registered == [real_switch, fake_switch]
+        assert getattr(real_switch, GRAPH_OWNED_PERIPHERAL_ATTR) is True
+        assert not getattr(fake_switch, GRAPH_OWNED_PERIPHERAL_ATTR, False)
 
     def test_manyfold_graph_nodes_include_physical_switch_on_pi(
         self,
