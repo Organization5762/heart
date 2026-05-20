@@ -7,6 +7,7 @@ PLAYER_TWO = 2
 ROUTE_ACROSS_SCREEN_TWO = "screens_1_2_3"
 ROUTE_ACROSS_SCREEN_FOUR = "screens_1_4_3"
 ROUND_RESET_HOLD_S = 1.0
+SECOND_BALL_START_DELAY_S = 0.45
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +25,7 @@ class CubePongBall:
     y: float
     vx: float
     vy: float
+    launch_delay_s: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +112,7 @@ def _new_cube_pong_round(
                 y=screen_height * 0.65,
                 vx=ball_speed,
                 vy=-vertical_speed,
+                launch_delay_s=SECOND_BALL_START_DELAY_S,
             ),
         ),
         player_one_score=player_one_score,
@@ -244,6 +247,19 @@ def _advance_ball(
     paddle_two_y: float,
     delta_s: float,
 ) -> tuple[CubePongBall, int | None]:
+    if ball.launch_delay_s > 0:
+        return (
+            CubePongBall(
+                route_name=ball.route_name,
+                x=ball.x,
+                y=ball.y,
+                vx=ball.vx,
+                vy=ball.vy,
+                launch_delay_s=max(0.0, ball.launch_delay_s - delta_s),
+            ),
+            None,
+        )
+
     radius = ball_radius(screen_width)
     next_x = ball.x + ball.vx * delta_s
     next_y = ball.y + ball.vy * delta_s
