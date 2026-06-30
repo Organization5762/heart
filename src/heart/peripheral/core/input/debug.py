@@ -11,6 +11,7 @@ from typing import Any
 
 from manyfold import StreamNode
 
+from heart.peripheral.core.input.events import InputEvent, input_event_topic
 from heart.peripheral.core.streams import EventStream
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
@@ -59,12 +60,17 @@ class InputDebugTap:
         history_size: int = DEFAULT_DEBUG_HISTORY_SIZE,
         latency_history_size: int = DEFAULT_LATENCY_HISTORY_SIZE,
     ) -> None:
+        if history_size < 0:
+            raise ValueError("history_size must be greater than or equal to 0")
+        if latency_history_size < 0:
+            raise ValueError("latency_history_size must be greater than or equal to 0")
         self._history_size = history_size
         self._latency_history_size = latency_history_size
         self._history: deque[InputDebugEnvelope] = deque(maxlen=history_size)
         self._latency_history: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
         self._stream: EventStream[InputDebugEnvelope] = EventStream()
+        self._input_events = input_event_topic()
 
     def publish(
         self,
@@ -83,18 +89,34 @@ class InputDebugTap:
             payload=payload,
             upstream_ids=tuple(upstream_ids),
         )
-        with self._lock:
-            self._history.append(envelope)
+        if self._history_size > 0:
+            with self._lock:
+                self._history.append(envelope)
         self._stream.emit(envelope)
+        self._input_events.publish(
+            InputEvent.from_payload(
+                event_type=f"input.{stage.value}.{stream_name}",
+                source_id=source_id,
+                stream_name=stream_name,
+                stage=stage.value,
+                payload=payload,
+                timestamp_monotonic=envelope.timestamp_monotonic,
+            )
+        )
 
     def observable(self) -> StreamNode[InputDebugEnvelope]:
         return self._stream.observable()
+
+    def input_events(self) -> Any:
+        return self._input_events
 
     def snapshot(self) -> tuple[InputDebugEnvelope, ...]:
         with self._lock:
             return tuple(self._history)
 
     def record_latency(self, stream_name: str, delay_s: float) -> None:
+        if self._latency_history_size == 0:
+            return
         with self._lock:
             history = self._latency_history.setdefault(
                 stream_name, deque(maxlen=self._latency_history_size)

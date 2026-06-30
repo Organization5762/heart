@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import IntEnum
 from functools import cached_property
 from itertools import count
-from queue import PriorityQueue
+from queue import Full, PriorityQueue
 from threading import Lock, Thread
 from typing import Any, Callable, Generic, Iterable, TypeVar, cast
 
@@ -23,7 +23,10 @@ RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
 _BACKGROUND_SEQUENCE = count()
-_BACKGROUND_QUEUE: PriorityQueue[tuple[int, int, Callable[[], None]]] = PriorityQueue()
+DEFAULT_BACKGROUND_QUEUE_LIMIT = 2048
+_BACKGROUND_QUEUE: PriorityQueue[tuple[int, int, Callable[[], None]]] = PriorityQueue(
+    maxsize=DEFAULT_BACKGROUND_QUEUE_LIMIT
+)
 _BACKGROUND_WORKERS_STARTED = False
 _BACKGROUND_WORKERS_LOCK = Lock()
 _BACKGROUND_WORKER_COUNT = 1
@@ -69,9 +72,13 @@ def _schedule_background(
     callback: Callable[[], None],
     *,
     priority: StreamPriority,
-) -> None:
+) -> bool:
     _ensure_background_workers()
-    _BACKGROUND_QUEUE.put((int(priority), next(_BACKGROUND_SEQUENCE), callback))
+    try:
+        _BACKGROUND_QUEUE.put_nowait((int(priority), next(_BACKGROUND_SEQUENCE), callback))
+    except Full:
+        return False
+    return True
 
 
 def unwrap_stream_value(value: Any) -> Any:
@@ -115,22 +122,28 @@ def observe_on_background(
             callback()
 
         def schedule_next(value: Any) -> None:
-            _schedule_background(
+            scheduled = _schedule_background(
                 lambda: if_live(lambda: observer.on_next(value)),
                 priority=priority,
             )
+            if not scheduled:
+                observer.on_error(OverflowError("background stream queue is full"))
 
         def schedule_error(error: Exception) -> None:
-            _schedule_background(
+            scheduled = _schedule_background(
                 lambda: if_live(lambda: observer.on_error(error)),
                 priority=priority,
             )
+            if not scheduled:
+                observer.on_error(OverflowError("background stream queue is full"))
 
         def schedule_completed() -> None:
-            _schedule_background(
+            scheduled = _schedule_background(
                 lambda: if_live(observer.on_completed),
                 priority=priority,
             )
+            if not scheduled:
+                observer.on_error(OverflowError("background stream queue is full"))
 
         subscription = source.subscribe(
             schedule_next,
@@ -190,6 +203,7 @@ class EventStream(Generic[T]):
     def __init__(self) -> None:
         self._lock = Lock()
         self._subscribers: dict[int, Any] = {}
+        self._subscriber_snapshot: tuple[Any, ...] = ()
         self._next_subscription_id = 0
 
     @property
@@ -198,7 +212,7 @@ class EventStream(Generic[T]):
 
     def emit(self, value: T) -> None:
         with self._lock:
-            subscribers = tuple(self._subscribers.values())
+            subscribers = self._subscriber_snapshot
         for subscriber in subscribers:
             subscriber(value)
 
@@ -227,6 +241,7 @@ class EventStream(Generic[T]):
             subscription_id = self._next_subscription_id
             self._next_subscription_id += 1
             self._subscribers[subscription_id] = callback
+            self._subscriber_snapshot = tuple(self._subscribers.values())
         return _EventStreamSubscription(self, subscription_id)
 
     def pipe(self, *operators: Any) -> StreamNode[Any]:
@@ -422,7 +437,10 @@ class EventStream(Generic[T]):
 
     def _unsubscribe(self, subscription_id: int) -> None:
         with self._lock:
-            self._subscribers.pop(subscription_id, None)
+            if subscription_id not in self._subscribers:
+                return
+            self._subscribers.pop(subscription_id)
+            self._subscriber_snapshot = tuple(self._subscribers.values())
 
 
 class _EventStreamSubscription:
@@ -646,7 +664,11 @@ class GraphRouteStream(Generic[T]):
         return None if latest is None else latest.value
 
     def emit(self, value: T) -> None:
-        self._graph.publish(self._route, value)
+        publish_nowait = getattr(self._graph, "publish_nowait", None)
+        if publish_nowait is None:
+            self._graph.publish(self._route, value)
+            return
+        publish_nowait(self._route, value)
 
     def on_next(self, value: T) -> None:
         self.emit(value)

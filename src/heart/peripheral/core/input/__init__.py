@@ -11,6 +11,7 @@ from heart.peripheral.core.input.debug import InputDebugNode as InputDebugNode
 from heart.peripheral.core.input.debug import \
     InputDebugStage as InputDebugStage
 from heart.peripheral.core.input.debug import InputDebugTap as InputDebugTap
+from heart.peripheral.core.input.events import InputEvent as InputEvent
 from heart.peripheral.core.input.external_sensors import \
     ExternalSensorHub as ExternalSensorHub
 from heart.peripheral.core.input.frame import FrameTick as FrameTick

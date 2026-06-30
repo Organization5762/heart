@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import sys
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pygame
 
 from heart.peripheral.core.input.debug import InputDebugTap
+from heart.peripheral.core.input.events import InputEvent, input_event_topic
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth,
@@ -50,6 +49,22 @@ class GamepadAxis(StrEnum):
     RIGHT_Y = "right_y"
     TRIGGER_LEFT = "trigger_left"
     TRIGGER_RIGHT = "trigger_right"
+
+
+GAMEPAD_BUTTON_MAPPING_ATTRS: tuple[tuple[GamepadButton, str], ...] = (
+    (GamepadButton.SOUTH, "BUTTON_B"),
+    (GamepadButton.EAST, "BUTTON_A"),
+    (GamepadButton.WEST, "BUTTON_Y"),
+    (GamepadButton.NORTH, "BUTTON_X"),
+    (GamepadButton.PLUS, "BUTTON_PLUS"),
+    (GamepadButton.MINUS, "BUTTON_MINUS"),
+    (GamepadButton.HOME, "BUTTON_HOME"),
+    (GamepadButton.CAPTURE, "BUTTON_CAPTURE"),
+    (GamepadButton.ZL, "BUTTON_ZL"),
+    (GamepadButton.ZR, "BUTTON_ZR"),
+    (GamepadButton.L3, "BUTTON_L3"),
+    (GamepadButton.R3, "BUTTON_R3"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,12 +131,17 @@ class GamepadController:
         self._pump_skips = 0
         self._pump_errors = 0
         self._sample_callers: dict[str, int] = {}
+        self._input_events = input_event_topic()
+
+    def input_events(self) -> Any:
+        return self._input_events
 
     def sample(
         self,
         joystick_id: int | None = None,
         *,
         include_tapped_buttons: bool = True,
+        source: str = "direct.sample",
     ) -> tuple[GamepadSnapshotEvent, ...]:
         self._pump_gamepad_events()
         if joystick_id is not None:
@@ -132,6 +152,7 @@ class GamepadController:
                     joystick_id=joystick_id,
                     gamepad_count=0,
                     connected_count=0,
+                    source=source,
                 )
                 return ()
             snapshot = self._sample_gamepad(
@@ -144,6 +165,7 @@ class GamepadController:
                     joystick_id=joystick_id,
                     gamepad_count=1,
                     connected_count=0,
+                    source=source,
                 )
                 return ()
             self._record_sample(
@@ -151,8 +173,13 @@ class GamepadController:
                 joystick_id=joystick_id,
                 gamepad_count=1,
                 connected_count=1,
+                source=source,
             )
-            return (GamepadSnapshotEvent(joystick_id=joystick_id, snapshot=snapshot),)
+            events = (
+                GamepadSnapshotEvent(joystick_id=joystick_id, snapshot=snapshot),
+            )
+            self._publish_snapshot_events(events, source=source)
+            return events
         gamepads = self._gamepads()
         events = self._sample_events_without_pump(
             gamepads=gamepads,
@@ -163,13 +190,16 @@ class GamepadController:
             joystick_id=None,
             gamepad_count=len(gamepads),
             connected_count=len(events),
+            source=source,
         )
+        self._publish_snapshot_events(events, source=source)
         return events
 
     def sample_events(
         self,
         *,
         include_tapped_buttons: bool = True,
+        source: str = "direct.sample_events",
     ) -> tuple[GamepadSnapshotEvent, ...]:
         self._pump_gamepad_events()
         gamepads = self._gamepads()
@@ -182,7 +212,9 @@ class GamepadController:
             joystick_id=None,
             gamepad_count=len(gamepads),
             connected_count=len(events),
+            source=source,
         )
+        self._publish_snapshot_events(events, source=source)
         return events
 
     def _sample_events_without_pump(
@@ -236,24 +268,11 @@ class GamepadController:
         tapped_buttons = frozenset()
         if include_tapped_buttons:
             tapped_buttons = frozenset(
-                (
-                    button
-                    for button, button_id in {
-                        GamepadButton.SOUTH: mapping.BUTTON_B,
-                        GamepadButton.EAST: mapping.BUTTON_A,
-                        GamepadButton.WEST: mapping.BUTTON_Y,
-                        GamepadButton.NORTH: mapping.BUTTON_X,
-                        GamepadButton.PLUS: mapping.BUTTON_PLUS,
-                        GamepadButton.MINUS: mapping.BUTTON_MINUS,
-                        GamepadButton.HOME: mapping.BUTTON_HOME,
-                        GamepadButton.CAPTURE: mapping.BUTTON_CAPTURE,
-                        GamepadButton.ZL: mapping.BUTTON_ZL,
-                        GamepadButton.ZR: mapping.BUTTON_ZR,
-                        GamepadButton.L3: mapping.BUTTON_L3,
-                        GamepadButton.R3: mapping.BUTTON_R3,
-                    }.items()
-                    if button_id >= 0 and gamepad.was_tapped(button_id)
-                )
+                button
+                for button, mapping_attr in GAMEPAD_BUTTON_MAPPING_ATTRS
+                if (
+                    button_id := getattr(mapping, mapping_attr)
+                ) >= 0 and gamepad.was_tapped(button_id)
             )
         axes = {
             GamepadAxis.LEFT_X: gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.0),
@@ -307,6 +326,7 @@ class GamepadController:
         joystick_id: int | None,
         gamepad_count: int,
         connected_count: int,
+        source: str,
     ) -> None:
         if kind == "sample_events":
             self._sample_events_calls += 1
@@ -316,9 +336,30 @@ class GamepadController:
             self._targeted_sample_calls += 1
         self._gamepad_slots_sampled += gamepad_count
         self._connected_snapshots_sampled += connected_count
-        caller = _sample_caller_label()
-        self._sample_callers[caller] = self._sample_callers.get(caller, 0) + 1
+        self._sample_callers[source] = self._sample_callers.get(source, 0) + 1
         self._log_sample_stats_if_due()
+
+    def _publish_snapshot_events(
+        self,
+        events: tuple[GamepadSnapshotEvent, ...],
+        *,
+        source: str,
+    ) -> None:
+        for event in events:
+            self._input_events.publish(
+                InputEvent.from_payload(
+                    event_type="input.raw.gamepad.snapshot",
+                    source_id=f"gamepad.{event.joystick_id}",
+                    stream_name="gamepad.snapshot",
+                    stage="raw",
+                    payload={
+                        "source": source,
+                        "joystick_id": event.joystick_id,
+                        "snapshot": event.snapshot,
+                    },
+                    timestamp_monotonic=event.snapshot.timestamp_monotonic,
+                )
+            )
 
     def _log_sample_stats_if_due(self) -> None:
         now = time.monotonic()
@@ -374,7 +415,11 @@ class GamepadController:
         return None
 
     def _snapshot_for_joystick_id(self, joystick_id: int) -> GamepadSnapshot:
-        events = self.sample(joystick_id=joystick_id, include_tapped_buttons=False)
+        events = self.sample(
+            joystick_id=joystick_id,
+            include_tapped_buttons=False,
+            source="gamepad.snapshot_for_joystick_id",
+        )
         if not events:
             return GamepadSnapshot(connected=False, identifier=None)
         return events[0].snapshot
@@ -408,13 +453,3 @@ class GamepadController:
             )
             return GamepadDpadValue(x=x_dir, y=y_dir)
         return GamepadDpadValue()
-
-
-def _sample_caller_label() -> str:
-    try:
-        frame = sys._getframe(3)
-    except ValueError:
-        return "unknown"
-    code = frame.f_code
-    filename = Path(code.co_filename).name
-    return f"{filename}:{code.co_name}"

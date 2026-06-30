@@ -31,6 +31,7 @@ from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
+from heart.utilities.env import Configuration
 
 FINAL_FRAME_ROUTE = runtime_route("window", "HeartRuntimeWindow")
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
@@ -57,7 +58,12 @@ class InputIO:
 
     @cached_property
     def debug_tap(self) -> InputDebugTap:
-        return InputDebugTap()
+        if (
+            Configuration.is_debug_mode()
+            or Configuration.stream_beats_input_debug()
+        ):
+            return InputDebugTap()
+        return InputDebugTap(history_size=0, latency_history_size=0)
 
     @cached_property
     def frame_ticks(self) -> FrameTickController:
