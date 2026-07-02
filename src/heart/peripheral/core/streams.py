@@ -114,11 +114,7 @@ class GraphRouteStream(Generic[T]):
         return None if latest is None else latest.value
 
     def emit(self, value: T) -> None:
-        publish_nowait = getattr(self._graph, "publish_nowait", None)
-        if publish_nowait is None:
-            self._graph.publish(self._route, value)
-            return
-        publish_nowait(self._route, value)
+        self._graph.publish_nowait(self._route, value)
 
     def on_next(self, value: T) -> None:
         self.emit(value)

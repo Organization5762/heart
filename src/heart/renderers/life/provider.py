@@ -56,7 +56,7 @@ class LifeStateProvider:
         )
         reseed_states: Variable[LifeState] = (
             PubSubObservable.merge(self._pm.input_io.main_switch_stream())
-            .map(_switch_state)
+            .map(lambda switch_event: switch_event.state)
             .with_latest_from(window_sizes)
             .map(lambda pair: create_new_grid(pair[1]))
             .map(create_state)
@@ -73,7 +73,3 @@ class LifeStateProvider:
 
 def _should_reseed_from_gamepad(gamepad: GamepadSnapshot) -> bool:
     return gamepad.connected and gamepad.button_tapped(GamepadButton.PLUS)
-
-
-def _switch_state(switch_event: object) -> object:
-    return getattr(switch_event, "state", switch_event)

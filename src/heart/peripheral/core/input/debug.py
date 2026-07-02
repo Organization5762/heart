@@ -10,8 +10,11 @@ from math import ceil
 from typing import Any
 
 from manyfold.architecture import NewValues, PubSubObservable
+from manyfold.graph import FluentStream, RoutePipeline
 
 from heart.peripheral.core.input.events import InputEvent, input_event_topic
+from heart.peripheral.core.streams import GraphRouteStream
+from heart.peripheral.core.subscriptions import CallbackObservable
 from heart.peripheral.core.variables import Variable
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
@@ -179,9 +182,26 @@ class InputDebugNode:
         object.__setattr__(self, "upstream_ids", tuple(self.upstream_ids))
 
     def observable(self, source: Variable[Any]) -> Variable[Any]:
-        if hasattr(source, "do_action"):
+        if isinstance(
+            source, (NewValues, PubSubObservable, FluentStream, GraphRouteStream, RoutePipeline)
+        ):
             return source.do_action(on_next=self._publish)
-        return PubSubObservable.merge(source).do_action(on_next=self._publish)
+
+        def subscribe(observer: Any, scheduler: object | None = None) -> Any:
+            class TapObserver:
+                def on_next(_, value: Any) -> None:
+                    self._publish(value)
+                    observer.on_next(value)
+
+                def on_error(_, error: Exception) -> None:
+                    observer.on_error(error)
+
+                def on_completed(_) -> None:
+                    observer.on_completed()
+
+            return source.subscribe(TapObserver(), scheduler=scheduler)
+
+        return CallbackObservable(subscribe)
 
     def connect(self, source: Variable[Any]) -> Variable[Any]:
         return self.observable(source)

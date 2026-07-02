@@ -6,8 +6,8 @@ import pygame
 from manyfold.architecture import NewValues
 
 from heart.device import Device, Rectangle
+from heart.peripheral.core.input.io import SwitchStateEvent
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.renderer import YoListenRenderer
 from heart.runtime.display_context import DisplayContext
 
@@ -28,7 +28,7 @@ class TestYoListenRenderer:
         )
         renderer = YoListenRenderer()
         peripheral_manager = PeripheralManager()
-        switch_stream: NewValues[SwitchState] = NewValues()
+        switch_stream: NewValues[SwitchStateEvent] = NewValues()
         monkeypatch.setattr(
             peripheral_manager.input_io,
             "main_switch_stream",

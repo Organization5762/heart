@@ -101,7 +101,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
                 switches.map(
                     lambda switch_event: (
                         lambda state: self.handle_switch(
-                            state, _switch_state(switch_event)
+                            state, switch_event.state
                         )
                     )
                 )
@@ -303,10 +303,3 @@ def _trigger_pressure(raw_value: float) -> float:
     if raw_value < 0.0:
         return max(0.0, min(1.0, (raw_value + 1.0) * 0.5))
     return max(0.0, min(1.0, raw_value))
-
-
-def _switch_state(switch_event: object) -> SwitchState:
-    state = getattr(switch_event, "state", switch_event)
-    if not isinstance(state, SwitchState):
-        raise TypeError("switch event must contain a SwitchState")
-    return state

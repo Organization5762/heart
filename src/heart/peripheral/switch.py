@@ -158,11 +158,8 @@ class BaseSwitch(Peripheral[SwitchState]):
         def spawn(peripheral: "BaseSwitch", access: Any) -> None:
             if not spawn_sources:
                 return
-            install_node = getattr(peripheral, "install_node", None)
-            if install_node is None:
-                return
             access.own(
-                install_node(
+                peripheral.install_node(
                     access.graph,
                     output_route=resolved_state_output_route,
                     error_route=state_error_route or switch_error_route(),

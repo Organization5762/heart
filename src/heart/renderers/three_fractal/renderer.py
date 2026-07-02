@@ -153,8 +153,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if self.tiled_mode and (
             self.render_size is None
             or self.real_window_size is None
-            or getattr(self, "pixels", None) is None
-            or getattr(self, "display_texture", None) is None
+            or self.pixels is None
+            or self.display_texture is None
         ):
             return False
         return True
@@ -806,7 +806,7 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             logger.debug(
                 "Skipping fractal mouse reset; pygame video is not initialized"
             )
-        self._delete_gl_texture(getattr(self, "display_texture", None))
+        self._delete_gl_texture(self.display_texture)
         self.initialized = False
         self._auto_started = False
         self.mode = "auto"

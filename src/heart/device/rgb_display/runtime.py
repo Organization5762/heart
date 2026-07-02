@@ -87,10 +87,8 @@ def build_matrix_config(native_module: ModuleType, orientation: Orientation) -> 
         )
     hardware_mapping = os.environ.get(HARDWARE_MAPPING_ENV_VAR, "three-port-active")
     wiring = _resolve_wiring_profile(wiring_profile, hardware_mapping)
-    three_port_active = getattr(wiring_profile, "ThreePortActive", None)
     if (
-        three_port_active is not None
-        and wiring == three_port_active
+        wiring == wiring_profile.ThreePortActive
         and (orientation.layout.columns != 4 or orientation.layout.rows != 1)
     ):
         raise RuntimeError(

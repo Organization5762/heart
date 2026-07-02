@@ -88,7 +88,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         switch_updates = peripheral_manager.input_io.main_switch_stream().map(
             lambda switch_event: (
                 lambda state: self.handle_switch_state(
-                    state, _switch_state(switch_event)
+                    state, switch_event.state
                 )
             )
         )
@@ -124,10 +124,3 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             initial_state,
             lambda state, update: update(state),
         )
-
-
-def _switch_state(switch_event: object) -> SwitchState:
-    state = getattr(switch_event, "state", switch_event)
-    if not isinstance(state, SwitchState):
-        raise TypeError("switch event must contain a SwitchState")
-    return state

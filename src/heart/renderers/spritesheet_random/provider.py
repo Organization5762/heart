@@ -57,7 +57,7 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
         switch_updates = switches.map(
             lambda switch_event: (
                 lambda state: self.handle_switch_state(
-                    state, _switch_state(switch_event)
+                    state, switch_event.state
                 )
             )
         )
@@ -108,10 +108,3 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             time_since_last_update=time_since_last,
             current_screen=next_screen,
         )
-
-
-def _switch_state(switch_event: object) -> SwitchState:
-    state = getattr(switch_event, "state", switch_event)
-    if not isinstance(state, SwitchState):
-        raise TypeError("switch event must contain a SwitchState")
-    return state

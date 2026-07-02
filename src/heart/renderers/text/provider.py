@@ -8,7 +8,6 @@ from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
 from heart.peripheral.core.variables import Variable
-from heart.peripheral.switch import SwitchState
 from heart.renderers.text.state import TextRenderingState
 
 
@@ -46,7 +45,9 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             line_spacing_px=self._line_spacing_px,
         )
         return PubSubObservable.merge(
-            peripheral_manager.input_io.main_switch_stream().map(_switch_state)
+            peripheral_manager.input_io.main_switch_stream().map(
+                lambda switch_event: switch_event.state
+            )
         ).state(
             initial_state,
             lambda state, switch_state: replace(state, switch_state=switch_state),
@@ -63,10 +64,3 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=None,
             line_spacing_px=0,
         )
-
-
-def _switch_state(switch_event: object) -> SwitchState:
-    state = getattr(switch_event, "state", switch_event)
-    if not isinstance(state, SwitchState):
-        raise TypeError("switch event must contain a SwitchState")
-    return state

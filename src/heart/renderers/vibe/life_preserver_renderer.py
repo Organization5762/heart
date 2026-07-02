@@ -65,7 +65,7 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
             lambda switch_event: (
-                lambda state: self.handle_switch(state, _switch_state(switch_event))
+                lambda state: self.handle_switch(state, switch_event.state)
             )
         )
         tick_updates = frame_ticks.map(
@@ -369,10 +369,3 @@ def _trigger_pressure(value: float) -> float:
 def _speed_multiplier(duration_scale: float) -> float:
     effective_duration_scale = max(-0.9, min(0.9, duration_scale))
     return 1.0 / max(0.1, 1.0 - effective_duration_scale)
-
-
-def _switch_state(switch_event: object) -> SwitchState:
-    state = getattr(switch_event, "state", switch_event)
-    if not isinstance(state, SwitchState):
-        raise TypeError("switch event must contain a SwitchState")
-    return state

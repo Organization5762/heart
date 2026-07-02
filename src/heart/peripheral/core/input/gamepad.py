@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
@@ -51,19 +52,21 @@ class GamepadAxis(StrEnum):
     TRIGGER_RIGHT = "trigger_right"
 
 
-GAMEPAD_BUTTON_MAPPING_ATTRS: tuple[tuple[GamepadButton, str], ...] = (
-    (GamepadButton.SOUTH, "BUTTON_B"),
-    (GamepadButton.EAST, "BUTTON_A"),
-    (GamepadButton.WEST, "BUTTON_Y"),
-    (GamepadButton.NORTH, "BUTTON_X"),
-    (GamepadButton.PLUS, "BUTTON_PLUS"),
-    (GamepadButton.MINUS, "BUTTON_MINUS"),
-    (GamepadButton.HOME, "BUTTON_HOME"),
-    (GamepadButton.CAPTURE, "BUTTON_CAPTURE"),
-    (GamepadButton.ZL, "BUTTON_ZL"),
-    (GamepadButton.ZR, "BUTTON_ZR"),
-    (GamepadButton.L3, "BUTTON_L3"),
-    (GamepadButton.R3, "BUTTON_R3"),
+ButtonId = Callable[[SwitchLikeMapping], int]
+
+GAMEPAD_BUTTON_MAPPING_ACCESSORS: tuple[tuple[GamepadButton, ButtonId], ...] = (
+    (GamepadButton.SOUTH, lambda mapping: mapping.BUTTON_B),
+    (GamepadButton.EAST, lambda mapping: mapping.BUTTON_A),
+    (GamepadButton.WEST, lambda mapping: mapping.BUTTON_Y),
+    (GamepadButton.NORTH, lambda mapping: mapping.BUTTON_X),
+    (GamepadButton.PLUS, lambda mapping: mapping.BUTTON_PLUS),
+    (GamepadButton.MINUS, lambda mapping: mapping.BUTTON_MINUS),
+    (GamepadButton.HOME, lambda mapping: mapping.BUTTON_HOME),
+    (GamepadButton.CAPTURE, lambda mapping: mapping.BUTTON_CAPTURE),
+    (GamepadButton.ZL, lambda mapping: mapping.BUTTON_ZL),
+    (GamepadButton.ZR, lambda mapping: mapping.BUTTON_ZR),
+    (GamepadButton.L3, lambda mapping: mapping.BUTTON_L3),
+    (GamepadButton.R3, lambda mapping: mapping.BUTTON_R3),
 )
 
 
@@ -267,8 +270,8 @@ class GamepadController:
         if include_tapped_buttons:
             tapped_buttons = frozenset(
                 button
-                for button, mapping_attr in GAMEPAD_BUTTON_MAPPING_ATTRS
-                if (button_id := getattr(mapping, mapping_attr)) >= 0
+                for button, button_id_for in GAMEPAD_BUTTON_MAPPING_ACCESSORS
+                if (button_id := button_id_for(mapping)) >= 0
                 and gamepad.was_tapped(button_id)
             )
         axes = {
