@@ -1352,11 +1352,27 @@ class TestMandelbrotControlProfile:
         """Verify gamepad movement is not blocked waiting for derived keyboard/gamepad view streams."""
         tap = InputDebugTap()
         keyboard = KeyboardController(tap)
-        joystick = _JoystickProbe(
-            axes={0: 0.5, 1: -0.25, 3: 0.6, 4: -0.7, 2: 0.0, 5: 0.0},
-            hat=(1, -1),
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        monkeypatch.setattr(
+            gamepad,
+            "sample",
+            lambda include_tapped_buttons=False, **_kwargs: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(
+                        axes={
+                            GamepadAxis.LEFT_X: 0.5,
+                            GamepadAxis.LEFT_Y: -0.25,
+                            GamepadAxis.RIGHT_X: 0.6,
+                            GamepadAxis.RIGHT_Y: -0.7,
+                            GamepadAxis.TRIGGER_LEFT: 0.0,
+                            GamepadAxis.TRIGGER_RIGHT: 0.0,
+                        },
+                        dpad=GamepadDpadValue(x=1, y=-1),
+                    ),
+                ),
+            ),
         )
-        gamepad = _gamepad_controller_for_joystick(tap, joystick)
         keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
         monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
         profile = MandelbrotControlProfile(
@@ -1404,10 +1420,29 @@ class TestMandelbrotControlProfile:
         """Verify Mandelbrot triggers work for controllers whose trigger axes rest at -1."""
         tap = InputDebugTap()
         keyboard = KeyboardController(tap)
-        joystick = _JoystickProbe(
-            axes={0: 0.0, 1: 0.0, 3: 0.0, 4: 0.0, 2: -1.0, 5: -1.0}
-        )
-        gamepad = _gamepad_controller_for_joystick(tap, joystick)
+        gamepad = GamepadController(manager=object(), debug_tap=tap)
+        trigger_right = -1.0
+
+        def sample_gamepad(
+            include_tapped_buttons: bool = False, **_kwargs: object
+        ) -> tuple[GamepadSnapshotEvent, ...]:
+            return (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(
+                        axes={
+                            GamepadAxis.LEFT_X: 0.0,
+                            GamepadAxis.LEFT_Y: 0.0,
+                            GamepadAxis.RIGHT_X: 0.0,
+                            GamepadAxis.RIGHT_Y: 0.0,
+                            GamepadAxis.TRIGGER_LEFT: -1.0,
+                            GamepadAxis.TRIGGER_RIGHT: trigger_right,
+                        },
+                    ),
+                ),
+            )
+
+        monkeypatch.setattr(gamepad, "sample", sample_gamepad)
         keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
         monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
         profile = MandelbrotControlProfile(
@@ -1421,7 +1456,7 @@ class TestMandelbrotControlProfile:
             lambda state: motion_states.append((state.zoom_in, state.zoom_out))
         )
 
-        joystick._axes[5] = 1.0
+        trigger_right = 1.0
         keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=10.0))
 
         assert motion_states == [(False, False), (True, False)]
