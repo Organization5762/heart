@@ -12,6 +12,7 @@ from manyfold.architecture import NewValues
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
+from heart.peripheral.core.input.streams import scan_stream
 from heart.peripheral.core.variables import Variable
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
@@ -151,8 +152,11 @@ class KeyboardController:
             return _KeyboardTracker(state=updated, event=event)
 
         base_stream = (
-            self.snapshot_stream()
-            .scan(_advance, seed=_KeyboardTracker())
+            scan_stream(
+                self.snapshot_stream(),
+                _advance,
+                seed=_KeyboardTracker(),
+            )
             .map(lambda tracker: tracker.event)
             .filter(lambda event: event is not None)
             .map(lambda event: cast(KeyboardEvent, event))

@@ -22,11 +22,28 @@ class _SampleAverage:
 
 
 def map_stream(source: Variable[T], mapper: Callable[[T], U]) -> Variable[U]:
-    return source.map(mapper)
+    return stream_from(source).map(mapper)
+
+
+def stream_from(source: Variable[T]) -> PubSubObservable:
+    return PubSubObservable.merge(source)
 
 
 def merge_streams(*streams: Variable[T]) -> Variable[T]:
     return PubSubObservable.merge(*streams)
+
+
+def scan_stream(
+    source: Variable[T],
+    accumulator: Callable[[U, T], U],
+    *,
+    seed: U,
+) -> Variable[U]:
+    return stream_from(source).scan(accumulator, seed=seed)
+
+
+def start_with_stream(source: Variable[T], *values: T) -> Variable[T]:
+    return stream_from(source).start_with(*values)
 
 
 def average_by_frame_window(
@@ -54,8 +71,11 @@ def average_by_frame_window(
         return _SampleAverage(value=average)
 
     return (
-        frame_ticks.with_latest_from(source)
-        .scan(accumulate, seed=_SampleAverage())
+        scan_stream(
+            stream_from(frame_ticks).with_latest_from(source),
+            accumulate,
+            seed=_SampleAverage(),
+        )
         .filter(lambda average: average.value is not None)
         .map(lambda average: average.value)
     )

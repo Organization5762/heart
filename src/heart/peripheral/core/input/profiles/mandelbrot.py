@@ -13,7 +13,8 @@ from heart.peripheral.core.input.gamepad import (
     GamepadController, GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
-from heart.peripheral.core.input.streams import map_stream
+from heart.peripheral.core.input.streams import (map_stream, scan_stream,
+                                                 start_with_stream)
 from heart.peripheral.core.variables import Variable
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
@@ -150,8 +151,10 @@ class MandelbrotControlProfile:
     @cached_property
     def motion_state(self) -> Variable[MandelbrotMotionState]:
         stream = (
-            self._keyboard.snapshot_stream()
-            .start_with(KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0))
+            start_with_stream(
+                self._keyboard.snapshot_stream(),
+                KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
+            )
             .map(
                 lambda keyboard_snapshot: self._to_motion_state_from_gamepad_events(
                     keyboard_snapshot,
@@ -183,8 +186,10 @@ class MandelbrotControlProfile:
 
     @cached_property
     def _edge_state(self) -> Variable[MandelbrotEdgeState]:
-        return self.command_events.scan(
-            self._apply_command, seed=MandelbrotEdgeState()
+        return scan_stream(
+            self.command_events,
+            self._apply_command,
+            seed=MandelbrotEdgeState(),
         ).start_with(MandelbrotEdgeState())
 
     @cached_property

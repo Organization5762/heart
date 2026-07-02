@@ -7,6 +7,7 @@ from typing import cast
 
 from manyfold.architecture import NewValues
 
+from heart.peripheral.core.input.streams import map_stream, stream_from
 from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.core.variables import Variable
 
@@ -66,7 +67,7 @@ class NavigationProfile:
 
     @cached_property
     def intents(self) -> Variable[NavigationIntent]:
-        return self._intents
+        return stream_from(self._intents)
 
     @cached_property
     def browse(self) -> Variable[BrowseIntent]:
@@ -93,7 +94,7 @@ class NavigationProfile:
 
     @cached_property
     def browse_delta(self) -> Variable[int]:
-        return self.browse.map(lambda intent: intent.step)
+        return map_stream(self.browse, lambda intent: intent.step)
 
     def inject_browse(self, step: int, source: str = "beats.control") -> None:
         if step == 0:
