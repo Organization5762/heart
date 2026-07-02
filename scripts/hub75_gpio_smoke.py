@@ -85,6 +85,7 @@ class RpiGpioBackend(GpioBackend):
     def cleanup(self) -> None:
         self._gpio.cleanup()
 
+
 DEFAULT_PANEL_ROWS: Final[int] = 64
 DEFAULT_PANEL_COLS: Final[int] = 64
 DEFAULT_FRAME_HOLD_SECONDS: Final[float] = 3.0
@@ -123,7 +124,12 @@ RGB_GPIOS: Final[tuple[int, ...]] = (
     B2_GPIO,
 )
 ADDR_GPIOS: Final[tuple[int, ...]] = (A_GPIO, B_GPIO, C_GPIO, D_GPIO, E_GPIO)
-CONTROL_GPIOS: Final[tuple[int, ...]] = (CLK_GPIO, LAT_GPIO, OE_GPIO, LEGACY_OE_SYNC_GPIO)
+CONTROL_GPIOS: Final[tuple[int, ...]] = (
+    CLK_GPIO,
+    LAT_GPIO,
+    OE_GPIO,
+    LEGACY_OE_SYNC_GPIO,
+)
 ALL_GPIOS: Final[tuple[int, ...]] = RGB_GPIOS + ADDR_GPIOS + CONTROL_GPIOS
 
 
@@ -148,7 +154,9 @@ def build_gpio_backend() -> GpioBackend:
         logger.info("Using RPi.GPIO backend for HUB75 GPIO smoke test.")
         return backend
     except Exception as error:
-        raise RuntimeError("No usable GPIO backend found for HUB75 GPIO smoke test.") from error
+        raise RuntimeError(
+            "No usable GPIO backend found for HUB75 GPIO smoke test."
+        ) from error
 
 
 def main() -> int:
@@ -210,8 +218,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--rows", type=int, default=DEFAULT_PANEL_ROWS)
     parser.add_argument("--cols", type=int, default=DEFAULT_PANEL_COLS)
-    parser.add_argument("--frame-hold-seconds", type=float, default=DEFAULT_FRAME_HOLD_SECONDS)
-    parser.add_argument("--row-dwell-seconds", type=float, default=DEFAULT_ROW_DWELL_SECONDS)
+    parser.add_argument(
+        "--frame-hold-seconds", type=float, default=DEFAULT_FRAME_HOLD_SECONDS
+    )
+    parser.add_argument(
+        "--row-dwell-seconds", type=float, default=DEFAULT_ROW_DWELL_SECONDS
+    )
     parser.add_argument("--iterations", type=int, default=DEFAULT_ITERATIONS)
     parser.add_argument("--intensity", type=int, default=DEFAULT_INTENSITY)
     parser.add_argument(
@@ -234,7 +246,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_color_steps(intensity: int, single_color: str | None) -> tuple[ColorStep, ...]:
+def build_color_steps(
+    intensity: int, single_color: str | None
+) -> tuple[ColorStep, ...]:
     """Build the simple RGB cycle used for bring-up."""
 
     level_on = intensity >= PWM_THRESHOLD
@@ -242,7 +256,9 @@ def build_color_steps(intensity: int, single_color: str | None) -> tuple[ColorSt
         ColorStep("red", (level_on, False, False), (level_on, False, False)),
         ColorStep("green", (False, level_on, False), (False, level_on, False)),
         ColorStep("blue", (False, False, level_on), (False, False, level_on)),
-        ColorStep("white", (level_on, level_on, level_on), (level_on, level_on, level_on)),
+        ColorStep(
+            "white", (level_on, level_on, level_on), (level_on, level_on, level_on)
+        ),
     )
     if single_color is None:
         return steps
@@ -383,7 +399,9 @@ def resolve_row_pair_index(panel_rows: int, single_row_index: int | None) -> int
     if single_row_index is None:
         return 0
     if single_row_index < 0 or single_row_index >= row_pairs:
-        raise ValueError(f"single_row_index must be in [0, {row_pairs - 1}], got {single_row_index}")
+        raise ValueError(
+            f"single_row_index must be in [0, {row_pairs - 1}], got {single_row_index}"
+        )
     return single_row_index
 
 
@@ -406,12 +424,16 @@ def run_diagnostic_mode(
     step = color_steps[0]
 
     while total_cycles is None or completed_cycles < total_cycles:
-        logger.info("Running diagnostic mode %s on row_pair=%s", diagnostic_mode, row_pair)
+        logger.info(
+            "Running diagnostic mode %s on row_pair=%s", diagnostic_mode, row_pair
+        )
         deadline = time.monotonic() + frame_hold_seconds
         if diagnostic_mode == "hold-row":
             run_hold_row(gpio, row_pair, panel_cols, step, deadline, row_dwell_seconds)
         elif diagnostic_mode == "latch-pulse":
-            run_latch_pulse(gpio, row_pair, panel_cols, step, deadline, row_dwell_seconds)
+            run_latch_pulse(
+                gpio, row_pair, panel_cols, step, deadline, row_dwell_seconds
+            )
         elif diagnostic_mode == "oe-toggle":
             run_oe_toggle(gpio, row_pair, panel_cols, step, deadline, row_dwell_seconds)
         elif diagnostic_mode == "walking-bit":
@@ -500,7 +522,9 @@ def run_walking_bit(
                 lit = column == lit_column
                 write_rgb(
                     gpio,
-                    ColorStep("walking-red", (lit, False, False), (False, False, False)),
+                    ColorStep(
+                        "walking-red", (lit, False, False), (False, False, False)
+                    ),
                 )
                 gpio.output(CLK_GPIO, gpio.HIGH)
                 gpio.output(CLK_GPIO, gpio.LOW)

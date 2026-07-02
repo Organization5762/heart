@@ -101,8 +101,12 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_HARDWARE_MAPPING,
         choices=HARDWARE_MAPPING_CHOICES,
     )
-    parser.add_argument("--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE)
-    parser.add_argument("--step-hold-seconds", type=float, default=DEFAULT_STEP_HOLD_SECONDS)
+    parser.add_argument(
+        "--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE
+    )
+    parser.add_argument(
+        "--step-hold-seconds", type=float, default=DEFAULT_STEP_HOLD_SECONDS
+    )
     parser.add_argument(
         "--resubmit-interval-seconds",
         type=float,

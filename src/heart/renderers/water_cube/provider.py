@@ -33,23 +33,23 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
             msg = "WaterCubeStateProvider requires a PeripheralManager"
             raise ValueError(msg)
         initial = WaterCubeState.initial_state(self.device)
-        acceleration = peripheral_manager.input_io.active_acceleration().start_with(None)
+        acceleration = peripheral_manager.input_io.active_acceleration().start_with(
+            None
+        )
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         average_acceleration = self._average_acceleration(acceleration, frame_ticks)
         samples = average_acceleration.map(
             lambda latest: (
                 latest,
-                peripheral_manager.input_io.gamepad.sample(),
+                peripheral_manager.input_io.gamepad.sample(
+                    source="renderer.water_cube",
+                ),
             )
         )
-        return (
-            samples
-            .scan(
-                lambda prev, latest: self._advance_state(prev, latest),
-                seed=initial,
-            )
-            .start_with(initial)
-        )
+        return samples.scan(
+            lambda prev, latest: self._advance_state(prev, latest),
+            seed=initial,
+        ).start_with(initial)
 
     def _average_acceleration(
         self,

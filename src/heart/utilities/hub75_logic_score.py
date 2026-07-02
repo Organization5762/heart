@@ -45,7 +45,9 @@ class Hub75LogicCapture:
         """Return the logical level for a signal at a given timestamp."""
 
         channel = self.signal_map[signal]
-        return self.initial_state[channel] ^ (bisect_right(self.edges[channel], timestamp) & 1)
+        return self.initial_state[channel] ^ (
+            bisect_right(self.edges[channel], timestamp) & 1
+        )
 
     def edge_count_between(self, signal: str, start: float, end: float) -> int:
         """Return the number of edges for a signal between two timestamps."""
@@ -162,7 +164,9 @@ def load_hub75_logic_csv(
                 initial_state = state.copy()
                 first_timestamp = timestamp
             if previous_state is not None:
-                for channel, (old, new) in enumerate(zip(previous_state, state, strict=True)):
+                for channel, (old, new) in enumerate(
+                    zip(previous_state, state, strict=True)
+                ):
                     if old == new:
                         continue
                     edges[channel].append(timestamp)
@@ -224,7 +228,10 @@ def summarize_hub75_capture(
     address_edges_per_lat = _address_edges_per_lat(capture, lat_rises)
     address_edge_counts = _signal_edge_counts(capture, HUB75_ADDRESS_SIGNALS)
     address_edge_intervals = _signal_edge_intervals(capture, HUB75_ADDRESS_SIGNALS)
-    clk_periods = [later - earlier for earlier, later in zip(clk_rises, clk_rises[1:], strict=False)]
+    clk_periods = [
+        later - earlier
+        for earlier, later in zip(clk_rises, clk_rises[1:], strict=False)
+    ]
     clk_highs = _clock_high_durations(clk_rises, clk_falls)
     clk_lows = _clock_low_durations(clk_rises, clk_falls)
     long_clk_period_indexes = [
@@ -360,7 +367,9 @@ def diagnose_hub75_capture(
 
     mapped_channels = set(capture.signal_map.values())
     unexpected_active_channels = tuple(
-        activity for activity in active_channels if activity.channel not in mapped_channels
+        activity
+        for activity in active_channels
+        if activity.channel not in mapped_channels
     )
     mapped_edge_total = sum(mapped_edge_counts.values())
     if mapped_edge_total == 0 and unexpected_active_channels:
@@ -421,19 +430,23 @@ def score_hub75_similarity(
             baseline.interval_count,
             candidate.interval_count,
         ),
-        "row_clock_mismatch_count": row_activity_similarity * _count_similarity(
+        "row_clock_mismatch_count": row_activity_similarity
+        * _count_similarity(
             baseline.row_clock_mismatch_count,
             candidate.row_clock_mismatch_count,
         ),
-        "lat_while_output_enabled_count": row_activity_similarity * _count_similarity(
+        "lat_while_output_enabled_count": row_activity_similarity
+        * _count_similarity(
             baseline.lat_while_output_enabled_count,
             candidate.lat_while_output_enabled_count,
         ),
-        "active_address_edge_count": row_activity_similarity * _count_similarity(
+        "active_address_edge_count": row_activity_similarity
+        * _count_similarity(
             baseline.active_address_edge_count,
             candidate.active_address_edge_count,
         ),
-        "median_clocks_per_row": row_activity_similarity * _relative_similarity(
+        "median_clocks_per_row": row_activity_similarity
+        * _relative_similarity(
             baseline.median_clocks_per_row,
             candidate.median_clocks_per_row,
             tolerance_fraction=0.02,
@@ -539,9 +552,7 @@ def score_hub75_similarity(
     timing_similarity = _average(timing_scores.values()) * validity_gate
     address_similarity = _average(address_scores.values()) * validity_gate
     total = (
-        control_similarity * 0.45
-        + timing_similarity * 0.35
-        + address_similarity * 0.20
+        control_similarity * 0.45 + timing_similarity * 0.35 + address_similarity * 0.20
     )
     return Hub75SimilarityScore(
         total=total,
@@ -588,7 +599,9 @@ def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ..
             if initial_state is None:
                 initial_state = state.copy()
             if previous_state is not None:
-                for channel, (old, new) in enumerate(zip(previous_state, state, strict=True)):
+                for channel, (old, new) in enumerate(
+                    zip(previous_state, state, strict=True)
+                ):
                     if old == new:
                         continue
                     edges[channel] += 1
@@ -614,7 +627,11 @@ def summarize_logic_channels(path: str | Path) -> tuple[LogicChannelActivity, ..
                 final_level=final_state[channel],
             )
         )
-    return tuple(sorted(activities, key=lambda activity: (-activity.edge_count, activity.channel)))
+    return tuple(
+        sorted(
+            activities, key=lambda activity: (-activity.edge_count, activity.channel)
+        )
+    )
 
 
 def _resolve_signal_map(
@@ -644,7 +661,9 @@ def _slice_between(values: Sequence[float], start: float, end: float) -> list[fl
     return list(values[begin:finish])
 
 
-def _clock_high_durations(clk_rises: Sequence[float], clk_falls: Sequence[float]) -> list[float]:
+def _clock_high_durations(
+    clk_rises: Sequence[float], clk_falls: Sequence[float]
+) -> list[float]:
     durations: list[float] = []
     fall_index = 0
     for rise in clk_rises:
@@ -655,7 +674,9 @@ def _clock_high_durations(clk_rises: Sequence[float], clk_falls: Sequence[float]
     return durations
 
 
-def _clock_low_durations(clk_rises: Sequence[float], clk_falls: Sequence[float]) -> list[float]:
+def _clock_low_durations(
+    clk_rises: Sequence[float], clk_falls: Sequence[float]
+) -> list[float]:
     durations: list[float] = []
     rise_index = 0
     for fall in clk_falls:
@@ -724,8 +745,7 @@ def _signal_edge_intervals(
             continue
         edges = capture.edges[capture.signal_map[signal]]
         intervals[signal] = [
-            later - earlier
-            for earlier, later in zip(edges, edges[1:], strict=False)
+            later - earlier for earlier, later in zip(edges, edges[1:], strict=False)
         ]
     return intervals
 

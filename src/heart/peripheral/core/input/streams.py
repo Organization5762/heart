@@ -4,7 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
-from manyfold import MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.frame import FrameTick
 
@@ -25,7 +26,7 @@ def map_stream(source: StreamNode[T], mapper: Callable[[T], U]) -> StreamNode[U]
 
 
 def merge_streams(*streams: StreamNode[T]) -> StreamNode[T]:
-    return MergeNode.merge(*streams)
+    return PubSubObservable.merge(*streams)
 
 
 def average_by_frame_window(

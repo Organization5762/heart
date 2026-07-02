@@ -38,9 +38,7 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[LSystemState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = LSystemState()
 
         def advance(state: LSystemState, frame_tick: object) -> LSystemState:
@@ -50,9 +48,4 @@ class LSystemStateProvider(ObservableProvider[LSystemState]):
                 update_interval_ms=self._update_interval_ms,
             )
 
-        return (
-            frame_ticks.scan(advance, seed=initial_state)
-            .start_with(initial_state)
-
-
-        )
+        return frame_ticks.scan(advance, seed=initial_state).start_with(initial_state)

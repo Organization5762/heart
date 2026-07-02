@@ -2,12 +2,12 @@
 
 import pygame
 import pytest
-from manyfold import BehaviorSubject
+from manyfold.architecture import NewValues
 
 from heart.assets import loader as assets_loader
 from heart.device import Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.switch import SwitchState
@@ -41,17 +41,22 @@ def _peripheral_manager(
     *,
     gamepad: Gamepad | None = None,
     gamepad_snapshot: GamepadSnapshot | None = None,
-) -> tuple[PeripheralManager, BehaviorSubject[SwitchState]]:
+) -> tuple[PeripheralManager, NewValues[SwitchState]]:
     manager = PeripheralManager()
-    switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
+    switch_stream: NewValues[SwitchState] = NewValues()
     monkeypatch.setattr(manager.input_io, "main_switch_stream", lambda: switch_stream)
     if gamepad is not None:
         manager.register(gamepad)
         monkeypatch.setattr(
             manager.input_io.gamepad,
             "sample",
-            lambda: gamepad_snapshot
-            or GamepadSnapshot(connected=True, identifier="pad"),
+            lambda: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=gamepad_snapshot
+                    or GamepadSnapshot(connected=True, identifier="pad"),
+                ),
+            ),
         )
     return manager, switch_stream
 
@@ -187,14 +192,15 @@ class TestSpritesheetLoopProvider:
         )
         renderer.initialize(window, manager, orientation)
 
-        switch_stream.on_next(SwitchState(0, 0, 0, 10, 0))
-        switch_stream.on_next(SwitchState(0, 0, 0, 25, 0))
+        switch_stream.emit(SwitchState(0, 0, 0, 0, 0))
+        switch_stream.emit(SwitchState(0, 0, 0, 10, 0))
+        switch_stream.emit(SwitchState(0, 0, 0, 25, 0))
 
         state_after_increase = renderer.state
         assert state_after_increase.duration_scale == pytest.approx(0.10)
         assert state_after_increase.last_switch_rotation == 25
 
-        switch_stream.on_next(SwitchState(0, 0, 0, 5, 0))
+        switch_stream.emit(SwitchState(0, 0, 0, 5, 0))
         state_after_decrease = renderer.state
         assert state_after_decrease.duration_scale == pytest.approx(0.05)
         assert state_after_decrease.last_switch_rotation == 5
@@ -223,7 +229,7 @@ class TestSpritesheetLoopProvider:
         renderer.initialize(window, manager, orientation)
 
         initial_state = renderer.state
-        switch_stream.on_next(SwitchState(0, 0, 0, 10, 0))
+        switch_stream.emit(SwitchState(0, 0, 0, 10, 0))
         assert renderer.state == initial_state
 
     def test_signed_resting_triggers_do_not_cancel_kirby_speed_controls(
@@ -291,7 +297,11 @@ class TestSpritesheetLoopProvider:
         )
         gamepad = Gamepad()
         manager, _ = _peripheral_manager(monkeypatch, gamepad=gamepad)
-        monkeypatch.setattr(manager.input_io.gamepad, "sample", lambda: next(snapshots))
+        monkeypatch.setattr(
+            manager.input_io.gamepad,
+            "sample",
+            lambda: (GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),),
+        )
         monkeypatch.setattr(
             assets_loader.Loader,
             "load_spirtesheet",

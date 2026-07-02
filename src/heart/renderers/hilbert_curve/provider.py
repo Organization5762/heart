@@ -282,6 +282,4 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             .map(lambda _: time.monotonic())
             .scan(lambda state, now: self.advance(state, now=now), seed=initial_state)
             .start_with(initial_state)
-
-
         )

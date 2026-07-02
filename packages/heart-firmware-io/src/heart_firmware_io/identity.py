@@ -21,6 +21,7 @@ except ImportError:  # pragma: no cover - supervisor is unavailable on CPython
 _DEFAULT_COMMIT_CACHE: str | None = None
 DEFAULT_FIRMWARE_COMMIT = "UNKNOWN"
 
+
 class Identity:
     """Container describing a firmware build."""
 
@@ -87,7 +88,9 @@ def poll_and_respond(
 
 
 def _format_identity_payload(identity: Identity) -> str:
-    return json.dumps({"event_type": constants.DEVICE_IDENTIFY, "data": identity.as_payload()})
+    return json.dumps(
+        {"event_type": constants.DEVICE_IDENTIFY, "data": identity.as_payload()}
+    )
 
 
 def _iter_serial_queries(*, stdin):
@@ -197,7 +200,9 @@ def _commit_from_generated_module() -> str | None:
 def _commit_from_git(default: str) -> str | None:
     if importlib is None:
         return None
-    if importlib.util.find_spec("subprocess") is None:  # pragma: no cover - hardware environments
+    if (
+        importlib.util.find_spec("subprocess") is None
+    ):  # pragma: no cover - hardware environments
         return None
     subprocess = importlib.import_module("subprocess")
 

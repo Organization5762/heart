@@ -68,9 +68,7 @@ def resolve_arduino_port(config: ArduinoConfig) -> str:
 
     scored_ports.sort(reverse=True)
     highest_score = scored_ports[0][0]
-    best_ports = [
-        device for score, device in scored_ports if score == highest_score
-    ]
+    best_ports = [device for score, device in scored_ports if score == highest_score]
     if len(best_ports) != 1:
         message = (
             "Multiple Arduino upload ports matched the configured keywords: "
@@ -106,9 +104,7 @@ def _arduino_command_prefix(
     return command
 
 
-def _install_arduino_core(
-    command_prefix: list[str], config: ArduinoConfig
-) -> None:
+def _install_arduino_core(command_prefix: list[str], config: ArduinoConfig) -> None:
     logger.info("Installing Arduino core %s", config.core)
     _run_arduino_cli(command_prefix + ["core", "update-index"])
     _run_arduino_cli(command_prefix + ["core", "install", config.core])
@@ -125,14 +121,11 @@ def _install_arduino_libraries(
 def _compile_sketch(command_prefix: list[str], config: ArduinoConfig) -> None:
     logger.info("Compiling Arduino sketch %s", config.sketch_path)
     _run_arduino_cli(
-        command_prefix
-        + ["compile", "--fqbn", config.fqbn, str(config.sketch_path)]
+        command_prefix + ["compile", "--fqbn", config.fqbn, str(config.sketch_path)]
     )
 
 
-def _upload_sketch(
-    command_prefix: list[str], config: ArduinoConfig, port: str
-) -> None:
+def _upload_sketch(command_prefix: list[str], config: ArduinoConfig, port: str) -> None:
     logger.info("Uploading Arduino sketch %s to %s", config.sketch_path, port)
     _run_arduino_cli(
         command_prefix

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import BehaviorSubject
+from manyfold.architecture import NewValues
 
 from heart.device import Device, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
@@ -28,7 +28,7 @@ class TestYoListenRenderer:
         )
         renderer = YoListenRenderer()
         peripheral_manager = PeripheralManager()
-        switch_stream = BehaviorSubject(SwitchState(0, 0, 0, 0, 0))
+        switch_stream: NewValues[SwitchState] = NewValues()
         monkeypatch.setattr(
             peripheral_manager.input_io,
             "main_switch_stream",

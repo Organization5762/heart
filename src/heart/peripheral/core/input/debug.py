@@ -10,9 +10,9 @@ from math import ceil
 from typing import Any
 
 from manyfold import StreamNode
+from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.peripheral.core.input.events import InputEvent, input_event_topic
-from heart.peripheral.core.streams import EventStream
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
 DEFAULT_LATENCY_HISTORY_SIZE = 512
@@ -69,7 +69,7 @@ class InputDebugTap:
         self._history: deque[InputDebugEnvelope] = deque(maxlen=history_size)
         self._latency_history: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
-        self._stream: EventStream[InputDebugEnvelope] = EventStream()
+        self._stream = NewValues[InputDebugEnvelope](name="heart.input.debug")
         self._input_events = input_event_topic()
 
     def publish(
@@ -105,7 +105,7 @@ class InputDebugTap:
         )
 
     def observable(self) -> StreamNode[InputDebugEnvelope]:
-        return self._stream.observable()
+        return self._stream
 
     def input_events(self) -> Any:
         return self._input_events
@@ -181,8 +181,7 @@ class InputDebugNode:
     def observable(self, source: StreamNode[Any]) -> StreamNode[Any]:
         if hasattr(source, "do_action"):
             return source.do_action(on_next=self._publish)
-        stream = source.map(lambda value: self._publish(value) or value)
-        return stream
+        return PubSubObservable.merge(source).do_action(on_next=self._publish)
 
     def connect(self, source: StreamNode[Any]) -> StreamNode[Any]:
         return self.observable(source)

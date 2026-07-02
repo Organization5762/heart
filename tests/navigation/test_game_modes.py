@@ -456,8 +456,9 @@ class TestNavigationGameModes:
         orientation = Mock()
 
         with (
-            patch.object(game_modes_module.Configuration, "render_crash_on_error")
-            as render_crash_on_error,
+            patch.object(
+                game_modes_module.Configuration, "render_crash_on_error"
+            ) as render_crash_on_error,
             patch.object(game_modes_module, "logger") as logger,
         ):
             render_crash_on_error.return_value = False
@@ -502,7 +503,9 @@ class TestNavigationGameModes:
         window.screen.get_flags.return_value = 0
 
         with (
-            patch.object(game_modes_module.Configuration, "render_initialization_progress") as progress_enabled,
+            patch.object(
+                game_modes_module.Configuration, "render_initialization_progress"
+            ) as progress_enabled,
             patch.object(game_modes_module.logger, "info"),
             patch.object(game_modes_module.pygame.display, "flip"),
         ):

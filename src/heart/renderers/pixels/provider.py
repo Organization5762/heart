@@ -3,7 +3,8 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-from manyfold import BehaviorSubject, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -14,7 +15,7 @@ from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 
 class BorderStateProvider(ObservableProvider[BorderState]):
     def __init__(self, initial_color: Color | None = None) -> None:
-        self._color = BehaviorSubject(initial_color or Color.random())
+        self._color = Value.initialized(initial_color or Color.random())
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
@@ -22,7 +23,7 @@ class BorderStateProvider(ObservableProvider[BorderState]):
         return self._color.map(lambda color: BorderState(color=color))
 
     def set_color(self, color: Color) -> None:
-        self._color.on_next(color)
+        self._color.set(color)
 
 
 class RainStateProvider(ObservableProvider[RainState]):
@@ -47,11 +48,11 @@ class RainStateProvider(ObservableProvider[RainState]):
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
         )
-        return (
+        return PubSubObservable.merge(
             self._peripheral_manager.input_io.frame_tick_stream()
-            .scan(lambda state, _: self._next_state(state), seed=initial_state)
-            .start_with(initial_state)
-
+        ).state(
+            initial_state,
+            lambda state, _: self._next_state(state),
         )
 
     def _next_state(self, state: RainState) -> RainState:
@@ -85,11 +86,11 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
         )
-        return (
+        return PubSubObservable.merge(
             self._peripheral_manager.input_io.frame_tick_stream()
-            .scan(lambda state, _: self._next_state(state), seed=initial_state)
-            .start_with(initial_state)
-
+        ).state(
+            initial_state,
+            lambda state, _: self._next_state(state),
         )
 
     def _next_state(self, state: SlinkyState) -> SlinkyState:

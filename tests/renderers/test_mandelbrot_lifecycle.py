@@ -330,7 +330,9 @@ class TestMandelbrotLifecycle:
         monkeypatch.setattr(renderer, "process_input", process_input)
         monkeypatch.setattr(renderer, "reset", reset)
         monkeypatch.setattr(renderer, "_is_input_grace_period", lambda: True)
-        monkeypatch.setattr(renderer, "_draw_mandelbrot_to_surface", lambda _surface: None)
+        monkeypatch.setattr(
+            renderer, "_draw_mandelbrot_to_surface", lambda _surface: None
+        )
 
         renderer.real_process(window, orientation)
 
@@ -354,9 +356,13 @@ class TestMandelbrotLifecycle:
         renderer = MandelbrotMode(enable_input=False)
         renderer.initialize(window, manager, orientation)
         renderer.time_initialized = 0.0
-        process_input = Mock(side_effect=AssertionError("preview should not read input"))
+        process_input = Mock(
+            side_effect=AssertionError("preview should not read input")
+        )
         monkeypatch.setattr(renderer, "process_input", process_input)
-        monkeypatch.setattr(renderer, "_draw_mandelbrot_to_surface", lambda _surface: None)
+        monkeypatch.setattr(
+            renderer, "_draw_mandelbrot_to_surface", lambda _surface: None
+        )
 
         renderer.real_process(window, orientation)
 

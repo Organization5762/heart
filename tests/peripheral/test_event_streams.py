@@ -3,22 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from queue import Full
-from threading import Event, get_ident
 from typing import Any
 
 from manyfold import Graph, StreamNode
+from manyfold.architecture import NewValues, PubSubObservable
 
-import heart.peripheral.core.streams as stream_module
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
-                                           StreamPriority,
-                                           _schedule_background,
-                                           combine_latest,
-                                           observe_on_background,
-                                           runtime_route)
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  NoopSubscription)
 
@@ -41,7 +34,7 @@ class EmittingPeripheral(Peripheral[int]):
     """Peripheral backed by a controllable event stream for envelope tests."""
 
     def __init__(self) -> None:
-        self.events: EventStream[int] = EventStream()
+        self.events = NewValues[int](name="test.emitting_peripheral.events")
 
     def _event_stream(self) -> StreamNode[int]:
         return self.events
@@ -49,23 +42,6 @@ class EmittingPeripheral(Peripheral[int]):
 
 class TestPeripheralObserveSharing:
     """Group tests for shared peripheral streams to avoid duplicate source work."""
-
-    def test_event_stream_reuses_subscriber_snapshot_between_emits(self) -> None:
-        """Keep hot push streams from allocating a subscriber tuple per emitted event."""
-        stream: EventStream[int] = EventStream()
-        observed: list[int] = []
-        subscription = stream.subscribe(observed.append)
-        try:
-            subscriber_snapshot = stream._subscriber_snapshot
-
-            stream.emit(1)
-            stream.emit(2)
-
-            assert observed == [1, 2]
-            assert stream._subscriber_snapshot is subscriber_snapshot
-        finally:
-            subscription.dispose()
-        assert stream._subscriber_snapshot == ()
 
     def test_observe_shares_subscription(self) -> None:
         """Ensure observe shares a single subscription so redundant polling is avoided for scalability."""
@@ -126,7 +102,9 @@ class TestGraphRouteStreamTransforms:
             publish_nowait(target, value)
 
         def unexpected_publish(*_args: object, **_kwargs: object) -> None:
-            raise AssertionError("GraphRouteStream.emit should not fall back to publish")
+            raise AssertionError(
+                "GraphRouteStream.emit should not fall back to publish"
+            )
 
         graph.publish_nowait = record_publish_nowait  # type: ignore[method-assign]
         graph.publish = unexpected_publish  # type: ignore[method-assign]
@@ -136,7 +114,7 @@ class TestGraphRouteStreamTransforms:
         assert calls == [(route, 7)]
         assert stream.value == 7
 
-    def test_combine_latest_accepts_graph_route_stream_sources(self) -> None:
+    def test_pubsub_combine_latest_accepts_graph_route_stream_sources(self) -> None:
         graph = Graph()
         route_a = runtime_route("test_event_stream_combine_a", "HeartCombineA")
         route_b = runtime_route("test_event_stream_combine_b", "HeartCombineB")
@@ -144,7 +122,9 @@ class TestGraphRouteStreamTransforms:
         stream_b = GraphRouteStream[int](graph, route_b)
         observed: list[tuple[int, int]] = []
 
-        subscription = combine_latest(stream_a, stream_b).subscribe(observed.append)
+        subscription = PubSubObservable.combine_latest(stream_a, stream_b).subscribe(
+            observed.append
+        )
         try:
             stream_a.on_next(1)
             stream_b.on_next(2)
@@ -173,9 +153,9 @@ class TestGraphRouteStreamTransforms:
 
             assert observed == [3]
         finally:
-            connection.remove()
+            connection.dispose()
 
-    def test_pipe_delegates_operator_sharing_to_observable_pipeline(
+    def test_pipe_delegates_to_observable_pipeline(
         self,
     ) -> None:
         graph = Graph()
@@ -202,103 +182,11 @@ class TestGraphRouteStreamTransforms:
             assert observed_a == [42]
             assert observed_b == [42]
             assert observed_doubled == [82]
-            assert calls["mapper"] == 1
+            assert calls["mapper"] == 2
         finally:
             subscription_a.dispose()
             subscription_b.dispose()
             subscription_doubled.dispose()
-
-
-class TestBackgroundStreamScheduling:
-    def test_background_scheduler_reports_full_queue(self, monkeypatch: Any) -> None:
-        calls = {"count": 0}
-
-        class FullQueue:
-            def put_nowait(self, _item: tuple[int, int, Any]) -> None:
-                calls["count"] += 1
-                raise Full
-
-        monkeypatch.setattr(stream_module, "_ensure_background_workers", lambda: None)
-        monkeypatch.setattr(stream_module, "_BACKGROUND_QUEUE", FullQueue())
-
-        scheduled = _schedule_background(
-            lambda: None,
-            priority=StreamPriority.NORMAL,
-        )
-
-        assert scheduled is False
-        assert calls == {"count": 1}
-
-    def test_observe_on_background_reports_overflow(self, monkeypatch: Any) -> None:
-        source: EventStream[int] = EventStream()
-        errors: list[Exception] = []
-        observed: list[int] = []
-
-        def reject_schedule(_callback: Any, *, priority: StreamPriority) -> bool:
-            assert priority == StreamPriority.NORMAL
-            return False
-
-        monkeypatch.setattr(stream_module, "_schedule_background", reject_schedule)
-        subscription = observe_on_background(source).subscribe(
-            observed.append,
-            errors.append,
-        )
-        try:
-            source.emit(1)
-
-            assert observed == []
-            assert len(errors) == 1
-            assert isinstance(errors[0], OverflowError)
-            assert str(errors[0]) == "background stream queue is full"
-        finally:
-            subscription.dispose()
-
-    def test_observe_on_background_delivers_off_caller_thread(self) -> None:
-        source: EventStream[int] = EventStream()
-        caller_thread = get_ident()
-        delivered = Event()
-        observed: list[tuple[int, int]] = []
-
-        subscription = observe_on_background(source).subscribe(
-            lambda value: (observed.append((value, get_ident())), delivered.set())
-        )
-        try:
-            source.emit(3)
-
-            assert delivered.wait(1.0)
-            assert observed == [(3, observed[0][1])]
-            assert observed[0][1] != caller_thread
-        finally:
-            subscription.dispose()
-
-    def test_background_scheduler_prefers_higher_priority_pending_work(self) -> None:
-        started = Event()
-        release = Event()
-        completed = Event()
-        observed: list[str] = []
-
-        def blocking_low_priority() -> None:
-            started.set()
-            assert release.wait(1.0)
-            observed.append("low-blocking")
-
-        def record(value: str) -> None:
-            observed.append(value)
-            if len(observed) == 3:
-                completed.set()
-
-        _schedule_background(
-            blocking_low_priority,
-            priority=StreamPriority.LOW,
-        )
-        assert started.wait(1.0)
-
-        _schedule_background(lambda: record("low-pending"), priority=StreamPriority.LOW)
-        _schedule_background(lambda: record("high-pending"), priority=StreamPriority.HIGH)
-        release.set()
-
-        assert completed.wait(1.0)
-        assert observed == ["low-blocking", "high-pending", "low-pending"]
 
 
 class TestManyfoldSensorEnvelopeBridge:

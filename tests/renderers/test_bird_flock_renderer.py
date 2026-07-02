@@ -6,7 +6,7 @@ from heart import DeviceDisplayMode
 from heart.device import Cube
 from heart.device.local import LocalScreen
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.bird_flock import BirdFlockRenderer
 from heart.renderers.bird_flock.renderer import _bird_color, _controlled_hue
@@ -95,7 +95,12 @@ def test_bumpers_control_bird_count(monkeypatch, device) -> None:
     monkeypatch.setattr(
         manager.input_io.gamepad,
         "sample",
-        lambda **_kwargs: _gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+        lambda **_kwargs: (
+            GamepadSnapshotEvent(
+                joystick_id=0,
+                snapshot=_gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+            ),
+        ),
     )
 
     renderer.real_process(window, orientation)

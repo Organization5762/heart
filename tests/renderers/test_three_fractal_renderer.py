@@ -10,7 +10,8 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import (FractalRuntime,
                                                     FractalScene,
@@ -67,7 +68,7 @@ class _SnapshotController:
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> object:
+    def sample(self, **_kwargs) -> object:
         return self.snapshot
 
 
@@ -88,8 +89,10 @@ class _SamplingGamepad:
     def __init__(self, snapshot: GamepadSnapshot) -> None:
         self.snapshot = snapshot
 
-    def sample(self) -> GamepadSnapshot:
-        return self.snapshot
+    def sample(self, **_kwargs) -> tuple[GamepadSnapshotEvent, ...]:
+        if not self.snapshot.connected:
+            return ()
+        return (GamepadSnapshotEvent(joystick_id=0, snapshot=self.snapshot),)
 
 
 class _SamplingInputIO:
@@ -291,7 +294,7 @@ class TestFractalRuntime:
 
         runtime._process_input(_SamplingPeripheralManager(snapshot))
 
-        assert runtime._gamepad_snapshot is snapshot
+        assert runtime._gamepad_snapshots[0].snapshot is snapshot
         assert runtime.vel[0] > 0.0
 
     def test_west_button_returns_free_look_to_auto_mode(self) -> None:
@@ -302,10 +305,13 @@ class TestFractalRuntime:
         runtime.max_velocity = 2.0
         runtime.mat = np.identity(4, dtype=np.float32)
         runtime.vel = np.zeros((3,), dtype=np.float32)
-        runtime._gamepad_snapshot = GamepadSnapshot(
+        snapshot = GamepadSnapshot(
             connected=True,
             identifier="8BitDo Lite 2",
             tapped_buttons=frozenset({GamepadButton.WEST}),
+        )
+        runtime._gamepad_snapshots = (
+            GamepadSnapshotEvent(joystick_id=0, snapshot=snapshot),
         )
 
         runtime._check_enter_auto(Mock())
@@ -390,7 +396,9 @@ class TestFractalScene:
         scene.set_state(FractalSceneState(runtime=runtime))
         scene._peripheral_manager = Mock()
 
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert runtime.initialize_calls == 1
 
@@ -402,8 +410,12 @@ class TestFractalScene:
         scene.set_state(FractalSceneState(runtime=runtime))
         scene._peripheral_manager = Mock()
 
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        scene.real_process(
+            window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert runtime.initialize_calls == 1
         assert scene._runtime_failed is True

@@ -23,9 +23,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[MetadataScreenState]:
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = MetadataScreenState()
 
         def advance_state(
@@ -35,11 +33,8 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
             active_monitors = list(current_bpms.keys())
             return self._update_state(state, active_monitors, elapsed_ms)
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def _update_state(

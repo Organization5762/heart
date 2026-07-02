@@ -223,7 +223,9 @@ class Compass(Peripheral[Vector3 | None]):
 
         resolved_input_route = input_route or magnetometer_vector_event_route()
         resolved_output_route = output_route or compass_vector_event_route()
-        resolved_heading_output_route = heading_output_route or compass_heading_event_route()
+        resolved_heading_output_route = (
+            heading_output_route or compass_heading_event_route()
+        )
 
         def _body(stop: StopToken, graph: Graph) -> None:
             def publish_compass_state(event: SensorEvent) -> None:

@@ -4,7 +4,8 @@ import textwrap
 from typing import Iterable
 
 import pygame
-from manyfold import BehaviorSubject, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import Value
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
@@ -21,7 +22,7 @@ TEXT_PADDING_PX = 4
 
 class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
     def __init__(self) -> None:
-        self._text = BehaviorSubject(DEFAULT_TEXT)
+        self._text = Value.initialized(DEFAULT_TEXT)
         self._font_cache: dict[int, pygame.font.Font] = {}
         self._font_size_max: int = FONT_SIZE_MAX
         self._font_size_min: int = FONT_SIZE_MIN
@@ -34,8 +35,6 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_size())
             .distinct_until_changed()
-
-
         )
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
 
@@ -60,13 +59,11 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
             .map(to_state)
             .start_with(self.initial_state())
             .distinct_until_changed()
-
-
         )
 
     def initial_state(self) -> FreeTextRendererState:
         return FreeTextRendererState(
-            text=self._text.value,
+            text=self._text.latest or DEFAULT_TEXT,
             wrapped_lines=tuple(),
             window_size=(0, 0),
             font_size=self._initial_font_size,
@@ -74,7 +71,7 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
         )
 
     def set_text(self, text: str) -> None:
-        self._text.on_next(text)
+        self._text.set(text)
 
     def get_font(self, size: int) -> pygame.font.Font:
         if size not in self._font_cache:

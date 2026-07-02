@@ -29,7 +29,6 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size())
             .distinct_until_changed()
-
         )
         base_image = self._load_base_image()
 
@@ -51,7 +50,9 @@ class SurfaceRenderImageStateProvider(ObservableProvider[RenderImageState]):
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[RenderImageState]:
         if peripheral_manager is None:
-            raise ValueError("SurfaceRenderImageStateProvider requires a PeripheralManager")
+            raise ValueError(
+                "SurfaceRenderImageStateProvider requires a PeripheralManager"
+            )
         window_stream = (
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: cast(pygame.Surface, window))

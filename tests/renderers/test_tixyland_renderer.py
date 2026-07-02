@@ -8,7 +8,7 @@ import pygame
 from heart.device import Cube
 from heart.device.local import LocalScreen
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.tixyland.provider import (MAX_SPEED_SCALE,
                                                TixylandStateProvider)
@@ -43,7 +43,12 @@ class TestTixyland:
         monkeypatch.setattr(
             peripheral_manager.input_io.gamepad,
             "sample",
-            lambda: _gamepad_snapshot(axes={GamepadAxis.TRIGGER_RIGHT: 1.0}),
+            lambda **_kwargs: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(axes={GamepadAxis.TRIGGER_RIGHT: 1.0}),
+                ),
+            ),
         )
 
         provider.observable().subscribe(observed_states.append)
@@ -60,7 +65,12 @@ class TestTixyland:
         monkeypatch.setattr(
             peripheral_manager.input_io.gamepad,
             "sample",
-            lambda: _gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+            lambda **_kwargs: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+                ),
+            ),
         )
 
         provider.observable().subscribe(observed_states.append)

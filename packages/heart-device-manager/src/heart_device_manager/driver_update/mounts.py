@@ -17,20 +17,14 @@ UF2_INSTALL_DELAY_SECONDS = 10
 
 def mount_points(media_directory: Path) -> list[Path]:
     if not media_directory.is_dir():
-        message = (
-            f"Expected media directory {media_directory} to exist before updates."
-        )
+        message = f"Expected media directory {media_directory} to exist before updates."
         logger.error(message)
         raise UpdateError(message)
 
-    return [
-        entry for entry in media_directory.iterdir() if entry.is_dir()
-    ]
+    return [entry for entry in media_directory.iterdir() if entry.is_dir()]
 
 
-def install_uf2_if_available(
-    config: DriverConfig, *, media_directory: Path
-) -> None:
+def install_uf2_if_available(config: DriverConfig, *, media_directory: Path) -> None:
     uf2_destination = media_directory / config.device_boot_name
     if uf2_destination.is_dir():
         downloaded_file_path = download_file(config.uf2_url, config.uf2_checksum)
@@ -42,13 +36,9 @@ def install_uf2_if_available(
         )
 
 
-def circuitpy_mounts(
-    mount_points: list[Path], *, media_directory: Path
-) -> list[Path]:
+def circuitpy_mounts(mount_points: list[Path], *, media_directory: Path) -> list[Path]:
     circuitpy_mounts = [
-        mount_point
-        for mount_point in mount_points
-        if "CIRCUITPY" in mount_point.name
+        mount_point for mount_point in mount_points if "CIRCUITPY" in mount_point.name
     ]
     if not circuitpy_mounts:
         logger.warning("No CIRCUITPY volumes found under %s.", media_directory)

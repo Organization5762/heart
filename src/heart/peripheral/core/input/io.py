@@ -6,7 +6,8 @@ from functools import cached_property
 from typing import Any, TypeVar, cast
 
 import pygame
-from manyfold import EmptyNode, Graph, MergeNode, StreamNode
+from manyfold import EmptyNode, Graph, StreamNode
+from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
 from heart.peripheral.core.input.accelerometer import (
@@ -26,8 +27,7 @@ from heart.peripheral.core.input.profiles.navigation import (
     ActivateIntent, AlternateActivateIntent, BrowseIntent, NavigationIntent,
     NavigationProfile)
 from heart.peripheral.core.input.streams import map_stream, merge_streams
-from heart.peripheral.core.streams import (EventStream, GraphRouteStream,
-                                           runtime_route)
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
@@ -58,10 +58,7 @@ class InputIO:
 
     @cached_property
     def debug_tap(self) -> InputDebugTap:
-        if (
-            Configuration.is_debug_mode()
-            or Configuration.stream_beats_input_debug()
-        ):
+        if Configuration.is_debug_mode() or Configuration.stream_beats_input_debug():
             return InputDebugTap()
         return InputDebugTap(history_size=0, latency_history_size=0)
 
@@ -96,8 +93,8 @@ class InputIO:
         )
 
     @cached_property
-    def injected_navigation_intents(self) -> EventStream[NavigationIntent]:
-        return EventStream()
+    def injected_navigation_intents(self) -> NewValues[NavigationIntent]:
+        return NewValues(name="heart.input.navigation.injected")
 
     @cached_property
     def navigation(self) -> NavigationProfile:
@@ -152,7 +149,7 @@ class InputIO:
         ]
         if not streams:
             return EmptyNode().observable()
-        return MergeNode.merge(*streams).map(_switch_state_event)
+        return PubSubObservable.merge(*streams).map(_switch_state_event)
 
     @cached_property
     def all_accelerometers(self) -> StreamNode[Acceleration]:
@@ -164,7 +161,7 @@ class InputIO:
         if not streams:
             return EmptyNode().observable()
         merged = (
-            MergeNode.merge(*streams)
+            PubSubObservable.merge(*streams)
             .map(PeripheralMessageEnvelope[Acceleration | None].unwrap_peripheral)
             .filter(lambda value: value is not None)
             .map(lambda value: cast(Acceleration, value))
@@ -246,7 +243,7 @@ class InputIO:
 
     def switch_navigation_intents(self) -> StreamNode[NavigationIntent]:
         switch_updates = self.physical_main_switch_stream()
-        return MergeNode.merge(
+        return PubSubObservable.merge(
             self.switch_browse_intents(switch_updates),
             self.switch_activate_intents(switch_updates),
             self.switch_alternate_activate_intents(switch_updates),
@@ -255,7 +252,7 @@ class InputIO:
     def switch_browse_intents(
         self, switch_updates: StreamNode[SwitchStateEvent]
     ) -> StreamNode[BrowseIntent]:
-        output: EventStream[BrowseIntent] = EventStream()
+        output = NewValues[BrowseIntent](name="heart.input.switch.browse_intents")
         previous_by_source: dict[str, int] = {}
 
         def emit_delta(event: SwitchStateEvent) -> None:
@@ -294,7 +291,7 @@ def _counter_increase_intents(
     counter_value: Callable[[SwitchStateEvent], int],
     create_intent: Callable[[], TNavigationIntent],
 ) -> StreamNode[TNavigationIntent]:
-    output: EventStream[TNavigationIntent] = EventStream()
+    output = NewValues[TNavigationIntent](name="heart.input.switch.counter_intents")
     previous_by_source: dict[str, int] = {}
 
     def emit_increases(event: SwitchStateEvent) -> None:

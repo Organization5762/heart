@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Capture a repeatable developer experience snapshot for Heart."""
+
 from __future__ import annotations
 
 import argparse
@@ -68,7 +69,9 @@ def _git_snapshot() -> dict[str, object] | None:
         "branch": branch,
         "commit": commit,
         "dirty": dirty,
-        "changed_files": len([line for line in status_lines.splitlines() if line.strip()]),
+        "changed_files": len(
+            [line for line in status_lines.splitlines() if line.strip()]
+        ),
     }
 
 
@@ -115,15 +118,9 @@ def _format_text(payload: dict[str, object]) -> str:
     lines: list[str] = ["Devex Snapshot"]
     lines.append(f"Timestamp (UTC): {payload['timestamp_utc']}")
     platform_data = payload["platform"]
-    lines.append(
-        "Platform: {system} {release} ({machine})".format(
-            **platform_data
-        )
-    )
+    lines.append("Platform: {system} {release} ({machine})".format(**platform_data))
     python_data = payload["python"]
-    lines.append(
-        "Python: {version} ({implementation})".format(**python_data)
-    )
+    lines.append("Python: {version} ({implementation})".format(**python_data))
     tools = payload["tools"]
     lines.append(f"uv: {tools.get('uv') or 'missing'}")
     lines.append(f"git: {tools.get('git') or 'missing'}")

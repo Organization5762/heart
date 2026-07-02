@@ -137,7 +137,9 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         radius = self._ball_radius(rect)
         swing_angles = self._swing_angles(elapsed_s)
 
-        pygame.draw.line(screen, FRAME_HIGHLIGHT_COLOR, frame.topleft, frame.topright, 2)
+        pygame.draw.line(
+            screen, FRAME_HIGHLIGHT_COLOR, frame.topleft, frame.topright, 2
+        )
         pygame.draw.line(screen, FRAME_COLOR, frame.bottomleft, frame.topleft, 1)
         pygame.draw.line(screen, FRAME_COLOR, frame.bottomright, frame.topright, 1)
 
@@ -290,7 +292,10 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
         active: bool,
         core_color: tuple[int, int, int] = BALL_CORE_COLOR,
     ) -> None:
-        shadow_center = (center[0] + max(1, radius // 3), center[1] + max(1, radius // 3))
+        shadow_center = (
+            center[0] + max(1, radius // 3),
+            center[1] + max(1, radius // 3),
+        )
         pygame.draw.circle(screen, BALL_SHADOW_COLOR, shadow_center, radius)
         pygame.draw.circle(screen, core_color, center, radius)
         edge_color = BALL_EDGE_COLOR if active else FRAME_HIGHLIGHT_COLOR

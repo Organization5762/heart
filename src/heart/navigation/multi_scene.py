@@ -125,7 +125,8 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         if peripheral_manager is None:
             return
         events = peripheral_manager.input_io.gamepad.sample(
-            include_tapped_buttons=False
+            include_tapped_buttons=False,
+            source="navigation.multi_scene",
         )
         if not events:
             self._dpad_armed = True

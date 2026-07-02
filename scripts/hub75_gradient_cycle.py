@@ -93,7 +93,9 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_HARDWARE_MAPPING,
         choices=HARDWARE_MAPPING_CHOICES,
     )
-    parser.add_argument("--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE)
+    parser.add_argument(
+        "--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE
+    )
     parser.add_argument("--hold-seconds", type=float, default=DEFAULT_HOLD_SECONDS)
     parser.add_argument("--frame-seconds", type=float, default=DEFAULT_FRAME_SECONDS)
     parser.add_argument("--blue-bias", type=int, default=DEFAULT_BLUE_BIAS)

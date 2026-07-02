@@ -8,11 +8,11 @@ from collections.abc import Iterator, Mapping
 from typing import Any
 
 from manyfold import StreamNode
+from manyfold.architecture import NewValues
 
 from heart.peripheral.core import Input, PeripheralInfo, PeripheralTag
 from heart.peripheral.core.input.color import ColorSnapshot
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.core.subscriptions import NoopSubscription
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (FLOWTOY_PATTERN_EVENT, RadioPeripheral,
@@ -48,7 +48,9 @@ class FlowToyPeripheral(RadioPeripheral):
 
     def __init__(self, *, driver: SerialRadioDriver) -> None:
         super().__init__(driver=driver)
-        self._packet_stream: EventStream[FlowToyPacket] = EventStream()
+        self._packet_stream = NewValues[FlowToyPacket](
+            name="heart.peripheral.flowtoy.packet"
+        )
 
     @classmethod
     def detect(cls) -> Iterator["FlowToyPeripheral"]:
@@ -56,7 +58,7 @@ class FlowToyPeripheral(RadioPeripheral):
             yield cls(driver=driver)
 
     def _event_stream(self) -> StreamNode[FlowToyPacket]:
-        return self._packet_stream.observable()
+        return self._packet_stream
 
     def peripheral_info(self) -> PeripheralInfo:
         decoded = self._decoded_payload(self.latest_packet)

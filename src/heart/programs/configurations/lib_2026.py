@@ -51,7 +51,9 @@ def pattern_numpy(t: float, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     return val
 
 
-def centered_text_title(text: str, override_font_size: int = TITLE_FONT_SIZE) -> TextRendering:
+def centered_text_title(
+    text: str, override_font_size: int = TITLE_FONT_SIZE
+) -> TextRendering:
     return centered_text(
         text=text,
         font_size=override_font_size,
@@ -98,11 +100,7 @@ def friend_beacon_text(
 
 
 def friend_beacon_person_text(name: str) -> TextRendering:
-    color = (
-        JUICEBOX_FRIEND_BEACON_COLOR
-        if name == "juicebox"
-        else FRIEND_BEACON_COLOR
-    )
+    color = JUICEBOX_FRIEND_BEACON_COLOR if name == "juicebox" else FRIEND_BEACON_COLOR
     return friend_beacon_text(text=f"Where's\n{name}", color=color)
 
 
@@ -118,33 +116,35 @@ def configure(loop: GameLoop) -> None:
             [
                 *[
                     friend_beacon_person_text(name)
-                    for name in sorted([
-                        "anil",
-                        "august",
-                        "brian",
-                        "cal",
-                        "clem",
-                        "deena",
-                        "elena",
-                        "eric",
-                        "faye",
-                        "giang",
-                        "goose babe",
-                        "jordan",
-                        "lampe",
-                        "lilli",
-                        "macy",
-                        "maddie",
-                        "popov",
-                        "pranay",
-                        "seb",
-                        "spriha",
-                        "rachel",
-                        "logan",
-                        "sri",
-                        "will",
-                        "juicebox"
-                    ])
+                    for name in sorted(
+                        [
+                            "anil",
+                            "august",
+                            "brian",
+                            "cal",
+                            "clem",
+                            "deena",
+                            "elena",
+                            "eric",
+                            "faye",
+                            "giang",
+                            "goose babe",
+                            "jordan",
+                            "lampe",
+                            "lilli",
+                            "macy",
+                            "maddie",
+                            "popov",
+                            "pranay",
+                            "seb",
+                            "spriha",
+                            "rachel",
+                            "logan",
+                            "sri",
+                            "will",
+                            "juicebox",
+                        ]
+                    )
                 ],
                 friend_beacon_text(text="Lost my\nfriends\nagain"),
             ]
@@ -170,13 +170,17 @@ def configure(loop: GameLoop) -> None:
     mandelbulb_mode = loop.add_mode(centered_text_title("bulb"))
     mandelbulb_mode.add_renderer(MandelbulbScene())
 
-    sphere_mode = loop.add_mode(centered_text_title("void\nsphere", override_font_size=14))
+    sphere_mode = loop.add_mode(
+        centered_text_title("void\nsphere", override_font_size=14)
+    )
     sphere_mode.add_renderer(FractalScene)
 
     palette_tunnel_mode = loop.add_mode(centered_text_title("gem"))
     palette_tunnel_mode.add_renderer(PaletteTunnelScene())
 
-    audio_storm_mode = loop.add_mode(centered_text_title("spectrum", override_font_size=10))
+    audio_storm_mode = loop.add_mode(
+        centered_text_title("spectrum", override_font_size=10)
+    )
     audio_storm_mode.add_renderer(AudioStormScene())
 
     bouncing_ball_mode = loop.add_mode(centered_text_title("bounce"))

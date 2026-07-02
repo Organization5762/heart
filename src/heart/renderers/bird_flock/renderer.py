@@ -123,7 +123,8 @@ class BirdFlockRenderer(StatefulBaseRenderer[BirdFlockState]):
         if self._peripheral_manager is None:
             return ()
         return self._peripheral_manager.input_io.gamepad.sample(
-            include_tapped_buttons=False
+            include_tapped_buttons=False,
+            source="renderer.bird_flock",
         )
 
     def _apply_count_control(
@@ -318,7 +319,9 @@ class BirdFlockRenderer(StatefulBaseRenderer[BirdFlockState]):
         body_color = _mix_color(SEAGULL_WHITE, bird_color, 0.1)
         highlight = _mix_color(body_color, (255, 255, 255), 0.45)
         pygame.draw.polygon(screen, BIRD_SHADOW, shadow_points)
-        _draw_wing(screen, root=left_root, tip=left_tip, outer=left_outer, color=wing_color)
+        _draw_wing(
+            screen, root=left_root, tip=left_tip, outer=left_outer, color=wing_color
+        )
         _draw_wing(
             screen,
             root=right_root,
@@ -380,9 +383,13 @@ def _controlled_hue(
     if not gamepad.connected:
         return hue_degrees
     hue_delta = (
-        _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT))
-        - _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_LEFT))
-    ) * HUE_DEGREES_PER_SECOND * dt
+        (
+            _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_RIGHT))
+            - _trigger_pressure(gamepad.axis_value(GamepadAxis.TRIGGER_LEFT))
+        )
+        * HUE_DEGREES_PER_SECOND
+        * dt
+    )
     return (hue_degrees + hue_delta) % 360.0
 
 

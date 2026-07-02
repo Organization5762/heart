@@ -19,7 +19,9 @@ def _sha256sum(path: Path) -> str:
     return digest.hexdigest()
 
 
-def download_file(url: str, checksum: str, *, destination_dir: Path | None = None) -> Path:
+def download_file(
+    url: str, checksum: str, *, destination_dir: Path | None = None
+) -> Path:
     try:
         target_dir = destination_dir or Path("/tmp")
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -40,9 +42,7 @@ def download_file(url: str, checksum: str, *, destination_dir: Path | None = Non
             if is_pi():
                 subprocess.run(["wget", url, "-O", str(destination)], check=True)
             else:
-                subprocess.run(
-                    ["curl", "-fL", url, "-o", str(destination)], check=True
-                )
+                subprocess.run(["curl", "-fL", url, "-o", str(destination)], check=True)
             logger.info("Finished download: %s", destination)
 
         downloaded_checksum = _sha256sum(destination)

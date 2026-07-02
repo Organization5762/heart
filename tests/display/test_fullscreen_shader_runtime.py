@@ -40,7 +40,9 @@ def _install_compile_stubs(monkeypatch) -> dict[str, list[Any]]:
         "bind_texture": [],
         "draw": [],
     }
-    monkeypatch.setattr(fullscreen_module, "glCreateShader", lambda shader_type: shader_type)
+    monkeypatch.setattr(
+        fullscreen_module, "glCreateShader", lambda shader_type: shader_type
+    )
     monkeypatch.setattr(fullscreen_module, "glShaderSource", lambda *_args: None)
     monkeypatch.setattr(fullscreen_module, "glCompileShader", lambda *_args: None)
 
@@ -60,8 +62,12 @@ def _install_compile_stubs(monkeypatch) -> dict[str, list[Any]]:
     monkeypatch.setattr(fullscreen_module, "glGetProgramiv", lambda *_args: 1)
     monkeypatch.setattr(fullscreen_module, "glUseProgram", lambda *_args: None)
     monkeypatch.setattr(fullscreen_module, "glVertexAttribPointer", lambda *_args: None)
-    monkeypatch.setattr(fullscreen_module, "glEnableVertexAttribArray", lambda *_args: None)
-    monkeypatch.setattr(fullscreen_module, "glGetUniformLocation", lambda _program, name: len(name))
+    monkeypatch.setattr(
+        fullscreen_module, "glEnableVertexAttribArray", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        fullscreen_module, "glGetUniformLocation", lambda _program, name: len(name)
+    )
     monkeypatch.setattr(fullscreen_module, "glViewport", lambda *_args: None)
     monkeypatch.setattr(fullscreen_module, "glClear", lambda *_args: None)
     monkeypatch.setattr(
@@ -190,7 +196,9 @@ class TestFullscreenShaderRuntime:
 
     def test_reset_deletes_compiled_program(self, monkeypatch) -> None:
         deleted_programs: list[int] = []
-        monkeypatch.setattr(fullscreen_module, "glDeleteProgram", deleted_programs.append)
+        monkeypatch.setattr(
+            fullscreen_module, "glDeleteProgram", deleted_programs.append
+        )
         runtime = FullscreenShaderRuntime()
         runtime.program = 101
 
@@ -203,7 +211,9 @@ class TestFullscreenShaderRuntime:
     ) -> None:
         _install_compile_stubs(monkeypatch)
         deleted_programs: list[int] = []
-        monkeypatch.setattr(fullscreen_module, "glDeleteProgram", deleted_programs.append)
+        monkeypatch.setattr(
+            fullscreen_module, "glDeleteProgram", deleted_programs.append
+        )
         runtime = FullscreenShaderRuntime()
         runtime.initialize(fragment_source="void main() {}")
 

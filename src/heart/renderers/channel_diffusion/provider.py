@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -26,7 +27,6 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             .map(lambda window: window.get_size())
             .distinct_until_changed()
             .start_with(initial_size)
-
         )
         ticks = peripheral_manager.input_io.frame_tick_stream()
 
@@ -34,13 +34,12 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
             size: tuple[int, int],
         ) -> StreamNode[ChannelDiffusionState]:
             seeded_state = self.initial_state(width=size[0], height=size[1])
-            return (
-                ticks.scan(lambda state, _: self.next_state(state), seed=seeded_state)
-                .start_with(seeded_state)
-
+            return PubSubObservable.merge(ticks).state(
+                seeded_state,
+                lambda state, _: self.next_state(state),
             )
 
-        return window_sizes.map(build_stream).switch_latest()
+        return PubSubObservable.merge(window_sizes.map(build_stream)).switch_latest()
 
     def next_state(self, state: ChannelDiffusionState) -> ChannelDiffusionState:
         grid = state.grid.astype(np.int32)

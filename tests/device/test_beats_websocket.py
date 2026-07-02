@@ -431,6 +431,7 @@ class TestWebSocketReplayCache:
 
     def test_send_enqueues_live_frames_when_broadcast_loop_is_running(self) -> None:
         """Verify connected clients receive live frames without waiting for reconnect replay."""
+
         class _Loop:
             def __init__(self) -> None:
                 self.calls = []

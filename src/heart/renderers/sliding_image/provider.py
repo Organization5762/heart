@@ -4,7 +4,8 @@ from dataclasses import replace
 from typing import cast
 
 import pygame
-from manyfold import ConstantNode, MergeNode, StreamNode
+from manyfold import ConstantNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -38,10 +39,9 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size()[0])
             .distinct_until_changed()
-
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = MergeNode.merge(
+        window_stream = PubSubObservable.merge(
             ConstantNode(initial_state.width).observable(), window_stream
         )
         return (
@@ -53,7 +53,6 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-
         )
 
 
@@ -87,10 +86,9 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
             .map(lambda window: cast(pygame.Surface, window))
             .map(lambda window: window.get_size()[0])
             .distinct_until_changed()
-
         )
         initial_state = self._initial_state_snapshot()
-        window_stream = MergeNode.merge(
+        window_stream = PubSubObservable.merge(
             ConstantNode(initial_state.width).observable(), window_stream
         )
         return (
@@ -102,5 +100,4 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
                 seed=initial_state,
             )
             .start_with(initial_state)
-
         )

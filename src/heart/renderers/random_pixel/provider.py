@@ -5,12 +5,12 @@ from dataclasses import replace
 from typing import Any
 
 import numpy as np
-from manyfold import BehaviorSubject, MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import CallbackPlacement, PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.streams import StreamPriority, observe_on_background
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
@@ -32,7 +32,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         self._height = height
         self._num_pixels = num_pixels
         self._peripheral_manager = peripheral_manager
-        self._color = BehaviorSubject(initial_color)
+        self._color = Value[Color | None](initial_color, has_initial=True)
         self._rng = rng
         self._numpy_rng = randomness.numpy_rng()
         self._update_interval_ms = update_interval_ms
@@ -41,26 +41,24 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[RandomPixelState]:
-        initial_color = self._color.value or Color.random()
+        initial_color = self._color.latest or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()
         )
         color_updates = self._color.map(lambda color: ("color", color))
-        tick_updates = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-            .map(lambda frame_tick: ("tick", frame_tick))
-
+        tick_updates = self._peripheral_manager.input_io.frame_tick_stream().map(
+            lambda frame_tick: ("tick", frame_tick)
         )
-        events = observe_on_background(
-            MergeNode.merge(color_updates, tick_updates),
-            priority=StreamPriority.LOW,
+        events = PubSubObservable.merge(color_updates, tick_updates).deliver_on(
+            CallbackPlacement.spawned_thread("heart-random-pixel-state")
         )
-        return events.scan(self._advance_state, seed=initial_state).start_with(
-            initial_state
+        return PubSubObservable.merge(events).state(
+            initial_state,
+            self._advance_state,
         )
 
     def set_color(self, color: Color | None) -> None:
-        self._color.on_next(color)
+        self._color.set(color)
 
     def _advance_state(
         self, state: RandomPixelState, event: tuple[str, Color | Any]
@@ -74,7 +72,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         if self._elapsed_ms < self._update_interval_ms:
             return state
         self._elapsed_ms %= self._update_interval_ms
-        next_color = self._color.value or Color.random()
+        next_color = self._color.latest or Color.random()
         return RandomPixelState(color=next_color, pixels=self._random_pixels())
 
     def _random_pixels(self) -> np.ndarray:

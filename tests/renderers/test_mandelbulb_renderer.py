@@ -59,7 +59,7 @@ class _SnapshotController:
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> object:
+    def sample(self, **_kwargs) -> object:
         if isinstance(self.snapshot, GamepadSnapshot):
             if not self.snapshot.connected:
                 return ()
@@ -724,6 +724,8 @@ class TestMandelbulbScene:
         assert scene.target_power == BASE_POWER
         assert scene.color_mode == DEFAULT_COLOR_MODE
         assert scene.phase_speed == BASE_PHASE_SPEED
-        assert scene.morph_target_power == (
-            (BASE_POWER + MORPH_POWER_DELTA - MIN_POWER) % (MAX_POWER - MIN_POWER)
-        ) + MIN_POWER
+        assert (
+            scene.morph_target_power
+            == ((BASE_POWER + MORPH_POWER_DELTA - MIN_POWER) % (MAX_POWER - MIN_POWER))
+            + MIN_POWER
+        )

@@ -49,7 +49,7 @@ class _SnapshotController:
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> object:
+    def sample(self, **_kwargs) -> object:
         if isinstance(self.snapshot, GamepadSnapshot):
             if not self.snapshot.connected:
                 return ()
@@ -189,7 +189,9 @@ class TestPaletteTunnelScene:
         )
         assert render_call["uniforms"]["iViewportOrigin"] == (0, 0)
 
-    def test_gamepad_stick_sample_moves_virtual_cursor_without_stream_emit(self) -> None:
+    def test_gamepad_stick_sample_moves_virtual_cursor_without_stream_emit(
+        self,
+    ) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -216,7 +218,9 @@ class TestPaletteTunnelScene:
         assert scene.cursor[0] > initial_cursor[0]
         assert scene.cursor[1] == initial_cursor[1]
 
-    def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
+    def test_cube_orientation_renders_square_tile_across_window(
+        self, monkeypatch
+    ) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -305,7 +309,9 @@ class TestPaletteTunnelScene:
 
         assert scene.tiled_mode is True
         assert scene.render_size == (80, 80)
-        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [(80, 80)]
+        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [
+            (80, 80)
+        ]
         assert shader_runtime.draw_calls[0]["viewport_origin"] == (0, 0)
         assert shader_runtime.draw_calls[0]["uniforms"]["iViewportOrigin"] == (0, 0)
         assert scene.display_texture == 7
@@ -319,7 +325,9 @@ class TestPaletteTunnelScene:
 
         assert PaletteTunnelScene._render_size((128, 64), orientation) == (64, 32)
 
-    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(self) -> None:
+    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(
+        self,
+    ) -> None:
         orientation = Rectangle.with_layout(columns=4, rows=1)
 
         assert PaletteTunnelScene._render_size((320, 80), orientation) == (80, 80)

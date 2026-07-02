@@ -35,21 +35,44 @@ BEST_KNOWN_VARIANT = "best-known"
 PREPARE_SCRIPT = REPO_ROOT / "scripts" / "prepare_piomatter_parity_checkout.py"
 RGB_CYCLE_SCRIPT = REPO_ROOT / "scripts" / "piomatter_rgb_cycle.py"
 ROW_REPEAT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_repeat_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_repeat_engine.h"
 )
 ROW_COMPACT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_compact_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_compact_engine.h"
 )
 ROW_WINDOW_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_window_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_window_engine.h"
 )
 RP1_PIO_PARAM_ROOT = DEFAULT_RP1_PIO_PARAM_ROOT
 
 
 def row_repeat_pio_source_path() -> Path:
     candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_repeat_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_repeat_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rgb_matrix_driver"
+        / "pio"
+        / "piomatter_row_repeat_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rust"
+        / "pio"
+        / "piomatter_row_repeat_engine_parity.pio",
     )
     for candidate in candidates:
         if candidate.exists():
@@ -59,8 +82,16 @@ def row_repeat_pio_source_path() -> Path:
 
 def row_compact_pio_source_path() -> Path:
     candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_compact_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_compact_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rgb_matrix_driver"
+        / "pio"
+        / "piomatter_row_compact_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rust"
+        / "pio"
+        / "piomatter_row_compact_engine_parity.pio",
     )
     for candidate in candidates:
         if candidate.exists():
@@ -70,8 +101,16 @@ def row_compact_pio_source_path() -> Path:
 
 def row_window_pio_source_path() -> Path:
     candidates = (
-        REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_window_engine_parity.pio",
-        REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_window_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rgb_matrix_driver"
+        / "pio"
+        / "piomatter_row_window_engine_parity.pio",
+        REPO_ROOT
+        / "rust"
+        / "heart_rust"
+        / "pio"
+        / "piomatter_row_window_engine_parity.pio",
     )
     for candidate in candidates:
         if candidate.exists():
@@ -90,7 +129,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=DEFAULT_HEIGHT)
     parser.add_argument("--n-addr-lines", type=int, default=DEFAULT_N_ADDR_LINES)
     parser.add_argument("--n-planes", type=int, default=DEFAULT_N_PLANES)
-    parser.add_argument("--n-temporal-planes", type=int, default=DEFAULT_N_TEMPORAL_PLANES)
+    parser.add_argument(
+        "--n-temporal-planes", type=int, default=DEFAULT_N_TEMPORAL_PLANES
+    )
     parser.add_argument("--pinout", type=str, default=DEFAULT_PINOUT)
     parser.add_argument("--pattern", type=str, default=DEFAULT_PATTERN)
     parser.add_argument(
@@ -134,7 +175,9 @@ def main() -> int:
         render_override = ROW_COMPACT_RENDER_OVERRIDE
     else:
         if args.pattern not in {"rgb-cycle", "center-box"}:
-            raise ValueError("row-window only supports rgb-cycle and center-box patterns")
+            raise ValueError(
+                "row-window only supports rgb-cycle and center-box patterns"
+            )
         pio_source = row_window_pio_source_path()
         render_override = ROW_WINDOW_RENDER_OVERRIDE
 
@@ -159,7 +202,14 @@ def main() -> int:
             ]
         )
     if not args.skip_install:
-        install_command = [sys.executable, "-m", "pip", "install", "--user", "--force-reinstall"]
+        install_command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--user",
+            "--force-reinstall",
+        ]
         if args.break_system_packages:
             install_command.append("--break-system-packages")
         clean_checkout_build_artifacts(args.checkout)
@@ -225,14 +275,18 @@ def parse_rp1_pio_param_overrides(raw_values: list[str]) -> dict[str, str]:
 def read_rp1_pio_parameter(name: str) -> str:
     parameter_path = RP1_PIO_PARAM_ROOT / name
     if not parameter_path.exists():
-        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+        raise FileNotFoundError(
+            f"RP1 PIO parameter {name!r} does not exist at {parameter_path}"
+        )
     return parameter_path.read_text(encoding="utf-8").strip()
 
 
 def write_rp1_pio_parameter(name: str, value: str) -> None:
     parameter_path = RP1_PIO_PARAM_ROOT / name
     if not parameter_path.exists():
-        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+        raise FileNotFoundError(
+            f"RP1 PIO parameter {name!r} does not exist at {parameter_path}"
+        )
     LOGGER.info("Setting RP1 PIO parameter %s=%s", name, value)
     subprocess.run(
         ["sudo", "/usr/bin/tee", str(parameter_path)],

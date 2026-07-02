@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from manyfold import StreamNode
+from manyfold.architecture import NewValues
 
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.core.subscriptions import CompositeSubscription
 
 
@@ -37,7 +37,7 @@ class NavigationProfile:
     def __init__(
         self,
         intents: StreamNode[NavigationIntent],
-        injected_intents: EventStream[NavigationIntent],
+        injected_intents: NewValues[NavigationIntent],
     ) -> None:
         self._intents = intents
         self._injected_intents = injected_intents
@@ -69,29 +69,21 @@ class NavigationProfile:
 
     @cached_property
     def browse(self) -> StreamNode[BrowseIntent]:
-        return (
-            self.intents.filter(lambda intent: isinstance(intent, BrowseIntent))
-            .map(lambda intent: intent)
-
+        return self.intents.filter(lambda intent: isinstance(intent, BrowseIntent)).map(
+            lambda intent: intent
         )
 
     @cached_property
     def activate(self) -> StreamNode[ActivateIntent]:
-        return (
-            self.intents.filter(lambda intent: isinstance(intent, ActivateIntent))
-            .map(lambda intent: intent)
-
-        )
+        return self.intents.filter(
+            lambda intent: isinstance(intent, ActivateIntent)
+        ).map(lambda intent: intent)
 
     @cached_property
     def alternate_activate(self) -> StreamNode[AlternateActivateIntent]:
-        return (
-            self.intents.filter(
-                lambda intent: isinstance(intent, AlternateActivateIntent)
-            )
-            .map(lambda intent: intent)
-
-        )
+        return self.intents.filter(
+            lambda intent: isinstance(intent, AlternateActivateIntent)
+        ).map(lambda intent: intent)
 
     @cached_property
     def browse_delta(self) -> StreamNode[int]:

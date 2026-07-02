@@ -23,13 +23,13 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[TixylandState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = TixylandState()
 
         def advance_state(state: TixylandState, frame_tick: object) -> TixylandState:
-            for event in self._peripheral_manager.input_io.gamepad.sample():
+            for event in self._peripheral_manager.input_io.gamepad.sample(
+                source="renderer.tixyland",
+            ):
                 state = _apply_gamepad_controls(state, event.snapshot)
             delta_seconds = max(frame_tick.delta_ms, 0.0) / 1000
             return replace(
@@ -37,11 +37,8 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
                 time_seconds=state.time_seconds + delta_seconds * state.speed_scale,
             )
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
 

@@ -44,11 +44,17 @@ class TestControllerPairingRenderer:
         device = ControllerPairingDeviceState(target=target, connected=True)
 
         assert _bluetooth_status_label(device) == "BT LINK"
-        assert _input_status_label(
-            0,
-            GamepadSnapshot(connected=False, identifier=None),
-        ) == "APP NO 1"
-        assert _input_status_label(
-            0,
-            GamepadSnapshot(connected=True, identifier="8BitDo Lite 2"),
-        ) == "APP SLOT 1"
+        assert (
+            _input_status_label(
+                0,
+                GamepadSnapshot(connected=False, identifier=None),
+            )
+            == "APP NO 1"
+        )
+        assert (
+            _input_status_label(
+                0,
+                GamepadSnapshot(connected=True, identifier="8BitDo Lite 2"),
+            )
+            == "APP SLOT 1"
+        )

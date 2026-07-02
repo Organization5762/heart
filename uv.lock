@@ -708,7 +708,7 @@ requires-dist = [
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
     { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", directory = "rust/heart_rgb_matrix_driver" },
     { name = "lagom" },
-    { name = "manyfold", specifier = ">=0.1.40" },
+    { name = "manyfold", specifier = ">=0.1.41" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
@@ -1057,17 +1057,14 @@ wheels = [
 
 [[package]]
 name = "manyfold"
-version = "0.1.40"
+version = "0.1.41"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "reactivex" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/1a/0c0da31f900ba06e651edb1b0e1255accba39b1947bc35547f38d4729f24/manyfold-0.1.40.tar.gz", hash = "sha256:fe91e6946a814d07161235059d283455d1a34fe31a1f93d37cf17ec3fd17b3d2", size = 2666101, upload-time = "2026-06-30T23:26:29.395Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/b5/c477aaf00ffd111d492ccb1f0ec566159542361c8675c7fd166310068191/manyfold-0.1.41.tar.gz", hash = "sha256:ee9ddf61281ed7287f5c19b661ad2a94d9287ed4d50bb8a34cfacb18f7811b79", size = 2696927, upload-time = "2026-07-02T21:44:42.051Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/70/8457afa3207cb9f88ac93290a5cc961381378df45c27d6c6d0ff8f9b336b/manyfold-0.1.40-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:cc5b0fcd5d4467d42d8c1afce4642ef175b962107c56103704144d209f253441", size = 3019604, upload-time = "2026-06-30T23:26:22.024Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/08/ad0c6cfc58517c30a57c3353b480e15e2448f4128ce6958d347130dc2cf0/manyfold-0.1.40-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:b5f1bdbf366cbfde93890e6038ffab25030d390718705452500d2c2bb3557b96", size = 2880440, upload-time = "2026-06-30T23:26:23.832Z" },
-    { url = "https://files.pythonhosted.org/packages/c3/10/b8d27c40f35c49b02d4de20d0d7f34f41f98e73abb65d1b833c62d212717/manyfold-0.1.40-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a8af66f9a51451b4335633db222d914f44ff66a5f898c949af256fbc63e33993", size = 10397057, upload-time = "2026-06-30T23:26:25.496Z" },
-    { url = "https://files.pythonhosted.org/packages/09/94/e6c22b48cc217c6ae682f2748203c5089172a2a36ba51590954562719546/manyfold-0.1.40-cp310-abi3-win_amd64.whl", hash = "sha256:b61aaf95f422d8e336a77cf4484d9d99be9968aca29c7481ebfe747f470e70bc", size = 2726023, upload-time = "2026-06-30T23:26:27.954Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/af/928f519d284870be5edbf39b23ad65cfe1b9c1329d011a1d1ae0de32fe9d/manyfold-0.1.41-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:9ed48a89071bdf6f7bdef21d7fb422f5ea26547901be70879910cecbc6d6751d", size = 3069510, upload-time = "2026-07-02T21:44:32.687Z" },
+    { url = "https://files.pythonhosted.org/packages/30/43/ed37b813d78a0f98cf5dbfe45a4b7f32f012c71ae128961f0612f79526e2/manyfold-0.1.41-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:4dbf0622c1f10d751574b73119be0741905080cccf841536e24716e3c2fe9cc2", size = 2929654, upload-time = "2026-07-02T21:44:34.954Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/8c/71df67a87e447c898bf87a4dd35907bf0079dffbfd0cc55a1f887ef354b3/manyfold-0.1.41-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:211263102af535d4207f3e6d6c7daf0bde3c9d42ba4f1e8542f9d37db2e9fe63", size = 10507832, upload-time = "2026-07-02T21:44:36.965Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/e8/a983cf13f7c61ddc6083fe7340216950c8eed0dcf5c197636433bedf7a95/manyfold-0.1.41-cp310-abi3-win_amd64.whl", hash = "sha256:5c4e685244985ebb6b088c753eb1ae1ab6c0cbdf51dea2ce89362fe907c7f6a2", size = 2773404, upload-time = "2026-07-02T21:44:40.157Z" },
 ]
 
 [[package]]
@@ -2170,18 +2167,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/da/92/1446574745d74df0c92e6aa4a7b0b3130706a4142b2d1a5869f2eaa423c6/pyyaml-6.0.3-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:16249ee61e95f858e83976573de0f5b2893b3677ba71c9dd36b9cf8be9ac6d65", size = 829923, upload-time = "2025-09-25T21:32:54.537Z" },
     { url = "https://files.pythonhosted.org/packages/f0/7a/1c7270340330e575b92f397352af856a8c06f230aa3e76f86b39d01b416a/pyyaml-6.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4ad1906908f2f5ae4e5a8ddfce73c320c2a1429ec52eafd27138b7f1cbe341c9", size = 174062, upload-time = "2025-09-25T21:32:55.767Z" },
     { url = "https://files.pythonhosted.org/packages/f1/12/de94a39c2ef588c7e6455cfbe7343d3b2dc9d6b6b2f40c4c6565744c873d/pyyaml-6.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:ebc55a14a21cb14062aa4162f906cd962b28e2e9ea38f9b4391244cd8de4ae0b", size = 149341, upload-time = "2025-09-25T21:32:56.828Z" },
-]
-
-[[package]]
-name = "reactivex"
-version = "5.0.0a2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/46/c5/3a0203d286f4b3180e788382b05922a0c8266fafd16eb92a87bc87debad3/reactivex-5.0.0a2.tar.gz", hash = "sha256:161c84db09d23f284c2ac9c9a01c23869c51ce300602bd9c7c4ceb647f380807", size = 135960, upload-time = "2025-11-11T06:46:13.291Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c4/bf/5bac05bacf7b00865748a363e92a184a1bf883176acc3fdc842bdaeff661/reactivex-5.0.0a2-py3-none-any.whl", hash = "sha256:824a2d9c75e43024b8099f5fa7ecb469b837b3c98c9b53605d9bcd0d23cfa37f", size = 255617, upload-time = "2025-11-11T06:46:11.818Z" },
 ]
 
 [[package]]

@@ -98,9 +98,7 @@ class TestRgbDisplayRuntime:
 
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
-        monkeypatch.setenv(
-            "HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active"
-        )
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active")
         native_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
             WiringProfile=SimpleNamespace(

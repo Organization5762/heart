@@ -388,8 +388,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         self._peripheral_manager = peripheral_manager
         return ControllerPairingState(
             devices=tuple(
-                ControllerPairingDeviceState(target=target)
-                for target in self._targets
+                ControllerPairingDeviceState(target=target) for target in self._targets
             )
         )
 
@@ -462,11 +461,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         panel_height = screen.get_height()
         for index, device in enumerate(devices):
             x = index * panel_width
-            width = (
-                screen.get_width() - x
-                if index == len(devices) - 1
-                else panel_width
-            )
+            width = screen.get_width() - x if index == len(devices) - 1 else panel_width
             rect = pygame.Rect(x, 0, width, panel_height)
             base_color = CONTROLLER_PANEL_COLORS.get(
                 device.target.color,
@@ -523,7 +518,9 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         line_height = 7
         y = rect.top
         for line_index, line in enumerate(lines):
-            color = INPUT_ACTIVE_COLOR if line_index == len(lines) - 1 else INPUT_LINE_COLOR
+            color = (
+                INPUT_ACTIVE_COLOR if line_index == len(lines) - 1 else INPUT_LINE_COLOR
+            )
             self._draw_clipped_text(
                 screen,
                 self._small_font,
@@ -540,6 +537,7 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         events = manager.input_io.gamepad.sample(
             joystick_id=slot,
             include_tapped_buttons=False,
+            source="renderer.controller_pairing",
         )
         if not events:
             return GamepadSnapshot(connected=False, identifier=None)
@@ -586,7 +584,9 @@ def _bluetooth_status_label(device: ControllerPairingDeviceState) -> str:
     return "BT WAIT"
 
 
-def _bluetooth_status_color(device: ControllerPairingDeviceState) -> tuple[int, int, int]:
+def _bluetooth_status_color(
+    device: ControllerPairingDeviceState,
+) -> tuple[int, int, int]:
     if device.connected:
         return CONNECTED_COLOR
     if device.pairing or device.seen:
@@ -637,9 +637,7 @@ def _trigger_pressure(raw_value: float) -> float:
 
 def _held_button_labels(snapshot: GamepadSnapshot) -> str:
     return " ".join(
-        label
-        for button, label in BUTTON_LABELS.items()
-        if snapshot.button_held(button)
+        label for button, label in BUTTON_LABELS.items() if snapshot.button_held(button)
     )
 
 

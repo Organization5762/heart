@@ -1,84 +1,27 @@
 from __future__ import annotations
 
-from enum import IntEnum
 from functools import cached_property
-from itertools import count
-from queue import Full, PriorityQueue
-from threading import Lock, Thread
-from typing import Any, Callable, Generic, Iterable, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, TypeVar
 
-from manyfold import (EmptyNode, Graph, Layer, MergeNode, OwnerName, Plane,
+from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane,
                       RouteRetentionPolicy, Schema, StreamFamily, StreamName,
                       StreamNode, TypedEnvelope, TypedRoute, Variant, route)
+from manyfold.architecture import PubSubObservable
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 CallbackSubscription,
-                                                 CompositeSubscription)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 RUNTIME_OWNER = OwnerName("heart.runtime")
 RUNTIME_FAMILY = StreamFamily("runtime")
 T = TypeVar("T")
-_BACKGROUND_SEQUENCE = count()
-DEFAULT_BACKGROUND_QUEUE_LIMIT = 2048
-_BACKGROUND_QUEUE: PriorityQueue[tuple[int, int, Callable[[], None]]] = PriorityQueue(
-    maxsize=DEFAULT_BACKGROUND_QUEUE_LIMIT
-)
-_BACKGROUND_WORKERS_STARTED = False
-_BACKGROUND_WORKERS_LOCK = Lock()
-_BACKGROUND_WORKER_COUNT = 1
 LATEST_ONLY_RETENTION = RouteRetentionPolicy(
     latest_replay_policy="latest_only",
     replay_window="latest",
     payload_retention_policy="separate_store",
     history_limit=1,
 )
-
-
-class StreamPriority(IntEnum):
-    HIGH = 0
-    NORMAL = 10
-    LOW = 20
-
-
-def _ensure_background_workers() -> None:
-    global _BACKGROUND_WORKERS_STARTED
-    with _BACKGROUND_WORKERS_LOCK:
-        if _BACKGROUND_WORKERS_STARTED:
-            return
-        _BACKGROUND_WORKERS_STARTED = True
-        for index in range(_BACKGROUND_WORKER_COUNT):
-            thread = Thread(
-                target=_run_background_worker,
-                name=f"heart-stream-background-{index}",
-                daemon=True,
-            )
-            thread.start()
-
-
-def _run_background_worker() -> None:
-    while True:
-        _priority, _sequence, callback = _BACKGROUND_QUEUE.get()
-        try:
-            callback()
-        finally:
-            _BACKGROUND_QUEUE.task_done()
-
-
-def _schedule_background(
-    callback: Callable[[], None],
-    *,
-    priority: StreamPriority,
-) -> bool:
-    _ensure_background_workers()
-    try:
-        _BACKGROUND_QUEUE.put_nowait((int(priority), next(_BACKGROUND_SEQUENCE), callback))
-    except Full:
-        return False
-    return True
 
 
 def unwrap_stream_value(value: Any) -> Any:
@@ -89,495 +32,8 @@ def _unwrap_stream_value(value: Any) -> Any:
     return unwrap_stream_value(value)
 
 
-def _subscribe_source(source: Any, observer: Any) -> Any:
-    def emit(value: Any) -> None:
-        observer.on_next(_unwrap_stream_value(value))
-
-    return source.subscribe(emit, observer.on_error, observer.on_completed)
-
-
-def _stream_from_source(source: Any) -> "_DerivedStream":
-    return _DerivedStream(lambda observer: _subscribe_source(source, observer))
-
-
-def _materialize_stream(source: Any) -> StreamNode[Any]:
-    return cast(StreamNode[Any], _MaterializedStream(source))
-
-
-def observe_on_background(
-    source: Any,
-    *,
-    priority: StreamPriority = StreamPriority.NORMAL,
-) -> StreamNode[Any]:
-    """Deliver stream notifications from a priority-aware background worker."""
-
-    def subscribe(observer: Any) -> Any:
-        disposed = False
-        lock = Lock()
-
-        def if_live(callback: Callable[[], None]) -> None:
-            with lock:
-                if disposed:
-                    return
-            callback()
-
-        def schedule_next(value: Any) -> None:
-            scheduled = _schedule_background(
-                lambda: if_live(lambda: observer.on_next(value)),
-                priority=priority,
-            )
-            if not scheduled:
-                observer.on_error(OverflowError("background stream queue is full"))
-
-        def schedule_error(error: Exception) -> None:
-            scheduled = _schedule_background(
-                lambda: if_live(lambda: observer.on_error(error)),
-                priority=priority,
-            )
-            if not scheduled:
-                observer.on_error(OverflowError("background stream queue is full"))
-
-        def schedule_completed() -> None:
-            scheduled = _schedule_background(
-                lambda: if_live(observer.on_completed),
-                priority=priority,
-            )
-            if not scheduled:
-                observer.on_error(OverflowError("background stream queue is full"))
-
-        subscription = source.subscribe(
-            schedule_next,
-            schedule_error,
-            schedule_completed,
-        )
-
-        def dispose() -> None:
-            nonlocal disposed
-            with lock:
-                disposed = True
-            subscription.dispose()
-
-        return CallbackSubscription(dispose)
-
-    return cast(StreamNode[Any], _materialize_stream(_DerivedStream(subscribe)))
-
-
-def combine_latest(*sources: Any) -> StreamNode[tuple[Any, ...]]:
-    """Combine source streams without depending on reactivex source internals."""
-
-    def subscribe(observer: Any) -> Any:
-        source_count = len(sources)
-        values = [None] * source_count
-        has_value = [False] * source_count
-        is_done = [False] * source_count
-        lock = Lock()
-
-        def subscribe_source(index: int, source: Any) -> Any:
-            def on_next(value: Any) -> None:
-                with lock:
-                    values[index] = _unwrap_stream_value(value)
-                    has_value[index] = True
-                    if all(has_value):
-                        observer.on_next(tuple(values))
-
-            def on_completed() -> None:
-                with lock:
-                    is_done[index] = True
-                    if all(is_done):
-                        observer.on_completed()
-
-            return source.subscribe(on_next, observer.on_error, on_completed)
-
-        return CompositeSubscription(
-            subscribe_source(index, source) for index, source in enumerate(sources)
-        )
-
-    return cast(
-        StreamNode[tuple[Any, ...]], _materialize_stream(_DerivedStream(subscribe))
-    )
-
-
-class EventStream(Generic[T]):
-    """Small Heart-owned push stream for event producers."""
-
-    def __init__(self) -> None:
-        self._lock = Lock()
-        self._subscribers: dict[int, Any] = {}
-        self._subscriber_snapshot: tuple[Any, ...] = ()
-        self._next_subscription_id = 0
-
-    @property
-    def lock(self) -> Lock:
-        return self._lock
-
-    def emit(self, value: T) -> None:
-        with self._lock:
-            subscribers = self._subscriber_snapshot
-        for subscriber in subscribers:
-            subscriber(value)
-
-    def observable(self) -> StreamNode[T]:
-        return cast(StreamNode[T], self)
-
-    def subscribe(
-        self,
-        observer: Callable[[T], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[T], None] | None = None,
-    ) -> Any:
-        del on_error, on_completed, scheduler
-        callback = on_next or observer
-        if callback is None:
-
-            def callback(_value: T) -> None:
-                return None
-
-        if not callable(callback):
-            callback = callback.on_next
-        with self._lock:
-            subscription_id = self._next_subscription_id
-            self._next_subscription_id += 1
-            self._subscribers[subscription_id] = callback
-            self._subscriber_snapshot = tuple(self._subscribers.values())
-        return _EventStreamSubscription(self, subscription_id)
-
-    def pipe(self, *operators: Any) -> StreamNode[Any]:
-        stream: Any = self
-        for operator in operators:
-            stream = operator(stream)
-        return stream
-
-    def map(self, transform: Callable[[T], Any], *, name: str | None = None) -> Any:
-        del name
-        return _materialize_stream(
-            _DerivedStream(
-                lambda observer: self.subscribe(
-                    lambda value: observer.on_next(transform(value)),
-                    observer.on_error,
-                    observer.on_completed,
-                )
-            )
-        )
-
-    def filter(self, predicate: Callable[[T], bool], *, name: str | None = None) -> Any:
-        del name
-
-        def subscribe(observer: Any) -> Any:
-            def on_next(value: T) -> None:
-                if predicate(value):
-                    observer.on_next(value)
-
-            return self.subscribe(on_next, observer.on_error, observer.on_completed)
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def do_action(
-        self,
-        on_next: Callable[[T], None] | None = None,
-        *_args: Any,
-        **_kwargs: Any,
-    ) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            def emit(value: T) -> None:
-                if on_next is not None:
-                    on_next(value)
-                observer.on_next(value)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return cast(StreamNode[T], _materialize_stream(_DerivedStream(subscribe)))
-
-    def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
-        def subscribe(observer: Any) -> Any:
-            state = seed
-
-            def emit(value: T) -> None:
-                nonlocal state
-                state = accumulator(state, value)
-                observer.on_next(state)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def start_with(self, value: Any) -> Any:
-        def subscribe(observer: Any) -> Any:
-            observer.on_next(value)
-            return self.subscribe(
-                observer.on_next, observer.on_error, observer.on_completed
-            )
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def distinct_until_changed(self) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            sentinel = object()
-            previous: Any = sentinel
-
-            def emit(value: T) -> None:
-                nonlocal previous
-                if previous is sentinel or value != previous:
-                    previous = value
-                    observer.on_next(value)
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return cast(StreamNode[T], _materialize_stream(_DerivedStream(subscribe)))
-
-    def pairwise(self) -> Any:
-        def subscribe(observer: Any) -> Any:
-            sentinel = object()
-            previous: Any = sentinel
-
-            def emit(value: T) -> None:
-                nonlocal previous
-                if previous is not sentinel:
-                    observer.on_next((previous, value))
-                previous = value
-
-            return self.subscribe(emit, observer.on_error, observer.on_completed)
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def take(self, count: int) -> StreamNode[T]:
-        def subscribe(observer: Any) -> Any:
-            seen = 0
-            subscription: Any | None = None
-
-            def emit(value: T) -> None:
-                nonlocal seen
-                if seen >= count:
-                    return
-                seen += 1
-                observer.on_next(value)
-                if seen >= count and subscription is not None:
-                    subscription.dispose()
-
-            subscription = self.subscribe(
-                emit, observer.on_error, observer.on_completed
-            )
-            return subscription
-
-        return cast(StreamNode[T], _materialize_stream(_DerivedStream(subscribe)))
-
-    def with_latest_from(self, *sources: Any) -> Any:
-        def subscribe(observer: Any) -> Any:
-            latest: list[Any] = [None] * len(sources)
-            ready = [False] * len(sources)
-            subscriptions = [
-                source.subscribe(
-                    lambda value, index=index: _record_latest(
-                        latest, ready, index, value
-                    ),
-                    observer.on_error,
-                    observer.on_completed,
-                )
-                for index, source in enumerate(sources)
-            ]
-
-            def emit(value: T) -> None:
-                if all(ready):
-                    observer.on_next((value, *latest))
-
-            subscriptions.append(
-                self.subscribe(emit, observer.on_error, observer.on_completed)
-            )
-            return _CompositeSubscription(subscriptions)
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def flat_map(self, project: Callable[[T], Any]) -> Any:
-        def subscribe(observer: Any) -> Any:
-            subscriptions: list[Any] = []
-
-            def emit(value: T) -> None:
-                inner = project(value)
-                subscriptions.append(
-                    inner.subscribe(
-                        observer.on_next, observer.on_error, observer.on_completed
-                    )
-                )
-
-            subscriptions.append(
-                self.subscribe(emit, observer.on_error, observer.on_completed)
-            )
-            return _CompositeSubscription(subscriptions)
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def switch_latest(self) -> Any:
-        def subscribe(observer: Any) -> Any:
-            active_subscription: Any | None = None
-
-            def emit(inner: Any) -> None:
-                nonlocal active_subscription
-                if active_subscription is not None:
-                    active_subscription.dispose()
-                active_subscription = inner.subscribe(
-                    observer.on_next, observer.on_error, observer.on_completed
-                )
-
-            outer_subscription = self.subscribe(
-                emit, observer.on_error, observer.on_completed
-            )
-            return _SwitchLatestSubscription(
-                lambda: active_subscription, outer_subscription
-            )
-
-        return _materialize_stream(_DerivedStream(subscribe))
-
-    def callback(
-        self, receive: Callable[[T], None], *, name: str | None = None
-    ) -> _CallbackConnection:
-        del name
-        return _CallbackConnection(self.subscribe(receive))
-
-    def _unsubscribe(self, subscription_id: int) -> None:
-        with self._lock:
-            if subscription_id not in self._subscribers:
-                return
-            self._subscribers.pop(subscription_id)
-            self._subscriber_snapshot = tuple(self._subscribers.values())
-
-
-class _EventStreamSubscription:
-    def __init__(self, stream: EventStream[Any], subscription_id: int) -> None:
-        self._stream = stream
-        self._subscription_id = subscription_id
-        self._disposed = False
-
-    def dispose(self) -> None:
-        if self._disposed:
-            return
-        self._disposed = True
-        self._stream._unsubscribe(self._subscription_id)
-
-
-class _Observer:
-    def __init__(
-        self,
-        on_next: Callable[[Any], None],
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-    ) -> None:
-        self.on_next = on_next
-        self.on_error = on_error or (lambda _error: None)
-        self.on_completed = on_completed or (lambda: None)
-
-
-class _CompositeSubscription:
-    def __init__(self, subscriptions: Iterable[Any]) -> None:
-        self._subscriptions = tuple(subscriptions)
-
-    def dispose(self) -> None:
-        for subscription in self._subscriptions:
-            subscription.dispose()
-
-
-class _SwitchLatestSubscription:
-    def __init__(
-        self, active_subscription: Callable[[], Any | None], outer_subscription: Any
-    ) -> None:
-        self._active_subscription = active_subscription
-        self._outer_subscription = outer_subscription
-
-    def dispose(self) -> None:
-        self._outer_subscription.dispose()
-        active_subscription = self._active_subscription()
-        if active_subscription is not None:
-            active_subscription.dispose()
-
-
-class _CallbackConnection:
-    def __init__(self, subscription: Any) -> None:
-        self._subscription = subscription
-
-    def remove(self) -> None:
-        self._subscription.dispose()
-
-    def dispose(self) -> None:
-        self.remove()
-
-
-class _NoopSubscription:
-    def dispose(self) -> None:
-        return None
-
-
-def _record_latest(
-    latest: list[Any], ready: list[bool], index: int, value: Any
-) -> None:
-    latest[index] = value
-    ready[index] = True
-
-
-class _DerivedStream(EventStream[Any]):
-    def __init__(self, subscribe: Callable[[Any], Any]) -> None:
-        super().__init__()
-        self._subscribe = subscribe
-
-    def subscribe(
-        self,
-        observer: Callable[[Any], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[Any], None] | None = None,
-    ) -> Any:
-        del scheduler
-        callback = on_next or observer
-        if callback is None:
-
-            def callback(_value: Any) -> None:
-                return None
-
-        if callable(callback):
-            wrapped = _Observer(callback, on_error, on_completed)
-        else:
-            wrapped = callback
-        return self._subscribe(wrapped)
-
-
-class _MaterializedStream(EventStream[Any]):
-    def __init__(self, source: Any) -> None:
-        super().__init__()
-        self._source = source
-        self._source_subscription: Any | None = None
-
-    def subscribe(
-        self,
-        observer: Callable[[Any], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[Any], None] | None = None,
-    ) -> Any:
-        subscription = super().subscribe(
-            observer,
-            on_error,
-            on_completed,
-            scheduler,
-            on_next=on_next,
-        )
-        if self._source_subscription is None:
-            self._source_subscription = self._source.subscribe(
-                self.emit, on_error, on_completed
-            )
-        return subscription
-
-    def _unsubscribe(self, subscription_id: int) -> None:
-        super()._unsubscribe(subscription_id)
-        with self._lock:
-            has_subscribers = bool(self._subscribers)
-        if has_subscribers or self._source_subscription is None:
-            return
-        self._source_subscription.dispose()
-        self._source_subscription = None
+def _stream_from_source(source: Any) -> PubSubObservable:
+    return PubSubObservable.merge(source).map(_unwrap_stream_value)
 
 
 def _route_pipeline_do_action(
@@ -592,12 +48,7 @@ def _route_pipeline_do_action(
 def _route_pipeline_start_with(
     self: RoutePipeline[Any], *values: Any
 ) -> StreamNode[Any]:
-    def subscribe(observer: Any) -> Any:
-        for value in values:
-            observer.on_next(value)
-        return _subscribe_source(self, observer)
-
-    return cast(StreamNode[Any], _materialize_stream(_DerivedStream(subscribe)))
+    return _stream_from_source(self).start_with(*values)
 
 
 def _route_pipeline_scan(
@@ -730,12 +181,14 @@ class GraphRouteStream(Generic[T]):
     def switch_latest(self) -> Any:
         return _stream_from_source(self).switch_latest()
 
-    def _observable(self) -> StreamNode[T]:
-        def subscribe(observer: Any, scheduler: Any = None) -> Any:
-            del scheduler
-            return self.callback(observer.on_next, replay_latest=True)
+    def _observable(self) -> PubSubObservable:
+        def subscribe(
+            callback: Callable[[object], object],
+            replay_latest: bool,
+        ) -> Any:
+            return self.callback(callback, replay_latest=replay_latest)
 
-        return cast(StreamNode[T], CallbackObservable(subscribe))
+        return PubSubObservable(subscribe_factory=subscribe)
 
 
 class PeripheralStreams:
@@ -763,7 +216,7 @@ class PeripheralStreams:
         observables = [peripheral.observe for peripheral in main_switches]
         if not observables:
             return EmptyNode().observable()
-        merged = MergeNode.merge(*observables).map(
+        merged = PubSubObservable.merge(*observables).map(
             PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
         return merged

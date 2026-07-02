@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pygame
 from manyfold import EmptyNode, StreamNode, Timer
+from manyfold.architecture import NewValues
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
@@ -38,6 +39,7 @@ class _KeyboardTracker:
 class KeyboardController:
     def __init__(self, debug_tap: InputDebugTap) -> None:
         self._debug_tap = debug_tap
+        self._key_event_subscriptions: dict[int, object] = {}
 
     @cached_property
     def _snapshot_stream(self) -> StreamNode[KeyboardSnapshot]:
@@ -84,7 +86,9 @@ class KeyboardController:
             pygame.event.pump()
             keys = pygame.key.get_pressed()
         except pygame.error:
-            logger.debug("Keyboard polling skipped because pygame video is unavailable.")
+            logger.debug(
+                "Keyboard polling skipped because pygame video is unavailable."
+            )
             return KeyboardSnapshot(
                 pressed_keys=frozenset(), timestamp_ms=time.monotonic() * 1000.0
             )
@@ -151,15 +155,19 @@ class KeyboardController:
             .map(lambda tracker: tracker.event)
             .filter(lambda event: event is not None)
             .map(lambda event: cast(KeyboardEvent, event))
-
         )
-        return InputDebugNode(
+        events = NewValues[KeyboardEvent](
+            name=f"heart.input.keyboard.key.{pygame.key.name(key)}"
+        )
+        instrumented = InputDebugNode(
             tap=self._debug_tap,
             stage=InputDebugStage.RAW,
             stream_name=f"keyboard.key.{pygame.key.name(key)}",
             source_id=lambda event: cast(KeyboardEvent, event).key_name,
             upstream_ids=("keyboard.snapshot",),
         ).connect(base_stream)
+        self._key_event_subscriptions[key] = instrumented.subscribe(events.publish)
+        return events
 
     @cache
     def key_pressed(self, key: int) -> StreamNode[KeyPressedEvent]:
@@ -180,7 +188,6 @@ class KeyboardController:
             .map(lambda event: event.state)
             .start_with(KeyState())
             .distinct_until_changed()
-
         )
         key_name = pygame.key.name(key)
         return InputDebugNode(
@@ -207,7 +214,6 @@ class KeyboardController:
                     KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent, event
                 )
             )
-
         )
         return InputDebugNode(
             tap=self._debug_tap,

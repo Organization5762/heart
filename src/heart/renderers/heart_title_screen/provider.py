@@ -16,9 +16,7 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[HeartTitleScreenState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = HeartTitleScreenState()
 
         def advance_state(
@@ -26,11 +24,8 @@ class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
         ) -> HeartTitleScreenState:
             return self._advance_state(state=state, frame_ms=frame_tick.delta_ms)
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def _advance_state(

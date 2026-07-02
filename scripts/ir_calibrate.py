@@ -85,7 +85,9 @@ def _resolve_layout(layout: str, layout_file: Path | None) -> np.ndarray:
     raise typer.BadParameter(f"Unknown layout '{layout}'")
 
 
-def _group_by_frame(records: Iterable[CaptureRecord]) -> dict[int, dict[int, CaptureRecord]]:
+def _group_by_frame(
+    records: Iterable[CaptureRecord],
+) -> dict[int, dict[int, CaptureRecord]]:
     frames: dict[int, dict[int, CaptureRecord]] = {}
     for record in records:
         frames.setdefault(record.frame_id, {})[record.sensor_index] = record
@@ -123,9 +125,7 @@ def _compute_offsets(
         frames_used += 1
 
     collapsed = {
-        sensor: float(np.median(values))
-        for sensor, values in offsets.items()
-        if values
+        sensor: float(np.median(values)) for sensor, values in offsets.items() if values
     }
 
     rmse = float(np.sqrt(np.mean(np.square(residuals)))) if residuals else 0.0

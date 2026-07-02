@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 
 import pygame
 from manyfold import Graph, StreamNode, TypedRoute
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
-from heart.peripheral.core.streams import (GraphRouteStream, combine_latest,
-                                           runtime_route)
+from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import CompositeSubscription
 from heart.peripheral.sensor import Acceleration
 from heart.utilities.env import Configuration
@@ -32,7 +32,7 @@ DEBUG_ACCELERATION_ROUTE = runtime_route(
 
 
 @dataclass
-class AccelerometerMergeNode:
+class AccelerometerPublisher:
     source_streams: tuple[StreamNode[Acceleration | None], ...]
     output_route: TypedRoute[Acceleration | None]
     _subscription: CompositeSubscription | None = field(default=None, init=False)
@@ -68,7 +68,7 @@ class AccelerometerController:
 
     def node(self) -> GraphRouteStream[Acceleration]:
         if self._merge_subscription is None:
-            self._merge_subscription = AccelerometerMergeNode(
+            self._merge_subscription = AccelerometerPublisher(
                 source_streams=(self._source_stream,),
                 output_route=ACCELERATION_ROUTE,
             ).install(self._graph)
@@ -103,7 +103,7 @@ class AccelerometerDebugProfile:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
-        key_states = combine_latest(
+        key_states = PubSubObservable.combine_latest(
             self._keyboard_controller.key_state(pygame.K_a),
             self._keyboard_controller.key_state(pygame.K_d),
             self._keyboard_controller.key_state(pygame.K_w),
@@ -116,7 +116,6 @@ class AccelerometerDebugProfile:
             .with_latest_from(key_states)
             .map(lambda latest: self._to_acceleration(latest[0].monotonic_s, latest[1]))
             .distinct_until_changed()
-
         )
         instrumented_keyboard_stream = InputDebugNode(
             tap=self._debug_tap,
@@ -137,7 +136,7 @@ class AccelerometerDebugProfile:
 
     def node(self) -> GraphRouteStream[Acceleration | None]:
         if self._merge_subscription is None:
-            self._merge_subscription = AccelerometerMergeNode(
+            self._merge_subscription = AccelerometerPublisher(
                 source_streams=(
                     self._external_sensor_hub.observable_acceleration(),
                     self._keyboard_observable,

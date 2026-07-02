@@ -76,7 +76,7 @@ class ExternalSensorHub:
         )
 
     def observable_acceleration(self) -> StreamNode[Acceleration | None]:
-        return self._accelerometer_stream
+        return self._accelerometer_stream.start_with(self._accelerometer_stream.value)
 
     def _resolve_acceleration_locked(self) -> Acceleration | None:
         matching = {

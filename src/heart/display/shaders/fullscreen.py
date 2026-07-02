@@ -170,7 +170,9 @@ class FullscreenShaderRuntime:
             try:
                 glDeleteProgram(self.program)
             except GLError:
-                logger.debug("Skipping shader program delete; OpenGL context is unavailable")
+                logger.debug(
+                    "Skipping shader program delete; OpenGL context is unavailable"
+                )
         self.program = None
         self.uniform_locations.clear()
         self.pixel_buffer = None

@@ -4,20 +4,14 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterator
-from importlib import import_module
 
 import pytest
 from manyfold import Graph
+from manyfold.datastream_threads import reset_datastream_delivery_for_tests
 
 from heart.peripheral.core.subscriptions import NoopSubscription
 from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
-
-_manyfold_testing = import_module("manyfold._testing")
-_reset_manyfold_threading_state = getattr(
-    _manyfold_testing,
-    "reset_" + "react" + "ive_threading_state",
-)
 
 BUTTON_PRESS_EVENT = "button.press"
 BUTTON_LONG_PRESS_EVENT = "button.long_press"
@@ -26,9 +20,9 @@ SWITCH_ROTATION_EVENT = "switch.rotation"
 
 @pytest.fixture(autouse=True)
 def _reset_manyfold_runtime() -> Iterator[None]:
-    _reset_manyfold_threading_state()
+    reset_datastream_delivery_for_tests()
     yield
-    _reset_manyfold_threading_state()
+    reset_datastream_delivery_for_tests()
 
 
 class TestSwitchRunLoopIsolation:

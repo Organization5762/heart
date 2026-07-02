@@ -10,12 +10,12 @@ from typing import Any, Mapping
 from manyfold import (Graph, Layer, ManagedGraphNode, ManagedGraphNodeHandle,
                       OwnerName, Plane, Schema, StreamFamily, StreamName,
                       StreamNode, TypedRoute, Variant, route)
+from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from PIL import Image
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
 from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
@@ -84,7 +84,9 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         self._latest_frame: DisplayFrame | None = None
         self._sequence = 0
         self._stop = threading.Event()
-        self._frame_stream: EventStream[DisplayFrame] = EventStream()
+        self._frame_stream = NewValues[DisplayFrame](
+            name="heart.peripheral.led_matrix.frame"
+        )
         self._frame_publishers: list[tuple[Graph, TypedRoute[SensorEvent]]] = []
         self._log_controller = get_logging_controller()
         self._frame_count = 0
@@ -107,7 +109,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
             return self._latest_frame
 
     def _event_stream(self) -> StreamNode[DisplayFrame]:
-        return self._frame_stream.observable()
+        return self._frame_stream
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(
@@ -171,9 +173,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         """Record ``image`` as the latest frame"""
 
         if image.size != (self._width, self._height):
-            raise ValueError(
-                "Image dimensions do not match configured display size"
-            )
+            raise ValueError("Image dimensions do not match configured display size")
 
         with self._frame_lock:
             frame = DisplayFrame.from_image(

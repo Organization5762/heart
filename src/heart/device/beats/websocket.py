@@ -308,7 +308,9 @@ def decode_control_message(message: str | bytes) -> ControlMessage | None:
             command=command,
             browse_step=browse_step,
             image_base64=image_base64 if isinstance(image_base64, str) else None,
-            image_mime_type=image_mime_type if isinstance(image_mime_type, str) else None,
+            image_mime_type=image_mime_type
+            if isinstance(image_mime_type, str)
+            else None,
             clear=clear,
         )
 

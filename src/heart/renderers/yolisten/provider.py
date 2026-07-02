@@ -2,7 +2,8 @@ import random
 import time
 from dataclasses import replace
 
-from manyfold import MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
@@ -84,21 +85,18 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[YoListenState]:
         initial_state = self.initial_state()
-        switch_updates = (
-            peripheral_manager.input_io.main_switch_stream()
-            .map(
-                lambda switch_event: (
-                    lambda state: self.handle_switch_state(state, switch_event.state)
+        switch_updates = peripheral_manager.input_io.main_switch_stream().map(
+            lambda switch_event: (
+                lambda state: self.handle_switch_state(
+                    state, _switch_state(switch_event)
                 )
             )
-
         )
         window_widths = (
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_width())
             .distinct_until_changed()
             .start_with(0)
-
         )
 
         def advance(state: YoListenState, window_width: int) -> YoListenState:
@@ -121,12 +119,15 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             peripheral_manager.input_io.frame_tick_stream()
             .with_latest_from(window_widths)
             .map(lambda latest: lambda state: advance(state, latest[1]))
-
         )
-        return (
-            MergeNode.merge(switch_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
-
-
+        return PubSubObservable.merge(switch_updates, tick_updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )
+
+
+def _switch_state(switch_event: object) -> SwitchState:
+    state = getattr(switch_event, "state", switch_event)
+    if not isinstance(state, SwitchState):
+        raise TypeError("switch event must contain a SwitchState")
+    return state

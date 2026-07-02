@@ -21,9 +21,7 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
     ) -> StreamNode[WaterTitleScreenState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = WaterTitleScreenState()
 
         def advance_state(
@@ -34,9 +32,6 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
                 wave_offset=state.wave_offset + self._wave_speed * dt_seconds * 60.0
             )
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )

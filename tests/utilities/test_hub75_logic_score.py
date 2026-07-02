@@ -30,7 +30,9 @@ class TestHub75LogicScore:
         assert summary.row_clock_mismatch_count == 0
         assert summary.lat_while_output_enabled_count == 0
         assert 0.0 < summary.oe_active_fraction < 1.0
-        assert summary.oe_active_fraction + summary.oe_blank_fraction == pytest.approx(1.0)
+        assert summary.oe_active_fraction + summary.oe_blank_fraction == pytest.approx(
+            1.0
+        )
         assert summary.median_oe_active_ns is not None
         assert summary.median_oe_blank_ns is not None
         assert summary.p99_oe_blank_ns is not None
@@ -52,23 +54,31 @@ class TestHub75LogicScore:
         _write_capture_csv(candidate_path, _build_capture_rows(extra_clock_row=1))
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert candidate.row_clock_mismatch_count == 1
         assert score.total < 1.0
         assert score.control_similarity < 1.0
 
-    def test_address_edge_during_enabled_output_is_penalized(self, tmp_path: Path) -> None:
+    def test_address_edge_during_enabled_output_is_penalized(
+        self, tmp_path: Path
+    ) -> None:
         """Verify address chatter during active output lowers similarity so ghost-risk shows up."""
 
         baseline_path = tmp_path / "baseline.csv"
         candidate_path = tmp_path / "candidate.csv"
         _write_capture_csv(baseline_path, _build_capture_rows())
-        _write_capture_csv(candidate_path, _build_capture_rows(active_address_glitch_row=2))
+        _write_capture_csv(
+            candidate_path, _build_capture_rows(active_address_glitch_row=2)
+        )
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert candidate.active_address_edge_count > 0
@@ -81,10 +91,14 @@ class TestHub75LogicScore:
         baseline_path = tmp_path / "baseline.csv"
         candidate_path = tmp_path / "candidate.csv"
         _write_capture_csv(baseline_path, _build_capture_rows())
-        _write_capture_csv(candidate_path, _build_capture_rows(oe_blank_padding_ticks=5))
+        _write_capture_csv(
+            candidate_path, _build_capture_rows(oe_blank_padding_ticks=5)
+        )
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert candidate.oe_active_fraction < baseline.oe_active_fraction
@@ -123,7 +137,9 @@ class TestHub75LogicScore:
         )
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert baseline.long_oe_blank_count == 0
@@ -148,7 +164,9 @@ class TestHub75LogicScore:
         _write_capture_csv(candidate_path, _build_flatline_rows())
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert baseline.valid_hub75 is True
@@ -169,7 +187,9 @@ class TestHub75LogicScore:
         _write_capture_csv(candidate_path, _build_flatline_rows())
 
         baseline = summarize_hub75_capture(load_hub75_logic_csv(baseline_path), cols=4)
-        candidate = summarize_hub75_capture(load_hub75_logic_csv(candidate_path), cols=4)
+        candidate = summarize_hub75_capture(
+            load_hub75_logic_csv(candidate_path), cols=4
+        )
         score = score_hub75_similarity(baseline, candidate)
 
         assert baseline.valid_hub75 is False
@@ -179,7 +199,9 @@ class TestHub75LogicScore:
         assert score.feature_scores["validity_gate"] == 0.0
         assert score.total == 0.0
 
-    def test_capture_diagnosis_flags_unmapped_live_channels(self, tmp_path: Path) -> None:
+    def test_capture_diagnosis_flags_unmapped_live_channels(
+        self, tmp_path: Path
+    ) -> None:
         """Verify live edges on unexpected channels are classified as a map mismatch."""
 
         capture_path = tmp_path / "shifted.csv"
@@ -203,7 +225,9 @@ class TestHub75LogicScore:
             "unmapped_channels_show_activity",
         )
 
-    def test_custom_signal_map_recovers_shifted_live_capture(self, tmp_path: Path) -> None:
+    def test_custom_signal_map_recovers_shifted_live_capture(
+        self, tmp_path: Path
+    ) -> None:
         """Verify alternate CLI mappings can score a shifted capture once channels are known."""
 
         capture_path = tmp_path / "shifted.csv"

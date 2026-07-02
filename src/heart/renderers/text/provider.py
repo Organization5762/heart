@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import replace
 
 from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.switch import SwitchState
 from heart.renderers.text.state import TextRenderingState
 
 
@@ -43,16 +45,11 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=self._y_location,
             line_spacing_px=self._line_spacing_px,
         )
-        return (
-            peripheral_manager.input_io.main_switch_stream()
-            .map(lambda switch_event: switch_event.state)
-            .start_with(None)
-            .scan(
-                lambda state, switch_state: replace(state, switch_state=switch_state),
-                seed=initial_state,
-            )
-            .start_with(initial_state)
-
+        return PubSubObservable.merge(
+            peripheral_manager.input_io.main_switch_stream().map(_switch_state)
+        ).state(
+            initial_state,
+            lambda state, switch_state: replace(state, switch_state=switch_state),
         )
 
     @classmethod
@@ -66,3 +63,10 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=None,
             line_spacing_px=0,
         )
+
+
+def _switch_state(switch_event: object) -> SwitchState:
+    state = getattr(switch_event, "state", switch_event)
+    if not isinstance(state, SwitchState):
+        raise TypeError("switch event must contain a SwitchState")
+    return state

@@ -19,11 +19,11 @@ from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, StreamNode, TypedRoute,
                       Variant, route)
+from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1078,7 +1078,9 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self.address = address
         self.name = name
         self.characteristic_uuids = tuple(characteristic_uuids or ())
-        self._events: EventStream[RubiksConnectedXNotification] = EventStream()
+        self._events = NewValues[RubiksConnectedXNotification](
+            name=f"heart.peripheral.rubiks_connected_x.{address}.notifications"
+        )
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._sequence = 0
@@ -1087,7 +1089,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self._managed_graph_node_installed = False
 
     def _event_stream(self) -> StreamNode[RubiksConnectedXNotification]:
-        return self._events.observable()
+        return self._events
 
     def peripheral_info(self) -> PeripheralInfo:
         return PeripheralInfo(

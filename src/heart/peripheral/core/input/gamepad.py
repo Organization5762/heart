@@ -175,9 +175,7 @@ class GamepadController:
                 connected_count=1,
                 source=source,
             )
-            events = (
-                GamepadSnapshotEvent(joystick_id=joystick_id, snapshot=snapshot),
-            )
+            events = (GamepadSnapshotEvent(joystick_id=joystick_id, snapshot=snapshot),)
             self._publish_snapshot_events(events, source=source)
             return events
         gamepads = self._gamepads()
@@ -270,9 +268,8 @@ class GamepadController:
             tapped_buttons = frozenset(
                 button
                 for button, mapping_attr in GAMEPAD_BUTTON_MAPPING_ATTRS
-                if (
-                    button_id := getattr(mapping, mapping_attr)
-                ) >= 0 and gamepad.was_tapped(button_id)
+                if (button_id := getattr(mapping, mapping_attr)) >= 0
+                and gamepad.was_tapped(button_id)
             )
         axes = {
             GamepadAxis.LEFT_X: gamepad.axis_value(mapping.AXIS_LEFT_X, dead_zone=0.0),

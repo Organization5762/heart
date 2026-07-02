@@ -90,57 +90,148 @@ PINOUT_NAMES = {
 }
 PREPARE_SCRIPT = REPO_ROOT / "scripts" / "prepare_piomatter_parity_checkout.py"
 ROW_REPEAT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_repeat_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_repeat_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_repeat_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_repeat_engine_parity.pio",
 )
 ROW_REPEAT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_repeat_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_repeat_engine.h"
 )
 ROW_COMPACT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_compact_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_compact_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_compact_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_compact_engine_parity.pio",
 )
 ROW_COMPACT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_compact_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_compact_engine.h"
 )
 ROW_COMPACT_TIGHT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_compact_tight_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_compact_tight_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_compact_tight_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_compact_tight_engine_parity.pio",
 )
 ROW_COUNTED_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_counted_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_counted_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_counted_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_counted_engine_parity.pio",
 )
 ROW_COUNTED_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_counted_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_counted_engine.h"
 )
 ROW_HYBRID_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_hybrid_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_hybrid_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_hybrid_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_hybrid_engine_parity.pio",
 )
 ROW_HYBRID_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_hybrid_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_hybrid_engine.h"
 )
 ROW_RUNS_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_runs_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_runs_engine_parity.pio",
     REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_runs_engine_parity.pio",
 )
 ROW_RUNS_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_runs_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_runs_engine.h"
 )
 ROW_SPLIT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_split_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_split_engine_parity.pio",
     REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_split_engine_parity.pio",
 )
 ROW_SPLIT_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_split_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_split_engine.h"
 )
 ROW_WINDOW_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT / "rust" / "heart_rgb_matrix_driver" / "pio" / "piomatter_row_window_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_window_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rgb_matrix_driver"
+    / "pio"
+    / "piomatter_row_window_engine_parity.pio",
+    REPO_ROOT
+    / "rust"
+    / "heart_rust"
+    / "pio"
+    / "piomatter_row_window_engine_parity.pio",
 )
 ROW_WINDOW_RENDER_OVERRIDE = (
-    REPO_ROOT / "docs" / "research" / "generated" / "piomatter_override" / "render_row_window_engine.h"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "generated"
+    / "piomatter_override"
+    / "render_row_window_engine.h"
 )
 RP1_PIO_PARAM_ROOT = DEFAULT_RP1_PIO_PARAM_ROOT
 
@@ -168,7 +259,9 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_N_TEMPORAL_PLANES,
     )
     parser.add_argument("--post-addr-delay", type=int, default=DEFAULT_POST_ADDR_DELAY)
-    parser.add_argument("--post-latch-delay", type=int, default=DEFAULT_POST_LATCH_DELAY)
+    parser.add_argument(
+        "--post-latch-delay", type=int, default=DEFAULT_POST_LATCH_DELAY
+    )
     parser.add_argument("--post-oe-delay", type=int, default=DEFAULT_POST_OE_DELAY)
     parser.add_argument(
         "--rescale-mode",
@@ -176,12 +269,20 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_RESCALE_MODE,
         choices=RESCALE_MODE_CHOICES,
     )
-    parser.add_argument("--pinout", type=str, default=DEFAULT_PINOUT, choices=PINOUT_CHOICES)
-    parser.add_argument("--pattern", type=str, default=DEFAULT_PATTERN, choices=PATTERN_CHOICES)
-    parser.add_argument("--duration-seconds", type=float, default=DEFAULT_DURATION_SECONDS)
+    parser.add_argument(
+        "--pinout", type=str, default=DEFAULT_PINOUT, choices=PINOUT_CHOICES
+    )
+    parser.add_argument(
+        "--pattern", type=str, default=DEFAULT_PATTERN, choices=PATTERN_CHOICES
+    )
+    parser.add_argument(
+        "--duration-seconds", type=float, default=DEFAULT_DURATION_SECONDS
+    )
     parser.add_argument("--warmup-seconds", type=float, default=DEFAULT_WARMUP_SECONDS)
     parser.add_argument("--target-freq-hz", type=int, default=DEFAULT_TARGET_FREQ_HZ)
-    parser.add_argument("--variant", type=str, default=DEFAULT_VARIANT, choices=VARIANT_CHOICES)
+    parser.add_argument(
+        "--variant", type=str, default=DEFAULT_VARIANT, choices=VARIANT_CHOICES
+    )
     parser.add_argument(
         "--baseline-group",
         action=argparse.BooleanOptionalAction,
@@ -217,23 +318,38 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     resolved_variant = resolve_effective_variant(args.variant, args.pattern)
-    resolved_baseline_variant = resolve_effective_variant(args.baseline_variant, args.pattern)
-    if uses_row_split_variant(resolved_variant, resolved_baseline_variant) and args.pattern not in {
+    resolved_baseline_variant = resolve_effective_variant(
+        args.baseline_variant, args.pattern
+    )
+    if uses_row_split_variant(
+        resolved_variant, resolved_baseline_variant
+    ) and args.pattern not in {
         "solid-red",
         "quadrants",
     }:
         raise ValueError("row-split only supports solid-red and quadrants patterns")
-    if uses_row_window_variant(resolved_variant, resolved_baseline_variant) and args.pattern not in {
+    if uses_row_window_variant(
+        resolved_variant, resolved_baseline_variant
+    ) and args.pattern not in {
         "solid-red",
         "quadrants",
         "center-box",
     }:
-        raise ValueError("row-window only supports solid-red, quadrants, and center-box patterns")
+        raise ValueError(
+            "row-window only supports solid-red, quadrants, and center-box patterns"
+        )
     slab_copies = parse_slab_copies(args.slab_copies)
-    baseline_param_overrides = parse_rp1_pio_param_overrides(args.baseline_rp1_pio_param)
-    experiment_param_overrides = parse_rp1_pio_param_overrides(args.experiment_rp1_pio_param)
+    baseline_param_overrides = parse_rp1_pio_param_overrides(
+        args.baseline_rp1_pio_param
+    )
+    experiment_param_overrides = parse_rp1_pio_param_overrides(
+        args.experiment_rp1_pio_param
+    )
     if resolved_variant == "both":
-        planned_runs = [PlannedRun("stock", 1), PlannedRun("row-repeat", slab_copies[0])]
+        planned_runs = [
+            PlannedRun("stock", 1),
+            PlannedRun("row-repeat", slab_copies[0]),
+        ]
     elif resolved_variant == "all":
         planned_runs = [
             PlannedRun("stock", 1),
@@ -249,9 +365,13 @@ def main() -> int:
         planned_runs = [PlannedRun("stock", 1)]
     elif args.baseline_group:
         planned_runs = [
-            PlannedRun(resolved_baseline_variant, slab_copies[0], group_role="baseline-pre"),
+            PlannedRun(
+                resolved_baseline_variant, slab_copies[0], group_role="baseline-pre"
+            ),
             PlannedRun(resolved_variant, slab_copies[0], group_role="experiment"),
-            PlannedRun(resolved_baseline_variant, slab_copies[0], group_role="baseline-post"),
+            PlannedRun(
+                resolved_baseline_variant, slab_copies[0], group_role="baseline-post"
+            ),
         ]
     else:
         planned_runs = [PlannedRun(resolved_variant, slab_copies[0])]
@@ -315,7 +435,9 @@ def main() -> int:
 
     kernel_releases = {str(result["kernel_release"]) for result in results}
     if len(kernel_releases) > 1:
-        LOGGER.warning("Kernel release changed during benchmark group: %s", sorted(kernel_releases))
+        LOGGER.warning(
+            "Kernel release changed during benchmark group: %s", sorted(kernel_releases)
+        )
     baseline_consistent, baseline_drift = grouped_baseline_consistency(results)
     if baseline_drift is not None:
         LOGGER.info("Grouped baseline drift=%.2f%%", baseline_drift * 100.0)
@@ -362,7 +484,14 @@ def install_variant(
     rescale_mode: str,
 ) -> None:
     if variant == "stock":
-        command = [sys.executable, "-m", "pip", "install", "--user", "--force-reinstall"]
+        command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--user",
+            "--force-reinstall",
+        ]
         if break_system_packages:
             command.append("--break-system-packages")
         command.append("Adafruit-Blinka-Raspberry-Pi5-Piomatter")
@@ -396,7 +525,14 @@ def install_variant(
             rescale_mode,
         ]
     )
-    install_command = [sys.executable, "-m", "pip", "install", "--user", "--force-reinstall"]
+    install_command = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "--user",
+        "--force-reinstall",
+    ]
     if break_system_packages:
         install_command.append("--break-system-packages")
     clean_checkout_build_artifacts(checkout)
@@ -486,6 +622,7 @@ def variant_assets(variant: str) -> tuple[Path, Path]:
         return resolve_row_window_pio_source(), ROW_WINDOW_RENDER_OVERRIDE
     raise ValueError(f"Unsupported non-stock variant: {variant}")
 
+
 def uses_row_split_variant(variant: str, baseline_variant: str) -> bool:
     return variant == "row-split" or baseline_variant == "row-split"
 
@@ -503,13 +640,19 @@ def resolve_effective_variant(variant: str, pattern: str) -> str:
 
 
 class PlannedRun:
-    def __init__(self, variant: str, slab_copies: int, group_role: str | None = None) -> None:
+    def __init__(
+        self, variant: str, slab_copies: int, group_role: str | None = None
+    ) -> None:
         self.variant = variant
         self.slab_copies = slab_copies
         self.group_role = group_role
 
     def display_name(self) -> str:
-        base_name = self.variant if self.variant == "stock" else f"{self.variant}-x{self.slab_copies}"
+        base_name = (
+            self.variant
+            if self.variant == "stock"
+            else f"{self.variant}-x{self.slab_copies}"
+        )
         if self.group_role is None:
             return base_name
         return f"{base_name}-{self.group_role}"
@@ -563,14 +706,18 @@ def parse_rp1_pio_param_overrides(raw_values: list[str]) -> dict[str, str]:
 def read_rp1_pio_parameter(name: str) -> str:
     parameter_path = RP1_PIO_PARAM_ROOT / name
     if not parameter_path.exists():
-        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+        raise FileNotFoundError(
+            f"RP1 PIO parameter {name!r} does not exist at {parameter_path}"
+        )
     return parameter_path.read_text(encoding="utf-8").strip()
 
 
 def write_rp1_pio_parameter(name: str, value: str) -> None:
     parameter_path = RP1_PIO_PARAM_ROOT / name
     if not parameter_path.exists():
-        raise FileNotFoundError(f"RP1 PIO parameter {name!r} does not exist at {parameter_path}")
+        raise FileNotFoundError(
+            f"RP1 PIO parameter {name!r} does not exist at {parameter_path}"
+        )
     LOGGER.info("Setting RP1 PIO parameter %s=%s", name, value)
     subprocess.run(
         ["sudo", "/usr/bin/tee", str(parameter_path)],
@@ -615,7 +762,9 @@ def benchmark_variant(
 ) -> dict[str, float | str | int]:
     schedule_groups = max(1, n_temporal_planes)
     rows_per_scan = 1 << n_addr_lines
-    shift_only_ceiling_hz = target_freq_hz / (2 * width * rows_per_scan * max(1, n_planes))
+    shift_only_ceiling_hz = target_freq_hz / (
+        2 * width * rows_per_scan * max(1, n_planes)
+    )
     benchmark_code = f"""
 import gc
 import json
@@ -761,7 +910,9 @@ def grouped_baseline_consistency(
     results: list[dict[str, float | str | int]],
 ) -> tuple[bool, float | None]:
     grouped_results = {
-        str(result.get("group_role")): result for result in results if result.get("group_role") is not None
+        str(result.get("group_role")): result
+        for result in results
+        if result.get("group_role") is not None
     }
     baseline_pre = grouped_results.get("baseline-pre")
     baseline_post = grouped_results.get("baseline-post")

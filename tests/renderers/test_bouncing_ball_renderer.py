@@ -136,7 +136,10 @@ class TestBouncingBallRenderer:
         )
 
         assert surface.get_clip() == original_clip
-        assert self._count_bright_pixels(surface.subsurface(pygame.Rect(64, 0, 64, 64))) == 0
+        assert (
+            self._count_bright_pixels(surface.subsurface(pygame.Rect(64, 0, 64, 64)))
+            == 0
+        )
 
     def test_state_bounces_off_side_and_top_walls(self) -> None:
         renderer = BouncingBallRenderer()

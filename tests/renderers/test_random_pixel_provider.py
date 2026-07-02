@@ -1,27 +1,14 @@
 from __future__ import annotations
 
 from heart.display.color import Color
-from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.provider import RandomPixelStateProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
 
-class FrameTickInputIo:
-    def __init__(self) -> None:
-        self.frames: EventStream[object] = EventStream()
-
-    def frame_tick_stream(self) -> EventStream[object]:
-        return self.frames
-
-
-class RandomPixelPeripheralManager:
-    def __init__(self) -> None:
-        self.input_io = FrameTickInputIo()
-
-
 def test_random_pixel_provider_emits_initial_state_synchronously() -> None:
-    manager = RandomPixelPeripheralManager()
+    manager = PeripheralManager()
     provider = RandomPixelStateProvider(
         width=8,
         height=8,

@@ -1,4 +1,5 @@
-from manyfold import EmptyNode, MergeNode, StreamNode
+from manyfold import EmptyNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
@@ -18,10 +19,8 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
         ]
         if not main_switches:
             return EmptyNode().observable()
-        result = (
-            MergeNode.merge(*main_switches)
-            .map(PeripheralMessageEnvelope[SwitchState].unwrap_peripheral)
-
+        result = PubSubObservable.merge(*main_switches).map(
+            PeripheralMessageEnvelope[SwitchState].unwrap_peripheral
         )
         return result
 

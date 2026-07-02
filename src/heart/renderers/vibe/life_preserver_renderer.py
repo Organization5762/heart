@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import pygame
-from manyfold import MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
@@ -64,7 +65,7 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
             lambda switch_event: (
-                lambda state: self.handle_switch(state, switch_event.state)
+                lambda state: self.handle_switch(state, _switch_state(switch_event))
             )
         )
         tick_updates = frame_ticks.map(
@@ -72,10 +73,9 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
                 lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
             )
         )
-        return (
-            MergeNode.merge(switch_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
+        return PubSubObservable.merge(switch_updates, tick_updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )
 
     def handle_switch(
@@ -126,9 +126,9 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         rotation_duration_scale = state.rotation_duration_scale
         for event in gamepad_controller.sample():
             snapshot = event.snapshot
-            bumper_pressed = snapshot.button_held(GamepadButton.ZL) or snapshot.button_held(
-                GamepadButton.ZR
-            )
+            bumper_pressed = snapshot.button_held(
+                GamepadButton.ZL
+            ) or snapshot.button_held(GamepadButton.ZR)
             left_trigger_pressure = _trigger_pressure(
                 snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
             )
@@ -182,10 +182,7 @@ class LifePreserverRenderer(StatefulBaseRenderer[LifePreserverState]):
         text_margin = max(1, round(radius * 0.12))
         float_offset = round(
             sin(
-                self.state.caption_elapsed_ms
-                / LIFE_PRESERVER_CAPTION_FLOAT_MS
-                * 2
-                * pi
+                self.state.caption_elapsed_ms / LIFE_PRESERVER_CAPTION_FLOAT_MS * 2 * pi
             )
             * max(1, round(radius * 0.08))
         )
@@ -372,3 +369,10 @@ def _trigger_pressure(value: float) -> float:
 def _speed_multiplier(duration_scale: float) -> float:
     effective_duration_scale = max(-0.9, min(0.9, duration_scale))
     return 1.0 / max(0.1, 1.0 - effective_duration_scale)
+
+
+def _switch_state(switch_event: object) -> SwitchState:
+    state = getattr(switch_event, "state", switch_event)
+    if not isinstance(state, SwitchState):
+        raise TypeError("switch event must contain a SwitchState")
+    return state

@@ -49,7 +49,9 @@ def main() -> None:
         program = adafruit_pioasm.Program(spec["path"].read_text(encoding="utf-8"))
         assembled = list(program.assembled)
         instructions = ", ".join(f"0x{opcode:04x}" for opcode in assembled)
-        delay_patch_indices = ", ".join(str(index) for index in spec["delay_patch_indices"])
+        delay_patch_indices = ", ".join(
+            str(index) for index in spec["delay_patch_indices"]
+        )
         prefix = spec["name"]
         lines.extend(
             [

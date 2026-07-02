@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 
-from manyfold import EmptyNode, MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
@@ -34,42 +35,37 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[FlowToySpectrumState]:
         initial_state = self.initial_state()
-        packet_updates = (
-            self._flowtoy_packet_stream(peripheral_manager)
-            .map(lambda packet: lambda state: self._apply_packet(state, packet))
-
-        )
-        tick_updates = (
-            peripheral_manager.input_io.frame_tick_stream()
-            .map(
+        updates: list[object] = [
+            peripheral_manager.input_io.frame_tick_stream().map(
                 lambda frame_tick: (
                     lambda state: self._advance(state, frame_tick.delta_s)
                 )
             )
-
-        )
-        return (
-            MergeNode.merge(packet_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
-
-
+        ]
+        packet_stream = self._flowtoy_packet_stream(peripheral_manager)
+        if packet_stream is not None:
+            updates.append(
+                packet_stream.map(
+                    lambda packet: lambda state: self._apply_packet(state, packet)
+                )
+            )
+        return PubSubObservable.merge(*updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )
 
     def _flowtoy_packet_stream(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[FlowToyPacket]:
+    ) -> StreamNode[FlowToyPacket] | None:
         observables = [
             peripheral.observe
             for peripheral in peripheral_manager.peripherals
             if isinstance(peripheral, FlowToyPeripheral)
         ]
         if not observables:
-            return EmptyNode().observable()
-        return (
-            MergeNode.merge(*observables)
-            .map(PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral)
-
+            return None
+        return PubSubObservable.merge(*observables).map(
+            PeripheralMessageEnvelope[FlowToyPacket].unwrap_peripheral
         )
 
     def _advance(

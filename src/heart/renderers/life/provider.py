@@ -1,7 +1,8 @@
 from typing import Callable
 
 import numpy as np
-from manyfold import MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input import GamepadButton, GamepadSnapshot
 from heart.peripheral.core.manager import PeripheralManager
@@ -40,11 +41,8 @@ class LifeStateProvider:
             return lambda _: new_state
 
         def op_from_tick(_: object) -> StateOp:
-            gamepads = self._pm.input_io.gamepad.sample()
-            if any(
-                _should_reseed_from_gamepad(event.snapshot)
-                for event in gamepads
-            ):
+            gamepads = self._pm.input_io.gamepad.sample(source="renderer.life")
+            if any(_should_reseed_from_gamepad(event.snapshot) for event in gamepads):
                 return lambda s: create_state(create_new_grid(s.grid.shape))
             return lambda s: s._update_grid()
 
@@ -52,37 +50,30 @@ class LifeStateProvider:
             self._pm.window.filter(lambda w: w is not None)
             .map(lambda w: w.get_size())
             .distinct_until_changed()
-
-
         )
         initial_state: StreamNode[LifeState] = (
             window_sizes.take(1).map(create_new_grid).map(create_state)
         )
         reseed_states: StreamNode[LifeState] = (
-            self._pm.input_io.main_switch_stream()
-            .map(lambda switch_event: switch_event.state)
+            PubSubObservable.merge(self._pm.input_io.main_switch_stream())
+            .map(_switch_state)
             .with_latest_from(window_sizes)
             .map(lambda pair: create_new_grid(pair[1]))
             .map(create_state)
-
-
         )
-        injected_states: StreamNode[LifeState] = MergeNode.merge(
-            initial_state, reseed_states
-        )
-        operations: StreamNode[StateOp] = MergeNode.merge(
-            injected_states.map(op_from_injected),
+        operations = PubSubObservable.merge(
+            reseed_states.map(op_from_injected),
             self._pm.input_io.frame_tick_stream().map(op_from_tick),
         )
-        result: StreamNode[LifeState] = initial_state.flat_map(
-            lambda first_state: operations.scan(
-                lambda acc, op: op(acc), seed=first_state
-            )
-            .start_with(first_state)
-
+        result: StreamNode[LifeState] = PubSubObservable.merge(initial_state).flat_map(
+            lambda first_state: operations.state(first_state, lambda acc, op: op(acc))
         )
         return result
 
 
 def _should_reseed_from_gamepad(gamepad: GamepadSnapshot) -> bool:
     return gamepad.connected and gamepad.button_tapped(GamepadButton.PLUS)
+
+
+def _switch_state(switch_event: object) -> object:
+    return getattr(switch_event, "state", switch_event)

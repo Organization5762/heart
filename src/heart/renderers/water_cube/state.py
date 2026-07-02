@@ -76,9 +76,7 @@ class WaterCubeState:
             else acceleration_average
         )
         next_hue = (
-            self.water_hue_degrees
-            if water_hue_degrees is None
-            else water_hue_degrees
+            self.water_hue_degrees if water_hue_degrees is None else water_hue_degrees
         )
         smoothed_acceleration = self._smooth_acceleration(
             acceleration,

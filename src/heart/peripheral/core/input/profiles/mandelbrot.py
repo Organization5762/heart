@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
-from manyfold import MergeNode, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
@@ -14,7 +15,6 @@ from heart.peripheral.core.input.gamepad import (
 from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
 from heart.peripheral.core.input.streams import map_stream
-from heart.peripheral.core.streams import combine_latest
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -155,11 +155,13 @@ class MandelbrotControlProfile:
             .map(
                 lambda keyboard_snapshot: self._to_motion_state_from_gamepad_events(
                     keyboard_snapshot,
-                    self._gamepad.sample(include_tapped_buttons=False),
+                    self._gamepad.sample(
+                        include_tapped_buttons=False,
+                        source="input.profile.mandelbrot.stream",
+                    ),
                 )
             )
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -182,19 +184,16 @@ class MandelbrotControlProfile:
 
     @cached_property
     def _edge_state(self) -> StreamNode[MandelbrotEdgeState]:
-        return (
-            self.command_events.scan(self._apply_command, seed=MandelbrotEdgeState())
-            .start_with(MandelbrotEdgeState())
-
-        )
+        return self.command_events.scan(
+            self._apply_command, seed=MandelbrotEdgeState()
+        ).start_with(MandelbrotEdgeState())
 
     @cached_property
     def _observable(self) -> StreamNode[MandelbrotControlState]:
         stream = (
-            combine_latest(self.motion_state, self._edge_state)
+            PubSubObservable.combine_latest(self.motion_state, self._edge_state)
             .map(lambda latest: self._to_compatibility_state(*latest))
             .distinct_until_changed()
-
         )
         return InputDebugNode(
             tap=self._debug_tap,
@@ -210,19 +209,25 @@ class MandelbrotControlProfile:
     def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
         return self._to_motion_state_from_gamepad_events(
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
-            self._gamepad.sample(include_tapped_buttons=False),
+            self._gamepad.sample(
+                include_tapped_buttons=False,
+                source="input.profile.mandelbrot.motion",
+            ),
         )
 
     def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
         return frozenset(
             button
-            for event in self._gamepad.sample(include_tapped_buttons=False)
+            for event in self._gamepad.sample(
+                include_tapped_buttons=False,
+                source="input.profile.mandelbrot.buttons",
+            )
             for button in GamepadButton
             if event.snapshot.button_held(button)
         )
 
     def _keyboard_command_streams(self) -> StreamNode[MandelbrotCommand]:
-        return MergeNode.merge(
+        return PubSubObservable.merge(
             map_stream(
                 self._keyboard.key_pressed(pygame.K_LEFTBRACKET),
                 lambda _event: PreviousViewModeCommand(source="keyboard.left_bracket"),

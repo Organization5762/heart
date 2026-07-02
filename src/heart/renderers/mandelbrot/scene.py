@@ -224,9 +224,7 @@ class MandelbrotMode(StatefulBaseRenderer[AppState]):
         individual_screen_width: int,
         individual_screen_height: int,
     ) -> None:
-        ordered_screens = [
-            screen for _position, screen in sorted(self.screens.items())
-        ]
+        ordered_screens = [screen for _position, screen in sorted(self.screens.items())]
         for index in range(0, len(ordered_screens) - 1, 2):
             first = ordered_screens[index]
             second = ordered_screens[index + 1]

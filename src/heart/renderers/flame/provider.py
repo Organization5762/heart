@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import BehaviorSubject, StreamNode
+from manyfold import StreamNode
+from manyfold.architecture import Value
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
@@ -14,14 +15,12 @@ class FlameStateProvider(ObservableProvider[FlameState]):
         self._initial_state = FlameState(
             time_seconds=self._initial_time, dt_seconds=0.0
         )
-        self._latest_state = BehaviorSubject(self._initial_state)
+        self._latest_state = Value.initialized(self._initial_state)
 
     def observable(
         self, peripheral_manager: PeripheralManager
     ) -> StreamNode[FlameState]:
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
 
         def to_state(frame_tick: object) -> FlameState:
             return FlameState(
@@ -31,12 +30,13 @@ class FlameStateProvider(ObservableProvider[FlameState]):
 
         return (
             frame_ticks.map(to_state)
-            .do_action(self._latest_state.on_next)
+            .do_action(self._latest_state.set)
             .start_with(self._initial_state)
-
-
         )
 
     @property
     def latest_state(self) -> FlameState:
-        return self._latest_state.value
+        latest = self._latest_state.latest
+        if latest is None:
+            return self._initial_state
+        return latest

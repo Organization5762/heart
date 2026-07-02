@@ -48,7 +48,12 @@ class ContainRenderImage(RenderImage):
         del orientation
         base_width, base_height = self.state.base_image.get_size()
         target_width, target_height = window.get_size()
-        if base_width <= 0 or base_height <= 0 or target_width <= 0 or target_height <= 0:
+        if (
+            base_width <= 0
+            or base_height <= 0
+            or target_width <= 0
+            or target_height <= 0
+        ):
             return
 
         scale = min(target_width / base_width, target_height / base_height)

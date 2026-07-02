@@ -97,5 +97,4 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
                 seed=initial,
             )
             .start_with(initial)
-
         )
