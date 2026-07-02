@@ -157,7 +157,6 @@ class MandelbrotControlProfile:
                     keyboard_snapshot,
                     self._gamepad.sample(
                         include_tapped_buttons=False,
-                        source="input.profile.mandelbrot.stream",
                     ),
                 )
             )
@@ -211,7 +210,6 @@ class MandelbrotControlProfile:
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
             self._gamepad.sample(
                 include_tapped_buttons=False,
-                source="input.profile.mandelbrot.motion",
             ),
         )
 
@@ -220,7 +218,6 @@ class MandelbrotControlProfile:
             button
             for event in self._gamepad.sample(
                 include_tapped_buttons=False,
-                source="input.profile.mandelbrot.buttons",
             )
             for button in GamepadButton
             if event.snapshot.button_held(button)
