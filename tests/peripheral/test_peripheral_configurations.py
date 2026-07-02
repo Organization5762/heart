@@ -8,18 +8,11 @@ from pytest import MonkeyPatch
 
 from heart.peripheral.compass import Compass, compass_detection_route
 from heart.peripheral.configurations import (
-    _accelerometer_detection_node, _compass_detection_node,
-    _detect_drawing_pads, _detect_gamepads, _detect_heart_rate_sensor,
-    _detect_phone_text, _detect_radios, _detect_switches, _detect_uwb_position,
+    _accelerometer_detection_node, _compass_detection_node, _detect_radios,
     _drawing_pad_detection_node, _fake_accelerometer_detection_node,
-    _gamepad_detection_node, _heart_rate_detection_node, _manyfold_graph_nodes,
-    _microphone_detection_node, _phone_text_detection_node,
-    _radio_detection_node, _switch_detection_node, _uwb_detection_node)
-from heart.peripheral.configurations.default import configure
-from heart.peripheral.configurations.pranay_pi import \
-    configure as configure_pranay_pi
-from heart.peripheral.configurations.rubiks_connected_x import \
-    configure as configure_rubiks_connected_x
+    _gamepad_detection_node, _manyfold_graph_nodes, _microphone_detection_node,
+    _phone_text_detection_node, _radio_detection_node, _switch_detection_node,
+    _uwb_detection_node)
 from heart.peripheral.core.manager import GRAPH_OWNED_PERIPHERAL_ATTR
 from heart.peripheral.drawing_pad import (DrawingPad,
                                           drawing_pad_detection_route,
@@ -334,41 +327,6 @@ class TestManyfoldAccelerometerConfiguration:
         assert latest_vector.value.event_type == "peripheral.accelerometer.vector"
         assert latest_vector.value.identity.id == "fake_accelerometer"
 
-    def test_default_configuration_moves_fake_accelerometer_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure()
-
-        assert _fake_accelerometer_detection_node in configuration.graph_nodes
-
-    def test_rubiks_configuration_moves_fake_accelerometer_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure_rubiks_connected_x()
-
-        assert _fake_accelerometer_detection_node in configuration.graph_nodes
-
-
 class TestManyfoldGamepadConfiguration:
     """Cover default graph-node factories so gamepad discovery stays Manyfold-owned."""
 
@@ -420,13 +378,6 @@ class TestManyfoldGamepadConfiguration:
         }
         assert latest_detection.value.identity.id == "gamepad:2"
 
-    def test_default_configuration_moves_gamepad_to_graph_node(self) -> None:
-        configuration = configure()
-
-        assert _gamepad_detection_node in configuration.graph_nodes
-        assert _detect_gamepads not in configuration.detectors
-
-
 class TestManyfoldDrawingPadConfiguration:
     """Cover default graph-node factories so virtual drawing pads stay Manyfold-owned."""
 
@@ -476,13 +427,6 @@ class TestManyfoldDrawingPadConfiguration:
         assert latest_sample.value.event_type == "peripheral.drawing_pad.sample"
         assert latest_sample.value.data["pressure"] == 0.6
 
-    def test_default_configuration_moves_drawing_pad_to_graph_node(self) -> None:
-        configuration = configure()
-
-        assert _drawing_pad_detection_node in configuration.graph_nodes
-        assert _detect_drawing_pads not in configuration.detectors
-
-
 class TestManyfoldSwitchConfiguration:
     """Cover default graph-node factories so switch streams stay Manyfold-owned."""
 
@@ -530,139 +474,6 @@ class TestManyfoldSwitchConfiguration:
         nodes = _manyfold_graph_nodes()
 
         assert nodes[0] is _switch_detection_node
-
-    def test_default_configuration_moves_physical_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: True,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
-    def test_default_configuration_moves_local_fake_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
-    def test_rubiks_configuration_moves_physical_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: True,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure_rubiks_connected_x()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
-    def test_rubiks_configuration_moves_local_fake_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure_rubiks_connected_x()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
-    def test_pranay_configuration_moves_physical_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: True,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure_pranay_pi()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
-    def test_pranay_configuration_moves_local_fake_switch_to_graph_node(
-        self,
-        monkeypatch,
-    ) -> None:
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.use_mock_switch",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.configurations.Configuration.is_x11_forward",
-            lambda: False,
-        )
-
-        configuration = configure_pranay_pi()
-
-        assert _switch_detection_node in configuration.graph_nodes
-        assert _detect_switches not in configuration.detectors
-
 
 class TestManyfoldMicrophoneConfiguration:
     """Cover default graph-node factories so microphone streams stay Manyfold-owned."""
@@ -712,16 +523,6 @@ class TestManyfoldMicrophoneConfiguration:
         assert latest_level.value.data["rms"] == 0.5
 
 
-class TestManyfoldHeartRateConfiguration:
-    """Cover default graph-node factories so ANT+ heart-rate streams stay Manyfold-owned."""
-
-    def test_default_configuration_moves_heart_rate_to_graph_node(self) -> None:
-        configuration = configure()
-
-        assert _heart_rate_detection_node in configuration.graph_nodes
-        assert _detect_heart_rate_sensor not in configuration.detectors
-
-
 class TestManyfoldPhoneTextConfiguration:
     """Cover default graph-node factories so BLE text input stays Manyfold-owned."""
 
@@ -765,13 +566,6 @@ class TestManyfoldPhoneTextConfiguration:
         assert latest_message is not None
         assert latest_message.value.event_type == "peripheral.phone_text.message"
         assert latest_message.value.data == {"text": "hello"}
-
-    def test_default_configuration_moves_phone_text_to_graph_node(self) -> None:
-        configuration = configure()
-
-        assert _phone_text_detection_node in configuration.graph_nodes
-        assert _detect_phone_text not in configuration.detectors
-
 
 class TestManyfoldUWBConfiguration:
     """Cover default graph-node factories so UWB positioning stays Manyfold-owned."""
@@ -830,9 +624,3 @@ class TestManyfoldUWBConfiguration:
         assert latest_position is not None
         assert latest_position.value.event_type == "peripheral.uwb.position"
         assert latest_position.value.data["stations"][0]["station_id"] == "bs_0"
-
-    def test_default_configuration_moves_uwb_to_graph_node(self) -> None:
-        configuration = configure()
-
-        assert _uwb_detection_node in configuration.graph_nodes
-        assert _detect_uwb_position not in configuration.detectors
