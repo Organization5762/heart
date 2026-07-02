@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
+from typing import cast
 
 from manyfold.architecture import NewValues
 
@@ -69,21 +70,26 @@ class NavigationProfile:
 
     @cached_property
     def browse(self) -> Variable[BrowseIntent]:
-        return self.intents.filter(lambda intent: isinstance(intent, BrowseIntent)).map(
-            lambda intent: intent
+        return cast(
+            Variable[BrowseIntent],
+            self.intents.filter(lambda intent: isinstance(intent, BrowseIntent)),
         )
 
     @cached_property
     def activate(self) -> Variable[ActivateIntent]:
-        return self.intents.filter(
-            lambda intent: isinstance(intent, ActivateIntent)
-        ).map(lambda intent: intent)
+        return cast(
+            Variable[ActivateIntent],
+            self.intents.filter(lambda intent: isinstance(intent, ActivateIntent)),
+        )
 
     @cached_property
     def alternate_activate(self) -> Variable[AlternateActivateIntent]:
-        return self.intents.filter(
-            lambda intent: isinstance(intent, AlternateActivateIntent)
-        ).map(lambda intent: intent)
+        return cast(
+            Variable[AlternateActivateIntent],
+            self.intents.filter(
+                lambda intent: isinstance(intent, AlternateActivateIntent)
+            ),
+        )
 
     @cached_property
     def browse_delta(self) -> Variable[int]:
