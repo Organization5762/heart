@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import pygame
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable
 
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
@@ -59,7 +59,7 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> StreamNode[LifePreserverState]:
+    ) -> Variable[LifePreserverState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers.text.state import TextRenderingState
 
@@ -34,7 +34,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[TextRenderingState]:
+    ) -> Variable[TextRenderingState]:
         initial_state = TextRenderingState(
             switch_state=None,
             text=self._text,

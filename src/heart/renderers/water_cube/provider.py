@@ -1,5 +1,3 @@
-from manyfold import StreamNode
-
 from heart.device import Device
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, GamepadSnapshotEvent)
@@ -7,6 +5,7 @@ from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
 
@@ -28,7 +27,7 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[WaterCubeState]:
+    ) -> Variable[WaterCubeState]:
         if peripheral_manager is None:
             msg = "WaterCubeStateProvider requires a PeripheralManager"
             raise ValueError(msg)
@@ -53,9 +52,9 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
     def _average_acceleration(
         self,
-        acceleration: StreamNode[Acceleration | None],
-        frame_ticks: StreamNode[FrameTick],
-    ) -> StreamNode[Acceleration]:
+        acceleration: Variable[Acceleration | None],
+        frame_ticks: Variable[FrameTick],
+    ) -> Variable[Acceleration]:
         average_x = average_by_frame_window(
             acceleration,
             frame_ticks,

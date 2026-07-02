@@ -3,12 +3,12 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 
@@ -19,7 +19,7 @@ class BorderStateProvider(ObservableProvider[BorderState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[BorderState]:
+    ) -> Variable[BorderState]:
         return self._color.map(lambda color: BorderState(color=color))
 
     def set_color(self, color: Color) -> None:
@@ -43,7 +43,7 @@ class RainStateProvider(ObservableProvider[RainState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[RainState]:
+    ) -> Variable[RainState]:
         initial_state = RainState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
@@ -81,7 +81,7 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[SlinkyState]:
+    ) -> Variable[SlinkyState]:
         initial_state = SlinkyState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),

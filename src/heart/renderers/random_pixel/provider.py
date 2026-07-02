@@ -5,12 +5,12 @@ from dataclasses import replace
 from typing import Any
 
 import numpy as np
-from manyfold import StreamNode
 from manyfold.architecture import CallbackPlacement, PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
@@ -40,7 +40,7 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[RandomPixelState]:
+    ) -> Variable[RandomPixelState]:
         initial_color = self._color.latest or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()

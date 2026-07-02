@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pygame
-from manyfold import ConstantNode, Graph, StreamNode
+from manyfold import ConstantNode, Graph
 from manyfold.architecture import NewValues
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -32,6 +32,7 @@ from heart.peripheral.core.input.peripheral_inputs import \
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import runtime_route
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
@@ -74,7 +75,7 @@ class _SwitchProbe(BaseSwitch):
         self._stream = stream
         self._source_id = source_id
 
-    def _event_stream(self) -> StreamNode[SwitchState]:
+    def _event_stream(self) -> Variable[SwitchState]:
         return self._stream
 
     def peripheral_info(self) -> PeripheralInfo:

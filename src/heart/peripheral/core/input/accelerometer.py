@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 import pygame
-from manyfold import Graph, StreamNode, TypedRoute
+from manyfold import Graph, TypedRoute
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
@@ -14,6 +14,7 @@ from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
 from heart.peripheral.core.input.external_sensors import ExternalSensorHub
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import CompositeSubscription
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 from heart.utilities.env import Configuration
 
@@ -33,7 +34,7 @@ DEBUG_ACCELERATION_ROUTE = runtime_route(
 
 @dataclass
 class AccelerometerPublisher:
-    source_streams: tuple[StreamNode[Acceleration | None], ...]
+    source_streams: tuple[Variable[Acceleration | None], ...]
     output_route: TypedRoute[Acceleration | None]
     _subscription: CompositeSubscription | None = field(default=None, init=False)
     _latest: Acceleration | None | object = field(default=object(), init=False)
@@ -59,7 +60,7 @@ class AccelerometerController:
         self,
         *,
         graph: Graph,
-        source_stream: StreamNode[Acceleration],
+        source_stream: Variable[Acceleration],
     ) -> None:
         self._graph = graph
         self._source_stream = source_stream
@@ -74,7 +75,7 @@ class AccelerometerController:
             ).install(self._graph)
         return self._stream
 
-    def observable(self) -> StreamNode[Acceleration]:
+    def observable(self) -> Variable[Acceleration]:
         return self.node()
 
 
@@ -99,7 +100,7 @@ class AccelerometerDebugProfile:
         self._space_impulse_until = 0.0
 
     @cached_property
-    def _keyboard_observable(self) -> StreamNode[Acceleration | None]:
+    def _keyboard_observable(self) -> Variable[Acceleration | None]:
         self._keyboard_controller.key_pressed(pygame.K_SPACE).subscribe(
             on_next=lambda _event: self._arm_space_impulse()
         )
@@ -145,7 +146,7 @@ class AccelerometerDebugProfile:
             ).install(self._graph)
         return self._debug_stream
 
-    def observable(self) -> StreamNode[Acceleration | None]:
+    def observable(self) -> Variable[Acceleration | None]:
         return self.node()
 
     def should_use_debug_input(self) -> bool:

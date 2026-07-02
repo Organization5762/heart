@@ -7,11 +7,12 @@ from functools import cache, cached_property
 from typing import Any, cast
 
 import pygame
-from manyfold import EmptyNode, StreamNode, Timer
+from manyfold import EmptyNode, Timer
 from manyfold.architecture import NewValues
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -42,7 +43,7 @@ class KeyboardController:
         self._key_event_subscriptions: dict[int, object] = {}
 
     @cached_property
-    def _snapshot_stream(self) -> StreamNode[KeyboardSnapshot]:
+    def _snapshot_stream(self) -> Variable[KeyboardSnapshot]:
         if Configuration.is_pi() and (not Configuration.is_x11_forward()):
             return EmptyNode().observable()
 
@@ -74,7 +75,7 @@ class KeyboardController:
             source_id="keyboard",
         ).connect(stream)
 
-    def snapshot_stream(self) -> StreamNode[KeyboardSnapshot]:
+    def snapshot_stream(self) -> Variable[KeyboardSnapshot]:
         return self._snapshot_stream
 
     def sample(self) -> KeyboardSnapshot:
@@ -98,7 +99,7 @@ class KeyboardController:
         )
 
     @cache
-    def key_events(self, key: int) -> StreamNode[KeyboardEvent]:
+    def key_events(self, key: int) -> Variable[KeyboardEvent]:
         def _advance(
             tracker: _KeyboardTracker, snapshot: KeyboardSnapshot
         ) -> _KeyboardTracker:
@@ -170,19 +171,19 @@ class KeyboardController:
         return events
 
     @cache
-    def key_pressed(self, key: int) -> StreamNode[KeyPressedEvent]:
+    def key_pressed(self, key: int) -> Variable[KeyPressedEvent]:
         return self._key_view(key, event_type=KeyPressedEvent, suffix="pressed")
 
     @cache
-    def key_released(self, key: int) -> StreamNode[KeyReleasedEvent]:
+    def key_released(self, key: int) -> Variable[KeyReleasedEvent]:
         return self._key_view(key, event_type=KeyReleasedEvent, suffix="released")
 
     @cache
-    def key_held(self, key: int) -> StreamNode[KeyHeldEvent]:
+    def key_held(self, key: int) -> Variable[KeyHeldEvent]:
         return self._key_view(key, event_type=KeyHeldEvent, suffix="held")
 
     @cache
-    def key_state(self, key: int) -> StreamNode[KeyState]:
+    def key_state(self, key: int) -> Variable[KeyState]:
         stream = (
             self.key_events(key)
             .map(lambda event: event.state)
@@ -204,7 +205,7 @@ class KeyboardController:
         *,
         event_type: type[KeyPressedEvent] | type[KeyReleasedEvent] | type[KeyHeldEvent],
         suffix: str,
-    ) -> StreamNode[KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent]:
+    ) -> Variable[KeyPressedEvent | KeyReleasedEvent | KeyHeldEvent]:
         key_name = pygame.key.name(key)
         stream = (
             self.key_events(key)

@@ -12,13 +12,13 @@ from typing import Any, Self, cast
 import numpy as np
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
@@ -203,7 +203,7 @@ class Microphone(Peripheral[MicrophoneLevel]):
 
         return self._latest_level
 
-    def _event_stream(self) -> StreamNode[MicrophoneLevel]:
+    def _event_stream(self) -> Variable[MicrophoneLevel]:
         return self._level_stream
 
     def stop(self) -> None:

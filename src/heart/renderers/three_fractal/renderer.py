@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pygame
-from manyfold import StreamNode
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
@@ -32,6 +31,7 @@ from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshotEvent,
                                          KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
@@ -891,7 +891,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[FractalSceneState]:
+    ) -> Variable[FractalSceneState]:
         if self._initial_state is None:
             raise ValueError("FractalScene requires an initial state")
         return self.provider.observable(initial_state=self._initial_state)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable
 
 from heart.assets.loader import Loader
@@ -10,6 +9,7 @@ from heart.display.models import KeyFrame
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
@@ -87,7 +87,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[SpritesheetLoopState]:
+    ) -> Variable[SpritesheetLoopState]:
         initial_state = self._last_state or self.initial_state(
             peripheral_manager=peripheral_manager
         )

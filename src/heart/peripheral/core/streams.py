@@ -5,11 +5,12 @@ from typing import Any, Callable, Generic, Iterable, TypeVar
 
 from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane,
                       RouteRetentionPolicy, Schema, StreamFamily, StreamName,
-                      StreamNode, TypedEnvelope, TypedRoute, Variant, route)
+                      TypedEnvelope, TypedRoute, Variant, route)
 from manyfold.architecture import PubSubObservable
 from manyfold.graph import RoutePipeline
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
@@ -41,13 +42,11 @@ def _route_pipeline_do_action(
     on_next: Callable[[Any], None] | None = None,
     *_args: Any,
     **_kwargs: Any,
-) -> StreamNode[Any]:
+) -> Variable[Any]:
     return _stream_from_source(self).do_action(on_next)
 
 
-def _route_pipeline_start_with(
-    self: RoutePipeline[Any], *values: Any
-) -> StreamNode[Any]:
+def _route_pipeline_start_with(self: RoutePipeline[Any], *values: Any) -> Variable[Any]:
     return _stream_from_source(self).start_with(*values)
 
 
@@ -56,27 +55,27 @@ def _route_pipeline_scan(
     accumulator: Callable[[Any, Any], Any],
     *,
     seed: Any = None,
-) -> StreamNode[Any]:
+) -> Variable[Any]:
     return _stream_from_source(self).scan(accumulator, seed=seed)
 
 
-def _route_pipeline_pairwise(self: RoutePipeline[Any]) -> StreamNode[Any]:
+def _route_pipeline_pairwise(self: RoutePipeline[Any]) -> Variable[Any]:
     return _stream_from_source(self).pairwise()
 
 
-def _route_pipeline_take(self: RoutePipeline[Any], count: int) -> StreamNode[Any]:
+def _route_pipeline_take(self: RoutePipeline[Any], count: int) -> Variable[Any]:
     return _stream_from_source(self).take(count)
 
 
 def _route_pipeline_with_latest_from(
     self: RoutePipeline[Any], *sources: Any
-) -> StreamNode[Any]:
+) -> Variable[Any]:
     return _stream_from_source(self).with_latest_from(*sources)
 
 
 def _route_pipeline_flat_map(
     self: RoutePipeline[Any], project: Callable[[Any], Any]
-) -> StreamNode[Any]:
+) -> Variable[Any]:
     return _stream_from_source(self).flat_map(project)
 
 
@@ -127,7 +126,7 @@ class GraphRouteStream(Generic[T]):
     def subscribe(self, *args: Any, **kwargs: Any) -> Any:
         return self._observable().subscribe(*args, **kwargs)
 
-    def pipe(self, *operators: Any) -> StreamNode[Any]:
+    def pipe(self, *operators: Any) -> Variable[Any]:
         return self._observable().pipe(*operators)
 
     def callback(
@@ -154,7 +153,7 @@ class GraphRouteStream(Generic[T]):
         on_next: Callable[[T], None] | None = None,
         *_args: Any,
         **_kwargs: Any,
-    ) -> StreamNode[T]:
+    ) -> Variable[T]:
         return _stream_from_source(self).do_action(on_next)
 
     def scan(self, accumulator: Callable[[Any, T], Any], *, seed: Any = None) -> Any:
@@ -163,13 +162,13 @@ class GraphRouteStream(Generic[T]):
     def start_with(self, value: Any) -> Any:
         return _stream_from_source(self).start_with(value)
 
-    def distinct_until_changed(self) -> StreamNode[T]:
+    def distinct_until_changed(self) -> Variable[T]:
         return _stream_from_source(self).distinct_until_changed()
 
     def pairwise(self) -> Any:
         return _stream_from_source(self).pairwise()
 
-    def take(self, count: int) -> StreamNode[T]:
+    def take(self, count: int) -> Variable[T]:
         return _stream_from_source(self).take(count)
 
     def with_latest_from(self, *sources: Any) -> Any:
@@ -198,15 +197,15 @@ class PeripheralStreams:
         self._graph = graph
         self._peripheral_source = peripheral_source
 
-    def main_switch_subscription(self) -> StreamNode[SwitchState]:
+    def main_switch_subscription(self) -> Variable[SwitchState]:
         return self._switch_subscription(include_fake_switches=True)
 
-    def physical_main_switch_subscription(self) -> StreamNode[SwitchState]:
+    def physical_main_switch_subscription(self) -> Variable[SwitchState]:
         return self._switch_subscription(include_fake_switches=False)
 
     def _switch_subscription(
         self, *, include_fake_switches: bool
-    ) -> StreamNode[SwitchState]:
+    ) -> Variable[SwitchState]:
         main_switches = [
             peripheral
             for peripheral in self._peripheral_source()

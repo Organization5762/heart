@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from manyfold import Graph, StreamNode
+from manyfold import Graph
 from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
@@ -14,6 +14,7 @@ from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  NoopSubscription)
+from heart.peripheral.core.variables import Variable
 
 
 class CountingPeripheral(Peripheral[int]):
@@ -22,7 +23,7 @@ class CountingPeripheral(Peripheral[int]):
     def __init__(self, counter: dict[str, int]) -> None:
         self._counter = counter
 
-    def _event_stream(self) -> StreamNode[int]:
+    def _event_stream(self) -> Variable[int]:
         def on_subscribe(observer: Any, scheduler: Any) -> NoopSubscription:
             self._counter["subscriptions"] += 1
             return NoopSubscription()
@@ -36,7 +37,7 @@ class EmittingPeripheral(Peripheral[int]):
     def __init__(self) -> None:
         self.events = NewValues[int](name="test.emitting_peripheral.events")
 
-    def _event_stream(self) -> StreamNode[int]:
+    def _event_stream(self) -> Variable[int]:
         return self.events
 
 

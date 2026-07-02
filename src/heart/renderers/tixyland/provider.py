@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.tixyland.state import TixylandState
 
 MIN_SPEED_SCALE = 0.1
@@ -22,7 +21,7 @@ class TixylandStateProvider(ObservableProvider[TixylandState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[TixylandState]:
+    ) -> Variable[TixylandState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = TixylandState()
 

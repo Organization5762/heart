@@ -4,11 +4,12 @@ from dataclasses import replace
 from typing import cast
 
 import pygame
-from manyfold import ConstantNode, StreamNode
+from manyfold import ConstantNode
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
 
@@ -31,7 +32,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[SlidingImageState]:
+    ) -> Variable[SlidingImageState]:
         if peripheral_manager is None:
             raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
         window_stream = (
@@ -76,7 +77,7 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[SlidingRendererState]:
+    ) -> Variable[SlidingRendererState]:
         if peripheral_manager is None:
             raise ValueError(
                 "SlidingRendererStateProvider requires a PeripheralManager"

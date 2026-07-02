@@ -2,12 +2,12 @@ import random
 import time
 from dataclasses import replace
 
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
@@ -83,7 +83,7 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[YoListenState]:
+    ) -> Variable[YoListenState]:
         initial_state = self.initial_state()
         switch_updates = peripheral_manager.input_io.main_switch_stream().map(
             lambda switch_event: (

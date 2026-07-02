@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import StreamNode
 from manyfold.architecture import Value
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.flame.state import FlameState
 
 
@@ -17,9 +17,7 @@ class FlameStateProvider(ObservableProvider[FlameState]):
         )
         self._latest_state = Value.initialized(self._initial_state)
 
-    def observable(
-        self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[FlameState]:
+    def observable(self, peripheral_manager: PeripheralManager) -> Variable[FlameState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
 
         def to_state(frame_tick: object) -> FlameState:

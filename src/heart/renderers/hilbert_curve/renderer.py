@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import StreamNode
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.hilbert_curve.provider import HilbertCurveProvider
 from heart.renderers.hilbert_curve.state import HilbertCurveState
@@ -32,7 +32,7 @@ class HilbertScene(StatefulBaseRenderer[HilbertCurveState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[HilbertCurveState]:
+    ) -> Variable[HilbertCurveState]:
         if self._initial_state is None:
             raise ValueError("HilbertScene requires an initial state")
         return self.provider.observable(

@@ -6,8 +6,7 @@ from typing import (Any, Callable, ClassVar, Dict, Iterator, List, Optional,
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
@@ -23,6 +22,7 @@ from openant.easy.node import Node
 from usb.core import NoBackendError
 
 from heart.peripheral.core import Peripheral
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.input_payloads import (HeartRateLifecycle,
                                              HeartRateMeasurement)
 from heart.utilities.logging import get_logger
@@ -271,7 +271,7 @@ class HeartRateManager(Peripheral[Any]):
             start_immediately=start_immediately,
         )
 
-    def _event_stream(self) -> StreamNode[Any]:
+    def _event_stream(self) -> Variable[Any]:
         return self._event_streamer
 
     # ---------- Callbacks -----------------------------------------------------

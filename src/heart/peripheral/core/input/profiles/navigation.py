@@ -4,10 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 
-from manyfold import StreamNode
 from manyfold.architecture import NewValues
 
 from heart.peripheral.core.subscriptions import CompositeSubscription
+from heart.peripheral.core.variables import Variable
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +36,7 @@ NavigationIntent = BrowseIntent | ActivateIntent | AlternateActivateIntent
 class NavigationProfile:
     def __init__(
         self,
-        intents: StreamNode[NavigationIntent],
+        intents: Variable[NavigationIntent],
         injected_intents: NewValues[NavigationIntent],
     ) -> None:
         self._intents = intents
@@ -64,29 +64,29 @@ class NavigationProfile:
         return CompositeSubscription(subscriptions)
 
     @cached_property
-    def intents(self) -> StreamNode[NavigationIntent]:
+    def intents(self) -> Variable[NavigationIntent]:
         return self._intents
 
     @cached_property
-    def browse(self) -> StreamNode[BrowseIntent]:
+    def browse(self) -> Variable[BrowseIntent]:
         return self.intents.filter(lambda intent: isinstance(intent, BrowseIntent)).map(
             lambda intent: intent
         )
 
     @cached_property
-    def activate(self) -> StreamNode[ActivateIntent]:
+    def activate(self) -> Variable[ActivateIntent]:
         return self.intents.filter(
             lambda intent: isinstance(intent, ActivateIntent)
         ).map(lambda intent: intent)
 
     @cached_property
-    def alternate_activate(self) -> StreamNode[AlternateActivateIntent]:
+    def alternate_activate(self) -> Variable[AlternateActivateIntent]:
         return self.intents.filter(
             lambda intent: isinstance(intent, AlternateActivateIntent)
         ).map(lambda intent: intent)
 
     @cached_property
-    def browse_delta(self) -> StreamNode[int]:
+    def browse_delta(self) -> Variable[int]:
         return self.browse.map(lambda intent: intent.step)
 
     def inject_browse(self, step: int, source: str = "beats.control") -> None:

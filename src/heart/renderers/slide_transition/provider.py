@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
                                                     DEFAULT_STATIC_MASK_STEPS,
@@ -44,7 +43,7 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: SlideTransitionState,
-    ) -> StreamNode[SlideTransitionState]:
+    ) -> Variable[SlideTransitionState]:
         return (
             peripheral_manager.input_io.frame_tick_stream()
             .scan(

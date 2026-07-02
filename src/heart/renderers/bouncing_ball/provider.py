@@ -3,11 +3,10 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    DEFAULT_BALL_SPEED,
@@ -34,7 +33,7 @@ class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> StreamNode[BouncingBallState]:
+    ) -> Variable[BouncingBallState]:
         initial = BouncingBallState(
             position=DEFAULT_BALL_POSITION,
             velocity=DEFAULT_BALL_SPEED,

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
-from manyfold import StreamNode
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 
 from .state import DopplerState
 
@@ -73,7 +73,7 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[DopplerState]:
+    ) -> Variable[DopplerState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = self._initial_state()
 

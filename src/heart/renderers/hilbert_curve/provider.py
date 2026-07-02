@@ -5,11 +5,11 @@ import time
 from dataclasses import replace
 
 import numpy as np
-from manyfold import StreamNode
 from numba import njit
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
 
 
@@ -276,7 +276,7 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager, *, initial_state: HilbertCurveState
-    ) -> StreamNode[HilbertCurveState]:
+    ) -> Variable[HilbertCurveState]:
         return (
             peripheral_manager.input_io.frame_tick_stream()
             .map(lambda _: time.monotonic())

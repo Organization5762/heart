@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
@@ -22,7 +21,7 @@ class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[MetadataScreenState]:
+    ) -> Variable[MetadataScreenState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = MetadataScreenState()
 

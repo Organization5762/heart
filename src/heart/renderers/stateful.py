@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Generic
 
-from manyfold import StreamNode
 from manyfold.graph import SubscriptionLike
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import (ObservableProvider,
                                              StaticStateProvider)
+from heart.peripheral.core.variables import Variable
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
 from heart.runtime.display_context import DisplayContext
 
@@ -38,7 +38,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def state_observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> StreamNode[StateT]:
+    ) -> Variable[StateT]:
         assert self.builder is not None
         return self.builder.observable(peripheral_manager)
 

@@ -3,11 +3,11 @@ import math
 import numba as nb
 import numpy as np
 import pygame
-from manyfold import StreamNode
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.multicolor.provider import MulticolorStateProvider
 from heart.renderers.multicolor.state import MulticolorState
@@ -113,7 +113,7 @@ class MulticolorRenderer(StatefulBaseRenderer[MulticolorState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[MulticolorState]:
+    ) -> Variable[MulticolorState]:
         self._ensure_builder(peripheral_manager)
         assert self._builder is not None
         return self._builder.observable()

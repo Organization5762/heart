@@ -6,7 +6,7 @@ from functools import cached_property
 from typing import Any, TypeVar, cast
 
 import pygame
-from manyfold import EmptyNode, Graph, StreamNode
+from manyfold import EmptyNode, Graph
 from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.peripheral.core import Peripheral, PeripheralMessageEnvelope
@@ -28,6 +28,7 @@ from heart.peripheral.core.input.profiles.navigation import (
     NavigationProfile)
 from heart.peripheral.core.input.streams import map_stream, merge_streams
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import (Acceleration, Accelerometer,
                                      FakeAccelerometer)
 from heart.peripheral.switch import BaseSwitch, FakeSwitch, SwitchState
@@ -132,15 +133,15 @@ class InputIO:
     def peripherals(self) -> tuple[Peripheral[Any], ...]:
         return tuple(self.peripheral_source())
 
-    def main_switch_stream(self) -> StreamNode[SwitchStateEvent]:
+    def main_switch_stream(self) -> Variable[SwitchStateEvent]:
         return self._switch_stream(include_fake_switches=True)
 
-    def physical_main_switch_stream(self) -> StreamNode[SwitchStateEvent]:
+    def physical_main_switch_stream(self) -> Variable[SwitchStateEvent]:
         return self._switch_stream(include_fake_switches=False)
 
     def _switch_stream(
         self, *, include_fake_switches: bool
-    ) -> StreamNode[SwitchStateEvent]:
+    ) -> Variable[SwitchStateEvent]:
         streams = [
             peripheral.observe
             for peripheral in self.peripherals
@@ -152,7 +153,7 @@ class InputIO:
         return PubSubObservable.merge(*streams).map(_switch_state_event)
 
     @cached_property
-    def all_accelerometers(self) -> StreamNode[Acceleration]:
+    def all_accelerometers(self) -> Variable[Acceleration]:
         streams = [
             peripheral.observe
             for peripheral in self.peripherals
@@ -173,10 +174,10 @@ class InputIO:
             source_id="accelerometer",
         ).connect(merged)
 
-    def keyboard_snapshots(self) -> StreamNode[KeyboardSnapshot]:
+    def keyboard_snapshots(self) -> Variable[KeyboardSnapshot]:
         return self.keyboard.snapshot_stream()
 
-    def frame_tick_stream(self) -> StreamNode[FrameTick]:
+    def frame_tick_stream(self) -> Variable[FrameTick]:
         return self.frame_ticks.observable()
 
     def final_frame_stream(self) -> GraphRouteStream[pygame.Surface]:
@@ -188,13 +189,13 @@ class InputIO:
     def debug_acceleration(self) -> GraphRouteStream[Acceleration | None]:
         return self.debug_accelerometer.node()
 
-    def active_acceleration(self) -> StreamNode[Acceleration | None]:
+    def active_acceleration(self) -> Variable[Acceleration | None]:
         if self.debug_accelerometer.should_use_debug_input():
             return self.debug_acceleration()
         return self.physical_acceleration()
 
     @cached_property
-    def navigation_intent_stream(self) -> StreamNode[NavigationIntent]:
+    def navigation_intent_stream(self) -> Variable[NavigationIntent]:
         keyboard_left = map_stream(
             self.keyboard.key_pressed(pygame.K_LEFT),
             lambda _event: BrowseIntent(source="keyboard.left", step=-1),
@@ -235,13 +236,13 @@ class InputIO:
             ),
         ).connect(stream)
 
-    def navigation_intents(self) -> StreamNode[NavigationIntent]:
+    def navigation_intents(self) -> Variable[NavigationIntent]:
         return self.navigation_intent_stream
 
-    def mandelbrot_controls(self) -> StreamNode[MandelbrotControlState]:
+    def mandelbrot_controls(self) -> Variable[MandelbrotControlState]:
         return self.mandelbrot.observable()
 
-    def switch_navigation_intents(self) -> StreamNode[NavigationIntent]:
+    def switch_navigation_intents(self) -> Variable[NavigationIntent]:
         switch_updates = self.physical_main_switch_stream()
         return PubSubObservable.merge(
             self.switch_browse_intents(switch_updates),
@@ -250,8 +251,8 @@ class InputIO:
         )
 
     def switch_browse_intents(
-        self, switch_updates: StreamNode[SwitchStateEvent]
-    ) -> StreamNode[BrowseIntent]:
+        self, switch_updates: Variable[SwitchStateEvent]
+    ) -> Variable[BrowseIntent]:
         output = NewValues[BrowseIntent](name="heart.input.switch.browse_intents")
         previous_by_source: dict[str, int] = {}
 
@@ -268,8 +269,8 @@ class InputIO:
         return output
 
     def switch_activate_intents(
-        self, switch_updates: StreamNode[SwitchStateEvent]
-    ) -> StreamNode[ActivateIntent]:
+        self, switch_updates: Variable[SwitchStateEvent]
+    ) -> Variable[ActivateIntent]:
         return _counter_increase_intents(
             switch_updates,
             lambda event: event.state.button_value,
@@ -277,8 +278,8 @@ class InputIO:
         )
 
     def switch_alternate_activate_intents(
-        self, switch_updates: StreamNode[SwitchStateEvent]
-    ) -> StreamNode[AlternateActivateIntent]:
+        self, switch_updates: Variable[SwitchStateEvent]
+    ) -> Variable[AlternateActivateIntent]:
         return _counter_increase_intents(
             switch_updates,
             lambda event: event.state.long_button_value,
@@ -287,10 +288,10 @@ class InputIO:
 
 
 def _counter_increase_intents(
-    source: StreamNode[SwitchStateEvent],
+    source: Variable[SwitchStateEvent],
     counter_value: Callable[[SwitchStateEvent], int],
     create_intent: Callable[[], TNavigationIntent],
-) -> StreamNode[TNavigationIntent]:
+) -> Variable[TNavigationIntent]:
     output = NewValues[TNavigationIntent](name="heart.input.switch.counter_intents")
     previous_by_source: dict[str, int] = {}
 

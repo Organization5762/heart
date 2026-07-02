@@ -4,10 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
-from manyfold import StreamNode
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.frame import FrameTick
+from heart.peripheral.core.variables import Variable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -21,21 +21,21 @@ class _SampleAverage:
     value: float | None = None
 
 
-def map_stream(source: StreamNode[T], mapper: Callable[[T], U]) -> StreamNode[U]:
+def map_stream(source: Variable[T], mapper: Callable[[T], U]) -> Variable[U]:
     return source.map(mapper)
 
 
-def merge_streams(*streams: StreamNode[T]) -> StreamNode[T]:
+def merge_streams(*streams: Variable[T]) -> Variable[T]:
     return PubSubObservable.merge(*streams)
 
 
 def average_by_frame_window(
-    source: StreamNode[T | None],
-    frame_ticks: StreamNode[FrameTick],
+    source: Variable[T | None],
+    frame_ticks: Variable[FrameTick],
     *,
     interval_ms: float,
     selector: Callable[[T], float],
-) -> StreamNode[float]:
+) -> Variable[float]:
     def accumulate(previous: _SampleAverage, latest: tuple[FrameTick, T | None]):
         frame_tick, value = latest
         elapsed_ms = previous.elapsed_ms + max(float(frame_tick.delta_ms), 0.0)

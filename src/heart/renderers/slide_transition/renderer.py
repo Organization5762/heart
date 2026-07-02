@@ -3,11 +3,11 @@ import time
 
 import numpy as np
 import pygame
-from manyfold import StreamNode
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation, Rectangle
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.provider import SlideTransitionProvider
 from heart.renderers.slide_transition.state import (SlideTransitionMode,
@@ -52,7 +52,7 @@ class SlideTransitionRenderer(StatefulBaseRenderer[SlideTransitionState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[SlideTransitionState]:
+    ) -> Variable[SlideTransitionState]:
         if self._initial_state is None:
             raise ValueError("SlideTransitionRenderer requires an initial state")
         return self.provider.observable(

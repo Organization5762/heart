@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import StreamNode
 
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.pranay_sketch.state import (PranaySketchPiece,
                                                  PranaySketchState)
@@ -94,7 +94,7 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[PranaySketchState]:
+    ) -> Variable[PranaySketchState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = self._load_initial_state()
 

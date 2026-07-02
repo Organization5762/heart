@@ -1,11 +1,11 @@
 from typing import cast
 
 import pygame
-from manyfold import StreamNode
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.image.state import RenderImageState
 
 
@@ -21,7 +21,7 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[RenderImageState]:
+    ) -> Variable[RenderImageState]:
         if peripheral_manager is None:
             raise ValueError("RenderImageStateProvider requires a PeripheralManager")
         window_stream = (
@@ -48,7 +48,7 @@ class SurfaceRenderImageStateProvider(ObservableProvider[RenderImageState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[RenderImageState]:
+    ) -> Variable[RenderImageState]:
         if peripheral_manager is None:
             raise ValueError(
                 "SurfaceRenderImageStateProvider requires a PeripheralManager"
