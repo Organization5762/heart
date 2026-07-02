@@ -77,7 +77,9 @@ class OvermonoRunner(StatefulBaseRenderer[OvermonoRunnerState]):
             self._scaled_frame_key = frame_key
 
         assert self._scaled_frame is not None
-        cycle_progress = (elapsed_ms % OVERMONO_TRAVEL_DURATION_MS) / OVERMONO_TRAVEL_DURATION_MS
+        cycle_progress = (
+            elapsed_ms % OVERMONO_TRAVEL_DURATION_MS
+        ) / OVERMONO_TRAVEL_DURATION_MS
         start_x = window_width
         end_x = -sprite_width
         x = round(start_x + (end_x - start_x) * cycle_progress)

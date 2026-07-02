@@ -10,20 +10,20 @@ import serial
 from bleak.backends.device import BLEDevice
 from manyfold import (DetectionNode, EmptyNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
-                      Schema, StreamFamily, StreamName, StreamNode, Timer,
-                      TypedRoute, Variant, route)
+                      Schema, StreamFamily, StreamName, Timer, TypedRoute,
+                      Variant, route)
 from manyfold.graph import ObserverLike, SubscriptionLike
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import (Peripheral, PeripheralEventNode,
-                                   PeripheralInfo, PeripheralMessageEnvelope,
-                                   PeripheralTag)
+from heart.peripheral.core import (Peripheral, PeripheralInfo,
+                                   PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.subscriptions import (CallbackObservable,
                                                  CallbackSubscription,
                                                  NoopSubscription)
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
                                        KeyPressedEvent)
 from heart.utilities.env import Configuration, get_device_ports
@@ -158,11 +158,8 @@ class BaseSwitch(Peripheral[SwitchState]):
         def spawn(peripheral: "BaseSwitch", access: Any) -> None:
             if not spawn_sources:
                 return
-            install_node = getattr(peripheral, "install_node", None)
-            if install_node is None:
-                return
             access.own(
-                install_node(
+                peripheral.install_node(
                     access.graph,
                     output_route=resolved_state_output_route,
                     error_route=state_error_route or switch_error_route(),
@@ -225,7 +222,7 @@ class FakeSwitch(BaseSwitch):
         super().__init__(*args, **kwargs)
         self._navigation_subscription = None
 
-    def _key_press_stream(self, key: int) -> StreamNode[KeyboardEvent]:
+    def _key_press_stream(self, key: int) -> Variable[KeyboardEvent]:
         def _unwrap(
             envelope: PeripheralMessageEnvelope[KeyboardEvent],
         ) -> KeyboardEvent:
@@ -325,7 +322,7 @@ class FakeSwitch(BaseSwitch):
     def _handle_browse(self, delta: int) -> None:
         self.rotational_value += delta
 
-    def _event_stream(self) -> PeripheralEventNode[SwitchState]:
+    def _event_stream(self) -> Variable[SwitchState]:
         if Configuration.is_pi() and (not Configuration.is_x11_forward()):
             return EmptyNode().observable()
         else:

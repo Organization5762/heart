@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
 
 DEFAULT_METADATA_DURATION_MS = 12000
@@ -21,10 +20,8 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[CombinedBpmScreenState]:
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+    ) -> Variable[CombinedBpmScreenState]:
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = CombinedBpmScreenState()
 
         def advance_state(
@@ -32,11 +29,8 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
         ) -> CombinedBpmScreenState:
             return self._advance_state(state=state, elapsed_ms=int(frame_tick.delta_ms))
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def _advance_state(

@@ -9,6 +9,4 @@ from heart.peripheral.configurations import _manyfold_graph_nodes
 def configure() -> PeripheralConfiguration:
     """Return the default detection plan for ``manager``."""
 
-    return PeripheralConfiguration(
-        detectors=(), graph_nodes=_manyfold_graph_nodes()
-    )
+    return PeripheralConfiguration(detectors=(), graph_nodes=_manyfold_graph_nodes())

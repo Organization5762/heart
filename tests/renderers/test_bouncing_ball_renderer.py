@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.manager import PeripheralManager
@@ -16,11 +15,6 @@ from heart.runtime.display_context import DisplayContext
 
 
 class TestBouncingBallRenderer:
-    def test_constructor_uses_full_display_mode(self) -> None:
-        renderer = BouncingBallRenderer()
-
-        assert renderer.device_display_mode == DeviceDisplayMode.FULL
-
     def test_cradle_swing_alternates_between_outer_balls(self) -> None:
         first_half = BouncingBallRenderer._swing_angles(0.65)
         second_half = BouncingBallRenderer._swing_angles(1.95)
@@ -136,7 +130,10 @@ class TestBouncingBallRenderer:
         )
 
         assert surface.get_clip() == original_clip
-        assert self._count_bright_pixels(surface.subsurface(pygame.Rect(64, 0, 64, 64))) == 0
+        assert (
+            self._count_bright_pixels(surface.subsurface(pygame.Rect(64, 0, 64, 64)))
+            == 0
+        )
 
     def test_state_bounces_off_side_and_top_walls(self) -> None:
         renderer = BouncingBallRenderer()

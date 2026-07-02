@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 import pytest
-from manyfold._rx.testing.marbles import marbles_testing
+from manyfold.architecture import pubsub_marbles
 
 from heart.peripheral.core.input import FrameTick
 from heart.peripheral.core.manager import PeripheralManager
@@ -52,21 +52,20 @@ class TestSlidingImageMarbleOutputs:
             base_surface.set_at((index, 0), (*color, 255))
         initial_state = SlidingImageState(speed=speed, width=4)
         provider = SlidingImageStateProvider(initial_state=initial_state)
-        tick_values = {label: True for label in tick_pattern if label.isalpha()}
-        with marbles_testing() as (start, cold, _hot, _exp):
-            tick_stream = (
-                cold(tick_pattern, tick_values)
-                .map_indexed(
-                    lambda _tick, frame_index: FrameTick(
-                        frame_index=frame_index,
-                        delta_ms=0.0,
-                        delta_s=0.0,
-                        monotonic_s=float(frame_index),
-                        fps=None,
-                    )
-                )
-
+        tick_values = {
+            label: FrameTick(
+                frame_index=frame_index,
+                delta_ms=0.0,
+                delta_s=0.0,
+                monotonic_s=float(frame_index),
+                fps=None,
             )
+            for frame_index, label in enumerate(
+                label for label in tick_pattern if label.isalpha()
+            )
+        }
+        with pubsub_marbles(namespace=f"heart-sliding-image-{speed}") as marbles:
+            tick_stream = marbles.topic("frame_ticks", schema=FrameTick)
             manager = PeripheralManager()
             monkeypatch.setattr(
                 manager.input_io.frame_ticks,
@@ -82,9 +81,11 @@ class TestSlidingImageMarbleOutputs:
                         image.get_at((x, 0))[:3] for x in range(image.get_width())
                     ]
                 )
-
             )
-            records = start(lambda: image_stream)
-        images = [record.value.value for record in records if record.value.kind == "N"]
+            records = marbles.run(
+                tick_stream, tick_pattern, tick_values, observe=image_stream
+            )
+
+        images = [record.value for record in records]
         expected = [colors[offset:] + colors[:offset] for offset in expected_offsets]
         assert images == expected

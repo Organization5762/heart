@@ -49,7 +49,9 @@ class LampeControllerRuntime:
         self._send_fn(events)
 
 
-def _initialise_led(board_module=board, digitalio_module=digitalio) -> digitalio.DigitalInOut:
+def _initialise_led(
+    board_module=board, digitalio_module=digitalio
+) -> digitalio.DigitalInOut:
     led = digitalio_module.DigitalInOut(board_module.LED)
     led.direction = digitalio_module.Direction.OUTPUT
     led.value = True
@@ -86,7 +88,9 @@ def create_runtime() -> LampeControllerRuntime:
     return LampeControllerRuntime(controller, bluetooth.send, led=led)
 
 
-def main(runtime: LampeControllerRuntime | None = None) -> None:  # pragma: no cover - hardware only
+def main(
+    runtime: LampeControllerRuntime | None = None,
+) -> None:  # pragma: no cover - hardware only
     runtime = runtime or create_runtime()
     while True:
         runtime.run_once()

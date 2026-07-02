@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import EmptyNode, MergeNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
@@ -86,29 +87,35 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[SpritesheetLoopState]:
+    ) -> Variable[SpritesheetLoopState]:
         initial_state = self._last_state or self.initial_state(
             peripheral_manager=peripheral_manager
         )
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
+        updates: list[object] = []
         if self.disable_input:
-            switch_updates = EmptyNode().observable()
+            pass
         else:
             switches = peripheral_manager.input_io.main_switch_stream()
-            switch_updates = switches.map(
-                lambda switch_event: (
-                    lambda state: self.handle_switch(state, switch_event.state)
+            updates.append(
+                switches.map(
+                    lambda switch_event: (
+                        lambda state: self.handle_switch(
+                            state, switch_event.state
+                        )
+                    )
                 )
             )
-        tick_updates = frame_ticks.map(
-            lambda frame_tick: (
-                lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
+        updates.append(
+            frame_ticks.map(
+                lambda frame_tick: (
+                    lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
+                )
             )
         )
         return (
-            MergeNode.merge(switch_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
+            PubSubObservable.merge(*updates)
+            .state(initial_state, lambda state, update: update(state))
             .do_action(self._remember_state)
         )
 
@@ -148,12 +155,14 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             accelerate = (
                 snapshot.button_held(GamepadButton.PLUS)
                 or snapshot.button_held(GamepadButton.ZR)
-                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT)) > 0.0
+                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_RIGHT))
+                > 0.0
             )
             decelerate = (
                 snapshot.button_held(GamepadButton.MINUS)
                 or snapshot.button_held(GamepadButton.ZL)
-                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)) > 0.0
+                or _trigger_pressure(snapshot.axis_value(GamepadAxis.TRIGGER_LEFT))
+                > 0.0
             )
             if accelerate and (not decelerate):
                 duration_scale += 0.005

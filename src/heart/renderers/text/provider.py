@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.text.state import TextRenderingState
 
 
@@ -32,7 +33,7 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[TextRenderingState]:
+    ) -> Variable[TextRenderingState]:
         initial_state = TextRenderingState(
             switch_state=None,
             text=self._text,
@@ -43,16 +44,13 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
             y_location=self._y_location,
             line_spacing_px=self._line_spacing_px,
         )
-        return (
-            peripheral_manager.input_io.main_switch_stream()
-            .map(lambda switch_event: switch_event.state)
-            .start_with(None)
-            .scan(
-                lambda state, switch_state: replace(state, switch_state=switch_state),
-                seed=initial_state,
+        return PubSubObservable.merge(
+            peripheral_manager.input_io.main_switch_stream().map(
+                lambda switch_event: switch_event.state
             )
-            .start_with(initial_state)
-
+        ).state(
+            initial_state,
+            lambda state, switch_state: replace(state, switch_state=switch_state),
         )
 
     @classmethod

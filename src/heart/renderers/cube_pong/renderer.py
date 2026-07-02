@@ -195,9 +195,7 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
             raise RuntimeError("CubePongRenderer requires an initialized display")
         screen = window.screen
         color = (
-            PADDLE_ONE_COLOR
-            if state.winning_player == PLAYER_ONE
-            else PADDLE_TWO_COLOR
+            PADDLE_ONE_COLOR if state.winning_player == PLAYER_ONE else PADDLE_TWO_COLOR
         )
         label = "P1 WINS" if state.winning_player == PLAYER_ONE else "P2 WINS"
         font_size = max(18, round(state.screen_height * WINNER_FONT_SCALE))
@@ -287,6 +285,7 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
             events = controller.sample(
                 joystick_id=gamepad.joystick_id,
                 include_tapped_buttons=False,
+                source="renderer.cube_pong",
             )
             if not events:
                 continue

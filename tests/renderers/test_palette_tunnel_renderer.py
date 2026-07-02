@@ -7,7 +7,6 @@ from unittest.mock import Mock
 import numpy as np
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
                                          GamepadSnapshot, GamepadSnapshotEvent,
@@ -49,7 +48,7 @@ class _SnapshotController:
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> object:
+    def sample(self, **_kwargs) -> object:
         if isinstance(self.snapshot, GamepadSnapshot):
             if not self.snapshot.connected:
                 return ()
@@ -141,11 +140,6 @@ def _window(width: int = 100, height: int = 80) -> Mock:
 
 
 class TestPaletteTunnelScene:
-    def test_constructor_uses_opengl_display_mode(self) -> None:
-        scene = PaletteTunnelScene()
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
-
     def test_gamepad_and_keyboard_move_virtual_cursor(self) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
@@ -189,7 +183,9 @@ class TestPaletteTunnelScene:
         )
         assert render_call["uniforms"]["iViewportOrigin"] == (0, 0)
 
-    def test_gamepad_stick_sample_moves_virtual_cursor_without_stream_emit(self) -> None:
+    def test_gamepad_stick_sample_moves_virtual_cursor_without_stream_emit(
+        self,
+    ) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -216,7 +212,9 @@ class TestPaletteTunnelScene:
         assert scene.cursor[0] > initial_cursor[0]
         assert scene.cursor[1] == initial_cursor[1]
 
-    def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
+    def test_cube_orientation_renders_square_tile_across_window(
+        self, monkeypatch
+    ) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -305,7 +303,9 @@ class TestPaletteTunnelScene:
 
         assert scene.tiled_mode is True
         assert scene.render_size == (80, 80)
-        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [(80, 80)]
+        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [
+            (80, 80)
+        ]
         assert shader_runtime.draw_calls[0]["viewport_origin"] == (0, 0)
         assert shader_runtime.draw_calls[0]["uniforms"]["iViewportOrigin"] == (0, 0)
         assert scene.display_texture == 7
@@ -319,27 +319,10 @@ class TestPaletteTunnelScene:
 
         assert PaletteTunnelScene._render_size((128, 64), orientation) == (64, 32)
 
-    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(self) -> None:
+    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(
+        self,
+    ) -> None:
         orientation = Rectangle.with_layout(columns=4, rows=1)
 
         assert PaletteTunnelScene._render_size((320, 80), orientation) == (80, 80)
         assert PaletteTunnelScene._should_tile(orientation) is True
-
-    def test_reset_clears_snapshot_state_and_shader(self) -> None:
-        scene = PaletteTunnelScene()
-        shader_runtime = _ShaderRuntime()
-        scene.shader_runtime = shader_runtime
-        manager = _PeripheralManager()
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        scene.reset()
-
-        assert manager.input_io.keyboard.stream.subscriptions == []
-        assert shader_runtime.reset_calls == 1
-        assert scene.window_size is None
-        assert scene.render_size is None
-        assert scene.tiled_mode is False

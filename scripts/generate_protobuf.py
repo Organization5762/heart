@@ -51,7 +51,9 @@ def generate(
         f"--python_out={python_out}",
         *(str(path) for path in proto),
     ]
-    logger.info("Generating protobuf modules: %s", ", ".join(path.name for path in proto))
+    logger.info(
+        "Generating protobuf modules: %s", ", ".join(path.name for path in proto)
+    )
     try:
         subprocess.run(args, check=True)
     except subprocess.CalledProcessError as exc:

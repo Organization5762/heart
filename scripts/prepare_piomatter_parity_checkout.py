@@ -35,27 +35,27 @@ DEFAULT_POST_LATCH_DELAY = 0
 DEFAULT_POST_OE_DELAY = 0
 DEFAULT_RESCALE_MODE = "stock"
 RESCALE_MODE_CHOICES = ("stock", "none")
-TARGET_FREQ_PATTERN = re.compile(
-    r"constexpr double target_freq =\s*\n\s*\d+; // .*"
-)
+TARGET_FREQ_PATTERN = re.compile(r"constexpr double target_freq =\s*\n\s*\d+; // .*")
 MAX_XFER_PATTERN = re.compile(r"constexpr size_t MAX_XFER = \d+;")
-PIOMATTER_THREAD_INCLUDE_PATTERN = re.compile(r'#include <thread>\n')
-PIOMATTER_SCHED_INCLUDE_PATTERN = re.compile(r'#include <sched.h>\n')
+PIOMATTER_THREAD_INCLUDE_PATTERN = re.compile(r"#include <thread>\n")
+PIOMATTER_SCHED_INCLUDE_PATTERN = re.compile(r"#include <sched.h>\n")
 PIO_XFER_HELPER_PATTERN = re.compile(
     r"static int pio_sm_xfer_data_large\(PIO pio, int sm, int direction, size_t size,\n"
     r"\s+uint32_t \*databuf\) \{.*?\n\}",
     re.DOTALL,
 )
-POST_ADDR_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_addr_delay = \d+;")
-POST_LATCH_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_latch_delay = \d+;")
+POST_ADDR_DELAY_PATTERN = re.compile(
+    r"static constexpr uint32_t post_addr_delay = \d+;"
+)
+POST_LATCH_DELAY_PATTERN = re.compile(
+    r"static constexpr uint32_t post_latch_delay = \d+;"
+)
 POST_OE_DELAY_PATTERN = re.compile(r"static constexpr uint32_t post_oe_delay = \d+;")
 RESCALE_SCHEDULE_PATTERN = re.compile(
     r"schedule_sequence rescale_schedule\(schedule_sequence ss, size_t pixels_across\) \{.*?\n\}",
     re.DOTALL,
 )
-SETUP_EXTRA_COMPILE_ARGS_PATTERN = re.compile(
-    r'extra_compile_args\s*=\s*\[[^\]]*\],'
-)
+SETUP_EXTRA_COMPILE_ARGS_PATTERN = re.compile(r"extra_compile_args\s*=\s*\[[^\]]*\],")
 PIOMATTER_DESTRUCTOR_PATTERN = re.compile(
     r"    ~piomatter\(\) \{\n.*?\n    \}\n",
     re.DOTALL,
@@ -227,7 +227,9 @@ def main() -> int:
     return 0
 
 
-def run_generator(generator_path: Path, output_path: Path, pio_source: Path | None) -> None:
+def run_generator(
+    generator_path: Path, output_path: Path, pio_source: Path | None
+) -> None:
     command = [
         "python3",
         str(generator_path),
@@ -256,11 +258,15 @@ def patch_target_frequency(destination: Path, target_freq_hz: int) -> None:
         "constexpr double target_freq =\n"
         f"            {target_freq_hz}; // configurable SM clock target"
     )
-    updated_content, replacement_count = TARGET_FREQ_PATTERN.subn(replacement, content, count=1)
+    updated_content, replacement_count = TARGET_FREQ_PATTERN.subn(
+        replacement, content, count=1
+    )
     if replacement_count != 1:
         raise ValueError(f"Could not patch target frequency in {destination}")
     destination.write_text(updated_content, encoding="utf-8")
-    LOGGER.info("Patched Piomatter target frequency to %s Hz in %s", target_freq_hz, destination)
+    LOGGER.info(
+        "Patched Piomatter target frequency to %s Hz in %s", target_freq_hz, destination
+    )
 
 
 def patch_max_xfer_bytes(destination: Path, max_xfer_bytes: int) -> None:
@@ -371,7 +377,9 @@ def patch_program_lifecycle(destination: Path) -> None:
             count=1,
         )
         if add_program_replacements != 1:
-            raise ValueError(f"Could not patch pio_add_program lifecycle in {destination}")
+            raise ValueError(
+                f"Could not patch pio_add_program lifecycle in {destination}"
+            )
 
     if "uint program_offset = PIO_ORIGIN_INVALID;" not in updated_content:
         updated_content, member_replacements = PIO_MEMBER_PATTERN.subn(
@@ -384,7 +392,10 @@ def patch_program_lifecycle(destination: Path) -> None:
         if member_replacements != 1:
             raise ValueError(f"Could not add program_offset member in {destination}")
 
-    if "pio_remove_program(pio, &protomatter_program, program_offset);" not in updated_content:
+    if (
+        "pio_remove_program(pio, &protomatter_program, program_offset);"
+        not in updated_content
+    ):
         updated_content, destructor_replacements = PIOMATTER_DESTRUCTOR_PATTERN.subn(
             """    ~piomatter() {
         manager.request_exit();
@@ -435,12 +446,12 @@ def patch_fifo_mode_support(destination: Path) -> None:
     content = destination.read_text(encoding="utf-8")
     updated_content = content
 
-    if '#include <sys/ioctl.h>' not in updated_content:
+    if "#include <sys/ioctl.h>" not in updated_content:
         updated_content, include_replacements = PIOMATTER_THREAD_INCLUDE_PATTERN.subn(
-            '#include <thread>\n#include <cerrno>\n#include <cstdlib>\n#include <cstring>\n'
-            '#include <sched.h>\n'
+            "#include <thread>\n#include <cerrno>\n#include <cstdlib>\n#include <cstring>\n"
+            "#include <sched.h>\n"
             '#include "rp1_pio_if.h"\n'
-            '#include <sys/ioctl.h>\n#include <sys/mman.h>\n#include <unistd.h>\n',
+            "#include <sys/ioctl.h>\n#include <sys/mman.h>\n#include <unistd.h>\n",
             updated_content,
             count=1,
         )
@@ -453,9 +464,11 @@ def patch_fifo_mode_support(destination: Path) -> None:
             count=1,
         )
         if include_replacements != 1:
-            raise ValueError(f"Could not patch Piomatter rp1_pio_if include in {destination}")
+            raise ValueError(
+                f"Could not patch Piomatter rp1_pio_if include in {destination}"
+            )
 
-    replacement = r'''#ifndef PIO_IOC_SM_GET_FIFO_MAP_INFO
+    replacement = r"""#ifndef PIO_IOC_SM_GET_FIFO_MAP_INFO
 #define PIO_IOC_MAGIC 102
 struct rp1_pio_sm_fifo_state_args {
     uint16_t sm;
@@ -658,14 +671,16 @@ static int pio_sm_xfer_data_large(PIO pio, int sm, int direction, size_t size,
         }
     }
     return 0;
-}'''
+}"""
     updated_content, helper_replacements = PIO_XFER_HELPER_PATTERN.subn(
         replacement,
         updated_content,
         count=1,
     )
     if helper_replacements != 1:
-        raise ValueError(f"Could not patch Piomatter FIFO mode support in {destination}")
+        raise ValueError(
+            f"Could not patch Piomatter FIFO mode support in {destination}"
+        )
 
     destination.write_text(updated_content, encoding="utf-8")
     LOGGER.info("Patched Piomatter FIFO mode support in %s", destination)

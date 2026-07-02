@@ -7,7 +7,12 @@ from typing import Final
 
 from PIL import Image
 
-from ._heart_rgb_matrix_driver import ColorOrder, NativeMatrixDriver, NativeMatrixStats, WiringProfile
+from ._heart_rgb_matrix_driver import (
+    ColorOrder,
+    NativeMatrixDriver,
+    NativeMatrixStats,
+    WiringProfile,
+)
 
 RGBA_IMAGE_FORMAT: Final[str] = "RGBA"
 
@@ -63,7 +68,9 @@ class FrameCanvas:
 
 
 class MatrixDriver:
-    def __init__(self, config: MatrixConfig, *, skip_duplicate_frames: bool = True) -> None:
+    def __init__(
+        self, config: MatrixConfig, *, skip_duplicate_frames: bool = True
+    ) -> None:
         self._driver = NativeMatrixDriver(
             config.wiring,
             config.panel_rows,

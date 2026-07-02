@@ -54,7 +54,9 @@ class WavingTreeRenderer(StatefulBaseRenderer[float]):
         elapsed_s = time.monotonic() - self._animation_start_s
         width, height = window.get_size()
         self.set_state(elapsed_s)
-        self._draw_background(window.screen, width=width, height=height, elapsed_s=elapsed_s)
+        self._draw_background(
+            window.screen, width=width, height=height, elapsed_s=elapsed_s
+        )
         root = (width // 2, height - max(5, height // 9))
         trunk_length = height * 0.48
         sway = math.sin(elapsed_s * 0.78) * 0.18

@@ -131,9 +131,15 @@ def spawn_child_balls(
         ChildBall(
             position=position,
             velocity=BallVelocity(
-                x=(velocity.x * 0.22) + axis_push.x + _tangent_component(impact_axis, offset, "x"),
-                y=(velocity.y * 0.22) + axis_push.y + _tangent_component(impact_axis, offset, "y"),
-                z=(velocity.z * 0.22) + axis_push.z + _tangent_component(impact_axis, offset, "z"),
+                x=(velocity.x * 0.22)
+                + axis_push.x
+                + _tangent_component(impact_axis, offset, "x"),
+                y=(velocity.y * 0.22)
+                + axis_push.y
+                + _tangent_component(impact_axis, offset, "y"),
+                z=(velocity.z * 0.22)
+                + axis_push.z
+                + _tangent_component(impact_axis, offset, "z"),
             ),
             age_s=0.0,
             lifetime_s=CHILD_BALL_LIFETIME_SECONDS,

@@ -44,8 +44,9 @@ class _Gamepad:
         self.sample_include_tapped_buttons: list[bool] = []
 
     def sample(
-        self, *, include_tapped_buttons: bool = True
+        self, *, include_tapped_buttons: bool = True, source: str = "test"
     ) -> tuple[GamepadSnapshotEvent, ...]:
+        del source
         self.sample_include_tapped_buttons.append(include_tapped_buttons)
         return (
             GamepadSnapshotEvent(
@@ -61,9 +62,9 @@ class _Gamepad:
 
 class _DisconnectedGamepad:
     def sample(
-        self, *, include_tapped_buttons: bool = True
+        self, *, include_tapped_buttons: bool = True, source: str = "test"
     ) -> tuple[GamepadSnapshotEvent, ...]:
-        del include_tapped_buttons
+        del include_tapped_buttons, source
         return ()
 
 

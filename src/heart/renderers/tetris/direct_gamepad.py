@@ -98,7 +98,9 @@ class DirectTetrisGamepads:
         buttons = _read_buttons(joystick, mapping)
         previous = self._previous_buttons_by_slot.get(slot, {})
         tapped_buttons = frozenset(
-            button for button, held in buttons.items() if held and not previous.get(button)
+            button
+            for button, held in buttons.items()
+            if held and not previous.get(button)
         )
         self._previous_buttons_by_slot[slot] = buttons
         snapshot = DirectGamepadSnapshot(
@@ -167,7 +169,9 @@ class DirectTetrisGamepads:
             snapshot.axes.get(GamepadAxis.LEFT_Y, 0.0),
             ",".join(
                 button.value
-                for button in sorted(snapshot.tapped_buttons, key=lambda item: item.value)
+                for button in sorted(
+                    snapshot.tapped_buttons, key=lambda item: item.value
+                )
             ),
             ",".join(
                 button.value
@@ -201,7 +205,9 @@ def _mapped_joystick_index(slot: int) -> int | None:
     if target_mac is None:
         return None
     normalized_target = _normalize_bluetooth_mac(target_mac)
-    for pygame_index, joystick_path in enumerate(sorted(LINUX_JOYSTICK_SYSFS.glob("js*"))):
+    for pygame_index, joystick_path in enumerate(
+        sorted(LINUX_JOYSTICK_SYSFS.glob("js*"))
+    ):
         uniq_path = joystick_path / "device" / "uniq"
         try:
             controller_mac = uniq_path.read_text().strip()

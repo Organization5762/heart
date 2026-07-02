@@ -26,9 +26,7 @@ def resolve_update_mode(
     return requested_mode
 
 
-def main(
-    device_driver_name: str, *, mode: UpdateMode = UpdateMode.AUTO
-) -> None:
+def main(device_driver_name: str, *, mode: UpdateMode = UpdateMode.AUTO) -> None:
     code_path = get_driver_path(device_driver_name)
     config = load_driver_config(code_path / DRIVER_SETTINGS_FILENAME)
     resolved_mode = resolve_update_mode(

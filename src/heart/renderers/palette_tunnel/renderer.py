@@ -293,12 +293,16 @@ class PaletteTunnelScene(StatefulBaseRenderer[PaletteTunnelState]):
 
     def _refresh_keyboard_snapshot(self) -> None:
         try:
-            self._keyboard_snapshot = self.state.peripheral_manager.input_io.keyboard.sample()
+            self._keyboard_snapshot = (
+                self.state.peripheral_manager.input_io.keyboard.sample()
+            )
         except (AttributeError, pygame.error):
             return
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample(
+            source="renderer.palette_tunnel",
+        )
 
     @staticmethod
     def _elapsed_seconds(clock: pygame.time.Clock | None) -> float:

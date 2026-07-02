@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from heart.peripheral.core.input import GamepadButton, GamepadSnapshot
+from heart.peripheral.core.input import (GamepadButton, GamepadSnapshot,
+                                         GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.life.provider import (LifeStateProvider,
@@ -45,7 +46,9 @@ def test_plus_button_tap_reseeds_life_grid(monkeypatch) -> None:
     monkeypatch.setattr(
         manager.input_io.gamepad,
         "sample",
-        lambda: next(snapshots),
+        lambda **_kwargs: (
+            GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),
+        ),
     )
 
     provider.observable().subscribe(observed_states.append)

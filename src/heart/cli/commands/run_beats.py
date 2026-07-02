@@ -339,7 +339,9 @@ def run_supervised_processes(
             while True:
                 runtime_return_code = runtime_process.poll()
                 if runtime_return_code is not None:
-                    logger.info("Totem runtime exited with code %d", runtime_return_code)
+                    logger.info(
+                        "Totem runtime exited with code %d", runtime_return_code
+                    )
                     return runtime_return_code
 
                 assert beats_process is not None

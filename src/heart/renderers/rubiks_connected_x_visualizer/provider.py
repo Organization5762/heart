@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 
-from manyfold import ConstantNode, MergeNode, StreamNode
+from manyfold import ConstantNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
     RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
@@ -41,7 +43,7 @@ class RubiksConnectedXVisualizerStateProvider(
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[RubiksConnectedXVisualizerState]:
+    ) -> Variable[RubiksConnectedXVisualizerState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
@@ -55,20 +57,12 @@ class RubiksConnectedXVisualizerStateProvider(
             last_move=f"Set {RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR} to the cube address if auto-detect is disabled.",
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
-        merged = (
-            MergeNode.merge(*observables)
-            .map(
-                PeripheralMessageEnvelope[
-                    RubiksConnectedXNotification
-                ].unwrap_peripheral
-            )
-
+        merged = PubSubObservable.merge(*observables).map(
+            PeripheralMessageEnvelope[RubiksConnectedXNotification].unwrap_peripheral
         )
-        return (
-            merged.scan(self._advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return merged.state(
+            initial_state,
+            self._advance_state,
         )
 
     def _advance_state(

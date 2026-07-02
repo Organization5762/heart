@@ -17,13 +17,11 @@ SUPERVISOR_SCANNER = REPO_ROOT / "drivers/totem/heart-supervisor-rp1-scanner.sh"
 TOTEM_ENV_EXAMPLE = REPO_ROOT / "drivers/totem/totem3.env.example"
 RP1H_DRIVER = REPO_ROOT / "rp1/linux/files/drivers/misc/rp1-hub75.c"
 REGULAR_PROFILE = (
-    REPO_ROOT
-    / "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/"
+    REPO_ROOT / "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/"
     "rp1_core1_state32_regular_p0p1_chain2_profile.inc"
 )
 CLKRETAIN_SCANNER = (
-    REPO_ROOT
-    / "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/"
+    REPO_ROOT / "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/"
     "rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame6_dwell8_"
     "regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2_clkretain.s"
 )
@@ -89,7 +87,10 @@ def test_regular_p0p1_chain2_defaults_point_at_oeoffshift_candidate() -> None:
 
     assert f'candidate="{KNOWN_GOOD_CANDIDATE}"' in repro_script
     assert KNOWN_GOOD_CANDIDATE in repro_doc
-    assert f"HEART_RP1_HUB75_SCANNER_CANDIDATE:-{KNOWN_GOOD_CANDIDATE}" in supervisor_scanner
+    assert (
+        f"HEART_RP1_HUB75_SCANNER_CANDIDATE:-{KNOWN_GOOD_CANDIDATE}"
+        in supervisor_scanner
+    )
     assert f"HEART_RP1_HUB75_SCANNER_CANDIDATE={KNOWN_GOOD_CANDIDATE}" in totem_env
     assert "HEART_LAYOUT_COLUMNS=4" in totem_env
     assert "HEART_LAYOUT_ROWS=1" in totem_env
@@ -162,7 +163,7 @@ def test_regular_p0p1_chain2_expected_packer_words_are_exact_gpio_masks() -> Non
     )
 
     assert oe == 0x00040000
-    assert a_c_transport == 0x000c0a40
+    assert a_c_transport == 0x000C0A40
     assert b_d_transport == 0x08043400
     assert row1_a_top_blue == 0x00440080
     assert "KUNIT_EXPECT_EQ(test, a_c_transport, words[0]);" in driver

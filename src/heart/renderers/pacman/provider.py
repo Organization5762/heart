@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import random
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pacman.state import PacmanGhostState
 
@@ -28,7 +27,7 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[PacmanGhostState]:
+    ) -> Variable[PacmanGhostState]:
         initial_state = self._spawn_state(
             width=self._width, height=self._height, blood=True
         )
@@ -36,7 +35,6 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
             self._peripheral_manager.input_io.frame_tick_stream()
             .scan(lambda state, _: self._next_state(state), seed=initial_state)
             .start_with(initial_state)
-
         )
 
     def _next_state(self, state: PacmanGhostState) -> PacmanGhostState:

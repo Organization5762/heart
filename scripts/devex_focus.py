@@ -14,6 +14,7 @@ from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 @dataclass(frozen=True)
 class FocusTargets:
     """Group the files relevant to developer feedback loops."""
@@ -129,7 +130,9 @@ def run_formatting(targets: FocusTargets, repo_root: Path, mode: str) -> list[in
 
     exit_codes: list[int] = []
     if targets.python_files:
-        python_args = [str(path.relative_to(repo_root)) for path in targets.python_files]
+        python_args = [
+            str(path.relative_to(repo_root)) for path in targets.python_files
+        ]
         if mode == "format":
             exit_codes.append(run_command(["uvx", "isort", *python_args], repo_root))
             exit_codes.append(
@@ -201,8 +204,12 @@ def run_tests(
 
     if test_scope == "changed-or-last-failed":
         if targets.test_files:
-            test_args = [str(path.relative_to(repo_root)) for path in targets.test_files]
-            exit_codes.append(run_command(["uv", "run", "pytest", *test_args], repo_root))
+            test_args = [
+                str(path.relative_to(repo_root)) for path in targets.test_files
+            ]
+            exit_codes.append(
+                run_command(["uv", "run", "pytest", *test_args], repo_root)
+            )
             return exit_codes
         last_failed = repo_root / ".pytest_cache" / "v" / "cache" / "lastfailed"
         if last_failed.exists():

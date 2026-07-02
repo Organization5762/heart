@@ -1,9 +1,8 @@
-from manyfold import StreamNode
-
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
@@ -80,7 +79,7 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[MarioRendererState]:
+    ) -> Variable[MarioRendererState]:
         initial = self._create_initial_state()
         accelerations = peripheral_manager.input_io.active_acceleration().start_with(
             None
@@ -97,5 +96,4 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
                 seed=initial,
             )
             .start_with(initial)
-
         )

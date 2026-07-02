@@ -62,7 +62,14 @@ def main() -> int:
             ]
         )
     if not args.skip_install:
-        install_command = [sys.executable, "-m", "pip", "install", "--user", "--force-reinstall"]
+        install_command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--user",
+            "--force-reinstall",
+        ]
         if args.break_system_packages:
             install_command.append("--break-system-packages")
         install_command.append(str(args.checkout))

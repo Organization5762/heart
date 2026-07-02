@@ -4,9 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
-from manyfold import MergeNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.frame import FrameTick
+from heart.peripheral.core.variables import Variable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -20,21 +21,38 @@ class _SampleAverage:
     value: float | None = None
 
 
-def map_stream(source: StreamNode[T], mapper: Callable[[T], U]) -> StreamNode[U]:
-    return source.map(mapper)
+def map_stream(source: Variable[T], mapper: Callable[[T], U]) -> Variable[U]:
+    return stream_from(source).map(mapper)
 
 
-def merge_streams(*streams: StreamNode[T]) -> StreamNode[T]:
-    return MergeNode.merge(*streams)
+def stream_from(source: Variable[T]) -> PubSubObservable:
+    return PubSubObservable.merge(source)
+
+
+def merge_streams(*streams: Variable[T]) -> Variable[T]:
+    return PubSubObservable.merge(*streams)
+
+
+def scan_stream(
+    source: Variable[T],
+    accumulator: Callable[[U, T], U],
+    *,
+    seed: U,
+) -> Variable[U]:
+    return stream_from(source).scan(accumulator, seed=seed)
+
+
+def start_with_stream(source: Variable[T], *values: T) -> Variable[T]:
+    return stream_from(source).start_with(*values)
 
 
 def average_by_frame_window(
-    source: StreamNode[T | None],
-    frame_ticks: StreamNode[FrameTick],
+    source: Variable[T | None],
+    frame_ticks: Variable[FrameTick],
     *,
     interval_ms: float,
     selector: Callable[[T], float],
-) -> StreamNode[float]:
+) -> Variable[float]:
     def accumulate(previous: _SampleAverage, latest: tuple[FrameTick, T | None]):
         frame_tick, value = latest
         elapsed_ms = previous.elapsed_ms + max(float(frame_tick.delta_ms), 0.0)
@@ -53,8 +71,11 @@ def average_by_frame_window(
         return _SampleAverage(value=average)
 
     return (
-        frame_ticks.with_latest_from(source)
-        .scan(accumulate, seed=_SampleAverage())
+        scan_stream(
+            stream_from(frame_ticks).with_latest_from(source),
+            accumulate,
+            seed=_SampleAverage(),
+        )
         .filter(lambda average: average.value is not None)
         .map(lambda average: average.value)
     )

@@ -9,7 +9,6 @@ from pprint import pformat
 
 import numpy as np
 import pygame
-from manyfold import shutdown
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_CLAMP_TO_EDGE, GL_COLOR_BUFFER_BIT,
                        GL_DEPTH_BUFFER_BIT, GL_MODELVIEW, GL_NEAREST,
@@ -222,8 +221,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             dtype=np.float32,
         )
         noise_phase = (
-            self._y_coordinates[:, None] * 311.7
-            + self._x_coordinates[None, :] * 127.1
+            self._y_coordinates[:, None] * 311.7 + self._x_coordinates[None, :] * 127.1
         )
         self._noise_texture = (
             0.5 + 0.5 * np.sin(noise_phase) * np.sin(noise_phase * 1.618)
@@ -451,17 +449,14 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
     ) -> None:
         for band in voice.bands:
             center_y = self._clamp(
-                band.center_y
-                + band_shift * voice.band_shift_multiplier,
+                band.center_y + band_shift * voice.band_shift_multiplier,
                 0.0,
                 1.0,
             )
             x_width = max(band.width_x * width_multiplier, 0.001)
             y_width = max(band.width_y * width_multiplier, 0.001)
             x_profile = np.exp(
-                -0.5
-                * ((self._x_coordinates - write_x - band.x_offset) / x_width)
-                ** 2
+                -0.5 * ((self._x_coordinates - write_x - band.x_offset) / x_width) ** 2
             )
             y_profile = np.exp(-0.5 * ((self._y_coordinates - center_y) / y_width) ** 2)
             band_profile = y_profile[:, None] * x_profile[None, :]
@@ -481,9 +476,9 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
             GamepadAxis.LEFT_X,
             dead_zone=GAMEPAD_DEAD_ZONE,
         )
-        keyboard_x = float(pygame.K_RIGHT in self._keyboard_snapshot.pressed_keys) - float(
-            pygame.K_LEFT in self._keyboard_snapshot.pressed_keys
-        )
+        keyboard_x = float(
+            pygame.K_RIGHT in self._keyboard_snapshot.pressed_keys
+        ) - float(pygame.K_LEFT in self._keyboard_snapshot.pressed_keys)
         return self._clamp(
             SYNTH_WRITE_X_CENTER + (stick_x + keyboard_x) * SYNTH_WRITE_X_RANGE,
             0.0,
@@ -755,7 +750,9 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self._keyboard_snapshot = snapshot
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample(
+            source="renderer.audio_storm",
+        )
         if not self._gamepad_snapshots:
             self._trigger_rest_values.clear()
             return
@@ -788,8 +785,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
 
     def _button_held(self, button: GamepadButton) -> bool:
         return any(
-            event.snapshot.button_held(button)
-            for event in self._gamepad_snapshots
+            event.snapshot.button_held(button) for event in self._gamepad_snapshots
         )
 
     def _axis_value(self, axis: GamepadAxis, *, dead_zone: float) -> float:
@@ -916,9 +912,6 @@ def main() -> None:
             peripheral_runtime.tick()
         scene.reset()
     finally:
-        shutdown.on_next(True)
-        shutdown.on_completed()
-        shutdown.dispose()
         pygame.quit()
 
 

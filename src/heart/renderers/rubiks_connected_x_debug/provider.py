@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from manyfold import ConstantNode, MergeNode, StreamNode
+from manyfold import ConstantNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RubiksConnectedXMessageType,
     RubiksConnectedXNotification, RubiksConnectedXPeripheral)
@@ -25,7 +27,7 @@ class RubiksConnectedXDebugStateProvider(
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[RubiksConnectedXDebugState]:
+    ) -> Variable[RubiksConnectedXDebugState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals
@@ -45,20 +47,11 @@ class RubiksConnectedXDebugStateProvider(
             )
         )
         observables = [peripheral.observe for peripheral in cube_peripherals]
-        merged = (
-            MergeNode.merge(*observables)
-            .map(
-                PeripheralMessageEnvelope[
-                    RubiksConnectedXNotification
-                ].unwrap_peripheral
-            )
-
+        merged = PubSubObservable.merge(*observables).map(
+            PeripheralMessageEnvelope[RubiksConnectedXNotification].unwrap_peripheral
         )
-        return (
-            merged.scan(self._advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return merged.scan(self._advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     def _advance_state(

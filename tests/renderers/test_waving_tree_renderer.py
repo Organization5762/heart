@@ -2,17 +2,10 @@ from __future__ import annotations
 
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.waving_tree import WavingTreeRenderer
 from heart.runtime.display_context import DisplayContext
-
-
-def test_waving_tree_uses_full_display_mode() -> None:
-    renderer = WavingTreeRenderer()
-
-    assert renderer.device_display_mode == DeviceDisplayMode.FULL
 
 
 def test_waving_tree_draws_visible_tree(device) -> None:

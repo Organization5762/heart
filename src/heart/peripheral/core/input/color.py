@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
-from manyfold import StreamNode
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
                                                InputDebugTap)
+from heart.peripheral.core.variables import Variable
 
 COLOR_SNAPSHOT_STREAM = "color.snapshot"
 
@@ -28,29 +28,29 @@ class ColorInputProfile:
     def __init__(
         self,
         *,
-        final_frames: StreamNode[pygame.Surface],
+        final_frames: Variable[pygame.Surface],
         debug_tap: InputDebugTap,
     ) -> None:
         self._final_frames = final_frames
         self._debug_tap = debug_tap
 
-    def average_rgb(self) -> StreamNode[tuple[int, int, int]]:
+    def average_rgb(self) -> Variable[tuple[int, int, int]]:
         return self.snapshot().map(lambda snapshot: snapshot.average_rgb)
 
-    def hue(self) -> StreamNode[float]:
+    def hue(self) -> Variable[float]:
         return self.snapshot().map(lambda snapshot: snapshot.hue)
 
-    def saturation(self) -> StreamNode[float]:
+    def saturation(self) -> Variable[float]:
         return self.snapshot().map(lambda snapshot: snapshot.saturation)
 
-    def brightness(self) -> StreamNode[float]:
+    def brightness(self) -> Variable[float]:
         return self.snapshot().map(lambda snapshot: snapshot.brightness)
 
-    def value(self) -> StreamNode[float]:
+    def value(self) -> Variable[float]:
         return self.snapshot().map(lambda snapshot: snapshot.value)
 
     @cached_property
-    def _snapshot_stream(self) -> StreamNode[ColorSnapshot]:
+    def _snapshot_stream(self) -> Variable[ColorSnapshot]:
         snapshots = self._final_frames.map(_surface_color_snapshot)
         return InputDebugNode(
             tap=self._debug_tap,
@@ -60,7 +60,7 @@ class ColorInputProfile:
             upstream_ids=("runtime.window",),
         ).connect(snapshots)
 
-    def snapshot(self) -> StreamNode[ColorSnapshot]:
+    def snapshot(self) -> Variable[ColorSnapshot]:
         return self._snapshot_stream
 
 

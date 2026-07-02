@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import numpy as np
 import pygame
 from heart_device_manager.environment import is_pi
-from manyfold import shutdown
 
 from heart import DeviceDisplayMode
 from heart.device import Device
@@ -251,11 +250,6 @@ class GameLoop:
         finally:
             logger.info("Shutting down GameLoop.")
 
-            # SHut down the IO threads
-            shutdown.on_next(True)
-            shutdown.on_completed()
-            shutdown.dispose()
-
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:
@@ -335,9 +329,7 @@ class GameLoop:
             raise RuntimeError("GameLoop clock is not initialized")
         display_mode = self._resolve_display_mode(renderers)
         self._reset_opengl_renderers_before_display_mode_change(display_mode)
-        with self.components.display.display_mode(
-            display_mode
-        ):
+        with self.components.display.display_mode(display_mode):
             return ComposedRenderer.render_batch(
                 renderers,
                 window=self.components.display,

@@ -4,9 +4,12 @@ from typing import Callable
 try:
     from digitalio import Pull
 except ModuleNotFoundError:  # pragma: no cover - desktop test fallback
+
     class Pull:  # type: ignore[no-redef]
         UP = "up"
         DOWN = "down"
+
+
 from heart_firmware_io import constants
 
 LONG_PRESS_DURATION_SECONDS = 0.5
@@ -15,10 +18,7 @@ DEFAULT_ROTARY_ENCODER_INDEX = 0
 
 # We don't use `json` here because the Trinkey doesn't support it by default
 def form_json(name: str, data: int, producer_id: int):
-    return (
-        f'{{"event_type": "{name}", "data": {data}, '
-        f'"producer_id": {producer_id}}}'
-    )
+    return f'{{"event_type": "{name}", "data": {data}, "producer_id": {producer_id}}}'
 
 
 class RotaryEncoderHandler:

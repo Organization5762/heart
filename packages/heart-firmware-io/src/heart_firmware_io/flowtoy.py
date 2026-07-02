@@ -28,9 +28,7 @@ FLOWTOY_MODE_REFERENCE_PATH = Path(__file__).with_name("flowtoy_modes.json")
 def _documented_modes_by_key() -> dict[tuple[int, int], dict[str, Any]]:
     """Return the documented FlowToy mode reference keyed by page and mode."""
 
-    mode_reference = json.loads(
-        FLOWTOY_MODE_REFERENCE_PATH.read_text(encoding="utf-8")
-    )
+    mode_reference = json.loads(FLOWTOY_MODE_REFERENCE_PATH.read_text(encoding="utf-8"))
     return {
         (int(entry["page"]), int(entry["mode"])): dict(entry)
         for entry in mode_reference
@@ -137,7 +135,10 @@ def decode_sync_packet(
             "speed": bool(radio_flags & (1 << 4)),
             "density": bool(radio_flags & (1 << 5)),
         },
-        "reserved": [int(packet[FLOWTOY_RESERVED_OFFSET]), int(packet[FLOWTOY_RESERVED_OFFSET + 1])],
+        "reserved": [
+            int(packet[FLOWTOY_RESERVED_OFFSET]),
+            int(packet[FLOWTOY_RESERVED_OFFSET + 1]),
+        ],
         "page": page,
         "mode": mode,
         "mode_name": mode_name_from_values(page, mode),

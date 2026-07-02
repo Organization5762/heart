@@ -13,13 +13,13 @@ from typing import Any, Callable, Self, cast
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, StreamNode, TypedRoute,
-                      Variant, route)
+                      StreamFamily, StreamName, TypedRoute, Variant, route)
+from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.variables import Variable
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
@@ -100,7 +100,7 @@ class PhoneText(Peripheral[str]):
         self._last_text: str | None = None  # full text as received
         self.new_text = False
         self._buffer = bytearray()  # assembly buffer for chunks
-        self._text_stream: EventStream[str] = EventStream()
+        self._text_stream = NewValues[str](name="heart.peripheral.phone_text.text")
         self._on_text: Callable[[str], None] | None = None
 
     # ---------------------------------------------------------------------
@@ -306,8 +306,8 @@ class PhoneText(Peripheral[str]):
             self._on_text(text)
         logger.info("Processed text: %r", text)
 
-    def _event_stream(self) -> StreamNode[str]:
-        return self._text_stream.observable()
+    def _event_stream(self) -> Variable[str]:
+        return self._text_stream
 
     def _text_to_sensor_event(self, text: str) -> SensorEvent:
         return SensorEvent(

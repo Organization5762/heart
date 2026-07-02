@@ -63,9 +63,7 @@ def _draw_lines(
     surface.blit(title, (PADDING, y))
     y += 32
 
-    status_line = (
-        f"frame={frame} connected={summary['connected']} identifier={summary['identifier']}"
-    )
+    status_line = f"frame={frame} connected={summary['connected']} identifier={summary['identifier']}"
     surface.blit(font.render(status_line, True, TEXT), (PADDING, y))
     y += LINE_HEIGHT * 2
 
@@ -108,7 +106,9 @@ def main() -> None:
         nonlocal latest_snapshot
         latest_snapshot = snapshot
 
-    peripheral_manager.gamepad_controller.snapshot_stream().subscribe(on_next=_set_snapshot)
+    peripheral_manager.gamepad_controller.snapshot_stream().subscribe(
+        on_next=_set_snapshot
+    )
 
     running = True
     frame = 0

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-import sys
-import time
 import argparse
+import re
+import time
+
 import serial
 from serial.tools import list_ports
-import math
-import re
 
 DEFAULT_BAUD = 115200
+
 
 def pick_port(explicit: str | None) -> str:
     if explicit:
@@ -27,7 +27,10 @@ def pick_port(explicit: str | None) -> str:
         if "ttyUSB" in p.device or "ttyACM" in p.device:
             return p.device
 
-    raise SystemExit("No serial ports found. Pass --port /dev/ttyUSB0 (or /dev/ttyACM0).")
+    raise SystemExit(
+        "No serial ports found. Pass --port /dev/ttyUSB0 (or /dev/ttyACM0)."
+    )
+
 
 def open_ser(port: str, baud: int) -> serial.Serial:
     ser = serial.Serial(port, baud, timeout=0.2, write_timeout=0.5)
@@ -36,7 +39,10 @@ def open_ser(port: str, baud: int) -> serial.Serial:
     ser.reset_input_buffer()
     return ser
 
-def send_cmd(ser: serial.Serial, cmd: str, settle_s: float = 0.15, max_wait_s: float = 1.2) -> str:
+
+def send_cmd(
+    ser: serial.Serial, cmd: str, settle_s: float = 0.15, max_wait_s: float = 1.2
+) -> str:
     """
     Sends an AT command with CRLF and reads until we see OK/ERR or we time out.
     Handles multi-line responses and devices that don't end lines cleanly.
@@ -77,6 +83,7 @@ def send_cmd(ser: serial.Serial, cmd: str, settle_s: float = 0.15, max_wait_s: f
         out = "(no response)"
     return out.strip("\x00")
 
+
 def interactive(ser: serial.Serial):
     print("BU03 AT CLI. Type commands like: AT+GETCFG  (Ctrl-C to quit)")
     while True:
@@ -91,6 +98,7 @@ def interactive(ser: serial.Serial):
         print(resp)
         print()
 
+
 def distance_loop(ser: serial.Serial, period: float):
     print("Polling AT+DISTANCE (Ctrl-C to stop).")
     while True:
@@ -104,6 +112,7 @@ def distance_loop(ser: serial.Serial, period: float):
             print()
             return
 
+
 def quick_probe(ser: serial.Serial):
     cmds = ["AT", "AT+GETVER", "AT+GETCFG", "AT+GETDEV"]
     for c in cmds:
@@ -111,16 +120,33 @@ def quick_probe(ser: serial.Serial):
         print(send_cmd(ser, c, max_wait_s=2.0))
         print()
 
+
 def main():
     ap = argparse.ArgumentParser(description="BU03 serial/AT helper")
-    ap.add_argument("--port", help="Serial port, e.g. /dev/ttyUSB0 or /dev/serial/by-id/...")
+    ap.add_argument(
+        "--port", help="Serial port, e.g. /dev/ttyUSB0 or /dev/serial/by-id/..."
+    )
     ap.add_argument("--baud", type=int, default=DEFAULT_BAUD)
-    ap.add_argument("--probe", action="store_true", help="Run AT/GETVER/GETCFG/GETDEV and exit")
-    ap.add_argument("--distance", action="store_true", help="Poll AT+DISTANCE repeatedly")
-    ap.add_argument("--period", type=float, default=0.5, help="Seconds between distance polls")
-    ap.add_argument("--calibrate", action="store_true", help="Interactive linear calibration using AT+DISTANCE")
-    ap.add_argument("--points", type=int, default=3, help="Number of calibration points (N)")
-    ap.add_argument("--samples", type=int, default=10, help="Samples per point (filters 0.000000)")
+    ap.add_argument(
+        "--probe", action="store_true", help="Run AT/GETVER/GETCFG/GETDEV and exit"
+    )
+    ap.add_argument(
+        "--distance", action="store_true", help="Poll AT+DISTANCE repeatedly"
+    )
+    ap.add_argument(
+        "--period", type=float, default=0.5, help="Seconds between distance polls"
+    )
+    ap.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Interactive linear calibration using AT+DISTANCE",
+    )
+    ap.add_argument(
+        "--points", type=int, default=3, help="Number of calibration points (N)"
+    )
+    ap.add_argument(
+        "--samples", type=int, default=10, help="Samples per point (filters 0.000000)"
+    )
     args = ap.parse_args()
 
     port = pick_port(args.port)
@@ -130,7 +156,12 @@ def main():
     try:
         if args.calibrate:
             id_number = int(input("Enter ID number: "))
-            calibrate_mode(id_number=id_number, ser=ser, points=args.points, samples_per_point=args.samples)
+            calibrate_mode(
+                id_number=id_number,
+                ser=ser,
+                points=args.points,
+                samples_per_point=args.samples,
+            )
             return
         if args.probe:
             quick_probe(ser)
@@ -142,7 +173,9 @@ def main():
     finally:
         ser.close()
 
+
 DIST_RE = re.compile(r"distance:\s*([-+]?\d*\.?\d+)")
+
 
 def parse_distance(resp: str) -> float | None:
     """
@@ -156,6 +189,7 @@ def parse_distance(resp: str) -> float | None:
         return float(m.group(1))
     except ValueError:
         return None
+
 
 def linfit(xs: list[float], ys: list[float]) -> tuple[float, float]:
     """
@@ -178,7 +212,10 @@ def linfit(xs: list[float], ys: list[float]) -> tuple[float, float]:
     b = ybar - a * xbar
     return a, b
 
-def take_measurement(ser: serial.Serial, samples: int, settle_s: float = 0.05) -> float | None:
+
+def take_measurement(
+    ser: serial.Serial, samples: int, settle_s: float = 0.05
+) -> float | None:
     """
     Takes multiple AT+DISTANCE samples, filters out 0.000000 and parse failures.
     Returns (mean_measured, good_count, total_count).
@@ -190,18 +227,23 @@ def take_measurement(ser: serial.Serial, samples: int, settle_s: float = 0.05) -
         d = parse_distance(resp)
         print(f"Measurement: {d}")
         if d is None:
-            print(f"No valid distance samples out of {len(vals)}. Last value was {vals[-1]}")
+            print(
+                f"No valid distance samples out of {len(vals)}. Last value was {vals[-1]}"
+            )
             continue
         vals.append(d)
 
     yield from vals
 
+
 def set_cfg(id_number: int, ser: serial.Serial):
     if id_number > 10:
-        raise ValueError(f"ID number must be between 0 and 10, got {id_number}. Will silently fail if not 0-10.")
+        raise ValueError(
+            f"ID number must be between 0 and 10, got {id_number}. Will silently fail if not 0-10."
+        )
 
     # From what I can tell, the group parameter doesn't actually do anything.  But setting it often helps with pairing it seems
-    GROUP=100
+    GROUP = 100
     print(send_cmd(ser, "AT+GETDEV", max_wait_s=2.0))
     print(send_cmd(ser, "AT+GETCFG", max_wait_s=2.0))
     print(send_cmd(ser, f"AT+SETCFG={id_number},1,1,1，{GROUP}", max_wait_s=2.0))
@@ -209,6 +251,7 @@ def set_cfg(id_number: int, ser: serial.Serial):
     print(send_cmd(ser, "AT+RESTART", max_wait_s=2.0))
     print(send_cmd(ser, "AT+GETCFG", max_wait_s=2.0))
     print()
+
 
 def calibrate_mode(
     id_number: int,
@@ -226,8 +269,12 @@ def calibrate_mode(
     """
     print("\nCalibration mode")
     print("You will enter a known TRUE distance each step (use consistent units).")
-    print("For best results: 5–10 points spanning your working range, 20–50 samples/point.")
-    print("If you see lots of 0.000000, fix ranging first (channel/role, LOS, distance ~0.5–3m).\n")
+    print(
+        "For best results: 5–10 points spanning your working range, 20–50 samples/point."
+    )
+    print(
+        "If you see lots of 0.000000, fix ranging first (channel/role, LOS, distance ~0.5–3m).\n"
+    )
 
     measured: list[float] = []
     truth: list[float] = []
@@ -240,7 +287,7 @@ def calibrate_mode(
 
     for i in range(points):
         while True:
-            s = input(f"[{i+1}/{points}] Enter TRUE distance (e.g. 1.25): ").strip()
+            s = input(f"[{i + 1}/{points}] Enter TRUE distance (e.g. 1.25): ").strip()
             try:
                 true_d = float(s)
                 if true_d <= 0:
@@ -266,10 +313,10 @@ def calibrate_mode(
     a, b = linfit(measured, truth)
 
     # Report fit quality (simple R^2)
-    yhat = [a*x + b for x in measured]
-    ybar = sum(truth)/len(truth)
-    ss_res = sum((y - yh)**2 for y, yh in zip(truth, yhat))
-    ss_tot = sum((y - ybar)**2 for y in truth)
+    yhat = [a * x + b for x in measured]
+    ybar = sum(truth) / len(truth)
+    ss_res = sum((y - yh) ** 2 for y, yh in zip(truth, yhat))
+    ss_tot = sum((y - ybar) ** 2 for y in truth)
     r2 = 1.0 - (ss_res / ss_tot if ss_tot > 0 else float("nan"))
 
     print("Fit complete:")
@@ -287,6 +334,7 @@ def calibrate_mode(
     print("\nUpdated device params:")
     print(send_cmd(ser, "AT+GETDEV", max_wait_s=2.0))
     print("\nDone.\n")
+
 
 if __name__ == "__main__":
     main()

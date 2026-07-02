@@ -122,7 +122,9 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
             now,
         )
         if render_target is not window.screen:
-            pygame.transform.scale(render_target, window.screen.get_size(), window.screen)
+            pygame.transform.scale(
+                render_target, window.screen.get_size(), window.screen
+            )
 
     def reset(self) -> None:
         self.set_state(
@@ -176,9 +178,10 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         for player_index, player in enumerate(players):
             if player.false_start or player.reaction_time_s is not None:
                 continue
-            pressed = self._reaction_pressed(snapshots[player_index]) or keyboard_pressed[
-                player_index
-            ]
+            pressed = (
+                self._reaction_pressed(snapshots[player_index])
+                or keyboard_pressed[player_index]
+            )
             if not pressed:
                 continue
             if state.phase in (ReactionPhase.COUNTDOWN, ReactionPhase.WAIT):
@@ -198,9 +201,7 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         if state.phase is not ReactionPhase.GO:
             return state
         elapsed = now - state.go_at
-        active_players = [
-            player for player in state.players if not player.false_start
-        ]
+        active_players = [player for player in state.players if not player.false_start]
         all_active_players_answered = active_players and all(
             player.reaction_time_s is not None for player in active_players
         )
@@ -218,7 +219,10 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         native_size = window.device.full_display_size()
         if window.screen.get_size() == native_size:
             return window.screen
-        if self._native_surface is None or self._native_surface.get_size() != native_size:
+        if (
+            self._native_surface is None
+            or self._native_surface.get_size() != native_size
+        ):
             self._native_surface = pygame.Surface(native_size, pygame.SRCALPHA)
         return self._native_surface
 
@@ -244,9 +248,10 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
                 panel_width,
                 panel_height,
             )
-            active_input = self._reaction_pressed(
-                snapshots[player_index]
-            ) or keyboard_pressed[player_index]
+            active_input = (
+                self._reaction_pressed(snapshots[player_index])
+                or keyboard_pressed[player_index]
+            )
             self._draw_panel(
                 screen,
                 panel,

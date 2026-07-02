@@ -128,7 +128,10 @@ def command_deploy_target(args: argparse.Namespace) -> int:
         )
         remote_run(host, remote_script)
     else:
-        remote_run(host, f"rm -rf {shell_quote(remote_dir)} && mkdir -p {shell_quote(remote_dir)}")
+        remote_run(
+            host,
+            f"rm -rf {shell_quote(remote_dir)} && mkdir -p {shell_quote(remote_dir)}",
+        )
         rsync_bundle_selftests(host, remote_dir)
 
     remote_run(host, build_remote_helper_script(remote_dir))
@@ -191,7 +194,9 @@ cp {shell_quote(remote_dir)}/rp1_hub75_module/Makefile {shell_quote(remote_modul
     # the canonical driver sources from the bundle so standalone deploys do not
     # depend on Linux source-tree relative paths existing on the target.
     driver_source = BUNDLE_ROOT / "files" / "drivers" / "misc" / "rp1-hub75.c"
-    header_source = BUNDLE_ROOT / "files" / "include" / "uapi" / "misc" / "rp1_hub75_if.h"
+    header_source = (
+        BUNDLE_ROOT / "files" / "include" / "uapi" / "misc" / "rp1_hub75_if.h"
+    )
     subprocess.run(
         ["scp", str(driver_source), f"{host}:{remote_module_dir}/rp1-hub75.c"],
         check=True,
@@ -228,8 +233,7 @@ ls -l /dev/rp1-hub75
 def remote_read32(host: str, remote_dir: str, offset: str) -> str:
     normalized_host = normalize_host(host)
     command = (
-        f"cd {shell_quote(remote_dir)} && "
-        f"sudo ./rp1_sram_read32 {shell_quote(offset)}"
+        f"cd {shell_quote(remote_dir)} && sudo ./rp1_sram_read32 {shell_quote(offset)}"
     )
     result = subprocess.run(
         ["ssh", normalized_host, command],
@@ -255,8 +259,22 @@ def command_preflight(args: argparse.Namespace) -> int:
         args.host,
         f"[ -x {shell_quote(args.remote_dir)}/rp1_sram_read32 ]",
     )
-    rows.append(("/dev/rp1-hub75", "present", "present" if dev_status else "missing", verdict(dev_status)))
-    rows.append(("rp1_sram_read32", "executable", "executable" if helper_status else "missing", verdict(helper_status)))
+    rows.append(
+        (
+            "/dev/rp1-hub75",
+            "present",
+            "present" if dev_status else "missing",
+            verdict(dev_status),
+        )
+    )
+    rows.append(
+        (
+            "rp1_sram_read32",
+            "executable",
+            "executable" if helper_status else "missing",
+            verdict(helper_status),
+        )
+    )
 
     if not helper_status:
         print_table(rows)
@@ -264,7 +282,9 @@ def command_preflight(args: argparse.Namespace) -> int:
 
     feature = checks["firmware_feature_table"]
     observed_feature = [
-        remote_read32(args.host, args.remote_dir, hex(int(feature["address"], 16) + i * 4))
+        remote_read32(
+            args.host, args.remote_dir, hex(int(feature["address"], 16) + i * 4)
+        )
         for i in range(4)
     ]
     expected_feature = [word.lower() for word in feature["known_launchable_words"]]
@@ -278,7 +298,10 @@ def command_preflight(args: argparse.Namespace) -> int:
         )
     )
 
-    for key, label in (("legacy_hook_5fc", "hook 0x5fc"), ("vector_hook_12c", "hook 0x12c")):
+    for key, label in (
+        ("legacy_hook_5fc", "hook 0x5fc"),
+        ("vector_hook_12c", "hook 0x12c"),
+    ):
         check = checks[key]
         observed = remote_read32(args.host, args.remote_dir, check["address"])
         expected = check["known_launchable_word"].lower()
@@ -316,16 +339,22 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser = subparsers.add_parser("list", help="list bundled Linux files")
     list_parser.set_defaults(func=command_list)
 
-    apply_parser = subparsers.add_parser("apply", help="copy bundle files into a Linux checkout")
+    apply_parser = subparsers.add_parser(
+        "apply", help="copy bundle files into a Linux checkout"
+    )
     apply_parser.add_argument("--linux", type=Path, required=True)
     apply_parser.add_argument("--dry-run", action="store_true")
     apply_parser.set_defaults(func=command_apply)
 
-    diff_parser = subparsers.add_parser("diff", help="check whether a Linux checkout matches the bundle")
+    diff_parser = subparsers.add_parser(
+        "diff", help="check whether a Linux checkout matches the bundle"
+    )
     diff_parser.add_argument("--linux", type=Path, required=True)
     diff_parser.set_defaults(func=command_diff)
 
-    deploy_parser = subparsers.add_parser("deploy-target", help="deploy and build the bundle on a totem")
+    deploy_parser = subparsers.add_parser(
+        "deploy-target", help="deploy and build the bundle on a totem"
+    )
     deploy_parser.add_argument("--host", required=True)
     deploy_parser.add_argument("--remote-dir", default=DEFAULT_REMOTE_DIR)
     deploy_parser.add_argument("--remote-module-dir", default=DEFAULT_REMOTE_MODULE_DIR)
@@ -335,7 +364,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     deploy_parser.set_defaults(func=command_deploy_target)
 
-    preflight_parser = subparsers.add_parser("preflight", help="classify RP1 boot state on a totem")
+    preflight_parser = subparsers.add_parser(
+        "preflight", help="classify RP1 boot state on a totem"
+    )
     preflight_parser.add_argument("--host", required=True)
     preflight_parser.add_argument("--remote-dir", default="/home/michael/rp1-pio")
     preflight_parser.set_defaults(func=command_preflight)

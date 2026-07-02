@@ -113,11 +113,17 @@ class ZedRenderer(StatefulBaseRenderer[ZedState]):
 
         font = self._font_for_size(width, height, is_final_hit)
         max_width = int(width * (0.96 if is_final_hit else 0.88))
-        lines = tuple(text.splitlines()) if is_final_hit else self._wrap_text(text, font, max_width)
+        lines = (
+            tuple(text.splitlines())
+            if is_final_hit
+            else self._wrap_text(text, font, max_width)
+        )
         self._layout_cache[key] = (font, lines)
         return font, lines
 
-    def _font_for_size(self, width: int, height: int, is_final_hit: bool) -> pygame.font.Font:
+    def _font_for_size(
+        self, width: int, height: int, is_final_hit: bool
+    ) -> pygame.font.Font:
         key = (width, height, is_final_hit)
         cached = self._font_cache.get(key)
         if cached is not None:
@@ -137,9 +143,14 @@ class ZedRenderer(StatefulBaseRenderer[ZedState]):
         best = pygame.font.Font(str(ZED_FONT_PATH), size)
         while size >= 12:
             font = pygame.font.Font(str(ZED_FONT_PATH), size)
-            widths = [font.render(line, False, ZED_TEXT).get_width() for line in sample_lines]
+            widths = [
+                font.render(line, False, ZED_TEXT).get_width() for line in sample_lines
+            ]
             total_height = font.get_linesize() * len(sample_lines)
-            if max(widths) <= width * max_width_ratio and total_height <= height * max_height_ratio:
+            if (
+                max(widths) <= width * max_width_ratio
+                and total_height <= height * max_height_ratio
+            ):
                 best = font
                 break
             size -= 1

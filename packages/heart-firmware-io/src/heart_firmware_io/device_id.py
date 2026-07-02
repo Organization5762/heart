@@ -97,7 +97,10 @@ def _hardware_device_uid(microcontroller_module=None) -> str | None:
 def _random_device_id() -> str:
     try:
         random_bytes = os.urandom(8)
-    except (AttributeError, NotImplementedError):  # pragma: no cover - hardware fallback
+    except (
+        AttributeError,
+        NotImplementedError,
+    ):  # pragma: no cover - hardware fallback
         random_bytes = b"\x00" * 8
     return random_bytes.hex()
 

@@ -57,9 +57,7 @@ def _parse_update_mode(value: object) -> UpdateMode:
     if value is None:
         return UpdateMode.CIRCUITPYTHON
     if not isinstance(value, str):
-        raise ValueError(
-            f"Expected DEFAULT_UPDATE_MODE to be a string, got {value!r}"
-        )
+        raise ValueError(f"Expected DEFAULT_UPDATE_MODE to be a string, got {value!r}")
     try:
         return UpdateMode(value.strip().lower())
     except ValueError as error:
@@ -82,18 +80,14 @@ def _load_arduino_config(
         )
     ).resolve()
     if not sketch_path.exists():
-        raise ValueError(
-            f"Expected ARDUINO_SKETCH_PATH to exist, got {sketch_path}"
-        )
+        raise ValueError(f"Expected ARDUINO_SKETCH_PATH to exist, got {sketch_path}")
 
     port_keywords = _parse_csv(
         config.get("ARDUINO_PORT_KEYWORDS", ""),
         field_name="ARDUINO_PORT_KEYWORDS",
     )
     if not port_keywords:
-        raise ValueError(
-            "Expected ARDUINO_PORT_KEYWORDS to include at least one entry"
-        )
+        raise ValueError("Expected ARDUINO_PORT_KEYWORDS to include at least one entry")
 
     return ArduinoConfig(
         board_manager_urls=_parse_csv(

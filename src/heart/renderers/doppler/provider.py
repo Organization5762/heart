@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
-from manyfold import StreamNode
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 
 from .state import DopplerState
 
@@ -73,10 +73,8 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[DopplerState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+    ) -> Variable[DopplerState]:
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = self._initial_state()
 
         def advance_state(state: DopplerState, frame_tick: object) -> DopplerState:
@@ -84,11 +82,8 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
             acceleration = self._random_acceleration()
             return self._advance_state(state, acceleration=acceleration, dt=dt_seconds)
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )
 
     @property

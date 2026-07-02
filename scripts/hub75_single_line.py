@@ -111,7 +111,9 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_HARDWARE_MAPPING,
         choices=HARDWARE_MAPPING_CHOICES,
     )
-    parser.add_argument("--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE)
+    parser.add_argument(
+        "--led-rgb-sequence", type=str, default=DEFAULT_LED_RGB_SEQUENCE
+    )
     parser.add_argument("--row-index", type=int, default=DEFAULT_ROW_INDEX)
     parser.add_argument("--line-thickness", type=int, default=DEFAULT_LINE_THICKNESS)
     parser.add_argument("--red", type=int, default=255)
@@ -186,7 +188,9 @@ def build_line_image(width: int, height: int, pattern: LinePattern) -> Image.Ima
     """Create the one-line RGBA frame submitted to the Pi 5 backend."""
 
     if pattern.row_index < 0 or pattern.row_index >= height:
-        raise ValueError(f"Row index {pattern.row_index} is outside image height {height}.")
+        raise ValueError(
+            f"Row index {pattern.row_index} is outside image height {height}."
+        )
     if pattern.thickness <= 0:
         raise ValueError("line_thickness must be at least 1.")
 

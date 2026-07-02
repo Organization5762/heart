@@ -75,7 +75,9 @@ class LEDMatrix(Device):
         )
 
     def _flush_startup_frames(self) -> None:
-        logger.info("Flushing matrix startup state with %s black frames", STARTUP_FLUSH_FRAMES)
+        logger.info(
+            "Flushing matrix startup state with %s black frames", STARTUP_FLUSH_FRAMES
+        )
         self.driver.clear()
         width, height = self.full_display_size()
         blank_frame = bytes(width * height * len(RGBA_IMAGE_FORMAT))

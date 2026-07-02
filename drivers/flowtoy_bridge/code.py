@@ -17,7 +17,7 @@ import json
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 from heart_firmware_io import device_id, flowtoy, identity, radio
 
@@ -82,7 +82,9 @@ class RadioBridgeRuntime:
                 payload,
                 protocol=str(packet.get("protocol", radio.FLOWTOY_PROTOCOL)),
                 channel=int(packet.get("channel", radio.FLOWTOY_CHANNEL)),
-                bitrate_kbps=int(packet.get("bitrate_kbps", radio.FLOWTOY_BITRATE_KBPS)),
+                bitrate_kbps=int(
+                    packet.get("bitrate_kbps", radio.FLOWTOY_BITRATE_KBPS)
+                ),
                 modulation=str(packet.get("modulation", radio.FLOWTOY_MODULATION)),
                 crc_ok=self._extract_bool(packet.get("crc_ok")),
                 frequency_hz=self._extract_optional_float(packet.get("frequency_hz")),
@@ -138,7 +140,9 @@ class RadioBridgeRuntime:
 
 def create_runtime(
     *,
-    gather_packet_fn: Callable[[], Mapping[str, object] | bytes | None] = _default_packet,
+    gather_packet_fn: Callable[
+        [], Mapping[str, object] | bytes | None
+    ] = _default_packet,
     print_fn: Callable[[str], None] = _write_serial_bus,
     sleep_fn: Callable[[float], None] = time.sleep,
     interval_seconds: float = FLOWTOY_BRIDGE_LOOP_INTERVAL_SECONDS,

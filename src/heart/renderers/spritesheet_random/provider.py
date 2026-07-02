@@ -1,12 +1,13 @@
 import random
 from dataclasses import replace
 
-from manyfold import MergeNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
@@ -50,14 +51,14 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
 
     def observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[SpritesheetLoopRandomState]:
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+    ) -> Variable[SpritesheetLoopRandomState]:
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
             lambda switch_event: (
-                lambda state: self.handle_switch_state(state, switch_event.state)
+                lambda state: self.handle_switch_state(
+                    state, switch_event.state
+                )
             )
         )
         tick_updates = frame_ticks.map(
@@ -66,12 +67,9 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             )
         )
         initial_state = self.initial_state()
-        return (
-            MergeNode.merge(switch_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
-
-
+        return PubSubObservable.merge(switch_updates, tick_updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )
 
     def handle_switch_state(

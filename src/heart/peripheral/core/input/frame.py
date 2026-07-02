@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import pygame
-from manyfold import Graph, StreamNode
+from manyfold import Graph
+from manyfold.architecture import NewValues
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.input.events import frame_tick_topic
+from heart.peripheral.core.variables import Variable
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +27,8 @@ class FrameTickController:
         del graph
         self._debug_tap = debug_tap
         self._frame_index = 0
-        self._stream: EventStream[FrameTick] = EventStream()
+        self._stream = NewValues[FrameTick](name="heart.input.frame_tick")
+        self._topic = frame_tick_topic(FrameTick)
 
     def advance(self, clock: pygame.time.Clock) -> FrameTick:
         fps = float(clock.get_fps())
@@ -37,7 +40,9 @@ class FrameTickController:
             fps=fps if fps > 0 else None,
         )
         self._frame_index += 1
-        self._debug_tap.record_latency("frame.tick", time.monotonic() - frame.monotonic_s)
+        self._debug_tap.record_latency(
+            "frame.tick", time.monotonic() - frame.monotonic_s
+        )
         self._debug_tap.publish(
             stage=InputDebugStage.FRAME,
             stream_name="frame.tick",
@@ -45,7 +50,11 @@ class FrameTickController:
             payload=frame,
         )
         self._stream.emit(frame)
+        self._topic.publish(frame)
         return frame
 
-    def observable(self) -> StreamNode[FrameTick]:
-        return cast(StreamNode[FrameTick], self._stream.observable())
+    def observable(self) -> Variable[FrameTick]:
+        return cast(Variable[FrameTick], self._stream)
+
+    def topic(self) -> Any:
+        return self._topic

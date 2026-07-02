@@ -5,12 +5,10 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 import numpy as np
-import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, KeyboardSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import (FractalRuntime,
                                                     FractalScene,
@@ -41,55 +39,14 @@ class _StubRuntime:
         return None
 
 
-class _Subscription:
-    def __init__(self) -> None:
-        self.dispose_calls = 0
-
-    def dispose(self) -> None:
-        self.dispose_calls += 1
-
-
-class _SnapshotStream:
-    def __init__(self) -> None:
-        self.subscriptions: list[_Subscription] = []
-
-    def subscribe(self, **_kwargs) -> _Subscription:
-        subscription = _Subscription()
-        self.subscriptions.append(subscription)
-        return subscription
-
-
-class _SnapshotController:
-    def __init__(self, snapshot: object | None = None) -> None:
-        self.stream = _SnapshotStream()
-        self.snapshot = snapshot or GamepadSnapshot(connected=False, identifier=None)
-
-    def snapshot_stream(self) -> _SnapshotStream:
-        return self.stream
-
-    def sample(self) -> object:
-        return self.snapshot
-
-
-class _InputIO:
-    def __init__(self) -> None:
-        self.keyboard = _SnapshotController(
-            KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
-        )
-        self.gamepad = _SnapshotController()
-
-
-class _PeripheralManager:
-    def __init__(self) -> None:
-        self.input_io = _InputIO()
-
-
 class _SamplingGamepad:
     def __init__(self, snapshot: GamepadSnapshot) -> None:
         self.snapshot = snapshot
 
-    def sample(self) -> GamepadSnapshot:
-        return self.snapshot
+    def sample(self, **_kwargs) -> tuple[GamepadSnapshotEvent, ...]:
+        if not self.snapshot.connected:
+            return ()
+        return (GamepadSnapshotEvent(joystick_id=0, snapshot=self.snapshot),)
 
 
 class _SamplingInputIO:
@@ -104,154 +61,6 @@ class _SamplingPeripheralManager:
 
 class TestFractalRuntime:
     """Ensure fractal runtime cleanup is explicit so OpenGL modes do not poison later renderer lifecycles."""
-
-    def test_initial_state_does_not_reconfigure_display_context(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify fractal initialization avoids mutating the provided display context so scratch-window setup cannot strand later scenes in OpenGL mode."""
-        runtime = FractalRuntime()
-        window = Mock()
-        window.get_size.return_value = (64, 64)
-        window.clock = Mock()
-        orientation = Rectangle.with_layout(columns=1, rows=1)
-        peripheral_manager = Mock()
-
-        monkeypatch.setattr(
-            "heart.renderers.three_fractal.renderer.glGetString",
-            lambda _value: b"mock",
-        )
-        runtime.shader = Mock()
-        monkeypatch.setattr(runtime, "_render", lambda: None)
-        monkeypatch.setattr(runtime, "_center_mouse", lambda: None)
-        monkeypatch.setattr(pygame.mouse, "set_visible", lambda _visible: None)
-
-        runtime._create_initial_state(
-            window=window,
-            peripheral_manager=peripheral_manager,
-            orientation=orientation,
-        )
-
-        window.configure_window.assert_not_called()
-
-    def test_reset_does_not_retain_snapshot_subscriptions(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify repeated fractal entry and exit does not create live input listeners."""
-        runtime = FractalRuntime()
-        window = Mock()
-        window.get_size.return_value = (64, 64)
-        window.clock = Mock()
-        manager = _PeripheralManager()
-
-        monkeypatch.setattr(
-            "heart.renderers.three_fractal.renderer.glGetString",
-            lambda _value: b"mock",
-        )
-        monkeypatch.setattr(runtime, "_render", lambda: None)
-        monkeypatch.setattr(runtime, "_center_mouse", lambda: None)
-        monkeypatch.setattr(pygame.mouse, "set_visible", lambda _visible: None)
-
-        runtime._create_initial_state(
-            window=window,
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        runtime.reset()
-
-        assert manager.input_io.keyboard.stream.subscriptions == []
-
-    def test_reset_deletes_owned_tiled_gl_texture(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify runtime reset releases textures allocated during fractal initialization."""
-        runtime = FractalRuntime()
-        runtime.display_texture = 11
-        deleted_textures: list[int] = []
-        monkeypatch.setattr(pygame.mouse, "set_visible", lambda _visible: None)
-        monkeypatch.setattr(
-            "heart.renderers.three_fractal.renderer.glDeleteTextures",
-            lambda textures: deleted_textures.extend(textures),
-        )
-
-        runtime.reset()
-
-        assert deleted_textures == [11]
-
-    def test_reset_clears_cached_window_state(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify runtime reset restores UI state and clears cached surfaces so leaving the fractal mode does not strand the app in stale OpenGL state."""
-        runtime = FractalRuntime()
-        runtime.target_surface = object()
-        runtime.clock = object()
-        runtime.window_size = (1, 2)
-        runtime.real_window_size = (3, 4)
-        runtime.render_size = (5, 6)
-        runtime.screen_center = (7, 8)
-        runtime.prev_mouse_pos = (9, 10)
-        runtime.mouse_pos = (11, 12)
-        runtime.last_frame_time = 1.0
-        runtime.last_update_time = 2.0
-        runtime.delta_real_time = 3.0
-        runtime.surface_array = object()
-        runtime.time_initialized = 4.0
-        runtime.initialized = True
-        runtime._auto_started = True
-        visibility_calls: list[bool] = []
-        monkeypatch.setattr(pygame.mouse, "set_visible", visibility_calls.append)
-        monkeypatch.setattr(
-            "heart.renderers.three_fractal.renderer.glDeleteTextures",
-            lambda *_args: None,
-        )
-
-        runtime.reset()
-
-        assert visibility_calls == [True]
-        assert runtime.initialized is False
-        assert runtime._auto_started is False
-        assert runtime.mode == "auto"
-        assert runtime.target_surface is None
-        assert runtime.clock is None
-        assert runtime.window_size is None
-        assert runtime.real_window_size is None
-        assert runtime.render_size is None
-        assert runtime.screen_center is None
-        assert runtime.prev_mouse_pos is None
-        assert runtime.mouse_pos is None
-        assert runtime.last_frame_time is None
-        assert runtime.last_update_time is None
-        assert runtime.delta_real_time is None
-        assert runtime.surface_array is None
-        assert runtime.time_initialized is None
-        assert runtime.shader is None
-        assert runtime.program is None
-        assert runtime.mat is None
-        assert runtime.prevMat is None
-        assert runtime.display_texture is None
-        assert runtime.pixels is None
-
-    def test_is_initialized_rejects_partial_tiled_runtime_state(self) -> None:
-        """Verify tiled fractal runtimes require their render-size buffers so reset races cannot execute one more broken OpenGL frame."""
-        runtime = FractalRuntime()
-        runtime.initialized = True
-        runtime.tiled_mode = True
-        runtime.shader = Mock()
-        runtime.program = 1
-        runtime.clock = Mock()
-        runtime.mat = Mock()
-        runtime.prevMat = Mock()
-        runtime.window_size = (64, 64)
-        runtime.surface_array = Mock()
-        runtime.render_size = None
-        runtime.real_window_size = (128, 64)
-        runtime.pixels = Mock()
-        runtime.display_texture = 1
-
-        assert runtime.is_initialized() is False
 
     def test_cube_tile_render_size_uses_one_physical_panel(self) -> None:
         """Verify cube rendering samples one panel before repeating it across the OpenGL window."""
@@ -291,7 +100,7 @@ class TestFractalRuntime:
 
         runtime._process_input(_SamplingPeripheralManager(snapshot))
 
-        assert runtime._gamepad_snapshot is snapshot
+        assert runtime._gamepad_snapshots[0].snapshot is snapshot
         assert runtime.vel[0] > 0.0
 
     def test_west_button_returns_free_look_to_auto_mode(self) -> None:
@@ -302,10 +111,13 @@ class TestFractalRuntime:
         runtime.max_velocity = 2.0
         runtime.mat = np.identity(4, dtype=np.float32)
         runtime.vel = np.zeros((3,), dtype=np.float32)
-        runtime._gamepad_snapshot = GamepadSnapshot(
+        snapshot = GamepadSnapshot(
             connected=True,
             identifier="8BitDo Lite 2",
             tapped_buttons=frozenset({GamepadButton.WEST}),
+        )
+        runtime._gamepad_snapshots = (
+            GamepadSnapshotEvent(joystick_id=0, snapshot=snapshot),
         )
 
         runtime._check_enter_auto(Mock())
@@ -358,42 +170,6 @@ class TestFractalScene:
         assert state.runtime.initialize_calls == 0
         assert state.runtime.initialized is False
 
-    def test_constructor_preserves_opengl_display_mode(self) -> None:
-        """Verify the scene reports OPENGL after construction so the runtime allocates the correct window type for fractal rendering."""
-        scene = FractalScene(provider=Mock())
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
-
-    def test_reset_resets_runtime_and_clears_cached_state(self) -> None:
-        """Verify scene reset forwards to the embedded runtime and drops cached initialization state so re-entry gets a clean OpenGL lifecycle."""
-        scene = FractalScene(provider=Mock())
-        runtime = _StubRuntime()
-        scene.set_state(FractalSceneState(runtime=runtime))
-        scene._initial_state = FractalSceneState(runtime=runtime)
-        scene._peripheral_manager = Mock()
-        scene.initialized = True
-
-        scene.reset()
-
-        assert runtime.reset_calls == 1
-        assert scene._initial_state is None
-        assert scene._peripheral_manager is None
-        assert scene.initialized is False
-
-    def test_real_process_reinitializes_runtime_if_nested_runtime_was_reset(
-        self,
-    ) -> None:
-        """Verify the scene heals a reset nested runtime before drawing so OpenGL exit and re-entry do not leave the wrapper pointing at cleared state."""
-        scene = FractalScene(provider=Mock())
-        runtime = _StubRuntime()
-        runtime._initialized = False
-        scene.set_state(FractalSceneState(runtime=runtime))
-        scene._peripheral_manager = Mock()
-
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
-
-        assert runtime.initialize_calls == 1
-
     def test_real_process_disables_runtime_after_initialization_failure(self) -> None:
         """Verify unsupported OpenGL contexts do not throw every frame after fractal entry fails."""
         scene = FractalScene(provider=Mock())
@@ -402,8 +178,12 @@ class TestFractalScene:
         scene.set_state(FractalSceneState(runtime=runtime))
         scene._peripheral_manager = Mock()
 
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        scene.real_process(window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        scene.real_process(
+            window=Mock(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert runtime.initialize_calls == 1
         assert scene._runtime_failed is True

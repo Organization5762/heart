@@ -6,12 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import pygame
-from manyfold import MergeNode, StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
@@ -58,7 +59,7 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
     def observable(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> StreamNode[LifePreserverState]:
+    ) -> Variable[LifePreserverState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()
@@ -72,10 +73,9 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
                 lambda state: self.advance(state, elapsed_ms=frame_tick.delta_ms)
             )
         )
-        return (
-            MergeNode.merge(switch_updates, tick_updates)
-            .scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
+        return PubSubObservable.merge(switch_updates, tick_updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )
 
     def handle_switch(
@@ -126,9 +126,9 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
         rotation_duration_scale = state.rotation_duration_scale
         for event in gamepad_controller.sample():
             snapshot = event.snapshot
-            bumper_pressed = snapshot.button_held(GamepadButton.ZL) or snapshot.button_held(
-                GamepadButton.ZR
-            )
+            bumper_pressed = snapshot.button_held(
+                GamepadButton.ZL
+            ) or snapshot.button_held(GamepadButton.ZR)
             left_trigger_pressure = _trigger_pressure(
                 snapshot.axis_value(GamepadAxis.TRIGGER_LEFT)
             )
@@ -182,10 +182,7 @@ class LifePreserverRenderer(StatefulBaseRenderer[LifePreserverState]):
         text_margin = max(1, round(radius * 0.12))
         float_offset = round(
             sin(
-                self.state.caption_elapsed_ms
-                / LIFE_PRESERVER_CAPTION_FLOAT_MS
-                * 2
-                * pi
+                self.state.caption_elapsed_ms / LIFE_PRESERVER_CAPTION_FLOAT_MS * 2 * pi
             )
             * max(1, round(radius * 0.08))
         )

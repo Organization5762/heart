@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
+from typing import cast
 
-from manyfold import StreamNode
+from manyfold.architecture import NewValues
 
-from heart.peripheral.core.streams import EventStream
+from heart.peripheral.core.input.streams import map_stream, stream_from
 from heart.peripheral.core.subscriptions import CompositeSubscription
+from heart.peripheral.core.variables import Variable
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +38,8 @@ NavigationIntent = BrowseIntent | ActivateIntent | AlternateActivateIntent
 class NavigationProfile:
     def __init__(
         self,
-        intents: StreamNode[NavigationIntent],
-        injected_intents: EventStream[NavigationIntent],
+        intents: Variable[NavigationIntent],
+        injected_intents: NewValues[NavigationIntent],
     ) -> None:
         self._intents = intents
         self._injected_intents = injected_intents
@@ -64,38 +66,35 @@ class NavigationProfile:
         return CompositeSubscription(subscriptions)
 
     @cached_property
-    def intents(self) -> StreamNode[NavigationIntent]:
-        return self._intents
+    def intents(self) -> Variable[NavigationIntent]:
+        return stream_from(self._intents)
 
     @cached_property
-    def browse(self) -> StreamNode[BrowseIntent]:
-        return (
-            self.intents.filter(lambda intent: isinstance(intent, BrowseIntent))
-            .map(lambda intent: intent)
-
+    def browse(self) -> Variable[BrowseIntent]:
+        return cast(
+            Variable[BrowseIntent],
+            self.intents.filter(lambda intent: isinstance(intent, BrowseIntent)),
         )
 
     @cached_property
-    def activate(self) -> StreamNode[ActivateIntent]:
-        return (
-            self.intents.filter(lambda intent: isinstance(intent, ActivateIntent))
-            .map(lambda intent: intent)
-
+    def activate(self) -> Variable[ActivateIntent]:
+        return cast(
+            Variable[ActivateIntent],
+            self.intents.filter(lambda intent: isinstance(intent, ActivateIntent)),
         )
 
     @cached_property
-    def alternate_activate(self) -> StreamNode[AlternateActivateIntent]:
-        return (
+    def alternate_activate(self) -> Variable[AlternateActivateIntent]:
+        return cast(
+            Variable[AlternateActivateIntent],
             self.intents.filter(
                 lambda intent: isinstance(intent, AlternateActivateIntent)
-            )
-            .map(lambda intent: intent)
-
+            ),
         )
 
     @cached_property
-    def browse_delta(self) -> StreamNode[int]:
-        return self.browse.map(lambda intent: intent.step)
+    def browse_delta(self) -> Variable[int]:
+        return map_stream(self.browse, lambda intent: intent.step)
 
     def inject_browse(self, step: int, source: str = "beats.control") -> None:
         if step == 0:

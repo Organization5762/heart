@@ -44,12 +44,8 @@ class Tixyland(StatefulBaseRenderer[TixylandState]):
         primary, secondary = _palette(state.hue_degrees)
 
         # Compute red and white intensity arrays, ensuring correct float32 dtype
-        low = (mag[..., None] * primary * 255).astype(
-            np.uint32
-        )
-        high = (mag[..., None] * secondary * 255).astype(
-            np.uint32
-        )
+        low = (mag[..., None] * primary * 255).astype(np.uint32)
+        high = (mag[..., None] * secondary * 255).astype(np.uint32)
 
         # Shape: (h, w, 3), dtype: uint32
         rgb = np.where(numpy_output[..., None] < 0, low, high).astype(np.uint32)

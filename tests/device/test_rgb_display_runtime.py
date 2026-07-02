@@ -61,6 +61,13 @@ class FakeDriver:
         self.closed = True
 
 
+FAKE_WIRING_PROFILE = SimpleNamespace(
+    AdafruitHatPwm="hat-pwm",
+    ElectroDragonP0="electrodragon-p0",
+    ThreePortActive="three-port-active",
+)
+
+
 class TestRgbDisplayRuntime:
     """Validate RGB display runtime hooks so the device path can move to the clean-room matrix API safely."""
 
@@ -74,7 +81,7 @@ class TestRgbDisplayRuntime:
         monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "adafruit_hat_pwm")
         native_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
-            WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
+            WiringProfile=FAKE_WIRING_PROFILE,
             ColorOrder=SimpleNamespace(RGB="rgb"),
         )
 
@@ -98,16 +105,10 @@ class TestRgbDisplayRuntime:
 
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")
         monkeypatch.setenv("HEART_PANEL_COLUMNS", "64")
-        monkeypatch.setenv(
-            "HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active"
-        )
+        monkeypatch.setenv("HEART_RGB_MATRIX_HARDWARE_MAPPING", "three-port-active")
         native_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
-            WiringProfile=SimpleNamespace(
-                AdafruitHatPwm="hat-pwm",
-                ElectroDragonP0="electrodragon-p0",
-                ThreePortActive="three-port-active",
-            ),
+            WiringProfile=FAKE_WIRING_PROFILE,
             ColorOrder=SimpleNamespace(RGB="rgb"),
         )
 
@@ -147,7 +148,7 @@ class TestRgbDisplayRuntime:
         fake_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
             MatrixDriver=FakeDriver,
-            WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
+            WiringProfile=FAKE_WIRING_PROFILE,
             ColorOrder=SimpleNamespace(RGB="rgb"),
         )
         monkeypatch.setattr(
@@ -178,7 +179,7 @@ class TestRgbDisplayRuntime:
         fake_module = SimpleNamespace(
             MatrixConfig=FakeMatrixConfig,
             MatrixDriver=FakeDriver,
-            WiringProfile=SimpleNamespace(AdafruitHatPwm="hat-pwm"),
+            WiringProfile=FAKE_WIRING_PROFILE,
             ColorOrder=SimpleNamespace(RGB="rgb"),
         )
         monkeypatch.setenv("HEART_PANEL_ROWS", "64")

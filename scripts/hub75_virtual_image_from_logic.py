@@ -43,7 +43,9 @@ class Capture:
     last_timestamp: float
 
     def level_at_channel(self, channel: int, timestamp: float) -> int:
-        return self.initial[channel] ^ (bisect_right(self.edges[channel], timestamp) & 1)
+        return self.initial[channel] ^ (
+            bisect_right(self.edges[channel], timestamp) & 1
+        )
 
 
 def main() -> int:
@@ -227,7 +229,9 @@ def decode_virtual_image(
                 continue
             offset_counts[top_offset] = offset_counts.get(top_offset, 0) + 1
             top_offset_counts[top_offset] = top_offset_counts.get(top_offset, 0) + 1
-            bottom_offset_counts[bottom_offset] = bottom_offset_counts.get(bottom_offset, 0) + 1
+            bottom_offset_counts[bottom_offset] = (
+                bottom_offset_counts.get(bottom_offset, 0) + 1
+            )
             offset_scores.append(score)
             clock_end = base_clock_end + top_offset
         else:
@@ -248,7 +252,9 @@ def decode_virtual_image(
         if row >= half_rows:
             skipped_address += 1
             continue
-        weight = oe_weight_after_lat(capture, signal_map, lat_time) if weight_oe else 1.0
+        weight = (
+            oe_weight_after_lat(capture, signal_map, lat_time) if weight_oe else 1.0
+        )
         if weight <= 0:
             continue
         for shifted_x, clock_time in enumerate(clocks):
@@ -352,10 +358,18 @@ def red_green_pattern_score(
     else:
         raise SystemExit(f"unknown half {half!r}")
     r_first = channel_sum(capture, signal_map[red_signal], first, sample_before_seconds)
-    r_second = channel_sum(capture, signal_map[red_signal], second, sample_before_seconds)
-    g_first = channel_sum(capture, signal_map[green_signal], first, sample_before_seconds)
-    g_second = channel_sum(capture, signal_map[green_signal], second, sample_before_seconds)
-    b_total = channel_sum(capture, signal_map[blue_signal], clocks, sample_before_seconds)
+    r_second = channel_sum(
+        capture, signal_map[red_signal], second, sample_before_seconds
+    )
+    g_first = channel_sum(
+        capture, signal_map[green_signal], first, sample_before_seconds
+    )
+    g_second = channel_sum(
+        capture, signal_map[green_signal], second, sample_before_seconds
+    )
+    b_total = channel_sum(
+        capture, signal_map[blue_signal], clocks, sample_before_seconds
+    )
 
     expected = r_first + g_second
     unexpected = r_second + g_first + b_total
@@ -373,10 +387,15 @@ def channel_sum(
 ) -> int:
     edges = capture.edges[channel]
     initial = capture.initial[channel]
-    return sum(initial ^ (bisect_right(edges, clock - sample_before_seconds) & 1) for clock in clocks)
+    return sum(
+        initial ^ (bisect_right(edges, clock - sample_before_seconds) & 1)
+        for clock in clocks
+    )
 
 
-def row_address_at(capture: Capture, signal_map: dict[str, int], timestamp: float) -> int:
+def row_address_at(
+    capture: Capture, signal_map: dict[str, int], timestamp: float
+) -> int:
     value = 0
     for bit, signal in enumerate(("A", "B", "C", "D", "E")):
         channel = signal_map.get(signal)
@@ -385,7 +404,9 @@ def row_address_at(capture: Capture, signal_map: dict[str, int], timestamp: floa
     return value
 
 
-def oe_weight_after_lat(capture: Capture, signal_map: dict[str, int], lat_time: float) -> float:
+def oe_weight_after_lat(
+    capture: Capture, signal_map: dict[str, int], lat_time: float
+) -> float:
     oe = signal_map["OE"]
     falls = capture.falls[oe]
     rises = capture.rises[oe]
@@ -449,7 +470,9 @@ def write_ppm(path: Path, image: list[list[list[float]]]) -> None:
         handle.write(f"P6\n{width} {height}\n255\n".encode())
         for row in image:
             for rgb in row:
-                handle.write(bytes(max(0, min(255, round(value * 255))) for value in rgb))
+                handle.write(
+                    bytes(max(0, min(255, round(value * 255))) for value in rgb)
+                )
 
 
 def print_summary(path: Path, stats: dict[str, object]) -> None:

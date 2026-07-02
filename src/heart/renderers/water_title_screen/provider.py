@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from manyfold import StreamNode
-
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.water_title_screen.state import WaterTitleScreenState
 
 DEFAULT_WAVE_SPEED = 0.5
@@ -20,10 +19,8 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
 
     def observable(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> StreamNode[WaterTitleScreenState]:
-        frame_ticks = (
-            self._peripheral_manager.input_io.frame_tick_stream()
-        )
+    ) -> Variable[WaterTitleScreenState]:
+        frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = WaterTitleScreenState()
 
         def advance_state(
@@ -34,9 +31,6 @@ class WaterTitleScreenStateProvider(ObservableProvider[WaterTitleScreenState]):
                 wave_offset=state.wave_offset + self._wave_speed * dt_seconds * 60.0
             )
 
-        return (
-            frame_ticks.scan(advance_state, seed=initial_state)
-            .start_with(initial_state)
-
-
+        return frame_ticks.scan(advance_state, seed=initial_state).start_with(
+            initial_state
         )

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from manyfold import StreamNode
+from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.variables import Variable
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 
 DEFAULT_FRAME_DURATION_MS = 650
@@ -44,10 +45,8 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
         peripheral_manager: PeripheralManager,
         *,
         initial_state: ThreeDGlassesState,
-    ) -> StreamNode[ThreeDGlassesState]:
-        frame_ticks = (
-            peripheral_manager.input_io.frame_tick_stream()
-        )
+    ) -> Variable[ThreeDGlassesState]:
+        frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         tick_updates = frame_ticks.map(
             lambda frame_tick: (
                 lambda state: self.next_state(
@@ -55,9 +54,7 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
                 )
             )
         )
-        return (
-            tick_updates.scan(lambda state, update: update(state), seed=initial_state)
-            .start_with(initial_state)
-
-
+        return PubSubObservable.merge(tick_updates).state(
+            initial_state,
+            lambda state, update: update(state),
         )

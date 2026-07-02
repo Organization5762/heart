@@ -24,7 +24,11 @@ UARTService = optional_import_attribute(
 )
 
 
-if BLERadio is not None and UARTService is not None and ProvideServicesAdvertisement is not None:
+if (
+    BLERadio is not None
+    and UARTService is not None
+    and ProvideServicesAdvertisement is not None
+):
     ble = BLERadio()
     uart = UARTService()
     advertisement = ProvideServicesAdvertisement(uart)
@@ -40,6 +44,7 @@ def _require_ble_dependencies() -> None:
             "adafruit_ble is required to use heart_firmware_io.bluetooth. "
             "Install the CircuitPython BLE libraries to enable Bluetooth communication."
         )
+
 
 END_OF_MESSAGE_DELIMETER = "\n"
 ENCODING = "utf-8"

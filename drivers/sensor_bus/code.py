@@ -50,6 +50,7 @@ def _write_serial_bus(message: str) -> None:
 
     print(message, end="")
 
+
 IDENTITY = identity.Identity(
     device_name=DEVICE_NAME,
     firmware_commit=identity.default_firmware_commit(),
@@ -149,7 +150,9 @@ def connect_to_sensors(i2c):
         try:
             sensors.append(sensor_factory(i2c))
         except Exception as exc:  # noqa: BLE001
-            _debug("Failed to initialize sensor %s: %s" % (sensor_factory.__name__, exc))
+            _debug(
+                "Failed to initialize sensor %s: %s" % (sensor_factory.__name__, exc)
+            )
     return sensors
 
 
@@ -175,7 +178,9 @@ def _has_any_address(scanned_addresses, expected_addresses) -> bool:
 class SensorReader:
     """Tracks last values and determines when updates are significant."""
 
-    def __init__(self, sensors, min_change: float = DEFAULT_MIN_CHANGE_THRESHOLD) -> None:
+    def __init__(
+        self, sensors, min_change: float = DEFAULT_MIN_CHANGE_THRESHOLD
+    ) -> None:
         self.sensors = sensors
         self.min_change = min_change
 

@@ -249,8 +249,7 @@ class Accelerometer(Peripheral[Acceleration | None]):
                             continue
                         output = (
                             resolved_magnetometer_output_route
-                            if sensor_input.event_type
-                            == MagnetometerVector.EVENT_TYPE
+                            if sensor_input.event_type == MagnetometerVector.EVENT_TYPE
                             else resolved_output_route
                         )
                         graph.publish(

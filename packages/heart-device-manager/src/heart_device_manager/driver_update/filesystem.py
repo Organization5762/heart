@@ -25,9 +25,7 @@ def copy_file(source: Path, destination: Path) -> None:
 def ensure_driver_files(driver_path: Path) -> None:
     from heart_device_manager.driver_update.layout import DRIVER_FILES
 
-    missing = [
-        name for name in DRIVER_FILES if not (driver_path / name).exists()
-    ]
+    missing = [name for name in DRIVER_FILES if not (driver_path / name).exists()]
     if missing:
         message = f"Missing driver files in {driver_path}: {', '.join(missing)}"
         logger.error(message)

@@ -10,8 +10,8 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from heart.utilities.hub75_logic_score import score_hub75_capture_files
-from heart.utilities.hub75_logic_score import diagnose_hub75_capture
+from heart.utilities.hub75_logic_score import diagnose_hub75_capture  # noqa: E402
+from heart.utilities.hub75_logic_score import score_hub75_capture_files  # noqa: E402
 
 
 def main() -> int:
@@ -57,7 +57,8 @@ def main() -> int:
             "timing_similarity": round(score.timing_similarity, 6),
             "address_similarity": round(score.address_similarity, 6),
             "feature_scores": {
-                key: round(value, 6) for key, value in sorted(score.feature_scores.items())
+                key: round(value, 6)
+                for key, value in sorted(score.feature_scores.items())
             },
         },
     }
@@ -96,9 +97,15 @@ def _summary_payload(summary: object) -> dict[str, object]:
 def _diagnosis_payload(diagnosis: object) -> dict[str, object]:
     return {
         "diagnosis": diagnosis.diagnosis,
-        "channel_activity": [activity.__dict__.copy() for activity in diagnosis.channel_activity],
-        "mapped_signal_edge_counts": dict(sorted(diagnosis.mapped_signal_edge_counts.items())),
-        "active_channels": [activity.__dict__.copy() for activity in diagnosis.active_channels],
+        "channel_activity": [
+            activity.__dict__.copy() for activity in diagnosis.channel_activity
+        ],
+        "mapped_signal_edge_counts": dict(
+            sorted(diagnosis.mapped_signal_edge_counts.items())
+        ),
+        "active_channels": [
+            activity.__dict__.copy() for activity in diagnosis.active_channels
+        ],
         "notes": list(diagnosis.notes),
     }
 

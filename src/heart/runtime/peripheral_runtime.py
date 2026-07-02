@@ -9,7 +9,7 @@ from queue import Empty, SimpleQueue
 from typing import Any
 
 import pygame
-from manyfold import drain_frame_thread_queue
+from manyfold import drain_main_thread_queue
 from PIL import Image, ImageOps
 
 from heart import DeviceDisplayMode
@@ -39,7 +39,7 @@ CONTROL_COMMAND_EMOJI_UPDATE = "emoji_update"
 PHONE_TEXT_DISPLAY_DURATION_SECONDS = 5.0
 PHONE_IMAGE_DISPLAY_DURATION_SECONDS = 5.0
 DPAD_CENTER_FRAMES_TO_REARM = 2
-FRAME_THREAD_DRAIN_MAX_ITEMS = 64
+MAIN_THREAD_DRAIN_MAX_ITEMS = 64
 PHONE_PHOTO_DIRECTORY_ENV_VAR = "HEART_PHONE_PHOTO_DIR"
 DEFAULT_PHONE_PHOTO_DIRECTORY = Path("~/heart-phone-photos")
 GAMEPAD_NAVIGATION_STICK_THRESHOLD = 0.6
@@ -239,11 +239,12 @@ class PeripheralRuntime:
     def poll(self) -> None:
         self._poll_gamepad_navigation()
         self._drain_control_messages()
-        drain_frame_thread_queue(max_items=FRAME_THREAD_DRAIN_MAX_ITEMS)
+        drain_main_thread_queue(max_items=MAIN_THREAD_DRAIN_MAX_ITEMS)
 
     def _poll_gamepad_navigation(self) -> None:
         events = self._peripheral_manager.input_io.gamepad.sample(
-            include_tapped_buttons=False
+            include_tapped_buttons=False,
+            source="runtime.navigation",
         )
         if not events:
             self._rearm_gamepad_navigation()

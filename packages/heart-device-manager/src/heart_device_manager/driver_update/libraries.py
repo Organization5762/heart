@@ -11,9 +11,7 @@ from heart_device_manager.logging import get_logger
 
 logger = get_logger(__name__)
 
-CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = (
-    "adafruit-circuitpython-bundle-9.x-mpy-20250412"
-)
+CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME = "adafruit-circuitpython-bundle-9.x-mpy-20250412"
 CIRCUIT_PY_COMMON_LIBS = (
     "https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/"
     f"20250412/{CIRCUIT_PY_COMMON_LIBS_UNZIPPED_NAME}.zip"
@@ -49,9 +47,7 @@ def load_driver_libs(libs: list[str], destination: Path) -> None:
             cwd=str(unzipped_location.parent),
         )
     else:
-        logger.info(
-            "Skipping unzipping %s because %s exists", zip_location, lib_path
-        )
+        logger.info("Skipping unzipping %s because %s exists", zip_location, lib_path)
 
     for lib in libs:
         copy_file(lib_path / lib, destination / lib)

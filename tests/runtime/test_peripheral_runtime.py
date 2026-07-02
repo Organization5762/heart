@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import gc
+import time
+import tracemalloc
 from datetime import datetime, timezone
 
 from PIL import Image
@@ -34,8 +37,9 @@ class _GamepadControllerStub:
         self.sample_calls: list[bool] = []
 
     def sample(
-        self, *, include_tapped_buttons: bool = True
+        self, *, include_tapped_buttons: bool = True, source: str = "test"
     ) -> tuple[GamepadSnapshotEvent, ...]:
+        del source
         self.sample_calls.append(include_tapped_buttons)
         if not self.snapshots:
             return ()
@@ -391,7 +395,7 @@ class TestPeripheralRuntimeStreaming:
 
         assert manager.input_io.navigation.injected == []
 
-    def test_poll_handles_gamepad_before_frame_thread_drain(self, monkeypatch) -> None:
+    def test_poll_handles_gamepad_before_main_thread_drain(self, monkeypatch) -> None:
         """Keep queued renderer graph work from sitting in front of direct input polling."""
 
         call_order: list[str] = []
@@ -407,18 +411,21 @@ class TestPeripheralRuntimeStreaming:
 
         original_sample = manager.input_io.gamepad.sample
 
-        def sample(*, include_tapped_buttons: bool = True) -> GamepadSnapshot:
+        def sample(
+            *, include_tapped_buttons: bool = True, source: str = "test"
+        ) -> GamepadSnapshot:
+            del source
             call_order.append("sample")
             return original_sample(include_tapped_buttons=include_tapped_buttons)
 
-        def drain_frame_thread_queue(*, max_items: int | None = None) -> int:
+        def drain_main_thread_queue(*, max_items: int | None = None) -> int:
             call_order.append(f"drain:{max_items}")
             return 0
 
         manager.input_io.gamepad.sample = sample
         monkeypatch.setattr(
-            "heart.runtime.peripheral_runtime.drain_frame_thread_queue",
-            drain_frame_thread_queue,
+            "heart.runtime.peripheral_runtime.drain_main_thread_queue",
+            drain_main_thread_queue,
         )
 
         runtime.poll()
@@ -427,6 +434,37 @@ class TestPeripheralRuntimeStreaming:
         assert manager.input_io.navigation.injected == [
             ("activate", 0, "gamepad.0.south"),
         ]
+
+    def test_poll_control_path_memory_stays_flat_after_warmup(self) -> None:
+        """Probe the hot runtime poll path so queued controls cannot accumulate per tick."""
+
+        manager = _PeripheralManagerStub()
+        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        samples: list[tuple[int, int]] = []
+        start = time.perf_counter()
+        tracemalloc.start()
+        try:
+            for step in range(1, 10_001):
+                runtime._handle_control_message(
+                    ControlMessage(command="browse", browse_step=1)
+                )
+                runtime.poll()
+                manager.input_io.navigation.injected.clear()
+                manager.input_io.gamepad.sample_calls.clear()
+                if step in {1_000, 5_000, 10_000}:
+                    gc.collect()
+                    current, _peak = tracemalloc.get_traced_memory()
+                    samples.append((step, current))
+        finally:
+            tracemalloc.stop()
+        elapsed_seconds = time.perf_counter() - start
+
+        steady_values = [current for _step, current in samples[1:]]
+        assert max(steady_values) - min(steady_values) <= 8_192
+        assert elapsed_seconds <= 5.0
+        assert runtime._control_messages.empty()
+        assert manager.input_io.navigation.injected == []
+        assert manager.input_io.gamepad.sample_calls == []
 
     def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:
         """Verify image clear controls remove a transient phone image instead of leaving stale artwork on screen."""

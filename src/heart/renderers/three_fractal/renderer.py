@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pygame
-from manyfold import StreamNode, shutdown
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
@@ -32,6 +31,7 @@ from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshotEvent,
                                          KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
@@ -153,8 +153,8 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         if self.tiled_mode and (
             self.render_size is None
             or self.real_window_size is None
-            or getattr(self, "pixels", None) is None
-            or getattr(self, "display_texture", None) is None
+            or self.pixels is None
+            or self.display_texture is None
         ):
             return False
         return True
@@ -555,7 +555,9 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
             else:
                 target = self.BASE_RADIUS
                 try:
-                    lerp_weight = 1.0 - math.exp(-self.INFLATE_SPEED * self.delta_real_time)
+                    lerp_weight = 1.0 - math.exp(
+                        -self.INFLATE_SPEED * self.delta_real_time
+                    )
                     self.active_radius = lerp(
                         self.active_radius,
                         target,
@@ -616,7 +618,9 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return key in self._keyboard_snapshot.pressed_keys
 
     def _refresh_gamepad_snapshot(self, peripheral_manager: PeripheralManager) -> None:
-        self._gamepad_snapshots = peripheral_manager.input_io.gamepad.sample()
+        self._gamepad_snapshots = peripheral_manager.input_io.gamepad.sample(
+            source="renderer.three_fractal",
+        )
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
@@ -640,18 +644,18 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
                 GamepadAxis.RIGHT_X,
                 GamepadAxis.RIGHT_Y,
             )
-        ) or any(any(event.snapshot.buttons.values()) for event in self._gamepad_snapshots)
+        ) or any(
+            any(event.snapshot.buttons.values()) for event in self._gamepad_snapshots
+        )
 
     def _button_held(self, button: GamepadButton) -> bool:
         return any(
-            event.snapshot.button_held(button)
-            for event in self._gamepad_snapshots
+            event.snapshot.button_held(button) for event in self._gamepad_snapshots
         )
 
     def _button_tapped(self, button: GamepadButton) -> bool:
         return any(
-            event.snapshot.button_tapped(button)
-            for event in self._gamepad_snapshots
+            event.snapshot.button_tapped(button) for event in self._gamepad_snapshots
         )
 
     def _axis_value(self, axis: GamepadAxis, *, dead_zone: float) -> float:
@@ -667,8 +671,14 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
 
     def _dpad_value(self) -> GamepadDpadValue:
         return GamepadDpadValue(
-            x=max(-1, min(1, sum(event.snapshot.dpad.x for event in self._gamepad_snapshots))),
-            y=max(-1, min(1, sum(event.snapshot.dpad.y for event in self._gamepad_snapshots))),
+            x=max(
+                -1,
+                min(1, sum(event.snapshot.dpad.x for event in self._gamepad_snapshots)),
+            ),
+            y=max(
+                -1,
+                min(1, sum(event.snapshot.dpad.y for event in self._gamepad_snapshots)),
+            ),
         )
 
     def _reset_camera_pos(self):
@@ -793,8 +803,10 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         try:
             pygame.mouse.set_visible(True)
         except pygame.error:
-            logger.debug("Skipping fractal mouse reset; pygame video is not initialized")
-        self._delete_gl_texture(getattr(self, "display_texture", None))
+            logger.debug(
+                "Skipping fractal mouse reset; pygame video is not initialized"
+            )
+        self._delete_gl_texture(self.display_texture)
         self.initialized = False
         self._auto_started = False
         self.mode = "auto"
@@ -843,7 +855,9 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         try:
             glDeleteTextures([texture_id])
         except GLError:
-            logger.debug("Skipping fractal texture delete; OpenGL context is unavailable")
+            logger.debug(
+                "Skipping fractal texture delete; OpenGL context is unavailable"
+            )
 
 
 def _trigger_pressure(raw_value: float) -> float:
@@ -877,7 +891,7 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[FractalSceneState]:
+    ) -> Variable[FractalSceneState]:
         if self._initial_state is None:
             raise ValueError("FractalScene requires an initial state")
         return self.provider.observable(initial_state=self._initial_state)
@@ -1002,9 +1016,6 @@ def main() -> None:
             peripheral_runtime.tick()
         runtime.reset()
     finally:
-        shutdown.on_next(True)
-        shutdown.on_completed()
-        shutdown.dispose()
         pygame.quit()
 
 

@@ -67,13 +67,14 @@ class OppiRenderer(StatefulBaseRenderer[OppiState]):
         frame_index = (elapsed_ms // OPPI_FRAME_DURATION_MS) % OPPI_FRAME_COUNT
 
         if self._scaled_static is None or self._scaled_static_size != panel_size:
-            self._scaled_static = pygame.transform.scale(
-                state.static_image, panel_size
-            )
+            self._scaled_static = pygame.transform.scale(state.static_image, panel_size)
             self._scaled_static_size = panel_size
 
         gif_frame_key = (frame_index, panel_width, panel_height)
-        if self._scaled_gif_frame is None or self._scaled_gif_frame_key != gif_frame_key:
+        if (
+            self._scaled_gif_frame is None
+            or self._scaled_gif_frame_key != gif_frame_key
+        ):
             frame_rect = (
                 frame_index * OPPI_FRAME_SIZE,
                 0,

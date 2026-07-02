@@ -8,7 +8,7 @@ import pygame
 from heart.device import Cube
 from heart.device.local import LocalScreen
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot)
+                                         GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.provider import (HUE_STEP_DEGREES,
@@ -103,7 +103,9 @@ class TestWaterCubeStateProvider:
         monkeypatch.setattr(
             peripheral_manager.input_io.gamepad,
             "sample",
-            lambda: next(snapshots),
+            lambda **_kwargs: (
+                GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),
+            ),
         )
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
@@ -139,7 +141,12 @@ class TestWaterCubeStateProvider:
         monkeypatch.setattr(
             peripheral_manager.input_io.gamepad,
             "sample",
-            lambda: _gamepad_snapshot(axes={GamepadAxis.TRIGGER_RIGHT: 1.0}),
+            lambda **_kwargs: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(axes={GamepadAxis.TRIGGER_RIGHT: 1.0}),
+                ),
+            ),
         )
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)
@@ -169,7 +176,12 @@ class TestWaterCubeStateProvider:
         monkeypatch.setattr(
             peripheral_manager.input_io.gamepad,
             "sample",
-            lambda: _gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+            lambda **_kwargs: (
+                GamepadSnapshotEvent(
+                    joystick_id=0,
+                    snapshot=_gamepad_snapshot(buttons={GamepadButton.ZR: True}),
+                ),
+            ),
         )
 
         provider.observable(peripheral_manager).subscribe(observed_states.append)

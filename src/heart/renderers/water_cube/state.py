@@ -4,9 +4,9 @@ from functools import lru_cache
 from typing import Self, Tuple
 
 import numpy as np
-from manyfold import StreamNode
 
 from heart.device import Device
+from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 
 GRID = 64
@@ -76,9 +76,7 @@ class WaterCubeState:
             else acceleration_average
         )
         next_hue = (
-            self.water_hue_degrees
-            if water_hue_degrees is None
-            else water_hue_degrees
+            self.water_hue_degrees if water_hue_degrees is None else water_hue_degrees
         )
         smoothed_acceleration = self._smooth_acceleration(
             acceleration,
@@ -139,7 +137,7 @@ class WaterCubeState:
         return cls(face_px=FACE_PX, heights=heights, velocities=velocities, gvec=None)
 
     @classmethod
-    def observable(cls, acceleration: StreamNode["Acceleration"]) -> "StreamNode[Self]":
+    def observable(cls, acceleration: Variable["Acceleration"]) -> "Variable[Self]":
         def update_state(accumulated: Self, a: "Acceleration") -> Self:
             return accumulated._step(
                 heights=accumulated.heights,

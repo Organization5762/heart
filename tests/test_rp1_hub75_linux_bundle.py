@@ -6,7 +6,9 @@ import importlib.util
 import sys
 from pathlib import Path
 
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "rp1_hub75_linux_bundle.py"
+SCRIPT_PATH = (
+    Path(__file__).resolve().parents[1] / "scripts" / "rp1_hub75_linux_bundle.py"
+)
 SPEC = importlib.util.spec_from_file_location("rp1_hub75_linux_bundle", SCRIPT_PATH)
 assert SPEC is not None
 assert SPEC.loader is not None
@@ -16,8 +18,13 @@ SPEC.loader.exec_module(rp1_hub75_linux_bundle)
 
 
 def test_normalize_host_adds_default_totem_user() -> None:
-    assert rp1_hub75_linux_bundle.normalize_host("totem3.local") == "michael@totem3.local"
-    assert rp1_hub75_linux_bundle.normalize_host("michael@totem3.local") == "michael@totem3.local"
+    assert (
+        rp1_hub75_linux_bundle.normalize_host("totem3.local") == "michael@totem3.local"
+    )
+    assert (
+        rp1_hub75_linux_bundle.normalize_host("michael@totem3.local")
+        == "michael@totem3.local"
+    )
 
 
 def test_remote_helper_build_script_only_compiles_required_c_helpers() -> None:

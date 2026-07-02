@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pygame
-from manyfold import StreamNode
 
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.channel_diffusion.provider import \
     ChannelDiffusionStateProvider
@@ -32,7 +32,7 @@ class ChannelDiffusionRenderer(StatefulBaseRenderer[ChannelDiffusionState]):
 
     def state_observable(
         self, peripheral_manager: PeripheralManager
-    ) -> StreamNode[ChannelDiffusionState]:
+    ) -> Variable[ChannelDiffusionState]:
         if self._initial_state is None:
             raise ValueError("ChannelDiffusionRenderer requires an initial state")
         return self._provider.observable(

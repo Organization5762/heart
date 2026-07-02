@@ -117,7 +117,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seconds", type=float, default=DEFAULT_SECONDS)
     parser.add_argument("--frame-ms", type=float, default=DEFAULT_FRAME_MS)
     parser.add_argument("--offset", type=parse_int, default=DEFAULT_OFFSET)
-    parser.add_argument("--source-frame-size", type=int, default=DEFAULT_SOURCE_FRAME_SIZE)
+    parser.add_argument(
+        "--source-frame-size", type=int, default=DEFAULT_SOURCE_FRAME_SIZE
+    )
     parser.add_argument("--panel-size", type=int, default=DEFAULT_PANEL_SIZE)
     parser.add_argument("--brightness", type=float, default=1.0)
     parser.add_argument("--contrast", type=float, default=1.0)
@@ -127,7 +129,9 @@ def parse_args() -> argparse.Namespace:
     scale_group = parser.add_mutually_exclusive_group()
     scale_group.add_argument("--scale", dest="scale", action="store_true", default=True)
     scale_group.add_argument("--crop", dest="scale", action="store_false")
-    parser.add_argument("--crop-mode", choices=CROP_MODE_CHOICES, default=DEFAULT_CROP_MODE)
+    parser.add_argument(
+        "--crop-mode", choices=CROP_MODE_CHOICES, default=DEFAULT_CROP_MODE
+    )
     parser.add_argument("--crop-x", type=int)
     parser.add_argument("--crop-y", type=int)
     parser.add_argument("--dry-run", action="store_true")

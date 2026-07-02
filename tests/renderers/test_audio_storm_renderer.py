@@ -8,7 +8,6 @@ import numpy as np
 import pygame
 import pytest
 
-from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Rectangle
 from heart.display.shaders.fullscreen import TextureUniform
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -54,7 +53,7 @@ class _SnapshotController:
     def snapshot_stream(self) -> _SnapshotStream:
         return self.stream
 
-    def sample(self) -> object:
+    def sample(self, **_kwargs) -> object:
         if isinstance(self.snapshot, GamepadSnapshot):
             if not self.snapshot.connected:
                 return ()
@@ -259,11 +258,6 @@ def _energy_centroid(energy: np.ndarray) -> tuple[float, float]:
 
 
 class TestAudioStormScene:
-    def test_constructor_uses_opengl_display_mode(self) -> None:
-        scene = AudioStormScene()
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
-
     def test_shoulder_inputs_write_audio_texture_uniform(self, monkeypatch) -> None:
         scene = AudioStormScene()
         shader_runtime = _ShaderRuntime()
@@ -272,7 +266,11 @@ class TestAudioStormScene:
         window = _window()
         gl_calls = _stub_texture_gl(monkeypatch, texture_id=42)
 
-        scene.initialize(window=window, peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=window,
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -287,7 +285,9 @@ class TestAudioStormScene:
                 },
             )
         )
-        scene.real_process(window=window, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=window, orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         render_call = shader_runtime.render_calls[-1]
         assert render_call["viewport_size"] == (100, 80)
@@ -312,14 +312,22 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.keyboard_controller.stream.emit(
             KeyboardSnapshot(
-                pressed_keys=frozenset({pygame.K_q, pygame.K_e, pygame.K_z, pygame.K_x}),
+                pressed_keys=frozenset(
+                    {pygame.K_q, pygame.K_e, pygame.K_z, pygame.K_x}
+                ),
                 timestamp_ms=1.0,
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert scene.audio_energy.max() > 0.0
 
@@ -337,7 +345,11 @@ class TestAudioStormScene:
             peripheral_manager=baseline_manager,
             orientation=Rectangle.with_layout(columns=1, rows=1),
         )
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         _calibrate_triggers(baseline_scene, baseline_manager)
         _calibrate_triggers(scene, manager)
         baseline_manager.gamepad_controller.stream.emit(
@@ -358,8 +370,12 @@ class TestAudioStormScene:
                 },
             )
         )
-        baseline_scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        baseline_scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         baseline_x, baseline_y = _energy_centroid(baseline_scene.audio_energy)
         shifted_x, shifted_y = _energy_centroid(scene.audio_energy)
@@ -407,8 +423,12 @@ class TestAudioStormScene:
             )
         )
 
-        base_scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        boosted_scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        base_scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        boosted_scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert boosted_scene.audio_energy.sum() > base_scene.audio_energy.sum()
         assert np.count_nonzero(boosted_scene.audio_energy > 0.5) > np.count_nonzero(
@@ -449,8 +469,12 @@ class TestAudioStormScene:
             )
         )
 
-        light_scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        full_scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        light_scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        full_scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         np.testing.assert_array_equal(light_scene.audio_energy, full_scene.audio_energy)
 
@@ -465,7 +489,11 @@ class TestAudioStormScene:
             0.0,
         )
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         _calibrate_triggers(scene, manager)
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
@@ -474,9 +502,13 @@ class TestAudioStormScene:
                 axes={GamepadAxis.TRIGGER_LEFT: 1.0},
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
         first_frame_energy = float(scene.audio_energy.sum())
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert scene.audio_energy.sum() > first_frame_energy
 
@@ -485,13 +517,19 @@ class TestAudioStormScene:
 
         assert scene._voice_palette == DEFAULT_VOICE_PALETTE
 
-    def test_east_button_randomizes_voice_palette_once_per_press(self, monkeypatch) -> None:
+    def test_east_button_randomizes_voice_palette_once_per_press(
+        self, monkeypatch
+    ) -> None:
         scene = AudioStormScene()
         scene.shader_runtime = _ShaderRuntime()
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -499,9 +537,13 @@ class TestAudioStormScene:
                 buttons={GamepadButton.EAST: True},
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
         randomized_palette = scene._voice_palette
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert randomized_palette != DEFAULT_VOICE_PALETTE
         assert scene._voice_palette == randomized_palette
@@ -525,7 +567,11 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -533,7 +579,9 @@ class TestAudioStormScene:
                 buttons={GamepadButton.EAST: True},
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         for voice in (
             scene._voice_palette.kick,
@@ -556,15 +604,23 @@ class TestAudioStormScene:
         _stub_texture_gl(monkeypatch)
         monkeypatch.setattr(audio_storm_module.logger, "info", logger_info)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.keyboard_controller.stream.emit(
             KeyboardSnapshot(
                 pressed_keys=frozenset({pygame.K_PERIOD}),
                 timestamp_ms=1.0,
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         logger_info.assert_called_once()
         assert logger_info.call_args.args[0] == "Current Audio Storm SynthPalette:\n%s"
@@ -580,14 +636,20 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.keyboard_controller.stream.emit(
             KeyboardSnapshot(
                 pressed_keys=frozenset({pygame.K_c}),
                 timestamp_ms=1.0,
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
         assert scene._voice_palette != DEFAULT_VOICE_PALETTE
 
         scene.reset()
@@ -600,7 +662,11 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -608,7 +674,9 @@ class TestAudioStormScene:
                 buttons={GamepadButton.ZL: True},
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         _centroid_x, centroid_y = _energy_centroid(scene.audio_energy)
         assert 0.35 < centroid_y < 0.7
@@ -619,7 +687,11 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         scene.audio_energy[20, 30] = 0.8
         original_energy = scene.audio_energy.copy()
         manager.gamepad_controller.stream.emit(
@@ -629,7 +701,9 @@ class TestAudioStormScene:
                 buttons={GamepadButton.WEST: True},
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         np.testing.assert_array_equal(scene.audio_energy, original_energy)
 
@@ -649,7 +723,11 @@ class TestAudioStormScene:
             10.0,
         )
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         scene.audio_energy[20, 30] = 0.8
         manager.keyboard_controller.stream.emit(
             KeyboardSnapshot(
@@ -657,7 +735,9 @@ class TestAudioStormScene:
                 timestamp_ms=1.0,
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert scene.audio_energy[20, 31] == 0.8
         assert scene.audio_energy[20, 30] == 0.0
@@ -668,7 +748,11 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
                 connected=True,
@@ -679,7 +763,9 @@ class TestAudioStormScene:
                 },
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
         resting_energy = float(scene.audio_energy.max())
         manager.gamepad_controller.stream.emit(
             GamepadSnapshot(
@@ -691,7 +777,9 @@ class TestAudioStormScene:
                 },
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert resting_energy == 0.0
         assert scene.audio_energy.max() > 0.0
@@ -702,7 +790,11 @@ class TestAudioStormScene:
         manager = _PeripheralManager()
         _stub_texture_gl(monkeypatch)
 
-        scene.initialize(window=_window(), peripheral_manager=manager, orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.initialize(
+            window=_window(),
+            peripheral_manager=manager,
+            orientation=Rectangle.with_layout(columns=1, rows=1),
+        )
         _calibrate_triggers(scene, manager, left=1.0, right=1.0)
         resting_energy = float(scene.audio_energy.max())
         manager.gamepad_controller.stream.emit(
@@ -715,12 +807,16 @@ class TestAudioStormScene:
                 },
             )
         )
-        scene.real_process(window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1))
+        scene.real_process(
+            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
+        )
 
         assert resting_energy == 0.0
         assert scene.audio_energy.max() > 0.0
 
-    def test_cube_orientation_renders_square_tile_across_window(self, monkeypatch) -> None:
+    def test_cube_orientation_renders_square_tile_across_window(
+        self, monkeypatch
+    ) -> None:
         scene = AudioStormScene()
         shader_runtime = _ShaderRuntime()
         scene.shader_runtime = shader_runtime
@@ -738,7 +834,9 @@ class TestAudioStormScene:
 
         assert scene.tiled_mode is True
         assert scene.render_size == (80, 80)
-        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [(80, 80)]
+        assert [call["viewport_size"] for call in shader_runtime.draw_calls] == [
+            (80, 80)
+        ]
         assert len(gl_begin_calls) == 4
         assert shader_runtime.read_to_surface_sizes == [(320, 80)]
 
@@ -747,30 +845,10 @@ class TestAudioStormScene:
 
         assert AudioStormScene._render_size((128, 64), orientation) == (64, 32)
 
-    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(self) -> None:
+    def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(
+        self,
+    ) -> None:
         orientation = Rectangle.with_layout(columns=4, rows=1)
 
         assert AudioStormScene._render_size((320, 80), orientation) == (80, 80)
         assert AudioStormScene._should_tile(orientation) is True
-
-    def test_reset_clears_input_snapshots_and_resources(self, monkeypatch) -> None:
-        scene = AudioStormScene()
-        scene.shader_runtime = _ShaderRuntime()
-        manager = _PeripheralManager()
-        gl_calls = _stub_texture_gl(monkeypatch)
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        scene._ensure_audio_texture()
-        scene.display_texture = 11
-        scene.reset()
-
-        assert manager.keyboard_controller.stream.subscriptions == []
-        assert gl_calls["delete"] == [([11],), ([9],)]
-        assert scene.window_size is None
-        assert scene.render_size is None
-        assert scene.tiled_mode is False
-        assert np.count_nonzero(scene.audio_energy) == 0
