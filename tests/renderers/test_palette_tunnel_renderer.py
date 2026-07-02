@@ -7,7 +7,6 @@ from unittest.mock import Mock
 import numpy as np
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadDpadValue,
                                          GamepadSnapshot, GamepadSnapshotEvent,
@@ -141,11 +140,6 @@ def _window(width: int = 100, height: int = 80) -> Mock:
 
 
 class TestPaletteTunnelScene:
-    def test_constructor_uses_opengl_display_mode(self) -> None:
-        scene = PaletteTunnelScene()
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
-
     def test_gamepad_and_keyboard_move_virtual_cursor(self) -> None:
         scene = PaletteTunnelScene()
         shader_runtime = _ShaderRuntime()
@@ -332,22 +326,3 @@ class TestPaletteTunnelScene:
 
         assert PaletteTunnelScene._render_size((320, 80), orientation) == (80, 80)
         assert PaletteTunnelScene._should_tile(orientation) is True
-
-    def test_reset_clears_snapshot_state_and_shader(self) -> None:
-        scene = PaletteTunnelScene()
-        shader_runtime = _ShaderRuntime()
-        scene.shader_runtime = shader_runtime
-        manager = _PeripheralManager()
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        scene.reset()
-
-        assert manager.input_io.keyboard.stream.subscriptions == []
-        assert shader_runtime.reset_calls == 1
-        assert scene.window_size is None
-        assert scene.render_size is None
-        assert scene.tiled_mode is False

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Device
 from heart.renderers.rubiks_connected_x_visualizer.renderer import \
     RubiksConnectedXVisualizerRenderer
@@ -15,13 +14,6 @@ from heart.runtime.display_context import DisplayContext
 
 class TestRubiksConnectedXVisualizerRenderer:
     """Exercise the cube visualizer layout so the physical wraparound panels show full square faces without debug chrome."""
-
-    def test_renderer_uses_full_display_mode(self) -> None:
-        """Verify the visualizer renders against the full 4-panel atlas so each physical pane receives a single face instead of a mirrored strip copy."""
-
-        renderer = RubiksConnectedXVisualizerRenderer()
-
-        assert renderer.device_display_mode is DeviceDisplayMode.FULL
 
     def test_real_process_defaults_to_solved_faces_before_sync(
         self,

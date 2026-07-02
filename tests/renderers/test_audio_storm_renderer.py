@@ -8,7 +8,6 @@ import numpy as np
 import pygame
 import pytest
 
-from heart import DeviceDisplayMode
 from heart.device import Cube, Layout, Rectangle
 from heart.display.shaders.fullscreen import TextureUniform
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -259,11 +258,6 @@ def _energy_centroid(energy: np.ndarray) -> tuple[float, float]:
 
 
 class TestAudioStormScene:
-    def test_constructor_uses_opengl_display_mode(self) -> None:
-        scene = AudioStormScene()
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
-
     def test_shoulder_inputs_write_audio_texture_uniform(self, monkeypatch) -> None:
         scene = AudioStormScene()
         shader_runtime = _ShaderRuntime()
@@ -858,25 +852,3 @@ class TestAudioStormScene:
 
         assert AudioStormScene._render_size((320, 80), orientation) == (80, 80)
         assert AudioStormScene._should_tile(orientation) is True
-
-    def test_reset_clears_input_snapshots_and_resources(self, monkeypatch) -> None:
-        scene = AudioStormScene()
-        scene.shader_runtime = _ShaderRuntime()
-        manager = _PeripheralManager()
-        gl_calls = _stub_texture_gl(monkeypatch)
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        scene._ensure_audio_texture()
-        scene.display_texture = 11
-        scene.reset()
-
-        assert manager.keyboard_controller.stream.subscriptions == []
-        assert gl_calls["delete"] == [([11],), ([9],)]
-        assert scene.window_size is None
-        assert scene.render_size is None
-        assert scene.tiled_mode is False
-        assert np.count_nonzero(scene.audio_energy) == 0

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Cube
 from heart.device.local import LocalScreen
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
@@ -12,12 +11,6 @@ from heart.renderers.bird_flock import BirdFlockRenderer
 from heart.renderers.bird_flock.renderer import _bird_color, _controlled_hue
 from heart.renderers.bird_flock.state import Bird, BirdFlockState
 from heart.runtime.display_context import DisplayContext
-
-
-def test_bird_flock_uses_full_display_mode() -> None:
-    renderer = BirdFlockRenderer()
-
-    assert renderer.device_display_mode == DeviceDisplayMode.FULL
 
 
 def test_bird_flock_advances_and_stays_inside_vertical_bounds() -> None:

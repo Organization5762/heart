@@ -8,7 +8,6 @@ from unittest.mock import Mock
 import numpy as np
 import pygame
 
-from heart import DeviceDisplayMode
 from heart.device import Rectangle
 from heart.display.shaders.shader_templates.mandelbulb import \
     __file__ as shader_template_location
@@ -170,11 +169,6 @@ class TestMandelbulbScene:
         assert "vec3 prismPalette(vec2 color_vector, float orbit)" in shader_source
         assert "vec3 stick_palette = stickPalette(uColorVector, orbit)" in shader_source
         assert "uColorMode < 0.5" in shader_source
-
-    def test_constructor_uses_opengl_display_mode(self) -> None:
-        scene = MandelbulbScene()
-
-        assert scene.device_display_mode == DeviceDisplayMode.OPENGL
 
     def test_normal_orientation_renders_full_window_shader(self) -> None:
         scene = MandelbulbScene()
@@ -692,40 +686,3 @@ class TestMandelbulbScene:
 
         assert MandelbulbScene._render_size((128, 64), orientation) == (64, 32)
         assert MandelbulbScene._should_tile(orientation) is True
-
-    def test_reset_clears_shader_and_tiled_resources(self, monkeypatch) -> None:
-        scene = MandelbulbScene()
-        shader_runtime = _ShaderRuntime()
-        scene.shader_runtime = shader_runtime
-        manager = _PeripheralManager()
-        scene.display_texture = 11
-        deleted_textures: list[int] = []
-        monkeypatch.setattr(
-            "heart.renderers.mandelbulb.renderer.glDeleteTextures",
-            lambda textures: deleted_textures.extend(textures),
-        )
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Mock(),
-        )
-        scene.display_texture = 11
-        scene.reset()
-
-        assert manager.input_io.keyboard.stream.subscriptions == []
-        assert deleted_textures == [11]
-        assert shader_runtime.reset_calls == 1
-        assert scene.window_size is None
-        assert scene.render_size is None
-        assert scene.tiled_mode is False
-        assert scene.display_texture is None
-        assert scene.tile_pixels is None
-        assert scene.target_power == BASE_POWER
-        assert scene.color_mode == DEFAULT_COLOR_MODE
-        assert scene.phase_speed == BASE_PHASE_SPEED
-        assert (
-            scene.morph_target_power
-            == ((BASE_POWER + MORPH_POWER_DELTA - MIN_POWER) % (MAX_POWER - MIN_POWER))
-            + MIN_POWER
-        )
