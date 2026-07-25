@@ -5,17 +5,17 @@ from dataclasses import replace
 from typing import Any
 
 import numpy as np
+from manyfold import Subscribable
 from manyfold.architecture import CallbackPlacement, PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.random_pixel.state import RandomPixelState
 
 
-class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
+class RandomPixelStateProvider(StateProvider[RandomPixelState]):
     def __init__(
         self,
         *,
@@ -38,9 +38,9 @@ class RandomPixelStateProvider(ObservableProvider[RandomPixelState]):
         self._update_interval_ms = update_interval_ms
         self._elapsed_ms = 0.0
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[RandomPixelState]:
+    ) -> Subscribable[RandomPixelState]:
         initial_color = self._color.latest or Color.random()
         initial_state = RandomPixelState(
             color=initial_color, pixels=self._random_pixels()

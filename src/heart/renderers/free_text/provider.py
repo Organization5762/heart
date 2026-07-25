@@ -4,12 +4,12 @@ import textwrap
 from typing import Iterable
 
 import pygame
+from manyfold import Subscribable
 from manyfold.architecture import Value
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.free_text.state import FreeTextRendererState
 
 PIXEL_FONT_PATH = "Grand9K Pixel.ttf"
@@ -20,7 +20,7 @@ DEFAULT_TEXT = ""
 TEXT_PADDING_PX = 4
 
 
-class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
+class FreeTextStateProvider(StateProvider[FreeTextRendererState]):
     def __init__(self) -> None:
         self._text = Value.initialized(DEFAULT_TEXT)
         self._font_cache: dict[int, pygame.font.Font] = {}
@@ -28,9 +28,9 @@ class FreeTextStateProvider(ObservableProvider[FreeTextRendererState]):
         self._font_size_min: int = FONT_SIZE_MIN
         self._initial_font_size: int = INITIAL_FONT_SIZE
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[FreeTextRendererState]:
+    ) -> Subscribable[FreeTextRendererState]:
         windows = (
             peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_size())

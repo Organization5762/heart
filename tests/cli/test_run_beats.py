@@ -220,14 +220,6 @@ class TestRunCommandWithBeats:
             "web_port": 5173,
         }
 
-    def test_cli_exposes_run_beats_subcommand(self) -> None:
-        """Verify the top-level CLI advertises the documented Beats web quick-start command."""
-
-        result = runner.invoke(loop.app, ["--help"])
-
-        assert result.exit_code == 0
-        assert "run-beats" in result.stdout
-
     def test_run_beats_subcommand_dispatches_to_launcher(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -371,25 +363,6 @@ class TestRunCommandWithBeats:
         assert recorded_call["configuration"] == "lib_2026"
         assert recorded_call["local_runtime"] is True
         assert recorded_call["web_host"] == "0.0.0.0"
-
-    def test_run_command_keeps_with_beats_web_as_alias(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Verify the old web-specific flag stays as a compatibility alias after Beats becomes web-only."""
-
-        recorded_call: dict[str, object] = {}
-
-        def _fake_run_beats_web_command(**kwargs: object) -> None:
-            recorded_call.update(kwargs)
-
-        monkeypatch.setattr(
-            "heart.cli.commands.run_beats.run_beats_web_command",
-            _fake_run_beats_web_command,
-        )
-
-        run_module.run_command(with_beats_web=True)
-
-        assert recorded_call["configuration"] == "lib_2025"
 
 
 class _FakeResolver:

@@ -86,8 +86,8 @@ def test_bumpers_control_bird_count(monkeypatch, device) -> None:
         )
     )
     monkeypatch.setattr(
-        manager.input_io.gamepad,
-        "sample",
+        manager.input_io.controls,
+        "gamepads",
         lambda **_kwargs: (
             GamepadSnapshotEvent(
                 joystick_id=0,

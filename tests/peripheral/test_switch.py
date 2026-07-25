@@ -6,10 +6,9 @@ import threading
 from collections.abc import Iterator
 
 import pytest
-from manyfold import Graph
+from manyfold import Graph, NoopSubscription
 from manyfold.datastream_threads import reset_datastream_delivery_for_tests
 
-from heart.peripheral.core.subscriptions import NoopSubscription
 from heart.peripheral.switch import (Switch, switch_detection_route,
                                      switch_state_event_route)
 

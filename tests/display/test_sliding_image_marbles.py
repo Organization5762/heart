@@ -73,7 +73,7 @@ class TestSlidingImageMarbleOutputs:
                 lambda: tick_stream,
             )
             image_stream = (
-                provider.observable(manager)
+                provider.states(manager)
                 .filter(lambda state: state.width > 0)
                 .map(lambda state: _render_sliding_frame(state, base_surface))
                 .map(

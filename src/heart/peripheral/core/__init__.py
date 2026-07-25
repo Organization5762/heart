@@ -9,14 +9,12 @@ from threading import Lock
 from typing import (Any, Generic, Iterator, Mapping, Self, Sequence, TypeVar,
                     cast)
 
-from manyfold import (EmptyNode, Graph, Layer, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedEnvelope, TypedRoute,
-                      Variant, route)
+from manyfold import (CallbackObservable, EmptyNode, Graph, Layer, OwnerName,
+                      Plane, Schema, StreamFamily, StreamName, Subscribable,
+                      TypedEnvelope, TypedRoute, Variant, route)
 from manyfold.sensor_io import (SensorEvent, SensorIdentity, SensorLocation,
                                 SensorTag)
 
-from heart.peripheral.core.subscriptions import CallbackObservable
-from heart.peripheral.core.variables import Variable
 from heart.utilities.logging import get_logger
 
 _OBSERVE_ROUTE_IDS = count(1)
@@ -50,7 +48,7 @@ class InputDescriptor:
     """Describe an input a peripheral or provider expects to consume."""
 
     name: str
-    stream: Variable[Any]
+    stream: Subscribable[Any]
     payload_type: type[Any] | None = None
     description: str | None = None
 
@@ -145,7 +143,7 @@ class Peripheral(Generic[A]):
 
     _logger = get_logger(__name__)
 
-    def _event_stream(self) -> Variable[A]:
+    def _event_stream(self) -> Subscribable[A]:
         return EmptyNode().observable()
 
     def peripheral_info(self) -> PeripheralInfo:
@@ -155,7 +153,7 @@ class Peripheral(Generic[A]):
         return PeripheralInfo()
 
     @cached_property
-    def observe(self) -> Variable[PeripheralMessageEnvelope[A]]:
+    def observe(self) -> Subscribable[PeripheralMessageEnvelope[A]]:
         graph = Graph()
         route_id = next(_OBSERVE_ROUTE_IDS)
         route_name = f"peripheral.{type(self).__name__}.{route_id}"
@@ -214,7 +212,7 @@ class Peripheral(Generic[A]):
             return output_subscription
 
         return cast(
-            Variable[PeripheralMessageEnvelope[A]], CallbackObservable(subscribe)
+            Subscribable[PeripheralMessageEnvelope[A]], CallbackObservable(subscribe)
         )
 
     @classmethod

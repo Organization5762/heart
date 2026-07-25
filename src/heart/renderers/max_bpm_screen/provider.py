@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.max_bpm_screen.state import AvatarBpmRendererState
 
@@ -18,10 +19,10 @@ AVATAR_MAPPINGS = {
 }
 
 
-class AvatarBpmStateProvider(ObservableProvider[AvatarBpmRendererState]):
-    def observable(
+class AvatarBpmStateProvider(StateProvider[AvatarBpmRendererState]):
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[AvatarBpmRendererState]:
+    ) -> Subscribable[AvatarBpmRendererState]:
         return (
             peripheral_manager.input_io.frame_tick_stream()
             .map(lambda _: self._select_top_bpm())

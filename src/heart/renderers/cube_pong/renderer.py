@@ -275,21 +275,20 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
     ) -> tuple[dict[int, tuple[GamepadSnapshot, ...]], tuple[GamepadSnapshot, ...]]:
         if self._peripheral_manager is None:
             return {}, ()
-        controller = self._peripheral_manager.input_io.gamepad
+        events_by_id = {
+            event.joystick_id: event
+            for event in self._peripheral_manager.input_io.controls.gamepads()
+        }
         assigned: dict[int, list[GamepadSnapshot]] = {}
         connected: list[GamepadSnapshot] = []
         for gamepad in sorted(
             self._gamepads(),
             key=lambda candidate: candidate.joystick_id,
         ):
-            events = controller.sample(
-                joystick_id=gamepad.joystick_id,
-                include_tapped_buttons=False,
-                source="renderer.cube_pong",
-            )
-            if not events:
+            event = events_by_id.get(gamepad.joystick_id)
+            if event is None:
                 continue
-            snapshot = events[0].snapshot
+            snapshot = event.snapshot
             if not snapshot.connected:
                 continue
             connected.append(snapshot)
@@ -355,21 +354,19 @@ class CubePongRenderer(StatefulBaseRenderer[CubePongState]):
         return snapshot.axis_value(GamepadAxis.RIGHT_Y, dead_zone=GAMEPAD_DEAD_ZONE)
 
     def _keyboard_controls(self) -> tuple[float, float]:
-        try:
-            pygame.event.pump()
-            keys = pygame.key.get_pressed()
-        except pygame.error:
+        if self._peripheral_manager is None:
             return 0.0, 0.0
+        keys = self._peripheral_manager.input_io.controls.keyboard().pressed_keys
 
         player_one = 0.0
         player_two = 0.0
-        if keys[pygame.K_w]:
+        if pygame.K_w in keys:
             player_one -= KEYBOARD_CONTROL_STEP
-        if keys[pygame.K_s]:
+        if pygame.K_s in keys:
             player_one += KEYBOARD_CONTROL_STEP
-        if keys[pygame.K_UP]:
+        if pygame.K_UP in keys:
             player_two -= KEYBOARD_CONTROL_STEP
-        if keys[pygame.K_DOWN]:
+        if pygame.K_DOWN in keys:
             player_two += KEYBOARD_CONTROL_STEP
         return player_one, player_two
 

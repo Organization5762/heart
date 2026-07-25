@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.heart_title_screen.state import HeartTitleScreenState
 
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
 
-class HeartTitleScreenStateProvider(ObservableProvider[HeartTitleScreenState]):
+class HeartTitleScreenStateProvider(StateProvider[HeartTitleScreenState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[HeartTitleScreenState]:
+    ) -> Subscribable[HeartTitleScreenState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = HeartTitleScreenState()
 

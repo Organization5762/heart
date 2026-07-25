@@ -9,14 +9,13 @@ from typing import Any, Mapping
 
 from manyfold import (Graph, Layer, ManagedGraphNode, ManagedGraphNodeHandle,
                       OwnerName, Plane, Schema, StreamFamily, StreamName,
-                      TypedRoute, Variant, route)
+                      Subscribable, TypedRoute, Variant, route)
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from PIL import Image
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.variables import Variable
 from heart.peripheral.input_payloads.display import DisplayFrame
 from heart.utilities.logging import get_logger
 from heart.utilities.logging_control import get_logging_controller
@@ -109,7 +108,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         with self._frame_lock:
             return self._latest_frame
 
-    def _event_stream(self) -> Variable[DisplayFrame]:
+    def _event_stream(self) -> Subscribable[DisplayFrame]:
         return self._frame_stream
 
     def peripheral_info(self) -> PeripheralInfo:

@@ -8,7 +8,7 @@ import pygame
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    DEFAULT_BALL_SPEED)
@@ -36,7 +36,7 @@ class BouncingBallRenderer(StatefulBaseRenderer[BouncingBallState]):
 
     def __init__(
         self,
-        provider: ObservableProvider[BouncingBallState] | None = None,
+        provider: StateProvider[BouncingBallState] | None = None,
     ) -> None:
         super().__init__(builder=provider)
         self.device_display_mode = DeviceDisplayMode.FULL

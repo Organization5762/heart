@@ -44,6 +44,7 @@ class _MandelbrotProfile:
         self.command_events = _Stream()
         self.sampled_gamepad_state: MandelbrotMotionState | None = None
         self.sampled_gamepad_buttons: frozenset[GamepadButton] = frozenset()
+        self.keyboard_keys: frozenset[int] = frozenset()
 
     def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
         return self.sampled_gamepad_state or MandelbrotMotionState()
@@ -51,16 +52,8 @@ class _MandelbrotProfile:
     def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
         return self.sampled_gamepad_buttons
 
-
-class _PressedKeys:
-    def __init__(self, *pressed_keys: int) -> None:
-        self._pressed_keys = set(pressed_keys)
-
-    def __len__(self) -> int:
-        return 512
-
-    def __getitem__(self, key: int) -> bool:
-        return key in self._pressed_keys
+    def latest_keyboard_keys(self) -> frozenset[int]:
+        return self.keyboard_keys
 
 
 def _build_mandelbrot_runtime() -> tuple[
@@ -175,45 +168,22 @@ class TestMandelbrotLifecycle:
                 60,
             )
 
-    def test_keyboard_controls_does_not_subscribe_to_profile_streams(self) -> None:
-        """Verify Mandelbrot controls read one current input snapshot per update."""
+    def test_keyboard_controls_use_retained_keyboard_state(self) -> None:
+        """Verify Mandelbrot movement reads the centrally retained keyboard state."""
         profile = _MandelbrotProfile()
-
-        controls = KeyboardControls(scene_controls=Mock(), profile=profile)
-        controls.update()
-        controls.dispose()
-
-        assert profile.motion_state.subscriptions == []
-        assert profile.command_events.subscriptions == []
-
-    def test_keyboard_controls_fall_back_to_current_pressed_keys(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify Mandelbrot keyboard movement still works if stream state is stale after re-entry."""
-        profile = _MandelbrotProfile()
+        profile.keyboard_keys = frozenset({pygame.K_d})
         scene_controls = Mock()
-        monkeypatch.setattr(pygame.event, "pump", lambda: None)
-        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys(pygame.K_d))
 
         controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
         controls.update()
 
         scene_controls._move.assert_called_once_with(1.0, 0.0, multiplier=1.0)
 
-    def test_keyboard_controls_uses_current_keyboard_snapshot_once(
-        self,
-        monkeypatch,
-    ) -> None:
+    def test_keyboard_controls_edge_detect_retained_keyboard_state(self) -> None:
         """Verify held keyboard commands edge-detect without stream button events."""
         profile = _MandelbrotProfile()
+        profile.keyboard_keys = frozenset({pygame.K_RIGHTBRACKET})
         scene_controls = Mock()
-        monkeypatch.setattr(pygame.event, "pump", lambda: None)
-        monkeypatch.setattr(
-            pygame.key,
-            "get_pressed",
-            lambda: _PressedKeys(pygame.K_RIGHTBRACKET),
-        )
 
         controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
         controls.update()
@@ -221,10 +191,7 @@ class TestMandelbrotLifecycle:
 
         scene_controls._increment_view_mode.assert_called_once_with()
 
-    def test_keyboard_controls_falls_back_to_sampled_gamepad_motion(
-        self,
-        monkeypatch,
-    ) -> None:
+    def test_keyboard_controls_use_retained_gamepad_motion(self) -> None:
         """Verify connected gamepad motion still drives Mandelbrot if the stream state is idle."""
         profile = _MandelbrotProfile()
         profile.sampled_gamepad_state = MandelbrotMotionState(
@@ -233,9 +200,6 @@ class TestMandelbrotLifecycle:
             move_multiplier=2.0,
         )
         scene_controls = Mock()
-        monkeypatch.setattr(pygame.event, "pump", lambda: None)
-        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys())
-
         controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
         controls.update()
 
@@ -244,16 +208,10 @@ class TestMandelbrotLifecycle:
             ((0.0, -0.5), {"explicit_mode": "panning", "multiplier": 2.0}),
         ]
 
-    def test_keyboard_controls_falls_back_to_sampled_right_shoulder_action(
-        self,
-        monkeypatch,
-    ) -> None:
+    def test_keyboard_controls_use_retained_right_shoulder_action(self) -> None:
         """Verify sampled ZR presses still advance Mandelbrot when stream events are missed."""
         profile = _MandelbrotProfile()
         scene_controls = Mock()
-        monkeypatch.setattr(pygame.event, "pump", lambda: None)
-        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys())
-
         controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
         profile.sampled_gamepad_buttons = frozenset({GamepadButton.ZR})
         controls.update()
@@ -261,16 +219,10 @@ class TestMandelbrotLifecycle:
 
         scene_controls._increment_view_mode.assert_called_once_with()
 
-    def test_keyboard_controls_samples_held_shoulder_once_until_release(
-        self,
-        monkeypatch,
-    ) -> None:
+    def test_keyboard_controls_edge_detect_held_shoulder_until_release(self) -> None:
         """Verify sampled ZR presses are edge-detected locally without stream state."""
         profile = _MandelbrotProfile()
         scene_controls = Mock()
-        monkeypatch.setattr(pygame.event, "pump", lambda: None)
-        monkeypatch.setattr(pygame.key, "get_pressed", lambda: _PressedKeys())
-
         controls = KeyboardControls(scene_controls=scene_controls, profile=profile)
         profile.sampled_gamepad_buttons = frozenset({GamepadButton.ZR})
         controls.update()

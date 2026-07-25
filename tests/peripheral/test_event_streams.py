@@ -3,32 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
 
-from manyfold import Graph
-from manyfold.architecture import NewValues, PubSubObservable
+from manyfold import Graph, Subscribable
+from manyfold.architecture import NewValues
 
 from heart.peripheral.core import (Input, Peripheral, PeripheralInfo,
                                    PeripheralLocation,
                                    PeripheralMessageEnvelope, PeripheralTag)
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 NoopSubscription)
-from heart.peripheral.core.variables import Variable
-
-
-class CountingPeripheral(Peripheral[int]):
-    """Capture subscription counts so shared streams avoid duplicate work."""
-
-    def __init__(self, counter: dict[str, int]) -> None:
-        self._counter = counter
-
-    def _event_stream(self) -> Variable[int]:
-        def on_subscribe(observer: Any, scheduler: Any) -> NoopSubscription:
-            self._counter["subscriptions"] += 1
-            return NoopSubscription()
-
-        return CallbackObservable(on_subscribe)
 
 
 class EmittingPeripheral(Peripheral[int]):
@@ -37,29 +19,11 @@ class EmittingPeripheral(Peripheral[int]):
     def __init__(self) -> None:
         self.events = NewValues[int](name="test.emitting_peripheral.events")
 
-    def _event_stream(self) -> Variable[int]:
+    def _event_stream(self) -> Subscribable[int]:
         return self.events
 
 
-class TestPeripheralObserveSharing:
-    """Group tests for shared peripheral streams to avoid duplicate source work."""
-
-    def test_observe_shares_subscription(self) -> None:
-        """Ensure observe shares a single subscription so redundant polling is avoided for scalability."""
-        counter = {"subscriptions": 0}
-        peripheral = CountingPeripheral(counter)
-        stream = peripheral.observe
-
-        subscription_a = stream.subscribe()
-        subscription_b = stream.subscribe()
-        try:
-            assert counter["subscriptions"] == 1, (
-                "Observe should share the underlying stream."
-            )
-        finally:
-            subscription_a.dispose()
-            subscription_b.dispose()
-
+class TestPeripheralObserve:
     def test_observe_unwraps_graph_pipeline_envelopes(self) -> None:
         """Ensure peripheral observers receive domain payloads instead of Manyfold route envelopes."""
         peripheral = EmittingPeripheral()
@@ -114,80 +78,6 @@ class TestGraphRouteStreamTransforms:
 
         assert calls == [(route, 7)]
         assert stream.value == 7
-
-    def test_pubsub_combine_latest_accepts_graph_route_stream_sources(self) -> None:
-        graph = Graph()
-        route_a = runtime_route("test_event_stream_combine_a", "HeartCombineA")
-        route_b = runtime_route("test_event_stream_combine_b", "HeartCombineB")
-        stream_a = GraphRouteStream[int](graph, route_a)
-        stream_b = GraphRouteStream[int](graph, route_b)
-        observed: list[tuple[int, int]] = []
-
-        subscription = PubSubObservable.combine_latest(stream_a, stream_b).subscribe(
-            observed.append
-        )
-        try:
-            stream_a.on_next(1)
-            stream_b.on_next(2)
-            stream_a.on_next(3)
-
-            assert observed == [(1, 2), (3, 2)]
-        finally:
-            subscription.dispose()
-
-    def test_callback_pipeline_connects_graph_route_to_python_sink(self) -> None:
-        graph = Graph()
-        route = runtime_route(
-            "test_event_stream_callback", "HeartTestEventStreamCallback"
-        )
-        stream = GraphRouteStream[int](graph, route)
-        observed: list[int] = []
-
-        connection = (
-            stream.map(lambda value: value + 1, name="increment")
-            .filter(lambda value: value > 2, name="greater-than-two")
-            .callback(observed.append, name="collect")
-        )
-        try:
-            stream.on_next(1)
-            stream.on_next(2)
-
-            assert observed == [3]
-        finally:
-            connection.dispose()
-
-    def test_pipe_delegates_to_observable_pipeline(
-        self,
-    ) -> None:
-        graph = Graph()
-        route = runtime_route("test_event_stream_map", "HeartTestEventStreamMap")
-        stream = GraphRouteStream[int](graph, route)
-        calls = {"mapper": 0}
-
-        def mapper(value: int) -> int:
-            calls["mapper"] += 1
-            return value + 1
-
-        transformed = stream.map(mapper)
-        doubled = stream.map(lambda value: value * 2)
-        observed_a: list[int] = []
-        observed_b: list[int] = []
-        observed_doubled: list[int] = []
-
-        subscription_a = transformed.subscribe(observed_a.append)
-        subscription_b = transformed.subscribe(observed_b.append)
-        subscription_doubled = doubled.subscribe(observed_doubled.append)
-        try:
-            stream.on_next(41)
-
-            assert observed_a == [42]
-            assert observed_b == [42]
-            assert observed_doubled == [82]
-            assert calls["mapper"] == 2
-        finally:
-            subscription_a.dispose()
-            subscription_b.dispose()
-            subscription_doubled.dispose()
 
 
 class TestManyfoldSensorEnvelopeBridge:

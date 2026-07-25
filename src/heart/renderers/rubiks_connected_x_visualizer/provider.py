@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import os
 
-from manyfold import ConstantNode
+from manyfold import ConstantNode, Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR,
     RUBIKS_CONNECTED_X_IGNORE_STATE_SYNC_ENV_VAR,
@@ -37,13 +36,13 @@ def _use_local_baseline_mode() -> bool:
 
 
 class RubiksConnectedXVisualizerStateProvider(
-    ObservableProvider[RubiksConnectedXVisualizerState]
+    StateProvider[RubiksConnectedXVisualizerState]
 ):
     """Maintain the latest full cube state from Rubik's Connected X packets."""
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[RubiksConnectedXVisualizerState]:
+    ) -> Subscribable[RubiksConnectedXVisualizerState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals

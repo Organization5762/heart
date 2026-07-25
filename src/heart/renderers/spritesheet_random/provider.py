@@ -1,20 +1,20 @@
 import random
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet_random.state import (
     LoopPhase, SpritesheetLoopRandomState)
 
 
-class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomState]):
+class SpritesheetLoopRandomProvider(StateProvider[SpritesheetLoopRandomState]):
     def __init__(
         self,
         sheet_file_path: str,
@@ -49,16 +49,14 @@ class SpritesheetLoopRandomProvider(ObservableProvider[SpritesheetLoopRandomStat
             switch_state=None,
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[SpritesheetLoopRandomState]:
+    ) -> Subscribable[SpritesheetLoopRandomState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()
         switch_updates = switches.map(
             lambda switch_event: (
-                lambda state: self.handle_switch_state(
-                    state, switch_event.state
-                )
+                lambda state: self.handle_switch_state(state, switch_event.state)
             )
         )
         tick_updates = frame_ticks.map(

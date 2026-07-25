@@ -122,10 +122,7 @@ class BirdFlockRenderer(StatefulBaseRenderer[BirdFlockState]):
     def _sample_gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
         if self._peripheral_manager is None:
             return ()
-        return self._peripheral_manager.input_io.gamepad.sample(
-            include_tapped_buttons=False,
-            source="renderer.bird_flock",
-        )
+        return self._peripheral_manager.input_io.controls.gamepads()
 
     def _apply_count_control(
         self,

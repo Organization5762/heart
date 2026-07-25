@@ -1,18 +1,17 @@
-from manyfold import EmptyNode
+from manyfold import EmptyNode, Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.switch import FakeSwitch, SwitchState
 
 
-class MainSwitchProvider(ObservableProvider[SwitchState]):
+class MainSwitchProvider(StateProvider[SwitchState]):
     def __init__(self, peripheral_manager: PeripheralManager):
         self._pm = peripheral_manager
 
-    def _switch_stream(self) -> Variable[SwitchState]:
+    def _switch_stream(self) -> Subscribable[SwitchState]:
         main_switches = [
             peripheral.observe
             for peripheral in self._pm.peripherals
@@ -25,5 +24,5 @@ class MainSwitchProvider(ObservableProvider[SwitchState]):
         )
         return result
 
-    def observable(self, *args: object, **kwargs: object) -> Variable[SwitchState]:
+    def states(self, *args: object, **kwargs: object) -> Subscribable[SwitchState]:
         return self._switch_stream()

@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from manyfold import ConstantNode
+from manyfold import ConstantNode, Subscribable
 
 from heart.device import Device, Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.three_fractal.state import FractalSceneState
 from heart.runtime.display_context import DisplayContext
 
 
-class FractalSceneProvider(ObservableProvider[FractalSceneState]):
+class FractalSceneProvider(StateProvider[FractalSceneState]):
     def __init__(self, device: Device) -> None:
         self.device = device
 
@@ -25,7 +24,7 @@ class FractalSceneProvider(ObservableProvider[FractalSceneState]):
         runtime = FractalRuntime(device=self.device)
         return FractalSceneState(runtime=runtime)
 
-    def observable(
+    def states(
         self, *, initial_state: FractalSceneState
-    ) -> Variable[FractalSceneState]:
+    ) -> Subscribable[FractalSceneState]:
         return ConstantNode(initial_state).observable()

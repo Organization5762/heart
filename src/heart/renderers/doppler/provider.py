@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import numpy as np
+from manyfold import Subscribable
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 
 from .state import DopplerState
 
 
-class DopplerStateProvider(ObservableProvider[DopplerState]):
+class DopplerStateProvider(StateProvider[DopplerState]):
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
@@ -71,9 +71,9 @@ class DopplerStateProvider(ObservableProvider[DopplerState]):
             last_dt=dt,
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[DopplerState]:
+    ) -> Subscribable[DopplerState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = self._initial_state()
 

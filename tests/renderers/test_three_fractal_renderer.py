@@ -8,7 +8,8 @@ import numpy as np
 
 from heart.device import Cube, Layout, Orientation, Rectangle
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadSnapshot, GamepadSnapshotEvent)
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.renderer import (FractalRuntime,
                                                     FractalScene,
@@ -52,6 +53,18 @@ class _SamplingGamepad:
 class _SamplingInputIO:
     def __init__(self, snapshot: GamepadSnapshot) -> None:
         self.gamepad = _SamplingGamepad(snapshot)
+        self.controls = _SamplingControls(self.gamepad)
+
+
+class _SamplingControls:
+    def __init__(self, gamepad: _SamplingGamepad) -> None:
+        self._gamepad = gamepad
+
+    def keyboard(self) -> KeyboardSnapshot:
+        return KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
+
+    def gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
+        return self._gamepad.sample()
 
 
 class _SamplingPeripheralManager:

@@ -161,31 +161,9 @@ class KeyboardControls:
 
     def _sample_keyboard_keys(self) -> frozenset[int] | None:
         try:
-            pygame.event.pump()
-            keys = pygame.key.get_pressed()
-        except pygame.error:
+            return self._profile.latest_keyboard_keys()
+        except AttributeError:
             return None
-
-        pressed_keys: set[int] = set()
-        for key in (
-            pygame.K_a,
-            pygame.K_d,
-            pygame.K_e,
-            pygame.K_i,
-            pygame.K_j,
-            pygame.K_k,
-            pygame.K_LEFTBRACKET,
-            pygame.K_p,
-            pygame.K_q,
-            pygame.K_RIGHTBRACKET,
-            pygame.K_s,
-            pygame.K_w,
-            pygame.K_0,
-            pygame.K_9,
-        ):
-            if self._key_pressed(keys, key):
-                pressed_keys.add(key)
-        return frozenset(pressed_keys)
 
     def _sample_keyboard_motion_state(
         self,
@@ -234,13 +212,6 @@ class KeyboardControls:
                 SetOrientationCommand(source="keyboard.9", orientation_kind="cube")
             )
         return tuple(commands)
-
-    @staticmethod
-    def _key_pressed(keys: pygame.key.ScancodeWrapper, key: int) -> bool:
-        try:
-            return bool(keys[key])
-        except (IndexError, KeyError):
-            return False
 
     @staticmethod
     def _has_keyboard_input(state: MandelbrotMotionState) -> bool:

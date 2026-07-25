@@ -382,16 +382,13 @@ class MandelbulbScene(StatefulBaseRenderer[MandelbulbState]):
         self._keyboard_snapshot = snapshot
 
     def _refresh_keyboard_snapshot(self) -> None:
-        try:
-            self._keyboard_snapshot = (
-                self.state.peripheral_manager.input_io.keyboard.sample()
-            )
-        except (AttributeError, pygame.error):
-            return
+        self._keyboard_snapshot = (
+            self.state.peripheral_manager.input_io.controls.keyboard()
+        )
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample(
-            source="renderer.mandelbulb",
+        self._gamepad_snapshots = (
+            self.state.peripheral_manager.input_io.controls.gamepads()
         )
 
     def _power_morph_held(self, keys: frozenset[int]) -> bool:

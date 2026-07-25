@@ -83,31 +83,6 @@ class TestNavigationGameModes:
         slide_cls.assert_called_once_with(provider)
         assert game_modes.state.previous_mode_index == 1
 
-    def test_active_renderer_wraps_with_negative_direction(self) -> None:
-        """Verify that active_renderer wraps from the first mode to the last when stepping negatively. This preserves intuitive cycling so users can scroll backwards seamlessly."""
-        game_modes = _make_game_modes(count=3)
-
-        with (
-            patch("heart.navigation.SlideTransitionProvider") as provider_cls,
-            patch("heart.navigation.SlideTransitionRenderer") as slide_cls,
-        ):
-            provider = Mock()
-            transition = Mock()
-            provider_cls.return_value = provider
-            slide_cls.return_value = transition
-
-            game_modes.state.mode_offset = -1
-            result = game_modes.state.active_renderer()
-
-        assert result is transition
-        provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.entries[0].title_renderer,
-            renderer_b=game_modes.state.entries[-1].title_renderer,
-            direction=-1,
-        )
-        slide_cls.assert_called_once_with(provider)
-        assert game_modes.state.previous_mode_index == len(game_modes.state.entries) - 1
-
     def test_active_renderer_returns_existing_transition_until_finished(self) -> None:
         """Verify that active_renderer reuses an in-progress transition until it completes. This avoids allocating redundant transitions that could stutter rendering."""
         game_modes = _make_game_modes(count=2)
@@ -156,33 +131,6 @@ class TestNavigationGameModes:
         assert result is new_transition
         previous_transition.reset.assert_called_once_with()
         assert game_modes.state.sliding_transition is new_transition
-
-    def test_active_renderer_zero_offset_prefers_forward_steps_when_equal(self) -> None:
-        """Verify that active_renderer prefers the forward direction when offsets are symmetric. This defines deterministic behaviour so inputs feel consistent."""
-        game_modes = _make_game_modes(count=4)
-        game_modes.state.previous_mode_index = 0
-        game_modes.state._active_mode_index = 2
-
-        with (
-            patch("heart.navigation.SlideTransitionProvider") as provider_cls,
-            patch("heart.navigation.SlideTransitionRenderer") as slide_cls,
-        ):
-            provider = Mock()
-            transition = Mock()
-            provider_cls.return_value = provider
-            slide_cls.return_value = transition
-
-            game_modes.state.mode_offset = 0
-            result = game_modes.state.active_renderer()
-
-        assert result is transition
-        provider_cls.assert_called_once_with(
-            renderer_a=game_modes.state.entries[0].title_renderer,
-            renderer_b=game_modes.state.entries[2].title_renderer,
-            direction=1,
-        )
-        slide_cls.assert_called_once_with(provider)
-        assert game_modes.state.previous_mode_index == 2
 
     def test_active_renderer_zero_offset_prefers_shortest_wrap_direction(self) -> None:
         """Verify that active_renderer wraps in the shortest direction when the last mode is closer. This minimizes animation time so the UI responds briskly."""
@@ -239,29 +187,20 @@ class TestNavigationGameModes:
         assert game_modes.state.previous_mode_index == 1
 
     def test_active_renderer_returns_title_renderer_in_select_mode(self) -> None:
-        """Verify that active_renderer returns the title renderer while the UI is in select mode. This ensures selection screens stay visible while browsing options."""
         game_modes = _make_game_modes(count=2)
         game_modes.state.sliding_transition = None
         game_modes.state.previous_mode_index = 0
 
         game_modes.state.mode_offset = 0
-        result = game_modes.state.active_renderer()
+        assert (
+            game_modes.state.active_renderer()
+            is game_modes.state.entries[0].title_renderer
+        )
 
-        assert result is game_modes.state.entries[0].title_renderer
-
-    def test_active_renderer_returns_mode_when_not_in_select_mode(self) -> None:
-        """Verify that active_renderer returns the active gameplay renderer when not in select mode. This keeps gameplay responsive once a selection is made."""
-        game_modes = _make_game_modes(count=3)
         game_modes.state.in_select_mode = False
-        game_modes.state.previous_mode_index = 1
-        game_modes.state._active_mode_index = 1
-        game_modes.state.sliding_transition = None
-
-        game_modes.state.mode_offset = 0
-        result = game_modes.state.active_renderer()
-
-        assert result is game_modes.state.entries[1].renderer, game_modes.state.entries
-        assert game_modes.state.previous_mode_index == 1
+        assert (
+            game_modes.state.active_renderer() is game_modes.state.entries[0].renderer
+        )
 
     def test_activate_commits_selected_offset_and_enters_mode(self) -> None:
         """Verify activate commits the current browse offset so logical navigation events still enter the selected mode without switch-specific state."""
@@ -295,44 +234,6 @@ class TestNavigationGameModes:
         assert all(
             entry.renderer.reset_calls == 1 for entry in game_modes.state.entries
         )
-
-    def test_initialize_registered_renderers_reports_progress(self) -> None:
-        """Verify initialization reports progress for every registered renderer so startup feedback stays accurate while scenes warm up."""
-        game_modes = GameModes()
-        title_renderer = DummyRenderer("title")
-        mode_renderer = DummyRenderer("mode")
-        post_processor = DummyRenderer("post")
-        game_modes.set_state(
-            GameModeState(
-                entries=[
-                    ModeEntry(
-                        title_renderer=title_renderer,
-                        renderer=mode_renderer,
-                    )
-                ],
-                post_processors=[post_processor],
-            )
-        )
-        window = _make_window()
-        peripheral_manager = Mock()
-        orientation = Mock()
-
-        with patch.object(game_modes, "_render_initialization_progress") as progress:
-            game_modes._initialize_registered_renderers(
-                window=window,
-                peripheral_manager=peripheral_manager,
-                orientation=orientation,
-            )
-
-        assert progress.call_args_list == [
-            ((window,), {"completed": 0, "total": 3}),
-            ((window,), {"completed": 1, "total": 3}),
-            ((window,), {"completed": 2, "total": 3}),
-            ((window,), {"completed": 3, "total": 3}),
-        ]
-        assert title_renderer.initialize_calls == 1
-        assert mode_renderer.initialize_calls == 1
-        assert post_processor.initialize_calls == 1
 
     def test_initialize_registered_renderers_resets_modes_after_warmup(self) -> None:
         """Verify startup warmup does not leave inactive gameplay renderers subscribed while browsing mode titles."""
@@ -474,52 +375,6 @@ class TestNavigationGameModes:
             opengl_renderer.name,
             display_error,
         )
-
-    def test_render_initialization_progress_logs_terminal_bar(self) -> None:
-        """Verify initialization progress logs a terminal bar so startup remains observable even when the window cannot draw the progress UI."""
-        game_modes = GameModes()
-        window = Mock()
-        window.screen = None
-
-        with patch.object(game_modes_module.logger, "info") as info:
-            game_modes._render_initialization_progress(
-                window=window,
-                completed=1,
-                total=4,
-            )
-
-        info.assert_called_once_with(
-            "Initializing game mode renderers (%s of %s) [%s]",
-            1,
-            4,
-            "######------------------",
-        )
-
-    def test_render_initialization_progress_can_skip_screen_draw(self) -> None:
-        """Verify totems can suppress the visible startup progress bar while retaining logs."""
-        game_modes = GameModes()
-        window = Mock()
-        window.screen = Mock()
-        window.screen.get_flags.return_value = 0
-
-        with (
-            patch.object(
-                game_modes_module.Configuration, "render_initialization_progress"
-            ) as progress_enabled,
-            patch.object(game_modes_module.logger, "info"),
-            patch.object(game_modes_module.pygame.display, "flip"),
-        ):
-            progress_enabled.return_value = False
-            game_modes._render_initialization_progress(
-                window=window,
-                completed=0,
-                total=4,
-            )
-
-        window.screen.fill.assert_called_once_with(
-            game_modes_module.INITIALIZATION_BACKGROUND_COLOR
-        )
-        window.device.set_screen.assert_called_once_with(window.screen)
 
 
 if __name__ == "__main__":

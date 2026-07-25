@@ -1,8 +1,9 @@
+from manyfold import Subscribable
+
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.mario.state import MarioRendererState
 from heart.utilities.logging import get_logger
@@ -10,7 +11,7 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 
-class MarioRendererProvider(ObservableProvider[MarioRendererState]):
+class MarioRendererProvider(StateProvider[MarioRendererState]):
     def __init__(
         self,
         metadata_file_path: str,
@@ -77,9 +78,9 @@ class MarioRendererProvider(ObservableProvider[MarioRendererState]):
             latest_acceleration=acceleration,
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[MarioRendererState]:
+    ) -> Subscribable[MarioRendererState]:
         initial = self._create_initial_state()
         accelerations = peripheral_manager.input_io.active_acceleration().start_with(
             None

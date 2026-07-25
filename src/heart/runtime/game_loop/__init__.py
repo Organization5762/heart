@@ -250,6 +250,8 @@ class GameLoop:
         finally:
             logger.info("Shutting down GameLoop.")
 
+            self.components.peripheral_runtime.close()
+            self.components.peripheral_manager.stop()
             pygame.quit()
 
     def set_screen(self, screen: pygame.Surface) -> None:

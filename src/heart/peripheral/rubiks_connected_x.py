@@ -17,13 +17,13 @@ from typing import Any, Iterable, Iterator, Sequence
 from bleak import BleakClient, BleakScanner
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, Subscribable, TypedRoute,
+                      Variant, route)
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.variables import Variable
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1088,7 +1088,7 @@ class RubiksConnectedXPeripheral(Peripheral[RubiksConnectedXNotification]):
         self._last_bluez_connect_attempt_monotonic = 0.0
         self._managed_graph_node_installed = False
 
-    def _event_stream(self) -> Variable[RubiksConnectedXNotification]:
+    def _event_stream(self) -> Subscribable[RubiksConnectedXNotification]:
         return self._events
 
     def peripheral_info(self) -> PeripheralInfo:

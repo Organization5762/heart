@@ -41,8 +41,8 @@ class TestTixyland:
         provider = TixylandStateProvider(peripheral_manager)
         observed_states: list[TixylandState] = []
         monkeypatch.setattr(
-            peripheral_manager.input_io.gamepad,
-            "sample",
+            peripheral_manager.input_io.controls,
+            "gamepads",
             lambda **_kwargs: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -51,7 +51,7 @@ class TestTixyland:
             ),
         )
 
-        provider.observable().subscribe(observed_states.append)
+        provider.states().subscribe(observed_states.append)
         for _ in range(30):
             peripheral_manager.input_io.frame_ticks.advance(_Clock())
 
@@ -63,8 +63,8 @@ class TestTixyland:
         provider = TixylandStateProvider(peripheral_manager)
         observed_states: list[TixylandState] = []
         monkeypatch.setattr(
-            peripheral_manager.input_io.gamepad,
-            "sample",
+            peripheral_manager.input_io.controls,
+            "gamepads",
             lambda **_kwargs: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -73,7 +73,7 @@ class TestTixyland:
             ),
         )
 
-        provider.observable().subscribe(observed_states.append)
+        provider.states().subscribe(observed_states.append)
         peripheral_manager.input_io.frame_ticks.advance(_Clock())
 
         assert observed_states[-1].hue_degrees > observed_states[0].hue_degrees

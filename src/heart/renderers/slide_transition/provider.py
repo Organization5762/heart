@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.slide_transition.state import (DEFAULT_GAUSSIAN_SIGMA,
                                                     DEFAULT_STATIC_MASK_STEPS,
@@ -18,7 +19,7 @@ DEFAULT_SLIDE_DURATION_MS = 333
 MIN_SLIDE_DURATION_MS = 1
 
 
-class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
+class SlideTransitionProvider(StateProvider[SlideTransitionState]):
     def __init__(
         self,
         renderer_a: StatefulBaseRenderer,
@@ -38,12 +39,12 @@ class SlideTransitionProvider(ObservableProvider[SlideTransitionState]):
         self.static_mask_steps = max(static_mask_steps, 1)
         self.gaussian_sigma = max(gaussian_sigma, 0.1)
 
-    def observable(
+    def states(
         self,
         peripheral_manager: PeripheralManager,
         *,
         initial_state: SlideTransitionState,
-    ) -> Variable[SlideTransitionState]:
+    ) -> Subscribable[SlideTransitionState]:
         return (
             peripheral_manager.input_io.frame_tick_stream()
             .scan(

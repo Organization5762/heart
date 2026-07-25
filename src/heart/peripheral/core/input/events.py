@@ -10,6 +10,8 @@ from manyfold.architecture import PubSubTopic
 HEART_INPUT_PUBSUB = "heart"
 INPUT_EVENT_TOPIC = "heart.input"
 FRAME_TICK_TOPIC = "heart.frame_tick"
+KEYBOARD_STATE_TOPIC = "heart.input.keyboard.state"
+GAMEPAD_STATE_TOPIC = "heart.input.gamepad.state"
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,10 +48,38 @@ class InputEvent:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class KeyboardInputState:
+    pressed_keys_json: str
+    timestamp_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class GamepadInputState:
+    snapshots_json: str
+    timestamp_monotonic: float
+
+
 def input_event_topic() -> Any:
     return PubSubTopic(
         INPUT_EVENT_TOPIC,
         schema=InputEvent,
+        pubsub=HEART_INPUT_PUBSUB,
+    )
+
+
+def keyboard_state_topic() -> Any:
+    return PubSubTopic(
+        KEYBOARD_STATE_TOPIC,
+        schema=KeyboardInputState,
+        pubsub=HEART_INPUT_PUBSUB,
+    )
+
+
+def gamepad_state_topic() -> Any:
+    return PubSubTopic(
+        GAMEPAD_STATE_TOPIC,
+        schema=GamepadInputState,
         pubsub=HEART_INPUT_PUBSUB,
     )
 

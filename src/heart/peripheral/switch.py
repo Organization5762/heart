@@ -8,24 +8,18 @@ from typing import Any, Callable, Iterable, Iterator, Mapping, Self
 
 import serial
 from bleak.backends.device import BLEDevice
-from manyfold import (DetectionNode, EmptyNode, Graph, Layer, ManagedGraphNode,
-                      ManagedGraphNodeHandle, OwnerName, Plane, RoutePipeline,
-                      Schema, StreamFamily, StreamName, Timer, TypedRoute,
-                      Variant, route)
+from manyfold import (CallbackObservable, CallbackSubscription, DetectionNode,
+                      EmptyNode, Graph, Layer, ManagedGraphNode,
+                      ManagedGraphNodeHandle, NoopSubscription, OwnerName,
+                      Plane, RoutePipeline, Schema, StreamFamily, StreamName,
+                      Subscribable, Timer, TypedRoute, Variant, route)
 from manyfold.graph import ObserverLike, SubscriptionLike
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop,
                                 ManagedRunLoopHandle, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.bluetooth import UartListener
-from heart.peripheral.core import (Peripheral, PeripheralInfo,
-                                   PeripheralMessageEnvelope, PeripheralTag)
-from heart.peripheral.core.subscriptions import (CallbackObservable,
-                                                 CallbackSubscription,
-                                                 NoopSubscription)
-from heart.peripheral.core.variables import Variable
-from heart.peripheral.keyboard import (KeyboardEvent, KeyboardKey,
-                                       KeyPressedEvent)
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.utilities.env import Configuration, get_device_ports
 from heart.utilities.logging import get_logger
 
@@ -222,18 +216,6 @@ class FakeSwitch(BaseSwitch):
         super().__init__(*args, **kwargs)
         self._navigation_subscription = None
 
-    def _key_press_stream(self, key: int) -> Variable[KeyboardEvent]:
-        def _unwrap(
-            envelope: PeripheralMessageEnvelope[KeyboardEvent],
-        ) -> KeyboardEvent:
-            return envelope.data
-
-        def _is_pressed(event: KeyboardEvent) -> bool:
-            return isinstance(event, KeyPressedEvent)
-
-        result = KeyboardKey.get(key).observe.map(_unwrap).filter(_is_pressed)
-        return result
-
     @classmethod
     def detect(cls) -> Iterator[Self]:
         yield cls()
@@ -322,7 +304,7 @@ class FakeSwitch(BaseSwitch):
     def _handle_browse(self, delta: int) -> None:
         self.rotational_value += delta
 
-    def _event_stream(self) -> Variable[SwitchState]:
+    def _event_stream(self) -> Subscribable[SwitchState]:
         if Configuration.is_pi() and (not Configuration.is_x11_forward()):
             return EmptyNode().observable()
         else:

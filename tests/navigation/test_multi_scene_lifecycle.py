@@ -35,7 +35,7 @@ class _PeripheralManager:
         self.input_io = Mock()
         self.input_io.navigation = self.navigation_profile
         self.gamepad = _Gamepad() if with_gamepad else None
-        self.input_io.gamepad = self.gamepad or _DisconnectedGamepad()
+        self.input_io.controls = _ControlSurface(self.gamepad or _DisconnectedGamepad())
 
 
 class _Gamepad:
@@ -66,6 +66,14 @@ class _DisconnectedGamepad:
     ) -> tuple[GamepadSnapshotEvent, ...]:
         del include_tapped_buttons, source
         return ()
+
+
+class _ControlSurface:
+    def __init__(self, gamepad: _Gamepad | _DisconnectedGamepad) -> None:
+        self._gamepad = gamepad
+
+    def gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
+        return self._gamepad.sample(include_tapped_buttons=False)
 
 
 class _Scene(StatefulBaseRenderer[int]):

@@ -17,7 +17,8 @@ from heart.device.beats.websocket import WebSocket
 from heart.peripheral.core import (PeripheralInfo, PeripheralMessageEnvelope,
                                    PeripheralTag)
 from heart.peripheral.core.input import (GamepadButton, GamepadDpadValue,
-                                         InputDebugEnvelope)
+                                         GamepadSnapshotEvent,
+                                         InputDebugEnvelope, KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.free_text import FreeTextRenderer
 from heart.renderers.image import (ContainRenderImage,
@@ -48,7 +49,10 @@ GAMEPAD_NAVIGATION_STICK_THRESHOLD = 0.6
 class PeripheralRuntime:
     """Manage peripheral lifecycle and event streaming for the runtime."""
 
-    def __init__(self, peripheral_manager: PeripheralManager) -> None:
+    def __init__(
+        self,
+        peripheral_manager: PeripheralManager,
+    ) -> None:
         self._peripheral_manager = peripheral_manager
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
         self._frame_clock: pygame.time.Clock | None = None
@@ -58,6 +62,13 @@ class PeripheralRuntime:
             GamepadButton.SOUTH: False,
             GamepadButton.NORTH: False,
         }
+        self._navigation_keys_held: dict[int, bool] = {
+            pygame.K_LEFT: False,
+            pygame.K_RIGHT: False,
+            pygame.K_DOWN: False,
+            pygame.K_UP: False,
+        }
+        self._subscriptions: list[Any] = []
 
     def detect_and_start(self) -> None:
         logger.info("Attempting to detect attached peripherals")
@@ -86,12 +97,19 @@ class PeripheralRuntime:
             logger.debug("Beats input debug streaming disabled")
             return
 
-        self._peripheral_manager.input_io.debug_tap.observable().subscribe(
-            on_next=lambda envelope: ws.send(
-                kind="peripheral",
-                payload=self._streaming_envelope(envelope),
-            ),
+        self._subscriptions.append(
+            self._peripheral_manager.input_io.debug_tap.observable().subscribe(
+                on_next=lambda envelope: ws.send(
+                    kind="peripheral",
+                    payload=self._streaming_envelope(envelope),
+                ),
+            )
         )
+
+    def close(self) -> None:
+        for subscription in reversed(self._subscriptions):
+            subscription.dispose()
+        self._subscriptions.clear()
 
     def _handle_control_message(self, control_message: Any) -> None:
         self._control_messages.put(control_message)
@@ -237,20 +255,30 @@ class PeripheralRuntime:
             logger.warning("Ignoring unsupported phone emoji: %s", emoji)
 
     def poll(self) -> None:
-        self._poll_gamepad_navigation()
+        keyboard, gamepads = self._peripheral_manager.input_io.poll()
+        self._poll_navigation(keyboard, gamepads)
         self._drain_control_messages()
         drain_main_thread_queue(max_items=MAIN_THREAD_DRAIN_MAX_ITEMS)
 
-    def _poll_gamepad_navigation(self) -> None:
-        events = self._peripheral_manager.input_io.gamepad.sample(
-            include_tapped_buttons=False,
-            source="runtime.navigation",
-        )
+    def _poll_navigation(
+        self,
+        keyboard: KeyboardSnapshot,
+        events: tuple[GamepadSnapshotEvent, ...],
+    ) -> None:
+        navigation = self._peripheral_manager.input_io.navigation
+        if self._key_pressed(keyboard, pygame.K_LEFT):
+            navigation.inject_browse(-1, source="keyboard.left")
+        if self._key_pressed(keyboard, pygame.K_RIGHT):
+            navigation.inject_browse(1, source="keyboard.right")
+        if self._key_pressed(keyboard, pygame.K_DOWN):
+            navigation.inject_activate(source="keyboard.down")
+        if self._key_pressed(keyboard, pygame.K_UP):
+            navigation.inject_alternate_activate(source="keyboard.up")
+
         if not events:
             self._rearm_gamepad_navigation()
             return
 
-        navigation = self._peripheral_manager.input_io.navigation
         for event in events:
             snapshot = event.snapshot
             if self._button_pressed(snapshot, GamepadButton.SOUTH):
@@ -288,6 +316,12 @@ class PeripheralRuntime:
         held = bool(snapshot.button_held(button))
         was_held = self._navigation_buttons_held[button]
         self._navigation_buttons_held[button] = held
+        return held and not was_held
+
+    def _key_pressed(self, snapshot: KeyboardSnapshot, key: int) -> bool:
+        held = key in snapshot.pressed_keys
+        was_held = self._navigation_keys_held[key]
+        self._navigation_keys_held[key] = held
         return held and not was_held
 
     @staticmethod

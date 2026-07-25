@@ -4,10 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.frame import FrameTick
-from heart.peripheral.core.variables import Variable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -21,38 +21,38 @@ class _SampleAverage:
     value: float | None = None
 
 
-def map_stream(source: Variable[T], mapper: Callable[[T], U]) -> Variable[U]:
+def map_stream(source: Subscribable[T], mapper: Callable[[T], U]) -> Subscribable[U]:
     return stream_from(source).map(mapper)
 
 
-def stream_from(source: Variable[T]) -> PubSubObservable:
+def stream_from(source: Subscribable[T]) -> PubSubObservable:
     return PubSubObservable.merge(source)
 
 
-def merge_streams(*streams: Variable[T]) -> Variable[T]:
+def merge_streams(*streams: Subscribable[T]) -> Subscribable[T]:
     return PubSubObservable.merge(*streams)
 
 
 def scan_stream(
-    source: Variable[T],
+    source: Subscribable[T],
     accumulator: Callable[[U, T], U],
     *,
     seed: U,
-) -> Variable[U]:
+) -> Subscribable[U]:
     return stream_from(source).scan(accumulator, seed=seed)
 
 
-def start_with_stream(source: Variable[T], *values: T) -> Variable[T]:
+def start_with_stream(source: Subscribable[T], *values: T) -> Subscribable[T]:
     return stream_from(source).start_with(*values)
 
 
 def average_by_frame_window(
-    source: Variable[T | None],
-    frame_ticks: Variable[FrameTick],
+    source: Subscribable[T | None],
+    frame_ticks: Subscribable[FrameTick],
     *,
     interval_ms: float,
     selector: Callable[[T], float],
-) -> Variable[float]:
+) -> Subscribable[float]:
     def accumulate(previous: _SampleAverage, latest: tuple[FrameTick, T | None]):
         frame_tick, value = latest
         elapsed_ms = previous.elapsed_ms + max(float(frame_tick.delta_ms), 0.0)
