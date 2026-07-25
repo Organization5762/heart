@@ -19,6 +19,7 @@ from heart.cli.commands.run_options import (DEFAULT_ADD_LOW_POWER_MODE,
                                             resolve_configuration_name)
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.game_loop import GameLoop
+from heart.runtime.manyfold_signer import ManyfoldSignerRuntime
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -131,4 +132,9 @@ def run_command(
     # Retain an empty loop for "lower power" mode
     if add_low_power_mode:
         loop.add_sleep_mode()
-    loop.start()
+    signer_runtime = ManyfoldSignerRuntime()
+    try:
+        signer_runtime.start()
+        loop.start()
+    finally:
+        signer_runtime.close()

@@ -153,6 +153,64 @@ sync_heart_environment() {
   )
 }
 
+initialize_manyfold_signer() {
+  local authority_socket
+  local cluster_id
+  local enrollment_bin
+  local node_id
+  local repo_dir
+  local signer_bin
+  local state_directory
+  local token_file
+
+  repo_dir="$(read_env_value HEART_REPO_DIR /home/michael/Desktop/heart)"
+  signer_bin="$(read_env_value HEART_MANYFOLD_SIGNER_BIN "${repo_dir}/.venv/bin/manyfold-machine-signer")"
+  enrollment_bin="$(read_env_value HEART_MANYFOLD_ENROLLMENT_BIN "${repo_dir}/.venv/bin/manyfold-enrollment")"
+  state_directory="$(read_env_value HEART_MANYFOLD_SIGNER_STATE_DIRECTORY /var/lib/heart/manyfold-signer)"
+  authority_socket="$(read_env_value HEART_MANYFOLD_ENROLLMENT_AUTHORITY_SOCKET "")"
+  token_file="$(read_env_value HEART_MANYFOLD_ENROLLMENT_TOKEN_FILE "")"
+  cluster_id="$(read_env_value HEART_MANYFOLD_CLUSTER_ID heart)"
+  node_id="$(read_env_value HEART_MANYFOLD_NODE_ID "$(hostname)")"
+
+  if [[ ! -x "${signer_bin}" ]]; then
+    log "Manyfold signer executable is missing: ${signer_bin}"
+    exit 2
+  fi
+  if [[ ! -x "${enrollment_bin}" ]]; then
+    log "Manyfold enrollment executable is missing: ${enrollment_bin}"
+    exit 2
+  fi
+
+  run_root install -d -m 0700 "${state_directory}" /run/heart-manyfold
+  if [[ -f "${state_directory}/identity.json" ]]; then
+    run_root "${enrollment_bin}" status \
+      --state-dir "${state_directory}" >/dev/null
+    log "Manyfold machine identity is already initialized"
+    return
+  fi
+  if [[ -n "${authority_socket}" || -n "${token_file}" ]]; then
+    if [[ -z "${authority_socket}" || -z "${token_file}" ]]; then
+      log "Manyfold member enrollment requires both an authority socket and token file"
+      exit 2
+    fi
+    run_root "${enrollment_bin}" enroll \
+      --authority-socket "${authority_socket}" \
+      --state-dir "${state_directory}" \
+      --node-id "${node_id}" \
+      --server-name "${node_id}" \
+      --token-file "${token_file}" >/dev/null
+    run_root rm -f "${token_file}"
+    log "enrolled Manyfold machine identity node=${node_id}"
+    return
+  fi
+  run_root "${enrollment_bin}" initialize \
+    --state-dir "${state_directory}" \
+    --cluster-id "${cluster_id}" \
+    --node-id "${node_id}" \
+    --server-name "${node_id}" >/dev/null
+  log "initialized Manyfold machine identity cluster=${cluster_id} node=${node_id}"
+}
+
 read_env_value() {
   local key="$1"
   local default_value="$2"
@@ -282,6 +340,7 @@ install_supervisor_files() {
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/setup-xvfb.sh" /usr/local/bin/setup-xvfb.sh
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-common.sh" /usr/local/bin/heart-supervisor-common.sh
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-xvfb.sh" /usr/local/bin/heart-supervisor-xvfb.sh
+  run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-signer.sh" /usr/local/bin/heart-supervisor-signer.sh
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-app.sh" /usr/local/bin/heart-supervisor-app.sh
   run_root install -m 0755 "${TOTEM_DRIVER_DIR}/heart-supervisor-rp1-scanner.sh" /usr/local/bin/heart-supervisor-rp1-scanner.sh
   printf 'KERNEL=="rp1-hub75", GROUP="gpio", MODE="0660"\n' | run_root tee /etc/udev/rules.d/99-rp1-hub75.rules >/dev/null
@@ -308,6 +367,7 @@ install_apt_packages
 install_uv_and_rust
 merge_env_file "${ENV_EXAMPLE}" "${TOTEM_ENV_FILE}"
 sync_heart_environment
+initialize_manyfold_signer
 install_supervisor_files
 
 log "REBOOT_REQUIRED=${REBOOT_REQUIRED}"
