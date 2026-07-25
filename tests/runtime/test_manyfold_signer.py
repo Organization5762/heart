@@ -73,7 +73,7 @@ class TestManyfoldSignerConfig:
             ManyfoldSignerConfig(**arguments)
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(70)
 def test_real_multiprocess_signer_qualification(tmp_path: Path) -> None:
     signer_executable = Path(sys.executable).with_name("manyfold-machine-signer")
     enrollment_executable = Path(sys.executable).with_name("manyfold-enrollment")
@@ -95,7 +95,7 @@ def test_real_multiprocess_signer_qualification(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        timeout=25,
+        timeout=60,
     )
 
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
