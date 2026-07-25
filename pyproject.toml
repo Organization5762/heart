@@ -36,7 +36,7 @@ dependencies = [
     "heart-device-manager",
     "heart-firmware-io",
     "lagom",
-    "manyfold @ git+https://github.com/Organization5762/manyfold.git@726f64d72b36d8bd134bda63e29ebd80472736b6",
+    "manyfold @ git+https://github.com/Organization5762/manyfold.git@89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7",
     "moderngl",
     "numba",
     "numpy",

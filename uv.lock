@@ -708,7 +708,7 @@ requires-dist = [
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
     { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", directory = "rust/heart_rgb_matrix_driver" },
     { name = "lagom" },
-    { name = "manyfold", git = "https://github.com/Organization5762/manyfold.git?rev=726f64d72b36d8bd134bda63e29ebd80472736b6" },
+    { name = "manyfold", git = "https://github.com/Organization5762/manyfold.git?rev=89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7" },
     { name = "moderngl" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numba" },
@@ -1067,7 +1067,7 @@ wheels = [
 [[package]]
 name = "manyfold"
 version = "0.1.42"
-source = { git = "https://github.com/Organization5762/manyfold.git?rev=726f64d72b36d8bd134bda63e29ebd80472736b6#726f64d72b36d8bd134bda63e29ebd80472736b6" }
+source = { git = "https://github.com/Organization5762/manyfold.git?rev=89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7#89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7" }
 dependencies = [
     { name = "cryptography" },
     { name = "pysyncobj" },
