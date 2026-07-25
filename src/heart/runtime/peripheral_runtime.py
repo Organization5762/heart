@@ -24,6 +24,7 @@ from heart.renderers.free_text import FreeTextRenderer
 from heart.renderers.image import (ContainRenderImage,
                                    SurfaceRenderImageStateProvider)
 from heart.runtime.active_game_loop import get_active_game_loop
+from heart.runtime.manyfold_node import ManyfoldNodeRuntime
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -52,8 +53,10 @@ class PeripheralRuntime:
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
+        manyfold_node: ManyfoldNodeRuntime | None = None,
     ) -> None:
         self._peripheral_manager = peripheral_manager
+        self._manyfold_node = manyfold_node or ManyfoldNodeRuntime()
         self._control_messages: SimpleQueue[Any] = SimpleQueue()
         self._frame_clock: pygame.time.Clock | None = None
         self._navigation_dpad_armed = True
@@ -71,16 +74,21 @@ class PeripheralRuntime:
         self._subscriptions: list[Any] = []
 
     def detect_and_start(self) -> None:
-        logger.info("Attempting to detect attached peripherals")
-        self._peripheral_manager.detect()
-        peripherals = self._peripheral_manager.peripherals
-        logger.info(
-            "Detected attached peripherals - found %d. peripherals=%s",
-            len(peripherals),
-            peripherals,
-        )
-        logger.info("Starting all peripherals")
-        self._peripheral_manager.start()
+        self._manyfold_node.start()
+        try:
+            logger.info("Attempting to detect attached peripherals")
+            self._peripheral_manager.detect()
+            peripherals = self._peripheral_manager.peripherals
+            logger.info(
+                "Detected attached peripherals - found %d. peripherals=%s",
+                len(peripherals),
+                peripherals,
+            )
+            logger.info("Starting all peripherals")
+            self._peripheral_manager.start()
+        except Exception:
+            self._manyfold_node.close()
+            raise
 
     def configure_streaming(self, websocket: Any | None = None) -> None:
         if (
@@ -107,9 +115,12 @@ class PeripheralRuntime:
         )
 
     def close(self) -> None:
-        for subscription in reversed(self._subscriptions):
-            subscription.dispose()
-        self._subscriptions.clear()
+        try:
+            for subscription in reversed(self._subscriptions):
+                subscription.dispose()
+        finally:
+            self._subscriptions.clear()
+            self._manyfold_node.close()
 
     def _handle_control_message(self, control_message: Any) -> None:
         self._control_messages.put(control_message)
@@ -255,6 +266,7 @@ class PeripheralRuntime:
             logger.warning("Ignoring unsupported phone emoji: %s", emoji)
 
     def poll(self) -> None:
+        self._manyfold_node.poll()
         keyboard, gamepads = self._peripheral_manager.input_io.poll()
         self._poll_navigation(keyboard, gamepads)
         self._drain_control_messages()

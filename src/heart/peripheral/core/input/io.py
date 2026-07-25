@@ -202,6 +202,8 @@ class InputIO:
     def close(self) -> None:
         if "navigation" in self.__dict__:
             self.navigation.close()
+        if "external_sensors" in self.__dict__:
+            self.external_sensors.close()
         if "keyboard" in self.__dict__:
             self.keyboard.close()
         for subscription in reversed(self._subscriptions):
