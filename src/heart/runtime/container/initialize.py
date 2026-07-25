@@ -13,6 +13,7 @@ from heart.peripheral.core.providers import apply_provider_registrations
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.programs.registry import ConfigurationRegistry
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.manyfold_node import ManyfoldNodeRuntime
 from heart.runtime.peripheral_runtime import PeripheralRuntime
 
 OverrideMap = Mapping[type[Any], Any]
@@ -72,7 +73,16 @@ def configure_runtime_container(
     )
     _define_default(container, DisplayContext, Singleton(DisplayContext), override_keys)
     _define_default(
-        container, PeripheralRuntime, Singleton(PeripheralRuntime), override_keys
+        container,
+        ManyfoldNodeRuntime,
+        Singleton(ManyfoldNodeRuntime),
+        override_keys,
+    )
+    _define_default(
+        container,
+        PeripheralRuntime,
+        Singleton(_build_peripheral_runtime),
+        override_keys,
     )
     _define_default(
         container,
@@ -132,6 +142,15 @@ def _build_peripheral_manager(
 ) -> PeripheralManager:
     return PeripheralManager(
         configuration_loader=container.resolve(PeripheralConfigurationLoader)
+    )
+
+
+def _build_peripheral_runtime(
+    container: RuntimeContainer,
+) -> PeripheralRuntime:
+    return PeripheralRuntime(
+        peripheral_manager=container.resolve(PeripheralManager),
+        manyfold_node=container.resolve(ManyfoldNodeRuntime),
     )
 
 

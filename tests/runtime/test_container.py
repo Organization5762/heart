@@ -6,6 +6,7 @@ from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.runtime.container import build_runtime_container
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.game_loop import GameLoop
+from heart.runtime.manyfold_node import ManyfoldNodeRuntime
 
 
 class TestRuntimeContainer:
@@ -26,6 +27,7 @@ class TestRuntimeContainer:
             DisplayContext,
             GameModes,
             RandomnessProvider,
+            ManyfoldNodeRuntime,
         ):
             assert container.resolve(service) is container.resolve(service)
 

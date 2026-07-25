@@ -42,6 +42,8 @@ class NavigationEvent:
     kind: str
     source: str
     step: int
+    event_id: str = ""
+    origin_node_id: str = ""
 
 
 class NavigationProfile:
@@ -121,9 +123,7 @@ class NavigationProfile:
 
     def _publish(self, intent: NavigationIntent) -> None:
         if isinstance(intent, BrowseIntent):
-            event = NavigationEvent(
-                kind="browse", source=intent.source, step=intent.step
-            )
+            event = NavigationEvent(kind="browse", source=intent.source, step=intent.step)
         elif isinstance(intent, ActivateIntent):
             event = NavigationEvent(kind="activate", source=intent.source, step=0)
         else:
