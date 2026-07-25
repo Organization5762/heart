@@ -1,6 +1,7 @@
 [Unit]
 Description=Totem Service
-After=multi-user.target
+Requires=manyfold-signer.service
+After=multi-user.target manyfold-signer.service
 
 [Service]
 Type=simple

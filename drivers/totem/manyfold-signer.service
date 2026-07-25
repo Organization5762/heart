@@ -1,0 +1,21 @@
+[Unit]
+Description=Manyfold machine-local signer
+After=local-fs.target
+Before=totem.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=-/etc/default/totem
+ExecStart=/usr/local/bin/heart-supervisor-signer.sh
+Restart=always
+RestartSec=1s
+TimeoutStopSec=10s
+RuntimeDirectory=heart-manyfold
+RuntimeDirectoryMode=0700
+StateDirectory=heart/manyfold-signer
+StateDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target
