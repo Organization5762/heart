@@ -14,6 +14,10 @@ from heart.runtime.manyfold_signer import (DEFAULT_SIGNER_SOCKET,
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QUALIFICATION_SCRIPT = PROJECT_ROOT / "scripts" / "qualify_manyfold_signer.py"
+# The real credential-window sleeps take about 13 seconds before CI scheduling
+# contention; these caps bound the harness without constraining signer policy.
+QUALIFICATION_SUBPROCESS_TIMEOUT_SECONDS = 45
+QUALIFICATION_TEST_TIMEOUT_SECONDS = 60
 
 
 class TestManyfoldSignerConfig:
@@ -73,7 +77,7 @@ class TestManyfoldSignerConfig:
             ManyfoldSignerConfig(**arguments)
 
 
-@pytest.mark.timeout(30)
+@pytest.mark.timeout(QUALIFICATION_TEST_TIMEOUT_SECONDS)
 def test_real_multiprocess_signer_qualification(tmp_path: Path) -> None:
     signer_executable = Path(sys.executable).with_name("manyfold-machine-signer")
     enrollment_executable = Path(sys.executable).with_name("manyfold-enrollment")
@@ -95,7 +99,7 @@ def test_real_multiprocess_signer_qualification(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        timeout=25,
+        timeout=QUALIFICATION_SUBPROCESS_TIMEOUT_SECONDS,
     )
 
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
