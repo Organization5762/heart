@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Generic
 
+from manyfold import Subscribable
 from manyfold.graph import SubscriptionLike
 
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import (ObservableProvider,
-                                             StaticStateProvider)
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import (ConstantStateProvider,
+                                             StateProvider)
 from heart.renderers.atomic import AtomicBaseRenderer, StateT
 from heart.runtime.display_context import DisplayContext
 
@@ -16,7 +16,7 @@ from heart.runtime.display_context import DisplayContext
 class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
     def __init__(
         self,
-        builder: ObservableProvider[StateT] | None = None,
+        builder: StateProvider[StateT] | None = None,
         state: StateT | None = None,
         *args,
         **kwargs,
@@ -27,7 +27,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             )
 
         self.builder = builder or (
-            StaticStateProvider(state) if state is not None else None
+            ConstantStateProvider(state) if state is not None else None
         )
         self._subscription: SubscriptionLike | None = None
         super().__init__(*args, **kwargs)
@@ -35,12 +35,12 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
             self.set_state(state)
             self.initialized = True
 
-    def state_observable(
+    def state_stream(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> Variable[StateT]:
+    ) -> Subscribable[StateT]:
         assert self.builder is not None
-        return self.builder.observable(peripheral_manager)
+        return self.builder.states(peripheral_manager)
 
     def initialize(
         self,
@@ -49,7 +49,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         orientation: Orientation,
     ) -> None:
         if self.builder is not None:
-            observable = self.state_observable(
+            states = self.state_stream(
                 peripheral_manager=peripheral_manager,
             )
 
@@ -58,7 +58,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
                 if not self.initialized:
                     self.initialized = True
 
-            self._subscription = observable.subscribe(on_next=_on_next)
+            self._subscription = states.subscribe(on_next=_on_next)
             return
 
         if not hasattr(self, "_create_initial_state"):

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pygame
+from manyfold import Subscribable
 
 from heart.assets.loader import Loader
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.pranay_sketch.state import (PranaySketchPiece,
                                                  PranaySketchState)
@@ -82,7 +82,7 @@ def enhance_piece_image(image: pygame.Surface) -> pygame.Surface:
     return enhanced
 
 
-class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
+class PranaySketchStateProvider(StateProvider[PranaySketchState]):
     def __init__(
         self,
         fallback_bpm: int = DEFAULT_FALLBACK_BPM,
@@ -92,9 +92,9 @@ class PranaySketchStateProvider(ObservableProvider[PranaySketchState]):
         self._burst_duration_beats = burst_duration_beats
         self._initial_state: PranaySketchState | None = None
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[PranaySketchState]:
+    ) -> Subscribable[PranaySketchState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = self._load_initial_state()
 

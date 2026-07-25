@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.flowtoy import FlowToyPeripheral
 from heart.peripheral.input_payloads import FlowToyPacket
 from heart.renderers.flowtoy_spectrum.state import (FlowToySpectrumState,
@@ -22,7 +22,7 @@ DEFAULT_UNKNOWN_COLOR_SPECTRUM = (
 )
 
 
-class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
+class FlowToySpectrumStateProvider(StateProvider[FlowToySpectrumState]):
     def __init__(
         self, *, period_seconds: float = DEFAULT_FLOWTOY_RENDER_PERIOD_SECONDS
     ) -> None:
@@ -31,9 +31,9 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
     def initial_state(self) -> FlowToySpectrumState:
         return FlowToySpectrumState(color_spectrum=DEFAULT_UNKNOWN_COLOR_SPECTRUM)
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[FlowToySpectrumState]:
+    ) -> Subscribable[FlowToySpectrumState]:
         initial_state = self.initial_state()
         updates: list[object] = [
             peripheral_manager.input_io.frame_tick_stream().map(
@@ -56,7 +56,7 @@ class FlowToySpectrumStateProvider(ObservableProvider[FlowToySpectrumState]):
 
     def _flowtoy_packet_stream(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[FlowToyPacket] | None:
+    ) -> Subscribable[FlowToyPacket] | None:
         observables = [
             peripheral.observe
             for peripheral in peripheral_manager.peripherals

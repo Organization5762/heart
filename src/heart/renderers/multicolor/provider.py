@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.multicolor.state import MulticolorState
 
 
-class MulticolorStateProvider(ObservableProvider[MulticolorState]):
+class MulticolorStateProvider(StateProvider[MulticolorState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[MulticolorState]:
+    ) -> Subscribable[MulticolorState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = MulticolorState()
 

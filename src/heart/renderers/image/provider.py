@@ -1,15 +1,15 @@
 from typing import cast
 
 import pygame
+from manyfold import Subscribable
 
 from heart.assets.loader import Loader
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.image.state import RenderImageState
 
 
-class RenderImageStateProvider(ObservableProvider[RenderImageState]):
+class RenderImageStateProvider(StateProvider[RenderImageState]):
     def __init__(self, image_file: str):
         self._image_file = image_file
         self._base_image: pygame.Surface | None = None
@@ -19,9 +19,9 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
             self._base_image = Loader.load(self._image_file).convert_alpha()
         return self._base_image
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[RenderImageState]:
+    ) -> Subscribable[RenderImageState]:
         if peripheral_manager is None:
             raise ValueError("RenderImageStateProvider requires a PeripheralManager")
         window_stream = (
@@ -38,7 +38,7 @@ class RenderImageStateProvider(ObservableProvider[RenderImageState]):
         return window_stream.map(build_state)
 
 
-class SurfaceRenderImageStateProvider(ObservableProvider[RenderImageState]):
+class SurfaceRenderImageStateProvider(StateProvider[RenderImageState]):
     def __init__(self, base_image: pygame.Surface):
         self._base_image = (
             base_image.convert_alpha()
@@ -46,9 +46,9 @@ class SurfaceRenderImageStateProvider(ObservableProvider[RenderImageState]):
             else base_image.copy()
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[RenderImageState]:
+    ) -> Subscribable[RenderImageState]:
         if peripheral_manager is None:
             raise ValueError(
                 "SurfaceRenderImageStateProvider requires a PeripheralManager"

@@ -45,7 +45,7 @@ class TestFlowToySpectrumStateProvider:
         manager.register(peripheral)
         observed: list[FlowToySpectrumState] = []
 
-        subscription = provider.observable(manager).subscribe(on_next=observed.append)
+        subscription = provider.states(manager).subscribe(on_next=observed.append)
         try:
             peripheral.process_packet(
                 RawRadioPacket(

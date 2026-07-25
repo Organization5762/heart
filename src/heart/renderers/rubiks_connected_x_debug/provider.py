@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from manyfold import ConstantNode
+from manyfold import ConstantNode, Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core import PeripheralMessageEnvelope
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.rubiks_connected_x import (
     RUBIKS_CONNECTED_X_ADDRESS_ENV_VAR, RubiksConnectedXMessageType,
     RubiksConnectedXNotification, RubiksConnectedXPeripheral)
@@ -20,14 +19,12 @@ DEFAULT_STATUS_LINES = (
 )
 
 
-class RubiksConnectedXDebugStateProvider(
-    ObservableProvider[RubiksConnectedXDebugState]
-):
+class RubiksConnectedXDebugStateProvider(StateProvider[RubiksConnectedXDebugState]):
     """Expose the latest raw cube notification as simple text lines."""
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[RubiksConnectedXDebugState]:
+    ) -> Subscribable[RubiksConnectedXDebugState]:
         cube_peripherals = [
             peripheral
             for peripheral in peripheral_manager.peripherals

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 import pygame
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.input.debug import (InputDebugNode, InputDebugStage,
@@ -15,7 +16,6 @@ from heart.peripheral.core.input.keyboard import (KeyboardController,
                                                   KeyboardSnapshot)
 from heart.peripheral.core.input.streams import (map_stream, scan_stream,
                                                  start_with_stream)
-from heart.peripheral.core.variables import Variable
 
 MANDELBROT_RIGHT_STICK_DEAD_ZONE = 0.35
 
@@ -149,18 +149,16 @@ class MandelbrotControlProfile:
         self._debug_tap = debug_tap
 
     @cached_property
-    def motion_state(self) -> Variable[MandelbrotMotionState]:
+    def motion_state(self) -> Subscribable[MandelbrotMotionState]:
         stream = (
             start_with_stream(
                 self._keyboard.snapshot_stream(),
-                KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
+                self._keyboard.latest(),
             )
             .map(
-                lambda keyboard_snapshot: self._to_motion_state_from_gamepad_events(
-                    keyboard_snapshot,
-                    self._gamepad.sample(
-                        include_tapped_buttons=False,
-                    ),
+                lambda keyboard: self._to_motion_state_from_gamepad_events(
+                    keyboard,
+                    self._gamepad.latest(),
                 )
             )
             .distinct_until_changed()
@@ -174,7 +172,7 @@ class MandelbrotControlProfile:
         ).connect(stream)
 
     @cached_property
-    def command_events(self) -> Variable[MandelbrotCommand]:
+    def command_events(self) -> Subscribable[MandelbrotCommand]:
         stream = self._keyboard_command_streams()
         return InputDebugNode(
             tap=self._debug_tap,
@@ -185,7 +183,7 @@ class MandelbrotControlProfile:
         ).connect(stream)
 
     @cached_property
-    def _edge_state(self) -> Variable[MandelbrotEdgeState]:
+    def _edge_state(self) -> Subscribable[MandelbrotEdgeState]:
         return scan_stream(
             self.command_events,
             self._apply_command,
@@ -193,7 +191,7 @@ class MandelbrotControlProfile:
         ).start_with(MandelbrotEdgeState())
 
     @cached_property
-    def _observable(self) -> Variable[MandelbrotControlState]:
+    def _observable(self) -> Subscribable[MandelbrotControlState]:
         stream = (
             PubSubObservable.combine_latest(self.motion_state, self._edge_state)
             .map(lambda latest: self._to_compatibility_state(*latest))
@@ -207,28 +205,27 @@ class MandelbrotControlProfile:
             upstream_ids=("mandelbrot.motion_state", "mandelbrot.command"),
         ).connect(stream)
 
-    def observable(self) -> Variable[MandelbrotControlState]:
+    def observable(self) -> Subscribable[MandelbrotControlState]:
         return self._observable
 
     def sample_gamepad_motion_state(self) -> MandelbrotMotionState:
         return self._to_motion_state_from_gamepad_events(
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0),
-            self._gamepad.sample(
-                include_tapped_buttons=False,
-            ),
+            self._gamepad.latest(),
         )
 
     def sample_gamepad_buttons(self) -> frozenset[GamepadButton]:
         return frozenset(
             button
-            for event in self._gamepad.sample(
-                include_tapped_buttons=False,
-            )
+            for event in self._gamepad.latest()
             for button in GamepadButton
             if event.snapshot.button_held(button)
         )
 
-    def _keyboard_command_streams(self) -> Variable[MandelbrotCommand]:
+    def latest_keyboard_keys(self) -> frozenset[int]:
+        return self._keyboard.latest().pressed_keys
+
+    def _keyboard_command_streams(self) -> Subscribable[MandelbrotCommand]:
         return PubSubObservable.merge(
             map_stream(
                 self._keyboard.key_pressed(pygame.K_LEFTBRACKET),

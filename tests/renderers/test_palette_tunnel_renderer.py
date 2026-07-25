@@ -66,6 +66,18 @@ class _InputIO:
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
         )
         self.gamepad = _SnapshotController(gamepad_snapshot)
+        self.controls = _ControlSurface(self)
+
+
+class _ControlSurface:
+    def __init__(self, input_io: _InputIO) -> None:
+        self._input_io = input_io
+
+    def keyboard(self) -> KeyboardSnapshot:
+        return self._input_io.keyboard.snapshot  # type: ignore[return-value]
+
+    def gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
+        return self._input_io.gamepad.sample()  # type: ignore[return-value]
 
 
 class _PeripheralManager:

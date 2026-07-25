@@ -3,30 +3,30 @@ from __future__ import annotations
 import random
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable, Value
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pixels.state import BorderState, RainState, SlinkyState
 
 
-class BorderStateProvider(ObservableProvider[BorderState]):
+class BorderStateProvider(StateProvider[BorderState]):
     def __init__(self, initial_color: Color | None = None) -> None:
         self._color = Value.initialized(initial_color or Color.random())
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[BorderState]:
+    ) -> Subscribable[BorderState]:
         return self._color.map(lambda color: BorderState(color=color))
 
     def set_color(self, color: Color) -> None:
         self._color.set(color)
 
 
-class RainStateProvider(ObservableProvider[RainState]):
+class RainStateProvider(StateProvider[RainState]):
     def __init__(
         self,
         *,
@@ -41,9 +41,9 @@ class RainStateProvider(ObservableProvider[RainState]):
         self._peripheral_manager = peripheral_manager
         self._rng = rng or randomness.rng()
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[RainState]:
+    ) -> Subscribable[RainState]:
         initial_state = RainState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),
@@ -64,7 +64,7 @@ class RainStateProvider(ObservableProvider[RainState]):
         return replace(state, current_y=new_y)
 
 
-class SlinkyStateProvider(ObservableProvider[SlinkyState]):
+class SlinkyStateProvider(StateProvider[SlinkyState]):
     def __init__(
         self,
         *,
@@ -79,9 +79,9 @@ class SlinkyStateProvider(ObservableProvider[SlinkyState]):
         self._peripheral_manager = peripheral_manager
         self._rng = rng or randomness.rng()
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[SlinkyState]:
+    ) -> Subscribable[SlinkyState]:
         initial_state = SlinkyState(
             starting_point=self._rng.randint(0, self._width),
             current_y=self._rng.randint(0, 20),

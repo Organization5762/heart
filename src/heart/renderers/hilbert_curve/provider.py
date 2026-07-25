@@ -5,11 +5,11 @@ import time
 from dataclasses import replace
 
 import numpy as np
+from manyfold import Subscribable
 from numba import njit
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.hilbert_curve.state import BoundingBox, HilbertCurveState
 
 
@@ -145,7 +145,7 @@ def transform_points(
     return new_points
 
 
-class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
+class HilbertCurveProvider(StateProvider[HilbertCurveState]):
     def __init__(
         self,
         *,
@@ -274,9 +274,9 @@ class HilbertCurveProvider(ObservableProvider[HilbertCurveState]):
             return self._advance_zoom(state, now)
         return self._advance_morph(state, now)
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager, *, initial_state: HilbertCurveState
-    ) -> Variable[HilbertCurveState]:
+    ) -> Subscribable[HilbertCurveState]:
         return (
             peripheral_manager.input_io.frame_tick_stream()
             .map(lambda _: time.monotonic())

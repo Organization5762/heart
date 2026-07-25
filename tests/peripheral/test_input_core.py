@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
 from typing import Any, cast
 
 import pygame
-from manyfold import ConstantNode, Graph
+from manyfold import ConstantNode, Graph, Subscribable
 from manyfold.architecture import NewValues
 
 from heart.peripheral.configuration import PeripheralConfiguration
@@ -18,9 +17,9 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          GamepadAxis, GamepadButton,
                                          GamepadController, GamepadDpadValue,
                                          GamepadSnapshot, GamepadSnapshotEvent,
-                                         InputDebugStage, InputDebugTap,
-                                         InputIO, KeyboardController,
-                                         KeyboardSnapshot,
+                                         GamepadStickValue, InputDebugStage,
+                                         InputDebugTap, InputIO,
+                                         KeyboardController, KeyboardSnapshot,
                                          MandelbrotControlProfile,
                                          SetOrientationCommand,
                                          ToggleDebugCommand)
@@ -32,8 +31,7 @@ from heart.peripheral.core.input.peripheral_inputs import \
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.streams import runtime_route
-from heart.peripheral.core.variables import Variable
-from heart.peripheral.gamepad import Gamepad
+from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
 from heart.peripheral.keyboard import (KeyboardEvent, KeyHeldEvent,
                                        KeyPressedEvent, KeyReleasedEvent,
                                        KeyState)
@@ -75,7 +73,7 @@ class _SwitchProbe(BaseSwitch):
         self._stream = stream
         self._source_id = source_id
 
-    def _event_stream(self) -> Variable[SwitchState]:
+    def _event_stream(self) -> Subscribable[SwitchState]:
         return self._stream
 
     def peripheral_info(self) -> PeripheralInfo:
@@ -153,50 +151,6 @@ class _InputProbe(Peripheral[int]):
 
     def handle_input(self, input: Input) -> None:
         self.inputs.append(input)
-
-
-class _ImmediateTimerNode:
-    def __init__(
-        self,
-        value: int = 0,
-        transforms: tuple[Callable[[Any], Any], ...] = (),
-    ) -> None:
-        self._value = value
-        self._transforms = transforms
-
-    def then_on_main_thread(self) -> "_ImmediateTimerNode":
-        return self
-
-    def map(self, transform: Callable[[Any], Any]) -> "_ImmediateTimerNode":
-        return _ImmediateTimerNode(self._value, (*self._transforms, transform))
-
-    def pipe(self, *stream_operators: Callable[[Any], Any]) -> Any:
-        stream: Any = self
-        for stream_operator in stream_operators:
-            stream = stream_operator(stream)
-        return stream
-
-    def subscribe(
-        self,
-        observer: Callable[[Any], None] | Any | None = None,
-        on_error: Callable[[Exception], None] | None = None,
-        on_completed: Callable[[], None] | None = None,
-        scheduler: object | None = None,
-        *,
-        on_next: Callable[[Any], None] | None = None,
-    ) -> _NoopSubscription:
-        del on_error, scheduler
-        value: Any = self._value
-        for transform in self._transforms:
-            value = transform(value)
-        callback = on_next or observer
-        if callable(callback):
-            callback(value)
-        elif callback is not None:
-            callback.on_next(value)
-        if on_completed is not None:
-            on_completed()
-        return _NoopSubscription()
 
 
 def _keyboard_snapshot(*pressed_keys: int, timestamp_ms: float) -> KeyboardSnapshot:
@@ -397,127 +351,10 @@ class TestInputStreamHelpers:
 class TestKeyboardController:
     """Group keyboard controller tests so shared key views stay stable for every consumer built on them."""
 
-    @staticmethod
-    def _immediate_timer(*_args: object, **_kwargs: object) -> object:
-        return _ImmediateTimerNode()
-
     def test_snapshot_stream_preserves_arrow_key_constants(
         self,
         monkeypatch,
     ) -> None:
-        """Verify keyboard snapshots preserve arrow-key constants so navigation can detect keys whose pygame codes are outside the base pressed-array index range."""
-
-        tap = InputDebugTap()
-        controller = KeyboardController(tap)
-        _enable_keyboard_polling(monkeypatch)
-
-        class _KeyStateStub:
-            def __len__(self) -> int:
-                return 8
-
-            def __getitem__(self, key: int) -> bool:
-                return key == pygame.K_LEFT
-
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.Timer",
-            self._immediate_timer,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.event.pump",
-            lambda: None,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
-            lambda: _KeyStateStub(),
-        )
-
-        snapshots: list[KeyboardSnapshot] = []
-        controller.snapshot_stream().subscribe(snapshots.append)
-
-        assert snapshots[0].pressed_keys == frozenset({pygame.K_LEFT})
-
-    def test_snapshot_stream_ignores_arrow_key_index_errors(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify Linux key-state wrappers that reject SDL2 key constants do not terminate the snapshot stream."""
-
-        tap = InputDebugTap()
-        controller = KeyboardController(tap)
-        _enable_keyboard_polling(monkeypatch)
-
-        class _KeyStateStub:
-            def __len__(self) -> int:
-                return 8
-
-            def __getitem__(self, key: int) -> bool:
-                if key >= len(self):
-                    raise IndexError("list index out of range")
-                return False
-
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.Timer",
-            self._immediate_timer,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.event.pump",
-            lambda: None,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
-            lambda: _KeyStateStub(),
-        )
-
-        snapshots: list[KeyboardSnapshot] = []
-        controller.snapshot_stream().subscribe(snapshots.append)
-
-        assert len(snapshots) == 1
-        assert snapshots[0].pressed_keys == frozenset()
-
-    def test_snapshot_stream_ignores_indexed_key_state_errors(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify sparse pygame key-state wrappers cannot terminate keyboard polling during the indexed key scan."""
-
-        tap = InputDebugTap()
-        controller = KeyboardController(tap)
-        _enable_keyboard_polling(monkeypatch)
-
-        class _KeyStateStub:
-            def __len__(self) -> int:
-                return 8
-
-            def __getitem__(self, key: int) -> bool:
-                if key == 3:
-                    raise IndexError("list index out of range")
-                return key == 2
-
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.Timer",
-            self._immediate_timer,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.event.pump",
-            lambda: None,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.pygame.key.get_pressed",
-            lambda: _KeyStateStub(),
-        )
-
-        snapshots: list[KeyboardSnapshot] = []
-        controller.snapshot_stream().subscribe(snapshots.append)
-
-        assert len(snapshots) == 1
-        assert snapshots[0].pressed_keys == frozenset({2})
-
-    def test_snapshot_stream_pumps_pygame_events_before_reading_pressed_keys(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify keyboard snapshots pump the Pygame event queue before sampling pressed keys so arrow-key navigation sees fresh input state each frame."""
-
         tap = InputDebugTap()
         controller = KeyboardController(tap)
         call_order: list[str] = []
@@ -528,13 +365,9 @@ class TestKeyboardController:
                 return 8
 
             def __getitem__(self, key: int) -> bool:
-                call_order.append("get_pressed")
-                return False
+                call_order.append("read")
+                return key == pygame.K_LEFT
 
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.keyboard.Timer",
-            self._immediate_timer,
-        )
         monkeypatch.setattr(
             "heart.peripheral.core.input.keyboard.pygame.event.pump",
             lambda: call_order.append("pump"),
@@ -546,10 +379,11 @@ class TestKeyboardController:
 
         snapshots: list[KeyboardSnapshot] = []
         controller.snapshot_stream().subscribe(snapshots.append)
+        controller.poll()
 
-        assert len(snapshots) == 1
+        assert snapshots[0].pressed_keys == frozenset({pygame.K_LEFT})
         assert call_order[0] == "pump"
-        assert "get_pressed" in call_order[1:]
+        assert "read" in call_order[1:]
 
     def test_key_events_emit_pressed_held_and_released_transitions(
         self,
@@ -691,72 +525,6 @@ class TestGamepadController:
             == -1.0
         )
 
-    def test_sample_reports_low_axis_noise_on_its_own_gamepad(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify joystick drift is not used to select a hidden active controller."""
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        active = Gamepad(
-            joystick_id=0,
-            joystick=_JoystickProbe(buttons={1: True}),
-        )
-        noisy_idle = Gamepad(
-            joystick_id=1,
-            joystick=_JoystickProbe(axes={0: 0.2, 1: -0.18}),
-        )
-        controller = GamepadController(
-            manager=_GamepadManager(active, noisy_idle),
-            debug_tap=InputDebugTap(),
-        )
-
-        events = controller.sample()
-
-        assert events[0].snapshot.button_held(GamepadButton.SOUTH) is True
-        assert events[0].snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0) == 0.0
-        assert events[1].snapshot.button_held(GamepadButton.SOUTH) is False
-        assert events[1].snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0) == 0.2
-
-    def test_sample_events_reports_each_connected_gamepad_without_merging(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify multi-controller consumers can inspect independent slot events."""
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        first = Gamepad(
-            joystick_id=0,
-            joystick=_JoystickProbe(buttons={1: True}, hat=(1, 0)),
-        )
-        second = Gamepad(
-            joystick_id=1,
-            joystick=_JoystickProbe(buttons={2: True}, hat=(-1, 0)),
-        )
-        controller = GamepadController(
-            manager=_GamepadManager(first, second),
-            debug_tap=InputDebugTap(),
-        )
-
-        events = controller.sample_events()
-
-        assert [event.joystick_id for event in events] == [0, 1]
-        assert all(isinstance(event, GamepadSnapshotEvent) for event in events)
-        assert events[0].snapshot.button_held(GamepadButton.SOUTH) is True
-        assert events[0].snapshot.dpad == GamepadDpadValue(x=1)
-        assert events[1].snapshot.button_held(GamepadButton.NORTH) is True
-        assert events[1].snapshot.dpad == GamepadDpadValue(x=-1)
-
     def test_sample_pumps_pygame_once_for_controller_batch(
         self,
         monkeypatch,
@@ -810,92 +578,6 @@ class TestGamepadController:
         assert len(events) == 4
         assert pump_calls == 2
         assert update_pump_flags == [False] * 12
-
-    def test_sample_stats_use_explicit_source_label(self, monkeypatch) -> None:
-        """Verify sample accounting avoids frame inspection on the hot path."""
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        gamepad = Gamepad(
-            joystick_id=0,
-            joystick=_JoystickProbe(buttons={1: True}),
-        )
-        controller = GamepadController(
-            manager=_GamepadManager(gamepad),
-            debug_tap=InputDebugTap(),
-        )
-
-        events = controller.sample(source="test.explicit")
-
-        assert len(events) == 1
-        assert controller._sample_callers == {"test.explicit": 1}
-
-    def test_sample_can_target_one_gamepad_by_joystick_id(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify renderers can read one physical controller by slot."""
-        monkeypatch.setattr(
-            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
-            lambda: False,
-        )
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        first = Gamepad(
-            joystick_id=0,
-            joystick=_JoystickProbe(buttons={1: True}, hat=(1, 0)),
-        )
-        second = Gamepad(
-            joystick_id=1,
-            joystick=_JoystickProbe(buttons={2: True}, hat=(-1, 0)),
-        )
-        controller = GamepadController(
-            manager=_GamepadManager(first, second),
-            debug_tap=InputDebugTap(),
-        )
-
-        first_events = controller.sample(joystick_id=0)
-        second_events = controller.sample(joystick_id=1)
-        assert len(first_events) == 1
-        assert len(second_events) == 1
-        first_snapshot = first_events[0].snapshot
-        second_snapshot = second_events[0].snapshot
-
-        assert first_snapshot.button_held(GamepadButton.SOUTH) is True
-        assert first_snapshot.button_held(GamepadButton.NORTH) is False
-        assert first_snapshot.dpad == GamepadDpadValue(x=1)
-        assert second_snapshot.button_held(GamepadButton.SOUTH) is False
-        assert second_snapshot.button_held(GamepadButton.NORTH) is True
-        assert second_snapshot.dpad == GamepadDpadValue(x=-1)
-
-    def test_motion_only_sample_does_not_consume_button_taps(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify fallback motion reads do not starve one-shot button commands."""
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        gamepad = Gamepad(
-            joystick_id=0,
-            joystick=_JoystickProbe(buttons={1: False}),
-        )
-        gamepad._tap_flag[1] = True
-        controller = GamepadController(
-            manager=_GamepadManager(gamepad),
-            debug_tap=InputDebugTap(),
-        )
-
-        motion_snapshot = controller.sample(include_tapped_buttons=False)[0].snapshot
-        command_snapshot = controller.sample()[0].snapshot
-
-        assert motion_snapshot.tapped_buttons == frozenset()
-        assert command_snapshot.tapped_buttons == frozenset({GamepadButton.SOUTH})
 
     def test_button_taps_emit_on_press_edge(
         self,
@@ -959,51 +641,56 @@ class TestGamepadController:
 
         assert snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0) == 0.0
 
-    def test_update_defaults_missing_axis_to_neutral(self, monkeypatch) -> None:
-        """Verify each poll starts neutral instead of retaining an old axis value."""
+    def test_central_poll_retains_controls_for_scenes_and_callbacks(
+        self,
+        monkeypatch,
+    ) -> None:
+        input_io = InputIO(graph=Graph(), peripheral_source=lambda: ())
+        keyboard = KeyboardSnapshot(
+            pressed_keys=frozenset({pygame.K_d}),
+            timestamp_ms=10.0,
+        )
+        gamepad = GamepadSnapshotEvent(
+            joystick_id=2,
+            snapshot=_gamepad_snapshot(
+                axes={
+                    GamepadAxis.LEFT_X: 0.75,
+                    GamepadAxis.LEFT_Y: -0.25,
+                }
+            ),
+        )
+        monkeypatch.setattr(input_io.keyboard, "sample", lambda: keyboard)
         monkeypatch.setattr(
-            "heart.peripheral.core.input.gamepad.Configuration.is_pi",
-            lambda: False,
+            input_io.gamepad,
+            "sample",
+            lambda **_kwargs: (gamepad,),
         )
-        monkeypatch.setattr(
-            "heart.peripheral.gamepad.gamepad.pygame.event.pump", lambda: None
-        )
-        joystick = _JoystickProbe(axes={0: 0.8})
-        gamepad = Gamepad(joystick_id=0, joystick=joystick)
-        controller = GamepadController(
-            manager=_GamepadManager(gamepad),
-            debug_tap=InputDebugTap(),
-        )
-        assert (
-            controller.sample()[0].snapshot.axis_value(
-                GamepadAxis.LEFT_X, dead_zone=0.0
-            )
-            == 0.8
-        )
+        stick_moves: list[GamepadStickValue] = []
+        subscription = input_io.controls.on_stick_move(stick_moves.append)
 
-        joystick._axes = {}
-        gamepad._num_axes = None
-        snapshot = controller.sample()[0].snapshot
+        polled_keyboard, polled_gamepads = input_io.poll()
 
-        assert snapshot.axis_value(GamepadAxis.LEFT_X, dead_zone=0.0) == 0.0
+        subscription.dispose()
+        assert polled_keyboard == keyboard
+        assert polled_gamepads == (gamepad,)
+        assert input_io.controls.keyboard() == keyboard
+        assert input_io.controls.gamepads() == (gamepad,)
+        assert stick_moves == [GamepadStickValue(x=0.75, y=-0.25)]
 
 
 class TestNavigationProfile:
     """Group navigation-profile tests so keyboard and injected inputs produce the shared logical navigation contract."""
 
-    def test_profile_maps_keyboard_and_injected_inputs_to_logical_events(
+    def test_profile_publishes_injected_inputs_as_logical_events(
         self,
         monkeypatch,
     ) -> None:
-        """Verify equivalent keyboard and injected inputs emit the same navigation outputs so runtime-owned gamepad navigation has one path."""
+        """Verify runtime input injections share one PubSub navigation contract."""
         monkeypatch.setattr(
             "heart.peripheral.core.input.io.Configuration.is_debug_mode",
             classmethod(lambda cls: True),
         )
         io = InputIO(graph=Graph(), peripheral_source=lambda: ())
-        tap = io.debug_tap
-        keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
-        monkeypatch.setattr(io.keyboard, "snapshot_stream", lambda: keyboard_snapshots)
         profile = io.navigation
         intents: list[tuple[str, str, int]] = []
         browse: list[int] = []
@@ -1027,37 +714,18 @@ class TestNavigationProfile:
             lambda intent: alternate.append(type(intent).__name__)
         )
 
-        keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=0.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_LEFT, timestamp_ms=10.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=100.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_RIGHT, timestamp_ms=110.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=200.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_DOWN, timestamp_ms=210.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(timestamp_ms=300.0))
-        keyboard_snapshots.emit(_keyboard_snapshot(pygame.K_UP, timestamp_ms=310.0))
-
         profile.inject_browse(1, source="gamepad.dpad")
         profile.inject_activate(source="gamepad.south")
         profile.inject_alternate_activate(source="gamepad.north")
 
-        assert browse == [-1, 1, 1]
-        assert activate == ["ActivateIntent", "ActivateIntent"]
-        assert alternate == [
-            "AlternateActivateIntent",
-            "AlternateActivateIntent",
-        ]
+        assert browse == [1]
+        assert activate == ["ActivateIntent"]
+        assert alternate == ["AlternateActivateIntent"]
         assert intents == [
-            ("BrowseIntent", "keyboard.left", -1),
-            ("BrowseIntent", "keyboard.right", 1),
-            ("ActivateIntent", "keyboard.down", 0),
-            ("AlternateActivateIntent", "keyboard.up", 0),
             ("BrowseIntent", "gamepad.dpad", 1),
             ("ActivateIntent", "gamepad.south", 0),
             ("AlternateActivateIntent", "gamepad.north", 0),
         ]
-        assert any(
-            envelope.stream_name == "navigation.intent" for envelope in tap.snapshot()
-        )
 
     def test_profile_maps_switch_edges_to_logical_navigation_events(self) -> None:
         """Verify switch rotation and button edges flow into the shared navigation profile so switch-only deployments still browse and activate scenes."""
@@ -1126,35 +794,6 @@ class TestNavigationProfile:
             ("AlternateActivateIntent", "switch.long_button", 0),
         ]
 
-    def test_subscribe_events_binds_requested_navigation_handlers(self) -> None:
-        """Verify subscribe_events wires the requested logical handlers in one place so navigation consumers do not duplicate subscription setup."""
-        switch_updates: NewValues[SwitchState] = NewValues()
-        io = InputIO(
-            graph=Graph(),
-            peripheral_source=lambda: (_SwitchProbe(switch_updates),),
-        )
-        profile = io.navigation
-        browse: list[int] = []
-        activate: list[str] = []
-        alternate: list[str] = []
-
-        subscription = profile.subscribe_events(
-            on_browse_delta=browse.append,
-            on_activate=lambda _intent: activate.append("activate"),
-            on_alternate_activate=lambda _intent: alternate.append("alternate"),
-        )
-
-        switch_updates.emit(SwitchState(0, 0, 0, 0, 0))
-        switch_updates.emit(SwitchState(3, 0, 0, 3, 3))
-        switch_updates.emit(SwitchState(3, 1, 0, 0, 3))
-        switch_updates.emit(SwitchState(3, 1, 1, 0, 0))
-
-        subscription.dispose()
-
-        assert browse == [3]
-        assert activate == ["activate"]
-        assert alternate == ["alternate"]
-
 
 class TestPeripheralInputBus:
     def test_bind_dispatches_mapped_inputs_to_matching_peripherals(
@@ -1191,22 +830,6 @@ class TestPeripheralInputBus:
             io.debug_tap.snapshot()[-1].stream_name == PERIPHERAL_INPUT_DISPATCH_STREAM
         )
 
-    def test_bind_without_targets_does_not_subscribe_to_source(self) -> None:
-        source: NewValues[int] = NewValues()
-        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
-        calls: list[int] = []
-
-        subscription = io.peripheral_inputs.bind(
-            source.map(lambda value: calls.append(value) or value),
-            lambda value: Input(event_type="test.input", data=value),
-        )
-        try:
-            source.emit(1)
-        finally:
-            subscription.dispose()
-
-        assert calls == []
-
 
 class TestColorInputProfile:
     def test_color_streams_derive_average_rgb_and_hsv_from_final_frame(self) -> None:
@@ -1235,24 +858,6 @@ class TestColorInputProfile:
         assert saturation == [1.0]
         assert brightness == [1.0]
 
-    def test_color_snapshot_is_not_computed_without_subscribers(
-        self,
-        monkeypatch,
-    ) -> None:
-        io = InputIO(graph=Graph(), peripheral_source=lambda: ())
-        surface = pygame.Surface((1, 1))
-        calls: list[pygame.Surface] = []
-
-        def average_color(candidate: pygame.Surface) -> tuple[int, int, int, int]:
-            calls.append(candidate)
-            return (0, 0, 0, 255)
-
-        monkeypatch.setattr(pygame.transform, "average_color", average_color)
-
-        io.final_frame_stream().emit(surface)
-
-        assert calls == []
-
 
 class TestMandelbrotControlProfile:
     """Group Mandelbrot profile tests so consumers receive direct motion state and command events instead of decoding merged revisions."""
@@ -1264,8 +869,12 @@ class TestMandelbrotControlProfile:
         """Verify Mandelbrot consumers can read continuous motion and discrete commands separately so scene controls do not decode unrelated state churn."""
         tap = InputDebugTap()
         keyboard = KeyboardController(tap)
-        joystick = _JoystickProbe(axes={0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0})
+        joystick = _JoystickProbe(
+            name=GamepadIdentifier.SWITCH_PRO.value,
+            axes={0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0},
+        )
         gamepad = _gamepad_controller_for_joystick(tap, joystick)
+        gamepad.poll()
         keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
         monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
         profile = MandelbrotControlProfile(
@@ -1305,7 +914,8 @@ class TestMandelbrotControlProfile:
         keyboard_snapshots.emit(
             _keyboard_snapshot(pygame.K_d, pygame.K_e, pygame.K_j, timestamp_ms=30.0)
         )
-        joystick._axes[3] = 0.5
+        joystick._axes[2] = 0.5
+        gamepad.poll()
         keyboard_snapshots.emit(
             _keyboard_snapshot(
                 pygame.K_d,
@@ -1346,77 +956,6 @@ class TestMandelbrotControlProfile:
             envelope.stream_name == "mandelbrot.command" for envelope in tap.snapshot()
         )
 
-    def test_motion_state_uses_gamepad_snapshot_without_keyboard_tick(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Verify gamepad movement is not blocked waiting for derived keyboard/gamepad view streams."""
-        tap = InputDebugTap()
-        keyboard = KeyboardController(tap)
-        gamepad = GamepadController(manager=object(), debug_tap=tap)
-        monkeypatch.setattr(
-            gamepad,
-            "sample",
-            lambda include_tapped_buttons=False, **_kwargs: (
-                GamepadSnapshotEvent(
-                    joystick_id=0,
-                    snapshot=_gamepad_snapshot(
-                        axes={
-                            GamepadAxis.LEFT_X: 0.5,
-                            GamepadAxis.LEFT_Y: -0.25,
-                            GamepadAxis.RIGHT_X: 0.6,
-                            GamepadAxis.RIGHT_Y: -0.7,
-                            GamepadAxis.TRIGGER_LEFT: 0.0,
-                            GamepadAxis.TRIGGER_RIGHT: 0.0,
-                        },
-                        dpad=GamepadDpadValue(x=1, y=-1),
-                    ),
-                ),
-            ),
-        )
-        keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
-        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
-        profile = MandelbrotControlProfile(
-            keyboard_controller=keyboard,
-            gamepad_controller=gamepad,
-            debug_tap=tap,
-        )
-        motion_states: list[tuple[float, float, float, float]] = []
-
-        profile.motion_state.subscribe(
-            lambda state: motion_states.append(
-                (state.move_x, state.move_y, state.pan_x, state.pan_y)
-            )
-        )
-
-        assert motion_states[-1] == (1.5, 0.75, 0.6, 0.7)
-
-    def test_left_stick_y_matches_keyboard_movement_direction(
-        self,
-        monkeypatch,
-    ) -> None:
-        """Keep Mandelbrot left-stick vertical motion aligned with W/S movement."""
-        tap = InputDebugTap()
-        keyboard = KeyboardController(tap)
-        joystick = _JoystickProbe(
-            axes={0: 0.0, 1: -0.5, 3: 0.0, 4: 0.0, 2: 0.0, 5: 0.0}
-        )
-        gamepad = _gamepad_controller_for_joystick(tap, joystick)
-        keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
-        monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
-        profile = MandelbrotControlProfile(
-            keyboard_controller=keyboard,
-            gamepad_controller=gamepad,
-            debug_tap=tap,
-        )
-        motion_states: list[tuple[float, float]] = []
-
-        profile.motion_state.subscribe(
-            lambda state: motion_states.append((state.move_x, state.move_y))
-        )
-
-        assert motion_states[-1] == (0.0, -0.5)
-
     def test_signed_trigger_axes_drive_zoom(self, monkeypatch) -> None:
         """Verify Mandelbrot triggers work for controllers whose trigger axes rest at -1."""
         tap = InputDebugTap()
@@ -1424,9 +963,7 @@ class TestMandelbrotControlProfile:
         gamepad = GamepadController(manager=object(), debug_tap=tap)
         trigger_right = -1.0
 
-        def sample_gamepad(
-            include_tapped_buttons: bool = False, **_kwargs: object
-        ) -> tuple[GamepadSnapshotEvent, ...]:
+        def latest_gamepad() -> tuple[GamepadSnapshotEvent, ...]:
             return (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -1443,7 +980,7 @@ class TestMandelbrotControlProfile:
                 ),
             )
 
-        monkeypatch.setattr(gamepad, "sample", sample_gamepad)
+        monkeypatch.setattr(gamepad, "latest", latest_gamepad)
         keyboard_snapshots: NewValues[KeyboardSnapshot] = NewValues()
         monkeypatch.setattr(keyboard, "snapshot_stream", lambda: keyboard_snapshots)
         profile = MandelbrotControlProfile(
@@ -1478,8 +1015,8 @@ class TestMandelbrotControlProfile:
         )
         monkeypatch.setattr(
             gamepad,
-            "sample",
-            lambda include_tapped_buttons=False, **_kwargs: (
+            "latest",
+            lambda: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
                     snapshot=_gamepad_snapshot(
@@ -1517,8 +1054,8 @@ class TestMandelbrotControlProfile:
         )
         monkeypatch.setattr(
             gamepad,
-            "sample",
-            lambda include_tapped_buttons=False, **_kwargs: (
+            "latest",
+            lambda: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
                     snapshot=_gamepad_snapshot(

@@ -1,26 +1,26 @@
 from __future__ import annotations
 
 import numpy as np
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.channel_diffusion.state import ChannelDiffusionState
 
 
-class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
+class ChannelDiffusionStateProvider(StateProvider[ChannelDiffusionState]):
     def initial_state(self, *, width: int, height: int) -> ChannelDiffusionState:
         grid = np.zeros((height, width, 3), dtype=np.uint8)
         grid[height // 2, width // 2] = np.array([255, 255, 255], dtype=np.uint8)
         return ChannelDiffusionState(grid=grid)
 
-    def observable(
+    def states(
         self,
         peripheral_manager: PeripheralManager,
         *,
         initial_state: ChannelDiffusionState,
-    ) -> Variable[ChannelDiffusionState]:
+    ) -> Subscribable[ChannelDiffusionState]:
         initial_size = (initial_state.grid.shape[1], initial_state.grid.shape[0])
         window_sizes = (
             peripheral_manager.window.filter(lambda window: window is not None)
@@ -32,7 +32,7 @@ class ChannelDiffusionStateProvider(ObservableProvider[ChannelDiffusionState]):
 
         def build_stream(
             size: tuple[int, int],
-        ) -> Variable[ChannelDiffusionState]:
+        ) -> Subscribable[ChannelDiffusionState]:
             seeded_state = self.initial_state(width=size[0], height=size[1])
             return PubSubObservable.merge(ticks).state(
                 seeded_state,

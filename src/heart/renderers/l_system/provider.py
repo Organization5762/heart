@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.l_system.state import LSystemState
 
 
@@ -27,16 +28,16 @@ def _advance_state(
     return LSystemState(grammar=grammar, time_since_last_update_ms=accumulated)
 
 
-class LSystemStateProvider(ObservableProvider[LSystemState]):
+class LSystemStateProvider(StateProvider[LSystemState]):
     def __init__(
         self, peripheral_manager: PeripheralManager, update_interval_ms: float = 1000.0
     ) -> None:
         self._peripheral_manager = peripheral_manager
         self._update_interval_ms = update_interval_ms
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[LSystemState]:
+    ) -> Subscribable[LSystemState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = LSystemState()
 

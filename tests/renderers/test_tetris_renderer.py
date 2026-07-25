@@ -6,6 +6,7 @@ import pygame
 
 from heart.device import Device, Rectangle
 from heart.peripheral.core.input import GamepadButton, GamepadDpadValue
+from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers.tetris.direct_gamepad import DirectGamepadSnapshot
 from heart.renderers.tetris.renderer import (BOARD_BORDER_COLOR,
                                              GHOST_PIECE_COLOR,
@@ -264,6 +265,7 @@ class TestTetrisRenderer:
         renderer = TetrisRenderer(rng=random.Random(1))
         renderer._play_mode = TetrisPlayMode.DUAL_SYNCED
         renderer.set_state(TetrisGameState.create(random.Random(1), player_count=2))
+        renderer._peripheral_manager = PeripheralManager()
         renderer.initialized = True
 
         renderer.real_process(window, device.orientation)
@@ -286,6 +288,7 @@ class TestTetrisRenderer:
         renderer = TetrisRenderer(rng=random.Random(1))
         renderer._play_mode = TetrisPlayMode.SOLO_MIRRORED
         renderer.set_state(TetrisGameState.create(random.Random(1), player_count=1))
+        renderer._peripheral_manager = PeripheralManager()
         renderer.initialized = True
 
         renderer.real_process(window, device.orientation)

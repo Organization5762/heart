@@ -21,14 +21,14 @@ class _StubHilbertState:
 class _StubHilbertProvider:
     def __init__(self) -> None:
         self.initial_state_calls: list[tuple[int, int]] = []
-        self.observable_initial_states: list[_StubHilbertState] = []
+        self.streamed_initial_states: list[_StubHilbertState] = []
 
     def initial_state(self, *, width: int, height: int) -> _StubHilbertState:
         self.initial_state_calls.append((width, height))
         return _StubHilbertState(width=width, height=height)
 
-    def observable(self, peripheral_manager, *, initial_state: _StubHilbertState):
-        self.observable_initial_states.append(initial_state)
+    def states(self, peripheral_manager, *, initial_state: _StubHilbertState):
+        self.streamed_initial_states.append(initial_state)
         return ConstantNode(initial_state).observable()
 
 
@@ -63,7 +63,7 @@ class TestHilbertScene:
         scene.initialize(window, manager, orientation)
 
         assert provider.initial_state_calls == [(64, 64)]
-        assert provider.observable_initial_states == [_StubHilbertState(64, 64)]
+        assert provider.streamed_initial_states == [_StubHilbertState(64, 64)]
 
     def test_zoom_target_scale_fits_zoom_bbox_to_available_rect(self) -> None:
         """Verify zoom target scale is derived from the available render rect so Hilbert zoom fills the intended height without relying on a magic multiplier."""

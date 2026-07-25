@@ -3,10 +3,11 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.bouncing_ball.physics import (DEFAULT_BALL_POSITION,
                                                    DEFAULT_BALL_SPEED,
@@ -24,16 +25,16 @@ VELOCITY_DAMPING_PER_SECOND = 0.09
 MAX_BALL_SPEED = 1.7
 
 
-class BouncingBallStateProvider(ObservableProvider[BouncingBallState]):
+class BouncingBallStateProvider(StateProvider[BouncingBallState]):
     """Drive bouncing-ball physics from active accelerometer input."""
 
     def __init__(self) -> None:
         self._baseline: Acceleration | None = None
 
-    def observable(
+    def states(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> Variable[BouncingBallState]:
+    ) -> Subscribable[BouncingBallState]:
         initial = BouncingBallState(
             position=DEFAULT_BALL_POSITION,
             velocity=DEFAULT_BALL_SPEED,

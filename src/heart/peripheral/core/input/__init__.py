@@ -5,6 +5,8 @@ from heart.peripheral.core.input.accelerometer import \
 from heart.peripheral.core.input.color import \
     ColorInputProfile as ColorInputProfile
 from heart.peripheral.core.input.color import ColorSnapshot as ColorSnapshot
+from heart.peripheral.core.input.controls import \
+    ControlSurface as ControlSurface
 from heart.peripheral.core.input.debug import \
     InputDebugEnvelope as InputDebugEnvelope
 from heart.peripheral.core.input.debug import InputDebugNode as InputDebugNode

@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Any
 
 import pygame
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.device import Orientation
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
@@ -48,7 +48,7 @@ class LifePreserverState:
     font: pygame.font.Font | None = None
 
 
-class LifePreserverProvider(ObservableProvider[LifePreserverState]):
+class LifePreserverProvider(StateProvider[LifePreserverState]):
     def initial_state(
         self,
         *,
@@ -56,10 +56,10 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
     ) -> LifePreserverState:
         return LifePreserverState(gamepad=peripheral_manager.input_io.gamepad)
 
-    def observable(
+    def states(
         self,
         peripheral_manager: PeripheralManager,
-    ) -> Variable[LifePreserverState]:
+    ) -> Subscribable[LifePreserverState]:
         initial_state = self.initial_state(peripheral_manager=peripheral_manager)
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         switches = peripheral_manager.input_io.main_switch_stream()
@@ -124,7 +124,7 @@ class LifePreserverProvider(ObservableProvider[LifePreserverState]):
             return state
         caption_duration_scale = state.caption_duration_scale
         rotation_duration_scale = state.rotation_duration_scale
-        for event in gamepad_controller.sample():
+        for event in gamepad_controller.latest():
             snapshot = event.snapshot
             bumper_pressed = snapshot.button_held(
                 GamepadButton.ZL

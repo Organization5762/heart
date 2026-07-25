@@ -118,10 +118,13 @@ class PeripheralManager:
             peripheral.run()
 
     def stop(self) -> None:
+        self._input_io.close()
         for handle in reversed(self._graph_node_handles):
             dispose = getattr(handle, "dispose", None)
             if dispose is not None:
                 dispose(timeout=1.0)
+        self._graph_node_handles.clear()
+        self._started = False
 
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
         peripheral_id = peripheral.peripheral_info().id

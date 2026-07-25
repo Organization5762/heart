@@ -9,13 +9,12 @@ from enum import StrEnum
 from math import ceil
 from typing import Any
 
+from manyfold import CallbackObservable, Subscribable
 from manyfold.architecture import NewValues, PubSubObservable
 from manyfold.graph import FluentStream, RoutePipeline
 
 from heart.peripheral.core.input.events import InputEvent, input_event_topic
 from heart.peripheral.core.streams import GraphRouteStream
-from heart.peripheral.core.subscriptions import CallbackObservable
-from heart.peripheral.core.variables import Variable
 
 DEFAULT_DEBUG_HISTORY_SIZE = 512
 DEFAULT_LATENCY_HISTORY_SIZE = 512
@@ -107,7 +106,7 @@ class InputDebugTap:
             )
         )
 
-    def observable(self) -> Variable[InputDebugEnvelope]:
+    def observable(self) -> Subscribable[InputDebugEnvelope]:
         return self._stream
 
     def input_events(self) -> Any:
@@ -181,9 +180,16 @@ class InputDebugNode:
     def __post_init__(self) -> None:
         object.__setattr__(self, "upstream_ids", tuple(self.upstream_ids))
 
-    def observable(self, source: Variable[Any]) -> Variable[Any]:
+    def observable(self, source: Subscribable[Any]) -> Subscribable[Any]:
         if isinstance(
-            source, (NewValues, PubSubObservable, FluentStream, GraphRouteStream, RoutePipeline)
+            source,
+            (
+                NewValues,
+                PubSubObservable,
+                FluentStream,
+                GraphRouteStream,
+                RoutePipeline,
+            ),
         ):
             return source.do_action(on_next=self._publish)
 
@@ -203,7 +209,7 @@ class InputDebugNode:
 
         return CallbackObservable(subscribe)
 
-    def connect(self, source: Variable[Any]) -> Variable[Any]:
+    def connect(self, source: Subscribable[Any]) -> Subscribable[Any]:
         return self.observable(source)
 
     def _publish(self, value: Any) -> None:

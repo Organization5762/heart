@@ -5,73 +5,34 @@ import time
 import tracemalloc
 from datetime import datetime, timezone
 
+import pygame
 from PIL import Image
 
 from heart.device.beats.websocket import ControlMessage
-from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
-                                         GamepadDpadValue, GamepadSnapshot,
-                                         GamepadSnapshotEvent, InputDebugStage,
-                                         InputDebugTap)
+from heart.peripheral.core.input import (BrowseIntent, GamepadAxis,
+                                         GamepadButton, GamepadDpadValue,
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         InputDebugStage, KeyboardSnapshot)
+from heart.peripheral.core.manager import PeripheralManager
+from heart.peripheral.sensor import Acceleration
 from heart.runtime.peripheral_runtime import (INPUT_DEBUG_STAGE_TAG,
                                               INPUT_DEBUG_STREAM_TAG,
                                               PeripheralRuntime,
                                               save_phone_photo)
 
-
-class _PeripheralManagerStub:
-    def __init__(self) -> None:
-        self.input_io = _InputIOStub()
+EMPTY_KEYBOARD = KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
 
 
-class _InputIOStub:
-    def __init__(self) -> None:
-        self.debug_tap = InputDebugTap()
-        self.navigation = _NavigationProfileStub()
-        self.external_sensors = _ExternalSensorHubStub()
-        self.gamepad = _GamepadControllerStub()
+def _navigation_tuple(intent) -> tuple[str, int, str]:
+    return (
+        type(intent).__name__,
+        intent.step if isinstance(intent, BrowseIntent) else 0,
+        intent.source,
+    )
 
 
-class _GamepadControllerStub:
-    def __init__(self) -> None:
-        self.snapshots: list[GamepadSnapshot] = []
-        self.sample_calls: list[bool] = []
-
-    def sample(
-        self, *, include_tapped_buttons: bool = True, source: str = "test"
-    ) -> tuple[GamepadSnapshotEvent, ...]:
-        del source
-        self.sample_calls.append(include_tapped_buttons)
-        if not self.snapshots:
-            return ()
-        snapshot = self.snapshots.pop(0)
-        if not snapshot.connected:
-            return ()
-        return (GamepadSnapshotEvent(joystick_id=0, snapshot=snapshot),)
-
-
-class _NavigationProfileStub:
-    def __init__(self) -> None:
-        self.injected: list[tuple[str, int, str]] = []
-
-    def inject_browse(self, step: int, source: str = "beats.control") -> None:
-        self.injected.append(("browse", step, source))
-
-    def inject_activate(self, source: str = "beats.control") -> None:
-        self.injected.append(("activate", 0, source))
-
-    def inject_alternate_activate(self, source: str = "beats.control") -> None:
-        self.injected.append(("alternate_activate", 0, source))
-
-
-class _ExternalSensorHubStub:
-    def __init__(self) -> None:
-        self.updates: list[tuple[str, str, float | None]] = []
-
-    def set_value(self, sensor_key: str, value: float) -> None:
-        self.updates.append(("set", sensor_key, value))
-
-    def clear_value(self, sensor_key: str) -> None:
-        self.updates.append(("clear", sensor_key, None))
+def _gamepad_event(snapshot: GamepadSnapshot) -> GamepadSnapshotEvent:
+    return GamepadSnapshotEvent(joystick_id=0, snapshot=snapshot)
 
 
 class _WebSocketStub:
@@ -106,8 +67,8 @@ class TestPeripheralRuntimeStreaming:
     ) -> None:
         """Verify default runtime startup avoids booting the Beats websocket so plain sessions do not open an unused server."""
 
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
 
         monkeypatch.setattr(
             "heart.runtime.peripheral_runtime.Configuration.forward_to_beats_app",
@@ -135,8 +96,8 @@ class TestPeripheralRuntimeStreaming:
     ) -> None:
         """Verify phone controls can start the Beats websocket without switching the runtime to streamed display output."""
 
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
 
         monkeypatch.setattr(
@@ -158,8 +119,8 @@ class TestPeripheralRuntimeStreaming:
 
     def test_configure_streaming_emits_peripheral_envelopes(self, monkeypatch) -> None:
         """Verify debug tap events are wrapped as peripheral payloads so the Beats websocket can replay and decode them after reconnects."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
 
         monkeypatch.setattr(
@@ -167,7 +128,7 @@ class TestPeripheralRuntimeStreaming:
             classmethod(lambda cls: True),
         )
 
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        runtime.configure_streaming(websocket=websocket)
         manager.input_io.debug_tap.publish(
             stage=InputDebugStage.RAW,
             stream_name="switch.tick",
@@ -191,11 +152,11 @@ class TestPeripheralRuntimeStreaming:
 
     def test_configure_streaming_leaves_input_debug_off_by_default(self) -> None:
         """Keep Beats frame/control streaming lightweight unless debug telemetry is explicitly requested."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
 
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        runtime.configure_streaming(websocket=websocket)
         manager.input_io.debug_tap.publish(
             stage=InputDebugStage.RAW,
             stream_name="switch.tick",
@@ -210,115 +171,177 @@ class TestPeripheralRuntimeStreaming:
         self,
     ) -> None:
         """Verify websocket control commands inject navigation intents so Beats controls can drive runtime navigation through the shared logical stream."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(
+            lambda intent: observed.append(_navigation_tuple(intent))
+        )
 
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
-        assert websocket.control_handler is not None
+        try:
+            runtime.configure_streaming(websocket=websocket)
+            assert websocket.control_handler is not None
 
-        websocket.control_handler(ControlMessage(command="browse", browse_step=2))
-        websocket.control_handler(ControlMessage(command="activate"))
-        websocket.control_handler(ControlMessage(command="alternate_activate"))
+            websocket.control_handler(ControlMessage(command="browse", browse_step=2))
+            websocket.control_handler(ControlMessage(command="activate"))
+            websocket.control_handler(ControlMessage(command="alternate_activate"))
 
-        assert manager.input_io.navigation.injected == []
-        runtime._drain_control_messages()
+            assert observed == []
+            runtime._drain_control_messages()
+        finally:
+            subscription.dispose()
 
-        assert manager.input_io.navigation.injected == [
-            ("browse", 2, "beats.control.browse"),
-            ("activate", 0, "beats.control.activate"),
-            ("alternate_activate", 0, "beats.control.alternate"),
+        assert observed == [
+            ("BrowseIntent", 2, "beats.control.browse"),
+            ("ActivateIntent", 0, "beats.control.activate"),
+            ("AlternateActivateIntent", 0, "beats.control.alternate"),
         ]
 
     def test_configure_streaming_maps_sensor_control_commands_into_external_hub(
         self,
     ) -> None:
         """Verify websocket sensor commands update the external hub so Beats-side controls become runtime-owned sensor values."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
-
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
-        assert websocket.control_handler is not None
-
-        websocket.control_handler(
-            ControlMessage(
-                command="sensor_update",
-                sensor_key="accelerometer:debug:z",
-                sensor_value=12.5,
-            )
-        )
-        websocket.control_handler(
-            ControlMessage(
-                command="sensor_update",
-                sensor_key="accelerometer:debug:z",
-                clear=True,
+        observed: list[Acceleration | None] = []
+        subscription = (
+            manager.input_io.external_sensors.observable_acceleration().subscribe(
+                observed.append
             )
         )
 
-        assert manager.input_io.external_sensors.updates == []
-        runtime._drain_control_messages()
+        try:
+            runtime.configure_streaming(websocket=websocket)
+            assert websocket.control_handler is not None
 
-        assert manager.input_io.external_sensors.updates == [
-            ("set", "accelerometer:debug:z", 12.5),
-            ("clear", "accelerometer:debug:z", None),
+            websocket.control_handler(
+                ControlMessage(
+                    command="sensor_update",
+                    sensor_key="accelerometer:debug:z",
+                    sensor_value=12.5,
+                )
+            )
+            websocket.control_handler(
+                ControlMessage(
+                    command="sensor_update",
+                    sensor_key="accelerometer:debug:z",
+                    clear=True,
+                )
+            )
+
+            runtime._drain_control_messages()
+        finally:
+            subscription.dispose()
+
+        assert Acceleration(x=0.0, y=0.0, z=12.5) in observed
+        assert observed[-1] is None
+
+    def test_poll_maps_one_sampled_gamepad_snapshot_to_navigation(
+        self,
+        monkeypatch,
+    ) -> None:
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        samples = iter(
+            (
+                (
+                    _gamepad_event(
+                        GamepadSnapshot(
+                            connected=True,
+                            identifier="controller",
+                            dpad=GamepadDpadValue(x=1),
+                            buttons={GamepadButton.SOUTH: True},
+                        )
+                    ),
+                ),
+                (
+                    _gamepad_event(
+                        GamepadSnapshot(
+                            connected=True,
+                            identifier="controller",
+                            buttons={GamepadButton.NORTH: True},
+                        )
+                    ),
+                ),
+            )
+        )
+        monkeypatch.setattr(
+            manager.input_io,
+            "poll",
+            lambda: (EMPTY_KEYBOARD, next(samples)),
+        )
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(
+            lambda intent: observed.append(_navigation_tuple(intent))
+        )
+
+        try:
+            runtime.poll()
+            runtime.poll()
+        finally:
+            subscription.dispose()
+
+        assert observed == [
+            ("ActivateIntent", 0, "gamepad.0.south"),
+            ("BrowseIntent", 1, "gamepad.dpad"),
+            ("AlternateActivateIntent", 0, "gamepad.0.north"),
         ]
 
-    def test_poll_maps_one_sampled_gamepad_snapshot_to_navigation(self) -> None:
-        """Verify runtime controller navigation samples once and injects logical intents without stream subscriptions."""
-
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.extend(
-            [
-                GamepadSnapshot(
-                    connected=True,
-                    identifier="controller",
-                    dpad=GamepadDpadValue(x=1),
-                    buttons={GamepadButton.SOUTH: True},
+    def test_poll_maps_keyboard_edges_to_navigation(self, monkeypatch) -> None:
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        snapshots = iter(
+            (
+                KeyboardSnapshot(
+                    pressed_keys=frozenset({pygame.K_RIGHT, pygame.K_DOWN}),
+                    timestamp_ms=1.0,
                 ),
-                GamepadSnapshot(
-                    connected=True,
-                    identifier="controller",
-                    buttons={GamepadButton.NORTH: True},
+                KeyboardSnapshot(
+                    pressed_keys=frozenset({pygame.K_RIGHT, pygame.K_DOWN}),
+                    timestamp_ms=1.0,
                 ),
-            ]
-        )
-
-        runtime.poll()
-        runtime.poll()
-
-        assert manager.input_io.navigation.injected == [
-            ("activate", 0, "gamepad.0.south"),
-            ("browse", 1, "gamepad.dpad"),
-            ("alternate_activate", 0, "gamepad.0.north"),
-        ]
-        assert manager.input_io.gamepad.sample_calls == [False, False]
-
-    def test_poll_does_not_bind_west_button_to_global_exit(self) -> None:
-        """Verify Y/WEST remains available for renderer-local controls."""
-
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.append(
-            GamepadSnapshot(
-                connected=True,
-                identifier="controller",
-                tapped_buttons=frozenset({GamepadButton.WEST}),
+                KeyboardSnapshot(
+                    pressed_keys=frozenset(),
+                    timestamp_ms=2.0,
+                ),
+                KeyboardSnapshot(
+                    pressed_keys=frozenset({pygame.K_LEFT, pygame.K_UP}),
+                    timestamp_ms=3.0,
+                ),
             )
         )
+        monkeypatch.setattr(
+            manager.input_io,
+            "poll",
+            lambda: (next(snapshots), ()),
+        )
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(
+            lambda intent: observed.append(_navigation_tuple(intent))
+        )
 
-        runtime.poll()
+        try:
+            for _ in range(4):
+                runtime.poll()
+        finally:
+            subscription.dispose()
 
-        assert manager.input_io.navigation.injected == []
-        assert manager.input_io.gamepad.sample_calls == [False]
+        assert observed == [
+            ("BrowseIntent", 1, "keyboard.right"),
+            ("ActivateIntent", 0, "keyboard.down"),
+            ("BrowseIntent", -1, "keyboard.left"),
+            ("AlternateActivateIntent", 0, "keyboard.up"),
+        ]
 
-    def test_poll_does_not_consume_renderer_local_tap_buttons(self) -> None:
-        """Verify renderer-local taps such as WEST/Y and L3 survive runtime polling."""
-
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.append(
+    def test_poll_does_not_consume_renderer_local_tap_buttons(
+        self,
+        monkeypatch,
+    ) -> None:
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        event = _gamepad_event(
             GamepadSnapshot(
                 connected=True,
                 identifier="controller",
@@ -327,21 +350,29 @@ class TestPeripheralRuntimeStreaming:
                     GamepadButton.L3: True,
                 },
                 tapped_buttons=frozenset({GamepadButton.WEST, GamepadButton.L3}),
+                axes={GamepadAxis.LEFT_X: 1.0},
             )
         )
+        monkeypatch.setattr(
+            manager.input_io,
+            "poll",
+            lambda: (EMPTY_KEYBOARD, (event,)),
+        )
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(observed.append)
 
-        runtime.poll()
+        try:
+            runtime.poll()
+        finally:
+            subscription.dispose()
 
-        assert manager.input_io.navigation.injected == []
-        assert manager.input_io.gamepad.sample_calls == [False]
+        assert observed == []
 
-    def test_poll_latches_sampled_dpad_until_centered(self) -> None:
-        """Verify held d-pad input does not repeat just because runtime samples before and after rendering."""
-
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.extend(
-            [
+    def test_poll_latches_sampled_dpad_until_centered(self, monkeypatch) -> None:
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        samples = iter(
+            (
                 GamepadSnapshot(
                     connected=True,
                     identifier="controller",
@@ -367,41 +398,36 @@ class TestPeripheralRuntimeStreaming:
                     identifier="controller",
                     dpad=GamepadDpadValue(x=-1),
                 ),
-            ]
-        )
-
-        for _ in range(5):
-            runtime.poll()
-
-        assert manager.input_io.navigation.injected == [
-            ("browse", 1, "gamepad.dpad"),
-            ("browse", -1, "gamepad.dpad"),
-        ]
-
-    def test_poll_ignores_left_stick_for_global_scene_navigation(self) -> None:
-        """Verify noisy left stick input does not browse global scenes."""
-
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.append(
-            GamepadSnapshot(
-                connected=True,
-                identifier="controller",
-                axes={GamepadAxis.LEFT_X: 1.0},
             )
         )
+        monkeypatch.setattr(
+            manager.input_io,
+            "poll",
+            lambda: (EMPTY_KEYBOARD, (_gamepad_event(next(samples)),)),
+        )
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(
+            lambda intent: observed.append(_navigation_tuple(intent))
+        )
 
-        runtime.poll()
+        try:
+            for _ in range(5):
+                runtime.poll()
+        finally:
+            subscription.dispose()
 
-        assert manager.input_io.navigation.injected == []
+        assert observed == [
+            ("BrowseIntent", 1, "gamepad.dpad"),
+            ("BrowseIntent", -1, "gamepad.dpad"),
+        ]
 
     def test_poll_handles_gamepad_before_main_thread_drain(self, monkeypatch) -> None:
         """Keep queued renderer graph work from sitting in front of direct input polling."""
 
         call_order: list[str] = []
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
-        manager.input_io.gamepad.snapshots.append(
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        event = _gamepad_event(
             GamepadSnapshot(
                 connected=True,
                 identifier="controller",
@@ -409,37 +435,47 @@ class TestPeripheralRuntimeStreaming:
             )
         )
 
-        original_sample = manager.input_io.gamepad.sample
-
-        def sample(
-            *, include_tapped_buttons: bool = True, source: str = "test"
-        ) -> GamepadSnapshot:
-            del source
+        def poll():
             call_order.append("sample")
-            return original_sample(include_tapped_buttons=include_tapped_buttons)
+            return EMPTY_KEYBOARD, (event,)
 
         def drain_main_thread_queue(*, max_items: int | None = None) -> int:
             call_order.append(f"drain:{max_items}")
             return 0
 
-        manager.input_io.gamepad.sample = sample
+        monkeypatch.setattr(manager.input_io, "poll", poll)
         monkeypatch.setattr(
             "heart.runtime.peripheral_runtime.drain_main_thread_queue",
             drain_main_thread_queue,
         )
+        observed = []
+        subscription = manager.input_io.navigation.intents.subscribe(
+            lambda intent: observed.append(_navigation_tuple(intent))
+        )
 
-        runtime.poll()
+        try:
+            runtime.poll()
+        finally:
+            subscription.dispose()
 
         assert call_order == ["sample", "drain:64"]
-        assert manager.input_io.navigation.injected == [
-            ("activate", 0, "gamepad.0.south"),
+        assert observed == [
+            ("ActivateIntent", 0, "gamepad.0.south"),
         ]
 
-    def test_poll_control_path_memory_stays_flat_after_warmup(self) -> None:
+    def test_poll_control_path_memory_stays_flat_after_warmup(
+        self,
+        monkeypatch,
+    ) -> None:
         """Probe the hot runtime poll path so queued controls cannot accumulate per tick."""
 
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
+        monkeypatch.setattr(
+            manager.input_io,
+            "poll",
+            lambda: (EMPTY_KEYBOARD, ()),
+        )
         samples: list[tuple[int, int]] = []
         start = time.perf_counter()
         tracemalloc.start()
@@ -449,8 +485,6 @@ class TestPeripheralRuntimeStreaming:
                     ControlMessage(command="browse", browse_step=1)
                 )
                 runtime.poll()
-                manager.input_io.navigation.injected.clear()
-                manager.input_io.gamepad.sample_calls.clear()
                 if step in {1_000, 5_000, 10_000}:
                     gc.collect()
                     current, _peak = tracemalloc.get_traced_memory()
@@ -463,13 +497,11 @@ class TestPeripheralRuntimeStreaming:
         assert max(steady_values) - min(steady_values) <= 8_192
         assert elapsed_seconds <= 5.0
         assert runtime._control_messages.empty()
-        assert manager.input_io.navigation.injected == []
-        assert manager.input_io.gamepad.sample_calls == []
 
     def test_image_clear_control_clears_temporary_renderer(self, monkeypatch) -> None:
         """Verify image clear controls remove a transient phone image instead of leaving stale artwork on screen."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
         loop = _TemporaryRendererLoop()
         monkeypatch.setattr(
@@ -477,7 +509,7 @@ class TestPeripheralRuntimeStreaming:
             lambda: loop,
         )
 
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        runtime.configure_streaming(websocket=websocket)
         assert websocket.control_handler is not None
 
         websocket.control_handler(ControlMessage(command="image_update", clear=True))
@@ -487,8 +519,8 @@ class TestPeripheralRuntimeStreaming:
 
     def test_emoji_control_presents_floating_overlay(self, monkeypatch) -> None:
         """Verify emoji controls are layered through the active loop instead of replacing the current renderer."""
-        manager = _PeripheralManagerStub()
-        runtime = PeripheralRuntime(manager)  # type: ignore[arg-type]
+        manager = PeripheralManager()
+        runtime = PeripheralRuntime(manager)
         websocket = _WebSocketStub()
         loop = _TemporaryRendererLoop()
         monkeypatch.setattr(
@@ -496,7 +528,7 @@ class TestPeripheralRuntimeStreaming:
             lambda: loop,
         )
 
-        runtime.configure_streaming(websocket=websocket)  # type: ignore[arg-type]
+        runtime.configure_streaming(websocket=websocket)
         assert websocket.control_handler is not None
 
         websocket.control_handler(ControlMessage(command="emoji_update", emoji="heart"))

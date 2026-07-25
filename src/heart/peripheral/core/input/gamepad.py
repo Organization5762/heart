@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -9,13 +10,16 @@ from typing import TYPE_CHECKING, Any
 import pygame
 
 from heart.peripheral.core.input.debug import InputDebugTap
-from heart.peripheral.core.input.events import InputEvent, input_event_topic
+from heart.peripheral.core.input.events import (GamepadInputState, InputEvent,
+                                                gamepad_state_topic,
+                                                input_event_topic)
 from heart.peripheral.gamepad import Gamepad, GamepadIdentifier
 from heart.peripheral.gamepad.peripheral_mappings import (BitDoLite2,
                                                           BitDoLite2Bluetooth,
                                                           DpadType,
                                                           SwitchLikeMapping,
                                                           SwitchProMapping)
+from heart.peripheral.gamepad.screen_mapping import screen_slot_for_joystick
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
 
@@ -135,9 +139,37 @@ class GamepadController:
         self._pump_errors = 0
         self._sample_callers: dict[str, int] = {}
         self._input_events = input_event_topic()
+        self._state = gamepad_state_topic()
 
     def input_events(self) -> Any:
         return self._input_events
+
+    def poll(self) -> tuple[GamepadSnapshotEvent, ...]:
+        events = self.sample(source="runtime.input")
+        timestamp = max(
+            (event.snapshot.timestamp_monotonic for event in events),
+            default=time.monotonic(),
+        )
+        self._state.publish(
+            GamepadInputState(
+                snapshots_json=json.dumps(
+                    [_snapshot_event_payload(event) for event in events],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                timestamp_monotonic=timestamp,
+            )
+        )
+        return events
+
+    def latest(self) -> tuple[GamepadSnapshotEvent, ...]:
+        row = self._state.latest()
+        if row is None:
+            return ()
+        return _snapshot_events_from_row(row)
+
+    def state_stream(self) -> Any:
+        return self._state.map(_snapshot_events_from_row)
 
     def sample(
         self,
@@ -233,7 +265,7 @@ class GamepadController:
             if snapshot.connected:
                 events.append(
                     GamepadSnapshotEvent(
-                        joystick_id=gamepad.joystick_id,
+                        joystick_id=screen_slot_for_joystick(gamepad.joystick_id),
                         snapshot=snapshot,
                     )
                 )
@@ -453,3 +485,51 @@ class GamepadController:
             )
             return GamepadDpadValue(x=x_dir, y=y_dir)
         return GamepadDpadValue()
+
+
+def _snapshot_event_payload(event: GamepadSnapshotEvent) -> dict[str, Any]:
+    snapshot = event.snapshot
+    return {
+        "joystick_id": event.joystick_id,
+        "connected": snapshot.connected,
+        "identifier": snapshot.identifier,
+        "buttons": {button.value: held for button, held in snapshot.buttons.items()},
+        "tapped_buttons": sorted(button.value for button in snapshot.tapped_buttons),
+        "axes": {axis.value: value for axis, value in snapshot.axes.items()},
+        "dpad_x": snapshot.dpad.x,
+        "dpad_y": snapshot.dpad.y,
+        "timestamp_monotonic": snapshot.timestamp_monotonic,
+    }
+
+
+def _snapshot_event_from_payload(payload: dict[str, Any]) -> GamepadSnapshotEvent:
+    return GamepadSnapshotEvent(
+        joystick_id=int(payload["joystick_id"]),
+        snapshot=GamepadSnapshot(
+            connected=bool(payload["connected"]),
+            identifier=payload.get("identifier"),
+            buttons={
+                GamepadButton(button): bool(held)
+                for button, held in payload.get("buttons", {}).items()
+            },
+            tapped_buttons=frozenset(
+                GamepadButton(button) for button in payload.get("tapped_buttons", ())
+            ),
+            axes={
+                GamepadAxis(axis): float(value)
+                for axis, value in payload.get("axes", {}).items()
+            },
+            dpad=GamepadDpadValue(
+                x=int(payload.get("dpad_x", 0)),
+                y=int(payload.get("dpad_y", 0)),
+            ),
+            timestamp_monotonic=float(payload.get("timestamp_monotonic", 0.0)),
+        ),
+    )
+
+
+def _snapshot_events_from_row(row: Any) -> tuple[GamepadSnapshotEvent, ...]:
+    return tuple(
+        _snapshot_event_from_payload(payload)
+        for payload in json.loads(str(row.snapshots_json))
+    )

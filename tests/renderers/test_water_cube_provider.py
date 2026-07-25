@@ -53,7 +53,7 @@ class TestWaterCubeStateProvider:
         )
         observed_states = []
 
-        provider.observable(peripheral_manager).subscribe(observed_states.append)
+        provider.states(peripheral_manager).subscribe(observed_states.append)
         accelerometer_controller.node().on_next(Acceleration(x=1.0, y=2.0, z=3.0))
         accelerometer_controller.node().on_next(Acceleration(x=4.0, y=5.0, z=6.0))
 
@@ -101,14 +101,14 @@ class TestWaterCubeStateProvider:
             ]
         )
         monkeypatch.setattr(
-            peripheral_manager.input_io.gamepad,
-            "sample",
+            peripheral_manager.input_io.controls,
+            "gamepads",
             lambda **_kwargs: (
                 GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),
             ),
         )
 
-        provider.observable(peripheral_manager).subscribe(observed_states.append)
+        provider.states(peripheral_manager).subscribe(observed_states.append)
         peripheral_manager.input_io.accelerometer.node().on_next(
             Acceleration(x=10.0, y=0.0, z=1.0)
         )
@@ -139,8 +139,8 @@ class TestWaterCubeStateProvider:
         )
         observed_states = []
         monkeypatch.setattr(
-            peripheral_manager.input_io.gamepad,
-            "sample",
+            peripheral_manager.input_io.controls,
+            "gamepads",
             lambda **_kwargs: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -149,7 +149,7 @@ class TestWaterCubeStateProvider:
             ),
         )
 
-        provider.observable(peripheral_manager).subscribe(observed_states.append)
+        provider.states(peripheral_manager).subscribe(observed_states.append)
         peripheral_manager.input_io.accelerometer.node().on_next(
             Acceleration(x=1.0, y=0.0, z=1.0)
         )
@@ -174,8 +174,8 @@ class TestWaterCubeStateProvider:
         )
         observed_states = []
         monkeypatch.setattr(
-            peripheral_manager.input_io.gamepad,
-            "sample",
+            peripheral_manager.input_io.controls,
+            "gamepads",
             lambda **_kwargs: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -184,7 +184,7 @@ class TestWaterCubeStateProvider:
             ),
         )
 
-        provider.observable(peripheral_manager).subscribe(observed_states.append)
+        provider.states(peripheral_manager).subscribe(observed_states.append)
         peripheral_manager.input_io.accelerometer.node().on_next(
             Acceleration(x=0.0, y=0.0, z=1.0)
         )

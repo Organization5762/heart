@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.tixyland.state import TixylandState
 
 MIN_SPEED_SCALE = 0.1
@@ -15,20 +16,18 @@ SPEED_SCALE_STEP = 0.15
 HUE_STEP_DEGREES = 8.0
 
 
-class TixylandStateProvider(ObservableProvider[TixylandState]):
+class TixylandStateProvider(StateProvider[TixylandState]):
     def __init__(self, peripheral_manager: PeripheralManager) -> None:
         self._peripheral_manager = peripheral_manager
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[TixylandState]:
+    ) -> Subscribable[TixylandState]:
         frame_ticks = self._peripheral_manager.input_io.frame_tick_stream()
         initial_state = TixylandState()
 
         def advance_state(state: TixylandState, frame_tick: object) -> TixylandState:
-            for event in self._peripheral_manager.input_io.gamepad.sample(
-                source="renderer.tixyland",
-            ):
+            for event in self._peripheral_manager.input_io.controls.gamepads():
                 state = _apply_gamepad_controls(state, event.snapshot)
             delta_seconds = max(frame_tick.delta_ms, 0.0) / 1000
             return replace(

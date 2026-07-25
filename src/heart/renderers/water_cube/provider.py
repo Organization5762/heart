@@ -1,11 +1,12 @@
+from manyfold import Subscribable
+
 from heart.device import Device
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.input.frame import FrameTick
 from heart.peripheral.core.input.streams import average_by_frame_window
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.water_cube.state import WaterCubeState
 
@@ -16,7 +17,7 @@ ACCELERATION_AVERAGE_STEP = 0.15
 HUE_STEP_DEGREES = 8.0
 
 
-class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
+class WaterCubeStateProvider(StateProvider[WaterCubeState]):
     def __init__(
         self,
         device: Device,
@@ -25,9 +26,9 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         self.device = device
         self._min_update_interval_ms = min_update_interval_ms
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[WaterCubeState]:
+    ) -> Subscribable[WaterCubeState]:
         if peripheral_manager is None:
             msg = "WaterCubeStateProvider requires a PeripheralManager"
             raise ValueError(msg)
@@ -40,9 +41,7 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
         samples = average_acceleration.map(
             lambda latest: (
                 latest,
-                peripheral_manager.input_io.gamepad.sample(
-                    source="renderer.water_cube",
-                ),
+                peripheral_manager.input_io.controls.gamepads(),
             )
         )
         return samples.scan(
@@ -52,9 +51,9 @@ class WaterCubeStateProvider(ObservableProvider[WaterCubeState]):
 
     def _average_acceleration(
         self,
-        acceleration: Variable[Acceleration | None],
-        frame_ticks: Variable[FrameTick],
-    ) -> Variable[Acceleration]:
+        acceleration: Subscribable[Acceleration | None],
+        frame_ticks: Subscribable[FrameTick],
+    ) -> Subscribable[Acceleration]:
         average_x = average_by_frame_window(
             acceleration,
             frame_ticks,

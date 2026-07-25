@@ -4,17 +4,16 @@ from dataclasses import replace
 from typing import cast
 
 import pygame
-from manyfold import ConstantNode
+from manyfold import ConstantNode, Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.sliding_image.state import (SlidingImageState,
                                                  SlidingRendererState)
 
 
-class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
+class SlidingImageStateProvider(StateProvider[SlidingImageState]):
     def __init__(self, initial_state: SlidingImageState | None = None) -> None:
         self._initial_state = initial_state or SlidingImageState()
 
@@ -30,9 +29,9 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[SlidingImageState]:
+    ) -> Subscribable[SlidingImageState]:
         if peripheral_manager is None:
             raise ValueError("SlidingImageStateProvider requires a PeripheralManager")
         window_stream = (
@@ -57,7 +56,7 @@ class SlidingImageStateProvider(ObservableProvider[SlidingImageState]):
         )
 
 
-class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
+class SlidingRendererStateProvider(StateProvider[SlidingRendererState]):
     def __init__(self, initial_state: SlidingRendererState | None = None) -> None:
         self._initial_state = initial_state or SlidingRendererState()
 
@@ -75,9 +74,9 @@ class SlidingRendererStateProvider(ObservableProvider[SlidingRendererState]):
         offset = (state.offset + state.speed) % width
         return replace(state, offset=offset, width=width)
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[SlidingRendererState]:
+    ) -> Subscribable[SlidingRendererState]:
         if peripheral_manager is None:
             raise ValueError(
                 "SlidingRendererStateProvider requires a PeripheralManager"

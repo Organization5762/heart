@@ -44,14 +44,14 @@ def test_plus_button_tap_reseeds_life_grid(monkeypatch) -> None:
     )
     observed_states: list[LifeState] = []
     monkeypatch.setattr(
-        manager.input_io.gamepad,
-        "sample",
+        manager.input_io.controls,
+        "gamepads",
         lambda **_kwargs: (
             GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),
         ),
     )
 
-    provider.observable().subscribe(observed_states.append)
+    provider.states().subscribe(observed_states.append)
     manager.window.on_next(_Window((8, 8)))
     manager.input_io.frame_ticks.advance(_Clock())
     manager.input_io.frame_ticks.advance(_Clock())

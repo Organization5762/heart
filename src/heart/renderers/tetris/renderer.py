@@ -87,6 +87,7 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         self._play_mode = TetrisPlayMode.FOUR_PLAYER
         self._mode_switch_chord_held = False
         self._synchronized_input_memory = TetrisInputMemory()
+        self._peripheral_manager: PeripheralManager | None = None
 
     def _create_initial_state(
         self,
@@ -94,7 +95,8 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> TetrisGameState:
-        del window, peripheral_manager, orientation
+        del window, orientation
+        self._peripheral_manager = peripheral_manager
         return self._create_game_state()
 
     def real_process(
@@ -105,7 +107,12 @@ class TetrisRenderer(StatefulBaseRenderer[TetrisGameState]):
         if window.screen is None:
             raise RuntimeError("TetrisRenderer requires an initialized display surface")
         elapsed_ms = self._elapsed_ms(window)
-        self._gamepads.refresh(player_count=PLAYER_COUNT)
+        if self._peripheral_manager is None:
+            raise RuntimeError("TetrisRenderer requires a PeripheralManager")
+        self._gamepads.refresh(
+            self._peripheral_manager.input_io.controls.gamepads(),
+            player_count=PLAYER_COUNT,
+        )
         snapshots = [self._latest_snapshot(slot) for slot in range(PLAYER_COUNT)]
         if self._consume_mode_switch_chord(snapshots):
             self._switch_play_mode()

@@ -11,11 +11,11 @@ from typing import Sequence
 
 import numpy as np
 import pygame
+from manyfold import Subscribable
 
 from heart.assets.loader import Loader
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_d_glasses.provider import ThreeDGlassesStateProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
@@ -182,12 +182,12 @@ class ThreeDGlassesRenderer(StatefulBaseRenderer[ThreeDGlassesState]):
         self._initial_state = self.provider.initial_state()
         super().initialize(window, peripheral_manager, orientation)
 
-    def state_observable(
+    def state_stream(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[ThreeDGlassesState]:
+    ) -> Subscribable[ThreeDGlassesState]:
         if self._initial_state is None:
             raise ValueError("ThreeDGlassesRenderer requires an initial state")
-        return self.provider.observable(
+        return self.provider.states(
             peripheral_manager,
             initial_state=self._initial_state,
         )

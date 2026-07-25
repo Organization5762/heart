@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 import numpy as np
 import pygame
+from manyfold import Subscribable
 from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
                        GL_CULL_FACE, GL_DEPTH_TEST, GL_FALSE, GL_FLOAT,
                        GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_PACK_ALIGNMENT,
@@ -27,7 +28,6 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_COMPILE_STATUS,
 from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.cloth_sail.provider import ClothSailStateProvider
 from heart.renderers.cloth_sail.state import ClothSailState
@@ -268,14 +268,14 @@ class ClothSailRenderer(StatefulBaseRenderer[ClothSailState]):
 
         super().initialize(window, peripheral_manager, orientation)
 
-    def state_observable(
+    def state_stream(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[ClothSailState]:
+    ) -> Subscribable[ClothSailState]:
         if self._builder is None:
             self._builder = ClothSailStateProvider(peripheral_manager)
             self.builder = self._builder
 
-        return self._builder.observable()
+        return self._builder.states()
 
     def _ensure_pixel_buffer(self, size: tuple[int, int]) -> None:
         width, height = size

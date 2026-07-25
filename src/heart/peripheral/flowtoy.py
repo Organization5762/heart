@@ -7,13 +7,12 @@ import time
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+from manyfold import NoopSubscription, Subscribable
 from manyfold.architecture import NewValues
 
 from heart.peripheral.core import Input, PeripheralInfo, PeripheralTag
 from heart.peripheral.core.input.color import ColorSnapshot
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.subscriptions import NoopSubscription
-from heart.peripheral.core.variables import Variable
 from heart.peripheral.input_payloads import FlowToyPacket, RadioPacket
 from heart.peripheral.radio import (FLOWTOY_PATTERN_EVENT, RadioPeripheral,
                                     RawRadioPacket, SerialRadioDriver)
@@ -57,7 +56,7 @@ class FlowToyPeripheral(RadioPeripheral):
         for driver in SerialRadioDriver.detect():
             yield cls(driver=driver)
 
-    def _event_stream(self) -> Variable[FlowToyPacket]:
+    def _event_stream(self) -> Subscribable[FlowToyPacket]:
         return self._packet_stream
 
     def peripheral_info(self) -> PeripheralInfo:

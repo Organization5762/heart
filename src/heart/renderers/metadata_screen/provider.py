@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.heart_rates import current_bpms
 from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
                                                    HeartAnimationState,
@@ -13,15 +14,15 @@ from heart.renderers.metadata_screen.state import (DEFAULT_HEART_COLORS,
 DEFAULT_TIME_BETWEEN_FRAMES_MS = 400
 
 
-class MetadataScreenStateProvider(ObservableProvider[MetadataScreenState]):
+class MetadataScreenStateProvider(StateProvider[MetadataScreenState]):
     def __init__(self, colors: Iterable[str] | None = None) -> None:
         self._colors = (
             list(colors) if colors is not None else list(DEFAULT_HEART_COLORS)
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[MetadataScreenState]:
+    ) -> Subscribable[MetadataScreenState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = MetadataScreenState()
 

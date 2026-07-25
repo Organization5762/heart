@@ -3,9 +3,10 @@ from __future__ import annotations
 import math
 from random import Random
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.peripheral.sensor import Acceleration
 from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
@@ -15,7 +16,7 @@ from heart.renderers.led_wave_boat.state import (LedWaveBoatFrameInput,
 HULL_DEPTH = 1.0
 
 
-class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
+class LedWaveBoatStateProvider(StateProvider[LedWaveBoatState]):
     def __init__(
         self,
         peripheral_manager: PeripheralManager,
@@ -24,9 +25,9 @@ class LedWaveBoatStateProvider(ObservableProvider[LedWaveBoatState]):
         self._peripheral_manager = peripheral_manager
         self._rng = randomness.rng()
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[LedWaveBoatState]:
+    ) -> Subscribable[LedWaveBoatState]:
         window_sizes = (
             self._peripheral_manager.window.filter(lambda window: window is not None)
             .map(lambda window: window.get_size())

@@ -78,6 +78,7 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         self._gamepads = DirectTetrisGamepads()
         self._fonts: dict[int, pygame.font.Font] = {}
         self._native_surface: pygame.Surface | None = None
+        self._peripheral_manager: PeripheralManager | None = None
 
     def _create_initial_state(
         self,
@@ -85,7 +86,8 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         peripheral_manager: PeripheralManager,
         orientation: Orientation,
     ) -> ReactionTimeState:
-        del window, peripheral_manager, orientation
+        del window, orientation
+        self._peripheral_manager = peripheral_manager
         return new_reaction_round(
             now=time.monotonic(),
             player_count=PLAYER_COUNT,
@@ -101,7 +103,12 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
             raise RuntimeError("ReactionTimeRenderer requires an initialized display")
 
         now = time.monotonic()
-        self._gamepads.refresh(player_count=PLAYER_COUNT)
+        if self._peripheral_manager is None:
+            raise RuntimeError("ReactionTimeRenderer requires a PeripheralManager")
+        self._gamepads.refresh(
+            self._peripheral_manager.input_io.controls.gamepads(),
+            player_count=PLAYER_COUNT,
+        )
         snapshots = tuple(
             self._gamepads.snapshot_for_slot(player_index)
             for player_index in range(PLAYER_COUNT)
@@ -394,13 +401,11 @@ class ReactionTimeRenderer(StatefulBaseRenderer[ReactionTimeState]):
         return snapshot.dpad.x != 0 or snapshot.dpad.y != 0
 
     def _keyboard_pressed(self) -> tuple[bool, ...]:
-        try:
-            pygame.event.pump()
-            keys = pygame.key.get_pressed()
-        except pygame.error:
+        if self._peripheral_manager is None:
             return tuple(False for _ in range(PLAYER_COUNT))
+        keys = self._peripheral_manager.input_io.controls.keyboard().pressed_keys
         return tuple(
-            any(keys[key] for key in player_keys)
+            any(key in keys for key in player_keys)
             for player_keys in KEYBOARD_KEYS_BY_PLAYER
         )
 

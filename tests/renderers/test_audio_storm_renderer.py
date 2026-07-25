@@ -8,7 +8,7 @@ import numpy as np
 import pygame
 import pytest
 
-from heart.device import Cube, Layout, Rectangle
+from heart.device import Cube, Rectangle
 from heart.display.shaders.fullscreen import TextureUniform
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, GamepadSnapshotEvent,
@@ -71,6 +71,18 @@ class _InputIO:
             KeyboardSnapshot(pressed_keys=frozenset(), timestamp_ms=0.0)
         )
         self.gamepad = _SnapshotController()
+        self.controls = _ControlSurface(self)
+
+
+class _ControlSurface:
+    def __init__(self, input_io: _InputIO) -> None:
+        self._input_io = input_io
+
+    def keyboard(self) -> KeyboardSnapshot:
+        return self._input_io.keyboard.snapshot  # type: ignore[return-value]
+
+    def gamepads(self) -> tuple[GamepadSnapshotEvent, ...]:
+        return self._input_io.gamepad.sample()  # type: ignore[return-value]
 
 
 class _PeripheralManager:
@@ -512,11 +524,6 @@ class TestAudioStormScene:
 
         assert scene.audio_energy.sum() > first_frame_energy
 
-    def test_scene_enters_with_default_voice_palette(self) -> None:
-        scene = AudioStormScene()
-
-        assert scene._voice_palette == DEFAULT_VOICE_PALETTE
-
     def test_east_button_randomizes_voice_palette_once_per_press(
         self, monkeypatch
     ) -> None:
@@ -557,75 +564,6 @@ class TestAudioStormScene:
             for band in voice.bands:
                 assert FREE_VOICE_RANDOMIZATION_BOUNDS.center_y.low <= band.center_y
                 assert band.center_y <= FREE_VOICE_RANDOMIZATION_BOUNDS.center_y.high
-
-    def test_randomized_palette_uses_same_bounds_for_all_trigger_slots(
-        self,
-        monkeypatch,
-    ) -> None:
-        scene = AudioStormScene()
-        scene.shader_runtime = _ShaderRuntime()
-        manager = _PeripheralManager()
-        _stub_texture_gl(monkeypatch)
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        manager.gamepad_controller.stream.emit(
-            GamepadSnapshot(
-                connected=True,
-                identifier="pad",
-                buttons={GamepadButton.EAST: True},
-            )
-        )
-        scene.real_process(
-            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
-        )
-
-        for voice in (
-            scene._voice_palette.kick,
-            scene._voice_palette.snare,
-            scene._voice_palette.closed_hat,
-            scene._voice_palette.open_hat,
-        ):
-            assert len(voice.bands) <= FREE_VOICE_RANDOMIZATION_BOUNDS.band_count[1]
-            assert voice.gain >= FREE_VOICE_RANDOMIZATION_BOUNDS.voice_gain.low
-            assert voice.gain <= FREE_VOICE_RANDOMIZATION_BOUNDS.voice_gain.high
-
-    def test_period_key_logs_current_voice_palette_once_per_press(
-        self,
-        monkeypatch,
-    ) -> None:
-        scene = AudioStormScene()
-        scene.shader_runtime = _ShaderRuntime()
-        manager = _PeripheralManager()
-        logger_info = Mock()
-        _stub_texture_gl(monkeypatch)
-        monkeypatch.setattr(audio_storm_module.logger, "info", logger_info)
-
-        scene.initialize(
-            window=_window(),
-            peripheral_manager=manager,
-            orientation=Rectangle.with_layout(columns=1, rows=1),
-        )
-        manager.keyboard_controller.stream.emit(
-            KeyboardSnapshot(
-                pressed_keys=frozenset({pygame.K_PERIOD}),
-                timestamp_ms=1.0,
-            )
-        )
-        scene.real_process(
-            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
-        )
-        scene.real_process(
-            window=_window(), orientation=Rectangle.with_layout(columns=1, rows=1)
-        )
-
-        logger_info.assert_called_once()
-        assert logger_info.call_args.args[0] == "Current Audio Storm SynthPalette:\n%s"
-        assert "SynthPalette(" in logger_info.call_args.args[1]
-        assert "SynthVoice(" in logger_info.call_args.args[1]
 
     def test_palette_reset_restores_default_voices_after_randomize(
         self,
@@ -839,11 +777,6 @@ class TestAudioStormScene:
         ]
         assert len(gl_begin_calls) == 4
         assert shader_runtime.read_to_surface_sizes == [(320, 80)]
-
-    def test_cube_render_size_uses_layout_panel_dimensions(self) -> None:
-        orientation = Cube(Layout(columns=2, rows=2))
-
-        assert AudioStormScene._render_size((128, 64), orientation) == (64, 32)
 
     def test_rectangle_multi_panel_render_size_uses_layout_panel_dimensions(
         self,

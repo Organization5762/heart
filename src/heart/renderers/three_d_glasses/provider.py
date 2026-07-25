@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.three_d_glasses.state import ThreeDGlassesState
 
 DEFAULT_FRAME_DURATION_MS = 650
 DEFAULT_FRAME_COUNT = 0
 
 
-class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
+class ThreeDGlassesStateProvider(StateProvider[ThreeDGlassesState]):
     def __init__(
         self,
         frame_duration_ms: int = DEFAULT_FRAME_DURATION_MS,
@@ -40,12 +40,12 @@ class ThreeDGlassesStateProvider(ObservableProvider[ThreeDGlassesState]):
             index = (index + 1) % self._frame_count
         return ThreeDGlassesState(current_index=index, elapsed_ms=total_elapsed)
 
-    def observable(
+    def states(
         self,
         peripheral_manager: PeripheralManager,
         *,
         initial_state: ThreeDGlassesState,
-    ) -> Variable[ThreeDGlassesState]:
+    ) -> Subscribable[ThreeDGlassesState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         tick_updates = frame_ticks.map(
             lambda frame_tick: (

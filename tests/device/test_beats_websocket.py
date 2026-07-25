@@ -254,109 +254,58 @@ class TestStreamEnvelopeDecoding:
 
 
 class TestControlMessageDecoding:
-    """Validate control-message parsing so Beats can send runtime commands over the websocket."""
-
-    def test_decodes_browse_control_messages(self) -> None:
-        """Verify JSON control envelopes decode into browse commands so panel navigation can reach Heart."""
-        decoded = decode_control_message(
-            json.dumps(
-                {
-                    "kind": "control",
-                    "command": "browse",
-                    "browse_step": -1,
-                }
-            )
-        )
-
-        assert decoded is not None
-        assert decoded.command == "browse"
-        assert decoded.browse_step == -1
-
-    def test_rejects_unknown_control_messages(self) -> None:
-        """Verify malformed or unsupported control payloads are ignored so random websocket traffic does not trigger navigation."""
-        assert decode_control_message('{"kind":"control","command":"bogus"}') is None
-
-    def test_decodes_sensor_update_control_messages(self) -> None:
-        """Verify sensor control payloads decode into keyed numeric updates so Beats can stream external sensor values into Heart."""
-        decoded = decode_control_message(
-            json.dumps(
+    def test_decodes_supported_runtime_controls(self) -> None:
+        payloads = (
+            (
+                {"kind": "control", "command": "browse", "browse_step": -1},
+                {"command": "browse", "browse_step": -1},
+            ),
+            (
                 {
                     "kind": "control",
                     "command": "sensor_update",
                     "sensor_key": "accelerometer:debug:z",
                     "sensor_value": 12.5,
-                }
-            )
-        )
-
-        assert decoded is not None
-        assert decoded.command == "sensor_update"
-        assert decoded.sensor_key == "accelerometer:debug:z"
-        assert decoded.sensor_value == 12.5
-        assert decoded.clear is False
-
-    def test_decodes_image_clear_control_messages(self) -> None:
-        """Verify image controls can explicitly clear temporary phone artwork without requiring an image payload."""
-        decoded = decode_control_message(
-            json.dumps(
+                },
                 {
-                    "kind": "control",
+                    "command": "sensor_update",
+                    "sensor_key": "accelerometer:debug:z",
+                    "sensor_value": 12.5,
+                    "clear": False,
+                },
+            ),
+            (
+                {"kind": "control", "command": "image_update", "clear": True},
+                {
                     "command": "image_update",
+                    "image_base64": None,
                     "clear": True,
-                }
-            )
+                },
+            ),
+            (
+                {"kind": "control", "command": "emoji_update", "emoji": "rainbow"},
+                {"command": "emoji_update", "emoji": "rainbow"},
+            ),
+            (
+                {"kind": "control", "command": "emoji_update", "emoji": "seb"},
+                {"command": "emoji_update", "emoji": "seb"},
+            ),
         )
 
-        assert decoded is not None
-        assert decoded.command == "image_update"
-        assert decoded.image_base64 is None
-        assert decoded.clear is True
+        for payload, expected_fields in payloads:
+            decoded = decode_control_message(json.dumps(payload))
+            assert decoded is not None
+            for field, expected in expected_fields.items():
+                assert getattr(decoded, field) == expected
 
-    def test_decodes_emoji_update_control_messages(self) -> None:
-        """Verify phone emoji controls decode into a validated overlay trigger."""
-        decoded = decode_control_message(
-            json.dumps(
-                {
-                    "kind": "control",
-                    "command": "emoji_update",
-                    "emoji": "rainbow",
-                }
+    def test_rejects_unknown_runtime_controls(self) -> None:
+        assert decode_control_message('{"kind":"control","command":"bogus"}') is None
+        assert (
+            decode_control_message(
+                '{"kind":"control","command":"emoji_update","emoji":"fire"}'
             )
+            is None
         )
-
-        assert decoded is not None
-        assert decoded.command == "emoji_update"
-        assert decoded.emoji == "rainbow"
-
-    def test_decodes_face_update_control_messages(self) -> None:
-        """Verify phone face controls reuse the validated floating overlay trigger."""
-        decoded = decode_control_message(
-            json.dumps(
-                {
-                    "kind": "control",
-                    "command": "emoji_update",
-                    "emoji": "seb",
-                }
-            )
-        )
-
-        assert decoded is not None
-        assert decoded.command == "emoji_update"
-        assert decoded.emoji == "seb"
-
-    def test_rejects_unknown_emoji_update_control_messages(self) -> None:
-        """Reject unsupported emoji names so the runtime only handles known overlay art."""
-        decoded = decode_control_message(
-            json.dumps(
-                {
-                    "kind": "control",
-                    "command": "emoji_update",
-                    "emoji": "fire",
-                }
-            )
-        )
-
-        assert decoded is None
 
 
 class TestWebSocketReplayCache:

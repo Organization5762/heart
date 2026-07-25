@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pygame
+from manyfold import Subscribable
 from OpenGL.error import GLError
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_MODELVIEW,
                        GL_NEAREST, GL_PROJECTION, GL_QUADS, GL_RENDERER,
@@ -31,7 +32,6 @@ from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshotEvent,
                                          KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.variables import Variable
 from heart.renderers import StatefulBaseRenderer
 from heart.renderers.three_fractal.provider import FractalSceneProvider
 from heart.renderers.three_fractal.state import FractalSceneState
@@ -618,18 +618,13 @@ class FractalRuntime(StatefulBaseRenderer[FractalRuntimeState]):
         return key in self._keyboard_snapshot.pressed_keys
 
     def _refresh_gamepad_snapshot(self, peripheral_manager: PeripheralManager) -> None:
-        self._gamepad_snapshots = peripheral_manager.input_io.gamepad.sample(
-            source="renderer.three_fractal",
-        )
+        self._gamepad_snapshots = peripheral_manager.input_io.controls.gamepads()
 
     def _set_keyboard_snapshot(self, snapshot: KeyboardSnapshot) -> None:
         self._keyboard_snapshot = snapshot
 
     def _refresh_keyboard_snapshot(self, peripheral_manager: PeripheralManager) -> None:
-        try:
-            self._keyboard_snapshot = peripheral_manager.input_io.keyboard.sample()
-        except (AttributeError, pygame.error):
-            return
+        self._keyboard_snapshot = peripheral_manager.input_io.controls.keyboard()
 
     def _has_manual_input(self) -> bool:
         if self._keyboard_snapshot.pressed_keys:
@@ -889,12 +884,12 @@ class FractalScene(StatefulBaseRenderer[FractalSceneState]):
         )
         super().initialize(window, peripheral_manager, orientation)
 
-    def state_observable(
+    def state_stream(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[FractalSceneState]:
+    ) -> Subscribable[FractalSceneState]:
         if self._initial_state is None:
             raise ValueError("FractalScene requires an initial state")
-        return self.provider.observable(initial_state=self._initial_state)
+        return self.provider.states(initial_state=self._initial_state)
 
     def real_process(
         self,

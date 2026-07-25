@@ -13,13 +13,13 @@ from typing import Any, Callable, Self, cast
 
 from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
-                      StreamFamily, StreamName, TypedRoute, Variant, route)
+                      StreamFamily, StreamName, Subscribable, TypedRoute,
+                      Variant, route)
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
-from heart.peripheral.core.variables import Variable
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
@@ -306,7 +306,7 @@ class PhoneText(Peripheral[str]):
             self._on_text(text)
         logger.info("Processed text: %r", text)
 
-    def _event_stream(self) -> Variable[str]:
+    def _event_stream(self) -> Subscribable[str]:
         return self._text_stream
 
     def _text_to_sensor_event(self, text: str) -> SensorEvent:

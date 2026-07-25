@@ -316,18 +316,7 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self,
         peripheral_manager: PeripheralManager,
     ) -> None:
-        input_io = getattr(peripheral_manager, "input_io", None)
-        keyboard_controller = (
-            input_io.keyboard
-            if input_io is not None
-            else getattr(peripheral_manager, "keyboard_controller", None)
-        )
-        if keyboard_controller is None:
-            return
-        try:
-            self._keyboard_snapshot = keyboard_controller.sample()
-        except (AttributeError, pygame.error):
-            return
+        self._keyboard_snapshot = peripheral_manager.input_io.controls.keyboard()
 
     def _initialize_shader(self) -> None:
         template_path = Path(shader_template_location).parent
@@ -750,8 +739,8 @@ class AudioStormScene(StatefulBaseRenderer[AudioStormState]):
         self._keyboard_snapshot = snapshot
 
     def _refresh_gamepad_snapshot(self) -> None:
-        self._gamepad_snapshots = self.state.peripheral_manager.input_io.gamepad.sample(
-            source="renderer.audio_storm",
+        self._gamepad_snapshots = (
+            self.state.peripheral_manager.input_io.controls.gamepads()
         )
         if not self._gamepad_snapshots:
             self._trigger_rest_values.clear()

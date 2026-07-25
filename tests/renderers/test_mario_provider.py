@@ -49,7 +49,7 @@ class TestMarioRendererProvider:
         )
         observed_states = []
 
-        provider.observable(peripheral_manager).subscribe(observed_states.append)
+        provider.states(peripheral_manager).subscribe(observed_states.append)
         peripheral_manager.input_io.physical_acceleration().on_next(
             Acceleration(x=0.0, y=0.0, z=12.5)
         )

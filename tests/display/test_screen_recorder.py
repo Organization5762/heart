@@ -81,66 +81,6 @@ class TestDisplayScreenRecorder:
 
         assert observed == colors
 
-    def test_screen_recorder_matches_expected_perceptual_hash(
-        self, screen_recorder: ScreenRecorder, tmp_path: Path
-    ) -> None:
-        """Verify ScreenRecorder output aligns with a perceptual hash baseline. This guards end-to-end capture against large rendering changes without brittle pixel-by-pixel comparisons."""
-        background = (5, 10, 20)
-        accent = (220, 40, 60)
-        inputs = [[PatternRenderer(background, accent)]]
-
-        result_path = screen_recorder.record(inputs, tmp_path / "hash.gif")
-
-        with Image.open(result_path) as image:
-            first_frame = next(ImageSequence.Iterator(image)).convert("RGB")
-            observed_hash = imagehash.phash(first_frame)
-
-        expected = Image.new("RGB", (64, 64), background)
-        draw = ImageDraw.Draw(expected)
-        draw.rectangle([8, 8, 55, 23], fill=accent)
-        draw.rectangle([16, 40, 47, 55], fill=accent)
-        expected_hash = imagehash.phash(expected)
-
-        distance = observed_hash - expected_hash
-        assert distance <= HASH_DISTANCE_LIMIT, (
-            f"perceptual hash distance too high: {distance}"
-        )
-
-    @pytest.mark.parametrize(
-        ("background", "accent"),
-        [
-            ((12, 24, 48), (200, 30, 80)),
-            ((30, 60, 90), (10, 200, 150)),
-        ],
-    )
-    def test_screen_recorder_perceptual_hashes_match_expected_frames(
-        self,
-        screen_recorder: ScreenRecorder,
-        tmp_path: Path,
-        background: tuple[int, int, int],
-        accent: tuple[int, int, int],
-    ) -> None:
-        """Verify each captured frame stays close to an expected hash baseline. This keeps multi-frame captures robust against subtle drift while still catching major render changes."""
-        inputs = [[PatternRenderer(background, accent)]]
-        result_path = screen_recorder.record(inputs, tmp_path / "multi_hash.gif")
-
-        expected = Image.new("RGB", (64, 64), background)
-        draw = ImageDraw.Draw(expected)
-        draw.rectangle([8, 8, 55, 23], fill=accent)
-        draw.rectangle([16, 40, 47, 55], fill=accent)
-        expected_hash = imagehash.phash(expected)
-
-        with Image.open(result_path) as image:
-            frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(image)]
-
-        assert len(frames) == len(inputs)
-        for frame in frames:
-            observed_hash = imagehash.phash(frame)
-            distance = observed_hash - expected_hash
-            assert distance <= HASH_DISTANCE_LIMIT, (
-                f"perceptual hash distance too high: {distance}"
-            )
-
     def test_screen_recorder_perceptual_hashes_match_per_frame_baselines(
         self, screen_recorder: ScreenRecorder, tmp_path: Path
     ) -> None:

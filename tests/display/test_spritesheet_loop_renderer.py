@@ -50,7 +50,7 @@ def _peripheral_manager(
         manager.register(gamepad)
         monkeypatch.setattr(
             manager.input_io.gamepad,
-            "sample",
+            "latest",
             lambda: (
                 GamepadSnapshotEvent(
                     joystick_id=0,
@@ -304,7 +304,7 @@ class TestSpritesheetLoopProvider:
         manager, _ = _peripheral_manager(monkeypatch, gamepad=gamepad)
         monkeypatch.setattr(
             manager.input_io.gamepad,
-            "sample",
+            "latest",
             lambda: (GamepadSnapshotEvent(joystick_id=0, snapshot=next(snapshots)),),
         )
         monkeypatch.setattr(

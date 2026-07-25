@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.text.state import TextRenderingState
 
 
-class TextRenderingProvider(ObservableProvider[TextRenderingState]):
+class TextRenderingProvider(StateProvider[TextRenderingState]):
     def __init__(
         self,
         *,
@@ -31,9 +31,9 @@ class TextRenderingProvider(ObservableProvider[TextRenderingState]):
         self._y_location = y_location
         self._line_spacing_px = line_spacing_px
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[TextRenderingState]:
+    ) -> Subscribable[TextRenderingState]:
         initial_state = TextRenderingState(
             switch_state=None,
             text=self._text,

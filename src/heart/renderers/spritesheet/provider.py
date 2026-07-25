@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.assets.loader import Loader
 from heart.display.models import KeyFrame
 from heart.peripheral.core.input import GamepadAxis, GamepadButton
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.spritesheet.state import (BoundingBox, FrameDescription,
                                                LoopPhase, Size,
                                                SpritesheetLoopState)
 
 
-class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
+class SpritesheetProvider(StateProvider[SpritesheetLoopState]):
     def __init__(
         self,
         sheet_file_path: str,
@@ -85,9 +85,9 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             gamepad=None if self.disable_input else peripheral_manager.input_io.gamepad,
         )
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[SpritesheetLoopState]:
+    ) -> Subscribable[SpritesheetLoopState]:
         initial_state = self._last_state or self.initial_state(
             peripheral_manager=peripheral_manager
         )
@@ -100,9 +100,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
             updates.append(
                 switches.map(
                     lambda switch_event: (
-                        lambda state: self.handle_switch(
-                            state, switch_event.state
-                        )
+                        lambda state: self.handle_switch(state, switch_event.state)
                     )
                 )
             )
@@ -150,7 +148,7 @@ class SpritesheetProvider(ObservableProvider[SpritesheetLoopState]):
         if gamepad_controller is None:
             return state
         duration_scale = state.duration_scale
-        for event in gamepad_controller.sample():
+        for event in gamepad_controller.latest():
             snapshot = event.snapshot
             accelerate = (
                 snapshot.button_held(GamepadButton.PLUS)

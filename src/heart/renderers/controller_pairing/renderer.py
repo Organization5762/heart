@@ -534,14 +534,17 @@ class ControllerPairingRenderer(StatefulBaseRenderer[ControllerPairingState]):
         manager = self._peripheral_manager
         if manager is None:
             return GamepadSnapshot(connected=False, identifier=None)
-        events = manager.input_io.gamepad.sample(
-            joystick_id=slot,
-            include_tapped_buttons=False,
-            source="renderer.controller_pairing",
+        event = next(
+            (
+                event
+                for event in manager.input_io.controls.gamepads()
+                if event.joystick_id == slot
+            ),
+            None,
         )
-        if not events:
+        if event is None:
             return GamepadSnapshot(connected=False, identifier=None)
-        return events[0].snapshot
+        return event.snapshot
 
     def _draw_centered_text(
         self,

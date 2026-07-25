@@ -5,12 +5,11 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import pygame
-from manyfold import Graph
+from manyfold import Graph, Subscribable
 from manyfold.architecture import NewValues
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.core.input.events import frame_tick_topic
-from heart.peripheral.core.variables import Variable
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,8 +52,8 @@ class FrameTickController:
         self._topic.publish(frame)
         return frame
 
-    def observable(self) -> Variable[FrameTick]:
-        return cast(Variable[FrameTick], self._stream)
+    def observable(self) -> Subscribable[FrameTick]:
+        return cast(Subscribable[FrameTick], self._stream)
 
     def topic(self) -> Any:
         return self._topic

@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import random
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.providers.randomness import RandomnessProvider
 from heart.renderers.pacman.state import PacmanGhostState
 
 
-class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
+class PacmanGhostStateProvider(StateProvider[PacmanGhostState]):
     def __init__(
         self,
         *,
@@ -25,9 +26,9 @@ class PacmanGhostStateProvider(ObservableProvider[PacmanGhostState]):
         self._asset_version = 0
         self._rng = rng or randomness.rng()
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager | None = None
-    ) -> Variable[PacmanGhostState]:
+    ) -> Subscribable[PacmanGhostState]:
         initial_state = self._spawn_state(
             width=self._width, height=self._height, blood=True
         )

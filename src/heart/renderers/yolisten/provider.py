@@ -2,12 +2,12 @@ import random
 import time
 from dataclasses import replace
 
+from manyfold import Subscribable
 from manyfold.architecture import PubSubObservable
 
 from heart.display.color import Color
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.switch import SwitchState
 from heart.renderers.yolisten.state import YoListenState
 from heart.utilities.logging import get_logger
@@ -15,7 +15,7 @@ from heart.utilities.logging import get_logger
 logger = get_logger(__name__)
 
 
-class YoListenStateProvider(ObservableProvider[YoListenState]):
+class YoListenStateProvider(StateProvider[YoListenState]):
     def __init__(
         self,
         base_color: Color,
@@ -81,15 +81,13 @@ class YoListenStateProvider(ObservableProvider[YoListenState]):
             return replace(state, word_position=word_position)
         return state
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[YoListenState]:
+    ) -> Subscribable[YoListenState]:
         initial_state = self.initial_state()
         switch_updates = peripheral_manager.input_io.main_switch_stream().map(
             lambda switch_event: (
-                lambda state: self.handle_switch_state(
-                    state, switch_event.state
-                )
+                lambda state: self.handle_switch_state(state, switch_event.state)
             )
         )
         window_widths = (

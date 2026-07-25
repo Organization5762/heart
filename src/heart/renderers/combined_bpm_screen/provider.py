@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from manyfold import Subscribable
+
 from heart.peripheral.core.manager import PeripheralManager
-from heart.peripheral.core.providers import ObservableProvider
-from heart.peripheral.core.variables import Variable
+from heart.peripheral.core.providers import StateProvider
 from heart.renderers.combined_bpm_screen.state import CombinedBpmScreenState
 
 DEFAULT_METADATA_DURATION_MS = 12000
 DEFAULT_MAX_BPM_DURATION_MS = 5000
 
 
-class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState]):
+class CombinedBpmScreenStateProvider(StateProvider[CombinedBpmScreenState]):
     def __init__(
         self,
         metadata_duration_ms: int = DEFAULT_METADATA_DURATION_MS,
@@ -18,9 +19,9 @@ class CombinedBpmScreenStateProvider(ObservableProvider[CombinedBpmScreenState])
         self._metadata_duration_ms = metadata_duration_ms
         self._max_bpm_duration_ms = max_bpm_duration_ms
 
-    def observable(
+    def states(
         self, peripheral_manager: PeripheralManager
-    ) -> Variable[CombinedBpmScreenState]:
+    ) -> Subscribable[CombinedBpmScreenState]:
         frame_ticks = peripheral_manager.input_io.frame_tick_stream()
         initial_state = CombinedBpmScreenState()
 

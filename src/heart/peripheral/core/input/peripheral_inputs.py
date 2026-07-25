@@ -4,10 +4,10 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from manyfold import NoopSubscription, Subscribable
+
 from heart.peripheral.core import Input, Peripheral
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
-from heart.peripheral.core.subscriptions import NoopSubscription
-from heart.peripheral.core.variables import Variable
 
 PeripheralSource = Callable[[], Iterable[Peripheral[Any]]]
 InputMapper = Callable[[Any], Input | None]
@@ -36,7 +36,7 @@ class PeripheralInputBus:
 
     def bind(
         self,
-        source: Variable[Any],
+        source: Subscribable[Any],
         mapper: InputMapper,
         target: PeripheralPredicate | None = None,
     ) -> Any:

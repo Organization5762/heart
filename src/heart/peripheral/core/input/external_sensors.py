@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from manyfold import Graph
+from manyfold import Graph, Subscribable
 
 from heart.peripheral.core.input.debug import InputDebugStage, InputDebugTap
 from heart.peripheral.core.streams import GraphRouteStream, runtime_route
-from heart.peripheral.core.variables import Variable
 from heart.peripheral.sensor import Acceleration
 
 ACCELEROMETER_PATHS = frozenset({"x", "y", "z"})
@@ -76,7 +75,7 @@ class ExternalSensorHub:
             upstream_ids=(EXTERNAL_SENSOR_SOURCE,),
         )
 
-    def observable_acceleration(self) -> Variable[Acceleration | None]:
+    def observable_acceleration(self) -> Subscribable[Acceleration | None]:
         return self._accelerometer_stream.start_with(self._accelerometer_stream.value)
 
     def _resolve_acceleration_locked(self) -> Acceleration | None:
