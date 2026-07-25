@@ -220,11 +220,12 @@ def test_real_process_mesh_story(tmp_path: Path) -> None:
             for event in loss["status_events"]
         )
 
+        replacement_incarnation = 1
         _write_node_config(
             config_b,
             node_id="node-b",
             instance_id="instance-b-2",
-            incarnation=1,
+            incarnation=replacement_incarnation,
             bootstrap_port=bootstrap_port_b,
             signer_socket=signer_socket_b,
             swim_key_hex=SWIM_KEY_B,
@@ -238,13 +239,18 @@ def test_real_process_mesh_story(tmp_path: Path) -> None:
         restarted_b = _start_node("node-b", config_b)
         reconnected_a = _wait_snapshot(
             node_a,
-            lambda snapshot: (
-                _connected_to("node-b")(snapshot)
-                and snapshot["members"]["node-b"]["instance_id"] == "instance-b-2"
-                and snapshot["members"]["node-b"]["incarnation"] == 1
+            _connected_to_instance(
+                "node-b",
+                instance_id="instance-b-2",
+                minimum_incarnation=replacement_incarnation,
             ),
         )
         reconnected_b = _wait_snapshot(restarted_b, _connected_to("node-a"))
+        replacement_member = reconnected_a["members"]["node-b"]
+        assert replacement_member["instance_id"] == "instance-b-2"
+        assert replacement_member["state"] == "alive"
+        assert replacement_member["incarnation"] >= replacement_incarnation
+        assert "node-b" in reconnected_a["authenticated_peers"]
         assert reconnected_a["remote_subscriptions"] == 3
         assert reconnected_b["remote_subscriptions"] == 3
 
@@ -636,6 +642,27 @@ def _connected_to(peer_node_id: str) -> Callable[[dict[str, Any]], bool]:
         and snapshot["mesh_peer_links"].get(peer_node_id) == "connected"
         and snapshot["remote_subscriptions"] == 3
     )
+
+
+def _connected_to_instance(
+    peer_node_id: str,
+    *,
+    instance_id: str,
+    minimum_incarnation: int,
+) -> Callable[[dict[str, Any]], bool]:
+    connected = _connected_to(peer_node_id)
+
+    def predicate(snapshot: dict[str, Any]) -> bool:
+        member = snapshot["members"].get(peer_node_id, {})
+        incarnation = member.get("incarnation")
+        return (
+            connected(snapshot)
+            and member.get("instance_id") == instance_id
+            and isinstance(incarnation, int)
+            and incarnation >= minimum_incarnation
+        )
+
+    return predicate
 
 
 def _event_count(events: list[dict[str, Any]], *, source: str) -> int:
