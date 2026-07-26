@@ -57,7 +57,7 @@ install:
 		exit 1; \
 	fi; \
 	echo "Using uv via: $$UV_CMD"; \
-	eval "$$UV_CMD sync --all-extras --group dev"; \
+	eval "$$UV_CMD sync --locked --group dev"; \
 	if [ -s "$(TOOL_LIST_FILE)" ]; then \
 		for tool in $(TOOLS); do eval "$$UV_CMD tool install $$tool"; done; \
 	else \

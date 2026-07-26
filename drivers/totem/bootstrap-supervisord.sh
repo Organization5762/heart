@@ -149,7 +149,7 @@ sync_heart_environment() {
 
   (
     cd "${repo_dir}"
-    uv sync --all-extras --group dev "${uv_flags[@]}"
+    uv sync --locked --extra native --group dev "${uv_flags[@]}"
   )
 }
 

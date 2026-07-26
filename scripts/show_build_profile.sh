@@ -10,7 +10,7 @@ BUILD_INPUTS=${BUILD_INPUTS:-}
 BUILD_ARGS=${BUILD_ARGS:-}
 PYTHON_BIN=${PYTHON_BIN:-}
 
-DEFAULT_BUILD_INPUTS=(src pyproject.toml README.md uv.lock)
+DEFAULT_BUILD_INPUTS=(packages src pyproject.toml README.md uv.lock)
 
 if [[ -z "${PYTHON_BIN}" ]]; then
   if command -v python3 >/dev/null 2>&1; then
@@ -88,8 +88,12 @@ print(f"PROFILE_NAME={shlex.quote(profile_name)}")
 PYTHON
   )"
 
-  profile_inputs=("${PROFILE_INPUTS[@]}")
-  profile_args=("${PROFILE_ARGS[@]}")
+  if [[ ${PROFILE_INPUTS[0]+set} ]]; then
+    profile_inputs=("${PROFILE_INPUTS[@]}")
+  fi
+  if [[ ${PROFILE_ARGS[0]+set} ]]; then
+    profile_args=("${PROFILE_ARGS[@]}")
+  fi
   profile_hash_mode="${PROFILE_HASH_MODE}"
   profile_description="${PROFILE_DESCRIPTION}"
   profile_name="${PROFILE_NAME}"
@@ -112,7 +116,10 @@ if [[ -n "${BUILD_INPUTS_FILE}" ]]; then
     echo "Error: BUILD_INPUTS_FILE does not exist at ${BUILD_INPUTS_FILE}" >&2
     exit 1
   fi
-  mapfile -t effective_inputs < <(grep -Ev '^\s*(#|$)' "${BUILD_INPUTS_FILE}")
+  effective_inputs=()
+  while IFS= read -r effective_input; do
+    effective_inputs+=("${effective_input}")
+  done < <(grep -Ev '^\s*(#|$)' "${BUILD_INPUTS_FILE}")
   effective_inputs_source="BUILD_INPUTS_FILE"
 elif [[ -n "${BUILD_INPUTS}" ]]; then
   read -r -a effective_inputs <<<"${BUILD_INPUTS}"

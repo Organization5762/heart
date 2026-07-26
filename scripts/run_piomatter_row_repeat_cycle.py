@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,12 @@ from heart.utilities.logging import get_logger
 LOGGER = get_logger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RGB_MATRIX_DRIVER_CHECKOUT = Path(
+    os.environ.get(
+        "HEART_RGB_MATRIX_DRIVER_CHECKOUT",
+        REPO_ROOT.parent / "heart-rgb-matrix-driver",
+    )
+)
 DEFAULT_CHECKOUT = Path("/home/michael/tmp/Adafruit_Blinka_Raspberry_Pi5_Piomatter")
 DEFAULT_COLOR_INTERVAL_SECONDS = 3.0
 DEFAULT_HEIGHT = 64
@@ -62,60 +69,27 @@ RP1_PIO_PARAM_ROOT = DEFAULT_RP1_PIO_PARAM_ROOT
 
 
 def row_repeat_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT
-        / "rust"
-        / "heart_rgb_matrix_driver"
+    return (
+        RGB_MATRIX_DRIVER_CHECKOUT
         / "pio"
-        / "piomatter_row_repeat_engine_parity.pio",
-        REPO_ROOT
-        / "rust"
-        / "heart_rust"
-        / "pio"
-        / "piomatter_row_repeat_engine_parity.pio",
+        / "piomatter_row_repeat_engine_parity.pio"
     )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
 
 
 def row_compact_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT
-        / "rust"
-        / "heart_rgb_matrix_driver"
+    return (
+        RGB_MATRIX_DRIVER_CHECKOUT
         / "pio"
-        / "piomatter_row_compact_engine_parity.pio",
-        REPO_ROOT
-        / "rust"
-        / "heart_rust"
-        / "pio"
-        / "piomatter_row_compact_engine_parity.pio",
+        / "piomatter_row_compact_engine_parity.pio"
     )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
 
 
 def row_window_pio_source_path() -> Path:
-    candidates = (
-        REPO_ROOT
-        / "rust"
-        / "heart_rgb_matrix_driver"
+    return (
+        RGB_MATRIX_DRIVER_CHECKOUT
         / "pio"
-        / "piomatter_row_window_engine_parity.pio",
-        REPO_ROOT
-        / "rust"
-        / "heart_rust"
-        / "pio"
-        / "piomatter_row_window_engine_parity.pio",
+        / "piomatter_row_window_engine_parity.pio"
     )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
 
 
 def parse_args() -> argparse.Namespace:

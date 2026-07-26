@@ -17,6 +17,12 @@ from heart.utilities.logging import get_logger
 LOGGER = get_logger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RGB_MATRIX_DRIVER_CHECKOUT = Path(
+    os.environ.get(
+        "HEART_RGB_MATRIX_DRIVER_CHECKOUT",
+        REPO_ROOT.parent / "heart-rgb-matrix-driver",
+    )
+)
 DEFAULT_CHECKOUT = Path("/home/michael/tmp/Adafruit_Blinka_Raspberry_Pi5_Piomatter")
 DEFAULT_DURATION_SECONDS = 5.0
 DEFAULT_ENABLE_BASELINE_GROUP = True
@@ -90,16 +96,7 @@ PINOUT_NAMES = {
 }
 PREPARE_SCRIPT = REPO_ROOT / "scripts" / "prepare_piomatter_parity_checkout.py"
 ROW_REPEAT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_repeat_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
-    / "pio"
-    / "piomatter_row_repeat_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_repeat_engine_parity.pio",
 )
 ROW_REPEAT_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -110,16 +107,7 @@ ROW_REPEAT_RENDER_OVERRIDE = (
     / "render_row_repeat_engine.h"
 )
 ROW_COMPACT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_compact_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
-    / "pio"
-    / "piomatter_row_compact_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_compact_engine_parity.pio",
 )
 ROW_COMPACT_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -130,28 +118,12 @@ ROW_COMPACT_RENDER_OVERRIDE = (
     / "render_row_compact_engine.h"
 )
 ROW_COMPACT_TIGHT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_compact_tight_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
+    RGB_MATRIX_DRIVER_CHECKOUT
     / "pio"
     / "piomatter_row_compact_tight_engine_parity.pio",
 )
 ROW_COUNTED_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_counted_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
-    / "pio"
-    / "piomatter_row_counted_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_counted_engine_parity.pio",
 )
 ROW_COUNTED_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -162,16 +134,7 @@ ROW_COUNTED_RENDER_OVERRIDE = (
     / "render_row_counted_engine.h"
 )
 ROW_HYBRID_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_hybrid_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
-    / "pio"
-    / "piomatter_row_hybrid_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_hybrid_engine_parity.pio",
 )
 ROW_HYBRID_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -182,12 +145,7 @@ ROW_HYBRID_RENDER_OVERRIDE = (
     / "render_row_hybrid_engine.h"
 )
 ROW_RUNS_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_runs_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_runs_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_runs_engine_parity.pio",
 )
 ROW_RUNS_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -198,12 +156,7 @@ ROW_RUNS_RENDER_OVERRIDE = (
     / "render_row_runs_engine.h"
 )
 ROW_SPLIT_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_split_engine_parity.pio",
-    REPO_ROOT / "rust" / "heart_rust" / "pio" / "piomatter_row_split_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_split_engine_parity.pio",
 )
 ROW_SPLIT_RENDER_OVERRIDE = (
     REPO_ROOT
@@ -214,16 +167,7 @@ ROW_SPLIT_RENDER_OVERRIDE = (
     / "render_row_split_engine.h"
 )
 ROW_WINDOW_PIO_SOURCE_CANDIDATES = (
-    REPO_ROOT
-    / "rust"
-    / "heart_rgb_matrix_driver"
-    / "pio"
-    / "piomatter_row_window_engine_parity.pio",
-    REPO_ROOT
-    / "rust"
-    / "heart_rust"
-    / "pio"
-    / "piomatter_row_window_engine_parity.pio",
+    RGB_MATRIX_DRIVER_CHECKOUT / "pio" / "piomatter_row_window_engine_parity.pio",
 )
 ROW_WINDOW_RENDER_OVERRIDE = (
     REPO_ROOT

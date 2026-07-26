@@ -1,5 +1,29 @@
 # Heart Runtime
 
+## Optional native RGB matrix runtime
+
+Heart installs without native display support by default. The Raspberry Pi
+HUB75 runtime lives in
+[`Organization5762/heart-rgb-matrix-driver`](https://github.com/Organization5762/heart-rgb-matrix-driver)
+and is pinned to an exact commit through the `native` extra.
+
+Use `make install` for the default development environment. Use
+`make bootstrap-native` when the native runtime is needed, or `make pi_install`
+to configure and install a Raspberry Pi deployment. Direct source and wheel
+installs use the same split:
+
+```console
+python -m pip install .
+python -m pip install '.[native]'
+make build
+python -m pip install --find-links dist dist/heart-0.2.0-py3-none-any.whl
+python -m pip install --find-links dist 'dist/heart-0.2.0-py3-none-any.whl[native]'
+```
+
+The wheel install uses the companion `heart-device-manager` and
+`heart-firmware-io` wheels emitted by `make build`. Building the native extra
+requires Rust. Default source and wheel installs do not.
+
 ## Problem Statement
 
 Provide an extensible runtime that drives an LED totem using pygame-based renderers, configuration playlists, and peripheral integrations.

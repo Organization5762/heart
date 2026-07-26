@@ -124,6 +124,7 @@ def _load_matrix_runtime_module() -> ModuleType:
     if native_module is None:
         raise RuntimeError(
             "The clean-room HUB75 runtime is unavailable. Install the optional "
-            "`heart-rgb-matrix-driver` package with `make install` or `make pi_install`."
+            "`heart-rgb-matrix-driver` package with `make bootstrap-native` or "
+            "`make pi_install`."
         )
     return cast(ModuleType, native_module)
