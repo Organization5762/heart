@@ -37,7 +37,7 @@
 
 - `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
 - `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv /Users/lampe/code/heart/.captures/20260512-pio-baseline-live2-all16/digital.csv`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
 - `ssh michael@totem4.local 'bash -lc '"'"'set -eu; pinctrl get 5; pinctrl set 5 op dl; pinctrl get 5; pinctrl set 5 dh; pinctrl get 5; pinctrl set 5 ip pn; pinctrl get 5'\"'\"''`
 - Logic2 MCP timed captures on channels `0..15` at `125 MS/s`
 
@@ -82,7 +82,7 @@
 
 - `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
 - `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260513-pio-baseline-live/digital.csv /Users/lampe/code/heart/.captures/20260513-manual-toggle-all16/digital.csv`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && HEART_PI5_SIMPLE_PROBE_LOG=0 HEART_PI5_SIMPLE_PROBE_SECONDS=10 HEART_PI5_SIMPLE_PROBE_PWM_BITS=6 HEART_PI5_SIMPLE_PROBE_CLOCK_DIVIDER=8 HEART_PI5_SIMPLE_SCAN_LSB_DWELL_TICKS=16 /home/michael/.cargo/bin/cargo run --quiet --bin pi5_simple_probe'`
 - Logic2 MCP timed captures on channels `0..6` and `0..15` at `250 MS/s` and `125 MS/s`
 - `ssh michael@totem4.local 'bash -lc '"'"'set -eu; for pin in 13 5 6 12; do pinctrl set $pin op dl; sleep 0.01; pinctrl set $pin dh; sleep 0.01; pinctrl set $pin dl; sleep 0.01; pinctrl set $pin ip pn; done'"'"''`
 
@@ -156,9 +156,9 @@
 #### What changed
 
 - Checkpoint commit: `a034299a` (`Fail fast on transport-only rp1-hub75 path`)
-- Updated [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is now opt-in instead of default-on.
+- Updated [`src/runtime/rp1_hub75.rs`](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/src/runtime/rp1_hub75.rs) so `HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE` is now opt-in instead of default-on.
 - Added a runtime guard that errors after `8` queued frames with no `frames_presented` or `vsync_count` progress, configurable via `HEART_RP1_HUB75_REQUIRE_PROGRESS_AFTER_QUEUED_FRAMES`.
-- Documented that fail-fast behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).
+- Documented that fail-fast behavior in the [standalone driver README](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/README.md).
 
 #### Live observations
 
@@ -176,7 +176,7 @@
 
 #### Validation
 
-- `PYO3_PYTHON=/Users/lampe/.local/bin/python3.12 cargo test --manifest-path rust/heart_rgb_matrix_driver/Cargo.toml rp1_hub75 -- --nocapture`
+- `PYO3_PYTHON=/Users/lampe/.local/bin/python3.12 cargo test --manifest-path ../heart-rgb-matrix-driver/Cargo.toml rp1_hub75 -- --nocapture`
 
 ### What changed
 
@@ -254,15 +254,15 @@
 
 - `./.venv/bin/pytest tests/utilities/test_hub75_logic_score.py`
 - `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/good/digital.csv /Users/lampe/code/linux/.rp1-runs/tool-selftest-stream/bad-clock/digital.csv`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && rm -f /tmp/rp1h_loop.log && (sudo ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_loop.log 2>&1 &) ; sleep 0.5; pinctrl get 5,6,12,13,16,17,18,20,21,22,23,24,26,27; wait; tail -n 20 /tmp/rp1h_loop.log'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && sudo ./target/debug/rp1_hub75_color_loop 2000 0'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && rm -f /tmp/rp1h_loop.log && (sudo ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_loop.log 2>&1 &) ; sleep 0.5; pinctrl get 5,6,12,13,16,17,18,20,21,22,23,24,26,27; wait; tail -n 20 /tmp/rp1h_loop.log'`
 
 ## 2026-05-12 Red-only device bring-up
 
 ### What changed
 
-- Added a deterministic solid-color mode to [`rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs) via `HEART_RP1_HUB75_COLOR_LOOP_SOLID`.
+- Added a deterministic solid-color mode to [`src/bin/rp1_hub75_color_loop.rs`](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/src/bin/rp1_hub75_color_loop.rs) via `HEART_RP1_HUB75_COLOR_LOOP_SOLID`.
 - Recorded the active Logic2 blocker in [`AGENTS.md`](/Users/lampe/code/heart/AGENTS.md) so future runs do not waste time rediscovering the `Cannot switch sessions while recording` failure mode.
 
 ### Live kernel-path observations
@@ -293,9 +293,9 @@
 
 ### Validation
 
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
-- `scp /Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs michael@totem4.local:/home/michael/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs`
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo env HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red ./target/debug/rp1_hub75_color_loop 1000 0'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
+- `scp /Users/lampe/code/heart-rgb-matrix-driver/src/bin/rp1_hub75_color_loop.rs michael@totem4.local:/home/michael/heart-rgb-matrix-driver/src/bin/rp1_hub75_color_loop.rs`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && sudo env HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red ./target/debug/rp1_hub75_color_loop 1000 0'`
 
 ## 2026-05-12 Queue-to-SRAM bridge bring-up
 
@@ -333,9 +333,9 @@
 
 ### Validation
 
-- `ssh michael@totem4.local 'cd /home/michael/heart/rust/heart_rgb_matrix_driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
+- `ssh michael@totem4.local 'cd /home/michael/heart-rgb-matrix-driver && /home/michael/.cargo/bin/cargo +stable build --quiet --bin rp1_hub75_color_loop'`
 - `scp /Users/lampe/code/heart/scripts/rp1_hub75_bridge_state32.c michael@totem4.local:/home/michael/rp1-pio/rp1_hub75_bridge_state32.c`
 - `ssh michael@totem4.local 'cd /home/michael/rp1-pio && gcc -O2 -Wall -Wextra -o rp1_hub75_bridge_state32 rp1_hub75_bridge_state32.c'`
-- `ssh michael@totem4.local 'set -eu; cd /home/michael/rp1-pio; rm -f /tmp/rp1h_candidate.log /tmp/rp1h_submitter.log /tmp/rp1h_bridge.log; ( RP1_HUB75_SEED_SOLID=red ./rp1_hub75_run_candidate.sh state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat2-clknop-regcount-dwell1 8 >/tmp/rp1h_candidate.log 2>&1 ) & candidate_pid=$!; sleep 0.8; ( cd /home/michael/heart/rust/heart_rgb_matrix_driver && sudo -n env HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE=0 ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_submitter.log 2>&1 ) & submitter_pid=$!; sleep 0.8; ( cd /home/michael/rp1-pio && sudo -n ./rp1_hub75_bridge_state32 5 /dev/rp1-hub75 0xc000 1 >/tmp/rp1h_bridge.log 2>&1 ) & bridge_pid=$!; wait $bridge_pid; wait $submitter_pid || true; wait $candidate_pid || true; tail -n 20 /tmp/rp1h_candidate.log; tail -n 20 /tmp/rp1h_submitter.log; tail -n 20 /tmp/rp1h_bridge.log'`
+- `ssh michael@totem4.local 'set -eu; cd /home/michael/rp1-pio; rm -f /tmp/rp1h_candidate.log /tmp/rp1h_submitter.log /tmp/rp1h_bridge.log; ( RP1_HUB75_SEED_SOLID=red ./rp1_hub75_run_candidate.sh state32-dsramcache-copy11plane-clkout-addrsetupnop8-seedoe-copydelay5-splithead1-allslow-lat2-clknop-regcount-dwell1 8 >/tmp/rp1h_candidate.log 2>&1 ) & candidate_pid=$!; sleep 0.8; ( cd /home/michael/heart-rgb-matrix-driver && sudo -n env HEART_PI5_SIMPLE_SCAN_DEFAULT_PWM_BITS=1 HEART_RP1_HUB75_COLOR_LOOP_SOLID=red HEART_RP1_HUB75_SIGNAL_VSYNC_AFTER_QUEUE=0 ./target/debug/rp1_hub75_color_loop 5000 0 >/tmp/rp1h_submitter.log 2>&1 ) & submitter_pid=$!; sleep 0.8; ( cd /home/michael/rp1-pio && sudo -n ./rp1_hub75_bridge_state32 5 /dev/rp1-hub75 0xc000 1 >/tmp/rp1h_bridge.log 2>&1 ) & bridge_pid=$!; wait $bridge_pid; wait $submitter_pid || true; wait $candidate_pid || true; tail -n 20 /tmp/rp1h_candidate.log; tail -n 20 /tmp/rp1h_submitter.log; tail -n 20 /tmp/rp1h_bridge.log'`
 - `ssh michael@totem4.local 'printf \"%s\\n\" \"candidate\"; tail -n 30 /tmp/rp1h_candidate.log; printf \"%s\\n\" \"submitter\"; tail -n 30 /tmp/rp1h_submitter.log; printf \"%s\\n\" \"bridge\"; tail -n 30 /tmp/rp1h_bridge.log'`
 - `./.venv/bin/python scripts/hub75_score_capture.py /Users/lampe/code/heart/.captures/20260512-pio-baseline/digital.csv /Users/lampe/code/heart/.captures/20260512-rp1h-bridge/digital.csv`

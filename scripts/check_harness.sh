@@ -75,10 +75,15 @@ echo "uv version: $(uv --version)"
 echo "uvx version: $(uvx --version)"
 
 if [[ -f "${UV_TOOL_LIST_FILE}" ]]; then
+  required_uv_tools=()
   if [[ -x "${LIST_TOOLS_SCRIPT}" ]]; then
-    mapfile -t required_uv_tools < <("${LIST_TOOLS_SCRIPT}" "${UV_TOOL_LIST_FILE}")
+    while IFS= read -r tool; do
+      required_uv_tools+=("${tool}")
+    done < <("${LIST_TOOLS_SCRIPT}" "${UV_TOOL_LIST_FILE}")
   else
-    mapfile -t required_uv_tools < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
+    while IFS= read -r tool; do
+      required_uv_tools+=("${tool}")
+    done < <(grep -E '^[a-zA-Z0-9_-]+' "${UV_TOOL_LIST_FILE}")
     echo "Warning: ${LIST_TOOLS_SCRIPT} is missing; falling back to basic parsing." >&2
   fi
   if [[ ${#required_uv_tools[@]} -eq 0 ]]; then
@@ -90,7 +95,10 @@ else
 fi
 
 if [[ ${#required_uv_tools[@]} -gt 0 ]]; then
-  mapfile -t duplicate_uv_tools < <(printf '%s\n' "${required_uv_tools[@]}" | sort | uniq -d)
+  duplicate_uv_tools=()
+  while IFS= read -r tool; do
+    duplicate_uv_tools+=("${tool}")
+  done < <(printf '%s\n' "${required_uv_tools[@]}" | sort | uniq -d)
   if [[ ${#duplicate_uv_tools[@]} -gt 0 ]]; then
     echo "Warning: duplicate entries in ${UV_TOOL_LIST_FILE}: ${duplicate_uv_tools[*]}" >&2
   fi
@@ -98,7 +106,10 @@ fi
 
 if [[ ${#required_uv_tools[@]} -gt 0 ]]; then
   if uv tool list >/dev/null 2>&1; then
-    mapfile -t installed_uv_tools < <(uv tool list | awk '/^[a-zA-Z0-9_-]+ v/ {print $1}')
+    installed_uv_tools=()
+    while IFS= read -r tool; do
+      installed_uv_tools+=("${tool}")
+    done < <(uv tool list | awk '/^[a-zA-Z0-9_-]+ v/ {print $1}')
     missing_uv_tools=()
     for tool in "${required_uv_tools[@]}"; do
       if ! printf '%s\n' "${installed_uv_tools[@]}" | grep -qx "${tool}"; then

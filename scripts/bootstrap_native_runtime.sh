@@ -24,4 +24,4 @@ python3 --version
 uv --version
 cargo --version
 
-uv sync --extra native
+uv sync --locked --extra native --group dev

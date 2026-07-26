@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 
 [[package]]
@@ -706,7 +706,7 @@ requires-dist = [
     { name = "bleak" },
     { name = "heart-device-manager", directory = "packages/heart-device-manager" },
     { name = "heart-firmware-io", directory = "packages/heart-firmware-io" },
-    { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", directory = "rust/heart_rgb_matrix_driver" },
+    { name = "heart-rgb-matrix-driver", marker = "extra == 'native'", git = "https://github.com/Organization5762/heart-rgb-matrix-driver.git?rev=f62c3cedc54d74a3e950d15efe356ca000b7756b" },
     { name = "lagom" },
     { name = "manyfold", git = "https://github.com/Organization5762/manyfold.git?rev=89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7" },
     { name = "moderngl" },
@@ -794,7 +794,10 @@ source = { directory = "packages/heart-firmware-io" }
 [[package]]
 name = "heart-rgb-matrix-driver"
 version = "0.1.0"
-source = { directory = "rust/heart_rgb_matrix_driver" }
+source = { git = "https://github.com/Organization5762/heart-rgb-matrix-driver.git?rev=f62c3cedc54d74a3e950d15efe356ca000b7756b#f62c3cedc54d74a3e950d15efe356ca000b7756b" }
+dependencies = [
+    { name = "pillow" },
+]
 
 [[package]]
 name = "httpcore"

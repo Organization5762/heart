@@ -12,7 +12,11 @@ BUILD_PROFILE=${BUILD_PROFILE:-}
 BUILD_PROFILE_FILE=${BUILD_PROFILE_FILE:-"${REPO_ROOT}/scripts/build_profiles.json"}
 PYTHON_BIN=${PYTHON_BIN:-}
 
-DEFAULT_BUILD_INPUTS=(src pyproject.toml README.md uv.lock)
+DEFAULT_BUILD_INPUTS=(packages src pyproject.toml README.md uv.lock)
+LOCAL_PACKAGE_DIRS=(
+  packages/heart-firmware-io
+  packages/heart-device-manager
+)
 if [[ -z "${PYTHON_BIN}" ]]; then
   if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN=python3
@@ -87,8 +91,12 @@ print(f"PROFILE_DESCRIPTION={shlex.quote(description)}")
 PYTHON
   )"
 
-  profile_inputs=("${PROFILE_INPUTS[@]}")
-  profile_args=("${PROFILE_ARGS[@]}")
+  if [[ ${PROFILE_INPUTS[0]+set} ]]; then
+    profile_inputs=("${PROFILE_INPUTS[@]}")
+  fi
+  if [[ ${PROFILE_ARGS[0]+set} ]]; then
+    profile_args=("${PROFILE_ARGS[@]}")
+  fi
   profile_hash_mode="${PROFILE_HASH_MODE}"
   profile_description="${PROFILE_DESCRIPTION}"
 fi
@@ -106,7 +114,10 @@ if [[ -n "${BUILD_INPUTS_FILE}" ]]; then
     echo "Error: BUILD_INPUTS_FILE does not exist at ${BUILD_INPUTS_FILE}" >&2
     exit 1
   fi
-  mapfile -t build_inputs < <(grep -Ev '^\s*(#|$)' "${BUILD_INPUTS_FILE}")
+  build_inputs=()
+  while IFS= read -r build_input; do
+    build_inputs+=("${build_input}")
+  done < <(grep -Ev '^\s*(#|$)' "${BUILD_INPUTS_FILE}")
 elif [[ -n "${BUILD_INPUTS:-}" ]]; then
   read -r -a build_inputs <<<"${BUILD_INPUTS}"
 elif [[ ${#profile_inputs[@]} -gt 0 ]]; then
@@ -130,12 +141,17 @@ collect_build_files() {
   done
 }
 
-mapfile -d '' -t build_files < <(collect_build_files)
+build_files=()
+while IFS= read -r -d '' build_file; do
+  build_files+=("${build_file}")
+done < <(collect_build_files)
 if [[ ${#build_files[@]} -eq 0 ]]; then
   echo "Warning: no build inputs found; proceeding with build." >&2
 fi
 
-current_hash=$(printf '%s\n' "${build_files[@]}" | BUILD_HASH_MODE="${BUILD_HASH_MODE}" "${PYTHON_BIN}" - <<'PYTHON'
+current_hash=$(
+  BUILD_HASH_MODE="${BUILD_HASH_MODE}" \
+  "${PYTHON_BIN}" - "${REPO_ROOT}" "${build_files[@]}" <<'PYTHON'
 import hashlib
 import os
 import sys
@@ -144,19 +160,21 @@ mode = os.environ.get("BUILD_HASH_MODE", "content")
 if mode not in {"content", "metadata"}:
   raise SystemExit(f"Unsupported BUILD_HASH_MODE: {mode}")
 
-paths = [line.strip() for line in sys.stdin if line.strip()]
+repo_root = sys.argv[1]
+paths = sys.argv[2:]
 paths.sort()
 
 hasher = hashlib.sha256()
 for path in paths:
-  rel_path = os.path.relpath(path)
+  absolute_path = path if os.path.isabs(path) else os.path.join(repo_root, path)
+  rel_path = os.path.relpath(absolute_path, repo_root)
   hasher.update(rel_path.encode())
   if mode == "metadata":
-    stat = os.stat(path)
+    stat = os.stat(absolute_path)
     hasher.update(str(stat.st_size).encode())
     hasher.update(str(stat.st_mtime_ns).encode())
   else:
-    with open(path, "rb") as handle:
+    with open(absolute_path, "rb") as handle:
       for chunk in iter(lambda: handle.read(8192), b""):
         hasher.update(chunk)
 
@@ -242,7 +260,15 @@ if [[ -n "${BUILD_ARGS}" ]]; then
   read -r -a build_args <<<"${BUILD_ARGS}"
 fi
 
-uv build "${build_args[@]}"
+for package_dir in "${LOCAL_PACKAGE_DIRS[@]}"; do
+  uv build "${REPO_ROOT}/${package_dir}" --out-dir "${REPO_ROOT}/dist"
+done
+
+if [[ ${#build_args[@]} -gt 0 ]]; then
+  uv build "${build_args[@]}"
+else
+  uv build
+fi
 
 echo "${current_hash}" > "${BUILD_STAMP_PATH}"
 write_manifest "false" "build-complete"

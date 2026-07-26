@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -13,6 +14,12 @@ from heart.utilities.logging import get_logger
 LOGGER = get_logger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RGB_MATRIX_DRIVER_CHECKOUT = Path(
+    os.environ.get(
+        "HEART_RGB_MATRIX_DRIVER_CHECKOUT",
+        REPO_ROOT.parent / "heart-rgb-matrix-driver",
+    )
+)
 DEFAULT_PIO_HEADER_RELATIVE_PATH = Path("src/include/piomatter/protomatter.pio.h")
 DEFAULT_MATRIXMAP_HEADER_RELATIVE_PATH = Path("src/include/piomatter/matrixmap.h")
 DEFAULT_PINS_HEADER_RELATIVE_PATH = Path("src/include/piomatter/pins.h")
@@ -92,22 +99,11 @@ NO_RESCALE_SCHEDULE_BLOCK = """schedule_sequence rescale_schedule(schedule_seque
 
 
 def default_generator_path() -> Path:
-    candidates = (
-        REPO_ROOT
-        / "rust"
-        / "heart_rgb_matrix_driver"
+    return (
+        RGB_MATRIX_DRIVER_CHECKOUT
         / "tools"
-        / "generate_piomatter_parity_header.py",
-        REPO_ROOT
-        / "rust"
-        / "heart_rust"
-        / "tools"
-        / "generate_piomatter_parity_header.py",
+        / "generate_piomatter_parity_header.py"
     )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
 
 
 def parse_args() -> argparse.Namespace:

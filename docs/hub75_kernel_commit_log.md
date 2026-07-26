@@ -30,8 +30,8 @@
 
 - `a034299a` `Fail fast on transport-only rp1-hub75 path`
 
-  - Changed [`rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/rp1_hub75.rs) so software-vsync is opt-in instead of default, and the backend now errors once frames queue without any present/vsync progress from a real worker.
-  - Added the matching tuning knob in [`rust/heart_rgb_matrix_driver/src/runtime/tuning.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/runtime/tuning.rs) and documented the behavior in [`rust/heart_rgb_matrix_driver/README.md`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/README.md).
+  - Changed [`src/runtime/rp1_hub75.rs`](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/src/runtime/rp1_hub75.rs) so software-vsync is opt-in instead of default, and the backend now errors once frames queue without any present/vsync progress from a real worker.
+  - Added the matching tuning knob in [`src/runtime/tuning.rs`](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/src/runtime/tuning.rs) and documented the behavior in the [standalone driver README](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/README.md).
 
 - `12c632a8` `Add RP1 HUB75 bridge bring-up helper`
 
@@ -48,4 +48,4 @@
 
 - `220cd53d` `Add red-only HUB75 submitter mode`
 
-  - [`rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs`](/Users/lampe/code/heart/rust/heart_rgb_matrix_driver/src/bin/rp1_hub75_color_loop.rs) now accepts `HEART_RP1_HUB75_COLOR_LOOP_SOLID` so the misc-device queue can be driven as a deterministic fixed-red source during bridge bring-up.
+  - [`src/bin/rp1_hub75_color_loop.rs`](https://github.com/Organization5762/heart-rgb-matrix-driver/blob/f62c3cedc54d74a3e950d15efe356ca000b7756b/src/bin/rp1_hub75_color_loop.rs) now accepts `HEART_RP1_HUB75_COLOR_LOOP_SOLID` so the misc-device queue can be driven as a deterministic fixed-red source during bridge bring-up.

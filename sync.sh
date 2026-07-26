@@ -20,7 +20,6 @@ DEFAULT_IGNORE_PATTERNS=(
   ".mypy_cache/"
   "node_modules/"
   "experimental/"
-  "rust/"
   "target/"
   ".vite/"
   "dist/"

@@ -68,7 +68,9 @@ dev = [
     "types-requests",
     "types-toml",
 ]
-native = ["heart-rgb-matrix-driver"]
+native = [
+    "heart-rgb-matrix-driver @ git+https://github.com/Organization5762/heart-rgb-matrix-driver.git@f62c3cedc54d74a3e950d15efe356ca000b7756b",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.6,<0.10.0"]
@@ -77,7 +79,6 @@ build-backend = "uv_build"
 [tool.uv.sources]
 heart-device-manager = { path = "./packages/heart-device-manager" }
 heart-firmware-io = { path = "./packages/heart-firmware-io" }
-heart-rgb-matrix-driver = { path = "./rust/heart_rgb_matrix_driver" }
 
 [tool.setuptools.package-data]
 heart = ["*.png", "**/*.png"]
