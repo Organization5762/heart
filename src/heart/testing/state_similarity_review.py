@@ -15,20 +15,15 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from heart.renderers.slide_transition.provider import DEFAULT_SLIDE_DURATION_MS
-from heart.testing.state_similarity import (
-    JsonValue,
-    StateSimilarityAction,
-    StateSimilarityScenario,
-    assert_rgb_similar,
-    canonicalize_state,
-    capture_surface_rgb,
-    load_state_similarity_scenario,
-)
+from heart.testing.state_similarity import (JsonValue, StateSimilarityAction,
+                                            StateSimilarityScenario,
+                                            assert_rgb_similar,
+                                            canonicalize_state,
+                                            capture_surface_rgb,
+                                            load_state_similarity_scenario)
 from heart.testing.state_similarity_workflows import (
-    StateSimilarityTransition,
-    StateSimilarityWorkflow,
-    build_state_similarity_workflow,
-)
+    StateSimilarityTransition, StateSimilarityWorkflow,
+    build_state_similarity_workflow)
 
 DEFAULT_REVIEW_OUTPUT = Path("tmp/state-similarity-review")
 DEFAULT_TRANSITION_FRAMES = 5

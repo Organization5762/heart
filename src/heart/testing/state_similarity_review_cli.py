@@ -9,10 +9,8 @@ from pathlib import Path
 from typing import final
 
 from heart.testing.state_similarity_review import (
-    DEFAULT_REVIEW_OUTPUT,
-    DEFAULT_TRANSITION_FRAMES,
-    generate_state_similarity_review,
-)
+    DEFAULT_REVIEW_OUTPUT, DEFAULT_TRANSITION_FRAMES,
+    generate_state_similarity_review)
 from heart.testing.system_contract import write_system_contract_review
 
 DEFAULT_SCENARIO_DIRECTORY = Path("tests/state_similarity/scenarios")

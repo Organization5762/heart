@@ -7,8 +7,8 @@ from heart.renderers.slide_transition import \
 
 from .composed_renderer import ComposedRenderer as ComposedRenderer
 from .composed_renderer import ComposedRendererState as ComposedRendererState
-from .game_modes import GameModes as GameModes
 from .game_modes import GameModeEntrySnapshot as GameModeEntrySnapshot
+from .game_modes import GameModes as GameModes
 from .game_modes import GameModeSnapshot as GameModeSnapshot
 from .game_modes import GameModeState as GameModeState
 from .multi_scene import MultiScene as MultiScene

@@ -13,7 +13,6 @@ import numpy as np
 import pygame
 from numpy.typing import NDArray
 
-
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
 

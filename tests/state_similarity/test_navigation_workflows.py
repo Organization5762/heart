@@ -4,15 +4,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from heart.testing.state_similarity import (
-    StateSimilarityScenario,
-    assert_rgb_similar,
-    load_state_similarity_scenario,
-    run_state_workflow,
-)
-from heart.testing.state_similarity_workflows import (
-    build_state_similarity_workflow,
-)
+from heart.testing.state_similarity import (StateSimilarityScenario,
+                                            assert_rgb_similar,
+                                            load_state_similarity_scenario,
+                                            run_state_workflow)
+from heart.testing.state_similarity_workflows import \
+    build_state_similarity_workflow
 
 SCENARIO_PATHS = tuple(
     sorted(Path(__file__).with_name("scenarios").glob("navigation*.json"))

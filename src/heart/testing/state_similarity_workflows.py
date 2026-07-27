@@ -12,13 +12,9 @@ from heart.device import Cube, Device, Orientation, Rectangle
 from heart.device.local import LocalScreen
 from heart.display.color import Color
 from heart.navigation import ComposedRenderer, GameModes, MultiScene
-from heart.peripheral.core.input import (
-    GamepadButton,
-    GamepadDpadValue,
-    GamepadSnapshot,
-    GamepadSnapshotEvent,
-    KeyboardSnapshot,
-)
+from heart.peripheral.core.input import (GamepadButton, GamepadDpadValue,
+                                         GamepadSnapshot, GamepadSnapshotEvent,
+                                         KeyboardSnapshot)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.gamepad import Gamepad
 from heart.peripheral.sensor import Acceleration
@@ -31,10 +27,8 @@ from heart.renderers.water_cube.provider import WaterCubeStateProvider
 from heart.renderers.water_cube.renderer import WaterCube
 from heart.runtime.display_context import DisplayContext
 from heart.runtime.peripheral_runtime import PeripheralRuntime
-from heart.testing.state_similarity import (
-    StateSimilarityAction,
-    StateSimilarityScenario,
-)
+from heart.testing.state_similarity import (StateSimilarityAction,
+                                            StateSimilarityScenario)
 
 _KEY_CODES = {
     "left": pygame.K_LEFT,

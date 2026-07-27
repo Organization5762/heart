@@ -5,14 +5,10 @@ from pathlib import Path
 
 import pygame
 
-from heart.testing.state_similarity import (
-    StateSimilarityAction,
-    StateSimilarityScenario,
-)
+from heart.testing.state_similarity import (StateSimilarityAction,
+                                            StateSimilarityScenario)
 from heart.testing.state_similarity_review import (
-    discover_state_similarity_scenarios,
-    generate_state_similarity_review,
-)
+    discover_state_similarity_scenarios, generate_state_similarity_review)
 from heart.testing.state_similarity_review_cli import parse_args
 from heart.testing.state_similarity_workflows import StateSimilarityTransition
 

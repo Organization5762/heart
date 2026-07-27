@@ -7,16 +7,10 @@ import numpy as np
 import pygame
 import pytest
 
-from heart.testing import (
-    StateSimilarityAction,
-    StateSimilarityInitial,
-    assert_rgb_similar,
-    canonicalize_state,
-    capture_surface_rgb,
-    load_state_similarity_scenario,
-    parse_state_similarity_scenario,
-    run_state_workflow,
-)
+from heart.testing import (StateSimilarityAction, StateSimilarityInitial,
+                           assert_rgb_similar, canonicalize_state,
+                           capture_surface_rgb, load_state_similarity_scenario,
+                           parse_state_similarity_scenario, run_state_workflow)
 
 
 class _Mode(Enum):

@@ -4,8 +4,12 @@ Heart owns one `ManyfoldNodeRuntime` per process. The runtime container starts i
 before peripheral detection, the game loop calls its bounded `poll()`, and
 shutdown closes it before the process exits.
 
-The integration uses only public APIs from ManyFold main commit
-`726f64d72b36d8bd134bda63e29ebd80472736b6`. Canonical
+The integration targets public APIs from ManyFold 0.1.42. The exact supported
+revision is the Git dependency in `pyproject.toml`, resolved again in `uv.lock`;
+those files are authoritative. The node-runtime integration originally landed
+against
+`726f64d72b36d8bd134bda63e29ebd80472736b6`, which remains provenance rather
+than the current Heart dependency pin. Canonical
 `manyfold.cluster.NodeRuntime` owns signer acquisition, discovery,
 mutually-authenticated bootstrap links, membership, SWIM, reconnect, and
 shutdown. Heart composes the public `TransportMesh` beside it because PubSub
