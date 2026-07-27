@@ -18,6 +18,7 @@ GAMEPAD_STATE_TOPIC = "heart.input.gamepad.state"
 class InputEvent:
     event_type: str
     source_id: str
+    coalescing_key: str
     stream_name: str
     stage: str
     payload_json: str
@@ -37,6 +38,7 @@ class InputEvent:
         return cls(
             event_type=event_type,
             source_id=source_id,
+            coalescing_key=f"{stage}:{stream_name}:{source_id}",
             stream_name=stream_name,
             stage=stage,
             payload_json=json.dumps(

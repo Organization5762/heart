@@ -95,15 +95,17 @@ class InputDebugTap:
             with self._lock:
                 self._history.append(envelope)
         self._stream.emit(envelope)
+        input_event = InputEvent.from_payload(
+            event_type=f"input.{stage.value}.{stream_name}",
+            source_id=source_id,
+            stream_name=stream_name,
+            stage=stage.value,
+            payload=payload,
+            timestamp_monotonic=envelope.timestamp_monotonic,
+        )
         self._input_events.publish(
-            InputEvent.from_payload(
-                event_type=f"input.{stage.value}.{stream_name}",
-                source_id=source_id,
-                stream_name=stream_name,
-                stage=stage.value,
-                payload=payload,
-                timestamp_monotonic=envelope.timestamp_monotonic,
-            )
+            input_event,
+            key=input_event.coalescing_key,
         )
 
     def observable(self) -> Subscribable[InputDebugEnvelope]:

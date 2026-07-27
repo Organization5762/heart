@@ -3,21 +3,19 @@ from __future__ import annotations
 import json
 import os
 import time
-from collections import deque
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
-from enum import Enum
+from dataclasses import dataclass
 from pathlib import Path
-from threading import Lock
 from typing import final
-from uuid import uuid4
 
-from manyfold.architecture import (CompositeDiscovery, LinkState,
+from manyfold.architecture import (CompositeDiscovery, DurableTopicDiagnostics,
                                    MachineSignerClient, MembershipConfig,
-                                   MeshConfig, MeshHealth, MeshPeerHealth,
-                                   MeshPublication, MeshSubscription,
+                                   MeshConfig, MeshDurabilityConfig,
+                                   MeshHealth, MeshLifecycleEvent,
+                                   MeshLifecycleHealth, MeshLifecycleKind,
+                                   MeshLifecycleSubscription, MeshPeerHealth,
+                                   MeshTopicBinding, MeshTopicPolicy,
                                    NodeIdentity, PeerEndpoint, PubSub,
-                                   PubSubCallbackSubscription, PubSubTopic,
                                    ReconnectPolicy, StaticSeedDiscovery,
                                    TcpAddress, TransportConfig, TransportMesh,
                                    TransportSecurity)
@@ -26,95 +24,239 @@ from manyfold.architecture.swim import (HmacDatagramTransport,
                                         HmacTransportConfig, SwimConfig,
                                         SwimMessageTransport,
                                         UdpDatagramSocket)
-from manyfold.architecture.transport_mesh import (MeshBackpressureError,
-                                                  MeshClosed, MeshRouteError)
 from manyfold.architecture.transport_mesh import \
     PeerDiscovery as MeshPeerDiscovery
 from manyfold.cluster import (NodeConfig, NodeRuntime, NodeSnapshot,
                               ProcessTransportSecurity)
 
 from heart.peripheral.core.input.events import (FRAME_TICK_TOPIC,
-                                                INPUT_EVENT_TOPIC)
+                                                INPUT_EVENT_TOPIC,
+                                                frame_tick_topic,
+                                                input_event_topic)
 from heart.peripheral.core.input.external_sensors import (
-    EXTERNAL_SENSOR_STATE_TOPIC, ExternalSensorStateEvent,
-    external_sensor_state_topic)
-from heart.peripheral.core.input.profiles.navigation import (
-    HEART_INPUT_PUBSUB, NAVIGATION_TOPIC, NavigationEvent)
+    EXTERNAL_SENSOR_STATE_TOPIC, external_sensor_state_topic)
+from heart.peripheral.core.input.frame import FrameTick
+from heart.peripheral.core.input.profiles.navigation import (NAVIGATION_TOPIC,
+                                                             navigation_topic)
+from heart.peripheral.led_matrix import (HEART_RENDERED_FRAME_TOPIC,
+                                         rendered_frame_topic)
+from heart.peripheral.microphone import (HEART_MICROPHONE_SAMPLE_TOPIC,
+                                         microphone_sample_topic)
+from heart.runtime.domain_lifecycle import (INPUT_LIFECYCLE_TOPIC,
+                                            PERIPHERAL_LIFECYCLE_TOPIC,
+                                            PIPELINE_LIFECYCLE_TOPIC,
+                                            RENDERER_LIFECYCLE_TOPIC,
+                                            SCENE_LIFECYCLE_TOPIC,
+                                            SENSOR_LIFECYCLE_TOPIC,
+                                            domain_lifecycle_topics)
 from heart.utilities.logging import get_logger
 
-DEFAULT_MAX_PUBLICATIONS_PER_POLL = 64
-DEFAULT_SENSOR_MESH_INTERVAL_SECONDS = 0.1
-DEFAULT_SEEN_EVENT_LIMIT = 4096
 HEART_MANYFOLD_CONFIG = "HEART_MANYFOLD_CONFIG"
-HEART_MANYFOLD_PUBSUB = "heart"
-HEART_MANYFOLD_STATUS_TOPIC = "heart.node.status"
-MICROPHONE_SAMPLE_STREAM = "heart.microphone.level"
-RENDERED_FRAME_STREAM = "heart.rendered_frame"
 
 logger = get_logger(__name__)
 
 
 def topic_policy_manifest() -> tuple[dict[str, object], ...]:
-    """Return the authoritative machine-readable Heart distribution policy."""
-    return tuple(asdict(policy) for policy in HEART_TOPIC_POLICIES)
+    """Return the authoritative machine-readable Heart mesh contracts."""
+    return tuple(contract.manifest() for contract in HEART_TOPIC_POLICIES)
 
 
-@final
-class TopicDelivery(str, Enum):
-    """How one named Heart stream may leave its process."""
+def heart_topic_handles() -> tuple[PubSub, ...]:
+    """Return the exact named PubSub handles used by Heart mesh processes."""
+    return (
+        navigation_topic(),
+        external_sensor_state_topic(),
+        frame_tick_topic(FrameTick),
+        rendered_frame_topic(),
+        microphone_sample_topic(),
+        input_event_topic(),
+        *domain_lifecycle_topics(),
+    )
 
-    LOCAL = "local"
-    MESH_BEST_EFFORT = "mesh_best_effort"
-    MESH_COALESCED = "mesh_coalesced"
+
+def bind_heart_topics(mesh: TransportMesh) -> tuple[MeshTopicBinding, ...]:
+    """Bind every Heart topic before the mesh registers any peers."""
+    topics = heart_topic_handles()
+    contracts = {contract.topic: contract for contract in HEART_TOPIC_POLICIES}
+    if {topic.topic for topic in topics} != set(contracts):
+        raise RuntimeError("Heart topic handles do not match the declared contracts")
+    return tuple(
+        mesh.bind(topic, policy=contracts[topic.topic].policy) for topic in topics
+    )
 
 
 @final
 @dataclass(frozen=True, slots=True)
 class TopicPolicy:
-    """Explicit transport and persistence decision for one Heart stream."""
+    """Heart's application contract for one public ManyFold topic binding."""
 
-    topic: str
-    delivery: TopicDelivery
+    data_class: str
+    policy: MeshTopicPolicy
+    coalescing_key: str
     purpose: str
-    durable: bool = False
     raft: bool = False
+
+    @property
+    def topic(self) -> str:
+        return self.policy.topic
+
+    def manifest(self) -> dict[str, object]:
+        journal = self.policy.journal_policy
+        delivery_class = self.policy.delivery_class.value
+        if delivery_class == "live_latest":
+            delivery_class = "volatile_latest"
+        return {
+            "topic": self.topic,
+            "data_class": self.data_class,
+            "delivery_class": delivery_class,
+            "coalescing_key": self.coalescing_key,
+            "ttl_ms": (
+                None if journal is None else round(journal.ttl_seconds * 1000)
+            ),
+            "max_items": self.policy.max_sources,
+            "max_bytes": None if journal is None else journal.max_bytes,
+            "max_message_bytes": self.policy.max_message_bytes,
+            "raft": self.raft,
+        }
 
 
 HEART_TOPIC_POLICIES = (
     TopicPolicy(
-        HEART_MANYFOLD_STATUS_TOPIC,
-        TopicDelivery.MESH_BEST_EFFORT,
-        "node lifecycle and peer health",
-    ),
-    TopicPolicy(
-        NAVIGATION_TOPIC,
-        TopicDelivery.MESH_BEST_EFFORT,
+        "NavigationEvent",
+        MeshTopicPolicy.commands(
+            NAVIGATION_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=16 * 1024,
+            ttl_seconds=10.0,
+        ),
+        "request_id",
         "deduplicated user navigation intent",
     ),
     TopicPolicy(
-        EXTERNAL_SENSOR_STATE_TOPIC,
-        TopicDelivery.MESH_COALESCED,
-        "selected low-rate external sensor state",
+        "ExternalSensorStateEvent",
+        MeshTopicPolicy.latest(
+            EXTERNAL_SENSOR_STATE_TOPIC,
+            max_sources=128,
+            max_bytes=2 * 1024 * 1024,
+            max_message_bytes=32 * 1024,
+            ttl_seconds=2.0,
+            key_field="sensor_key",
+        ),
+        "origin_node_id + topic + sensor_key",
+        "low-rate external sensor state with expiry",
     ),
     TopicPolicy(
-        FRAME_TICK_TOPIC,
-        TopicDelivery.LOCAL,
-        "frame-clock scheduling",
+        "FrameTick",
+        MeshTopicPolicy.live_latest(
+            FRAME_TICK_TOPIC,
+            max_sources=1,
+            max_message_bytes=1024,
+        ),
+        "origin_node_id + topic",
+        "current frame-clock state",
     ),
     TopicPolicy(
-        RENDERED_FRAME_STREAM,
-        TopicDelivery.LOCAL,
-        "rendered frame buffers",
+        "SensorEvent[DisplayFrame]",
+        MeshTopicPolicy.live_latest(
+            HEART_RENDERED_FRAME_TOPIC,
+            max_sources=8,
+            max_message_bytes=128 * 1024,
+        ),
+        "origin_node_id + topic + display identity",
+        "current rendered frame projection",
     ),
     TopicPolicy(
-        MICROPHONE_SAMPLE_STREAM,
-        TopicDelivery.LOCAL,
-        "microphone-rate samples",
+        "SensorEvent[MicrophoneLevel]",
+        MeshTopicPolicy.live_latest(
+            HEART_MICROPHONE_SAMPLE_TOPIC,
+            max_sources=8,
+            max_message_bytes=4 * 1024,
+        ),
+        "origin_node_id + topic + microphone identity",
+        "current microphone level projection",
     ),
     TopicPolicy(
-        INPUT_EVENT_TOPIC,
-        TopicDelivery.LOCAL,
-        "input debug taps",
+        "InputEvent",
+        MeshTopicPolicy.live_latest(
+            INPUT_EVENT_TOPIC,
+            max_sources=128,
+            max_message_bytes=16 * 1024,
+        ),
+        "origin_node_id + topic + stage + stream_name + source_id",
+        "bounded current debug and input projections",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            PERIPHERAL_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "peripheral attachment transitions",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            INPUT_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "input source availability transitions",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            SCENE_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "scene selection and activation transitions",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            RENDERER_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "renderer worker transitions",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            SENSOR_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "sensor availability transitions",
+    ),
+    TopicPolicy(
+        "HeartDomainTransition",
+        MeshTopicPolicy.commands(
+            PIPELINE_LIFECYCLE_TOPIC,
+            max_items=256,
+            max_bytes=1024 * 1024,
+            max_message_bytes=4096,
+            ttl_seconds=30.0,
+        ),
+        "event_id",
+        "coalesced frame and audio pressure transitions",
     ),
 )
 
@@ -132,7 +274,8 @@ class ManyfoldNodeConfig:
 
     @classmethod
     def from_environment(cls) -> "ManyfoldNodeConfig":
-        """Load an optional signer-enrolled node from ``HEART_MANYFOLD_CONFIG``."""
+        """Load an optional signer-enrolled node from
+        ``HEART_MANYFOLD_CONFIG``."""
         value = os.environ.get(HEART_MANYFOLD_CONFIG, "").strip()
         if not value:
             return cls(bootstrap=None)
@@ -157,60 +300,37 @@ class ManyfoldNodeConfig:
 @final
 @dataclass(frozen=True, slots=True)
 class ManyfoldNodeStatus:
-    """Heart-facing canonical node and mesh lifecycle snapshot."""
+    """Public ManyFold node, mesh, lifecycle, and topic health."""
 
     is_enabled: bool
     is_started: bool
     node: NodeSnapshot | None
     mesh: MeshHealth | None
     mesh_peers: tuple[MeshPeerHealth, ...]
-
-
-@final
-@dataclass(frozen=True, slots=True)
-class ManyfoldNodeEvent:
-    """Compact distributed status row for operations and SQL inspection."""
-
-    event_type: str
-    event_id: str
-    origin_node_id: str
-    authenticated_peers_json: str
-    members_json: str
-    candidate_count: int
-    discovery_failure_count: int
-    last_error: str
-    timestamp_monotonic: float
+    lifecycle: MeshLifecycleHealth | None
+    topics: tuple[DurableTopicDiagnostics, ...]
 
 
 @final
 class ManyfoldNodeRuntime:
-    """Apply Heart topic policy beside ManyFold's canonical node bootstrap."""
+    """Bind Heart's named PubSub topics to one canonical ManyFold mesh."""
 
     def __init__(self, config: ManyfoldNodeConfig | None = None) -> None:
         self.config = config or ManyfoldNodeConfig.from_environment()
-        self.status_topic = PubSubTopic(
-            HEART_MANYFOLD_STATUS_TOPIC,
-            schema=ManyfoldNodeEvent,
-            pubsub=HEART_MANYFOLD_PUBSUB,
-        )
         self._node: NodeRuntime | None = None
         self._mesh: TransportMesh | None = None
         self._signer_client: MachineSignerClient | None = None
-        self._mesh_subscriptions: list[MeshSubscription] = []
-        self._local_subscriptions: list[PubSubCallbackSubscription] = []
+        self._bindings: list[MeshTopicBinding] = []
         self._topics: dict[str, PubSub] = {}
-        self._pending_sensor: ExternalSensorStateEvent | None = None
-        self._pending_sensor_lock = Lock()
-        self._next_sensor_publish_at = 0.0
-        self._seen = _SeenEventIds(DEFAULT_SEEN_EVENT_LIMIT)
-        self._last_status_key: tuple[object, ...] | None = None
+        self._lifecycle_after_sequence = 0
 
     @property
     def is_started(self) -> bool:
         return self._node is not None
 
     def start(self) -> ManyfoldNodeStatus:
-        """Start signer-backed bootstrap and the public best-effort mesh once."""
+        """Start signer-backed bootstrap and install direct topic bindings
+        once."""
         if self._node is not None:
             return self.status()
         bootstrap = self.config.bootstrap
@@ -236,11 +356,11 @@ class ManyfoldNodeRuntime:
                 connector_config=process_security.connector_transport,
                 listener_config=process_security.listener_transport,
                 config=bootstrap.mesh,
+                durability=bootstrap.durability,
             )
             self._mesh = mesh
+            self._install_bindings()
             bootstrap.configure_mesh(mesh, process_security)
-            self._install_bridges()
-            self._publish_status("started")
         except Exception:
             self.close()
             raise
@@ -255,57 +375,73 @@ class ManyfoldNodeRuntime:
             node=None if node is None else node.snapshot(),
             mesh=None if mesh is None else mesh.health(),
             mesh_peers=() if mesh is None else mesh.peer_health(),
+            lifecycle=None if mesh is None else mesh.lifecycle_health(),
+            topics=() if mesh is None else mesh.durable_topic_diagnostics(),
         )
 
     def poll(self) -> None:
-        """Drain bounded mesh work without running discovery or SWIM inline."""
-        node = self._node
+        """Consume bounded public lifecycle transitions without transport
+        polling."""
         mesh = self._mesh
-        if node is None or mesh is None:
+        if mesh is None:
             return
-        self._flush_sensor()
-        for _index in range(DEFAULT_MAX_PUBLICATIONS_PER_POLL):
-            try:
-                publication = mesh.receive(timeout=0.0)
-            except TimeoutError:
-                break
-            except MeshClosed:
-                return
-            self._accept_publication(publication)
-        snapshot = node.snapshot()
-        peer_health = mesh.peer_health()
-        status_key = _status_key(snapshot, peer_health)
-        if status_key != self._last_status_key:
-            self._publish_status(
-                "changed",
-                snapshot=snapshot,
-                peer_health=peer_health,
-            )
+        for event in mesh.lifecycle_events(
+            after_sequence=self._lifecycle_after_sequence
+        ):
+            self._lifecycle_after_sequence = event.sequence
+            if event.kind is MeshLifecycleKind.DELIVERY_FAILED:
+                logger.warning(
+                    "ManyFold delivery failed topic=%s peer=%s correlation=%s "
+                    "reason=%s detail=%s",
+                    event.topic,
+                    event.peer_node_id,
+                    event.correlation_id,
+                    event.reason.value,
+                    event.detail,
+                )
+
+    def lifecycle_events(
+        self,
+        *,
+        after_sequence: int = 0,
+    ) -> tuple[MeshLifecycleEvent, ...]:
+        """Return typed ManyFold lifecycle events after a local sequence."""
+        mesh = self._require_mesh()
+        return mesh.lifecycle_events(after_sequence=after_sequence)
+
+    def subscribe_lifecycle(
+        self,
+        *,
+        after_sequence: int = 0,
+        queue_limit: int = 1024,
+    ) -> MeshLifecycleSubscription:
+        """Return a bounded pull subscription to ManyFold lifecycle events."""
+        return self._require_mesh().subscribe_lifecycle(
+            after_sequence=after_sequence,
+            queue_limit=queue_limit,
+        )
+
+    def lifecycle_health(self) -> MeshLifecycleHealth:
+        """Return lifecycle retention and subscriber-drop health."""
+        return self._require_mesh().lifecycle_health()
+
+    def topic_diagnostics(self) -> tuple[DurableTopicDiagnostics, ...]:
+        """Return public per-topic delivery and retention diagnostics."""
+        return self._require_mesh().durable_topic_diagnostics()
 
     def close(self) -> None:
-        """Release bridges, mesh, canonical bootstrap, and signer client."""
+        """Release the mesh, canonical bootstrap, and signer client."""
         node = self._node
         mesh = self._mesh
         signer_client = self._signer_client
         if node is None and mesh is None and signer_client is None:
             return
-        if node is not None and mesh is not None:
-            self._publish_status("stopping")
-        for local_subscription in reversed(self._local_subscriptions):
-            local_subscription.dispose()
-        self._local_subscriptions.clear()
-        for mesh_subscription in reversed(self._mesh_subscriptions):
-            try:
-                mesh_subscription.dispose()
-            except (MeshBackpressureError, MeshClosed) as error:
-                logger.warning("ManyFold topic withdrawal failed: %s", error)
-        self._mesh_subscriptions.clear()
+        self._bindings.clear()
         self._topics.clear()
-        with self._pending_sensor_lock:
-            self._pending_sensor = None
         self._mesh = None
         self._node = None
         self._signer_client = None
+        self._lifecycle_after_sequence = 0
         try:
             if mesh is not None:
                 mesh.close()
@@ -316,223 +452,12 @@ class ManyfoldNodeRuntime:
             finally:
                 if signer_client is not None:
                     signer_client.close()
-        self._last_status_key = None
 
-    def _install_bridges(self) -> None:
-        mesh = self._require_mesh()
-        navigation_topic = PubSubTopic(
-            NAVIGATION_TOPIC,
-            schema=NavigationEvent,
-            pubsub=HEART_INPUT_PUBSUB,
-        )
-        sensor_topic = external_sensor_state_topic()
+    def _install_bindings(self) -> None:
+        self._bindings = list(bind_heart_topics(self._require_mesh()))
         self._topics = {
-            HEART_MANYFOLD_STATUS_TOPIC: self.status_topic,
-            NAVIGATION_TOPIC: navigation_topic,
-            EXTERNAL_SENSOR_STATE_TOPIC: sensor_topic,
+            binding.topic.topic: binding.topic for binding in self._bindings
         }
-        self._mesh_subscriptions = [mesh.subscribe(topic) for topic in self._topics]
-        self._local_subscriptions = [
-            self.status_topic.subscribe(self._publish_local_status),
-            navigation_topic.subscribe(self._publish_local_navigation),
-            sensor_topic.subscribe(self._queue_local_sensor),
-        ]
-
-    def _publish_local_status(self, event: ManyfoldNodeEvent) -> None:
-        if event.event_id:
-            return
-        self._publish_mesh(
-            HEART_MANYFOLD_STATUS_TOPIC,
-            {
-                "event_type": event.event_type,
-                "origin_node_id": event.origin_node_id,
-                "authenticated_peers_json": event.authenticated_peers_json,
-                "members_json": event.members_json,
-                "candidate_count": event.candidate_count,
-                "discovery_failure_count": event.discovery_failure_count,
-                "last_error": event.last_error,
-                "timestamp_monotonic": event.timestamp_monotonic,
-            },
-        )
-
-    def _publish_local_navigation(self, event: NavigationEvent) -> None:
-        if event.event_id:
-            return
-        self._publish_mesh(
-            NAVIGATION_TOPIC,
-            {
-                "kind": event.kind,
-                "source": event.source,
-                "step": event.step,
-            },
-        )
-
-    def _queue_local_sensor(self, event: ExternalSensorStateEvent) -> None:
-        if event.event_id:
-            return
-        with self._pending_sensor_lock:
-            self._pending_sensor = event
-
-    def _flush_sensor(self) -> None:
-        now = time.monotonic()
-        if now < self._next_sensor_publish_at:
-            return
-        with self._pending_sensor_lock:
-            event = self._pending_sensor
-            self._pending_sensor = None
-        if event is None:
-            return
-        self._next_sensor_publish_at = now + DEFAULT_SENSOR_MESH_INTERVAL_SECONDS
-        self._publish_mesh(
-            EXTERNAL_SENSOR_STATE_TOPIC,
-            {
-                "sensor_key": event.sensor_key,
-                "value": event.value,
-            },
-        )
-
-    def _publish_mesh(self, topic: str, payload: Mapping[str, object]) -> None:
-        node = self._require_node()
-        mesh = self._require_mesh()
-        event_id = f"{node.config.identity.node_id}:{uuid4().hex}"
-        encoded = json.dumps(
-            {"event_id": event_id, "payload": payload},
-            allow_nan=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-        try:
-            mesh.publish(topic, encoded, message_id=event_id)
-        except (MeshBackpressureError, MeshClosed, MeshRouteError) as error:
-            logger.warning("ManyFold best-effort topic %s dropped: %s", topic, error)
-            return
-        self._seen.add(event_id)
-
-    def _accept_publication(self, publication: MeshPublication) -> None:
-        node = self._require_node()
-        if publication.source_node_id == node.config.identity.node_id:
-            return
-        try:
-            event_id, payload = _decode_mesh_payload(publication.payload)
-            if event_id != publication.message_id:
-                raise ValueError("event_id does not match mesh message_id")
-        except ValueError as error:
-            logger.warning(
-                "Ignoring malformed ManyFold topic %s from %s: %s",
-                publication.topic,
-                publication.source_node_id,
-                error,
-            )
-            return
-        if self._seen.contains(event_id):
-            return
-        self._seen.add(event_id)
-        topic = self._topics.get(publication.topic)
-        if topic is None:
-            return
-        if publication.topic == NAVIGATION_TOPIC:
-            topic.publish(
-                NavigationEvent(
-                    kind=_require_text(payload.get("kind"), "navigation kind"),
-                    source=_require_text(payload.get("source"), "navigation source"),
-                    step=_require_integer(payload.get("step"), "navigation step"),
-                    event_id=event_id,
-                    origin_node_id=publication.source_node_id,
-                )
-            )
-        elif publication.topic == EXTERNAL_SENSOR_STATE_TOPIC:
-            topic.publish(
-                ExternalSensorStateEvent(
-                    sensor_key=_require_text(payload.get("sensor_key"), "sensor key"),
-                    value=_optional_number(payload.get("value"), "sensor value"),
-                    event_id=event_id,
-                    origin_node_id=publication.source_node_id,
-                )
-            )
-        else:
-            topic.publish(
-                ManyfoldNodeEvent(
-                    event_type=_require_text(payload.get("event_type"), "event type"),
-                    event_id=event_id,
-                    origin_node_id=publication.source_node_id,
-                    authenticated_peers_json=_require_text(
-                        payload.get("authenticated_peers_json"),
-                        "authenticated peers",
-                    ),
-                    members_json=_require_text(payload.get("members_json"), "members"),
-                    candidate_count=_require_integer(
-                        payload.get("candidate_count"),
-                        "candidate count",
-                    ),
-                    discovery_failure_count=_require_integer(
-                        payload.get("discovery_failure_count"),
-                        "discovery failure count",
-                    ),
-                    last_error=_require_string(payload.get("last_error"), "last error"),
-                    timestamp_monotonic=_require_number(
-                        payload.get("timestamp_monotonic"),
-                        "status timestamp",
-                    ),
-                )
-            )
-
-    def _publish_status(
-        self,
-        event_type: str,
-        *,
-        snapshot: NodeSnapshot | None = None,
-        peer_health: tuple[MeshPeerHealth, ...] | None = None,
-    ) -> None:
-        node = self._require_node()
-        mesh = self._require_mesh()
-        resolved_snapshot = snapshot or node.snapshot()
-        resolved_peer_health = peer_health or mesh.peer_health()
-        self._last_status_key = _status_key(
-            resolved_snapshot,
-            resolved_peer_health,
-        )
-        authenticated_peers = sorted(
-            {
-                peer.health.remote_identity.node_id
-                for peer in resolved_snapshot.peers
-                if peer.health.state is LinkState.CONNECTED
-                and peer.health.remote_identity is not None
-            }
-        )
-        self.status_topic.publish(
-            ManyfoldNodeEvent(
-                event_type=event_type,
-                event_id="",
-                origin_node_id=resolved_snapshot.identity.node_id,
-                authenticated_peers_json=json.dumps(authenticated_peers),
-                members_json=json.dumps(
-                    [
-                        {
-                            "node_id": member.identity.node_id,
-                            "instance_id": member.identity.instance_id,
-                            "incarnation": member.incarnation,
-                            "state": member.state.value,
-                        }
-                        for member in resolved_snapshot.members
-                    ],
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ),
-                candidate_count=len(resolved_snapshot.peers),
-                discovery_failure_count=sum(
-                    diagnostic.code.startswith("discovery-")
-                    and diagnostic.severity.value != "info"
-                    for diagnostic in resolved_snapshot.diagnostics
-                ),
-                last_error=_last_node_error(resolved_snapshot),
-                timestamp_monotonic=time.monotonic(),
-            )
-        )
-
-    def _require_node(self) -> NodeRuntime:
-        if self._node is None:
-            raise RuntimeError("Heart ManyFold node is not started")
-        return self._node
 
     def _require_mesh(self) -> TransportMesh:
         if self._mesh is None:
@@ -592,6 +517,7 @@ class _HeartNodeBootstrap:
     swim: SwimConfig
     swim_transport: HmacTransportConfig
     mesh: MeshConfig
+    durability: MeshDurabilityConfig
     reconcile_interval_seconds: float
     startup_peer_timeout_seconds: float
     peer_absence_seconds: float
@@ -812,6 +738,24 @@ def _bootstrap_from_json(raw: Mapping[str, object]) -> _HeartNodeBootstrap:
                 default=1024,
             ),
         ),
+        durability=MeshDurabilityConfig(
+            Path(_mapping_text(raw, "state_directory")).expanduser() / "delivery",
+            hard_peer_items=_mapping_integer(
+                raw,
+                "durable_hard_peer_items",
+                default=1024,
+            ),
+            hard_peer_bytes=_mapping_integer(
+                raw,
+                "durable_hard_peer_bytes",
+                default=64 * 1024 * 1024,
+            ),
+            dedupe_retention_seconds=_mapping_number(
+                raw,
+                "durable_dedupe_retention_seconds",
+                default=30.0,
+            ),
+        ),
         reconcile_interval_seconds=_mapping_number(
             raw,
             "reconcile_interval_seconds",
@@ -928,66 +872,6 @@ def _transport_limits_from_json(raw: Mapping[str, object]) -> _TransportLimits:
     )
 
 
-def _decode_mesh_payload(payload: bytes) -> tuple[str, Mapping[str, object]]:
-    try:
-        raw = json.loads(payload)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"payload must be UTF-8 JSON: {error}") from error
-    envelope = _require_mapping(raw, "mesh envelope")
-    event_id = _mapping_text(envelope, "event_id")
-    return event_id, _require_mapping(envelope.get("payload"), "mesh payload")
-
-
-def _status_key(
-    snapshot: NodeSnapshot,
-    mesh_peers: tuple[MeshPeerHealth, ...],
-) -> tuple[object, ...]:
-    return (
-        snapshot.phase.value,
-        tuple(
-            (
-                member.identity.node_id,
-                member.identity.instance_id,
-                member.incarnation,
-                member.state.value,
-            )
-            for member in snapshot.members
-        ),
-        tuple(
-            (
-                peer.endpoint.host,
-                peer.endpoint.port,
-                peer.health.state.value,
-                (
-                    ""
-                    if peer.health.remote_identity is None
-                    else peer.health.remote_identity.instance_id
-                ),
-            )
-            for peer in snapshot.peers
-        ),
-        tuple(
-            (
-                peer.node_id,
-                peer.link.state.value,
-                tuple(peer.interested_topics),
-            )
-            for peer in mesh_peers
-        ),
-        tuple(
-            (diagnostic.sequence, diagnostic.code)
-            for diagnostic in snapshot.diagnostics
-        ),
-    )
-
-
-def _last_node_error(snapshot: NodeSnapshot) -> str:
-    for diagnostic in reversed(snapshot.diagnostics):
-        if diagnostic.severity.value == "error":
-            return diagnostic.message
-    return ""
-
-
 def _mapping_hex_bytes(raw: Mapping[str, object], name: str) -> bytes:
     value = _mapping_text(raw, name)
     try:
@@ -1026,12 +910,6 @@ def _mapping_text(raw: Mapping[str, object], name: str) -> str:
     return _require_text(raw[name], name)
 
 
-def _optional_number(value: object, name: str) -> float | None:
-    if value is None:
-        return None
-    return _require_number(value, name)
-
-
 def _require_integer(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{name} must be an integer")
@@ -1067,26 +945,3 @@ def _require_text(value: object, name: str) -> str:
     if not result:
         raise ValueError(f"{name} must not be empty")
     return result
-
-
-@final
-class _SeenEventIds:
-    def __init__(self, limit: int) -> None:
-        self._limit = limit
-        self._order: deque[str] = deque()
-        self._ids: set[str] = set()
-        self._lock = Lock()
-
-    def add(self, event_id: str) -> None:
-        with self._lock:
-            if event_id in self._ids:
-                return
-            while len(self._order) >= self._limit:
-                expired = self._order.popleft()
-                self._ids.remove(expired)
-            self._order.append(event_id)
-            self._ids.add(event_id)
-
-    def contains(self, event_id: str) -> bool:
-        with self._lock:
-            return event_id in self._ids

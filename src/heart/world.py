@@ -7,9 +7,6 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import cast, final
 
-from manyfold.architecture.transport import FrameKind, TransportMessage
-from manyfold.architecture.transport_delivery import (DurableDelivery,
-                                                      ReceivedDelivery)
 from manyfold.architecture.transport_rpc import (RpcCancellation, RpcEndpoint,
                                                  RpcRequest)
 from manyfold.cluster import CommittedCommand, ControlCommand
@@ -19,7 +16,6 @@ GET_DEVICE_RPC_METHOD = "get_device"
 GET_ACTIVE_MODE_RPC_METHOD = "get_active_mode"
 PUT_DEVICE_COMMAND_KIND = "heart.world.device.put"
 SELECT_MODE_COMMAND_KIND = "heart.world.mode.select"
-MODE_DELIVERY_CHANNEL = "heart.world.mode.command"
 COORDINATED_COMMAND_KINDS = frozenset(
     {
         PUT_DEVICE_COMMAND_KIND,
@@ -73,7 +69,8 @@ class WorldDevice:
 @final
 @dataclass(frozen=True, slots=True)
 class ActiveMode:
-    """The coordinated owner and immutable configuration selected for a mode."""
+    """The coordinated owner and immutable configuration selected for a
+    mode."""
 
     mode_id: str
     configuration_id: str
@@ -124,35 +121,6 @@ def select_mode_command(
         kind=SELECT_MODE_COMMAND_KIND,
         payload=_active_mode_to_json(active_mode),
     )
-
-
-def mode_delivery_message(command: CommittedCommand) -> TransportMessage:
-    """Encode one committed mode command for ManyFold durable delivery."""
-    if command.kind != SELECT_MODE_COMMAND_KIND:
-        raise ValueError(
-            f"durable mode delivery requires kind {SELECT_MODE_COMMAND_KIND!r}, "
-            f"observed {command.kind!r}"
-        )
-    return TransportMessage(
-        FrameKind.PUBSUB,
-        MODE_DELIVERY_CHANNEL,
-        _json_bytes(command.to_dict()),
-        correlation_id=command.command_id,
-    )
-
-
-def apply_delivered_mode(
-    state: WorldState,
-    delivery: DurableDelivery,
-    *,
-    timeout_seconds: float,
-) -> bool:
-    """Apply and ACK one delivered mode command, returning whether it was new."""
-    received = delivery.receive(timeout=timeout_seconds)
-    command = _mode_command_from_delivery(received)
-    was_applied = state.apply(command)
-    delivery.ack(received.message_id)
-    return was_applied
 
 
 @final
@@ -237,7 +205,8 @@ class WorldState:
 
 @final
 class WorldRpcServer:
-    """Typed, read-only world service on a ManyFold coordinator RPC endpoint."""
+    """Typed, read-only world service on a ManyFold coordinator RPC
+    endpoint."""
 
     def __init__(self, endpoint: RpcEndpoint, state: WorldState) -> None:
         if not isinstance(endpoint, RpcEndpoint):
@@ -390,44 +359,6 @@ class WorldRpcClient:
                     f"observed revision {self._observed_revision}"
                 )
             self._observed_revision = revision
-
-
-def _mode_command_from_delivery(received: ReceivedDelivery) -> CommittedCommand:
-    message = received.message
-    if message.kind is not FrameKind.PUBSUB:
-        raise ValueError("durable mode command must use a PubSub transport frame")
-    if message.channel != MODE_DELIVERY_CHANNEL:
-        raise ValueError(
-            f"durable mode command expected channel {MODE_DELIVERY_CHANNEL!r}, "
-            f"observed {message.channel!r}"
-        )
-    payload = _json_object(message.payload, "durable mode command")
-    command = _committed_command_from_json(payload)
-    if command.kind != SELECT_MODE_COMMAND_KIND:
-        raise ValueError(
-            f"durable mode command expected kind {SELECT_MODE_COMMAND_KIND!r}, "
-            f"observed {command.kind!r}"
-        )
-    if received.message_id != command.command_id:
-        raise ValueError(
-            f"delivery message_id {received.message_id!r} does not match "
-            f"command_id {command.command_id!r}"
-        )
-    if message.correlation_id != command.command_id:
-        raise ValueError(
-            f"delivery correlation_id {message.correlation_id!r} does not match "
-            f"command_id {command.command_id!r}"
-        )
-    return command
-
-
-def _committed_command_from_json(value: Mapping[str, object]) -> CommittedCommand:
-    return CommittedCommand(
-        sequence=_json_non_negative_int(value, "sequence"),
-        command_id=_json_string(value, "command_id"),
-        kind=_json_string(value, "kind"),
-        payload=_json_mapping(value.get("payload"), "command payload"),
-    )
 
 
 def _device_to_json(device: WorldDevice) -> dict[str, object]:

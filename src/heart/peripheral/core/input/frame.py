@@ -49,7 +49,7 @@ class FrameTickController:
             payload=frame,
         )
         self._stream.emit(frame)
-        self._topic.publish(frame)
+        self._topic.publish(frame, key="frame")
         return frame
 
     def observable(self) -> Subscribable[FrameTick]:

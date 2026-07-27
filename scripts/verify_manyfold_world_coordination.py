@@ -9,37 +9,18 @@ from importlib.metadata import distribution
 from pathlib import Path
 from typing import final
 
-from manyfold.architecture.transport import (
-    NodeIdentity,
-    ReconnectPolicy,
-    TcpTransport,
-    TransportConfig,
-    TransportSecurity,
-)
-from manyfold.architecture.transport_delivery import (
-    DeliveryConfig,
-    DurableDelivery,
-)
+from manyfold.architecture.transport import (NodeIdentity, ReconnectPolicy,
+                                             TcpTransport, TransportConfig,
+                                             TransportSecurity)
 from manyfold.architecture.transport_rpc import RpcEndpoint
-from manyfold.cluster import CommittedCommand, ControlCommand, DevelopmentCluster
+from manyfold.cluster import (CommittedCommand, ControlCommand,
+                              DevelopmentCluster)
 
-from heart.world import (
-    COORDINATED_COMMAND_KINDS,
-    EXCLUDED_DURABLE_DATA_KINDS,
-    MODE_DELIVERY_CHANNEL,
-    ActiveMode,
-    WorldDevice,
-    WorldDeviceRead,
-    WorldDimensions,
-    WorldPosition,
-    WorldRpcClient,
-    WorldRpcServer,
-    WorldState,
-    apply_delivered_mode,
-    mode_delivery_message,
-    put_device_command,
-    select_mode_command,
-)
+from heart.world import (COORDINATED_COMMAND_KINDS,
+                         EXCLUDED_DURABLE_DATA_KINDS, ActiveMode, WorldDevice,
+                         WorldDeviceRead, WorldDimensions, WorldPosition,
+                         WorldRpcClient, WorldRpcServer, WorldState,
+                         put_device_command, select_mode_command)
 
 _ARTIFACT_SCHEMA_VERSION = 1
 
@@ -83,12 +64,6 @@ def run_proof(root: Path) -> dict[str, object]:
             projections[recovered_leader],
             device.id,
         )
-        durable_result = _prove_durable_mode_restart(
-            root / "delivery",
-            device_command,
-            mode_command,
-        )
-
         return {
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
             "manyfold_installation": _manyfold_installation(),
@@ -124,10 +99,8 @@ def run_proof(root: Path) -> dict[str, object]:
                 if rpc_device_read.device is not None
                 else [],
             },
-            "durable_delivery": durable_result,
             "boundary": {
                 "raft_command_kinds": sorted(COORDINATED_COMMAND_KINDS),
-                "durable_channel": MODE_DELIVERY_CHANNEL,
                 "excluded_hot_path_data": sorted(EXCLUDED_DURABLE_DATA_KINDS),
             },
         }
@@ -203,77 +176,6 @@ def _read_device_over_rpc(
         proof.close()
 
 
-def _prove_durable_mode_restart(
-    root: Path,
-    device_command: ControlCommand,
-    mode_command: ControlCommand,
-) -> dict[str, object]:
-    root.mkdir(parents=True, exist_ok=True)
-    state = WorldState()
-    state.apply(_as_committed(1, device_command))
-    committed_mode = _as_committed(2, mode_command)
-    sender_transport, receiver_transport = _transport_pair()
-    sender = DurableDelivery(
-        sender_transport,
-        _delivery_config(root / "sender.sqlite3"),
-    )
-    receiver = DurableDelivery(
-        receiver_transport,
-        _delivery_config(root / "receiver.sqlite3"),
-    )
-    sender.send(
-        mode_delivery_message(committed_mode),
-        message_id=committed_mode.command_id,
-    )
-    received_before_restart = receiver.receive(timeout=2.0)
-    receiver.close()
-    receiver_transport.close()
-
-    restarted_transport = TcpTransport.listen(
-        NodeIdentity("heart", "receiver", "receiver-2"),
-        receiver_transport.address,
-        config=_transport_config(),
-        expected_peer_node_id="sender",
-    )
-    restarted = DurableDelivery(
-        restarted_transport,
-        _delivery_config(root / "receiver.sqlite3"),
-    )
-    try:
-        if not restarted_transport.wait_until_connected(timeout=2.0):
-            raise TimeoutError("durable receiver did not reconnect")
-        applied_count = int(
-            apply_delivered_mode(
-                state,
-                restarted,
-                timeout_seconds=2.0,
-            )
-        )
-        if not sender.flush(timeout=2.0):
-            raise TimeoutError("durable sender did not observe the mode ACK")
-        try:
-            restarted.receive(timeout=0.1)
-        except TimeoutError:
-            duplicate_exposed = False
-        else:
-            duplicate_exposed = True
-        return {
-            "message_id": committed_mode.command_id,
-            "received_before_restart": received_before_restart.message_id,
-            "receiver_restarted": True,
-            "applied_count": applied_count,
-            "duplicate_exposed_after_ack": duplicate_exposed,
-            "sender_outbox_items": sender.health().outbox_items,
-            "receiver_acknowledgements": (restarted.health().acknowledgements),
-            "revision": state.revision,
-        }
-    finally:
-        restarted.close()
-        restarted_transport.close()
-        sender.close()
-        sender_transport.close()
-
-
 def _transport_pair(
     *,
     server_node_id: str = "receiver",
@@ -308,34 +210,6 @@ def _transport_config() -> TransportConfig:
         heartbeat_interval=0.05,
         peer_timeout=0.5,
         reconnect=ReconnectPolicy(0.02, 1.5, 0.1),
-    )
-
-
-def _delivery_config(path: Path) -> DeliveryConfig:
-    return DeliveryConfig(
-        path,
-        max_outbox_items=16,
-        max_inbox_items=16,
-        max_storage_bytes=1024 * 1024,
-        receive_queue_limit=4,
-        max_message_bytes=4096,
-        message_ttl_seconds=5.0,
-        dedupe_retention_seconds=5.0,
-        retry_initial_seconds=0.05,
-        retry_multiplier=1.5,
-        retry_max_seconds=0.1,
-    )
-
-
-def _as_committed(
-    sequence: int,
-    command: ControlCommand,
-) -> CommittedCommand:
-    return CommittedCommand(
-        sequence=sequence,
-        command_id=command.command_id,
-        kind=command.kind,
-        payload=command.payload,
     )
 
 

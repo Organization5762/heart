@@ -8,9 +8,12 @@ from manyfold.sensor_io import (ManagedGraphNode, SensorEvent, StopToken,
                                 sensor_event_schema)
 
 from heart.peripheral.configuration import PeripheralConfiguration
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.core.manager import (GRAPH_OWNED_PERIPHERAL_ATTR,
                                            PeripheralManager)
+from heart.runtime.domain_lifecycle import (HeartLifecycleKind,
+                                            input_lifecycle_topic,
+                                            peripheral_lifecycle_topic)
 
 
 def _sensor_event(event_type: str) -> SensorEvent:
@@ -40,13 +43,25 @@ class _LoaderStub:
 
 
 class _DetectedPeripheral(Peripheral[str]):
-    def __init__(self, peripheral_id: str | None = None) -> None:
+    def __init__(
+        self,
+        peripheral_id: str | None = None,
+        *,
+        is_input: bool = False,
+    ) -> None:
         self._peripheral_id = peripheral_id
+        self._is_input = is_input
         self.run_count = 0
 
     def peripheral_info(self):
-        info = super().peripheral_info()
-        return type(info)(id=self._peripheral_id, tags=info.tags)
+        return PeripheralInfo(
+            id=self._peripheral_id,
+            tags=(
+                (PeripheralTag("input_variant", "test"),)
+                if self._is_input
+                else ()
+            ),
+        )
 
     def run(self) -> None:
         self.run_count += 1
@@ -167,3 +182,42 @@ class TestPeripheralManagerGraph:
         manager.register(replacement)
 
         assert manager.peripherals == (replacement, other)
+
+    def test_register_replace_and_stop_publish_bounded_domain_transitions(
+        self,
+    ) -> None:
+        peripheral_events = []
+        input_events = []
+        peripheral_subscription = peripheral_lifecycle_topic().subscribe(
+            peripheral_events.append
+        )
+        input_subscription = input_lifecycle_topic().subscribe(input_events.append)
+        first = _DetectedPeripheral("gamepad:0", is_input=True)
+        replacement = _DetectedPeripheral("gamepad:0", is_input=True)
+        manager = PeripheralManager(
+            configuration_loader=cast(
+                Any,
+                _LoaderStub(PeripheralConfiguration(detectors=())),
+            )
+        )
+        try:
+            manager.register(first)
+            manager.register(replacement)
+            manager.stop()
+            manager.stop()
+        finally:
+            input_subscription.dispose()
+            peripheral_subscription.dispose()
+
+        assert [event.kind for event in peripheral_events] == [
+            HeartLifecycleKind.PERIPHERAL_ATTACHED.value,
+            HeartLifecycleKind.PERIPHERAL_DETACHED.value,
+            HeartLifecycleKind.PERIPHERAL_ATTACHED.value,
+            HeartLifecycleKind.PERIPHERAL_DETACHED.value,
+        ]
+        assert [event.kind for event in input_events] == [
+            HeartLifecycleKind.INPUT_SOURCE_ACTIVE.value,
+            HeartLifecycleKind.INPUT_SOURCE_INACTIVE.value,
+            HeartLifecycleKind.INPUT_SOURCE_ACTIVE.value,
+            HeartLifecycleKind.INPUT_SOURCE_INACTIVE.value,
+        ]

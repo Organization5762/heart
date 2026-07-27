@@ -8,6 +8,7 @@ from unittest.mock import Mock
 from heart.navigation import MultiScene
 from heart.peripheral.core.input import (GamepadDpadValue, GamepadSnapshot,
                                          GamepadSnapshotEvent)
+from heart.peripheral.core.input.profiles.navigation import ActivateIntent
 from heart.renderers import StatefulBaseRenderer
 
 
@@ -142,7 +143,9 @@ class TestMultiSceneLifecycle:
         )
 
         assert manager.navigation_profile.activate_callback is not None
-        manager.navigation_profile.activate_callback(object())
+        manager.navigation_profile.activate_callback(
+            ActivateIntent(source="test", request_id="scene-switch")
+        )
 
         assert first.reset_calls == 1
         assert multi_scene.get_renderers() == [second]

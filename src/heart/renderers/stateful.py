@@ -34,6 +34,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         if state is not None:
             self.set_state(state)
             self.initialized = True
+            self._renderer_started()
 
     def state_stream(
         self,
@@ -57,6 +58,7 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
                 self.set_state(state)
                 if not self.initialized:
                     self.initialized = True
+                    self._renderer_started()
 
             self._subscription = states.subscribe(on_next=_on_next)
             return
@@ -72,11 +74,12 @@ class StatefulBaseRenderer(AtomicBaseRenderer[StateT], Generic[StateT]):
         )
         self.set_state(state)
         self.initialized = True
+        self._renderer_started()
 
     def reset(self) -> None:
         if self._subscription is not None:
             self._subscription.dispose()
             self._subscription = None
+        super().reset()
         if self.builder is not None:
             self.initialized = False
-        super().reset()

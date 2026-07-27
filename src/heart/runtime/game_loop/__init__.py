@@ -18,6 +18,10 @@ from heart.runtime.active_game_loop import set_active_game_loop
 from heart.runtime.container import (build_runtime_container,
                                      configure_runtime_container)
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.domain_lifecycle import (HeartLifecycleEmitter,
+                                            HeartLifecycleKind,
+                                            HeartLifecycleReason,
+                                            pipeline_lifecycle_topic)
 from heart.runtime.game_loop.components import GameLoopComponents
 from heart.utilities.env import Configuration
 from heart.utilities.logging import get_logger
@@ -121,6 +125,10 @@ class GameLoop:
         self._emoji_overlay_renderer: FloatingEmojiOverlayRenderer | None = None
         self._frame_index = 0
         self._last_perf_log_monotonic = 0.0
+        self._frame_pipeline_under_pressure = False
+        self._pipeline_lifecycle = HeartLifecycleEmitter(
+            pipeline_lifecycle_topic()
+        )
 
     def _one_loop(
         self,
@@ -649,4 +657,35 @@ class GameLoop:
 
             self._frame_index += 1
             timings["total_ms"] = _elapsed_ms_since(frame_started_at)
+            self._observe_frame_pipeline_pressure(timings)
             self._maybe_log_perf_frame(renderers=renderers, timings=timings)
+
+    def _observe_frame_pipeline_pressure(
+        self,
+        timings: dict[str, float],
+    ) -> None:
+        frame_budget_ms = 1000.0 / self.max_fps
+        work_ms = max(
+            0.0,
+            timings.get("total_ms", 0.0) - timings.get("pacing_ms", 0.0),
+        )
+        is_under_pressure = work_ms > frame_budget_ms
+        if is_under_pressure == self._frame_pipeline_under_pressure:
+            return
+        self._frame_pipeline_under_pressure = is_under_pressure
+        self._pipeline_lifecycle.emit(
+            (
+                HeartLifecycleKind.FRAME_PIPELINE_PRESSURE
+                if is_under_pressure
+                else HeartLifecycleKind.FRAME_PIPELINE_RECOVERED
+            ),
+            "game-loop",
+            (
+                HeartLifecycleReason.CAPACITY
+                if is_under_pressure
+                else HeartLifecycleReason.RECOVERED
+            ),
+            detail=(
+                f"work_ms={work_ms:.3f};budget_ms={frame_budget_ms:.3f}"
+            ),
+        )

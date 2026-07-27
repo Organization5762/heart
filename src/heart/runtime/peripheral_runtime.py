@@ -267,6 +267,7 @@ class PeripheralRuntime:
 
     def poll(self) -> None:
         self._manyfold_node.poll()
+        self._peripheral_manager.input_io.external_sensors.poll()
         keyboard, gamepads = self._peripheral_manager.input_io.poll()
         self._poll_navigation(keyboard, gamepads)
         self._drain_control_messages()

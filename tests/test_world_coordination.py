@@ -36,11 +36,6 @@ def test_three_process_world_coordination_proof(tmp_path: Path) -> None:
     assert set(artifact["raft"]["node_revisions"].values()) == {2}
     assert artifact["world_rpc"]["revision"] == 2
     assert artifact["world_rpc"]["device_id"] == "totem3"
-    assert artifact["durable_delivery"]["receiver_restarted"]
-    assert artifact["durable_delivery"]["applied_count"] == 1
-    assert artifact["durable_delivery"]["receiver_acknowledgements"] == 1
-    assert not artifact["durable_delivery"]["duplicate_exposed_after_ack"]
-    assert artifact["durable_delivery"]["sender_outbox_items"] == 0
     assert artifact["boundary"]["excluded_hot_path_data"] == [
         "debug",
         "frame_tick",

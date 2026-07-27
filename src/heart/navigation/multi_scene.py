@@ -3,9 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from heart.device import Orientation
+from heart.peripheral.core.input.profiles.navigation import ActivateIntent
 from heart.peripheral.core.manager import PeripheralManager
 from heart.renderers import StatefulBaseRenderer
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.domain_lifecycle import (HeartLifecycleEmitter,
+                                            HeartLifecycleKind,
+                                            HeartLifecycleReason,
+                                            scene_lifecycle_topic)
 
 from .composed_renderer import ComposedRenderer
 from .native_scene_manager import (SceneManagerBackend,
@@ -36,6 +41,7 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             resolve_renderer_spec(scene, renderer_resolver) for scene in scenes
         ]
         self._navigation_subscription = None
+        self._scene_lifecycle = HeartLifecycleEmitter(scene_lifecycle_topic())
         self._last_active_scene_index: int | None = None
         self._dpad_armed = True
         self._dpad_center_frames = DPAD_CENTER_FRAMES_TO_REARM
@@ -77,6 +83,19 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             self.device_display_mode = self.scenes[
                 active_scene_index
             ].device_display_mode
+            scene_id = self._scene_id(active_scene_index)
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_SELECTED,
+                scene_id,
+                HeartLifecycleReason.INITIALIZED,
+                correlation_id="scene:initial",
+            )
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_ACTIVATED,
+                scene_id,
+                HeartLifecycleReason.INITIALIZED,
+                correlation_id="scene:initial",
+            )
 
         return state
 
@@ -96,6 +115,12 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
             window.screen.blit(result, (0, 0))
 
     def reset(self) -> None:
+        if self._last_active_scene_index is not None:
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_DEACTIVATED,
+                self._scene_id(self._last_active_scene_index),
+                HeartLifecycleReason.RESET,
+            )
         if self._state is not None:
             self.state.offset_of_button_value = self.state.current_button_value
             self._scene_manager.reset_button_offset(self.state.current_button_value)
@@ -110,8 +135,11 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self.initialized = False
         super().reset()
 
-    def _process_activate(self, _event: object) -> None:
-        self._advance_scene(1)
+    def _process_activate(self, event: ActivateIntent) -> None:
+        self._advance_scene(
+            1,
+            correlation_id=event.request_id or None,
+        )
 
     def _process_dpad_scene_selection(self) -> None:
         if not self._enable_dpad_scene_selection:
@@ -144,16 +172,50 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         self._dpad_center_frames = 0
         self._advance_scene(direction)
 
-    def _advance_scene(self, step: int) -> None:
+    def _advance_scene(
+        self,
+        step: int,
+        *,
+        correlation_id: str | None = None,
+    ) -> None:
         previous_index = self._active_scene_index()
         self.state.current_button_value += step
         next_index = self._active_scene_index()
         if previous_index != next_index:
+            reason = (
+                HeartLifecycleReason.NAVIGATION
+                if correlation_id is not None
+                else HeartLifecycleReason.DIRECT_SELECTION
+            )
+            next_scene_id = self._scene_id(next_index)
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_SELECTED,
+                next_scene_id,
+                reason,
+                correlation_id=correlation_id,
+            )
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_DEACTIVATED,
+                self._scene_id(previous_index),
+                reason,
+                correlation_id=correlation_id,
+                related_id=next_scene_id,
+            )
             self.scenes[previous_index].reset()
             self._last_active_scene_index = next_index
+            self._scene_lifecycle.emit(
+                HeartLifecycleKind.SCENE_ACTIVATED,
+                next_scene_id,
+                reason,
+                correlation_id=correlation_id,
+                related_id=self._scene_id(previous_index),
+            )
 
     def _active_scene_index(self) -> int:
         return self._scene_manager.active_scene_index(self.state.current_button_value)
+
+    def _scene_id(self, index: int) -> str:
+        return f"{index}:{self.scenes[index].name}"
 
     def _reset_previous_active_scene(self, next_index: int) -> None:
         previous_index = self._last_active_scene_index

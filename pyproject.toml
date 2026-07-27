@@ -36,7 +36,7 @@ dependencies = [
     "heart-device-manager",
     "heart-firmware-io",
     "lagom",
-    "manyfold @ git+https://github.com/Organization5762/manyfold.git@89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7",
+    "manyfold @ git+https://github.com/Organization5762/manyfold.git@ac6086409736148fc60078d906ceceb498a0ca82",
     "moderngl",
     "numba",
     "numpy",
@@ -86,6 +86,7 @@ heart = ["*.png", "**/*.png"]
 [project.scripts]
 totem = "heart.loop:main"
 totem_debug = "heart.x.cli:main"
+heart-manyfold-qualification-fixture = "heart.runtime.manyfold_qualification:main"
 
 [tool.docformatter]
 recursive = true

@@ -1,4 +1,4 @@
-"""Peripheral exposing the current LED matrix frame"""
+"""Peripheral exposing the current LED matrix frame."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any, Mapping
 from manyfold import (Graph, Layer, ManagedGraphNode, ManagedGraphNodeHandle,
                       OwnerName, Plane, Schema, StreamFamily, StreamName,
                       Subscribable, TypedRoute, Variant, route)
-from manyfold.architecture import NewValues
+from manyfold.architecture import NewValues, PubSub, PubSubTopic
 from manyfold.sensor_io import (BackoffPolicy, RetryPolicy, SensorEvent,
                                 StopToken, sensor_event_schema)
 from PIL import Image
@@ -23,6 +23,17 @@ from heart.utilities.logging_control import get_logging_controller
 _LOGGER = get_logger(__name__)
 DISPLAY_GRAPH_OWNER = OwnerName("heart.display")
 DISPLAY_GRAPH_FAMILY = StreamFamily("peripheral")
+HEART_RENDERED_FRAME_TOPIC = "heart.rendered_frame"
+HEART_RUNTIME_PUBSUB = "heart"
+
+
+def rendered_frame_topic() -> PubSub:
+    """Return the raw, schema-encoded rendered-frame mesh topic."""
+    return PubSubTopic(
+        HEART_RENDERED_FRAME_TOPIC,
+        schema=bytes,
+        pubsub=HEART_RUNTIME_PUBSUB,
+    )
 
 
 def display_frame_event_route() -> TypedRoute[SensorEvent]:
@@ -87,6 +98,8 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         self._frame_stream = NewValues[DisplayFrame](
             name="heart.peripheral.led_matrix.frame"
         )
+        self._mesh_frame_schema = sensor_event_schema("HeartDisplayFrameEvent")
+        self._mesh_frame_topic = rendered_frame_topic()
         self._frame_publishers: list[tuple[Graph, TypedRoute[SensorEvent]]] = []
         self._log_controller = get_logging_controller()
         self._frame_count = 0
@@ -170,7 +183,7 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
         metadata: Mapping[str, Any] | None = None,
         timestamp: datetime | None = None,
     ) -> DisplayFrame:
-        """Record ``image`` as the latest frame"""
+        """Record ``image`` as the latest frame."""
 
         if image.size != (self._width, self._height):
             raise ValueError("Image dimensions do not match configured display size")
@@ -186,14 +199,19 @@ class LEDMatrixDisplay(Peripheral[DisplayFrame]):
 
         self._frame_count += 1
         self._frame_stream.emit(frame)
+        frame_event = frame.to_input(timestamp=timestamp).to_sensor_event(
+            identity=self.peripheral_info().to_sensor_identity(),
+            sequence_number=frame.frame_id,
+        )
+        source_id = frame_event.identity.id
+        if source_id is None:
+            raise RuntimeError("Rendered frame requires a stable display identity")
+        self._mesh_frame_topic.publish(
+            self._mesh_frame_schema.encode(frame_event),
+            key=source_id,
+        )
         for graph, output_route in tuple(self._frame_publishers):
-            graph.publish(
-                output_route,
-                frame.to_input(timestamp=timestamp).to_sensor_event(
-                    identity=self.peripheral_info().to_sensor_identity(),
-                    sequence_number=frame.frame_id,
-                ),
-            )
+            graph.publish(output_route, frame_event)
         self._log_controller.log(
             key="peripheral.display.frame",
             logger=_LOGGER,

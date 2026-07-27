@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-
 import pytest
-from manyfold.architecture.transport import (FrameKind, NodeIdentity,
-                                             ReconnectPolicy, TcpTransport,
-                                             TransportConfig, TransportMessage,
+from manyfold.architecture.transport import (NodeIdentity, ReconnectPolicy,
+                                             TcpTransport, TransportConfig,
                                              TransportSecurity)
-from manyfold.architecture.transport_delivery import (DeliveryConfig,
-                                                      DurableDelivery)
 from manyfold.architecture.transport_rpc import RpcEndpoint
 from manyfold.cluster import CommittedCommand, ControlCommand
 
@@ -17,9 +11,7 @@ from heart.world import (COORDINATED_COMMAND_KINDS,
                          EXCLUDED_DURABLE_DATA_KINDS, ActiveMode,
                          StaleWorldResponseError, WorldDevice, WorldDimensions,
                          WorldPosition, WorldRpcClient, WorldRpcServer,
-                         WorldState, apply_delivered_mode,
-                         mode_delivery_message, put_device_command,
-                         select_mode_command)
+                         WorldState, put_device_command, select_mode_command)
 
 
 class TestWorldState:
@@ -122,94 +114,6 @@ class TestWorldRpc:
                 client.get_active_mode(timeout_seconds=1.0)
 
 
-class TestWorldDurableDelivery:
-    def test_restart_before_ack_delivers_and_applies_mode_once(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            state = WorldState()
-            state.apply(_committed(1, put_device_command("device-1", _device())))
-            committed_mode = _committed(
-                2,
-                select_mode_command("mode-1", _active_mode()),
-            )
-            sender_transport, receiver_transport = _transport_pair()
-            sender = DurableDelivery(
-                sender_transport,
-                _delivery_config(root / "sender.sqlite3"),
-            )
-            receiver = DurableDelivery(
-                receiver_transport,
-                _delivery_config(root / "receiver.sqlite3"),
-            )
-            sender.send(
-                mode_delivery_message(committed_mode),
-                message_id=committed_mode.command_id,
-            )
-
-            first = receiver.receive(timeout=2.0)
-            assert first.message_id == "mode-1"
-            receiver.close()
-            receiver_transport.close()
-
-            restarted_transport = TcpTransport.listen(
-                NodeIdentity("heart", "receiver", "receiver-2"),
-                receiver_transport.address,
-                config=_transport_config(),
-                expected_peer_node_id="sender",
-            )
-            restarted = DurableDelivery(
-                restarted_transport,
-                _delivery_config(root / "receiver.sqlite3"),
-            )
-            try:
-                assert restarted_transport.wait_until_connected(timeout=2.0)
-                assert apply_delivered_mode(
-                    state,
-                    restarted,
-                    timeout_seconds=2.0,
-                )
-                assert sender.flush(timeout=2.0)
-                with pytest.raises(TimeoutError):
-                    restarted.receive(timeout=0.1)
-                assert state.active_mode().active_mode == _active_mode()
-                assert state.revision == 2
-            finally:
-                restarted.close()
-                restarted_transport.close()
-                sender.close()
-                sender_transport.close()
-
-    def test_rejects_non_mode_delivery_without_acknowledging_it(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            sender_transport, receiver_transport = _transport_pair()
-            sender = DurableDelivery(
-                sender_transport,
-                _delivery_config(root / "sender.sqlite3"),
-            )
-            receiver = DurableDelivery(
-                receiver_transport,
-                _delivery_config(root / "receiver.sqlite3"),
-            )
-            sender.send(
-                TransportMessage(FrameKind.PUBSUB, "frame_tick", b"{}"),
-                message_id="frame-1",
-            )
-            try:
-                with pytest.raises(ValueError, match="expected channel"):
-                    apply_delivered_mode(
-                        WorldState(),
-                        receiver,
-                        timeout_seconds=2.0,
-                    )
-                assert sender.health().outbox_items == 1
-            finally:
-                receiver.close()
-                sender.close()
-                receiver_transport.close()
-                sender_transport.close()
-
-
 class _RpcPair:
     def __init__(self, state: WorldState, minimum_revision: int) -> None:
         server_transport, client_transport = _transport_pair(
@@ -278,22 +182,6 @@ def _transport_config() -> TransportConfig:
         heartbeat_interval=0.05,
         peer_timeout=0.5,
         reconnect=ReconnectPolicy(0.02, 1.5, 0.1),
-    )
-
-
-def _delivery_config(path: Path) -> DeliveryConfig:
-    return DeliveryConfig(
-        path,
-        max_outbox_items=16,
-        max_inbox_items=16,
-        max_storage_bytes=1024 * 1024,
-        receive_queue_limit=4,
-        max_message_bytes=4096,
-        message_ttl_seconds=5.0,
-        dedupe_retention_seconds=5.0,
-        retry_initial_seconds=0.05,
-        retry_multiplier=1.5,
-        retry_max_seconds=0.1,
     )
 
 

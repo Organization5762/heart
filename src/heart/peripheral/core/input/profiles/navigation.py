@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any, cast
+from uuid import uuid4
 
 from manyfold import CompositeSubscription, Subscribable
 from manyfold.architecture import PubSubTopic
@@ -17,6 +18,7 @@ HEART_INPUT_PUBSUB = "heart"
 @dataclass(frozen=True, slots=True)
 class _NavigationIntent:
     source: str
+    request_id: str = field(default="", kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,17 +44,20 @@ class NavigationEvent:
     kind: str
     source: str
     step: int
-    event_id: str = ""
-    origin_node_id: str = ""
+    request_id: str
+
+
+def navigation_topic() -> Any:
+    return PubSubTopic(
+        NAVIGATION_TOPIC,
+        schema=NavigationEvent,
+        pubsub=HEART_INPUT_PUBSUB,
+    )
 
 
 class NavigationProfile:
     def __init__(self, intents: Subscribable[NavigationIntent]) -> None:
-        self._topic = PubSubTopic(
-            NAVIGATION_TOPIC,
-            schema=NavigationEvent,
-            pubsub=HEART_INPUT_PUBSUB,
-        )
+        self._topic = navigation_topic()
         self._source_subscription = intents.subscribe(self._publish)
 
     def subscribe_events(
@@ -123,25 +128,35 @@ class NavigationProfile:
 
     def _publish(self, intent: NavigationIntent) -> None:
         if isinstance(intent, BrowseIntent):
-            event = NavigationEvent(kind="browse", source=intent.source, step=intent.step)
+            kind = "browse"
+            step = intent.step
         elif isinstance(intent, ActivateIntent):
-            event = NavigationEvent(kind="activate", source=intent.source, step=0)
+            kind = "activate"
+            step = 0
         else:
-            event = NavigationEvent(
-                kind="alternate_activate",
-                source=intent.source,
-                step=0,
-            )
-        self._topic.publish(event)
+            kind = "alternate_activate"
+            step = 0
+        command = NavigationEvent(
+            kind=kind,
+            source=intent.source,
+            step=step,
+            request_id=intent.request_id or uuid4().hex,
+        )
+        self._topic.publish(command, key=command.request_id)
 
 
 def _intent_from_row(row: Any) -> NavigationIntent:
     kind = str(row.kind)
     source = str(row.source)
+    request_id = str(row.request_id)
     if kind == "browse":
-        return BrowseIntent(source=source, step=int(row.step))
+        return BrowseIntent(
+            source=source,
+            step=int(row.step),
+            request_id=request_id,
+        )
     if kind == "activate":
-        return ActivateIntent(source=source)
+        return ActivateIntent(source=source, request_id=request_id)
     if kind == "alternate_activate":
-        return AlternateActivateIntent(source=source)
+        return AlternateActivateIntent(source=source, request_id=request_id)
     raise ValueError(f"Unknown navigation event kind {kind!r}")

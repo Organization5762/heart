@@ -26,20 +26,17 @@
 - Run expensive frame-tick-driven renderer state work through priority-aware background stream scheduling instead of inline on the main loop.
 
 ## Validation Log
-- 2026-07-25: Heart world coordination now projects only device records and
-  active mode/configuration ownership from ManyFold's persistent Raft log,
-  serves revisioned reads over typed coordinator RPC, and delivers committed
-  mode commands through restart-safe durable delivery keyed by the Raft
-  command ID. Added a machine-readable three-process proof that kills the
-  leader, verifies re-election and log recovery, retries a command without
-  duplicate application, restarts a delivery receiver before ACK, and confirms
-  navigation, sensors, microphone, frames, and debug data remain excluded.
-  Rebased onto the signer-backed mesh merge
-  `0fe72ba0f8e5e30563c2b028a8ceef596509dc2c` and pinned the ManyFold reconnect
-  fix `89c1c8b01cfee1785cbdc7c72cc3876b61b7b8a7`. Built and installed that exact
-  ManyFold wheel, ran the executable proof with wheel provenance in its
-  artifact, and ran full Ruff, focused Mypy, and the full Heart suite, which
-  passed 606 tests with 4 environment-dependent skips.
+- 2026-07-26: Heart now binds navigation, external sensors, frame ticks,
+  rendered frames, microphone levels, debug input, and application lifecycle
+  transitions directly to ManyFold's bounded durable/latest topic policies.
+  Raft remains the sole owner of coordinated world/device state; the duplicate
+  mode-delivery transport and manual ACK envelope were removed. Added the
+  shared exact-wheel JSONL consumer fixture with nine real role processes and
+  public lifecycle/state observations. Pinned ManyFold durable-topic commit
+  `ac6086409736148fc60078d906ceceb498a0ca82`, rebased onto Heart
+  `414973a2f2008ba87fb51f7b2b71469861b92b57`, and ran the shared consumer gate,
+  three-process Raft proof, Ruff, lock verification, focused lifecycle tests,
+  and the full simulated-backend suite: 609 passed with 4 hardware-only skips.
 - 2026-06-21: Heart-shaped Manyfold nowait publishing now covers
   process-local `Schema.any` routes. `GraphRouteStream.emit` still calls
   `publish_nowait`, and the focused test now patches `Graph.publish` to fail so

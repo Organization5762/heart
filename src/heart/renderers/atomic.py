@@ -8,6 +8,10 @@ from heart import DeviceDisplayMode
 from heart.device import Orientation
 from heart.peripheral.core.manager import PeripheralManager
 from heart.runtime.display_context import DisplayContext
+from heart.runtime.domain_lifecycle import (HeartLifecycleEmitter,
+                                            HeartLifecycleKind,
+                                            HeartLifecycleReason,
+                                            renderer_lifecycle_topic)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,6 +26,10 @@ class AtomicBaseRenderer(Generic[StateT]):
         self.initialized = False
         self._state: StateT | None = None
         self.device_display_mode = DeviceDisplayMode.MIRRORED
+        self._renderer_lifecycle = HeartLifecycleEmitter(
+            renderer_lifecycle_topic()
+        )
+        self._renderer_failed = False
 
     @property
     def state(self) -> StateT:
@@ -62,7 +70,25 @@ class AtomicBaseRenderer(Generic[StateT]):
             raise ValueError("Needs to be initialized")
 
         start_ns = time.perf_counter_ns()
-        self.real_process(window=window, orientation=orientation)
+        try:
+            self.real_process(window=window, orientation=orientation)
+        except Exception as error:
+            if not self._renderer_failed:
+                self._renderer_lifecycle.emit(
+                    HeartLifecycleKind.RENDERER_FAILED,
+                    self.name,
+                    HeartLifecycleReason.PROCESSING_FAILED,
+                    detail=type(error).__name__,
+                )
+                self._renderer_failed = True
+            raise
+        if self._renderer_failed:
+            self._renderer_lifecycle.emit(
+                HeartLifecycleKind.RENDERER_STARTED,
+                self.name,
+                HeartLifecycleReason.RECOVERED,
+            )
+            self._renderer_failed = False
         duration_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
         logger.debug(
             "renderer.frame",
@@ -73,4 +99,17 @@ class AtomicBaseRenderer(Generic[StateT]):
         )
 
     def reset(self):
-        pass
+        if self.initialized:
+            self._renderer_lifecycle.emit(
+                HeartLifecycleKind.RENDERER_STOPPED,
+                self.name,
+                HeartLifecycleReason.RESET,
+            )
+
+    def _renderer_started(self) -> None:
+        self._renderer_lifecycle.emit(
+            HeartLifecycleKind.RENDERER_STARTED,
+            self.name,
+            HeartLifecycleReason.INITIALIZED,
+        )
+        self._renderer_failed = False

@@ -14,12 +14,16 @@ from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
                       ManagedGraphNodeHandle, OwnerName, Plane, Schema,
                       StreamFamily, StreamName, Subscribable, TypedRoute,
                       Variant, route)
-from manyfold.architecture import NewValues
+from manyfold.architecture import NewValues, PubSub, PubSubTopic
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
 
 from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
+from heart.runtime.domain_lifecycle import (HeartLifecycleEmitter,
+                                            HeartLifecycleKind,
+                                            HeartLifecycleReason,
+                                            pipeline_lifecycle_topic)
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
 
@@ -37,6 +41,17 @@ DEFAULT_CHANNELS = 1
 DEFAULT_RETRY_DELAY_SECONDS = 1.0
 MICROPHONE_GRAPH_OWNER = OwnerName("heart.microphone")
 MICROPHONE_GRAPH_FAMILY = StreamFamily("peripheral")
+HEART_MICROPHONE_SAMPLE_TOPIC = "heart.microphone.level"
+HEART_RUNTIME_PUBSUB = "heart"
+
+
+def microphone_sample_topic() -> PubSub:
+    """Return the raw, schema-encoded microphone sample mesh topic."""
+    return PubSubTopic(
+        HEART_MICROPHONE_SAMPLE_TOPIC,
+        schema=bytes,
+        pubsub=HEART_RUNTIME_PUBSUB,
+    )
 
 
 def microphone_level_event_route() -> TypedRoute[SensorEvent]:
@@ -91,7 +106,7 @@ def microphone_error_route() -> TypedRoute[BaseException]:
 
 
 class Microphone(Peripheral[MicrophoneLevel]):
-    """Capture audio input and emit loudness metrics"""
+    """Capture audio input and emit loudness metrics."""
 
     EVENT_LEVEL = "peripheral.microphone.level"
 
@@ -114,6 +129,12 @@ class Microphone(Peripheral[MicrophoneLevel]):
         self._level_stream = NewValues[MicrophoneLevel](
             name="heart.peripheral.microphone.level"
         )
+        self._mesh_level_schema = sensor_event_schema("HeartMicrophoneLevelEvent")
+        self._mesh_level_topic = microphone_sample_topic()
+        self._pipeline_lifecycle = HeartLifecycleEmitter(
+            pipeline_lifecycle_topic()
+        )
+        self._pipeline_under_pressure = False
 
     # ------------------------------------------------------------------
     # Detection lifecycle
@@ -267,7 +288,8 @@ class Microphone(Peripheral[MicrophoneLevel]):
         backoff: BackoffPolicy | None = None,
         start_immediately: bool = True,
     ) -> ManagedGraphNodeHandle:
-        """Install this microphone as a self-running Manyfold graph level source."""
+        """Install this microphone as a self-running Manyfold graph level
+        source."""
 
         resolved_output_route = output_route or microphone_level_event_route()
         blocksize = max(1, int(self.samplerate * self.block_duration))
@@ -347,6 +369,21 @@ class Microphone(Peripheral[MicrophoneLevel]):
     ) -> MicrophoneLevel | None:
         if status:  # pragma: no cover - requires real hardware conditions
             logger.warning("Microphone stream status: %s", status)
+            if not self._pipeline_under_pressure:
+                self._pipeline_lifecycle.emit(
+                    HeartLifecycleKind.AUDIO_PIPELINE_PRESSURE,
+                    "microphone:default",
+                    HeartLifecycleReason.CAPACITY,
+                    detail=str(status),
+                )
+                self._pipeline_under_pressure = True
+        elif self._pipeline_under_pressure:
+            self._pipeline_lifecycle.emit(
+                HeartLifecycleKind.AUDIO_PIPELINE_RECOVERED,
+                "microphone:default",
+                HeartLifecycleReason.RECOVERED,
+            )
+            self._pipeline_under_pressure = False
         try:
             audio = np.asarray(indata)
         except Exception:
@@ -374,6 +411,14 @@ class Microphone(Peripheral[MicrophoneLevel]):
         payload = level.to_input()
         self._latest_level = cast(dict[str, Any], payload.data)
         self._level_stream.emit(level)
+        event = self._level_to_sensor_event(level)
+        source_id = event.identity.id
+        if source_id is None:
+            raise RuntimeError("Microphone sample requires a stable device identity")
+        self._mesh_level_topic.publish(
+            self._mesh_level_schema.encode(event),
+            key=source_id,
+        )
         return level
 
     def _level_to_sensor_event(self, level: MicrophoneLevel) -> SensorEvent:

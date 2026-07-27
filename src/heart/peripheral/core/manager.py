@@ -9,6 +9,11 @@ from heart.peripheral.core.input import InputIO
 from heart.peripheral.core.streams import GraphRouteStream, PeripheralStreams
 from heart.peripheral.registry import PeripheralConfigurationRegistry
 from heart.peripheral.switch import BluetoothSwitch
+from heart.runtime.domain_lifecycle import (HeartLifecycleEmitter,
+                                            HeartLifecycleKind,
+                                            HeartLifecycleReason,
+                                            input_lifecycle_topic,
+                                            peripheral_lifecycle_topic)
 from heart.utilities.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,6 +31,11 @@ class PeripheralManager:
         configuration_loader: PeripheralConfigurationLoader | None = None,
     ) -> None:
         self._peripherals: list[Peripheral[Any]] = []
+        self._attached_peripheral_ids: set[str] = set()
+        self._peripheral_lifecycle = HeartLifecycleEmitter(
+            peripheral_lifecycle_topic()
+        )
+        self._input_lifecycle = HeartLifecycleEmitter(input_lifecycle_topic())
         self._graph = Graph()
         self._graph_node_handles: list[Any] = []
         self._started = False
@@ -124,6 +134,11 @@ class PeripheralManager:
             if dispose is not None:
                 dispose(timeout=1.0)
         self._graph_node_handles.clear()
+        for peripheral in self._peripherals:
+            self._emit_peripheral_detached(
+                peripheral,
+                HeartLifecycleReason.SHUTDOWN,
+            )
         self._started = False
 
     def _register_peripheral(self, peripheral: Peripheral[Any]) -> None:
@@ -137,9 +152,59 @@ class PeripheralManager:
                     "Replacing already-registered peripheral '%s'",
                     peripheral_id,
                 )
+                self._emit_peripheral_detached(
+                    existing,
+                    HeartLifecycleReason.REPLACED,
+                )
                 self._peripherals[index] = peripheral
+                self._emit_peripheral_attached(peripheral)
                 return
         self._peripherals.append(peripheral)
+        self._emit_peripheral_attached(peripheral)
+
+    def _emit_peripheral_attached(self, peripheral: Peripheral[Any]) -> None:
+        info = peripheral.peripheral_info()
+        if info.id is None:
+            return
+        if info.id in self._attached_peripheral_ids:
+            return
+        self._attached_peripheral_ids.add(info.id)
+        self._peripheral_lifecycle.emit(
+            HeartLifecycleKind.PERIPHERAL_ATTACHED,
+            info.id,
+            HeartLifecycleReason.DETECTED,
+            detail=type(peripheral).__name__,
+        )
+        if any(tag.name == "input_variant" for tag in info.tags):
+            self._input_lifecycle.emit(
+                HeartLifecycleKind.INPUT_SOURCE_ACTIVE,
+                info.id,
+                HeartLifecycleReason.DETECTED,
+                related_id=type(peripheral).__name__,
+            )
+
+    def _emit_peripheral_detached(
+        self,
+        peripheral: Peripheral[Any],
+        reason: HeartLifecycleReason,
+    ) -> None:
+        info = peripheral.peripheral_info()
+        if info.id is None or info.id not in self._attached_peripheral_ids:
+            return
+        self._attached_peripheral_ids.remove(info.id)
+        if any(tag.name == "input_variant" for tag in info.tags):
+            self._input_lifecycle.emit(
+                HeartLifecycleKind.INPUT_SOURCE_INACTIVE,
+                info.id,
+                reason,
+                related_id=type(peripheral).__name__,
+            )
+        self._peripheral_lifecycle.emit(
+            HeartLifecycleKind.PERIPHERAL_DETACHED,
+            info.id,
+            reason,
+            detail=type(peripheral).__name__,
+        )
 
     def bluetooth_switch(self) -> BluetoothSwitch | None:
         for peripheral in self._peripherals:
