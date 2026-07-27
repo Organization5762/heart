@@ -1,0 +1,157 @@
+{
+  "name": "water cube sensor and controller inputs",
+  "kind": "scene_controller",
+  "initial": {
+    "config": {
+      "renderer": "water_cube",
+      "device": {
+        "type": "fixed",
+        "width": 2,
+        "height": 2,
+        "orientation": {
+          "type": "cube_sides"
+        }
+      },
+      "gamepad": {
+        "name": "Nintendo Switch Pro Controller"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "sensor",
+      "config": {
+        "acceleration": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 1.0
+        }
+      }
+    },
+    {
+      "type": "gamepad",
+      "config": {
+        "axes": {},
+        "buttons": {}
+      }
+    },
+    {
+      "type": "tick",
+      "config": {
+        "delta_ms": 100.0,
+        "count": 1
+      }
+    },
+    {
+      "type": "sensor",
+      "config": {
+        "acceleration": {
+          "x": 0.5,
+          "y": -0.25,
+          "z": 1.0
+        }
+      }
+    },
+    {
+      "type": "gamepad",
+      "config": {
+        "axes": {
+          "trigger_right": 1.0
+        },
+        "buttons": {
+          "zr": true
+        }
+      }
+    },
+    {
+      "type": "tick",
+      "config": {
+        "delta_ms": 100.0,
+        "count": 1
+      }
+    },
+    {
+      "type": "sensor",
+      "config": {
+        "acceleration": {
+          "x": -0.5,
+          "y": 0.25,
+          "z": 1.0
+        }
+      }
+    },
+    {
+      "type": "gamepad",
+      "config": {
+        "axes": {
+          "trigger_left": 0.5
+        },
+        "buttons": {
+          "zl": true
+        }
+      }
+    },
+    {
+      "type": "tick",
+      "config": {
+        "delta_ms": 100.0,
+        "count": 1
+      }
+    }
+  ],
+  "expected": {
+    "state": {
+      "acceleration_average": 0.5750000000000001,
+      "face_px": 2,
+      "gvec": {
+        "x": -0.07500000000000007,
+        "y": 0.03750000000000003,
+        "z": 1.0
+      },
+      "heights": {
+        "dtype": "float64",
+        "shape": [2, 2],
+        "values": [
+          [1.0101985876623376, 1.0305957629870128],
+          [0.969404237012987, 0.9898014123376623]
+        ]
+      },
+      "velocities": {
+        "dtype": "float64",
+        "shape": [2, 2],
+        "values": [
+          [0.0028184677822178017, 0.008455403346653375],
+          [-0.008455403346653354, -0.002818467782217808]
+        ]
+      },
+      "water_hue_degrees": 218.0
+    },
+    "screen": {
+      "shape": [2, 8, 3],
+      "pixels": [
+        [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0]
+        ],
+        [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 93, 255],
+          [0, 93, 255],
+          [0, 93, 255],
+          [0, 93, 255],
+          [0, 0, 0]
+        ]
+      ],
+      "channel_tolerance": 1,
+      "max_outlier_fraction": 0.0
+    }
+  }
+}

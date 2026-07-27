@@ -1,0 +1,126 @@
+{
+  "name": "gamepad right and south in one frame",
+  "kind": "game_modes",
+  "initial": {
+    "config": {
+      "device": {
+        "type": "fixed",
+        "width": 8,
+        "height": 4,
+        "orientation": {
+          "type": "rectangle",
+          "columns": 1,
+          "rows": 1
+        }
+      },
+      "modes": [
+        {
+          "name": "red",
+          "title_rgb": [0, 0, 0],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [10, 20, 30]
+            },
+            {
+              "type": "border",
+              "rgb": [200, 30, 30],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "name": "green",
+          "title_rgb": [0, 0, 0],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [40, 50, 60]
+            },
+            {
+              "type": "border",
+              "rgb": [40, 200, 80],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "name": "blue",
+          "title_rgb": [0, 0, 0],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [70, 80, 90]
+            },
+            {
+              "type": "border",
+              "rgb": [30, 120, 220],
+              "width": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "type": "gamepad",
+      "config": {
+        "joystick_id": 0,
+        "identifier": "golden-pad",
+        "dpad": [1, 0],
+        "held_buttons": ["south"]
+      }
+    }
+  ],
+  "expected": {
+    "state": {
+      "entries": [
+        {
+          "name": "red",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        },
+        {
+          "name": "green",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        },
+        {
+          "name": "blue",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        }
+      ],
+      "post_processors": [
+        "SaturationPostProcessor",
+        "HueShiftPostProcessor",
+        "EdgePostProcessor"
+      ],
+      "in_select_mode": false,
+      "last_long_button_value": 0,
+      "committed_position": 1,
+      "committed_index": 1,
+      "preview_offset": 0,
+      "preview_index": 1,
+      "current_index": 1,
+      "current_entry": "green",
+      "previous_index": 1,
+      "transition_renderer": null,
+      "transition_mode": "slide",
+      "static_mask_steps": 20,
+      "gaussian_sigma": 1.5
+    },
+    "screen": {
+      "shape": [4, 8, 3],
+      "pixels": [
+        [[40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80]],
+        [[40, 200, 80], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 200, 80]],
+        [[40, 200, 80], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 200, 80]],
+        [[40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80]]
+      ],
+      "channel_tolerance": 0,
+      "max_outlier_fraction": 0.0
+    }
+  }
+}

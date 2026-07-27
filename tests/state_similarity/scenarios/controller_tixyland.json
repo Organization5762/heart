@@ -1,0 +1,87 @@
+{
+  "name": "tixyland combined controller inputs",
+  "kind": "scene_controller",
+  "initial": {
+    "config": {
+      "renderer": "tixyland",
+      "pattern": "sin_time_x_half_minus_y_quarter",
+      "device": {
+        "type": "local_screen",
+        "width": 3,
+        "height": 2,
+        "orientation": {
+          "type": "rectangle",
+          "columns": 1,
+          "rows": 1
+        }
+      },
+      "gamepad": {
+        "name": "Nintendo Switch Pro Controller"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "gamepad",
+      "config": {
+        "axes": {
+          "trigger_right": 1.0
+        },
+        "buttons": {
+          "zr": true
+        }
+      }
+    },
+    {
+      "type": "tick",
+      "config": {
+        "delta_ms": 100.0,
+        "count": 1
+      }
+    },
+    {
+      "type": "gamepad",
+      "config": {
+        "axes": {
+          "trigger_left": 0.25,
+          "trigger_right": 0.5
+        },
+        "buttons": {
+          "zl": true
+        }
+      }
+    },
+    {
+      "type": "tick",
+      "config": {
+        "delta_ms": 200.0,
+        "count": 2
+      }
+    }
+  ],
+  "expected": {
+    "state": {
+      "hue_degrees": 182.0,
+      "seed": 0,
+      "speed_scale": 1.225,
+      "time_seconds": 0.5975
+    },
+    "screen": {
+      "shape": [2, 3, 3],
+      "pixels": [
+        [
+          [93, 141, 143],
+          [147, 224, 226],
+          [165, 251, 254]
+        ],
+        [
+          [56, 85, 86],
+          [124, 188, 191],
+          [161, 245, 248]
+        ]
+      ],
+      "channel_tolerance": 1,
+      "max_outlier_fraction": 0.0
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "name": "multi scene activate advances one scene",
+  "kind": "multi_scene",
+  "initial": {
+    "config": {
+      "device": {
+        "type": "fixed",
+        "width": 8,
+        "height": 4,
+        "orientation": {
+          "type": "rectangle",
+          "columns": 1,
+          "rows": 1
+        }
+      },
+      "enable_dpad_scene_selection": true,
+      "scenes": [
+        {
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [10, 20, 30]
+            },
+            {
+              "type": "border",
+              "rgb": [200, 30, 30],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [40, 50, 60]
+            },
+            {
+              "type": "border",
+              "rgb": [40, 200, 80],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [70, 80, 90]
+            },
+            {
+              "type": "border",
+              "rgb": [30, 120, 220],
+              "width": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": ["down"],
+        "timestamp_ms": 1.0
+      }
+    }
+  ],
+  "expected": {
+    "state": {
+      "scene_names": [
+        "ComposedRenderer:RenderColor+Border",
+        "ComposedRenderer:RenderColor+Border",
+        "ComposedRenderer:RenderColor+Border"
+      ],
+      "current_button_value": 1,
+      "offset_of_button_value": null,
+      "active_scene_index": 1,
+      "active_scene_name": "ComposedRenderer:RenderColor+Border",
+      "previous_scene_index": 1,
+      "dpad_scene_selection_enabled": true,
+      "dpad_armed": true,
+      "dpad_center_frames": 2
+    },
+    "screen": {
+      "shape": [4, 8, 3],
+      "pixels": [
+        [[40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80]],
+        [[40, 200, 80], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 200, 80]],
+        [[40, 200, 80], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 50, 60], [40, 200, 80]],
+        [[40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80], [40, 200, 80]]
+      ],
+      "channel_tolerance": 0,
+      "max_outlier_fraction": 0.0
+    }
+  }
+}

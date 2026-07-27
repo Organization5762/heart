@@ -86,6 +86,7 @@ heart = ["*.png", "**/*.png"]
 [project.scripts]
 totem = "heart.loop:main"
 totem_debug = "heart.x.cli:main"
+heart-state-review = "heart.testing.state_similarity_review_cli:main"
 
 [tool.docformatter]
 recursive = true

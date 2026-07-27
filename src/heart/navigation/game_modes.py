@@ -48,6 +48,33 @@ INITIALIZATION_TERMINAL_BAR_WIDTH = 24
 class ModeEntry:
     title_renderer: StatefulBaseRenderer
     renderer: StatefulBaseRenderer
+    name: str = ""
+
+
+@dataclass(frozen=True)
+class GameModeEntrySnapshot:
+    name: str
+    title_renderer: str
+    renderer: str
+
+
+@dataclass(frozen=True)
+class GameModeSnapshot:
+    entries: tuple[GameModeEntrySnapshot, ...]
+    post_processors: tuple[str, ...]
+    in_select_mode: bool
+    last_long_button_value: int
+    committed_position: int
+    committed_index: int | None
+    preview_offset: int
+    preview_index: int | None
+    current_index: int | None
+    current_entry: str | None
+    previous_index: int | None
+    transition_renderer: str | None
+    transition_mode: str
+    static_mask_steps: int
+    gaussian_sigma: float
 
 
 @dataclass(frozen=True)
@@ -184,11 +211,17 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self,
         title_renderer: StatefulBaseRenderer,
         renderer: StatefulBaseRenderer,
+        *,
+        name: str | None = None,
     ) -> None:
         if self._state is None:
             self.set_state(GameModeState())
         self.state.entries.append(
-            ModeEntry(title_renderer=title_renderer, renderer=renderer)
+            ModeEntry(
+                title_renderer=title_renderer,
+                renderer=renderer,
+                name=name or title_renderer.name,
+            )
         )
         if self.is_initialized() and self._initialization_context is not None:
             title_renderer.initialize(
@@ -230,7 +263,7 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             renderer_resolver=self._renderer_resolver,
         )
         title_renderer = self._build_title_renderer("Untitled")
-        self._register_mode(title_renderer, new_scene)
+        self._register_mode(title_renderer, new_scene, name="Untitled")
         return new_scene
 
     def add_mode(
@@ -240,6 +273,8 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         | type[StatefulBaseRenderer]
         | StatefulBaseRenderer
         | None = None,
+        *,
+        name: str | None = None,
     ):
         from .composed_renderer import ComposedRenderer
 
@@ -251,8 +286,59 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
             title = "Untitled"
 
         title_renderer = self._build_title_renderer(title)
-        self._register_mode(title_renderer, result)
+        mode_name = name or (
+            title if isinstance(title, str) else title_renderer.name
+        )
+        self._register_mode(title_renderer, result, name=mode_name)
         return result
+
+    def snapshot_state(self) -> GameModeSnapshot:
+        entries = tuple(
+            GameModeEntrySnapshot(
+                name=entry.name or entry.renderer.name,
+                title_renderer=entry.title_renderer.name,
+                renderer=entry.renderer.name,
+            )
+            for entry in self.state.entries
+        )
+        entry_count = len(entries)
+        committed_index = (
+            self.state._active_mode_index % entry_count if entry_count else None
+        )
+        preview_index = (
+            (self.state._active_mode_index + self.state.mode_offset) % entry_count
+            if entry_count
+            else None
+        )
+        current_index = (
+            preview_index if self.state.in_select_mode else committed_index
+        )
+        current_entry = (
+            entries[current_index].name if current_index is not None else None
+        )
+        previous_index = (
+            self.state.previous_mode_index % entry_count if entry_count else None
+        )
+        transition = self.state.sliding_transition
+        return GameModeSnapshot(
+            entries=entries,
+            post_processors=tuple(
+                renderer.name for renderer in self.state.post_processors
+            ),
+            in_select_mode=self.state.in_select_mode,
+            last_long_button_value=self.state.last_long_button_value,
+            committed_position=self.state._active_mode_index,
+            committed_index=committed_index,
+            preview_offset=self.state.mode_offset,
+            preview_index=preview_index,
+            current_index=current_index,
+            current_entry=current_entry,
+            previous_index=previous_index,
+            transition_renderer=transition.name if transition is not None else None,
+            transition_mode=self.state.transition_mode.value,
+            static_mask_steps=self.state.static_mask_steps,
+            gaussian_sigma=self.state.gaussian_sigma,
+        )
 
     def get_renderers(self) -> list[StatefulBaseRenderer]:
         active_renderer = self.state.active_renderer()
@@ -280,6 +366,9 @@ class GameModes(StatefulBaseRenderer[GameModeState]):
         self.state._active_mode_index += self.state.mode_offset
         self.state.mode_offset = 0
         self.state.in_select_mode = False
+        self.state.previous_mode_index = (
+            self.state._active_mode_index % len(self.state.entries)
+        )
         self._initialize_active_renderer_if_needed(self._active_mode_entry().renderer)
 
     def _handle_alternate_activate(self, _event: object) -> None:
