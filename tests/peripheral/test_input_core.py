@@ -6,8 +6,9 @@ import json
 from typing import Any, cast
 
 import pygame
+import pytest
 from manyfold import ConstantNode, Graph, Subscribable
-from manyfold.architecture import NewValues
+from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.peripheral.configuration import PeripheralConfiguration
 from heart.peripheral.core import Input, Peripheral, PeripheralInfo
@@ -24,7 +25,7 @@ from heart.peripheral.core.input import (AccelerometerDebugProfile,
                                          SetOrientationCommand,
                                          ToggleDebugCommand)
 from heart.peripheral.core.input.accelerometer import (
-    ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE)
+    ACCELERATION_ROUTE, DEBUG_ACCELERATION_ROUTE, _debug_acceleration_stream)
 from heart.peripheral.core.input.debug import InputDebugNode
 from heart.peripheral.core.input.peripheral_inputs import \
     PERIPHERAL_INPUT_DISPATCH_STREAM
@@ -1079,6 +1080,55 @@ class TestMandelbrotControlProfile:
 
 class TestAccelerometerDebugProfile:
     """Group accelerometer debug-profile tests so keyboard motion debugging stays deterministic across scenes."""
+
+    @pytest.mark.parametrize("external_first", [True, False])
+    def test_debug_acceleration_selection_is_callback_order_independent(
+        self,
+        external_first: bool,
+    ) -> None:
+        """Prefer active keyboard input and otherwise retain external input."""
+        external = NewValues[Acceleration | None]()
+        keyboard = NewValues[Acceleration | None]()
+        observed: list[Acceleration | None] = []
+        subscription = _debug_acceleration_stream(
+            cast(
+                Subscribable[Acceleration | None],
+                PubSubObservable.merge(external),
+            ),
+            cast(
+                Subscribable[Acceleration | None],
+                PubSubObservable.merge(keyboard),
+            ),
+        ).subscribe(observed.append)
+        external_initial = Acceleration(x=1.0, y=2.0, z=3.0)
+        external_latest = Acceleration(x=4.0, y=5.0, z=6.0)
+        keyboard_active = Acceleration(x=7.0, y=8.0, z=9.0)
+
+        try:
+            assert external.subscriber_count == 1
+            assert keyboard.subscriber_count == 1
+            if external_first:
+                external.emit(external_initial)
+                keyboard.emit(None)
+            else:
+                keyboard.emit(None)
+                external.emit(external_initial)
+            keyboard.emit(keyboard_active)
+            external.emit(external_latest)
+            keyboard.emit(None)
+            external.emit(None)
+
+            assert observed == [
+                None,
+                external_initial,
+                keyboard_active,
+                external_latest,
+                None,
+            ]
+        finally:
+            subscription.dispose()
+        assert external.subscriber_count == 0
+        assert keyboard.subscriber_count == 0
 
     def test_controller_node_publishes_physical_acceleration_to_graph(
         self,

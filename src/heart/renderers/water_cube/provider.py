@@ -1,10 +1,14 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import cast, final
+
 from manyfold import Subscribable
 
 from heart.device import Device
 from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
                                          GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.input.frame import FrameTick
-from heart.peripheral.core.input.streams import average_by_frame_window
+from heart.peripheral.core.input.streams import stream_from
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.core.providers import StateProvider
 from heart.peripheral.sensor import Acceleration
@@ -54,27 +58,57 @@ class WaterCubeStateProvider(StateProvider[WaterCubeState]):
         acceleration: Subscribable[Acceleration | None],
         frame_ticks: Subscribable[FrameTick],
     ) -> Subscribable[Acceleration]:
-        average_x = average_by_frame_window(
-            acceleration,
-            frame_ticks,
-            interval_ms=self._min_update_interval_ms,
-            selector=lambda value: value.x,
+        def accumulate(
+            previous: _AccelerationWindow,
+            latest: tuple[FrameTick, Acceleration | None],
+        ) -> _AccelerationWindow:
+            frame_tick, value = latest
+            elapsed_ms = previous.elapsed_ms + max(float(frame_tick.delta_ms), 0.0)
+            total_x = previous.total_x
+            total_y = previous.total_y
+            total_z = previous.total_z
+            samples = previous.samples
+            if value is not None:
+                total_x += value.x
+                total_y += value.y
+                total_z += value.z
+                samples += 1
+            if elapsed_ms < self._min_update_interval_ms:
+                return _AccelerationWindow(
+                    elapsed_ms=elapsed_ms,
+                    total_x=total_x,
+                    total_y=total_y,
+                    total_z=total_z,
+                    samples=samples,
+                )
+            average = (
+                None
+                if samples == 0
+                else Acceleration(
+                    x=total_x / samples,
+                    y=total_y / samples,
+                    z=total_z / samples,
+                )
+            )
+            return _AccelerationWindow(value=average)
+
+        def completed(window: _AccelerationWindow) -> bool:
+            return window.value is not None
+
+        def acceleration_value(window: _AccelerationWindow) -> Acceleration:
+            return cast(Acceleration, window.value)
+
+        averaged = (
+            stream_from(frame_ticks)
+            .with_latest_from(acceleration)
+            .scan(
+                cast(Callable[[object, object], object], accumulate),
+                seed=_AccelerationWindow(),
+            )
+            .filter(cast(Callable[[object], bool], completed))
+            .map(cast(Callable[[object], object], acceleration_value))
         )
-        average_y = average_by_frame_window(
-            acceleration,
-            frame_ticks,
-            interval_ms=self._min_update_interval_ms,
-            selector=lambda value: value.y,
-        )
-        average_z = average_by_frame_window(
-            acceleration,
-            frame_ticks,
-            interval_ms=self._min_update_interval_ms,
-            selector=lambda value: value.z,
-        )
-        return average_x.with_latest_from(average_y, average_z).map(
-            lambda latest: Acceleration(x=latest[0], y=latest[1], z=latest[2])
-        )
+        return cast(Subscribable[Acceleration], averaged)
 
     def _advance_state(
         self,
@@ -97,6 +131,17 @@ class WaterCubeStateProvider(StateProvider[WaterCubeState]):
             acceleration_average=acceleration_average,
             water_hue_degrees=water_hue_degrees,
         )
+
+
+@final
+@dataclass(frozen=True, slots=True)
+class _AccelerationWindow:
+    elapsed_ms: float = 0.0
+    total_x: float = 0.0
+    total_y: float = 0.0
+    total_z: float = 0.0
+    samples: int = 0
+    value: Acceleration | None = None
 
 
 def _next_acceleration_average(current: float, gamepad: GamepadSnapshot) -> float:

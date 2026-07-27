@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pygame
+from manyfold import Subscribable
+from manyfold.architecture import NewValues, PubSubObservable
 
 from heart.device import Cube
 from heart.device.local import LocalScreen
-from heart.peripheral.core.input import (GamepadAxis, GamepadButton,
+from heart.peripheral.core.input import (FrameTick, GamepadAxis, GamepadButton,
                                          GamepadSnapshot, GamepadSnapshotEvent)
 from heart.peripheral.core.manager import PeripheralManager
 from heart.peripheral.sensor import Acceleration
@@ -34,6 +38,49 @@ class _Clock:
 
 class TestWaterCubeStateProvider:
     """Ensure the default playlist's water renderer initializes from a valid state."""
+
+    def test_acceleration_window_emits_one_complete_vector_per_interval(
+        self,
+    ) -> None:
+        """Keep every averaged axis in the same frame window."""
+        acceleration = NewValues[Acceleration | None]()
+        frame_ticks = NewValues[FrameTick]()
+        provider = WaterCubeStateProvider(
+            device=LocalScreen(width=64, height=64, orientation=Cube.sides()),
+        )
+        observed: list[Acceleration] = []
+        acceleration_stream = cast(
+            Subscribable[Acceleration | None],
+            PubSubObservable.merge(acceleration).start_with(None),
+        )
+        frame_tick_stream = cast(
+            Subscribable[FrameTick],
+            PubSubObservable.merge(frame_ticks),
+        )
+
+        subscription = provider._average_acceleration(
+            acceleration_stream,
+            frame_tick_stream,
+        ).subscribe(observed.append)
+
+        try:
+            assert acceleration.subscriber_count == 1
+            assert frame_ticks.subscriber_count == 1
+            acceleration.emit(Acceleration(x=2.0, y=20.0, z=200.0))
+            frame_ticks.emit(_frame_tick(index=0, delta_ms=40.0))
+            acceleration.emit(Acceleration(x=8.0, y=80.0, z=800.0))
+            frame_ticks.emit(_frame_tick(index=1, delta_ms=60.0))
+            acceleration.emit(Acceleration(x=-4.0, y=-40.0, z=-400.0))
+            frame_ticks.emit(_frame_tick(index=2, delta_ms=100.0))
+
+            assert observed == [
+                Acceleration(x=5.0, y=50.0, z=500.0),
+                Acceleration(x=-4.0, y=-40.0, z=-400.0),
+            ]
+        finally:
+            subscription.dispose()
+        assert acceleration.subscriber_count == 0
+        assert frame_ticks.subscriber_count == 0
 
     def test_observable_steps_at_most_once_per_100ms_with_averaged_acceleration(
         self,
@@ -232,4 +279,14 @@ def _gamepad_snapshot(
         identifier="test-pad",
         axes=axes or {},
         buttons=buttons or {},
+    )
+
+
+def _frame_tick(*, index: int, delta_ms: float) -> FrameTick:
+    return FrameTick(
+        frame_index=index,
+        delta_ms=delta_ms,
+        delta_s=delta_ms / 1_000.0,
+        monotonic_s=index * delta_ms / 1_000.0,
+        fps=1_000.0 / delta_ms,
     )
