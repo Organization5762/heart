@@ -34,9 +34,13 @@
   shared exact-wheel JSONL consumer fixture with nine real role processes and
   public lifecycle/state observations. Pinned ManyFold durable-topic commit
   `ac6086409736148fc60078d906ceceb498a0ca82`, rebased onto Heart
-  `414973a2f2008ba87fb51f7b2b71469861b92b57`, and ran the shared consumer gate,
+  `414973a2f2008ba87fb51f7b2b71469861b92b57`. The initial shared consumer gate,
   three-process Raft proof, Ruff, lock verification, focused lifecycle tests,
-  and the full simulated-backend suite: 609 passed with 4 hardware-only skips.
+  and full simulated-backend suite passed: 609 passed with 4 hardware-only
+  skips. The later exact-wheel gate reached clean role shutdown but exposed two
+  upstream blockers: concurrent bound PubSub traffic can raise
+  `RuntimeError("Already borrowed")`, and the gate treats a restarted process's
+  node-local lifecycle cursor reset as a sequence gap.
 - 2026-06-21: Heart-shaped Manyfold nowait publishing now covers
   process-local `Schema.any` routes. `GraphRouteStream.emit` still calls
   `publish_nowait`, and the focused test now patches `Graph.publish` to fail so

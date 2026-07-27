@@ -39,8 +39,12 @@ API_GAPS = (
     "observe the required origin/topic/source coalescing identity through the "
     "public consumer surface.",
     "ManyFold LIVE_LATEST exposes no typed coalesce/resync/pressure lifecycle "
-    "events or public counters, so Heart cannot prove frame/audio pressure and "
-    "recovery without private transport state.",
+    "events, and mesh topic diagnostics omit retained_items and "
+    "logical_storage_bytes, so Heart cannot prove zero hot-path storage, "
+    "bounded sensor storage, or frame/audio recovery without private state.",
+    "ManyFold ac608640 can raise RuntimeError('Already borrowed') while a real "
+    "mesh concurrently delivers and publishes bound PubSub traffic, so Heart "
+    "cannot qualify normal multi-role live-latest publication at that head.",
     "ManyFold StateMachine commit 3c62dd1 is not based on durable-topic commit "
     "ac608640, so Heart cannot pin one exact upstream commit for both APIs.",
 )
@@ -113,7 +117,7 @@ class HeartQualificationSupervisor:
                     "max_bytes": None,
                     "max_message_bytes": None,
                     "raft": True,
-                    "retains_journal_rows": True,
+                    "retains_journal_rows": False,
                 },
                 {
                     "topic": "heart.world.device",
@@ -125,7 +129,7 @@ class HeartQualificationSupervisor:
                     "max_bytes": None,
                     "max_message_bytes": None,
                     "raft": True,
-                    "retains_journal_rows": True,
+                    "retains_journal_rows": False,
                 },
             )
         )

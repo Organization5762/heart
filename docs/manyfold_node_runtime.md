@@ -32,6 +32,20 @@ resynchronizes only current values. Navigation is append/deduplicated because
 each user action matters. External sensor state is latest-per-key and expires
 because an old physical reading is not current state.
 
+The bounds cover measured encoded payloads:
+
+- frame ticks are 66 B against a 1 KiB message cap and one slot;
+- rendered frames are 16,768–87,771 B against a 128 KiB cap and eight slots;
+- microphone samples are 409 B against a 4 KiB cap and eight slots;
+- debug input is 195–595 B against a 16 KiB cap and 128 slots; and
+- external sensor samples are 287 B against a 32 KiB cap, 128 sources, and
+  2 MiB logical storage.
+
+Misclassifying hot paths as append traffic is operationally unsafe. A 1,024-item
+global append bound would fill in about 4.3 seconds from ticks or 1.5 seconds
+from ticks plus keyboard and one gamepad. At the observed frame rate and largest
+measured payload, rendered frames would consume about 64 MiB in 6.8 seconds.
+
 Raft accepts only `heart.world.device.put` and `heart.world.mode.select`.
 Frames, ticks, audio, navigation, sensors, and debug data are rejected by the
 world projection.
@@ -88,6 +102,9 @@ Heart exposes one JSONL supervisor:
 .venv/bin/heart-manyfold-qualification-fixture
 ```
 
+The complete request, response, ownership, and artifact contract is documented
+in [Heart consumer qualification fixture v1](consumer_qualification_fixture.md).
+
 Pass it to ManyFold's shared distributed gate as the consumer fixture. The gate
 owns seeds, scenario order, deadlines, signals, network/storage faults,
 resource sampling, lifecycle normalization, and invariant evaluation. Heart
@@ -122,9 +139,13 @@ These gaps remain release blockers and are returned by `describe`/`observe`:
    using the same stable source key overwrite one another downstream.
 1. A remotely bound PubSub row does not expose `origin_node_id`; Heart therefore
    cannot publicly observe the full origin/topic/source coalescing identity.
-1. `LIVE_LATEST` has no typed coalesce/resync/pressure lifecycle events or
-   public counters; exact frame/audio recovery cannot be proven without private
-   state.
+1. `LIVE_LATEST` has no typed coalesce/resync/pressure lifecycle events, and
+   mesh topic diagnostics omit `retained_items` and `logical_storage_bytes`.
+   Heart therefore cannot publicly prove zero hot-path storage, bounded sensor
+   storage, or exact frame/audio recovery.
+1. The exact `ac608640` wheel can raise `RuntimeError("Already borrowed")` when
+   bound PubSub delivery and publication overlap in the real multi-role
+   topology.
 1. StateMachine commit `3c62dd1` is not based on durable-topic commit
    `ac608640`; Heart cannot pin one exact upstream commit and use both APIs.
 

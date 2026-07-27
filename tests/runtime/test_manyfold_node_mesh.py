@@ -49,13 +49,8 @@ def test_fixture_describes_exact_public_topic_and_role_contract() -> None:
         json.loads(line)["value"] for line in process.stdout.splitlines()
     ]
 
-    assert {role["role_kind"] for role in describe["roles"]} == set(
-        REQUIRED_ROLE_KINDS
-    )
-    assert {
-        contract["delivery_class"]
-        for contract in describe["topic_contracts"]
-    } == {
+    assert {role["role_kind"] for role in describe["roles"]} == set(REQUIRED_ROLE_KINDS)
+    assert {contract["delivery_class"] for contract in describe["topic_contracts"]} == {
         "durable_append",
         "durable_latest",
         "volatile_latest",
@@ -65,6 +60,11 @@ def test_fixture_describes_exact_public_topic_and_role_contract() -> None:
         not contract["retains_journal_rows"] and not contract["raft"]
         for contract in describe["topic_contracts"]
         if contract["delivery_class"] == "volatile_latest"
+    )
+    assert all(
+        not contract["retains_journal_rows"] and contract["raft"]
+        for contract in describe["topic_contracts"]
+        if contract["delivery_class"] == "raft_state"
     )
     assert describe["api_gaps"] == list(API_GAPS)
     assert close["clean"]

@@ -4,17 +4,17 @@ import json
 
 from manyfold.architecture import TopicDeliveryClass
 
-from heart.peripheral.core.input.events import (FRAME_TICK_TOPIC,
-                                                INPUT_EVENT_TOPIC)
-from heart.peripheral.core.input.external_sensors import \
-    EXTERNAL_SENSOR_STATE_TOPIC
+from heart.peripheral.core.input.events import FRAME_TICK_TOPIC, INPUT_EVENT_TOPIC
+from heart.peripheral.core.input.external_sensors import EXTERNAL_SENSOR_STATE_TOPIC
 from heart.peripheral.core.input.profiles.navigation import NAVIGATION_TOPIC
 from heart.peripheral.led_matrix import HEART_RENDERED_FRAME_TOPIC
 from heart.peripheral.microphone import HEART_MICROPHONE_SAMPLE_TOPIC
-from heart.runtime.manyfold_node import (HEART_TOPIC_POLICIES,
-                                         ManyfoldNodeConfig,
-                                         ManyfoldNodeRuntime,
-                                         topic_policy_manifest)
+from heart.runtime.manyfold_node import (
+    HEART_TOPIC_POLICIES,
+    ManyfoldNodeConfig,
+    ManyfoldNodeRuntime,
+    topic_policy_manifest,
+)
 
 
 class TestManyfoldNodeRuntime:
@@ -58,18 +58,31 @@ class TestManyfoldNodeRuntime:
         assert all(not contract.raft for contract in HEART_TOPIC_POLICIES)
 
     def test_topic_policy_matches_measured_payload_and_expiry_bounds(self) -> None:
-        manifest = {
-            contract["topic"]: contract for contract in topic_policy_manifest()
-        }
+        manifest = {contract["topic"]: contract for contract in topic_policy_manifest()}
 
         assert manifest[FRAME_TICK_TOPIC]["max_message_bytes"] == 1024
-        assert manifest[HEART_RENDERED_FRAME_TOPIC]["max_message_bytes"] == (
-            128 * 1024
-        )
+        assert manifest[FRAME_TICK_TOPIC]["max_items"] == 1
+        assert manifest[HEART_RENDERED_FRAME_TOPIC]["max_message_bytes"] == (128 * 1024)
+        assert manifest[HEART_RENDERED_FRAME_TOPIC]["max_items"] == 8
         assert manifest[HEART_MICROPHONE_SAMPLE_TOPIC]["max_message_bytes"] == 4096
+        assert manifest[HEART_MICROPHONE_SAMPLE_TOPIC]["max_items"] == 8
         assert manifest[INPUT_EVENT_TOPIC]["max_message_bytes"] == 16 * 1024
+        assert manifest[INPUT_EVENT_TOPIC]["max_items"] == 128
+        for topic in (
+            FRAME_TICK_TOPIC,
+            HEART_RENDERED_FRAME_TOPIC,
+            HEART_MICROPHONE_SAMPLE_TOPIC,
+            INPUT_EVENT_TOPIC,
+        ):
+            assert manifest[topic]["max_bytes"] is None
         assert manifest[EXTERNAL_SENSOR_STATE_TOPIC]["ttl_ms"] == 2000
+        assert manifest[EXTERNAL_SENSOR_STATE_TOPIC]["max_items"] == 128
+        assert manifest[EXTERNAL_SENSOR_STATE_TOPIC]["max_bytes"] == 2 * 1024 * 1024
+        assert manifest[EXTERNAL_SENSOR_STATE_TOPIC]["max_message_bytes"] == (32 * 1024)
         assert manifest[NAVIGATION_TOPIC]["ttl_ms"] == 10_000
+        assert manifest[NAVIGATION_TOPIC]["max_items"] == 256
+        assert manifest[NAVIGATION_TOPIC]["max_bytes"] == 1024 * 1024
+        assert manifest[NAVIGATION_TOPIC]["max_message_bytes"] == 16 * 1024
 
     def test_topic_policy_manifest_is_stable_machine_readable_json(self) -> None:
         encoded = json.dumps(topic_policy_manifest(), sort_keys=True)
