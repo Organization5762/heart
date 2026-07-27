@@ -48,6 +48,20 @@ class TestPeripheralMicrophone:
         monkeypatch.setattr(microphone, "sd", None)
         assert list(Microphone.detect()) == []
 
+    def test_default_microphone_has_stable_sensor_identity(self) -> None:
+        peripheral = Microphone()
+
+        identity = peripheral.peripheral_info().to_sensor_identity()
+        event = peripheral._level_to_sensor_event(
+            peripheral._process_audio_chunk(
+                np.array([[0.0], [0.5], [-1.0]], dtype=float),
+                frames=3,
+            )
+        )
+
+        assert identity.id == "microphone:default"
+        assert event.identity == identity
+
     def test_detection_node_publishes_microphone_to_manyfold_route(
         self,
         monkeypatch,
