@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pygame
 from manyfold import CompositeSubscription, Graph, Subscribable, TypedRoute
@@ -135,11 +136,12 @@ class AccelerometerDebugProfile:
 
     def node(self) -> GraphRouteStream[Acceleration | None]:
         if self._merge_subscription is None:
+            selected_acceleration = _debug_acceleration_stream(
+                self._external_sensor_hub.observable_acceleration(),
+                self._keyboard_observable,
+            )
             self._merge_subscription = AccelerometerPublisher(
-                source_streams=(
-                    self._external_sensor_hub.observable_acceleration(),
-                    self._keyboard_observable,
-                ),
+                source_streams=(selected_acceleration,),
                 output_route=DEBUG_ACCELERATION_ROUTE,
             ).install(self._graph)
         return self._debug_stream
@@ -168,3 +170,27 @@ class AccelerometerDebugProfile:
         if x == 0.0 and y == 0.0 and (z_bias == 0.0) and (impulse == 0.0):
             return None
         return Acceleration(x=x, y=y, z=9.81 + z_bias + impulse)
+
+
+def _debug_acceleration_stream(
+    external: Subscribable[Acceleration | None],
+    keyboard: Subscribable[Acceleration | None],
+) -> Subscribable[Acceleration | None]:
+    external_with_initial = PubSubObservable.merge(external).start_with(None)
+    keyboard_with_initial = PubSubObservable.merge(keyboard).start_with(None)
+    selected = (
+        PubSubObservable.combine_latest(
+            external_with_initial,
+            keyboard_with_initial,
+        )
+        .map(cast(Callable[[object], object], _select_debug_acceleration))
+        .distinct_until_changed()
+    )
+    return cast(Subscribable[Acceleration | None], selected)
+
+
+def _select_debug_acceleration(
+    latest: tuple[Acceleration | None, Acceleration | None],
+) -> Acceleration | None:
+    external, keyboard = latest
+    return keyboard if keyboard is not None else external
