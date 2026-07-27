@@ -110,20 +110,6 @@ uv run heart-state-review \
   --transition-frames 8
 ```
 
-Machine-readable system qualification artifacts can be rendered into additional
-contract review pages with `--contract-artifact`:
-
-```console
-uv run heart-state-review \
-  --contract-artifact tmp/world-coordination.json
-```
-
-The contract projector keeps deterministic semantic fields: scenario metadata,
-ordered lifecycle events, role-by-failure impact rows, convergence bounds,
-negative assertions, explicit public API gaps, and a compact RGB strip. It
-intentionally excludes process IDs, command IDs, host paths, timestamps, and
-incidental log formatting.
-
 ## ManyFold StateMachine gap
 
 ManyFold PR 281 at `3c62dd1` adds the right public surfaces for future
