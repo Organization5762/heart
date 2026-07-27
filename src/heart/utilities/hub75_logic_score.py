@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from bisect import bisect_left, bisect_right
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import median
@@ -145,9 +145,15 @@ def load_hub75_logic_csv(
 
     resolved_map = _resolve_signal_map(signal_map)
     column_count = max(resolved_map.values()) + 1
-    edges = {index: [] for index in range(column_count)}
-    rises = {index: [] for index in range(column_count)}
-    falls = {index: [] for index in range(column_count)}
+    edges: dict[int, list[float]] = {
+        index: [] for index in range(column_count)
+    }
+    rises: dict[int, list[float]] = {
+        index: [] for index in range(column_count)
+    }
+    falls: dict[int, list[float]] = {
+        index: [] for index in range(column_count)
+    }
     initial_state: list[int] | None = None
     sample_count = 0
     first_timestamp = 0.0
@@ -415,45 +421,43 @@ def score_hub75_similarity(
     baseline: Hub75SignalSummary,
     candidate: Hub75SignalSummary,
 ) -> Hub75SimilarityScore:
-    """Return a normalized similarity score between two Hub75 captures."""
+    """Return a capture-length-independent similarity between HUB75 waveforms."""
 
-    row_activity_similarity = min(
-        _count_similarity(baseline.lat_rise_count, candidate.lat_rise_count),
-        _count_similarity(baseline.interval_count, candidate.interval_count),
-    )
     control_scores = {
-        "lat_rise_count": _count_similarity(
+        "lat_rise_count": _activity_presence_similarity(
             baseline.lat_rise_count,
             candidate.lat_rise_count,
         ),
-        "interval_count": _count_similarity(
+        "interval_count": _activity_presence_similarity(
             baseline.interval_count,
             candidate.interval_count,
         ),
-        "row_clock_mismatch_count": row_activity_similarity
-        * _count_similarity(
+        "row_clock_mismatch_count": _event_rate_similarity(
             baseline.row_clock_mismatch_count,
+            baseline.interval_count,
             candidate.row_clock_mismatch_count,
+            candidate.interval_count,
         ),
-        "lat_while_output_enabled_count": row_activity_similarity
-        * _count_similarity(
+        "lat_while_output_enabled_count": _event_rate_similarity(
             baseline.lat_while_output_enabled_count,
+            baseline.interval_count,
             candidate.lat_while_output_enabled_count,
+            candidate.interval_count,
         ),
-        "active_address_edge_count": row_activity_similarity
-        * _count_similarity(
+        "active_address_edge_count": _event_rate_similarity(
             baseline.active_address_edge_count,
+            baseline.interval_count,
             candidate.active_address_edge_count,
+            candidate.interval_count,
         ),
-        "median_clocks_per_row": row_activity_similarity
-        * _relative_similarity(
+        "median_clocks_per_row": _relative_similarity(
             baseline.median_clocks_per_row,
             candidate.median_clocks_per_row,
             tolerance_fraction=0.02,
         ),
-        "oe_active_fraction": _relative_similarity(
-            baseline.oe_active_fraction,
-            candidate.oe_active_fraction,
+        "median_oe_active_fraction": _relative_similarity(
+            _median_oe_active_fraction(baseline),
+            _median_oe_active_fraction(candidate),
             tolerance_fraction=0.05,
         ),
     }
@@ -478,14 +482,11 @@ def score_hub75_similarity(
             candidate.p99_clk_period_ns,
             tolerance_fraction=0.25,
         ),
-        "max_clk_period_ns": _relative_similarity(
-            baseline.max_clk_period_ns,
-            candidate.max_clk_period_ns,
-            tolerance_fraction=0.25,
-        ),
-        "long_clk_period_count": _count_similarity(
+        "long_clk_period_count": _event_rate_similarity(
             baseline.long_clk_period_count,
+            baseline.interval_count,
             candidate.long_clk_period_count,
+            candidate.interval_count,
         ),
         "median_oe_active_ns": _relative_similarity(
             baseline.median_oe_active_ns,
@@ -502,14 +503,11 @@ def score_hub75_similarity(
             candidate.p99_oe_blank_ns,
             tolerance_fraction=0.25,
         ),
-        "max_oe_blank_ns": _relative_similarity(
-            baseline.max_oe_blank_ns,
-            candidate.max_oe_blank_ns,
-            tolerance_fraction=0.25,
-        ),
-        "long_oe_blank_count": _count_similarity(
+        "long_oe_blank_count": _event_rate_similarity(
             baseline.long_oe_blank_count,
+            baseline.interval_count,
             candidate.long_oe_blank_count,
+            candidate.interval_count,
         ),
     }
     address_scores = {
@@ -520,25 +518,6 @@ def score_hub75_similarity(
         )
         for signal in baseline.address_edges_per_lat
     }
-    address_scores.update(
-        {
-            f"address_edge_count_{signal.lower()}": _count_similarity(
-                baseline.address_edge_counts.get(signal, 0),
-                candidate.address_edge_counts.get(signal, 0),
-            )
-            for signal in baseline.address_edge_counts
-        }
-    )
-    address_scores.update(
-        {
-            f"max_address_edge_interval_ns_{signal.lower()}": _relative_similarity(
-                baseline.max_address_edge_interval_ns.get(signal),
-                candidate.max_address_edge_interval_ns.get(signal),
-                tolerance_fraction=0.50,
-            )
-            for signal in baseline.max_address_edge_interval_ns
-        }
-    )
     feature_scores = {
         **control_scores,
         **timing_scores,
@@ -711,15 +690,18 @@ def _address_edges_per_lat(
     capture: Hub75LogicCapture,
     lat_rises: Sequence[float],
 ) -> dict[str, float]:
-    if not lat_rises:
+    if len(lat_rises) < 2:
         return {}
-    lat_edge_count = len(lat_rises)
+    interval_count = len(lat_rises) - 1
     ratios: dict[str, float] = {}
     for signal in HUB75_ADDRESS_SIGNALS:
         if signal not in capture.signal_map:
             continue
         channel = capture.signal_map[signal]
-        ratios[signal] = len(capture.edges[channel]) / lat_edge_count
+        ratios[signal] = (
+            _count_between(capture.edges[channel], lat_rises[0], lat_rises[-1])
+            / interval_count
+        )
     return ratios
 
 
@@ -793,12 +775,39 @@ def _max_ns(values: Sequence[float]) -> float | None:
     return max(values) * 1_000_000_000.0
 
 
-def _count_similarity(baseline: int, candidate: int) -> float:
-    if baseline == candidate:
-        return 1.0
-    if baseline == 0:
-        return 1.0 / (1.0 + candidate)
-    return max(0.0, 1.0 - abs(candidate - baseline) / max(baseline, candidate, 1))
+def _activity_presence_similarity(baseline: int, candidate: int) -> float:
+    return 1.0 if (baseline > 0) == (candidate > 0) else 0.0
+
+
+def _median_oe_active_fraction(summary: Hub75SignalSummary) -> float | None:
+    active = summary.median_oe_active_ns
+    blank = summary.median_oe_blank_ns
+    if active is None or blank is None or active + blank <= 0:
+        return None
+    return active / (active + blank)
+
+
+def _event_rate_similarity(
+    baseline_count: int,
+    baseline_opportunities: int,
+    candidate_count: int,
+    candidate_opportunities: int,
+) -> float:
+    baseline_rate = (
+        baseline_count / baseline_opportunities
+        if baseline_opportunities > 0
+        else None
+    )
+    candidate_rate = (
+        candidate_count / candidate_opportunities
+        if candidate_opportunities > 0
+        else None
+    )
+    return _relative_similarity(
+        baseline_rate,
+        candidate_rate,
+        tolerance_fraction=0.05,
+    )
 
 
 def _relative_similarity(
@@ -815,10 +824,11 @@ def _relative_similarity(
     return max(0.0, 1.0 - abs(candidate - baseline) / scale)
 
 
-def _average(values: Sequence[float]) -> float:
-    if not values:
+def _average(values: Iterable[float]) -> float:
+    resolved = tuple(values)
+    if not resolved:
         return 1.0
-    return sum(values) / len(values)
+    return sum(resolved) / len(resolved)
 
 
 def _validate_hub75_summary(

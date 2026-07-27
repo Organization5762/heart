@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility CLI for the shared RP1 HUB75 Linux bundle deployment module."""
+"""Calm, parameterized entrypoint for retained HUB75 laboratory work."""
 
 import os
 import sys
@@ -26,21 +26,7 @@ def _prepare_repo_python() -> None:
 
 _prepare_repo_python()
 
-from heart.utilities.hub75_lab._bundle import (  # noqa: E402
-    build_remote_helper_script,
-)
-from heart.utilities.hub75_lab._bundle import (  # noqa: E402
-    build_remote_module_script,
-)
-from heart.utilities.hub75_lab._bundle import main  # noqa: E402
-from heart.utilities.hub75_lab._bundle import normalize_host  # noqa: E402
-
-__all__ = [
-    "build_remote_helper_script",
-    "build_remote_module_script",
-    "main",
-    "normalize_host",
-]
+from heart.utilities.hub75_lab.cli import main  # noqa: E402
 
 
 if __name__ == "__main__":

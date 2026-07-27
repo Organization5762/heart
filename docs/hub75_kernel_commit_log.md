@@ -1,5 +1,12 @@
 # HUB75 Kernel Commit Log
 
+> Retired script paths below are historical evidence only and must not be
+> rerun. Entries preserve the names used by each commit to explain the recorded
+> conclusions. Use [`docs/HUB75_LAB.md`](HUB75_LAB.md) for the current
+> `hub75_experiment.py` workflow; recover a historical source only through its
+> exact full-SHA locator in
+> [`docs/hub75_script_inventory.json`](hub75_script_inventory.json).
+
 ## 2026-05-12
 
 ## 2026-05-13

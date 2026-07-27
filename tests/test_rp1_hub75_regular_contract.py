@@ -110,6 +110,16 @@ def test_regular_p0p1_chain2_repro_documents_256x64_abcd_transport_contract() ->
     assert "`49152` bytes" in repro_doc
 
 
+def test_known_good_repro_is_totem3_and_distinguishes_hash_policy() -> None:
+    repro_doc = REPRO_DOC.read_text()
+
+    assert "`michael@totem3.local`" in repro_doc
+    assert "michael@totem5.local" not in repro_doc
+    assert "enforces the\nknown-good payload hash" in repro_doc
+    assert "`RP1_HUB75_STRICT_HASHES=1` to enforce the\ntwo module checks" in repro_doc
+    assert "compatibility default `0` reports module mismatches" in repro_doc
+
+
 def test_regular_p0p1_chain2_packer_and_wrapper_match_hzeller_regular_gpio() -> None:
     driver = RP1H_DRIVER.read_text()
     profile = REGULAR_PROFILE.read_text()
