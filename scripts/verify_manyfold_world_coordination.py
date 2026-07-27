@@ -42,6 +42,9 @@ from heart.world import (
 )
 
 _ARTIFACT_SCHEMA_VERSION = 1
+_PROTOCOL = "heart.manyfold-world-coordination-proof"
+_SCENARIO_ID = "heart-world-coordination-node-failure-v1"
+_SCENARIO_SEED = "heart-world-coordination-deterministic-v1"
 
 
 def run_proof(root: Path) -> dict[str, object]:
@@ -90,7 +93,15 @@ def run_proof(root: Path) -> dict[str, object]:
         )
 
         return {
+            "protocol": _PROTOCOL,
             "schema_version": _ARTIFACT_SCHEMA_VERSION,
+            "scenario": {
+                "id": _SCENARIO_ID,
+                "seed": _SCENARIO_SEED,
+                "node_ids": sorted(node_ids),
+                "failed_role": "initial_raft_leader",
+                "clock": "real_runtime_bounded",
+            },
             "manyfold_installation": _manyfold_installation(),
             "raft": {
                 "node_count": len(node_ids),

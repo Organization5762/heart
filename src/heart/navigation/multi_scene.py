@@ -23,6 +23,19 @@ class MultiSceneState:
     peripheral_manager: PeripheralManager | None = None
 
 
+@dataclass(frozen=True)
+class MultiSceneSnapshot:
+    scene_names: tuple[str, ...]
+    current_button_value: int
+    offset_of_button_value: int | None
+    active_scene_index: int | None
+    active_scene_name: str | None
+    previous_scene_index: int | None
+    dpad_scene_selection_enabled: bool
+    dpad_armed: bool
+    dpad_center_frames: int
+
+
 class MultiScene(StatefulBaseRenderer[MultiSceneState]):
     def __init__(
         self,
@@ -52,6 +65,26 @@ class MultiScene(StatefulBaseRenderer[MultiSceneState]):
         active_scene = self.scenes[index]
         self.device_display_mode = active_scene.device_display_mode
         return [*active_scene.get_renderers()]
+
+    def snapshot_state(self) -> MultiSceneSnapshot:
+        scene_names = tuple(scene.name for scene in self.scenes)
+        active_scene_index = self._active_scene_index() if scene_names else None
+        active_scene_name = (
+            scene_names[active_scene_index]
+            if active_scene_index is not None
+            else None
+        )
+        return MultiSceneSnapshot(
+            scene_names=scene_names,
+            current_button_value=self.state.current_button_value,
+            offset_of_button_value=self.state.offset_of_button_value,
+            active_scene_index=active_scene_index,
+            active_scene_name=active_scene_name,
+            previous_scene_index=self._last_active_scene_index,
+            dpad_scene_selection_enabled=self._enable_dpad_scene_selection,
+            dpad_armed=self._dpad_armed,
+            dpad_center_frames=self._dpad_center_frames,
+        )
 
     def _create_initial_state(
         self,

@@ -1,0 +1,152 @@
+{
+  "name": "keyboard right twice then activate",
+  "kind": "game_modes",
+  "initial": {
+    "config": {
+      "device": {
+        "type": "fixed",
+        "width": 8,
+        "height": 4,
+        "orientation": {
+          "type": "rectangle",
+          "columns": 1,
+          "rows": 1
+        }
+      },
+      "modes": [
+        {
+          "name": "red",
+          "title_rgb": [120, 20, 20],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [10, 20, 30]
+            },
+            {
+              "type": "border",
+              "rgb": [200, 30, 30],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "name": "green",
+          "title_rgb": [20, 120, 20],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [40, 50, 60]
+            },
+            {
+              "type": "border",
+              "rgb": [40, 200, 80],
+              "width": 1
+            }
+          ]
+        },
+        {
+          "name": "blue",
+          "title_rgb": [20, 20, 120],
+          "renderers": [
+            {
+              "type": "color",
+              "rgb": [70, 80, 90]
+            },
+            {
+              "type": "border",
+              "rgb": [30, 120, 220],
+              "width": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": ["right"],
+        "timestamp_ms": 1.0
+      }
+    },
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": [],
+        "timestamp_ms": 2.0
+      }
+    },
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": ["right"],
+        "timestamp_ms": 3.0
+      }
+    },
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": [],
+        "timestamp_ms": 4.0
+      }
+    },
+    {
+      "type": "keyboard",
+      "config": {
+        "pressed": ["down"],
+        "timestamp_ms": 5.0
+      }
+    }
+  ],
+  "expected": {
+    "state": {
+      "entries": [
+        {
+          "name": "red",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        },
+        {
+          "name": "green",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        },
+        {
+          "name": "blue",
+          "title_renderer": "RenderColor",
+          "renderer": "ComposedRenderer:RenderColor+Border"
+        }
+      ],
+      "post_processors": [
+        "SaturationPostProcessor",
+        "HueShiftPostProcessor",
+        "EdgePostProcessor"
+      ],
+      "in_select_mode": false,
+      "last_long_button_value": 0,
+      "committed_position": 2,
+      "committed_index": 2,
+      "preview_offset": 0,
+      "preview_index": 2,
+      "current_index": 2,
+      "current_entry": "blue",
+      "previous_index": 2,
+      "transition_renderer": null,
+      "transition_mode": "slide",
+      "static_mask_steps": 20,
+      "gaussian_sigma": 1.5
+    },
+    "screen": {
+      "shape": [4, 8, 3],
+      "pixels": [
+        [[30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220]],
+        [[30, 120, 220], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [30, 120, 220]],
+        [[30, 120, 220], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [70, 80, 90], [30, 120, 220]],
+        [[30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220], [30, 120, 220]]
+      ],
+      "channel_tolerance": 0,
+      "max_outlier_fraction": 0.0
+    }
+  }
+}

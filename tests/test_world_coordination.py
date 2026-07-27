@@ -5,6 +5,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
+
+from heart.testing import assert_rgb_similar
+from heart.testing.system_contract import project_world_coordination_contract
+
+CONTRACT_GOLDEN_PATH = (
+    Path(__file__).parent
+    / "state_similarity"
+    / "contracts"
+    / "world_coordination_node_failure_expected.json"
+)
+
 
 def test_three_process_world_coordination_proof(tmp_path: Path) -> None:
     artifact_path = tmp_path / "coordination.json"
@@ -49,3 +61,19 @@ def test_three_process_world_coordination_proof(tmp_path: Path) -> None:
         "rendered_frame",
         "sensor_sample",
     ]
+    contract = project_world_coordination_contract(artifact)
+    golden = json.loads(CONTRACT_GOLDEN_PATH.read_text(encoding="utf-8"))
+    assert contract.state == golden["state"]
+    assert_rgb_similar(contract.rgb, _rgb_from_rows(golden["screen"]))
+    serialized_contract = json.dumps(contract.state, sort_keys=True)
+    assert "initial_process_ids" not in serialized_contract
+    assert "node_command_ids" not in serialized_contract
+    assert "installation_root" not in serialized_contract
+
+
+def _rgb_from_rows(screen: dict[str, object]) -> np.ndarray:
+    rows = np.asarray(screen["rows"], dtype=np.uint8)
+    shape = screen["shape"]
+    assert isinstance(shape, list)
+    assert shape == [len(rows), 8, 3]
+    return np.repeat(rows[:, np.newaxis, :], 8, axis=1)

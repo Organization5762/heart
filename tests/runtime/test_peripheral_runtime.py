@@ -284,8 +284,8 @@ class TestPeripheralRuntimeStreaming:
             subscription.dispose()
 
         assert observed == [
-            ("ActivateIntent", 0, "gamepad.0.south"),
             ("BrowseIntent", 1, "gamepad.dpad"),
+            ("ActivateIntent", 0, "gamepad.0.south"),
             ("AlternateActivateIntent", 0, "gamepad.0.north"),
         ]
 

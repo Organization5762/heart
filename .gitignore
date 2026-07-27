@@ -21,6 +21,8 @@ node_modules
 .hypothesis
 **/target
 .captures
+tmp/state-similarity-review/
+sites/state-similarity-review/
 
 # Generated RP1 payloads that are built from checked-in assembly sources.
 rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/rp1_core1_state32_dmapipeline4x4_rr01_cols128_frame11_dwell8_regular_p0p1_chain2_oeoffshift_preclk1_unroll8_addr8_lat2.bin

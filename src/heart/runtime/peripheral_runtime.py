@@ -268,15 +268,16 @@ class PeripheralRuntime:
     def poll(self) -> None:
         self._manyfold_node.poll()
         keyboard, gamepads = self._peripheral_manager.input_io.poll()
-        self._poll_navigation(keyboard, gamepads)
+        self.process_navigation_input(keyboard, gamepads)
         self._drain_control_messages()
         drain_main_thread_queue(max_items=MAIN_THREAD_DRAIN_MAX_ITEMS)
 
-    def _poll_navigation(
+    def process_navigation_input(
         self,
         keyboard: KeyboardSnapshot,
         events: tuple[GamepadSnapshotEvent, ...],
     ) -> None:
+        """Translate one typed input frame into ordered navigation intents."""
         navigation = self._peripheral_manager.input_io.navigation
         if self._key_pressed(keyboard, pygame.K_LEFT):
             navigation.inject_browse(-1, source="keyboard.left")
@@ -291,6 +292,7 @@ class PeripheralRuntime:
             self._rearm_gamepad_navigation()
             return
 
+        self._process_gamepad_browse(events)
         for event in events:
             snapshot = event.snapshot
             if self._button_pressed(snapshot, GamepadButton.SOUTH):
@@ -300,6 +302,11 @@ class PeripheralRuntime:
                     source=f"gamepad.{event.joystick_id}.north"
                 )
 
+    def _process_gamepad_browse(
+        self,
+        events: tuple[GamepadSnapshotEvent, ...],
+    ) -> None:
+        navigation = self._peripheral_manager.input_io.navigation
         direction = max(
             -1,
             min(

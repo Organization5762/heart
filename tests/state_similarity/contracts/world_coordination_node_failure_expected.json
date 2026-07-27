@@ -1,0 +1,206 @@
+{
+  "screen": {
+    "rows": [
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [143, 199, 255],
+      [143, 199, 255],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [57, 211, 140],
+      [212, 167, 44],
+      [212, 167, 44],
+      [212, 167, 44],
+      [212, 167, 44],
+      [212, 167, 44],
+      [212, 167, 44],
+      [212, 167, 44]
+    ],
+    "shape": [25, 8, 3]
+  },
+  "state": {
+    "api_gaps": [
+      {
+        "gap": "Heart exposes these through heart.node.status changed snapshots, but not as distinct ordered peer lifecycle events.",
+        "passed": false,
+        "transition": "peer_discovered_connected_recovered"
+      },
+      {
+        "gap": "World coordination exposes final durable transport state but not ordered public retry scheduled/attempted events.",
+        "passed": false,
+        "transition": "transport_retry_scheduled_attempted"
+      },
+      {
+        "gap": "Durable delivery exposes health counters and received messages, but no public PubSub lifecycle topic for queued, retried, or acknowledged records.",
+        "passed": false,
+        "transition": "durable_queued_retry_replay_acknowledged"
+      },
+      {
+        "gap": "No public Heart or ManyFold event in this qualification trace currently reports watermark coalescing, drops, or expiry.",
+        "passed": false,
+        "transition": "watermark_coalesced_dropped_expired"
+      },
+      {
+        "gap": "Signer renewal and restart are visible through status and health calls, but not through a public lifecycle event topic.",
+        "passed": false,
+        "transition": "signer_renewal_restart"
+      },
+      {
+        "gap": "Raft leader changes are visible through coordinator or DevelopmentCluster status, but not through a public ordered leader-change topic.",
+        "passed": false,
+        "transition": "raft_leader_change"
+      },
+      {
+        "gap": "Heart publishes stopping but not a terminal stopped lifecycle event after resources close.",
+        "passed": false,
+        "transition": "clean_shutdown_stopped"
+      }
+    ],
+    "bounds": [
+      {
+        "expected_revision": 2,
+        "name": "raft_revision_convergence",
+        "observed_revisions": [2],
+        "passed": true
+      },
+      {
+        "duplicate_sequence": 2,
+        "name": "duplicate_command_coalescence",
+        "original_sequence": 2,
+        "passed": true
+      },
+      {
+        "acknowledgements": 1,
+        "name": "durable_ack_convergence",
+        "passed": true,
+        "sender_outbox_items": 0
+      }
+    ],
+    "event_timeline": [
+      {
+        "node_count": 3,
+        "passed": true,
+        "state": "started",
+        "step": 1,
+        "topic": "manyfold.lifecycle.raft",
+        "transition": "cluster_started"
+      },
+      {
+        "passed": true,
+        "state": "revision_1",
+        "step": 2,
+        "topic": "manyfold.raft.log",
+        "transition": "device_state_committed"
+      },
+      {
+        "passed": true,
+        "role": "failed_leader",
+        "state": "failed_leader_unavailable",
+        "step": 3,
+        "topic": "manyfold.lifecycle.raft",
+        "transition": "leader_process_failed"
+      },
+      {
+        "passed": true,
+        "state": "replacement_elected",
+        "step": 4,
+        "topic": "manyfold.lifecycle.raft",
+        "transition": "leader_changed"
+      },
+      {
+        "passed": true,
+        "state": "revision_2",
+        "step": 5,
+        "topic": "manyfold.raft.log",
+        "transition": "mode_state_committed_after_failure"
+      },
+      {
+        "passed": true,
+        "state": "committed_mode_command",
+        "step": 6,
+        "topic": "manyfold.durable_delivery",
+        "transition": "durable_item_queued"
+      },
+      {
+        "passed": true,
+        "state": "receiver_restarted",
+        "step": 7,
+        "topic": "manyfold.durable_delivery",
+        "transition": "receiver_restarted_before_ack"
+      },
+      {
+        "passed": true,
+        "state": "sender_outbox_drained",
+        "step": 8,
+        "topic": "manyfold.durable_delivery",
+        "transition": "replay_acknowledged"
+      }
+    ],
+    "negative_assertions": [
+      {
+        "name": "no_duplicate_mode_commit",
+        "passed": true
+      },
+      {
+        "name": "no_duplicate_after_ack",
+        "passed": true
+      },
+      {
+        "name": "no_hot_path_data_in_durable_contract",
+        "passed": true
+      }
+    ],
+    "role_by_failure_impact_matrix": [
+      {
+        "expected_state": "restarted_and_converged",
+        "failure": "process_killed",
+        "observable_transition": "leader_changed",
+        "passed": true,
+        "role": "failed_leader"
+      },
+      {
+        "expected_state": "world_rpc_reads_revision_2",
+        "failure": "leader_loss",
+        "observable_transition": "mode_commit_after_failure",
+        "passed": true,
+        "role": "replacement_leader"
+      },
+      {
+        "expected_state": "applied_once_outbox_empty",
+        "failure": "restart_before_ack",
+        "observable_transition": "replay_acknowledged",
+        "passed": true,
+        "role": "durable_receiver"
+      },
+      {
+        "expected_state": "single_mode_revision",
+        "failure": "duplicate_mode_command",
+        "observable_transition": "duplicate_command_coalesced",
+        "passed": true,
+        "role": "all_nodes"
+      }
+    ],
+    "scenario": {
+      "clock": {
+        "semantic_bounds_only": true,
+        "type": "real_runtime_bounded"
+      },
+      "id": "heart-world-coordination-node-failure-v1",
+      "node_ids": ["node-1", "node-2", "node-3"],
+      "seed": "heart-world-coordination-deterministic-v1",
+      "source_protocol": "heart.manyfold-world-coordination-proof"
+    },
+    "schema_version": 1
+  }
+}
