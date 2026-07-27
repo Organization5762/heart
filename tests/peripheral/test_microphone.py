@@ -6,6 +6,7 @@ import numpy as np
 from manyfold import Graph
 
 from heart.peripheral import microphone
+from heart.peripheral.core import PeripheralTag
 from heart.peripheral.microphone import (Microphone,
                                          microphone_detection_route,
                                          microphone_level_event_route)
@@ -51,7 +52,8 @@ class TestPeripheralMicrophone:
     def test_default_microphone_has_stable_sensor_identity(self) -> None:
         peripheral = Microphone()
 
-        identity = peripheral.peripheral_info().to_sensor_identity()
+        peripheral_info = peripheral.peripheral_info()
+        identity = peripheral_info.to_sensor_identity()
         event = peripheral._level_to_sensor_event(
             peripheral._process_audio_chunk(
                 np.array([[0.0], [0.5], [-1.0]], dtype=float),
@@ -59,7 +61,10 @@ class TestPeripheralMicrophone:
             )
         )
 
-        assert identity.id == "microphone:default"
+        assert peripheral_info.id == "microphone:default"
+        assert peripheral_info.tags == (
+            PeripheralTag(name="input_variant", variant="microphone"),
+        )
         assert event.identity == identity
 
     def test_detection_node_publishes_microphone_to_manyfold_route(
@@ -100,8 +105,15 @@ class TestPeripheralMicrophone:
         spawned.loop_handle.token.set()
         spawned.loop_handle.loop.run(spawned.loop_handle.token)
 
+        latest_detection = graph.latest(microphone_detection_route())
         latest_level = graph.latest(microphone_level_event_route())
+        assert latest_detection is not None
         assert latest_level is not None
+        assert latest_detection.value.identity == latest_level.value.identity
+        assert latest_level.value.identity.id == "microphone:default"
+        assert tuple(
+            (tag.name, tag.variant) for tag in latest_level.value.identity.tags
+        ) == (("input_variant", "microphone"),)
         assert latest_level.value.event_type == "peripheral.microphone.level"
         assert latest_level.value.data["frames"] == 3
         assert latest_level.value.data["samplerate"] == 16_000
