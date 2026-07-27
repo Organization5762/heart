@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import cast
+from typing import cast, final
 
 from manyfold import Subscribable
 
@@ -133,7 +133,8 @@ class WaterCubeStateProvider(StateProvider[WaterCubeState]):
         )
 
 
-@dataclass(frozen=True)
+@final
+@dataclass(frozen=True, slots=True)
 class _AccelerationWindow:
     elapsed_ms: float = 0.0
     total_x: float = 0.0
