@@ -17,8 +17,9 @@ from manyfold import (DetectionNode, Graph, Layer, ManagedGraphNode,
 from manyfold.architecture import NewValues
 from manyfold.sensor_io import (BackoffPolicy, ManagedRunLoop, RetryPolicy,
                                 SensorEvent, StopToken, sensor_event_schema)
+from typing_extensions import override
 
-from heart.peripheral.core import Peripheral
+from heart.peripheral.core import Peripheral, PeripheralInfo, PeripheralTag
 from heart.peripheral.input_payloads.audio import MicrophoneLevel
 from heart.utilities.logging import get_logger
 from heart.utilities.optional_imports import optional_import
@@ -113,6 +114,15 @@ class Microphone(Peripheral[MicrophoneLevel]):
         self._stop_token = StopToken(group="microphone")
         self._level_stream = NewValues[MicrophoneLevel](
             name="heart.peripheral.microphone.level"
+        )
+
+    @override
+    def peripheral_info(self) -> PeripheralInfo:
+        return PeripheralInfo(
+            id="microphone:default",
+            tags=(
+                PeripheralTag(name="input_variant", variant="microphone"),
+            ),
         )
 
     # ------------------------------------------------------------------
