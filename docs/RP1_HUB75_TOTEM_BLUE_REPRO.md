@@ -7,7 +7,7 @@ blue image on `totem3` on 2026-05-18.
 
 | Item | Value | Direction |
 |---|---|---|
-| Target | `michael@totem5.local` | exact |
+| Target | `michael@totem3.local` | exact |
 | Heart checkout | `/Users/lampe/code/heart` on branch `lampe/yep` | exact |
 | Heart Linux bundle | `rp1/linux/files` | exact |
 | Driver module srcversion | `DAC57640AA92F9BAD6C30F9` | exact |
@@ -24,14 +24,29 @@ blue image on `totem3` on 2026-05-18.
 From `/Users/lampe/code/heart`:
 
 ```sh
-scripts/rp1_hub75_reproduce_totem_blue.sh michael@totem5.local
+scripts/rp1_hub75_reproduce_totem_blue.sh michael@totem3.local
 ```
 
 The script builds and deploys the `rp1-hub75` module directly from the
 Heart-owned Linux bundle under `rp1/linux/files`, syncs the bundled RP1 selftest
-sources to `/home/michael/rp1-pio`, builds the required helpers, verifies the
-known-good module and payload hashes, publishes a solid blue slot, and starts
-the scanner candidate. It does not require a local Linux checkout.
+sources to `/home/michael/rp1-pio`, builds the required helpers, enforces the
+known-good payload hash, reports the module srcversion and module SHA-256,
+publishes a solid blue slot, and starts the scanner candidate. It does not
+require a local Linux checkout. Set `RP1_HUB75_STRICT_HASHES=1` to enforce the
+two module checks too; the compatibility default `0` reports module mismatches
+without rejecting the run.
+
+The proven path is `totem3`. Earlier `totem5` examples in this note were
+documentation drift, not a separate validated reproduction.
+
+The consolidated runner exposes the same path and makes hash policy explicit:
+
+```sh
+./scripts/hub75_experiment.py plan totem3-known-good-blue \
+  --target michael@totem3.local --strict-hashes
+./scripts/hub75_experiment.py run totem3-known-good-blue \
+  --target michael@totem3.local --strict-hashes
+```
 
 Expected successful tail:
 

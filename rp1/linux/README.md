@@ -9,8 +9,8 @@ from this tree.
 - `files/`: paths laid out like the upstream Linux tree for reviewability.
 - `manifest.json`: the explicit file list and RP1 boot preflight words used by
   the helper script.
-- `scripts/rp1_hub75_linux_bundle.py`: bundle listing and target preflight
-  tooling.
+- `heart.utilities.hub75_lab._bundle`: authoritative bundle deployment logic.
+- `scripts/rp1_hub75_linux_bundle.py`: thin compatibility CLI.
 
 ## Workflow
 
@@ -24,8 +24,12 @@ from this tree.
 3. Before a visual run, classify the target RP1 firmware state when needed:
 
    ```sh
-   uv run python scripts/rp1_hub75_linux_bundle.py preflight --host totem3.local --remote-dir /home/michael/rp1-pio
+   ./scripts/hub75_experiment.py bundle preflight \
+     --host totem3.local --remote-dir /home/michael/rp1-pio
    ```
+
+See [`docs/HUB75_LAB.md`](../../docs/HUB75_LAB.md#linux-bundle-commands) for
+the exact `list`, `apply`, `diff`, `deploy-target`, and `preflight` matrix.
 
 ## Boot Contract
 

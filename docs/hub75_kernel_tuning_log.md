@@ -1,5 +1,12 @@
 # HUB75 Kernel Tuning Log
 
+> Retired script paths below are historical evidence only and must not be
+> rerun. Commands in dated entries are preserved verbatim to explain the
+> recorded conclusions. Use [`docs/HUB75_LAB.md`](HUB75_LAB.md) for the current
+> `hub75_experiment.py` workflow; recover a historical source only through its
+> exact full-SHA locator in
+> [`docs/hub75_script_inventory.json`](hub75_script_inventory.json).
+
 ## 2026-05-12
 
 ### Live capture recheck: bench still flat, scorer now accepts explicit remaps
@@ -30,7 +37,10 @@
 #### Concrete next directions
 
 1. Run a single-channel identification pass with one GPIO toggled at a time while probing the Saleae inputs physically, starting from the stuck-high Logic channels `9` and `11`.
-1. Once one measured edge exists, use `scripts/hub75_score_capture.py --signal ...` to test alternate channel maps directly against the shifted-capture workflow before resuming kernel waveform optimization.
+1. Once one measured edge exists, follow the trusted capture and score sequence
+   in [`docs/HUB75_LAB.md`](HUB75_LAB.md#trusted-logic2-capture-and-scoring)
+   with `--signal NAME=CHANNEL` overrides before resuming kernel waveform
+   optimization.
 1. After the analyzer path is credible again, collect the three captures in order: known-good PIO baseline, one-pin GPIO sanity pulse, then the custom-kernel candidate.
 
 #### Validation

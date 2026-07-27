@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "inventory_count": 27,
+  "recovery_commit": "dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c",
+  "entries": [
+    {
+      "path": "scripts/benchmark_piomatter_row_repeat.py",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "docs/HUB75_LAB.md#historical-piomatter-parity-results",
+      "recovery_ref": "git:a2f60dd1bc54cf95f99685000260e774f1000810:scripts/benchmark_piomatter_row_repeat.py",
+      "conclusion_ref": "git:67f7dfd28d27783f2ff95c98ade68e9d288296be:docs/research/piomatter_ablation_report.md",
+      "preserved_conclusion": "Grouped Pi runs found MMIO materially faster than forced DMA, row-compact the safest general parity protocol, and row-window useful only for matching sparse scenes. The script defaulted to two temporal planes, which is now forbidden; the trusted historical performance runs used zero temporal planes. The final pre-retirement source read parity PIO programs from HEART_RGB_MATRIX_DRIVER_CHECKOUT, defaulting to a sibling standalone-driver checkout."
+    },
+    {
+      "path": "scripts/hub75_color_cycle.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py run runtime-color-cycle",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_color_cycle.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#retained-command-matrix",
+      "preserved_conclusion": "Solid RGB primaries at explicit intensities are the fastest visual check for wiring and color-order failures in the clean-room runtime."
+    },
+    {
+      "path": "scripts/hub75_gpio_smoke.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py run gpio-smoke",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_gpio_smoke.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#retained-command-matrix",
+      "preserved_conclusion": "Slow direct GPIO scanout can separate panel/bonnet wiring faults from transport faults. GPIO18 and legacy GPIO4 must carry the same active-low OE blank/active waveform. The legacy whole-panel oe-toggle mode used a user-controlled cadence and is preserved only as historical evidence; promoting it would violate the no-temporal-PWM safety rule."
+    },
+    {
+      "path": "scripts/hub75_gradient_cycle.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py run runtime-gradient",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_gradient_cycle.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#retained-command-matrix",
+      "preserved_conclusion": "A moving full-frame gradient exposes color ordering, panel continuity, and whole-frame transport faults that solid fills can hide."
+    },
+    {
+      "path": "scripts/hub75_score_capture.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py score",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_score_capture.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#trusted-logic2-capture-and-scoring",
+      "preserved_conclusion": "Electrically silent captures are invalid even when compared with another flat capture. Signal-map overrides and whole-capture channel activity are required to distinguish silence from a map mismatch."
+    },
+    {
+      "path": "scripts/hub75_single_line.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py run runtime-single-line",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_single_line.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#retained-command-matrix",
+      "preserved_conclusion": "One repeated horizontal line isolates row-address, latch, blanking, and cadence faults more clearly than a full-frame fill."
+    },
+    {
+      "path": "scripts/hub75_virtual_image_from_logic.py",
+      "classification": "active",
+      "disposition": "replace",
+      "replacement": "scripts/hub75_experiment.py render-capture",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/hub75_virtual_image_from_logic.py",
+      "conclusion_ref": "docs/HUB75_LAB.md#trusted-logic2-capture-and-scoring",
+      "preserved_conclusion": "LAT commits and the preceding clocked RGB bits can reconstruct an approximate virtual panel image; OE-duration weighting is diagnostic evidence, not a substitute for a real brightness measurement."
+    },
+    {
+      "path": "scripts/piomatter_rgb_cycle.py",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "docs/HUB75_LAB.md#historical-piomatter-parity-results",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/piomatter_rgb_cycle.py",
+      "conclusion_ref": "git:67f7dfd28d27783f2ff95c98ade68e9d288296be:docs/research/piomatter_ablation_report.md",
+      "preserved_conclusion": "Piomatter was an external baseline, not the production runtime. Its two-temporal-plane default is retained only as historical evidence and must not be reproduced."
+    },
+    {
+      "path": "scripts/prepare_piomatter_parity_checkout.py",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "docs/HUB75_LAB.md#historical-piomatter-parity-results",
+      "recovery_ref": "git:a2f60dd1bc54cf95f99685000260e774f1000810:scripts/prepare_piomatter_parity_checkout.py",
+      "conclusion_ref": "git:67f7dfd28d27783f2ff95c98ade68e9d288296be:docs/research/piomatter_ablation_report.md",
+      "preserved_conclusion": "The checkout patcher proved parity programs could be injected into Piomatter, but its generated headers and render overrides were removed and the path is no longer reproducible from the current tree. The final pre-retirement source loaded its parity-header generator from HEART_RGB_MATRIX_DRIVER_CHECKOUT, defaulting to a sibling standalone-driver checkout."
+    },
+    {
+      "path": "scripts/rp1_hub75_bridge_state32.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/rp1_hub75_run_candidate.sh",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_bridge_state32.c",
+      "conclusion_ref": "docs/hub75_kernel_tuning_log.md",
+      "preserved_conclusion": "A userspace pending-slot copier proved the kernel queue could feed the no-PIO state32 worker. The electrical comparison remained untrusted because the analyzer stayed live with the wrong host and later exported flat captures."
+    },
+    {
+      "path": "scripts/rp1_hub75_linux_bundle.py",
+      "classification": "active",
+      "disposition": "retain",
+      "replacement": "scripts/hub75_experiment.py bundle",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_linux_bundle.py",
+      "conclusion_ref": "rp1/linux/README.md",
+      "preserved_conclusion": "The Heart-owned Linux bundle is the self-contained source of module, UAPI, launcher, publisher, and scanner artifacts; target preflight must not depend on a separate local Linux checkout."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_chunk_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_chunk_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The 0xa000 chunk source is safe only when the selected payload ends before it and the configured chunk fits below 0xff00. A fixed offset without payload-size validation is not reusable."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_pwm6bits_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_pwm6bits_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The 0xd000 packed six-bit source fits below the mailbox only for its original size and only when the payload ends before 0xd000; that offset is payload-size-dependent, not a general buffer."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_rgb333_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_rgb333_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The 0xc000 RGB333 source is valid only for the original 8 KiB layout and a payload ending before 0xc000; 0xc000 is not a generic safe source offset."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_rgb888_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_rgb888_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The default 0xc000 RGB888 source plus its 16 KiB frame ends at 0x10000 and overlaps the reserved firmware mailbox [0xff00,0x10000); the replacement validator refuses it."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_slab_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_slab_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The experiment writes CONFIG_OFFSET=0xff00, the first byte of the reserved firmware mailbox. Slab batching also did not materially improve measured scan throughput."
+    },
+    {
+      "path": "scripts/rp1_hub75_play_state32_frames.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_play_state32_frames.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "An expanded 11-plane 64x64 state32 frame is 90,112 bytes, larger than the entire 64 KiB shared SRAM window. Mapping 0x30000 bytes does not make the impossible shared-SRAM layout safe."
+    },
+    {
+      "path": "scripts/rp1_hub75_publish_direct_state32_regular.c",
+      "classification": "active",
+      "disposition": "retain",
+      "replacement": "scripts/hub75_experiment.py run regular-p0p1-direct",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_publish_direct_state32_regular.c",
+      "conclusion_ref": "docs/RP1_HUB75_REGULAR_P0P1_AUDIT_SCHEMA.md",
+      "preserved_conclusion": "This is the audited packer-bypass publisher for regular P0/P1 chain2. Its 0xb800 control slot must be republished after payload load through RP1_HUB75_PRE_START_COMMAND and before START_MAGIC."
+    },
+    {
+      "path": "scripts/rp1_hub75_publish_dma_frame.c",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/rp1_hub75_publish_regular_green_slot.c",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_publish_dma_frame.c",
+      "conclusion_ref": "docs/hub75_kernel_tuning_log.md",
+      "preserved_conclusion": "The one-frame DMA copier was early queue bring-up. It used a fixed 0xc000 destination without payload/mailbox validation and is superseded by the bundled publisher and direct audited path."
+    },
+    {
+      "path": "scripts/rp1_hub75_publish_dma_frames.c",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/rp1_hub75_publish_regular_green_slot.c",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_publish_dma_frames.c",
+      "conclusion_ref": "docs/hub75_kernel_tuning_log.md",
+      "preserved_conclusion": "The repeated DMA publisher established queue motion but kept fixed shared-SRAM offsets and stream assumptions that the bundled publisher now owns."
+    },
+    {
+      "path": "scripts/rp1_hub75_publish_regular_rgb888_pattern.c",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "rp1/linux/files/tools/testing/selftests/drivers/rp1-pio/rp1_hub75_publish_regular_green_slot.c",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_publish_regular_rgb888_pattern.c",
+      "conclusion_ref": "docs/RP1_HUB75_TOTEM_BLUE_REPRO.md",
+      "preserved_conclusion": "Pattern publishing was promoted into the Heart Linux bundle. The bundled publisher is the source used by the self-contained known-good reproduction."
+    },
+    {
+      "path": "scripts/rp1_hub75_reproduce_totem_blue.sh",
+      "classification": "active",
+      "disposition": "retain",
+      "replacement": "scripts/hub75_experiment.py run totem3-known-good-blue",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_reproduce_totem_blue.sh",
+      "conclusion_ref": "docs/RP1_HUB75_TOTEM_BLUE_REPRO.md",
+      "preserved_conclusion": "The proven 500 Hz state32 blue path is self-contained in Heart artifacts, defaults to totem3, publishes a fresh 0xb800 slot, and must never be replaced by the Rust color-loop runner."
+    },
+    {
+      "path": "scripts/rp1_hub75_run_direct_state32_regular.sh",
+      "classification": "active",
+      "disposition": "retain",
+      "replacement": "scripts/hub75_experiment.py run regular-p0p1-direct",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_hub75_run_direct_state32_regular.sh",
+      "conclusion_ref": "docs/RP1_HUB75_REGULAR_P0P1_AUDIT_SCHEMA.md",
+      "preserved_conclusion": "The direct regular path deliberately installs the 0xb800 publisher as RP1_HUB75_PRE_START_COMMAND so every run refreshes slot metadata after payload load and before START_MAGIC."
+    },
+    {
+      "path": "scripts/rp1_pio_ctl.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_pio_ctl.c",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_pio_ctl.c",
+      "conclusion_ref": "docs/HUB75_LAB.md#retired-low-level-probes-and-recovery",
+      "preserved_conclusion": "This direct /dev/pio0 state-machine claim, enable, FIFO-clear, and program-removal utility was a recovery probe, not a retained experiment."
+    },
+    {
+      "path": "scripts/rp1_sram_fill32.c",
+      "classification": "one-off",
+      "disposition": "delete",
+      "replacement": "src/heart/utilities/hub75_lab/memory.py",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/rp1_sram_fill32.c",
+      "conclusion_ref": "docs/RP1_HUB75_SRAM_MAP.md",
+      "preserved_conclusion": "The unrestricted fill primitive validated writes but knew only the 64 KiB BAR bound, not payload, firmware, mailbox, or source ownership. The calm path replaces it with fail-closed range validation."
+    },
+    {
+      "path": "scripts/run_piomatter_parity_cycle.py",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "docs/HUB75_LAB.md#historical-piomatter-parity-results",
+      "recovery_ref": "git:dbf7c8090bc5f0f3d0cb88f8696a183be9d7b35c:scripts/run_piomatter_parity_cycle.py",
+      "conclusion_ref": "git:67f7dfd28d27783f2ff95c98ade68e9d288296be:docs/research/piomatter_ablation_report.md",
+      "preserved_conclusion": "This external-checkout wrapper belonged to parity research and depends on the superseded Piomatter preparation path; it is not a production or retained hardware command."
+    },
+    {
+      "path": "scripts/run_piomatter_row_repeat_cycle.py",
+      "classification": "superseded",
+      "disposition": "delete",
+      "replacement": "docs/HUB75_LAB.md#historical-piomatter-parity-results",
+      "recovery_ref": "git:a2f60dd1bc54cf95f99685000260e774f1000810:scripts/run_piomatter_row_repeat_cycle.py",
+      "conclusion_ref": "git:67f7dfd28d27783f2ff95c98ade68e9d288296be:docs/research/piomatter_ablation_report.md",
+      "preserved_conclusion": "Row-repeat proved static-scene host-traffic reduction, but this wrapper defaulted to two temporal planes and referenced deleted generated overrides. It is historical only; no temporal control is promoted. The final pre-retirement source read parity PIO programs from HEART_RGB_MATRIX_DRIVER_CHECKOUT, defaulting to a sibling standalone-driver checkout."
+    }
+  ]
+}

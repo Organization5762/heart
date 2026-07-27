@@ -103,7 +103,7 @@ class TestHub75LogicScore:
 
         assert candidate.oe_active_fraction < baseline.oe_active_fraction
         assert "oe_median_blank_exceeds_5pct_active" in candidate.warnings
-        assert score.feature_scores["oe_active_fraction"] < 1.0
+        assert score.feature_scores["median_oe_active_fraction"] < 1.0
 
     def test_oe_median_blank_absolute_warning_flags_large_blanks(
         self, tmp_path: Path
@@ -150,10 +150,14 @@ class TestHub75LogicScore:
         assert candidate.max_clk_period_ns > candidate.long_clk_period_threshold_ns
         assert candidate.max_oe_blank_ns is not None
         assert candidate.max_oe_blank_ns > candidate.long_oe_blank_threshold_ns
-        assert score.feature_scores["max_oe_blank_ns"] < 1.0
         assert score.feature_scores["long_oe_blank_count"] < 1.0
-        assert score.feature_scores["max_clk_period_ns"] < 1.0
         assert score.feature_scores["long_clk_period_count"] < 1.0
+        assert "max_oe_blank_ns" not in score.feature_scores
+        assert "max_clk_period_ns" not in score.feature_scores
+        assert not any(
+            name.startswith("max_address_edge_interval_ns_")
+            for name in score.feature_scores
+        )
 
     def test_flatline_capture_scores_near_zero(self, tmp_path: Path) -> None:
         """Verify an electrically silent candidate cannot score like a plausible HUB75 waveform."""
