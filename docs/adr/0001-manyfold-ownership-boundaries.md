@@ -1,6 +1,7 @@
 # ADR 0001: Manyfold ownership boundaries
 
-- Status: Accepted
+- Status: Accepted; World ownership superseded by
+  [ADR 0002](0002-local-world-service.md)
 - Date: 2026-07-26
 - Owners: Heart and Manyfold maintainers
 
@@ -55,8 +56,9 @@ intentional Heart pin update.
 `PeripheralManager` does not own discovery, membership, SWIM, or mesh worker
 lifecycle. High-rate frame, microphone, and debug paths remain outside durable
 delivery and Raft as documented in
-[`manyfold_node_runtime.md`](../manyfold_node_runtime.md) and
-[`world_coordination.md`](../world_coordination.md).
+[`manyfold_node_runtime.md`](../manyfold_node_runtime.md). The former
+`world_coordination.md` described an abandoned experiment and is superseded by
+[ADR 0002](0002-local-world-service.md).
 
 ## Consequences
 

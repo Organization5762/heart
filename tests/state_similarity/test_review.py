@@ -238,7 +238,6 @@ def test_review_cli_parses_output_scenario_directories_and_transition_bound(
 ) -> None:
     scenario_path = tmp_path / "one.json"
     scenario_directory = tmp_path / "scenarios"
-    artifact_path = tmp_path / "qualification.json"
     output = tmp_path / "html"
 
     arguments = parse_args(
@@ -246,8 +245,6 @@ def test_review_cli_parses_output_scenario_directories_and_transition_bound(
             str(scenario_path),
             "--scenario-dir",
             str(scenario_directory),
-            "--contract-artifact",
-            str(artifact_path),
             "--output",
             str(output),
             "--transition-frames",
@@ -258,4 +255,3 @@ def test_review_cli_parses_output_scenario_directories_and_transition_bound(
     assert arguments.paths == (scenario_path, scenario_directory)
     assert arguments.output == output
     assert arguments.transition_frames == 3
-    assert arguments.contract_artifacts == (artifact_path,)
